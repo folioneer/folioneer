@@ -23,10 +23,16 @@ export function useAboutPage(): AboutPageData {
     if (checkStatus === "checking") return;
     setCheckStatus("checking");
     try {
-      const info = await updateGateway.checkForUpdate();
+      const result = await updateGateway.checkForUpdate();
+      if (result.status === "error") {
+        // UPD-027 — a refused access is a failed check; the banner names it (UPD-029)
+        logger.error("[AboutPage] Manual check refused", result.error);
+        setCheckStatus("error");
+        return;
+      }
       // R27 — if update found, banner shows automatically via update:available event
       // If no update, show "up to date" message
-      setCheckStatus(info ? "idle" : "up_to_date");
+      setCheckStatus(result.data ? "idle" : "up_to_date");
     } catch (e) {
       logger.error("[AboutPage] Manual check failed", e);
       setCheckStatus("error");

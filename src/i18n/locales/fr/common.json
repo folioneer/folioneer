@@ -166,6 +166,7 @@
     "downloading": "Téléchargement en cours…",
     "ready": "Prêt à installer",
     "error": "Échec du téléchargement",
+    "error_access_refused": "Accès aux mises à jour refusé — les identifiants de cette installation n'ont pas été acceptés.",
     "action_install": "Installer",
     "action_dismiss": "Ignorer",
     "action_restart": "Redémarrer maintenant",

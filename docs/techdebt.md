@@ -285,3 +285,12 @@ Remove an entry once it has been resolved.
 - Observation: A release writes the new version into `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json` and `Cargo.lock`, but not into `package-lock.json`, whose own `version` fields keep the value of the last `npm install`. Nothing reads them, so nothing breaks; the file simply states a version the project is not at.
 - User value: None.
 - Done when: A release leaves `package-lock.json` stating the released version, and a test of the release script proves it.
+
+## 2026-09-20 — TD-036 — The vocabulary has no entry for the update feature's terms
+
+- Found by: spec-reviewer (UPD-028 review on #037)
+- Where: docs/ubiquitous-language.md (no Update section); docs/spec/update.md, docs/adr/020-one-extension-file-per-build.md, docs/contracts/update-contract.md
+- Severity: 🔵
+- Observation: "update channel", "update server", "credentials" and "refused access" are used as terms by the spec, the ADR, the contract and the code, but the vocabulary defines none of them. Terms are the owner's to confirm (B5).
+- User value: None.
+- Done when: The vocabulary carries an Update section whose terms the owner has confirmed, and the spec, ADR, contract and code use them.

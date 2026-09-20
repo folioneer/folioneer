@@ -10,4 +10,4 @@ pub mod service;
 
 pub use api::*;
 pub use error::UpdateError;
-pub use service::{UpdateInfo, UpdateState};
+pub use service::{UpdateChannel, UpdateInfo, UpdateState};

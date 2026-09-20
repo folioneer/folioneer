@@ -837,7 +837,8 @@ async fetchAccountAssetPrices(accountId: string) : Promise<Result<null, FetchAcc
  * Checks whether a new application version is available (R1, R25).
  * 
  * Returns `None` if the application is up to date or if the check fails due
- * to network or server errors (R21). Emits `"update:available"` on the app
+ * to network or server errors (R21); `AccessRefused` when the update server
+ * refuses this build's access (UPD-028). Emits `"update:available"` on the app
  * handle if an update is found.
  */
 async checkForUpdate() : Promise<Result<UpdateInfo | null, UpdateError>> {
@@ -4177,7 +4178,12 @@ export type UpdateError =
  * The update operation failed (updater init, fetch, or install). The
  * underlying cause is logged server-side, not exposed on the wire.
  */
-{ code: "OperationFailed" }
+{ code: "OperationFailed" } | 
+/**
+ * The update server refuses this build's access — the credentials its update
+ * channel sends are missing, expired or revoked (UPD-028).
+ */
+{ code: "AccessRefused" }
 /**
  * Parameters for editing a fee schedule (FEE-060/061). `frequency` and
  * `start_date` are intentionally absent — they are immutable after creation.

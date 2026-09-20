@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { logger } from "@/lib/logger";
+import type { UpdateError } from "@/lib/updateGateway";
 import { updateGateway } from "@/lib/updateGateway";
+import { isRetryable, presentUpdateError } from "../shared/presenter";
+
+const GENERIC_ERROR_KEY = "update.error";
 
 export type UpdateBannerState = "idle" | "available" | "downloading" | "ready" | "error";
 
 export interface UpdateBannerData {
   state: UpdateBannerState;
+  /** i18n key of the message shown in the error state (UPD-023, UPD-029). */
+  errorKey: string;
+  /** Whether the error state offers "Retry" (UPD-023) or "Dismiss" (UPD-029). */
+  canRetry: boolean;
   version: string | null;
   progress: number;
   isRestarting: boolean;
@@ -17,6 +25,14 @@ export interface UpdateBannerData {
 
 export function useUpdateBanner(): UpdateBannerData {
   const [state, setState] = useState<UpdateBannerState>("idle");
+  const [errorKey, setErrorKey] = useState(GENERIC_ERROR_KEY);
+  const [canRetry, setCanRetry] = useState(true);
+
+  const showError = useCallback((error: UpdateError | null) => {
+    setErrorKey(error ? presentUpdateError(error) : GENERIC_ERROR_KEY);
+    setCanRetry(error ? isRetryable(error) : true);
+    setState("error");
+  }, []);
   const [version, setVersion] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [isRestarting, setIsRestarting] = useState(false);
@@ -30,9 +46,14 @@ export function useUpdateBanner(): UpdateBannerData {
     let mounted = true;
 
     // Startup check (R1): triggered after interface is loaded
-    updateGateway.checkForUpdate().catch((e) => {
-      logger.error("[UpdateBanner] Startup check failed", e);
-    });
+    updateGateway
+      .checkForUpdate()
+      .then((result) => {
+        if (mounted && result.status === "error") showError(result.error);
+      })
+      .catch((e) => {
+        logger.error("[UpdateBanner] Startup check failed", e);
+      });
 
     // Listen for update:available (R3) — emitted by backend on check
     const unlistenAvailable = updateGateway.onUpdateAvailable((info) => {
@@ -60,12 +81,11 @@ export function useUpdateBanner(): UpdateBannerData {
       setProgress(100);
     });
 
-    // Listen for download error (R23). The typed UpdateError variant is logged
-    // server-side; the banner shows a single generic message, so the payload is
-    // not surfaced to the user.
-    const unlistenError = updateGateway.onUpdateError(() => {
+    // Listen for update errors: a failed download (R23), or an access the update
+    // server refuses, announced by any check (UPD-028).
+    const unlistenError = updateGateway.onUpdateError((error) => {
       if (!mounted) return;
-      setState("error");
+      showError(error);
     });
 
     return () => {
@@ -75,7 +95,7 @@ export function useUpdateBanner(): UpdateBannerData {
       unlistenComplete.then((fn) => fn()).catch(() => {});
       unlistenError.then((fn) => fn()).catch(() => {});
     };
-  }, []);
+  }, [showError]);
 
   // R6 — start download
   const handleInstall = useCallback(() => {
@@ -83,16 +103,17 @@ export function useUpdateBanner(): UpdateBannerData {
     setProgress(0);
     updateGateway.downloadUpdate().catch((e) => {
       logger.error("[UpdateBanner] downloadUpdate command failed", e);
-      setState("error");
+      showError(null);
     });
-  }, []);
+  }, [showError]);
 
-  // R5 — dismiss: only allowed in 'available' state; no-op in 'ready' (R12)
+  // R5 — dismiss: allowed in 'available' state and for a refused access (UPD-029); no-op in 'ready' (R12)
   const handleDismiss = useCallback(() => {
-    if (state !== "available") return;
+    const refused = state === "error" && !canRetry;
+    if (state !== "available" && !refused) return;
     dismissedVersion.current = version;
     setState("idle");
-  }, [state, version]);
+  }, [state, version, canRetry]);
 
   // R24 — retry download from scratch
   const handleRetry = useCallback(() => {
@@ -100,9 +121,9 @@ export function useUpdateBanner(): UpdateBannerData {
     setProgress(0);
     updateGateway.downloadUpdate().catch((e) => {
       logger.error("[UpdateBanner] downloadUpdate retry failed", e);
-      setState("error");
+      showError(null);
     });
-  }, []);
+  }, [showError]);
 
   // R13 — install and restart; guard against double-click
   const handleRestart = useCallback(async () => {
@@ -118,6 +139,8 @@ export function useUpdateBanner(): UpdateBannerData {
 
   return {
     state,
+    errorKey,
+    canRetry,
     version,
     progress,
     isRestarting,

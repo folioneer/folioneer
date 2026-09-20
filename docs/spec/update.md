@@ -12,7 +12,7 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-001 (was R1) — Automatic check at startup (backend)**: At each launch, a background check runs to detect whether a new version is available. It starts once the UI is fully loaded.
 
-**UPD-002 (was R2) — No notification when no update (frontend)**: If the UPD-001 check detects no new version, nothing is shown to the user and the application stays in its normal state.
+**UPD-002 (was R2) — No notification when no update (frontend)**: If the UPD-001 check detects no new version, nothing is shown to the user and the application stays in its normal state. A refused access is not "no new version": see UPD-029.
 
 ### Notification
 
@@ -62,13 +62,17 @@ The application is distributed as a desktop executable. When a new version is pu
 
 ### Errors
 
-**UPD-021 (was R21) — Silent check failure (frontend)**: If the startup check fails (no network, server unavailable), no notification is displayed and the application starts normally.
+**UPD-021 (was R21) — Silent check failure (frontend)**: If the startup check fails (no network, server unavailable), no notification is displayed and the application starts normally — except a refused access (UPD-029).
 
 **UPD-022 (was R22) — Logging check failures (backend)**: Any error during the startup check is logged in the application logs.
 
-**UPD-023 (was R23) — Download error display (frontend)**: If the download fails (network error, insufficient disk space, or any other cause), or if the UPD-009 checksum fails, the banner displays an error message and a "Retry" button.
+**UPD-023 (was R23) — Download error display (frontend)**: If the download fails (network error, insufficient disk space, or any other cause), or if the UPD-009 checksum fails, the banner displays an error message and a "Retry" button — except a refused access (UPD-029).
 
 **UPD-024 (was R24) — Retry action (frontend + backend)**: Clicking "Retry" restarts the download from the beginning.
+
+**UPD-028 — Refused access is recognised (backend)**: An update channel may identify itself to the update server with credentials, and the server may refuse them (missing, expired or revoked). When a check or a download fails on such a channel, the application asks the update server once more to tell a refused access from any other failure, and logs a refusal. A channel that sends no credentials cannot be refused: its failures are never classified as a refusal and cost no extra request.
+
+**UPD-029 — Refused access banner (frontend)**: When an access is refused (UPD-028) — at the startup check, a manual check or a download — the banner shows a message naming the refusal and a "Dismiss" button. It offers no "Retry": trying again cannot succeed until the credentials are fixed and the application restarted. Dismissing closes the banner for the session; it returns at the next launch while the access is still refused.
 
 ### Manual check
 
@@ -76,7 +80,7 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-026 (was R26) — Manual check loading state (frontend)**: During the check triggered by UPD-025, the "Check for updates" button is disabled and shows a loading indicator to prevent multiple triggers.
 
-**UPD-027 (was R27) — Manual check result (frontend)**: At the end of the UPD-025 check: if an update is available, the UPD-003 banner is displayed; if no update is available, a message on the "About" page confirms that the application is up to date.
+**UPD-027 (was R27) — Manual check result (frontend)**: At the end of the UPD-025 check: if an update is available, the UPD-003 banner is displayed; if no update is available, a message on the "About" page confirms that the application is up to date; if the access is refused (UPD-028), the "About" page says the check failed while the banner names the refusal (UPD-029).
 
 ---
 
@@ -89,6 +93,7 @@ The application is distributed as a desktop executable. When a new version is pu
         ├─ No update → nothing displayed (UPD-002) ────────┤
         │                                             └─ Up to date → confirmation message (UPD-027)
         ├─ Network/server error → silent log, nothing displayed (UPD-021, UPD-022)
+        ├─ Access refused → banner names the refusal + [Dismiss] (UPD-028, UPD-029); About page: "check failed" (UPD-027)
         │
         └─ New version available
               → Banner: "Version X.Y.Z available" + [Install] [Dismiss] (UPD-003, UPD-004)
@@ -99,6 +104,7 @@ The application is distributed as a desktop executable. When a new version is pu
                           → Progress visible in the banner (UPD-008)
                           → If newer version published → keep going (UPD-010)
                                 │
+                                ├─ Access refused → banner names the refusal + [Dismiss] (UPD-028, UPD-029)
                                 ├─ Failure → error banner + [Retry] (UPD-023)
                                 │            [Retry] → restarts from the beginning (UPD-024)
                                 │
@@ -131,7 +137,7 @@ Two entry points:
 
 ### Main component
 
-Fixed banner integrated into the application shell (header or footer), visible across all pages. It only appears while an update is in progress or available, and disappears once the application has restarted. It is not a dialog or an ephemeral notification: the banner is part of the permanent layout.
+Fixed banner integrated into the application shell (header or footer), visible across all pages. It only appears while an update is in progress or available, or when the update server refuses this installation's access (UPD-029), and disappears once the application has restarted. It is not a dialog or an ephemeral notification: the banner is part of the permanent layout.
 
 ### Banner states
 
@@ -140,9 +146,10 @@ Fixed banner integrated into the application shell (header or footer), visible a
 - **Download in progress**: progress indicator, "Install" button replaced (UPD-008)
 - **Ready to install**: "Ready to install" + "Restart now" button — non-dismissible (UPD-011, UPD-012)
 - **Download error**: error message + "Retry" button (UPD-023)
+- **Access refused**: message naming the refusal + "Dismiss" button, no "Retry" (UPD-029)
 - **Migration in progress**: loading screen outside the banner ("Updating database…") (UPD-017)
 - **Migration error**: critical error message, application blocked at startup, outside the banner (UPD-018)
-- **Up to date**: contextual message on the "About" page, outside the banner (UPD-027)
+- **Up to date** / **Check failed**: contextual message on the "About" page, outside the banner (UPD-027)
 
 ### User flow
 

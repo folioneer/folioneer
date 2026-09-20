@@ -29,7 +29,7 @@ describe("useAboutPage", () => {
   });
 
   it("sets up_to_date when checkForUpdate returns null", async () => {
-    mockCheckForUpdate.mockResolvedValue(null);
+    mockCheckForUpdate.mockResolvedValue({ status: "ok", data: null });
     const { result } = renderHook(() => useAboutPage());
     await act(async () => {
       await result.current.handleCheckForUpdate();
@@ -38,12 +38,24 @@ describe("useAboutPage", () => {
   });
 
   it("sets idle when checkForUpdate returns an update (banner handles display)", async () => {
-    mockCheckForUpdate.mockResolvedValue({ version: "1.2.0" });
+    mockCheckForUpdate.mockResolvedValue({ status: "ok", data: { version: "1.2.0" } });
     const { result } = renderHook(() => useAboutPage());
     await act(async () => {
       await result.current.handleCheckForUpdate();
     });
     expect(result.current.checkStatus).toBe("idle");
+  });
+
+  // UPD-027 — a refused access is a failed check, never "up to date".
+  it("sets error when the check is refused", async () => {
+    mockCheckForUpdate.mockResolvedValue({ status: "error", error: { code: "AccessRefused" } });
+    const { result } = renderHook(() => useAboutPage());
+
+    await act(async () => {
+      await result.current.handleCheckForUpdate();
+    });
+
+    expect(result.current.checkStatus).toBe("error");
   });
 
   it("sets error when checkForUpdate throws", async () => {

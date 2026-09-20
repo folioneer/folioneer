@@ -5,8 +5,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::context::asset::{PriceProvider, ReqwestYahooClient};
-use crate::context::currency::{RateHistoryProvider, ReqwestFrankfurterClient};
+use crate::context::asset::PriceProvider;
+use crate::context::currency::RateHistoryProvider;
 use crate::context::sync::{
     FsFolderStore, SqliteChangeLogRepository, SqliteChangeRecorder, SqliteSyncStateRepository,
     SyncDevice, SyncRun, SyncStateRepository,
@@ -43,11 +43,20 @@ pub async fn publish_after_scheduled_fetch(device: Option<SyncDevice>, sync_run:
     }
 }
 
+/// The external data sources the headless run fetches from, built by the composition
+/// root once logging is up so a client that cannot start is logged like any failure.
+pub struct HeadlessProviders {
+    /// Daily closes of the assets in the fetch scope.
+    pub price: Arc<dyn PriceProvider>,
+    /// Exchange rates of the pairs in the fetch scope.
+    pub rate_history: Arc<dyn RateHistoryProvider>,
+}
+
 /// Resolves the app's data directory, opens the database, wires the minimal
 /// service graph, runs [`ScheduledFetchOrchestrator::run_scheduled_fetch`],
 /// and returns a process exit code — `0` unless the run record itself could
 /// not be written.
-pub async fn run() -> i32 {
+pub async fn run(build_providers: impl FnOnce() -> anyhow::Result<HeadlessProviders>) -> i32 {
     // A logging failure must not abandon the fetch — the subscriber is
     // best-effort; its absence falls back to the eprintln below only.
     match app_directories::resolve_log_dir() {
@@ -75,15 +84,8 @@ pub async fn run() -> i32 {
     };
     let pool = database.pool;
 
-    let frankfurter_client = match ReqwestFrankfurterClient::new() {
-        Ok(client) => Arc::new(client),
-        Err(error) => {
-            tracing::error!(target: BACKEND, err = %format!("{error:#}"), "scheduled fetch: HTTP client initialization failed");
-            return 1;
-        }
-    };
-    let price_provider = match ReqwestYahooClient::new() {
-        Ok(client) => Arc::new(client),
+    let providers = match build_providers() {
+        Ok(providers) => providers,
         Err(error) => {
             tracing::error!(target: BACKEND, err = %format!("{error:#}"), "scheduled fetch: HTTP client initialization failed");
             return 1;
@@ -96,9 +98,9 @@ pub async fn run() -> i32 {
         Arc::new(SqliteChangeRecorder::new(pool.clone()));
     let container = AppContainer::build(
         pool.clone(),
-        price_provider as Arc<dyn PriceProvider>,
+        providers.price,
         None,
-        Some(frankfurter_client as Arc<dyn RateHistoryProvider>),
+        Some(providers.rate_history),
         None,
         Arc::clone(&change_recorder),
     );

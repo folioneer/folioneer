@@ -189,6 +189,8 @@ This mirrors the lesson from the suppressed lifetime-performance metrics: a bare
 
 ## Part 4 — The hook
 
+> Decision: [ADR-020](adr/020-one-extension-file-per-build.md) — one extension file, `src-tauri/src/extensions.rs`, replaced by a file overlay in the private build. The options below record what was weighed; ADR-020 rejects the optional Cargo dependency recommended here.
+
 Requirement: the module is downloaded only from a private repository, and no
 advice semantics live in the public one.
 
@@ -247,7 +249,7 @@ than issuing imperatives, and that never places or schedules an order.
 
 ## Open questions
 
-- [ ] Ratify the hook (recommended Cargo feature vs sidecar).
+- [x] Ratify the hook — ADR-020: one extension file, overlaid by the private build.
 - [ ] Is SMA(200) wanted? It alone drives the window from ~120 bars to 240; the
       one-year default already covers it, but dropping it would allow a
       six-month window at half the payload.

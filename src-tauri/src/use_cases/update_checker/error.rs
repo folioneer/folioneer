@@ -16,6 +16,10 @@ pub enum UpdateError {
     /// underlying cause is logged server-side, not exposed on the wire.
     #[error("Update operation failed")]
     OperationFailed,
+    /// The update server refuses this build's access — the credentials its update
+    /// channel sends are missing, expired or revoked (UPD-028).
+    #[error("Update access refused")]
+    AccessRefused,
 }
 
 #[cfg(test)]
@@ -27,6 +31,12 @@ mod tests {
     fn no_downloaded_update_serialises_with_code_tag() {
         let value = serde_json::to_value(UpdateError::NoDownloadedUpdate).unwrap();
         assert_eq!(value, json!({ "code": "NoDownloadedUpdate" }));
+    }
+
+    #[test]
+    fn access_refused_serialises_with_code_tag() {
+        let value = serde_json::to_value(UpdateError::AccessRefused).unwrap();
+        assert_eq!(value, json!({ "code": "AccessRefused" }));
     }
 
     #[test]

@@ -1,10 +1,10 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UpdateError } from "@/bindings";
 
 // --- mocks ---
 
-const mockCheckForUpdate = vi.fn().mockResolvedValue(null);
+const mockCheckForUpdate = vi.fn().mockResolvedValue({ status: "ok", data: null });
 const mockDownloadUpdate = vi.fn().mockResolvedValue(undefined);
 const mockInstallUpdate = vi.fn().mockResolvedValue(undefined);
 
@@ -122,6 +122,63 @@ describe("useUpdateBanner", () => {
     });
 
     expect(result.current.state).toBe("error");
+  });
+
+  // UPD-028 — a refused access is announced at startup too, with no download running,
+  // and the banner names it instead of the generic download failure.
+  it("shows the refused-access message when update:error carries AccessRefused", async () => {
+    const { result } = renderHook(() => useUpdateBanner());
+
+    act(() => {
+      onErrorCb?.({ code: "AccessRefused" });
+    });
+
+    expect(result.current.state).toBe("error");
+    expect(result.current.errorKey).toBe("update.error_access_refused");
+    expect(result.current.canRetry).toBe(false);
+  });
+
+  // UPD-029 — the startup check's own answer is enough: the refusal shows without
+  // waiting for an event.
+  it("shows the refusal when the startup check itself is refused", async () => {
+    mockCheckForUpdate.mockResolvedValueOnce({ status: "error", error: { code: "AccessRefused" } });
+
+    const { result } = renderHook(() => useUpdateBanner());
+
+    await waitFor(() => expect(result.current.state).toBe("error"));
+    expect(result.current.errorKey).toBe("update.error_access_refused");
+  });
+
+  // UPD-029 — a refused access is dismissed for the session; a download failure is not dismissible.
+  it("dismisses a refused access but not a download failure", async () => {
+    const { result } = renderHook(() => useUpdateBanner());
+
+    act(() => {
+      onErrorCb?.({ code: "OperationFailed" });
+    });
+    act(() => {
+      result.current.handleDismiss();
+    });
+    expect(result.current.state).toBe("error");
+
+    act(() => {
+      onErrorCb?.({ code: "AccessRefused" });
+    });
+    act(() => {
+      result.current.handleDismiss();
+    });
+    expect(result.current.state).toBe("idle");
+  });
+
+  it("shows the generic message for any other update:error", async () => {
+    const { result } = renderHook(() => useUpdateBanner());
+
+    act(() => {
+      onErrorCb?.({ code: "OperationFailed" });
+    });
+
+    expect(result.current.errorKey).toBe("update.error");
+    expect(result.current.canRetry).toBe(true);
   });
 
   // R24 — error → downloading on handleRetry

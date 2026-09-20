@@ -3,7 +3,7 @@
 //! Exposes one Tauri command ([`lookup_asset`]) and the supporting types
 //! ([`AssetLookupResult`], [`WebLookupError`], [`AssetWebLookupUseCase`]).
 //! The concrete HTTP client ([`ReqwestOpenFigiClient`]) is also re-exported so
-//! that `lib.rs` can wire it into the Tauri state at startup.
+//! that the composition root (`extensions.rs`) can plug it in at startup.
 
 pub mod api;
 /// Typed application-layer error for the web-lookup use case.

@@ -83,6 +83,7 @@ shared/               gold-layout shared infra (docs/backend-rules.md B0/B37)
                       registering the daily scheduled fetch (SPF); NoopScheduler in every debug build
 
 lib.rs                composition root — wires services, use cases, dispatchers; calls app_handle.manage().
+extensions.rs         the one file a build differs by — external data sources (prices, rates, asset lookup) and update channel, read by both entry points (ADR-020)
                       Also exposes run_scheduled_fetch_headless() — the OS-triggered `--scheduled-fetch`
                       invocation (main.rs branch) that runs the daily download without a window (SPF-020)
 ```

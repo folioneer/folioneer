@@ -50,6 +50,8 @@
   --color-m3-on-error: #ffffff;
   --color-m3-error-container: #ffdad6;
   --color-m3-on-error-container: #410e0b;
+  /* Error-coloured text set on a tonal container (banners) rather than on the surface. */
+  --color-m3-error-on-container: var(--color-m3-error);
 
   /* Success: Uses Tertiary for visual consistency */
   --color-m3-success: var(--color-m3-tertiary);
@@ -365,6 +367,7 @@
   --color-m3-on-error: #ffffff;
   --color-m3-error-container: #8c1d18;
   --color-m3-on-error-container: #ffdad6;
+  --color-m3-error-on-container: #ffb4ab;
 
   /* Semantic surface aliases — CSS-only, consumed via var(), not Tailwind utilities.
      Reference the M3 tokens above to avoid drift. */

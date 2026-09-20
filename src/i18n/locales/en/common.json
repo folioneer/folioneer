@@ -166,6 +166,7 @@
     "downloading": "Downloading…",
     "ready": "Ready to install",
     "error": "Download failed",
+    "error_access_refused": "Update access refused — this installation's credentials were not accepted.",
     "action_install": "Install",
     "action_dismiss": "Dismiss",
     "action_restart": "Restart now",

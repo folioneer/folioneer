@@ -62,6 +62,7 @@ tauri-plugin-dialog = "2"
 
 [dev-dependencies]
 mockall = "0.13"
+tauri = { version = "2", features = ["test"] }
 tempfile = "3"
 tokio = { version = "1", features = ["test-util"] }
 

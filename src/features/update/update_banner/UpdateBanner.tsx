@@ -13,6 +13,8 @@ export function UpdateBanner({ data }: UpdateBannerProps) {
   const { t } = useTranslation();
   const {
     state,
+    errorKey,
+    canRetry,
     version,
     progress,
     isRestarting,
@@ -93,13 +95,24 @@ export function UpdateBanner({ data }: UpdateBannerProps) {
         </>
       )}
 
-      {/* R23 — error state with retry */}
+      {/* UPD-023 — error state with retry; UPD-029 — a refused access can only be dismissed */}
       {state === "error" && (
         <>
-          <span className="text-m3-error">{t("update.error")}</span>
-          <Button size="sm" variant="primary" onClick={handleRetry}>
-            {t("update.action_retry")}
-          </Button>
+          <span className="text-m3-error-on-container">{t(errorKey)}</span>
+          {canRetry ? (
+            <Button id="update-banner-retry" size="sm" variant="primary" onClick={handleRetry}>
+              {t("update.action_retry")}
+            </Button>
+          ) : (
+            <Button
+              id="update-banner-dismiss-refused"
+              size="sm"
+              variant="ghost"
+              onClick={handleDismiss}
+            >
+              {t("update.action_dismiss")}
+            </Button>
+          )}
         </>
       )}
     </div>

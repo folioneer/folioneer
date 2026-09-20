@@ -107,7 +107,7 @@
     "src/features/transactions/add_transaction_page/AddTransactionPage.tsx": 2,
     "src/features/transactions/edit_transaction_modal/EditTransactionModal.tsx": 2,
     "src/features/transactions/transaction_list/TransactionListPage.tsx": 3,
-    "src/features/update/update_banner/UpdateBanner.tsx": 5
+    "src/features/update/update_banner/UpdateBanner.tsx": 4
   },
   "math_usage": {
     "src/features/account_details/shared/presenter.ts": 1,

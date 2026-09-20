@@ -12,14 +12,7 @@
 #![cfg_attr(not(test), deny(clippy::unimplemented))]
 
 use crate::context::account::AccountService;
-use crate::context::asset::{
-    AssetPriceRepository, AssetService, PriceProvider, ReqwestYahooClient,
-    SqliteAssetPriceRepository,
-};
-use crate::context::currency::{
-    ChainedRateProvider, RateHistoryProvider, RateProvider, ReqwestEcbClient,
-    ReqwestFrankfurterClient,
-};
+use crate::context::asset::{AssetPriceRepository, AssetService, SqliteAssetPriceRepository};
 use crate::context::sync::{
     ChangeLogRepository, FirstPublish, FolderStore, FsFolderStore, Publisher,
     SqliteChangeLogRepository, SqliteChangeRecorder, SqliteSyncStateRepository, SyncRun,
@@ -38,7 +31,7 @@ use crate::use_cases::account_summary::AccountSummaryUseCase;
 use crate::use_cases::archive_asset::ArchiveAssetUseCase;
 use crate::use_cases::asset_price_fetch::dispatcher::Dispatcher as PriceFetchDispatcher;
 use crate::use_cases::asset_price_fetch::{AssetPriceFetchUseCase, FetchGuard};
-use crate::use_cases::asset_web_lookup::{AssetWebLookupUseCase, ReqwestOpenFigiClient};
+use crate::use_cases::asset_web_lookup::AssetWebLookupUseCase;
 use crate::use_cases::delete_asset::DeleteAssetUseCase;
 use crate::use_cases::fee_generation::{FeeGenerationOrchestrator, LaunchSyncSurface};
 use crate::use_cases::global_performance::GlobalPerformanceUseCase;
@@ -67,6 +60,8 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 pub mod context;
 /// Shared core utilities
 pub mod core;
+/// The one file a build differs by: external data sources and update channel (ADR-020)
+mod extensions;
 /// Cross-cutting infrastructure shared across bounded contexts (gold layout)
 pub mod shared;
 /// Application use cases
@@ -90,7 +85,14 @@ pub(crate) type ManagedUpdateState = Arc<UpdateState>;
 /// Headless entry for the OS-triggered scheduled run (SPF-016, SPF-020):
 /// no Tauri builder, no window — runs the sweep and returns the exit code.
 pub fn run_scheduled_fetch_headless() -> i32 {
-    tauri::async_runtime::block_on(use_cases::scheduled_fetch::headless::run())
+    use use_cases::scheduled_fetch::headless::{self, HeadlessProviders};
+
+    tauri::async_runtime::block_on(headless::run(|| {
+        extensions::providers().map(|providers| HeadlessProviders {
+            price: providers.price,
+            rate_history: providers.rate_history,
+        })
+    }))
 }
 
 /// Entry point for the Tauri application.
@@ -137,12 +139,12 @@ pub fn run() {
             // Manage update state before DB init so it is available even on migration failure (R10, R18)
             app_handle.manage(Arc::new(UpdateState::new()) as ManagedUpdateState);
 
-            // HTTP clients (ADR-009 rate providers, ADR-017 price provider) are built here,
-            // outside the keep-running async block, so a TLS-init failure surfaces as a
-            // graceful setup error rather than a panic.
-            let frankfurter_client = Arc::new(ReqwestFrankfurterClient::new()?);
-            let ecb_client = ReqwestEcbClient::new()?;
-            let yahoo_price_client = ReqwestYahooClient::new()?;
+            // The update channel and the external data sources come from `extensions.rs`
+            // (ADR-020). The HTTP clients are built here, outside the keep-running async
+            // block, so a TLS-init failure surfaces as a graceful setup error rather than
+            // a panic.
+            app_handle.manage(extensions::update_channel());
+            let providers = extensions::providers()?;
 
             tauri::async_runtime::block_on(async move {
                 // R18 — emit migration error and keep app running so frontend can show error screen
@@ -174,15 +176,6 @@ pub fn run() {
                 let price_repo_for_fetch: Arc<dyn AssetPriceRepository> =
                     Arc::new(SqliteAssetPriceRepository::new(db.pool.clone()));
 
-                // ADR-009 provider chain (Frankfurter → ECB) used by the currency
-                // BC's piggybacked auto-fetch (FXR-070).
-                let rate_provider_chain: Arc<dyn RateProvider> = Arc::new(ChainedRateProvider::new(
-                    vec![
-                        Arc::clone(&frankfurter_client) as Arc<dyn RateProvider>,
-                        Arc::new(ecb_client) as Arc<dyn RateProvider>,
-                    ],
-                ));
-
                 // ----- multi-device sync (SYN) -----
                 let sync_state_repo: Arc<dyn SyncStateRepository> =
                     Arc::new(SqliteSyncStateRepository::new(db.pool.clone()));
@@ -209,9 +202,9 @@ pub fn run() {
                     price_provider,
                 } = AppContainer::build(
                     db.pool.clone(),
-                    Arc::new(yahoo_price_client) as Arc<dyn PriceProvider>,
-                    Some(rate_provider_chain),
-                    Some(frankfurter_client as Arc<dyn RateHistoryProvider>),
+                    providers.price,
+                    Some(providers.rate),
+                    Some(providers.rate_history),
                     Some(Arc::clone(&event_bus)),
                     Arc::clone(&change_recorder) as Arc<dyn ChangeRecorder>,
                 );
@@ -317,7 +310,7 @@ pub fn run() {
                 app_handle.manage(holding_transaction_uc);
                 app_handle.manage(fee_generation_uc);
 
-                app_handle.manage(AssetWebLookupUseCase::new(Arc::new(ReqwestOpenFigiClient::new())));
+                app_handle.manage(AssetWebLookupUseCase::new(providers.asset_lookup));
 
                 // ----- asset price fetch (keyless Yahoo Finance, ADR-017) -----
                 let fetch_guard = Arc::new(FetchGuard::new());
