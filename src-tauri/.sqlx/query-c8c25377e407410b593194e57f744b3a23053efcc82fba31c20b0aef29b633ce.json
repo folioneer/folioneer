@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO categories (id, name, is_deleted) VALUES (?, ?, 0)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "c8c25377e407410b593194e57f744b3a23053efcc82fba31c20b0aef29b633ce"
+}

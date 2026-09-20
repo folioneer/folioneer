@@ -1,0 +1,67 @@
+name: Security Audit
+
+on:
+  schedule:
+    - cron: "0 8 * * 1" # every Monday at 08:00 UTC
+  workflow_dispatch: # allow manual trigger
+
+concurrency:
+  group: security-audit
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: 22
+
+      - name: Run npm audit
+        shell: bash
+        # --audit-level=moderate: fail on moderate, high, and critical CVEs.
+        # Low-severity issues are informational only and do not block.
+        # --omit=dev: skip devDependencies — Tauri ships no devDeps in the
+        # production bundle, so dev-only advisories are not release blockers.
+        # CI/dev exposure is tracked separately.
+        # No `npm ci` needed — `npm audit` reads package-lock.json directly.
+        run: npm audit --audit-level=moderate --omit=dev
+
+  cargo-audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        # Pinned to full SHA for v2.75.30 — mutable tags are a supply-chain risk.
+        # The tool itself is pinned too, so a cargo-audit release cannot change
+        # how .cargo/audit.toml is resolved between one run and the next.
+        uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff
+        with:
+          tool: cargo-audit@0.22.2
+
+      - name: Run cargo audit
+        shell: bash
+        working-directory: src-tauri
+        # Accepted advisories live in src-tauri/.cargo/audit.toml, which
+        # cargo-audit reads on its own — so this run and a local one agree.
+        run: cargo audit

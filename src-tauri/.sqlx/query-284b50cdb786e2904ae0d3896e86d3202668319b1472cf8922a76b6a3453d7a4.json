@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO sync_cursors (device_id, applied_through, last_applied_at)\n               VALUES (?, ?, ?)\n               ON CONFLICT(device_id) DO UPDATE SET\n                   applied_through = excluded.applied_through,\n                   last_applied_at = excluded.last_applied_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "284b50cdb786e2904ae0d3896e86d3202668319b1472cf8922a76b6a3453d7a4"
+}

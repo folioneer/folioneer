@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, name, sync_logical_timestamp, sync_origin, sync_device_id FROM categories WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 4,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "785afbc777fbce22f99aeb94f7d475ba4850c1eecf144543d0f5bdc56f545b5c"
+}

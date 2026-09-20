@@ -1,0 +1,92 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at FROM transactions WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "asset_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "transaction_type",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "date",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "quantity",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "unit_price",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "exchange_rate",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "fees",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "total_amount",
+        "ordinal": 9,
+        "type_info": "Integer"
+      },
+      {
+        "name": "note",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "realized_pnl",
+        "ordinal": 11,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 12,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "918a86a23abf06352b3cbc36becadbf9bf5e9b6eab85f9b08ff40e51cbe82ae0"
+}

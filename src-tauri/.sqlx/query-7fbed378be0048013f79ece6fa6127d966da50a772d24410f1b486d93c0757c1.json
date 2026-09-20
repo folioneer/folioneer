@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE changes SET published = 1 WHERE device_id = ? AND sequence BETWEEN ? AND ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "7fbed378be0048013f79ece6fa6127d966da50a772d24410f1b486d93c0757c1"
+}

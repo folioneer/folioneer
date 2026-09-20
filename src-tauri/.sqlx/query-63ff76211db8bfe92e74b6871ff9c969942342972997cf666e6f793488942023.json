@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sync_logical_timestamp AS \"sync_logical_timestamp?: String\"\n           FROM fee_schedules WHERE account_id = ? AND asset_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "sync_logical_timestamp?: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "63ff76211db8bfe92e74b6871ff9c969942342972997cf666e6f793488942023"
+}

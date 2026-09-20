@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE asset_prices SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n                 WHERE asset_id = ? AND date = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "3f267f2c6d8581b0c77d673807393fc0de4b748a4a4421ee68676dcb2ce87cbb"
+}

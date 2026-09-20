@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO sync_device\n               (id, device_id, device_name, folder, joined_at, paused, portfolio_created_at,\n                logical_clock, derived_key, data_format_version)\n               VALUES (1, ?, ?, ?, ?, ?, ?, 0, X'', ?)\n               ON CONFLICT(id) DO UPDATE SET\n                   device_id = excluded.device_id,\n                   device_name = excluded.device_name,\n                   folder = excluded.folder,\n                   joined_at = excluded.joined_at,\n                   paused = excluded.paused,\n                   portfolio_created_at = excluded.portfolio_created_at,\n                   data_format_version = excluded.data_format_version",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "78b4d4ef7f83ebcd28693070bf050cb75f3633c28a93a9054be0c0c477501dcb"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM fee_catch_up_positions WHERE account_id = ? AND asset_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "feffc582fbaf982d67beec56a7f59967af8f577eb752fc5c9ee9744f1899fa47"
+}

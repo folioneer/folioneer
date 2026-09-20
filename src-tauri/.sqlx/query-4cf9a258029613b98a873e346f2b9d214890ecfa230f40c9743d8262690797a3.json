@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE categories SET is_deleted = 1 WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "4cf9a258029613b98a873e346f2b9d214890ecfa230f40c9743d8262690797a3"
+}

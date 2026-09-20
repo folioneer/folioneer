@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sequence FROM changes WHERE device_id = ? ORDER BY sequence ASC",
+  "describe": {
+    "columns": [
+      {
+        "name": "sequence",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5b8c357ab19769b70493a7bfb4c6ea062bbacddff674fff17d8c4e7e056f2ddf"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO conflict_notices\n               (notice_id, kind, record_kind, record_identity, record_label, other_device_id,\n                other_device_name, raised_at, dismissed)\n               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "fd8000e55cf6c4d3b0bf448f2f57cf89d904b70863272672aca946272a2bb166"
+}

@@ -1,0 +1,71 @@
+[package]
+name = "folioneer"
+version = "0.0.0"
+description = "A private, local-first investment portfolio tracker"
+authors = ["Phil Eggel"]
+license = "AGPL-3.0-or-later"
+edition = "2021"
+rust-version = "1.90"
+default-run = "folioneer"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "folioneer_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "generate_bindings"
+path = "dev/generate_bindings.rs"
+
+[[bin]]
+name = "folioneer"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "macros"] }
+tokio = { version = "1", features = ["full"] }
+specta = { version = "2.0.0-rc.22", features = ["derive"] }
+tauri-specta = { version = "2.0.0-rc.21", features = ["javascript", "typescript", "derive"] }
+specta-typescript = "0.0.9"
+async-trait = "0.1.89"
+anyhow = "1.0.101"
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tauri-plugin-window-state = "2.4.1"
+tauri-plugin-updater = "2.10.1"
+iso_currency = "0.5.3"
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "cookies"] }
+sha2 = "0.10"
+quick-xml = "0.41"
+strum = "0.27.2"
+strum_macros = "0.27.2"
+unicode-normalization = "0.1.25"
+argon2 = "0.5.3"
+password-hash = "0.5"
+chacha20poly1305 = "0.11"
+zeroize = { version = "1", features = ["derive"] }
+tauri-plugin-dialog = "2"
+
+[dev-dependencies]
+mockall = "0.13"
+tempfile = "3"
+tokio = { version = "1", features = ["test-util"] }
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true

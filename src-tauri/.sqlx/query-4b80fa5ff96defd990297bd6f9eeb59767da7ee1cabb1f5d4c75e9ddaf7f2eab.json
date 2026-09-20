@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE holding_notes SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n             WHERE sync_logical_timestamp IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "4b80fa5ff96defd990297bd6f9eeb59767da7ee1cabb1f5d4c75e9ddaf7f2eab"
+}

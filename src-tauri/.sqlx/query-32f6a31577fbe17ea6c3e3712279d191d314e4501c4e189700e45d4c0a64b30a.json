@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE categories SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n             WHERE sync_logical_timestamp IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "32f6a31577fbe17ea6c3e3712279d191d314e4501c4e189700e45d4c0a64b30a"
+}

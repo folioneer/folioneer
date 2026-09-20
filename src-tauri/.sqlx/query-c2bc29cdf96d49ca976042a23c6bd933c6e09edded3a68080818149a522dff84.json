@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM fee_schedules WHERE account_id = ? AND asset_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "c2bc29cdf96d49ca976042a23c6bd933c6e09edded3a68080818149a522dff84"
+}

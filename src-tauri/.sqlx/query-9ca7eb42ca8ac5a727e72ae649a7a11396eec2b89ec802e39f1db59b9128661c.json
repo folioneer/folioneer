@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT from_currency, to_currency, date, rate, source FROM currency_rates\n             WHERE from_currency = ? AND to_currency = ? AND date <= ?\n             ORDER BY date DESC\n             LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "from_currency",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "to_currency",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "date",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "rate",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "source",
+        "ordinal": 4,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9ca7eb42ca8ac5a727e72ae649a7a11396eec2b89ec802e39f1db59b9128661c"
+}

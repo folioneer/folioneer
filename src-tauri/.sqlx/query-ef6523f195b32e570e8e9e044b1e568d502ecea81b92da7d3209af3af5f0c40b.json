@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT asset_id, date, price, source, sync_logical_timestamp, sync_origin, sync_device_id\n                       FROM asset_prices WHERE asset_id = ? AND date = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "asset_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "date",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "price",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "source",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 6,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "ef6523f195b32e570e8e9e044b1e568d502ecea81b92da7d3209af3af5f0c40b"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE assets SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "abb19e93afcc1cc5b728c3ead865e19698eae99df3f836805e2164041e209505"
+}

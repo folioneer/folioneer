@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO changes\n               (device_id, sequence, logical_timestamp, based_on, record_kind, record_identity,\n                operation, origin, content, published)\n               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "6779dabbe83d984abc134b08507cfcd867a1a9b62089be76096cc47f6717fecc"
+}

@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, name, bank_name, currency, update_frequency, management_fees_enabled,\n                              sync_logical_timestamp, sync_origin, sync_device_id\n                       FROM accounts WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "bank_name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "currency",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "update_frequency",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "management_fees_enabled",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 8,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "eef03014ba30866d2fe831af647ff4f436b6f628445f9c825456f7b7ec079d49"
+}

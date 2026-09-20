@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT asset_id AS identity, sync_logical_timestamp, sync_origin, sync_device_id\n               FROM holding_notes WHERE account_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "identity",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 3,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "92fde9a558b65b4ce84ddf539c42bb1e88d30133f9d4fd9eeacd6b5a21238d3e"
+}

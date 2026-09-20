@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO accounts (id, name, bank_name, currency, update_frequency, management_fees_enabled,\n                                     sync_logical_timestamp, sync_origin, sync_device_id)\n               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n               ON CONFLICT(id) DO UPDATE SET\n                   name = excluded.name,\n                   bank_name = excluded.bank_name,\n                   currency = excluded.currency,\n                   update_frequency = excluded.update_frequency,\n                   management_fees_enabled = excluded.management_fees_enabled,\n                   sync_logical_timestamp = excluded.sync_logical_timestamp,\n                   sync_origin = excluded.sync_origin,\n                   sync_device_id = excluded.sync_device_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "c615dd19d0578ae72a7b80a06893f1f7564dbc5ec0d23c28d7eb09e888feced8"
+}

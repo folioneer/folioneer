@@ -1,0 +1,53 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Folioneer",
+        "width": 800,
+        "height": 600,
+        "minWidth": 800,
+        "minHeight": 600,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "productName": "Folioneer",
+  "version": "0.0.0",
+  "identifier": "com.folioneer.desktop",
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYwNDQ2OTAzMjVGM0Y0MjEKUldRaDlQTWxBMmxFOE5ka3pJNXdhbnJhRDl2Y1RxQ1NTTGdPaHVFMlFMZG1HU2V4eWFwa0xIOXoK",
+      "endpoints": [
+        "https://github.com/folioneer/folioneer/releases/latest/download/latest.json"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "nsis",
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "linux": {
+      "deb": {
+        "conflicts": ["vault-compass"],
+        "replaces": ["vault-compass"]
+      }
+    }
+  }
+}

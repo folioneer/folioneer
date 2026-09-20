@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE assets SET name = ?, reference = ?, isin = ?, asset_class = ?, currency = ?, risk_level = ?, category_id = ?, exchange_code = ?, interest_bearing = ? WHERE id = ? AND is_archived = 0",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "fda4fdc1dc465c98be190a222a3471b5d5b131a1e9d76b2159891c9aa480cfdd"
+}

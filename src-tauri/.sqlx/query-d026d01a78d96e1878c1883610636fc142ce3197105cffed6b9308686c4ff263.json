@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT account_id FROM holding_notes WHERE account_id = ? AND asset_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "account_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d026d01a78d96e1878c1883610636fc142ce3197105cffed6b9308686c4ff263"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE currency_rates SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n                 WHERE from_currency = ? AND to_currency = ? AND date = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "48bfcd565034b2226a9158e34ea5412076f6f2791560d90da3a5e4ac06a40959"
+}

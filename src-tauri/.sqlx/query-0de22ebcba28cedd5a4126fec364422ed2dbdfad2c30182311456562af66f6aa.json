@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT operation FROM changes ORDER BY sequence ASC",
+  "describe": {
+    "columns": [
+      {
+        "name": "operation",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0de22ebcba28cedd5a4126fec364422ed2dbdfad2c30182311456562af66f6aa"
+}

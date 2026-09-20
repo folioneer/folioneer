@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO transactions (id, account_id, asset_id, transaction_type, date, quantity,\n                       unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at)\n                   VALUES (?, ?, 'asset-1', 'Purchase', '2026-08-20', 10, 100000000, 1000000, 0, 1000000000, NULL, NULL, '2026-08-20T00:00:00Z')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "eba4ae29e99737adf080d85b29feeb44c395862ca58bb37505e43443c27a9f64"
+}

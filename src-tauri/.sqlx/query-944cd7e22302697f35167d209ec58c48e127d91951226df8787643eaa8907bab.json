@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT device_id, applied_through, last_applied_at FROM sync_cursors WHERE device_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "device_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "applied_through",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "last_applied_at",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "944cd7e22302697f35167d209ec58c48e127d91951226df8787643eaa8907bab"
+}

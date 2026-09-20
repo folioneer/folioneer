@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE currency_pairs SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n             WHERE sync_logical_timestamp IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "05313800ef24ebc2bcd756d11def12d91762171081584b5789180611f7a03d0d"
+}

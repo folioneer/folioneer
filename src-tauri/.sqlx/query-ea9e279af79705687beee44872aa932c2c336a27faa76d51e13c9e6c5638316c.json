@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO currency_rates (from_currency, to_currency, date, rate, source)\n             VALUES (?, ?, ?, ?, 'Manual')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "ea9e279af79705687beee44872aa932c2c336a27faa76d51e13c9e6c5638316c"
+}

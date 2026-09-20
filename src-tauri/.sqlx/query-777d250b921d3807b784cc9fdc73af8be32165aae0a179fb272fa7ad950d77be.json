@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT operation, origin, record_kind, record_identity, content FROM changes WHERE device_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "operation",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "origin",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "record_kind",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "record_identity",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "content",
+        "ordinal": 4,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "777d250b921d3807b784cc9fdc73af8be32165aae0a179fb272fa7ad950d77be"
+}

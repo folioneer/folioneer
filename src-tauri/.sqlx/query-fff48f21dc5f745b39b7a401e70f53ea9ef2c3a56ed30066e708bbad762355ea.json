@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sync_logical_timestamp FROM asset_prices WHERE asset_id = 'asset-1' AND date = '2026-08-20'",
+  "describe": {
+    "columns": [
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "fff48f21dc5f745b39b7a401e70f53ea9ef2c3a56ed30066e708bbad762355ea"
+}

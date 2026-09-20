@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sync_logical_timestamp AS \"sync_logical_timestamp?: String\"\n               FROM asset_prices WHERE asset_id = ? AND date = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "sync_logical_timestamp?: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "d91cf00e6bf12d212fa06700a93f437a85bb1a8c35c22db8ba0182c903d23dea"
+}

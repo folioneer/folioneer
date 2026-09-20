@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO currency_pairs (from_currency, to_currency) VALUES (?, ?)\n             ON CONFLICT(from_currency, to_currency) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "df18525a750d252f2dff163871006e5a66ca6cea339e4fd023016890e75e7c12"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO held_back_changes\n               (id, origin_device_id, sequence, payload, waiting_kind, waiting_identity, held_since)\n               VALUES (?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "7f9d160b9ae40a6d2bae2c3aad2794339355e33ba5531c5a49db2c15085ffa98"
+}

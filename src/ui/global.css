@@ -1,0 +1,748 @@
+/* Import Tailwind CSS v4 base, components, and utilities */
+@import "tailwindcss";
+
+/* Locally bundled fonts (Tauri — no CDN) */
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/manrope";
+
+@theme {
+  /* ============================================
+     MATERIAL DESIGN 3 - SEMANTIC COLORS
+     ============================================ */
+
+  /* Primary: Deep indigo (Clinical Atelier) */
+  --color-m3-primary: #4f378a;
+  --color-m3-on-primary: #ffffff;
+  --color-m3-primary-container: #6750a4;
+  --color-m3-on-primary-container: #e0d2ff;
+
+  /* Secondary: Muted violet for secondary elements */
+  --color-m3-secondary: #63597c;
+  --color-m3-on-secondary: #ffffff;
+  --color-m3-secondary-container: #e1d4fd;
+  --color-m3-on-secondary-container: #645a7d;
+
+  /* Tertiary: Amber/gold for key metrics */
+  --color-m3-tertiary: #765b00;
+  --color-m3-on-tertiary: #ffffff;
+  --color-m3-tertiary-container: #c9a74d;
+  --color-m3-on-tertiary-container: #251a00;
+
+  /* Neutral/Surfaces: Mauve-tinted (Clinical Atelier) */
+  --color-m3-surface: #fef7ff;
+  --color-m3-on-surface: #1d1b20;
+  --color-m3-surface-variant: #e7e0e8;
+  --color-m3-on-surface-variant: #494551;
+  --color-m3-outline: #7a7582;
+  --color-m3-outline-variant: #cbc4d2;
+  --color-m3-surface-dim: #ded8e0;
+  --color-m3-scrim: #000000;
+
+  /* Container levels (mauve-tinted) */
+  --color-m3-surface-container-lowest: #ffffff;
+  --color-m3-surface-container-low: #f8f1f9;
+  --color-m3-surface-container: #f2ecf4;
+  --color-m3-surface-container-high: #ede6ee;
+  --color-m3-surface-container-highest: #e7e0e8;
+
+  /* Error: Red (alerts/errors) */
+  --color-m3-error: #ba1a1a;
+  --color-m3-on-error: #ffffff;
+  --color-m3-error-container: #ffdad6;
+  --color-m3-on-error-container: #410e0b;
+
+  /* Success: Uses Tertiary for visual consistency */
+  --color-m3-success: var(--color-m3-tertiary);
+  --color-m3-on-success: var(--color-m3-on-tertiary);
+  --color-m3-success-container: var(--color-m3-tertiary-container);
+  --color-m3-on-success-container: var(--color-m3-on-tertiary-container);
+
+  /* Financial polarity — gain/loss (P&L, performance) and debit/credit (cash
+     out/in) carry their own intent instead of overloading error/success
+     semantics. Same palette values; the .dark error override cascades through. */
+  --color-m3-gain: var(--color-m3-success);
+  --color-m3-loss: var(--color-m3-error);
+  --color-m3-credit: var(--color-m3-success);
+  --color-m3-debit: var(--color-m3-error);
+
+  /* Warning: Orange for caution states */
+  --color-m3-warning: #f57c00;
+  --color-m3-on-warning: #ffffff;
+  --color-m3-warning-container: #ffe0b2;
+  --color-m3-on-warning-container: #331a00;
+
+  /* Info: Uses Primary for consistency */
+  --color-m3-info: var(--color-m3-primary);
+  --color-m3-on-info: var(--color-m3-on-primary);
+  --color-m3-info-container: var(--color-m3-primary-container);
+  --color-m3-on-info-container: var(--color-m3-on-primary-container);
+
+  /* ============================================
+     SNACKBAR LIGHT COLORS
+     ============================================ */
+  --color-snackbar-success-bg: #c8e6c9;
+  --color-snackbar-success-text: #1b5e20;
+  --color-snackbar-info-bg: #bbdefb;
+  --color-snackbar-info-text: #0d47a1;
+  --color-snackbar-error-bg: #ffcdd2;
+  --color-snackbar-error-text: #b71c1c;
+  --color-snackbar-warning-bg: #fff9c4;
+  --color-snackbar-warning-text: #f57f17;
+
+  /* ============================================
+     LEGACY ALIASES - Backwards Compatibility
+     (will be removed progressively)
+     ============================================ */
+
+  /* Header gradient — fixed brand indigo, NOT overridden in dark mode.
+     The header is a structural branding element that stays rich indigo in all themes. */
+  --color-header-from: #4f378a;
+  --color-header-to: #6750a4;
+
+  /* Primary scale (legacy) */
+  --color-primary-0: #ffffff;
+  --color-primary-10: #f3f4ff;
+  --color-primary-20: #dfe0ff;
+  --color-primary-30: #c7c8ff;
+  --color-primary-40: #b0b1ff;
+  --color-primary-50: #8f91ff;
+  --color-primary-60: var(--color-m3-primary);
+  --color-primary-70: #003d82;
+  --color-primary-80: #002d5c;
+  --color-primary-90: #001d36;
+
+  /* Secondary scale (legacy) */
+  --color-secondary-0: #ffffff;
+  --color-secondary-10: #f3f3f8;
+  --color-secondary-20: #e8e9ee;
+  --color-secondary-30: #dddde4;
+  --color-secondary-40: #d3d3d9;
+  --color-secondary-50: #bdbdc4;
+  --color-secondary-60: var(--color-m3-secondary);
+  --color-secondary-70: #3d4956;
+  --color-secondary-80: #25313f;
+  --color-secondary-90: #101c2b;
+
+  /* Tertiary scale (legacy) */
+  --color-tertiary-0: #ffffff;
+  --color-tertiary-10: #fdf7ff;
+  --color-tertiary-20: #f2daff;
+  --color-tertiary-30: #e8b9ff;
+  --color-tertiary-40: #de98ff;
+  --color-tertiary-50: #d480f7;
+  --color-tertiary-60: var(--color-m3-tertiary);
+  --color-tertiary-70: #55405d;
+  --color-tertiary-80: #3f2843;
+  --color-tertiary-90: #251431;
+
+  /* Error scale (legacy) */
+  --color-error-0: #ffffff;
+  --color-error-10: #fdf9f7;
+  --color-error-20: #ffdad6;
+  --color-error-30: #ffb4a8;
+  --color-error-40: #ff8a80;
+  --color-error-50: #ff6b63;
+  --color-error-60: var(--color-m3-error);
+  --color-error-70: #8c0d0d;
+  --color-error-80: #6f0707;
+  --color-error-90: #410001;
+
+  /* Neutral scale (legacy) */
+  --color-neutral-0: #ffffff;
+  --color-neutral-10: #f1f4f9;
+  --color-neutral-20: #ebf0f7;
+  --color-neutral-30: #dfe4ea;
+  --color-neutral-40: #d4d9e0;
+  --color-neutral-50: #c4c9d1;
+  --color-neutral-60: #aba9af;
+  --color-neutral-70: #908d94;
+  --color-neutral-80: #73777f;
+  --color-neutral-90: #43474e;
+  --color-neutral-95: #2f3237;
+  --color-neutral-99: #191c20;
+
+  /* Neutral Variant scale (legacy) */
+  --color-neutral-variant-0: #ffffff;
+  --color-neutral-variant-10: #f5f0f7;
+  --color-neutral-variant-20: #ebe6f2;
+  --color-neutral-variant-30: #dfe3eb;
+  --color-neutral-variant-40: #d5d9e1;
+  --color-neutral-variant-50: #c4bfc9;
+  --color-neutral-variant-60: #aea9b4;
+  --color-neutral-variant-70: #98949f;
+  --color-neutral-variant-80: #827f8a;
+  --color-neutral-variant-90: #69676d;
+  --color-neutral-variant-95: #52505a;
+  --color-neutral-variant-99: #2b2930;
+
+  /* Semantic aliases for backwards compatibility */
+  --color-success-0: var(--color-tertiary-0);
+  --color-success-10: var(--color-tertiary-10);
+  --color-success-20: var(--color-tertiary-20);
+  --color-success-30: var(--color-tertiary-30);
+  --color-success-40: var(--color-tertiary-40);
+  --color-success-50: var(--color-tertiary-50);
+  --color-success-60: var(--color-tertiary-60);
+  --color-success-70: var(--color-tertiary-70);
+  --color-success-80: var(--color-tertiary-80);
+  --color-success-90: var(--color-tertiary-90);
+
+  --color-warning-0: var(--color-neutral-variant-0);
+  --color-warning-10: var(--color-neutral-variant-10);
+  --color-warning-20: var(--color-neutral-variant-20);
+  --color-warning-30: var(--color-neutral-variant-30);
+  --color-warning-40: var(--color-neutral-variant-40);
+  --color-warning-50: var(--color-neutral-variant-50);
+  --color-warning-60: var(--color-neutral-variant-60);
+  --color-warning-70: var(--color-neutral-variant-70);
+  --color-warning-80: var(--color-neutral-variant-80);
+  --color-warning-90: var(--color-neutral-variant-90);
+
+  /* Semantic Color Tokens (M3 style) */
+  --color-surface: var(--color-m3-surface);
+  --color-surface-dim: var(--color-m3-surface-dim);
+  --color-surface-container: var(--color-m3-surface-container);
+  --color-surface-container-high: var(--color-m3-surface-container-high);
+  --color-background: var(--color-m3-surface);
+  --color-on-surface: var(--color-m3-on-surface);
+  --color-on-background: var(--color-m3-on-surface);
+
+  /* Brand Colors (M3 style) */
+  --color-brand-primary: var(--color-m3-primary);
+  --color-brand-primary-dark: var(--color-m3-primary);
+  --color-brand-secondary: var(--color-m3-secondary);
+
+  /* Text Colors (M3 style) */
+  --color-text-primary: var(--color-m3-on-surface);
+  --color-text-secondary: var(--color-m3-on-surface-variant);
+  --color-text-disabled: var(--color-neutral-50);
+
+  /* Border Colors (M3 style) */
+  --color-border-default: var(--color-m3-outline);
+  --color-border-light: var(--color-m3-surface-variant);
+
+  /* ============================================
+     TYPOGRAPHY - Font Families
+     ============================================ */
+
+  --font-family-sans: "Inter Variable", "Inter", system-ui, sans-serif;
+  --font-family-headline: "Manrope Variable", "Manrope", sans-serif;
+  --font-family-mono: "Courier New", Monaco, Menlo, monospace;
+
+  /* ============================================
+     SPACING - Layout Grid (8px base unit)
+     ============================================ */
+
+  /* Extend default spacing with custom values */
+  --spacing-18: 4.5rem; /* 72px */
+  --spacing-22: 5.5rem; /* 88px */
+
+  /* ============================================
+     SIZING - Component Heights
+     ============================================ */
+
+  /* App bar height (header and drawer branding) */
+  --height-app-bar: 4rem; /* 64px - ensures consistent height */
+
+  /* ============================================
+     SHADOWS - Elevation System
+     ============================================ */
+
+  --shadow-elevation-1: 0px 2px 8px rgba(79, 55, 138, 0.06);
+  --shadow-elevation-2: 0px 4px 16px rgba(79, 55, 138, 0.08);
+  --shadow-elevation-3: 0px 8px 24px rgba(79, 55, 138, 0.1);
+  --shadow-elevation-4: 0px 12px 32px rgba(79, 55, 138, 0.12);
+  --shadow-elevation-5: 0px 16px 40px rgba(79, 55, 138, 0.15);
+
+  /* ============================================
+     ANIMATIONS - Motion Tokens
+     ============================================ */
+
+  --animate-spin: spin 1s linear infinite;
+  --animate-fadeIn: fadeIn 150ms ease-out;
+  --animate-slideUp: slideUp 300ms ease-out;
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(16px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideInFromBottom {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+}
+
+/* ============================================
+   TAURI SAFE AREAS
+   ============================================
+
+   CSS variables for native window integration.
+   These handle safe areas for rounded corners,
+   notches, and native drag regions on macOS/Windows.
+
+   @see https://tauri.app/develop/window-customization/
+*/
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
+/* ============================================
+   DARK MODE - Clinical Atelier dark palette
+   Extracted from Stitch project dark screen.
+   Applied via .dark class on <html> element.
+   Primary-60/70/80 kept unchanged so the
+   header gradient stays rich indigo in both modes.
+   ============================================ */
+.dark {
+  /* Primary — brand purple, kept consistent with light mode (Stitch convention) */
+  --color-m3-primary: #8069bf;
+  --color-m3-on-primary: #ffffff;
+  --color-m3-primary-container: #6750a4;
+  --color-m3-on-primary-container: #eaddff;
+
+  /* Secondary — grayish-purple, consistent with light mode */
+  --color-m3-secondary: #9d93b6;
+  --color-m3-on-secondary: #ffffff;
+  --color-m3-secondary-container: #4a4458;
+  --color-m3-on-secondary-container: #e8def8;
+
+  /* Tertiary — amber/gold, consistent with light mode (not inverted to pink) */
+  --color-m3-tertiary: #c9a74d;
+  --color-m3-on-tertiary: #251a00;
+  --color-m3-tertiary-container: #7a5c10;
+  --color-m3-on-tertiary-container: #ffeec7;
+
+  /* Surfaces */
+  --color-m3-surface: #141218;
+  --color-m3-on-surface: #e6e1e5;
+  --color-m3-surface-variant: #49454f;
+  --color-m3-on-surface-variant: #dcd8e2;
+  --color-m3-surface-dim: #1d1b20;
+  --color-m3-surface-container-lowest: #0f0d13;
+  --color-m3-surface-container-low: #1d1b20;
+  --color-m3-surface-container: #211f26;
+  --color-m3-surface-container-high: #2b2930;
+  --color-m3-surface-container-highest: #36343b;
+
+  /* Outline */
+  --color-m3-outline: #938f99;
+  --color-m3-outline-variant: #49454f;
+
+  /* Error — brighter red for dark surfaces (WCAG AA on dark bg + still clearly red) */
+  --color-m3-error: #e53935;
+  --color-m3-on-error: #ffffff;
+  --color-m3-error-container: #8c1d18;
+  --color-m3-on-error-container: #ffdad6;
+
+  /* Semantic surface aliases — CSS-only, consumed via var(), not Tailwind utilities.
+     Reference the M3 tokens above to avoid drift. */
+  --color-surface: var(--color-m3-surface);
+  --color-surface-dim: var(--color-m3-surface-dim);
+  --color-surface-container: var(--color-m3-surface-container);
+  --color-surface-container-high: var(--color-m3-surface-container-high);
+  --color-background: var(--color-m3-surface);
+  --color-on-surface: var(--color-m3-on-surface);
+  --color-on-background: var(--color-m3-on-surface);
+
+  /* Text / border */
+  --color-text-primary: var(--color-m3-on-surface);
+  --color-text-secondary: var(--color-m3-on-surface-variant);
+  --color-border-default: var(--color-m3-outline);
+  --color-border-light: var(--color-m3-outline-variant);
+
+  /* Header gradient — darker indigo in dark mode (brand identity preserved,
+     white text remains accessible at >7:1 WCAG AA on both stops). */
+  --color-header-from: #21005d;
+  --color-header-to: #381e72;
+
+  /* Snackbar colors (dark variants) */
+  --color-snackbar-success-bg: #1b3a1c;
+  --color-snackbar-success-text: #a5d6a7;
+  --color-snackbar-info-bg: #0d2744;
+  --color-snackbar-info-text: #90caf9;
+  --color-snackbar-error-bg: #3b0a0a;
+  --color-snackbar-error-text: #ef9a9a;
+  --color-snackbar-warning-bg: #3e2800;
+  --color-snackbar-warning-text: #ffcc80;
+}
+
+/* Base body styles */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-m3-surface text-m3-on-surface antialiased;
+    font-family: var(--font-family-sans);
+  }
+}
+
+/* ============================================
+   COMPONENT LAYER
+   ============================================
+
+   Custom component classes that combine
+   multiple Tailwind utilities.
+*/
+@layer components {
+  /* Button base styles */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2;
+    @apply px-6 py-2 h-10;
+    @apply border-none rounded-xl;
+    @apply text-sm font-medium tracking-wide;
+    @apply cursor-pointer;
+    @apply transition-all duration-150 ease-out;
+  }
+
+  .btn:hover:not(:disabled) {
+    @apply -translate-y-0.5;
+    box-shadow: var(--shadow-elevation-3);
+  }
+
+  .btn:active:not(:disabled) {
+    @apply translate-y-0;
+  }
+
+  .btn:disabled {
+    @apply opacity-60 cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply bg-m3-primary text-m3-on-primary;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    @apply bg-m3-primary-container;
+  }
+
+  .btn-secondary {
+    @apply bg-neutral-10 text-neutral-90;
+    @apply border border-neutral-30;
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    @apply bg-neutral-30;
+  }
+
+  /* Card component */
+  .card {
+    @apply bg-surface rounded-lg p-6;
+    box-shadow: var(--shadow-elevation-1);
+  }
+
+  .m3-card {
+    background-color: var(--color-m3-surface-container);
+    border-radius: 12px;
+    padding: 1rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .m3-card-elevated {
+    background-color: var(--color-m3-surface);
+    border-radius: 12px;
+    padding: 1rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-elevation-2);
+  }
+
+  .m3-card-elevated:hover {
+    box-shadow: var(--shadow-elevation-3);
+  }
+
+  .m3-navigation-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-full text-m3-on-surface-variant transition-colors cursor-pointer font-medium text-sm;
+  }
+
+  .m3-navigation-item:hover {
+    background-color: color-mix(in srgb, var(--color-m3-on-surface) 8%, transparent);
+  }
+
+  .m3-navigation-item:active {
+    background-color: color-mix(in srgb, var(--color-m3-on-surface) 12%, transparent);
+  }
+
+  .m3-navigation-item-active {
+    background-color: var(--color-m3-secondary-container);
+    color: var(--color-m3-on-secondary-container);
+  }
+
+  .m3-top-app-bar {
+    background-color: var(--color-m3-surface-container);
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    box-shadow: var(--shadow-elevation-1);
+  }
+
+  .m3-button-filled {
+    @apply bg-m3-primary text-m3-on-primary;
+    @apply rounded-xl px-6 py-2.5 font-medium text-sm transition-all duration-200;
+  }
+
+  .m3-button-filled:hover {
+    box-shadow: var(--shadow-elevation-2);
+  }
+
+  .m3-button-filled:active {
+    transform: scale(0.95);
+  }
+
+  /* Force native select dropdown to render in dark mode when dark theme is active.
+     color-scheme on the select element itself controls the native popup colors. */
+  .dark select {
+    color-scheme: dark;
+  }
+
+  .m3-input {
+    background-color: var(--color-m3-surface-variant);
+    border-bottom: 1px solid var(--color-m3-on-surface-variant);
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    padding: 0.75rem 1rem;
+    transition: all 0.2s;
+    color: var(--color-m3-on-surface);
+  }
+
+  .m3-input::-webkit-inner-spin-button,
+  .m3-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .m3-input[type="number"] {
+    -moz-appearance: textfield;
+  }
+
+  .m3-input::placeholder {
+    @apply text-xs text-m3-on-surface-variant/50;
+  }
+
+  .m3-input:focus {
+    outline: none;
+    border-bottom: 2px solid var(--color-m3-primary);
+  }
+
+  .m3-input-label {
+    @apply text-xs font-medium text-m3-primary ml-1 block mb-1;
+  }
+
+  .m3-table-container {
+    @apply flex-1 overflow-auto bg-m3-surface-container-low;
+  }
+
+  .m3-th {
+    @apply px-6 py-2 text-left text-xs font-bold text-m3-primary uppercase tracking-wider sticky top-0 bg-m3-surface-container-low z-20 border-b border-m3-outline/10 cursor-pointer select-none hover:bg-m3-surface-variant/30 transition-colors;
+    height: 44px;
+  }
+
+  .m3-tr {
+    @apply border-b border-m3-outline/5 hover:bg-m3-on-surface/6 transition-colors cursor-pointer;
+    height: 44px;
+  }
+
+  .m3-tr-selected {
+    @apply bg-m3-secondary-container hover:bg-m3-secondary-container;
+  }
+
+  .m3-td {
+    @apply px-6 py-2 text-sm text-m3-on-surface-variant align-middle;
+  }
+
+  .m3-icon-button-error {
+    @apply p-2 text-m3-on-surface-variant hover:text-m3-error hover:bg-m3-error/10 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .m3-icon-button-primary {
+    @apply p-2 text-m3-on-surface-variant hover:text-m3-primary hover:bg-m3-primary/10 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .m3-chip {
+    @apply inline-flex items-center px-3 py-1 bg-m3-secondary-container text-m3-on-secondary-container text-[11px] font-bold rounded-full uppercase tracking-tight whitespace-nowrap;
+  }
+
+  .m3-chip-outline {
+    @apply inline-flex items-center px-3 py-1 border border-m3-outline/30 text-m3-on-surface-variant text-[11px] font-medium rounded-full whitespace-nowrap;
+  }
+
+  .m3-search-input {
+    @apply w-full pl-12 pr-4 py-3 bg-m3-surface-container-high border-none rounded-full text-sm text-m3-on-surface outline-none transition-all;
+  }
+
+  .m3-search-input:hover {
+    @apply bg-m3-surface-variant/50;
+  }
+
+  .m3-search-input:focus {
+    @apply ring-2 ring-m3-primary/20 bg-m3-surface-container-low;
+  }
+
+  .m3-search-icon {
+    @apply absolute left-4 top-1/2 -translate-y-1/2 text-m3-on-surface-variant transition-colors duration-200;
+  }
+
+  .group:focus-within .m3-search-icon {
+    @apply text-m3-primary;
+  }
+
+  .m3-search-clear-btn {
+    @apply absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-m3-on-surface-variant hover:bg-m3-on-surface/10 rounded-full transition-all active:scale-90;
+  }
+
+  /* Animation */
+  .animate-slide-in-from-bottom {
+    animation: slideInFromBottom 0.3s ease-out forwards;
+  }
+
+  /* Sidebar drawer width transition */
+  .drawer-transition {
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* ============================================
+   UTILITIES LAYER
+   ============================================
+
+   Custom utility classes.
+*/
+@layer utilities {
+  /* Safe area padding utilities for Tauri */
+  .pt-safe {
+    padding-top: var(--safe-area-inset-top);
+  }
+
+  .pb-safe {
+    padding-bottom: var(--safe-area-inset-bottom);
+  }
+
+  .pl-safe {
+    padding-left: var(--safe-area-inset-left);
+  }
+
+  .pr-safe {
+    padding-right: var(--safe-area-inset-right);
+  }
+
+  .p-safe {
+    padding-top: var(--safe-area-inset-top);
+    padding-right: var(--safe-area-inset-right);
+    padding-bottom: var(--safe-area-inset-bottom);
+    padding-left: var(--safe-area-inset-left);
+  }
+
+  /* Titlebar height utility */
+  .pt-titlebar {
+    padding-top: var(--titlebar-height);
+  }
+
+  .mt-titlebar {
+    margin-top: var(--titlebar-height);
+  }
+
+  .h-titlebar {
+    height: var(--titlebar-height);
+  }
+
+  /* Elevation shadow utilities */
+  .shadow-elevation-1 {
+    box-shadow: var(--shadow-elevation-1);
+  }
+
+  .shadow-elevation-2 {
+    box-shadow: var(--shadow-elevation-2);
+  }
+
+  .shadow-elevation-3 {
+    box-shadow: var(--shadow-elevation-3);
+  }
+
+  .shadow-elevation-4 {
+    box-shadow: var(--shadow-elevation-4);
+  }
+
+  .shadow-elevation-5 {
+    box-shadow: var(--shadow-elevation-5);
+  }
+
+  /* Thin M3-tinted scrollbar */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-m3-outline-variant) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: var(--color-m3-outline-variant);
+    border-radius: 3px;
+  }
+
+  /* #022 — a scroll area whose horizontal scrollbar lives elsewhere: its own is hidden,
+     the vertical one keeps the thin tinted look. */
+  .pinned-scroll-area::-webkit-scrollbar {
+    width: 6px;
+    height: 0;
+  }
+
+  .pinned-scroll-area::-webkit-scrollbar-track,
+  .pinned-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .pinned-scroll-area::-webkit-scrollbar-thumb,
+  .pinned-scrollbar::-webkit-scrollbar-thumb {
+    background-color: var(--color-m3-outline-variant);
+    border-radius: 3px;
+  }
+
+  /* #022 — the relocated horizontal scrollbar: thin, tinted, over the moving columns only. */
+  .pinned-scrollbar::-webkit-scrollbar {
+    height: 6px;
+  }
+}

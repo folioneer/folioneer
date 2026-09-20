@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE fee_catch_up_positions SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n             WHERE sync_logical_timestamp IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "025bb96d714e1ca250c7f3f8e10146ba0fcf10cb529e9ea2a26a16f834d4ea71"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sync_logical_timestamp FROM currency_rates WHERE from_currency = 'USD' AND to_currency = 'EUR' AND date = '2026-08-20'",
+  "describe": {
+    "columns": [
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "3832cffcdd406da216794c561d93ba9c02ddaf48009879833abcc8bff3e04a5e"
+}

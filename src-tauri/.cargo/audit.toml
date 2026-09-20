@@ -1,0 +1,10 @@
+# cargo-audit configuration
+# https://docs.rs/cargo-audit/latest/cargo_audit/config/index.html
+
+[advisories]
+ignore = [
+    # RUSTSEC-2023-0071: rsa Marvin Attack (timing side-channel)
+    # No fix available upstream. Pulled in transitively via sqlx-mysql even
+    # though this project uses SQLite only. Not exploitable in our context.
+    "RUSTSEC-2023-0071",
+]

@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT\n                 p.from_currency AS \"from_currency!: String\",\n                 p.to_currency   AS \"to_currency!: String\",\n                 r.rate          AS \"latest_rate?: i64\",\n                 r.date          AS \"latest_rate_date?: String\",\n                 r.source        AS \"latest_rate_source?: String\"\n               FROM currency_pairs p\n               LEFT JOIN currency_rates r\n                 ON r.from_currency = p.from_currency\n                AND r.to_currency = p.to_currency\n                AND r.date = (\n                    SELECT MAX(r2.date) FROM currency_rates r2\n                    WHERE r2.from_currency = p.from_currency\n                      AND r2.to_currency = p.to_currency\n                )\n               ORDER BY p.from_currency, p.to_currency",
+  "describe": {
+    "columns": [
+      {
+        "name": "from_currency!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "to_currency!: String",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "latest_rate?: i64",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "latest_rate_date?: String",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "latest_rate_source?: String",
+        "ordinal": 4,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "2f609fae98b2b265d07f9547884a965a1929d0245dee6ce4756d4305d6c9f3e3"
+}

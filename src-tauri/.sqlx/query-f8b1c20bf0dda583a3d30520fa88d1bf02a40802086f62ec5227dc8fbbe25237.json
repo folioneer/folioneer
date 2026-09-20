@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT record_kind FROM tombstones WHERE record_kind = 'Account' AND record_identity = 'account-1'",
+  "describe": {
+    "columns": [
+      {
+        "name": "record_kind",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f8b1c20bf0dda583a3d30520fa88d1bf02a40802086f62ec5227dc8fbbe25237"
+}

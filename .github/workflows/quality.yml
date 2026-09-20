@@ -1,0 +1,292 @@
+name: Quality
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+  push:
+    branches: [main]
+  # Manual trigger: `gh workflow run Quality --ref <branch>` or via Actions tab.
+  # Useful when GH Actions silently drops a pull_request synchronize/reopen
+  # event (rare but happens on rebases).
+  workflow_dispatch:
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pr-checks:
+    name: PR checks (commit-msg hygiene + repo invariants)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Validate every commit in the PR
+        run: |
+          set -u
+          BASE=$(git merge-base HEAD origin/main)
+          FAIL=0
+          REGEX='^(feat|fix|docs|test|chore|refactor|ci)(\([^)]+\))?!?: .+'
+          # --no-merges skips the synthetic merge commit GitHub creates at
+          # HEAD for pull_request events (it represents "what main looks
+          # like if this PR merged" — not a real PR commit).
+          for sha in $(git rev-list --no-merges "$BASE..HEAD"); do
+            TITLE=$(git log -1 --pretty=%s "$sha")
+            BODY=$(git log -1 --pretty=%b "$sha")
+            AUTHOR_EMAIL=$(git log -1 --pretty=%ae "$sha")
+
+            # Conventional-commit format is load-bearing for release.py
+            # changelog parsing — enforced for every author, including bots.
+            if ! echo "$TITLE" | grep -E "$REGEX" >/dev/null; then
+              echo "::error::$sha — invalid conventional format: $TITLE"
+              FAIL=1
+            fi
+
+            # The remaining checks (title length, trailing period, body
+            # length, no Co-Authored-By) are human-writing-hygiene rules.
+            # Bot commits (Dependabot, Renovate) carry auto-generated
+            # titles/bodies that legitimately bypass them — e.g. "across
+            # N directories with M updates" titles and multi-page release
+            # notes. Enforce only for human authors.
+            if [[ "$AUTHOR_EMAIL" != *"[bot]@"* ]]; then
+              if [ ${#TITLE} -gt 72 ]; then
+                echo "::error::$sha — title > 72 chars (${#TITLE}): $TITLE"
+                FAIL=1
+              fi
+              TRIMMED=$(echo "$TITLE" | sed 's/[[:space:]]*$//')
+              if [[ "$TRIMMED" == *. ]]; then
+                echo "::error::$sha — title ends with period: $TITLE"
+                FAIL=1
+              fi
+              BODY_LINES=$(echo "$BODY" | { grep -v '^$' || true; } | { grep -v '^BREAKING CHANGE:' || true; } | wc -l)
+              if [ "$BODY_LINES" -gt 5 ]; then
+                echo "::error::$sha — body > 5 lines ($BODY_LINES): $TITLE"
+                FAIL=1
+              fi
+              if echo "$BODY" | grep -i '^Co-Authored-By:' >/dev/null; then
+                echo "::error::$sha — contains Co-Authored-By trailer: $TITLE"
+                FAIL=1
+              fi
+            fi
+          done
+          if [ "$FAIL" -eq 0 ]; then
+            echo "✅ All commits pass the commit-msg hook rules."
+          fi
+          exit "$FAIL"
+      - name: Assert no published sync format snapshot is edited
+        # src-tauri/tests/sync_format/vN.json pins how data format version N
+        # writes what is synced (SYN-038). A snapshot already on main may not
+        # change: a new written form arrives as a new version with its own file.
+        run: bash scripts/sync-format-check.sh "$(git merge-base HEAD origin/main)"
+      - name: Assert src-tauri/src/bin/ is empty
+        # Tauri's NSIS bundler walks src-tauri/src/bin/ on disk and expects
+        # every entry to produce a bundled .exe — it does NOT enumerate
+        # [[bin]] entries in Cargo.toml, so `required-features` gating is
+        # insufficient. Only emptying src/bin/ prevents the Windows-release
+        # bundling failure. Dev binaries belong in src-tauri/dev/.
+        shell: bash
+        run: |
+          if [ -d src-tauri/src/bin ] && [ -n "$(ls -A src-tauri/src/bin/)" ]; then
+            echo "::error::src-tauri/src/bin/ must be empty — Tauri's NSIS bundler walks it and fails on phantom .exe candidates. Move dev tools to src-tauri/dev/."
+            exit 1
+          fi
+
+  architecture:
+    name: Architecture — mechanical rules
+    # scripts/arch-check.py: gateway-only bindings, no sibling-feature or
+    # cross-context imports, typed wire errors, ui/ components with stable
+    # ids, no derivation or literal text in feature code. Frozen debt lives
+    # in arch-allowlist.json and may only shrink.
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: Architecture check
+        run: python3 scripts/arch-check.py
+
+  licences:
+    name: Licences — what the application ships
+    # scripts/licence-check.py: every crate reached without a dev-dependency and
+    # every npm package not flagged dev must carry a licence of
+    # licence-allowlist.json, or be accepted there by name. It reads
+    # `cargo metadata` and package-lock.json; nothing is built or installed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: Cache the crate sources
+        # `cargo metadata` reads each crate's manifest, so a cold run downloads
+        # every crate; the registry cache is keyed on the lockfile.
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/src
+          key: licences-cargo-registry-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: licences-cargo-registry-${{ runner.os }}-
+      - name: Script unit tests
+        run: python3 -m unittest discover -s scripts/tests -p "test_*.py"
+      - name: Licence check
+        run: python3 scripts/licence-check.py
+
+  frontend:
+    name: Frontend — quality + coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # The scope step diffs against the base branch.
+          fetch-depth: 0
+      - name: Which layers the change touches
+        # A pull request pays coverage only for a layer it changed (the same
+        # rule as `just harness`); a push to main measures both. Lint, types
+        # and the build still run on every job.
+        id: scope
+        shell: bash
+        env:
+          BASE: ${{ github.base_ref }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == "pull_request" ]]; then
+            scope=$(git diff --name-only --diff-filter=ACMRD "origin/$BASE...HEAD" | bash scripts/changed-scope.sh)
+          else
+            scope=both
+          fi
+          echo "scope=$scope"
+          echo "frontend=$([[ "$scope" == frontend || "$scope" == both ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "backend=$([[ "$scope" == backend || "$scope" == both ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Quality checks (lint + biome + tsc + build, skip tests)
+        run: python3 scripts/check.py --frontend --skip-tests
+      - name: Tests with coverage (instrumented)
+        if: steps.scope.outputs.frontend == 'true'
+        run: npm run test:coverage
+      - name: Coverage gate — feature code
+        # Hard floor on the lines that carry behaviour (coverage-gates.json).
+        if: steps.scope.outputs.frontend == 'true'
+        run: python3 scripts/coverage-gate.py --frontend
+      - name: Upload to Codecov
+        if: steps.scope.outputs.frontend == 'true'
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354  # v6.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/frontend/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
+
+  backend:
+    name: Backend — quality + coverage
+    runs-on: ubuntu-latest
+    # 40: a Cargo.lock change misses the Rust cache and a cold instrumented
+    # build is the slow path; the warm baseline
+    # with llvm-cov is measured in TD-020's closure.
+    timeout-minutes: 40
+    env:
+      CARGO_INCREMENTAL: "0"
+      RUSTFLAGS: "-C debuginfo=0"
+      # Absolute path so every step (cwd=repo root or src-tauri) resolves the
+      # same DB. The SQLx prepare check (`cargo sqlx prepare --check`) needs a
+      # live DB connection even in --check mode.
+      DATABASE_URL: "sqlite:${{ github.workspace }}/src-tauri/.local/dev_check.sqlite"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # The scope step diffs against the base branch.
+          fetch-depth: 0
+      - name: Which layers the change touches
+        # A pull request pays coverage only for a layer it changed (the same
+        # rule as `just harness`); a push to main measures both. Lint, types
+        # and the build still run on every job.
+        id: scope
+        shell: bash
+        env:
+          BASE: ${{ github.base_ref }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == "pull_request" ]]; then
+            scope=$(git diff --name-only --diff-filter=ACMRD "origin/$BASE...HEAD" | bash scripts/changed-scope.sh)
+          else
+            scope=both
+          fi
+          echo "scope=$scope"
+          echo "frontend=$([[ "$scope" == frontend || "$scope" == both ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "backend=$([[ "$scope" == backend || "$scope" == both ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdbus-1-dev
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # llvm-tools-preview: the profiler runtime and llvm-profdata/llvm-cov
+          # that cargo llvm-cov drives.
+          components: rustfmt, clippy, llvm-tools-preview
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2.9.1
+        with:
+          workspaces: src-tauri
+          prefix-key: linux-rust
+      - name: Install sqlx-cli
+        # Pinned to full SHA — mutable tags are a supply-chain risk.
+        # sqlx-cli version matches `sqlx` in Cargo.lock (0.8.6).
+        uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff  # v2.79.6
+        with:
+          tool: sqlx-cli@0.8.6
+      - name: Setup sqlx-check DB
+        working-directory: src-tauri
+        run: |
+          mkdir -p .local
+          sqlx database setup
+      - name: Quality checks
+        # --skip-tests: the suite runs once, under llvm-cov, two steps below.
+        run: python3 scripts/check.py --backend --skip-tests
+      - name: Install cargo-llvm-cov
+        # Pinned to full SHA — mutable tags are a supply-chain risk.
+        uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff  # v2.79.6
+        with:
+          tool: cargo-llvm-cov@0.8.7
+      - name: Coverage with llvm-cov
+        # Same report path and flags as `just coverage-be`: the binaries are
+        # instrumented at compile time and the suite runs as usual, so the run
+        # costs the tests' own time once the build is warm (TD-020).
+        # Inline `#[cfg(test)]` modules are then stripped from the report so a
+        # file's own tests never count as covered logic.
+        if: steps.scope.outputs.backend == 'true'
+        run: |
+          mkdir -p coverage/backend
+          (cd src-tauri && cargo llvm-cov --lib --tests --lcov --output-path ../coverage/backend/lcov.info --ignore-filename-regex '(^|/)build\.rs$|dev/generate_bindings\.rs$|/src-tauri/tests/')
+          python3 scripts/coverage-strip-tests.py coverage/backend/lcov.info
+      - name: Coverage gate — logic code
+        # Hard floor on domain, application, service and use-case lines
+        # (coverage-gates.json); wire adapters and repositories do not count.
+        if: steps.scope.outputs.backend == 'true'
+        run: python3 scripts/coverage-gate.py --backend
+      - name: Upload to Codecov
+        if: steps.scope.outputs.backend == 'true'
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354  # v6.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/backend/lcov.info
+          flags: backend
+          fail_ci_if_error: false

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sync_logical_timestamp AS \"sync_logical_timestamp?: String\" FROM accounts WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "sync_logical_timestamp?: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "1eeff6f38d4a714c76641f6d90e244c707e910d5f21f1b4ec388f3373f9a92f6"
+}

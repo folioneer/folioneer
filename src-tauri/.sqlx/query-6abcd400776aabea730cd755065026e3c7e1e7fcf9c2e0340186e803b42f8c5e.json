@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM tombstones WHERE record_kind = ? AND record_identity = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "6abcd400776aabea730cd755065026e3c7e1e7fcf9c2e0340186e803b42f8c5e"
+}

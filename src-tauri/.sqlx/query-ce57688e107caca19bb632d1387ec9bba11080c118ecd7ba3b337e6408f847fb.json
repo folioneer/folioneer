@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE scheduled_fetch_configuration SET enabled = ?, trigger_time = ? WHERE id = 1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "ce57688e107caca19bb632d1387ec9bba11080c118ecd7ba3b337e6408f847fb"
+}

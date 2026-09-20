@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sync_logical_timestamp FROM holding_notes WHERE account_id = 'acc-1' AND asset_id = 'asset-1'",
+  "describe": {
+    "columns": [
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "7a6be031e8b0c63f13c0bea36ff1ac38b0ae435fe5293941967ee4ae393f7553"
+}

@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT executed_at, trigger_date, outcome,\n                      updated_count AS \"updated_count: i64\",\n                      skipped_count AS \"skipped_count: i64\"\n               FROM scheduled_fetch_runs\n               ORDER BY executed_at DESC, rowid DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "executed_at",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "trigger_date",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "outcome",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_count: i64",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "skipped_count: i64",
+        "ordinal": 4,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6341d13cc4d5253569ba62a1a2355f44d44de30f369b72e804a8ae822508e83c"
+}

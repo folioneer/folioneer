@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM holding_notes WHERE account_id = ? AND asset_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "09dc21da2165c415b4e78e47467961ead860eeb8cf3ed8dfdf8599b2f53c7113"
+}

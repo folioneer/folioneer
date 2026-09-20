@@ -1,0 +1,6 @@
+{
+  "vite_preview_port": 1422,
+  "vite_preview_host": "127.0.0.1",
+  "global_css_import": "src/ui/global.css",
+  "i18n_import": "src/i18n/config.ts"
+}

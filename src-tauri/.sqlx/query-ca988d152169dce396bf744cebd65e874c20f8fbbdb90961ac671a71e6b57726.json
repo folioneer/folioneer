@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM asset_prices WHERE asset_id = ? AND date = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "ca988d152169dce396bf744cebd65e874c20f8fbbdb90961ac671a71e6b57726"
+}

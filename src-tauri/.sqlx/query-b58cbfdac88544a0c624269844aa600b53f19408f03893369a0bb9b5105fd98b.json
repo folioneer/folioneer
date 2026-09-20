@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE fee_schedules SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n             WHERE sync_logical_timestamp IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "b58cbfdac88544a0c624269844aa600b53f19408f03893369a0bb9b5105fd98b"
+}

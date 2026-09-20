@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO fee_catch_up_positions (account_id, asset_id, last_applied_period)\n               VALUES (?, ?, ?)\n               ON CONFLICT(account_id, asset_id) DO UPDATE SET\n                   last_applied_period = MAX(last_applied_period, excluded.last_applied_period)\n               RETURNING account_id, asset_id, last_applied_period",
+  "describe": {
+    "columns": [
+      {
+        "name": "account_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "asset_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "last_applied_period",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "81d97ca779b3519a670b0f8d8c9139fe5d9b4b139675c711e3c5364087e0a0e6"
+}

@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Pre-push hook
+# Runs the fast checks for the scope the pushed commits touch
+# (scripts/changed-scope.sh). Tests, coverage, E2E and the build are CI's job
+# on the pull request; the hook only catches what a commit slipped past.
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+CHECK_SCRIPT="$PROJECT_ROOT/scripts/check.py"
+SCOPE_SCRIPT="$PROJECT_ROOT/scripts/changed-scope.sh"
+
+# Colors (respect NO_COLOR=1)
+if [ -n "${NO_COLOR:-}" ]; then
+    RED='' YELLOW='' GREEN='' BLUE='' NC=''
+else
+    RED='\033[0;31m'
+    YELLOW='\033[0;33m'
+    GREEN='\033[0;32m'
+    BLUE='\033[0;34m'
+    NC='\033[0m'
+fi
+
+# Git provides "<local-ref> <local-sha> <remote-ref> <remote-sha>" on stdin
+# per ref (see `man githooks`). A deletion has an all-zero local sha (40 hex
+# under SHA-1, 64 under SHA-256); a new remote ref has an all-zero remote sha.
+# Drain all of stdin so every ref is seen; `while read` at EOF returns
+# non-zero, which bash treats as the loop terminator, not an errexit.
+DELETE_ONLY=true
+HAS_REFS=false
+CHANGED=""
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+    HAS_REFS=true
+    if [[ "$local_sha" =~ ^0+$ ]]; then
+        continue
+    fi
+    DELETE_ONLY=false
+    if [[ "$remote_sha" =~ ^0+$ ]]; then
+        # New branch: everything since it left main.
+        base=$(git merge-base "$local_sha" origin/main 2>/dev/null || git merge-base "$local_sha" main 2>/dev/null || echo "")
+    else
+        base="$remote_sha"
+    fi
+    if [[ -n "$base" ]]; then
+        CHANGED+=$(git diff --name-only --diff-filter=ACMRD "$base" "$local_sha" || true)$'\n'
+    else
+        echo -e "${YELLOW}⚠  No merge base with main found — only the tip commit is scoped.${NC}"
+        CHANGED+=$(git diff-tree --no-commit-id --name-only -r "$local_sha" || true)$'\n'
+    fi
+done
+
+if [[ "$HAS_REFS" == true && "$DELETE_ONLY" == true ]]; then
+    echo -e "${BLUE}ℹ  Delete-only push — skipping quality check.${NC}"
+    exit 0
+fi
+
+if [ ! -f "$CHECK_SCRIPT" ] || [ ! -f "$SCOPE_SCRIPT" ]; then
+    echo -e "${YELLOW}⚠  scripts/check.py or scripts/changed-scope.sh missing. Skipping validation.${NC}"
+    exit 0
+fi
+
+SCOPE=$(printf '%s' "$CHANGED" | bash "$SCOPE_SCRIPT")
+
+run_check() {
+    if python3 "$CHECK_SCRIPT" "$@"; then
+        echo -e "${GREEN}✅ Checks passed. Pushing.${NC}"
+    else
+        echo -e "${RED}❌ Push blocked! One or more checks failed.${NC}"
+        exit 1
+    fi
+}
+
+# Only Markdown that still exists: a deleted file has nothing to format.
+MD_FILES=$(printf '%s' "$CHANGED" | grep -E '\.md$' | sort -u | while IFS= read -r f; do [ -f "$f" ] && printf '%s\n' "$f"; done || true)
+if [ -n "$MD_FILES" ]; then
+    if ! command -v npx >/dev/null 2>&1; then
+        echo -e "${YELLOW}⚠  npx not found — Markdown not checked.${NC}"
+    elif printf '%s\n' "$MD_FILES" | tr '\n' '\0' | xargs -0 npx prettier --check >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Prettier: Markdown formatted.${NC}"
+    else
+        echo -e "${RED}❌ Prettier failed on pushed Markdown. Run: just format${NC}"
+        exit 1
+    fi
+fi
+
+case "$SCOPE" in
+    none|docs)
+        echo -e "${BLUE}🚀 Pre-push: no code check applies to the pushed files.${NC}"
+        ;;
+    frontend)
+        echo -e "${BLUE}🚀 Pre-push: frontend fast checks.${NC}"
+        run_check --fast --frontend
+        ;;
+    backend)
+        echo -e "${BLUE}🚀 Pre-push: backend fast checks.${NC}"
+        run_check --fast --backend
+        ;;
+    both)
+        echo -e "${BLUE}🚀 Pre-push: fast checks on both layers.${NC}"
+        run_check --fast
+        ;;
+esac

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE holding_notes\n                   SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n                   WHERE account_id = ? AND asset_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "cec9c961e263c9f6b544c010358ebaa46bd41d1566a6b6eae30d6f34f3d74efd"
+}

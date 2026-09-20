@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO scheduled_fetch_runs\n                 (id, executed_at, trigger_date, outcome, updated_count, skipped_count)\n             VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "df04d3e465ec69f183ba275b6307aef1de51e041ba05c9b4fbd1eafe591013fc"
+}

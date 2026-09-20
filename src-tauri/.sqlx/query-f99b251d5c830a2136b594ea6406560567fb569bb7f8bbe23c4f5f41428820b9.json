@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT from_currency, to_currency, date, rate, source,\n                              sync_logical_timestamp, sync_origin, sync_device_id\n                       FROM currency_rates WHERE from_currency = ? AND to_currency = ? AND date = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "from_currency",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "to_currency",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "date",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "rate",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "source",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "f99b251d5c830a2136b594ea6406560567fb569bb7f8bbe23c4f5f41428820b9"
+}

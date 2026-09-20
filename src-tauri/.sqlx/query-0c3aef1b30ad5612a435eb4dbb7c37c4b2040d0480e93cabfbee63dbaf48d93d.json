@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO assets (id, name, reference, asset_class, currency, risk_level, category_id, is_archived)\n             VALUES ('asset-1', 'Test Asset', 'REF', 'Stocks', 'EUR', 3, 'default-uncategorized', 0)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "0c3aef1b30ad5612a435eb4dbb7c37c4b2040d0480e93cabfbee63dbaf48d93d"
+}

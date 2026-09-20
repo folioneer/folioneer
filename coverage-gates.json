@@ -1,0 +1,21 @@
+{
+  "frontend": {
+    "lcov": "coverage/frontend/lcov.info",
+    "include": ["src/features/*"],
+    "exclude": ["src/features/*/gateway.ts"],
+    "lines": 80.0
+  },
+  "backend": {
+    "lcov": "coverage/backend/lcov.info",
+    "include": [
+      "src-tauri/src/context/*/domain/*",
+      "src-tauri/src/context/*/application/*",
+      "src-tauri/src/context/*/service.rs",
+      "src-tauri/src/use_cases/*",
+      "src-tauri/src/shared/domain/*"
+    ],
+    "exclude": ["*/api.rs", "*/mod.rs"],
+    "lines": 85.5,
+    "target": 90.0
+  }
+}

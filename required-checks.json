@@ -1,0 +1,18 @@
+{
+  "checks": [
+    "PR checks (commit-msg hygiene + repo invariants)",
+    "Architecture — mechanical rules",
+    "Licences — what the application ships",
+    "Frontend — quality + coverage",
+    "Backend — quality + coverage",
+    "E2E — headless WebDriver",
+    "Lanes touched by the diff",
+    "reviewer-backend",
+    "reviewer-arch",
+    "reviewer-frontend",
+    "reviewer-sql",
+    "reviewer-infra",
+    "reviewer-security",
+    "reviewer-e2e"
+  ]
+}

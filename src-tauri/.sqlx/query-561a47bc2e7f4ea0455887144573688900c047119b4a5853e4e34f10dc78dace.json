@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT account_id AS \"account_id: String\" FROM transactions WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "account_id: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "561a47bc2e7f4ea0455887144573688900c047119b4a5853e4e34f10dc78dace"
+}

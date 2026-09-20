@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO fee_schedules (id, account_id, asset_id, annual_rate_micros, frequency, start_date, end_date, active)\n               VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "0cbad134ad900a35ac3c84ddd46f4d42921dfac1cc0f8e44890616550370f2c4"
+}

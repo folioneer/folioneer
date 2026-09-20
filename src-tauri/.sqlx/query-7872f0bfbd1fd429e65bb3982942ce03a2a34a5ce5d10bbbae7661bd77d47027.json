@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sync_logical_timestamp FROM categories WHERE id = 'cat-1'",
+  "describe": {
+    "columns": [
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "7872f0bfbd1fd429e65bb3982942ce03a2a34a5ce5d10bbbae7661bd77d47027"
+}

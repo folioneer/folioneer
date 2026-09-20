@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sync_logical_timestamp, sync_origin, sync_device_id\n               FROM categories WHERE LOWER(name) = LOWER(?) AND id <> ? AND is_deleted = 0\n               ORDER BY sync_origin, sync_logical_timestamp, sync_device_id, id\n               LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "2a823f60a3d78e498652767555fc3892f1bd284ad7f59af6de2eb9f6ddb4a5cb"
+}

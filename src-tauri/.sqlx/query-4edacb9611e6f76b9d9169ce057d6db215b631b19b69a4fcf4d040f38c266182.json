@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COALESCE(MAX(logical_clock), 0) AS \"logical_clock!: i64\" FROM sync_device WHERE id = 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "logical_clock!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4edacb9611e6f76b9d9169ce057d6db215b631b19b69a4fcf4d040f38c266182"
+}

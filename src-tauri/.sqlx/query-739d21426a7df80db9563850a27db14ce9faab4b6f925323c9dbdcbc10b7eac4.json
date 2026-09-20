@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COALESCE(MAX(sequence), 0) AS \"sequence!: i64\"\n               FROM changes WHERE device_id = ? AND published = 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "sequence!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "739d21426a7df80db9563850a27db14ce9faab4b6f925323c9dbdcbc10b7eac4"
+}

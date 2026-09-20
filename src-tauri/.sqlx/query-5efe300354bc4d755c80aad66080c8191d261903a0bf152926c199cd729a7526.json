@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sync_logical_timestamp AS \"sync_logical_timestamp?: String\"\n           FROM holding_notes WHERE account_id = ? AND asset_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "sync_logical_timestamp?: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "5efe300354bc4d755c80aad66080c8191d261903a0bf152926c199cd729a7526"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT record_identity FROM tombstones WHERE record_kind = 'HoldingNote' AND record_identity = 'acc-1:asset-1'",
+  "describe": {
+    "columns": [
+      {
+        "name": "record_identity",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b947ec3f054f98904afcae24802525fe1632109cfbe1707d8ce5bcf7878addd0"
+}

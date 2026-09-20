@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO currency_pairs (from_currency, to_currency) VALUES ('USD', 'EUR')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "495c416843a7026ad96ea7714190016649eb598ddd9eca5fba14df9f14d38dc8"
+}

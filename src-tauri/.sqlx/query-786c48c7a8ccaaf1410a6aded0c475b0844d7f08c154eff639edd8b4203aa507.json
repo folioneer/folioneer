@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sync_logical_timestamp, sync_origin FROM accounts WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "786c48c7a8ccaaf1410a6aded0c475b0844d7f08c154eff639edd8b4203aa507"
+}

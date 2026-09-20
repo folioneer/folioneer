@@ -1,0 +1,17 @@
+# cargo-mutants scope: the code that carries logic, the same set the coverage
+# gate measures (coverage-gates.json). Wire adapters, repositories and module
+# files are not mutated.
+examine_globs = [
+  "src/context/*/domain/**",
+  "src/context/*/application/**",
+  "src/context/*/service.rs",
+  "src/use_cases/**",
+  "src/shared/domain/**",
+]
+exclude_globs = ["**/api.rs", "**/mod.rs"]
+# The suite opens SQLite databases and takes ~40 s per mutant in CI; a mutant
+# that runs five minutes is a hang. The multiplier serves runs with a baseline;
+# the minimum is the floor of the auto-set timeout. (`timeout` is not a config
+# key: the sweep of 2026-09-14 failed to parse it before running a mutant.)
+minimum_test_timeout = 300
+timeout_multiplier = 3.0

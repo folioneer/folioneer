@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE assets SET category_id = ? WHERE category_id = ? AND is_deleted = 0",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "b53b8b43ebd04574234e23ed262914c5e55c05285d15f9054387884f1c18f921"
+}

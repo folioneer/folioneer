@@ -1,0 +1,166 @@
+name: Mutation sweep
+
+# Monthly: cargo-mutants rewrites the logic code one change at a time and runs
+# the suite; a mutant the suite does not notice is a test that proves nothing.
+# Nothing gates on it. Survivors are listed in one sticky issue in the techdebt
+# entry format, and mutants.out is kept as an artifact.
+on:
+  schedule:
+    - cron: "13 3 1 * *" # the 1st of each month, 03:13 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: mutants
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mutants:
+    name: cargo-mutants shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        # Twelve is a first guess for ~2100 mutants (`cargo mutants --list |
+        # wc -l`); tune it from the first run's shard durations.
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    outputs:
+      # The report job reads the shard count from here, never from a copy.
+      total: ${{ strategy.job-total }}
+    env:
+      SQLX_OFFLINE: "true"
+      CARGO_INCREMENTAL: "0"
+      RUSTFLAGS: "-C debuginfo=0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdbus-1-dev
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust
+        # Same prefix as the Quality backend job so the warm build is reused;
+        # the shards never save (nothing new to keep, twelve writers otherwise).
+        # reviewer-infra FP: this is the commit tag v2.9.1 peels to
+        # (`git ls-remote --tags`, 2026-09-13); the older workflows pin another
+        # commit under the same label — TD-021.
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+        with:
+          workspaces: src-tauri
+          prefix-key: linux-rust
+          save-if: false
+      - name: Install cargo-mutants
+        # Pinned to full SHA — mutable tags are a supply-chain risk.
+        uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff  # v2.79.6
+        with:
+          tool: cargo-mutants@27.1.0
+      - name: Run the shard
+        working-directory: src-tauri
+        shell: bash
+        # Scope and timeouts come from .cargo/mutants.toml. Exit 2 = missed
+        # mutants, 3 = timeouts: findings, not failures. Exit 4 = the unmutated
+        # suite fails, so the shard proved nothing and fails; anything else is
+        # a broken run. The runner's bash has -e, so the exit code is caught on
+        # the same line. Measured: ~40 s per mutant, 2–3.5 h per shard of 175.
+        #
+        # The test binaries run under an 8 GB address-space cap (cargo's runner
+        # hook): a mutant that allocates without end then dies as a caught
+        # failure instead of taking the runner down (the sweep of 2026-09-14
+        # lost shard 5 twice to `year += 1` → `year -= 1` in a month loop).
+        # The baseline runs on every shard so a cap that broke the suite would
+        # fail the shard loudly rather than make every mutant look caught.
+        env:
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER: prlimit --as=8589934592
+        run: |
+          set -u
+          status=0
+          cargo mutants --in-place --shard "${{ matrix.shard }}/${{ strategy.job-total }}" --output .. || status=$?
+          case "$status" in 0|2|3) exit 0 ;; *) exit "$status" ;; esac
+      - name: Upload the shard's mutants.out
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: mutants-out-${{ matrix.shard }}
+          path: mutants.out/
+          if-no-files-found: ignore
+          retention-days: 90
+
+  report:
+    name: File the survivors
+    needs: mutants
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Download every shard
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131  # v7.0.0
+        with:
+          pattern: mutants-out-*
+          path: shards
+      - name: Write the sticky issue
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: "Mutation sweep — surviving mutants"
+        run: |
+          set -euo pipefail
+          merged() { cat shards/*/"$1" 2>/dev/null | grep . | sort -u || true; }
+          count() { merged "$1" | grep -c . || true; }
+          caught=$(count caught.txt); missed=$(count missed.txt); timeout=$(count timeout.txt); unviable=$(count unviable.txt)
+          shards=$(find shards -mindepth 1 -maxdepth 1 -type d 2>/dev/null | grep -c . || true)
+          expected="${{ needs.mutants.outputs.total }}"
+          today=$(date -u +%Y-%m-%d)
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo "<!-- mutants-sweep -->"
+            echo "## Mutation sweep — $today"
+            echo
+            if [[ "$shards" -lt "$expected" ]]; then
+              echo "⚠️ Only $shards of $expected shards reported — the table below is partial, see the run."
+              echo
+            fi
+            echo "| caught | missed | timeout | unviable | shards reporting |"
+            echo "| --- | --- | --- | --- | --- |"
+            echo "| $caught | $missed | $timeout | $unviable | $shards |"
+            echo
+            echo "[run]($run_url) · artifacts \`mutants-out-*\` · scope \`src-tauri/.cargo/mutants.toml\`"
+            if [[ "$missed" != 0 ]]; then
+              echo
+              echo "### Missed (a change in the logic no test notices)"
+              echo
+              # awk reads all its input: a `head` here would close the pipe
+              # under pipefail and kill the step before the issue is written.
+              merged missed.txt | awk 'NR <= 150 { print "- " $0 }'
+              [[ "$missed" -gt 150 ]] && echo "- … $((missed - 150)) more in the artifacts"
+              echo
+              echo "### Ready to file in \`docs/techdebt.md\`"
+              echo
+              echo '```'
+              echo "## $today — TD-NNN — $missed surviving mutants in the logic code"
+              echo
+              echo "- Found by: mutation sweep ($run_url)"
+              echo "- Where: the files listed in the sweep issue"
+              echo "- Context: branch \`main\` @ \`${GITHUB_SHA::7}\`"
+              echo "- Observation: each missed mutant is a change the suite does not notice; the test that should catch it is missing or asserts too little."
+              echo '```'
+            fi
+          } > body.md
+          # gh's --jq takes no --arg, so the title goes to a real jq as data;
+          # `[...][0]` picks the first match inside jq, where a `| head` would
+          # close the pipe under pipefail.
+          number=$(gh api "repos/${GITHUB_REPOSITORY}/issues?state=open&per_page=100" \
+            | jq -r --arg t "$TITLE" '[.[] | select(.title == $t and (.pull_request | not)) | .number][0] // empty')
+          if [[ -n "$number" ]]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/${number}" -F body=@body.md --jq '.html_url'
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues" -f title="$TITLE" -F body=@body.md --jq '.html_url'
+          fi
+          [[ "$shards" -ge "$expected" ]] || { echo "::error::only $shards of $expected shards reported"; exit 1; }

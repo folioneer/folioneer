@@ -1,0 +1,49 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.obsidian/
+
+# Custom Project folders
+.screenshots
+# Auto-generated E2E failure screenshots (captured by wdio.conf.ts afterTest hook)
+screenshots/e2e-failures/
+# Real-app captures taken by e2e/helpers/screenshot.ts (uploaded as a CI artifact)
+screenshots/e2e/
+tmp/
+coverage/
+# Reviewer reports (local triage artifacts, consumed by /review-triage)
+.review/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+# cargo-mutants output (just mutants)
+mutants.out/

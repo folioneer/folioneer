@@ -1,0 +1,207 @@
+{
+  "data_format_version": 1,
+  "envelope": {
+    "FolderHeader": {
+      "created_at": "string",
+      "created_by_device_id": "string",
+      "data_format_version": "number",
+      "derivation_parameters": {
+        "iterations": "number",
+        "memory_cost_kib": "number",
+        "parallelism": "number",
+        "salt": [
+          "number",
+          "number",
+          "number"
+        ]
+      },
+      "passphrase_check": [
+        "number"
+      ]
+    },
+    "Manifest": {
+      "app_version": "string",
+      "data_format_version": "number",
+      "device_id": "string",
+      "device_name": "string",
+      "latest_sequence": "number"
+    },
+    "Segment": {
+      "changes": [
+        {
+          "based_on": "string",
+          "content": "string",
+          "logical_timestamp": "string",
+          "operation": "string",
+          "origin": "string",
+          "record_identity": "string",
+          "record_kind": "string",
+          "sequence": "number"
+        }
+      ],
+      "data_format_version": "number",
+      "device_id": "string",
+      "first_sequence": "number",
+      "last_sequence": "number"
+    }
+  },
+  "records": {
+    "Account": {
+      "bank_name": "string",
+      "currency": "string",
+      "id": "string",
+      "management_fees_enabled": "boolean",
+      "name": "string",
+      "update_frequency": "string"
+    },
+    "Asset": {
+      "category": {
+        "id": "string",
+        "name": "string"
+      },
+      "class": "string",
+      "currency": "string",
+      "exchange": {
+        "code": "string",
+        "label": "string"
+      },
+      "id": "string",
+      "interest_bearing": "boolean",
+      "is_archived": "boolean",
+      "isin": "string",
+      "name": "string",
+      "price_refresh_blocked": "boolean",
+      "reference": "string",
+      "risk_level": "number"
+    },
+    "AssetPrice": {
+      "asset_id": "string",
+      "date": "string",
+      "price": "number",
+      "source": "string"
+    },
+    "Category": {
+      "id": "string",
+      "name": "string"
+    },
+    "CurrencyPair": {
+      "from_currency": "string",
+      "to_currency": "string"
+    },
+    "CurrencyRate": {
+      "date": "string",
+      "from_currency": "string",
+      "rate": "number",
+      "source": "string",
+      "to_currency": "string"
+    },
+    "FeeCatchUpPosition": {
+      "account_id": "string",
+      "asset_id": "string",
+      "last_applied_period": "string"
+    },
+    "FeeSchedule": {
+      "account_id": "string",
+      "active": "boolean",
+      "annual_rate_percent_micros": "number",
+      "asset_id": "string",
+      "end_date": "string",
+      "frequency": "string",
+      "id": "string",
+      "start_date": "string"
+    },
+    "HoldingNote": {
+      "account_id": "string",
+      "asset_id": "string",
+      "text": "string",
+      "threshold_direction": "string",
+      "threshold_price": "number"
+    },
+    "Transaction": {
+      "account_id": "string",
+      "asset_id": "string",
+      "created_at": "string",
+      "date": "string",
+      "exchange_rate": "number",
+      "fees": "number",
+      "id": "string",
+      "note": "null",
+      "quantity": "number",
+      "realized_pnl": "null",
+      "total_amount": "number",
+      "transaction_type": "string",
+      "unit_price": "number"
+    }
+  },
+  "values": {
+    "AssetClass": [
+      "RealEstate",
+      "Cash",
+      "Stocks",
+      "Bonds",
+      "ETF",
+      "ETP",
+      "MutualFunds",
+      "DigitalAsset",
+      "Derivatives"
+    ],
+    "AssetPriceSource": [
+      "Manual",
+      "YahooFinance"
+    ],
+    "CurrencyRateSource": [
+      "Manual",
+      "Frankfurter",
+      "Ecb"
+    ],
+    "FeeFrequency": [
+      "Monthly",
+      "Quarterly",
+      "Annually"
+    ],
+    "Operation": [
+      "Created",
+      "Updated",
+      "Removed"
+    ],
+    "Origin": [
+      "Application",
+      "User"
+    ],
+    "RecordKind": [
+      "Account",
+      "Category",
+      "Asset",
+      "Transaction",
+      "FeeSchedule",
+      "FeeCatchUpPosition",
+      "AssetPrice",
+      "CurrencyPair",
+      "CurrencyRate",
+      "HoldingNote"
+    ],
+    "ThresholdDirection": [
+      "Below",
+      "Above"
+    ],
+    "TransactionType": [
+      "Purchase",
+      "Sell",
+      "OpeningBalance",
+      "Deposit",
+      "Withdrawal",
+      "Dividend",
+      "FreeShares",
+      "ManagementFee",
+      "Split",
+      "Interest"
+    ],
+    "UpdateFrequency": [
+      "Automatic",
+      "ManualDay",
+      "ManualWeek",
+      "ManualMonth",
+      "ManualYear"
+    ]
+  }
+}

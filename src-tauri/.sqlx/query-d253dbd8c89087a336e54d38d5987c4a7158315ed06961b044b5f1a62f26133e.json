@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO tombstones (record_kind, record_identity, logical_timestamp, origin, removed_by)\n               VALUES (?, ?, ?, ?, ?)\n               ON CONFLICT(record_kind, record_identity) DO UPDATE SET\n                   logical_timestamp = excluded.logical_timestamp,\n                   origin = excluded.origin,\n                   removed_by = excluded.removed_by",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "d253dbd8c89087a336e54d38d5987c4a7158315ed06961b044b5f1a62f26133e"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sync_logical_timestamp AS \"sync_logical_timestamp?: String\"\n               FROM currency_rates WHERE from_currency = ? AND to_currency = ? AND date = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "sync_logical_timestamp?: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "25a0ac8845e5e017dcd72c894dd79baa1396fd7bac0be791ec26b59d2f549749"
+}

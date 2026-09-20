@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT enabled AS \"enabled: bool\", trigger_time\n               FROM scheduled_fetch_configuration WHERE id = 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "enabled: bool",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "trigger_time",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "5f5037c67c7fd8081a2675caecf9d32ea21abdc3103c308f31305a73f0788874"
+}

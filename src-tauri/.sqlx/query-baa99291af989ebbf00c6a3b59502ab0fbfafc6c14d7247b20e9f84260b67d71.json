@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE accounts SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n           WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "baa99291af989ebbf00c6a3b59502ab0fbfafc6c14d7247b20e9f84260b67d71"
+}

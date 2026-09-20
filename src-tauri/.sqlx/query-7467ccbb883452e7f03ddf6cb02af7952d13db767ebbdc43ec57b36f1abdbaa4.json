@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT account_id, asset_id, last_applied_period\n               FROM fee_catch_up_positions WHERE account_id = ? AND asset_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "account_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "asset_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "last_applied_period",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7467ccbb883452e7f03ddf6cb02af7952d13db767ebbdc43ec57b36f1abdbaa4"
+}

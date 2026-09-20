@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT record_identity FROM tombstones WHERE record_kind = 'AssetPrice' AND record_identity = 'asset-1:2026-08-20'",
+  "describe": {
+    "columns": [
+      {
+        "name": "record_identity",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "de1e142e2869d779f5722e8dba1cfa5d3147fb9b0f26513d71b5a492c17f7252"
+}

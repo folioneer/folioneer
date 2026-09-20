@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO holdings (id, account_id, asset_id, quantity, average_price, total_realized_pnl, last_sold_date)\n               VALUES (?, ?, ?, ?, ?, ?, ?)\n               ON CONFLICT(account_id, asset_id) DO UPDATE SET\n                   quantity = excluded.quantity,\n                   average_price = excluded.average_price,\n                   total_realized_pnl = excluded.total_realized_pnl,\n                   last_sold_date = excluded.last_sold_date",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "df11ba9a6c9e4e28247fbe1b2026bacbc5ef9d6efa159a2bfa96574186b14a46"
+}

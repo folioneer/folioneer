@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO asset_prices (asset_id, date, price, source, sync_logical_timestamp, sync_origin, sync_device_id)\n               VALUES (?, ?, ?, ?, ?, ?, ?)\n               ON CONFLICT(asset_id, date) DO UPDATE SET\n                   price = excluded.price,\n                   source = excluded.source,\n                   sync_logical_timestamp = excluded.sync_logical_timestamp,\n                   sync_origin = excluded.sync_origin,\n                   sync_device_id = excluded.sync_device_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "fd35ce04cf7aa7b9806b3dfaf3b8fe0f65f9292c04e2d0c66f3d478bd57fc976"
+}

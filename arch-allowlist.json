@@ -1,0 +1,119 @@
+{
+  "cross_feature_imports": [
+    {
+      "from": "src/features/account_details/account_details_view/useAccountDetails.ts",
+      "to": "@/features/accounts/shared/presenter"
+    },
+    {
+      "from": "src/features/account_details/buy_transaction/BuyTransactionModal.tsx",
+      "to": "@/features/transactions/shared/EntryModeToggle"
+    },
+    {
+      "from": "src/features/account_details/buy_transaction/BuyTransactionModal.tsx",
+      "to": "@/features/transactions/shared/RecordPriceCheckbox"
+    },
+    {
+      "from": "src/features/account_details/buy_transaction/useBuyTransaction.ts",
+      "to": "@/features/transactions/shared/types"
+    },
+    {
+      "from": "src/features/account_details/buy_transaction/useBuyTransaction.ts",
+      "to": "@/features/transactions/shared/validateTransaction"
+    },
+    {
+      "from": "src/features/account_details/buy_transaction/useBuyTransaction.ts",
+      "to": "@/features/transactions/useTransactions"
+    },
+    {
+      "from": "src/features/account_details/deposit_transaction/useDepositTransaction.ts",
+      "to": "@/features/transactions/shared/presenter"
+    },
+    {
+      "from": "src/features/account_details/gateway.ts",
+      "to": "@/features/transactions/shared/types"
+    },
+    {
+      "from": "src/features/account_details/open_balance/useOpenBalance.ts",
+      "to": "@/features/transactions/shared/presenter"
+    },
+    {
+      "from": "src/features/account_details/refresh_prices/useRefreshAccountPrices.ts",
+      "to": "@/features/accounts/shared/presenter"
+    },
+    {
+      "from": "src/features/account_details/sell_transaction/SellTransactionModal.tsx",
+      "to": "@/features/transactions/shared/EntryModeToggle"
+    },
+    {
+      "from": "src/features/account_details/sell_transaction/SellTransactionModal.tsx",
+      "to": "@/features/transactions/shared/RecordPriceCheckbox"
+    },
+    {
+      "from": "src/features/account_details/sell_transaction/useSellTransaction.ts",
+      "to": "@/features/transactions/shared/types"
+    },
+    {
+      "from": "src/features/account_details/sell_transaction/useSellTransaction.ts",
+      "to": "@/features/transactions/shared/validateTransaction"
+    },
+    {
+      "from": "src/features/account_details/sell_transaction/useSellTransaction.ts",
+      "to": "@/features/transactions/useTransactions"
+    },
+    {
+      "from": "src/features/account_details/withdrawal_transaction/useWithdrawalTransaction.ts",
+      "to": "@/features/transactions/shared/presenter"
+    },
+    {
+      "from": "src/features/transactions/account_journal/useAccountJournal.ts",
+      "to": "@/features/accounts/shared/presenter"
+    },
+    {
+      "from": "src/features/transactions/transaction_list/useTransactionList.ts",
+      "to": "@/features/accounts/shared/presenter"
+    }
+  ],
+  "missing_ids": {
+    "src/features/about/about_modal/AboutModal.tsx": 1,
+    "src/features/account_details/account_details_view/AccountDetailsView.tsx": 1,
+    "src/features/account_details/buy_transaction/BuyTransactionModal.tsx": 2,
+    "src/features/account_details/deposit_transaction/DepositTransactionModal.tsx": 2,
+    "src/features/account_details/dividend_transaction/DividendTransactionModal.tsx": 1,
+    "src/features/account_details/open_balance/OpenBalanceModal.tsx": 2,
+    "src/features/account_details/price_history/EditPriceForm.tsx": 3,
+    "src/features/account_details/price_history/PriceHistoryModal.tsx": 5,
+    "src/features/account_details/sell_transaction/SellTransactionModal.tsx": 2,
+    "src/features/account_details/withdrawal_transaction/WithdrawalTransactionModal.tsx": 2,
+    "src/features/accounts/account_table/AccountTable.tsx": 2,
+    "src/features/accounts/add_account/AddAccountModal.tsx": 2,
+    "src/features/accounts/edit_account_modal/EditAccountModal.tsx": 2,
+    "src/features/assets/add_asset/AddAsset.tsx": 3,
+    "src/features/assets/asset_table/AssetTable.tsx": 3,
+    "src/features/assets/edit_asset_modal/EditAssetModal.tsx": 2,
+    "src/features/assets/web_lookup/SearchPanel.tsx": 1,
+    "src/features/categories/CategoryManager.tsx": 1,
+    "src/features/categories/add_category/AddCategory.tsx": 2,
+    "src/features/categories/category_table/CategoryTable.tsx": 5,
+    "src/features/categories/edit_category_modal/EditCategoryModal.tsx": 2,
+    "src/features/currency/declare_pair/DeclarePairModal.tsx": 1,
+    "src/features/currency/record_rate/RecordRateModal.tsx": 2,
+    "src/features/design-system/DesignSystemPage.tsx": 49,
+    "src/features/settings/sync/SyncSection.tsx": 1,
+    "src/features/settings/sync/enable_modal/EnableSyncModal.tsx": 2,
+    "src/features/shell/Header.tsx": 1,
+    "src/features/shell/Sidebar.tsx": 1,
+    "src/features/transactions/account_journal/AccountJournalPage.tsx": 1,
+    "src/features/transactions/add_transaction/AddTransactionModal.tsx": 2,
+    "src/features/transactions/add_transaction_page/AddTransactionPage.tsx": 2,
+    "src/features/transactions/edit_transaction_modal/EditTransactionModal.tsx": 2,
+    "src/features/transactions/transaction_list/TransactionListPage.tsx": 3,
+    "src/features/update/update_banner/UpdateBanner.tsx": 5
+  },
+  "math_usage": {
+    "src/features/account_details/shared/presenter.ts": 1,
+    "src/features/account_details/split_transaction/useSplitTransaction.ts": 4,
+    "src/features/currency/shared/presenter.ts": 1,
+    "src/features/shell/PriceFetchProgressBar.tsx": 1,
+    "src/features/transactions/edit_transaction_modal/useEditTransactionModal.ts": 1
+  }
+}

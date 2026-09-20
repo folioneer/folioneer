@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO holding_notes (account_id, asset_id, text, threshold_price, threshold_direction,\n                                          sync_logical_timestamp, sync_origin, sync_device_id)\n               VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n               ON CONFLICT(account_id, asset_id) DO UPDATE SET\n                   text = excluded.text,\n                   threshold_price = excluded.threshold_price,\n                   threshold_direction = excluded.threshold_direction,\n                   sync_logical_timestamp = excluded.sync_logical_timestamp,\n                   sync_origin = excluded.sync_origin,\n                   sync_device_id = excluded.sync_device_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "de906a4268a45149f5fbe76d3d311bb387634cb31a860fd8e8bbfdd637bafdf7"
+}

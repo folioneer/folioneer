@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COALESCE(MAX(sequence), 0) + 1 AS \"sequence!: i64\" FROM changes WHERE device_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "sequence!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f69438971ca0e0f812b2d0487019b7c7e607b8d929700fdf2bddf54b1da03234"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE transactions SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n           WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "2f1223ca57ac309cb65dca1a19a3266c6f68318ff01d394aa934b46ffa9c1432"
+}

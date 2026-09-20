@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE transactions SET account_id = ?, asset_id = ?, transaction_type = ?,\n                               date = ?, quantity = ?, unit_price = ?, exchange_rate = ?, fees = ?,\n                               total_amount = ?, note = ?, realized_pnl = ?\n                           WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 12
+    },
+    "nullable": []
+  },
+  "hash": "4567a2c0aaa5570c08f8e018bd49d3a2063a09dd5441735938257c63edc0ea52"
+}

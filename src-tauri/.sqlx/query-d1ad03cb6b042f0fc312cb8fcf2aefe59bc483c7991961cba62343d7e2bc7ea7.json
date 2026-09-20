@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS identity, sync_logical_timestamp, sync_origin, sync_device_id\n               FROM accounts WHERE LOWER(name) = LOWER(?) AND id <> ?\n               ORDER BY sync_origin, sync_logical_timestamp, sync_device_id, id\n               LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "identity",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 3,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "d1ad03cb6b042f0fc312cb8fcf2aefe59bc483c7991961cba62343d7e2bc7ea7"
+}

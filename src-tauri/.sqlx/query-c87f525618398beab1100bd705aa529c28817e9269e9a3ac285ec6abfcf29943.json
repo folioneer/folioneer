@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT asset_id AS identity, sync_logical_timestamp, sync_origin, sync_device_id\n               FROM fee_schedules WHERE account_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "identity",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 3,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "c87f525618398beab1100bd705aa529c28817e9269e9a3ac285ec6abfcf29943"
+}

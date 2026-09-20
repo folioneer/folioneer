@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, name, bank_name, currency, update_frequency, management_fees_enabled FROM accounts",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "bank_name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "currency",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "update_frequency",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "management_fees_enabled",
+        "ordinal": 5,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f62c5e5fd529e13efa00802ecb25845fd98de97e782e40951bc994cb2c721504"
+}

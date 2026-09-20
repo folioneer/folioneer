@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT last_completed_at FROM price_fetch_log WHERE id = 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "last_completed_at",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b362ce36bfa75b75aa252978933b1e7a293b1f1d6881ee7e355786a088a45896"
+}

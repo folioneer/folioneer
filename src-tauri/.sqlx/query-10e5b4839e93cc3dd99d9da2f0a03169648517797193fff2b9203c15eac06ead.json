@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT record_identity FROM tombstones WHERE record_kind = 'Transaction' AND record_identity = 'tx-1'",
+  "describe": {
+    "columns": [
+      {
+        "name": "record_identity",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "10e5b4839e93cc3dd99d9da2f0a03169648517797193fff2b9203c15eac06ead"
+}

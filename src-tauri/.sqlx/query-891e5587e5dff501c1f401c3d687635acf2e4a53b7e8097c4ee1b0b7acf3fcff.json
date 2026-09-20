@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price,\n                              exchange_rate, fees, total_amount, note, realized_pnl, created_at,\n                              sync_logical_timestamp, sync_origin, sync_device_id\n                       FROM transactions WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "asset_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "transaction_type",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "date",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "quantity",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "unit_price",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "exchange_rate",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "fees",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "total_amount",
+        "ordinal": 9,
+        "type_info": "Integer"
+      },
+      {
+        "name": "note",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "realized_pnl",
+        "ordinal": 11,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 13,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 14,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 15,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "891e5587e5dff501c1f401c3d687635acf2e4a53b7e8097c4ee1b0b7acf3fcff"
+}

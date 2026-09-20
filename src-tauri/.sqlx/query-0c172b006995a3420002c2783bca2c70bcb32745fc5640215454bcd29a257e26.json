@@ -1,0 +1,92 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                a.id, a.name, a.reference, a.isin, a.asset_class, a.currency, a.risk_level,\n                c.id as \"category_id?: String\",\n                c.name as \"category_name?: String\",\n                a.is_archived as \"is_archived: bool\",\n                a.exchange_code,\n                a.price_refresh_blocked as \"price_refresh_blocked: bool\",\n                a.interest_bearing as \"interest_bearing: bool\"\n            FROM assets a\n            LEFT JOIN categories c ON a.category_id = c.id AND c.is_deleted = 0\n            WHERE a.id = ? AND a.is_deleted = 0\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "reference",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "isin",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "asset_class",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "currency",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "risk_level",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "category_id?: String",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "category_name?: String",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "is_archived: bool",
+        "ordinal": 9,
+        "type_info": "Integer"
+      },
+      {
+        "name": "exchange_code",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "price_refresh_blocked: bool",
+        "ordinal": 11,
+        "type_info": "Integer"
+      },
+      {
+        "name": "interest_bearing: bool",
+        "ordinal": 12,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "0c172b006995a3420002c2783bca2c70bcb32745fc5640215454bcd29a257e26"
+}

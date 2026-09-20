@@ -1,0 +1,13 @@
+-- DIV-023 — Documentation-only migration.
+--
+-- Cash Dividend introduces one new TransactionType discriminant on the Rust
+-- side: `Dividend`. The `transactions.transaction_type` column is already
+-- TEXT NOT NULL DEFAULT 'Purchase' (see 202604120002_create_transactions.sql)
+-- with no CHECK constraint, so no schema change is required — the new variant
+-- is a valid string value out of the box (same as Deposit/Withdrawal in
+-- 202605060001_add_cash_transaction_types.sql).
+--
+-- This file exists so the migration history records the moment the `Dividend`
+-- variant entered the wire format, and so `cargo sqlx prepare` is forced to
+-- refresh on a fresh checkout. The body is intentionally a no-op SELECT.
+SELECT 1;

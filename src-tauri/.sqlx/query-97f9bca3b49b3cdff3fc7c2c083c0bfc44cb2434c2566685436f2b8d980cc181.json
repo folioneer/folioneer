@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT record_kind, record_identity, logical_timestamp, origin, removed_by\n               FROM tombstones WHERE record_kind = ? AND record_identity = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "record_kind",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "record_identity",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "logical_timestamp",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "origin",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "removed_by",
+        "ordinal": 4,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "97f9bca3b49b3cdff3fc7c2c083c0bfc44cb2434c2566685436f2b8d980cc181"
+}

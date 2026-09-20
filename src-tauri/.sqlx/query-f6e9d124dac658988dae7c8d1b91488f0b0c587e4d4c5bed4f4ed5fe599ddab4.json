@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO asset_prices (asset_id, date, price, source) VALUES (?, ?, ?, ?)\n             ON CONFLICT(asset_id, date) DO UPDATE SET price = excluded.price, source = excluded.source",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "f6e9d124dac658988dae7c8d1b91488f0b0c587e4d4c5bed4f4ed5fe599ddab4"
+}

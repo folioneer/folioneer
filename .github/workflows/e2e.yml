@@ -1,0 +1,243 @@
+name: E2E
+
+on:
+  # Every pull request and every push to main run the full suite. The ~20-min
+  # Tauri build is the price of merging on green: nothing reaches main that the
+  # real app has not passed. Pull requests carry no path filter on purpose: a
+  # filtered-out run leaves a required check "Expected" forever and the PR can
+  # never merge, so doc-only PRs pay for the run too. Pushes to main keep the
+  # filter — nothing gates on them.
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths-ignore: ["**/*.md", "docs/**"]
+  # Run on demand against any branch — useful before merging a change to the
+  # test tooling itself.
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: E2E — headless WebDriver
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # The screenshot comment below is posted on the pull request.
+      pull-requests: write
+      # The visual comparison downloads main's screenshot artifact.
+      actions: read
+
+    env:
+      # SQLX_OFFLINE also set in src-tauri/.cargo/config.toml [env]; declaring
+      # it explicitly here for defence-in-depth (cargo only reads config.toml
+      # under src-tauri/ cwd) and parity with other workflows.
+      SQLX_OFFLINE: "true"
+      CARGO_INCREMENTAL: 0
+      RUSTFLAGS: "-C debuginfo=0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Install Linux dependencies
+        # webkit2gtk-driver provides WebKitWebDriver (used by tauri-driver on Linux);
+        # xvfb provides the virtual framebuffer for headless rendering.
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf \
+            webkit2gtk-driver xvfb libdbus-1-dev imagemagick
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2.9.1
+        with:
+          workspaces: src-tauri
+          prefix-key: linux-e2e-rust-${{ hashFiles('src-tauri/Cargo.lock') }}
+
+      - name: Cache tauri-driver binary
+        id: cache-tauri-driver
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+        with:
+          path: ~/.cargo/bin/tauri-driver
+          key: tauri-driver-2.0.5-${{ runner.os }}
+
+      - name: Install tauri-driver
+        if: steps.cache-tauri-driver.outputs.cache-hit != 'true'
+        shell: bash
+        run: cargo install tauri-driver --version 2.0.5 --locked
+
+      - name: Install frontend dependencies
+        shell: bash
+        run: npm ci
+
+      - name: Run E2E (headless via Xvfb)
+        # `test:e2e:ci` is the project's xvfb wrapper around `test:e2e` (see package.json).
+        shell: bash
+        run: npm run test:e2e:ci
+
+      - name: Upload real-app screenshots
+        # e2e/helpers/screenshot.ts captures each spec's screen in both themes.
+        # Uploaded pass or fail: on a failure the captures taken before the
+        # failing step are still the best picture of what the app showed. A
+        # cancelled run (superseded by a newer push) uploads nothing.
+        if: ${{ !cancelled() }}
+        id: upload-screens
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: e2e-screenshots
+          path: screenshots/e2e/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Compare the screens with main
+        # Visual regression: every capture is compared with the same screen
+        # from main's latest green run (its e2e-screenshots artifact). A
+        # difference above the threshold is a regression when the pull request
+        # touched no frontend file; when it did, the change is expected and
+        # only listed (a change to the capture helper counts as frontend for
+        # this purpose). Small text differences (a price age, a date) stay
+        # under the threshold; layout and theme breakage do not. No baseline (no
+        # green main run with an artifact) skips the comparison with a note.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        id: visual
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE: ${{ github.base_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          THRESHOLD_PCT: "0.3"
+        run: |
+          set -euo pipefail
+          mkdir -p screenshots/e2e-diff
+          # The checkout is shallow, so the PR's file list comes from the API.
+          files=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')
+          touched=$(grep -E '^(src/|public/|index\.html$|e2e/helpers/screenshot\.ts$)|\.(css|tsx)$' <<<"$files" || true)
+          if [[ -n "$touched" ]]; then frontend=true; else frontend=false; fi
+          run_id=$(gh run list --workflow E2E --branch "$BASE" --status success --limit 1 --json databaseId --jq '.[0].databaseId' || true)
+          if [[ -z "$run_id" || "$run_id" == "null" ]] || ! gh run download "$run_id" -n e2e-screenshots -D baseline; then
+            echo "verdict=no-baseline" >> "$GITHUB_OUTPUT"
+            echo "No green main run with screenshots — comparison skipped."
+            exit 0
+          fi
+          changed=""
+          for png in screenshots/e2e/*.png; do
+            [[ -e "$png" ]] || continue
+            name=$(basename "$png")
+            base="baseline/$name"
+            [[ -e "$base" ]] || { echo "new screen: $name"; continue; }
+            total=$(identify -format '%[fx:w*h]' "$png")
+            # AE = count of pixels that differ beyond the fuzz; compare exits 1 when any do.
+            ae=$(compare -metric AE -fuzz 3% "$base" "$png" "screenshots/e2e-diff/$name" 2>&1 >/dev/null || true)
+            # AE is a count, possibly in scientific notation; anything else
+            # (sizes differ, unreadable file) counts as a full change.
+            [[ "$ae" =~ ^[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$ ]] || ae=$total
+            pct=$(awk -v a="${ae:-0}" -v t="$total" 'BEGIN { printf "%.3f", (t > 0 ? 100 * a / t : 0) }')
+            if awk -v p="$pct" -v th="$THRESHOLD_PCT" 'BEGIN { exit !(p > th) }'; then
+              changed+="- \`${name%.png}\` (${pct}% of pixels)"$'\n'
+            else
+              rm -f "screenshots/e2e-diff/$name"
+            fi
+          done
+          delim="CHANGED_$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
+          {
+            echo "changed<<$delim"
+            printf '%s' "$changed"
+            echo "$delim"
+          } >> "$GITHUB_OUTPUT"
+          if [[ -z "$changed" ]]; then
+            echo "verdict=same" >> "$GITHUB_OUTPUT"; echo "No screen differs from main beyond ${THRESHOLD_PCT}%."
+          elif [[ "$frontend" == true ]]; then
+            echo "verdict=expected" >> "$GITHUB_OUTPUT"; echo "Screens differ and the PR touches frontend code:"; printf '%s' "$changed"
+          else
+            echo "verdict=regression" >> "$GITHUB_OUTPUT"; echo "::error::Screens differ from main but the PR touches no frontend file:"; printf '%s' "$changed"
+          fi
+
+      - name: Upload the visual diffs
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: e2e-visual-diff
+          path: screenshots/e2e-diff/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload E2E failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: e2e-failure-screenshots
+          path: screenshots/e2e-failures/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Link the screenshots from the pull request
+        # One sticky comment per PR (found by its marker, edited on re-runs)
+        # listing every captured screen and linking the artifact. Artifacts
+        # cannot be embedded inline, so the comment is an index, not a gallery.
+        # Best-effort: a fork or Dependabot PR runs with a read-only token and
+        # the comment is refused; that must never turn a green suite red.
+        # Skipped on a cancelled run so a superseded run cannot overwrite the
+        # comment the newer run is about to post.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ARTIFACT_URL: ${{ steps.upload-screens.outputs.artifact-url }}
+          JOB_STATUS: ${{ job.status }}
+          VISUAL_VERDICT: ${{ steps.visual.outputs.verdict }}
+          VISUAL_CHANGED: ${{ steps.visual.outputs.changed }}
+        run: |
+          set -euo pipefail
+          MARKER='<!-- e2e-screenshots -->'
+          case "${VISUAL_VERDICT:-}" in
+            same) VISUAL=$'\n\nNo screen differs from main.' ;;
+            expected) VISUAL=$'\n\nScreens that differ from main (frontend code changed, see the e2e-visual-diff artifact):\n\n'"$VISUAL_CHANGED" ;;
+            regression) VISUAL=$'\n\n**Visual regression** — screens differ from main although no frontend file changed (see the e2e-visual-diff artifact):\n\n'"$VISUAL_CHANGED" ;;
+            no-baseline) VISUAL=$'\n\nNo main baseline yet; comparison skipped.' ;;
+            *) VISUAL="" ;;
+          esac
+          LIST=""
+          for png in screenshots/e2e/*-light.png; do
+            [[ -e "$png" ]] || continue
+            screen=$(basename "$png" -light.png)
+            LIST+="- \`${screen}\`"$'\n'
+          done
+          if [[ -n "$LIST" ]]; then
+            COUNT=$(printf '%s' "$LIST" | grep -c '^-')
+            BODY=$(printf '%s\n## E2E screenshots — %s\n\n%s screens captured in light and dark by the real app ([download](%s), [run](%s)):\n\n%s%s' \
+              "$MARKER" "$JOB_STATUS" "$COUNT" "${ARTIFACT_URL:-$RUN_URL}" "$RUN_URL" "$LIST" "$VISUAL")
+          else
+            BODY=$(printf '%s\n## E2E screenshots — %s\n\nNo screen was captured ([run](%s)).\n' "$MARKER" "$JOB_STATUS" "$RUN_URL")
+          fi
+          EXISTING=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -n 1)
+          if [[ -n "$EXISTING" ]]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING}" -f body="$BODY" > /dev/null
+          else
+            gh pr comment "$PR_NUMBER" --body "$BODY"
+          fi
+
+      - name: Fail on a visual regression
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.visual.outputs.verdict == 'regression' }}
+        shell: bash
+        run: |
+          echo "::error::Visual regression — see the e2e-visual-diff artifact and the PR comment."
+          exit 1

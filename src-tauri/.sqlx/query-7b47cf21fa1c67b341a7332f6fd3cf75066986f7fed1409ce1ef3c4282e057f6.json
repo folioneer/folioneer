@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO sync_device\n               (id, device_id, device_name, folder, joined_at, paused, portfolio_created_at,\n                logical_clock, derived_key, data_format_version)\n               VALUES (1, ?, 'Desktop', '/tmp/sync', '2026-08-22T00:00:00Z', 0,\n                       '2026-08-22T00:00:00Z', 0, X'00', 1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "7b47cf21fa1c67b341a7332f6fd3cf75066986f7fed1409ce1ef3c4282e057f6"
+}

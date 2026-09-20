@@ -1,0 +1,80 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, account_id, asset_id, annual_rate_micros, frequency, start_date,\n                              end_date, active, sync_logical_timestamp, sync_origin, sync_device_id\n                       FROM fee_schedules WHERE account_id = ? AND asset_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "asset_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "annual_rate_micros",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "frequency",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "start_date",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "end_date",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "active",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 10,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "1a11271a325b6bc8dcc7335f5f5dcf232c26f87fe6f4f04d2bc279508f42f5f2"
+}

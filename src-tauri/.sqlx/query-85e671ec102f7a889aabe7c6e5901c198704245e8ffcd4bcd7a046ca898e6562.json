@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sync_logical_timestamp, sync_origin FROM fee_schedules WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "85e671ec102f7a889aabe7c6e5901c198704245e8ffcd4bcd7a046ca898e6562"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM held_back_changes WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "223721f32b11886bc3b709da1d2a3325ed05936bb20e6d1eb75fc3e8d66092d8"
+}

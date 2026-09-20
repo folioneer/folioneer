@@ -1,0 +1,217 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # Full history so `git merge-base --is-ancestor` in the "Verify tag
+          # is on main" step can traverse parents; depth-1 silently misclassifies
+          # any tag not literally at main's tip.
+          fetch-depth: 0
+
+      - name: Verify tag is on main
+        shell: bash
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$COMMIT_SHA" origin/main \
+            || { echo "Tag is not on main branch — aborting release"; exit 1; }
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2.9.1
+        with:
+          workspaces: src-tauri
+          prefix-key: windows-rust-${{ hashFiles('src-tauri/Cargo.lock') }}
+
+      - name: Clear stale WiX artifacts
+        shell: powershell
+        run: Remove-Item -Recurse -Force "src-tauri\target\x86_64-pc-windows-msvc\release\wix" -ErrorAction SilentlyContinue
+
+      - name: Install frontend dependencies
+        shell: bash
+        run: npm ci
+
+      - name: Derive product name
+        # Single source of truth: tauri.conf.json productName is the canonical
+        # Tauri display name (installer title, window title, bundle metadata).
+        # Reading it here keeps this workflow portable verbatim across projects.
+        # jq is pre-installed on windows-latest runners.
+        # -e exits non-zero if productName is null/missing — fail-fast over
+        # silently releasing "null v1.2.3".
+        shell: bash
+        run: |
+          name=$(jq -er .productName src-tauri/tauri.conf.json) \
+            || { echo "::error::productName missing in src-tauri/tauri.conf.json"; exit 1; }
+          echo "PRODUCT_NAME=$name" >> "$GITHUB_ENV"
+
+      - name: Build and release
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5  # action-v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          SQLX_OFFLINE: true
+          CARGO_INCREMENTAL: 0
+          RUSTFLAGS: "-C debuginfo=0"
+          # reqwest 0.13's rustls feature pulls aws-lc-sys, whose Windows build
+          # needs NASM; use the crate's prebuilt NASM objects so the runner does
+          # not have to provide the assembler.
+          AWS_LC_SYS_PREBUILT_NASM: "1"
+        with:
+          tauriScript: npm run tauri
+          args: --target x86_64-pc-windows-msvc
+          tagName: ${{ github.ref_name }}
+          releaseName: "${{ env.PRODUCT_NAME }} ${{ github.ref_name }}"
+          releaseBody: "See the release assets to download and install this version."
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+
+      - name: Clear Rust cache on failure
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh cache list --key "windows-rust-" --json id --jq '.[].id' --repo "${{ github.repository }}" \
+            | xargs -r -n1 gh cache delete --repo "${{ github.repository }}" || true
+
+  linux:
+    # Serialized behind the Windows job: tauri-action merges its platform entry
+    # into the release's existing latest.json, a read-modify-write that would
+    # race if both jobs uploaded the manifest at once.
+    needs: windows
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag is on main
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$COMMIT_SHA" origin/main \
+            || { echo "Tag is not on main branch — aborting release"; exit 1; }
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdbus-1-dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2.9.1
+        with:
+          workspaces: src-tauri
+          prefix-key: linux-rust-${{ hashFiles('src-tauri/Cargo.lock') }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Derive product name
+        run: |
+          name=$(jq -er .productName src-tauri/tauri.conf.json) \
+            || { echo "::error::productName missing in src-tauri/tauri.conf.json"; exit 1; }
+          echo "PRODUCT_NAME=$name" >> "$GITHUB_ENV"
+
+      - name: Build and release
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5  # action-v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          SQLX_OFFLINE: true
+          CARGO_INCREMENTAL: 0
+          RUSTFLAGS: "-C debuginfo=0"
+          # Runners have no FUSE, so the AppImage tooling unpacks itself
+          # instead of mounting.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        with:
+          tauriScript: npm run tauri
+          # The AppImage carries the updater signature; the deb is a
+          # manual-install artifact the updater never touches.
+          args: --target x86_64-unknown-linux-gnu --bundles appimage,deb
+          tagName: ${{ github.ref_name }}
+          releaseName: "${{ env.PRODUCT_NAME }} ${{ github.ref_name }}"
+          releaseBody: "See the release assets to download and install this version."
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+
+      - name: Verify updater manifest covers both platforms
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Waiting for the merged updater manifest..."
+          for i in 1 2 3; do
+            sleep 10
+            ASSET_URL=$(gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" \
+              --json assets --jq '.assets[] | select(.name == "latest.json") | .apiUrl')
+            if [ -n "$ASSET_URL" ]; then
+              gh api -H "Accept: application/octet-stream" "$ASSET_URL" > latest.json
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "::error::latest.json is not attached to the release"
+              exit 1
+            fi
+            echo "Attempt $i: latest.json not yet available, retrying..."
+          done
+          MISSING=$(jq -r '(["linux-x86_64", "windows-x86_64"] - (.platforms | keys)) | join(", ")' latest.json)
+          if [ -n "$MISSING" ]; then
+            echo "::error::latest.json is missing updater platform(s): $MISSING"
+            exit 1
+          fi
+          echo "✓ latest.json covers linux-x86_64 and windows-x86_64"
+
+      - name: Clear Rust cache on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh cache list --key "linux-rust-" --json id --jq '.[].id' --repo "${{ github.repository }}" \
+            | xargs -r -n1 gh cache delete --repo "${{ github.repository }}" || true

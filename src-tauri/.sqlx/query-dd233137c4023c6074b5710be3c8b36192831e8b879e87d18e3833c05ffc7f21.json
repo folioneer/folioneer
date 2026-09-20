@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, origin_device_id, sequence, payload, waiting_kind, waiting_identity,\n                      held_since\n               FROM held_back_changes ORDER BY held_since ASC, id ASC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "origin_device_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "sequence",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "payload",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "waiting_kind",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "waiting_identity",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "held_since",
+        "ordinal": 6,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "dd233137c4023c6074b5710be3c8b36192831e8b879e87d18e3833c05ffc7f21"
+}

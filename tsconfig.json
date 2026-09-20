@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    /* 2026 Standards */
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+
+    /* Bundler strategy (Vite 6 optimized) */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Explicit type inclusion to block react-scripts suggestions */
+    "types": ["vite/client", "vitest/globals"],
+
+    /* Strictness & Quality */
+    "strict": true,
+    "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+
+    /* Path aliases */
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["src/bindings.ts"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}

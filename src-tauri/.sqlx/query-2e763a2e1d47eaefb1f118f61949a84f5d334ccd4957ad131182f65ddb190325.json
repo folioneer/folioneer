@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM asset_prices",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "2e763a2e1d47eaefb1f118f61949a84f5d334ccd4957ad131182f65ddb190325"
+}

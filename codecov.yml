@@ -1,0 +1,23 @@
+coverage:
+  range: "25..65"    # <25% = red, >65% = green, gradient in between
+  precision: 0
+  round: down
+
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 2%   # allow up to 2% drop before failing CI
+    patch:
+      default:
+        target: 50%     # new code introduced in a PR should be ≥50% covered
+
+flags:
+  frontend:
+    paths:
+      - src/
+    carryforward: false
+  backend:
+    paths:
+      - src-tauri/src/
+    carryforward: false

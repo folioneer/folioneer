@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO fee_catch_up_positions (account_id, asset_id, last_applied_period,\n                                                   sync_logical_timestamp, sync_origin, sync_device_id)\n               VALUES (?, ?, ?, ?, ?, ?)\n               ON CONFLICT(account_id, asset_id) DO UPDATE SET\n                   last_applied_period = MAX(last_applied_period, excluded.last_applied_period),\n                   sync_logical_timestamp = excluded.sync_logical_timestamp,\n                   sync_origin = excluded.sync_origin,\n                   sync_device_id = excluded.sync_device_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "e267100bc166cf0620f873799addac9c7b027feb55c059265857ed71607d24a9"
+}

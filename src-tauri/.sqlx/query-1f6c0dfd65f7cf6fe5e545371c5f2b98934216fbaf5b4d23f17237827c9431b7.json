@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT record_kind, record_identity, removed_by FROM tombstones WHERE record_kind = 'Account' AND record_identity = 'account-1'",
+  "describe": {
+    "columns": [
+      {
+        "name": "record_kind",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "record_identity",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "removed_by",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1f6c0dfd65f7cf6fe5e545371c5f2b98934216fbaf5b4d23f17237827c9431b7"
+}

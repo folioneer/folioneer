@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sequence, logical_timestamp, based_on, record_kind, record_identity,\n                      operation, origin, content\n               FROM changes WHERE device_id = ? AND published = 0\n               ORDER BY sequence ASC",
+  "describe": {
+    "columns": [
+      {
+        "name": "sequence",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "logical_timestamp",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "based_on",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "record_kind",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "record_identity",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "operation",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "origin",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "content",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "c184b052e25ae92da4a11116225b7427584517dda8906eee69792a9cb9e789eb"
+}

@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT account_id, asset_id, text, threshold_price, threshold_direction\n               FROM holding_notes WHERE account_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "account_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "asset_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "text",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "threshold_price",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "threshold_direction",
+        "ordinal": 4,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "9ab3ddfc03edaae63e4fa081ccd356eb38d61baffc437b30de030263b14a7aa8"
+}

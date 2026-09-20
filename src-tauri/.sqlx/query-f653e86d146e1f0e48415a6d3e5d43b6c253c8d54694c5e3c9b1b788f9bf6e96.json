@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT sync_logical_timestamp, sync_origin, sync_device_id FROM assets WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "f653e86d146e1f0e48415a6d3e5d43b6c253c8d54694c5e3c9b1b788f9bf6e96"
+}

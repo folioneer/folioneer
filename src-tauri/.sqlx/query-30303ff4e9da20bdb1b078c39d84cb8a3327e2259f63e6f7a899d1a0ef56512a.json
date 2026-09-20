@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT origin FROM changes WHERE device_id = 'desktop-device'",
+  "describe": {
+    "columns": [
+      {
+        "name": "origin",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "30303ff4e9da20bdb1b078c39d84cb8a3327e2259f63e6f7a899d1a0ef56512a"
+}

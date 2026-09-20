@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO categories (id, name, is_deleted, sync_logical_timestamp, sync_origin, sync_device_id)\n               VALUES (?, ?, 0, ?, ?, ?)\n               ON CONFLICT(id) DO UPDATE SET\n                   name = excluded.name,\n                   is_deleted = 0,\n                   sync_logical_timestamp = excluded.sync_logical_timestamp,\n                   sync_origin = excluded.sync_origin,\n                   sync_device_id = excluded.sync_device_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "63d504245f50abe33c401ca4dec8253ccd0515319cb7e3653e349bd533aa5fa1"
+}

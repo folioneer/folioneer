@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE accounts\n               SET name = ?, bank_name = ?, currency = ?, update_frequency = ?, management_fees_enabled = ?\n               WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "410a05c1d2546a986f1ca53893501be7cf199d747b9c5e0bb75ae58f26b74ae2"
+}

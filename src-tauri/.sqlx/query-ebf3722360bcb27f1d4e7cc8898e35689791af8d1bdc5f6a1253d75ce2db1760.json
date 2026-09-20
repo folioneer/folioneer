@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE conflict_notices SET dismissed = 1 WHERE notice_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "ebf3722360bcb27f1d4e7cc8898e35689791af8d1bdc5f6a1253d75ce2db1760"
+}

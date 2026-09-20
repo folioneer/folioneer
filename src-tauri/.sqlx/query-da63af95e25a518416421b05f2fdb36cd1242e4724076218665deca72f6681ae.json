@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, account_id, asset_id, quantity, average_price, total_realized_pnl, last_sold_date FROM holdings WHERE account_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "asset_id",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "quantity",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "average_price",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "total_realized_pnl",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "last_sold_date",
+        "ordinal": 6,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "da63af95e25a518416421b05f2fdb36cd1242e4724076218665deca72f6681ae"
+}

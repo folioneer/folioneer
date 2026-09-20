@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT asset_id, SUM(realized_pnl) as \"total_pnl: i64\"\n               FROM transactions\n               WHERE account_id = ? AND transaction_type = 'Sell'\n               GROUP BY asset_id",
+  "describe": {
+    "columns": [
+      {
+        "name": "asset_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "total_pnl: i64",
+        "ordinal": 1,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "1018f3af99b6b2fbaca5586a0815efcfd90d9632f86489669b26327e7f0fa84e"
+}

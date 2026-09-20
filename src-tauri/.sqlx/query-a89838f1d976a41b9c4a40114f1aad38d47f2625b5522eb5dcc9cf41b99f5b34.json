@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE changes SET published = 1 WHERE device_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "a89838f1d976a41b9c4a40114f1aad38d47f2625b5522eb5dcc9cf41b99f5b34"
+}
