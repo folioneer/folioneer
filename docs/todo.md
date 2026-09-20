@@ -2,7 +2,7 @@
 
 <!-- Add new backlog items here. Format: ## #NNN — (domain) — Short title -->
 <!-- #NNN is a permanent reference: never renumbered, never reused. A new entry takes the -->
-<!-- next free number wherever it is placed. Next free: #036. -->
+<!-- next free number wherever it is placed. Next free: #041. -->
 <!-- Every entry ends with four lines: **User value:**, **Done when:**, **Design:** and -->
 <!-- **Open questions:**. Design is `none` until the agent proposes one (it does so before -->
 <!-- touching anything the user sees), then `proposed (screenshots/design/NNN-*.png)`, then -->
@@ -78,6 +78,19 @@ When the since-inception % and annualized-yield columns are suppressed by the Di
 **Done when:** The response carries a degradation reason, suppressed cells show a persistent hint naming the cause, and an opening balance submitted with Total Cost 0 warns inline.
 **Design:** none
 **Open questions:** none
+
+## #036 — (fullstack) — The application is complete without a price provider
+
+The application assumes a price provider always exists: `lib.rs` builds the Yahoo client unconditionally and hands it to the asset service, the scheduled fetch and the price history backfill. The owner's decision of 2026-09-20 (#034) is that the public build stops calling services whose terms forbid commercial use, so the public build will soon have no provider at all — and today that state does not exist.
+
+Proposal: the provider becomes optional at the composition root. The backend tells the frontend whether automatic prices are available; without them, the fetch actions, the scheduled daily fetch setting, the price history backfill and the fetch progress bar are absent, the scheduled fetch is not registered with the operating system, and nothing reports an error. Prices typed by hand work as they do today, and the application must read as complete, not as amputated. With a provider, nothing changes. MKT and SPF rules change: route through `/spec-writer`. Until #038 closes, the public build still carries Yahoo, so this entry ships the empty state without anyone meeting it yet.
+
+**User value:** A user of the free application gets a coherent application whose prices are typed by hand, with no dead button and no failed fetch.
+**Done when:** Built without a provider, the application offers no automatic-price control anywhere, registers no scheduled fetch and logs no fetch failure; the frontend learns availability from the backend and decides nothing itself; built with a provider, every existing test and the golden portfolio are unchanged; the changed rules are covered by tests; screenshots show the affected screens in both states, light and dark.
+**Design:** none
+**Open questions:**
+
+- [ ] Without a provider, are the automatic-price controls hidden, or shown disabled with a word about a future subscription? (Recommended: hidden now; the notice arrives with #039, when there is something to subscribe to.)
 
 ## #025 — (fullstack) — Import transactions from a CSV file
 
@@ -157,6 +170,18 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
 
+## #039 — (service) — A hosted price feed the application can subscribe to (deferred)
+
+What is sold is what a server of the owner's provides (#034): first a price feed under a licence that allows it, later bank feeds, perhaps advice. The application stays free and open, so nothing sold can live in it — a switch in an AGPL client is one fork away from being flipped. The client is ordinary public code: one more price provider behind the seam of #036 and #037, which calls the owner's service with the subscriber's token. Deferred until #034 has named a licensed source and its cost, and until the application is worth showing (#030).
+
+**User value:** A subscriber gets prices fetched for them, daily and on demand, without typing them and without the application standing on an endpoint it has no right to use.
+**Done when:** To be written when the entry is scheduled — the service, its licensed source, the subscription and the client each deserve their own entry.
+**Design:** none
+**Open questions:**
+
+- [ ] Which words name the paid feeds? "Sync" already means multi-device sync in the vocabulary. (Recommended: "price feed" and "bank feed".)
+- [ ] Does multi-device sync through a folder the user owns stay free, a hosted sync being a separate paid offer? (Assumed yes in #034's answer.)
+
 ## #013 — (frontend) — Merge TXL per-asset page into the account journal (deferred)
 
 The per-asset transaction page (`transaction_list/TransactionListPage.tsx`, route `/accounts/$accountId/transactions/$assetId`, the holdings-row loupe target) predates the account journal and is now a strict subset of it — both already share `TransactionTable`, `EditTransactionModal`, delete flow, and `routeEditTransaction`. Consolidate: the loupe navigates to the journal with the asset filter prepopulated (`/accounts/$accountId/journal?asset=<assetId>`); delete the TXL page/hook/route. Decided 2026-07-06: cash-statement columns (Cash out / Cash in / Balance) render only in the unfiltered (global) journal view; with an asset filter active the table shows plain Total Amount — a running balance over a filtered subset is misleading.
@@ -172,6 +197,17 @@ Must carry over before deleting TXL: (1) add-transaction CTA + `AddTransactionMo
 
 <!-- Below: no direct user value — test infrastructure, conventions, dependency currency. -->
 
+## #040 — (tooling) — A development run opens the owner's real portfolio, and `--reset-db` deletes it
+
+Measured 2026-09-20: `just dev` runs `scripts/start-app.sh`, which runs `tauri dev`; the data folder is `app_local_data_dir()` for the identifier `com.folioneer.desktop` — the installed application's folder. Only E2E runs are redirected (`FOLIONEER_E2E_DATA_DIR`, debug builds). So a development run applies migrations still being written to the live database, takes part in multi-device sync as the real computer, and `just dev --reset-db` deletes the live database (`core/db.rs` removes the file when `RESET_DATABASE` is set — a variable the release binary honours too). CLAUDE.md rule 1 declares that folder read-only; the development command does not respect it.
+
+Proposal: a debug build resolves its own data and log folders (a development identifier passed by `start-app.sh`, or a variable on the model of the E2E one), and the headless scheduled-fetch resolver (`resolve_app_local_data_dir`) follows the same rule. `RESET_DATABASE` is ignored outside debug builds. A recipe seeds the development folder with a copy of the live database on request, reading the source without modifying it.
+
+**User value:** None directly — the owner's real portfolio can no longer be migrated, synced or deleted by a development run.
+**Done when:** `just dev` reads and writes nothing under the installed application's folder, proven by a test of the folder resolution in debug and release; `--reset-db` can only delete the development database and a release binary ignores `RESET_DATABASE`; a recipe copies the live database into the development folder without touching the source; the Commands section of CLAUDE.md says where a development run keeps its data.
+**Design:** none
+**Open questions:** none
+
 ## #034 — (licence) — What the application relies on that may not be used commercially: services and data
 
 The licence check of `just licence-check` reads software licences; it cannot see the terms of a service the application calls or of data it embeds, and those can forbid commercial use just as well. Four services are called today (measured 2026-09-20): Yahoo Finance's unofficial chart endpoint for every price (`query1.finance.yahoo.com`, ADR-017) — its terms reserve it for personal use and it can disappear without notice; Frankfurter and the ECB for exchange rates; OpenFIGI for the asset lookup. Embedded data includes the exchange-code list and the fonts and icons, the last two already covered by the licence check. None of this matters while the application is a free personal tool; it decides what can be sold around it, and a paid product standing on an endpoint it has no right to use is the first thing to break.
@@ -183,7 +219,33 @@ Proposal: an inventory, one line per service and per embedded data set — who p
 **Design:** none
 **Open questions:**
 
-- [x] Is the paid offer the application itself, or a service around a free application? — **A service around a free application** (2026-09-20): hosted sync, a mobile companion. The application stays free, so the prices it fetches remain the user's own personal use; the inventory concentrates on what the paid service itself would call or embed, and still records every item so the free application's footing is known.
+- [x] Is the paid offer the application itself, or a service around a free application? — **Hosted feeds around a free application** (2026-09-20, revised the same day): what is sold is what a server of the owner's provides — a price feed first, later bank feeds, perhaps advice (#039). The application stays free, multi-device sync through the user's own folder included. It no longer leans on "personal use": the public build stops calling any service whose terms forbid commercial use, Yahoo first (#036, #037, #038), and the owner keeps those for his own use in a private build. The inventory says which other services must leave the same way, and still records every item.
+
+## #037 — (backend) — One extension file decides which providers and which update channel a build uses
+
+The owner keeps, for his own use, what the public build gives up (#034) — without the public repository naming anything private. An optional dependency on a private crate was considered and dropped: a dependency the public cannot fetch can break dependency resolution for every contributor, and a feature flag needs a module that only exists elsewhere.
+
+Proposal: one neutral file, `src-tauri/src/extensions.rs`, is the only place a build differs. It returns the providers to plug into the composition root (none in the public repository once #038 closes; Yahoo until then, so nothing changes for anyone in the meantime) and the update channel: the endpoint and the request headers the update check uses (`update_checker/service.rs`; the updater plugin accepts both at runtime, checked in 2.11.0), which default to the public release address and no header. A private build replaces that one file before compiling. No command is added, so the bindings do not move. ADR-worthy: it supersedes the part of ADR-017 that wires Yahoo in, and ratifies the hook left open in `advice-module-design.md` § Part 4, which the advice module can reuse.
+
+**User value:** None directly — a private build, and later a beta channel, become a one-file difference instead of a fork.
+**Done when:** The composition root takes its providers, and the update check its endpoint and headers, from `extensions.rs` only; the public file's behaviour is identical to today's and the existing tests pass unchanged; a test proves a replaced endpoint and header reach the update request; a refused update request says so instead of failing silently; the ADR is written and reviewed; `advice-module-design.md` points at it.
+**Design:** none
+**Open questions:** none
+
+## #038 — (release) — A private build channel for the owner, then Yahoo leaves the public repository
+
+Depends on #036 and #037. Most of the work lives in a private repository, `folioneer/folioneer-private`; this entry tracks it and owns the one public commit that ends it. The private repository holds its own `extensions.rs` and the Yahoo client, pins the public repository as a submodule at a release tag, copies its files over the submodule, builds with the same action as the public release and publishes to its own releases — nothing of it appears on the public releases page. Same identifier, so the same data folder: installing a public build over it loses automatic prices and nothing else. The build says what it is (`X.Y.Z+private` in About). Order, always: the owner releases publicly, then the private workflow builds that tag.
+
+Updates: the private build reads an access token from a file in its configuration folder, never from the binary, and sends it through the headers of #037. Probe first, on a throwaway private release: private assets are probably served only through the API address, in which case the workflow writes its own `latest.json`. If the probe fails, the private build only notifies, and a recipe downloads and installs.
+
+Last step, once the private build runs and updates itself on both of the owner's computers: the Yahoo client and its tests are deleted from the public repository, the public `extensions.rs` returns no provider, ADR-017 is superseded, the coverage floors are re-measured, and the next public release is the first without automatic prices.
+
+**User value:** None for a standard user, who keeps one installer and one update channel and never sees the other; the owner keeps automatic prices.
+**Done when:** The probe's result is recorded; the private workflow produces installers for Windows and Linux from a public tag; the owner's two computers run the private build, see their existing data and update from the private channel (or the fallback is in place); a refused token is reported in the application; then the public repository holds no Yahoo code, its harness is green with the re-measured floors, and ARCHITECTURE.md and the ADR index are current.
+**Design:** none
+**Open questions:**
+
+- [ ] If the probe shows self-update from private releases is not workable, is "notify, then a recipe downloads and installs" acceptable on both computers? (Recommended: yes — one user, two computers.)
 
 ## #030 — (site) — A landing page, once the application is worth showing (deferred)
 
