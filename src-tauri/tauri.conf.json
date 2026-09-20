@@ -22,7 +22,7 @@
     }
   },
   "productName": "Folioneer",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "identifier": "com.folioneer.desktop",
   "plugins": {
     "updater": {
@@ -45,8 +45,12 @@
     ],
     "linux": {
       "deb": {
-        "conflicts": ["vault-compass"],
-        "replaces": ["vault-compass"]
+        "conflicts": [
+          "vault-compass"
+        ],
+        "replaces": [
+          "vault-compass"
+        ]
       }
     }
   }

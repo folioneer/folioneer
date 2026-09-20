@@ -1,6 +1,6 @@
 [package]
 name = "folioneer"
-version = "0.0.0"
+version = "0.1.0"
 description = "A private, local-first investment portfolio tracker"
 authors = ["Phil Eggel"]
 license = "AGPL-3.0-or-later"
