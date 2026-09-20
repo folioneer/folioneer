@@ -147,6 +147,8 @@ Never commit files containing:
 
 Each commit should represent a single logical change. If you're tempted to say "and" in your commit message, you might need multiple commits.
 
+The reverse holds too: one piece of work lands as **one** commit. A correction to a commit of the same pull request is not a commit of its own — amend it before the first push, and after it use `git commit --fixup <sha>`. The hook and the pull-request check accept a `fixup!` title; `just merge` folds it into the commit it names before landing, and refuses one that names nothing, as well as `squash!` and `amend!` commits, whose message no check has read.
+
 ## Approval Requirement ✅
 
 **Always ask for approval before committing.** Do not commit changes without explicit user consent.

@@ -16,6 +16,10 @@ fi
 # Extract title (first non-comment line)
 TITLE=$(grep -v '^#' "$COMMIT_MSG_FILE" | head -n 1)
 
+# A fix pushed after the first push is a `fixup!` commit, which `just merge`
+# folds into the commit it names; the rules apply to the title it carries.
+TITLE=${TITLE#fixup! }
+
 # If title is empty or whitespace-only, exit (e.g. empty commit)
 if [ -z "$(echo "$TITLE" | tr -d '[:space:]')" ]; then
     exit 0

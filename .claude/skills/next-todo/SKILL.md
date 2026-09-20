@@ -93,7 +93,8 @@ repos/{owner}/{repo}/issues/<n>/comments`), grade every finding with
   one-off inline comment, (c) pattern → edit the reviewer prompt, `[DECISION]` → open
   question on the entry — then record the table in the PR body, push, and watch again.
 - One E2E failure that passes on re-run: file the flake as `TD-NNN` with the failure
-  screenshot and continue. Any other red: fix, push, watch again. The same gate red
+  screenshot and continue. Any other red: fix, commit with `git commit --fixup <sha>` (the entry lands as one
+  commit — `just merge` folds it), push, watch again. The same gate red
   three times: open question on the entry, leave the PR open, stop.
 - All green: `just merge`.
 
