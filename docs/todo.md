@@ -161,15 +161,6 @@ Must carry over before deleting TXL: (1) add-transaction CTA + `AddTransactionMo
 
 <!-- Below: no direct user value — test infrastructure, conventions, dependency currency. -->
 
-## #033 — (fullstack) — Carry the owner's data over from the application's former name
-
-Folioneer was called VaultCompass until version 0.43 of its former repository, and kept its data under another identifier (`com.phileggel.vault-compass`). The only installed copies are the owner's — a Linux AppImage and a Windows installation — so the data is carried over once, by two scripts the owner runs with the application closed (`scripts/migration/`), not by migration code shipped in the application for ever. They copy and never move: the old folder is left intact as a backup, an existing Folioneer database is never overwritten, the scheduler entries registered under the old names are removed, and the sync identity travels with the database — the sync folder's header file keeps its former name for the same reason. The agent never runs anything against the owner's live data without his go-ahead at that moment, and then only reads it. Steps: [`plan/033-rename-folioneer-plan.md`](plan/033-rename-folioneer-plan.md).
-
-**User value:** The owner opens Folioneer and finds his portfolio, on both computers.
-**Done when:** On each of the owner's two computers, after the carry-over script, Folioneer opens with all its data, the old folder is intact, sync still works with the other computer, and the scheduled download runs under its new name only; then the carry-over scripts, their tests, the README section about them, the plan and this entry are removed.
-**Design:** none
-**Open questions:** none
-
 ## #034 — (licence) — What the application relies on that may not be used commercially: services and data
 
 The licence check of `just licence-check` reads software licences; it cannot see the terms of a service the application calls or of data it embeds, and those can forbid commercial use just as well. Four services are called today (measured 2026-09-20): Yahoo Finance's unofficial chart endpoint for every price (`query1.finance.yahoo.com`, ADR-017) — its terms reserve it for personal use and it can disappear without notice; Frankfurter and the ECB for exchange rates; OpenFIGI for the asset lookup. Embedded data includes the exchange-code list and the fonts and icons, the last two already covered by the licence check. None of this matters while the application is a free personal tool; it decides what can be sold around it, and a paid product standing on an endpoint it has no right to use is the first thing to break.

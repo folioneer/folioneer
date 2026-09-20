@@ -108,17 +108,6 @@ Specs live in `e2e/` and follow `docs/e2e-rules.md`. Each spec seeds its own sta
 
 Output: `src-tauri/target/release/bundle/`
 
-## Coming from VaultCompass
-
-Folioneer was called VaultCompass until version 0.43, and keeps its data in a new folder: a fresh Folioneer opens empty. With the application closed, run the script for your system once, then install Folioneer:
-
-```bash
-bash scripts/migration/from-vaultcompass.sh                                   # Linux
-powershell -ExecutionPolicy Bypass -File scripts\migration\from-vaultcompass.ps1  # Windows
-```
-
-By hand, it is a copy of `portfolio`, `portfolio-wal` and `portfolio-shm` from `com.phileggel.vault-compass` to `com.folioneer.desktop`, under `~/.local/share` (Linux) or `%LOCALAPPDATA%` (Windows). The old folder is never touched and stays as a backup. On Windows, uninstall VaultCompass with "delete application data" left unticked.
-
 ## Code Quality
 
 ```bash
