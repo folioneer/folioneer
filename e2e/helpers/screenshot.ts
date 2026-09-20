@@ -29,7 +29,7 @@ export async function captureScreen(name: string): Promise<void> {
   const wasDark = await browser.execute(() => document.documentElement.classList.contains("dark"));
 
   try {
-    await setMotion(false);
+    await freezeForCapture(true);
     await parkPointer();
     for (const scheme of ["light", "dark"] as const) {
       await setDark(scheme === "dark");
@@ -37,26 +37,38 @@ export async function captureScreen(name: string): Promise<void> {
       await browser.saveScreenshot(resolve(SCREENSHOT_DIR, `${name}-${scheme}.png`));
     }
   } finally {
-    await setMotion(true);
+    await freezeForCapture(false);
     await setDark(wasDark);
   }
 }
 
-// The app animates colour changes over 150–200 ms; a capture two frames after
-// the theme flips lands mid-transition and differs from run to run by a few
-// units per pixel. Transitions and animations are switched off for the
-// capture so every run paints the settled state.
-async function setMotion(enabled: boolean): Promise<void> {
+// Two things the WebView paints on its own schedule, each large enough on its
+// own to cross the workflow's 0.3 % regression threshold:
+//
+//   Motion — the app animates colour changes over 150–200 ms, so a capture two
+//   frames after the theme flips lands mid-transition and differs from run to
+//   run by a few units per pixel.
+//
+//   Scrollbars — an overlay scrollbar fades in when a scrollable pane is
+//   touched and out again a moment later, so the same screen shows a thumb in
+//   one run and not in the next. On the settings page that thumb is a 3 px bar
+//   over 355 rows: 0.22 % of the screen.
+//
+// Both are switched off for the capture, so every run paints the settled state.
+async function freezeForCapture(frozen: boolean): Promise<void> {
   await browser.execute((on: boolean) => {
-    const id = "e2e-no-motion";
+    const id = "e2e-capture-freeze";
     document.getElementById(id)?.remove();
-    if (on) return;
+    if (!on) return;
     const style = document.createElement("style");
     style.id = id;
-    style.textContent =
-      "*, *::before, *::after { transition: none !important; animation: none !important; }";
+    style.textContent = [
+      "*, *::before, *::after { transition: none !important; animation: none !important; }",
+      "* { scrollbar-width: none !important; }",
+      "*::-webkit-scrollbar { display: none !important; }",
+    ].join("\n");
     document.head.appendChild(style);
-  }, enabled);
+  }, frozen);
 }
 
 // The pointer rests wherever the last click left it, so a control under it
