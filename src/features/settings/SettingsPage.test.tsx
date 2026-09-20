@@ -40,3 +40,15 @@ describe("SettingsPage — scheduled fetch section (SPF-010)", () => {
     expect(screen.getByTestId("scheduled-fetch-section-mounted")).toBeInTheDocument();
   });
 });
+
+// #035 — the shell's content area never scrolls, so the page must scroll itself: in a
+// window shorter than the page, every setting down to the last one stays reachable.
+describe("SettingsPage — scrolling (#035)", () => {
+  it("is its own vertical scroll container, holding every setting down to the last", () => {
+    const { container } = render(<SettingsPage />);
+
+    const page = container.firstElementChild;
+    expect(page).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
+    expect(page).toContainElement(container.querySelector("#settings-auto-record-price"));
+  });
+});
