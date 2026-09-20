@@ -1,6 +1,6 @@
 # Commit Policy & Versioning
 
-This document outlines the commit standards, workflow, and versioning strategy for the Midwife Patient Management System project.
+This document outlines the commit standards, workflow, and versioning strategy for Folioneer.
 
 ## Overview
 
@@ -26,6 +26,17 @@ Must be one of the following:
 | `test`     | Adding or updating tests                | `test: add unit tests for patient service`    |
 | `chore`    | Build, dependencies, or tooling         | `chore: upgrade React to 18.3`                |
 | `refactor` | Code restructuring (no behavior change) | `refactor: extract validation logic`          |
+
+### Choosing the type
+
+`feat` and `fix` are the only types that reach `CHANGELOG.md` and the What's-new dialog, so they are reserved for a change a user notices — and their titles are written for that user (see CLAUDE.md § Standards). The other four never reach it; pick between them by **what the change touches**, not by how large or how visible it feels:
+
+- `refactor` — production code changed: restructured, or given behaviour only a future build reaches.
+- `chore` — production code untouched: build, dependencies, tooling, scripts, release mechanics, repository hygiene.
+- `docs` — documentation and records only.
+- `test` — tests only.
+
+A change that touches production code is never `chore`, however invisible it is to today's user. A change that touches none is never `refactor`.
 
 ### Description
 
