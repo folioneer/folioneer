@@ -17,6 +17,10 @@ dev *ARGS:
 dev-wayland *ARGS:
     GDK_BACKEND=wayland ./scripts/start-app.sh {{ARGS}}
 
+# Seed the development data folder with a copy of the installed application's database (read-only on the source)
+dev-seed *ARGS:
+    python3 scripts/dev-seed.py {{ARGS}}
+
 # Regenerate Specta TypeScript bindings (run after adding or changing Tauri commands)
 generate-types:
     cd src-tauri && cargo run --bin generate_bindings

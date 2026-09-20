@@ -19,10 +19,10 @@ pub struct Database {
 impl Database {
     /// Initializes the database at the specified path and runs pending migrations.
     pub async fn new(app_data_dir: PathBuf) -> anyhow::Result<Self> {
-        // Check if database reset is requested
-        let is_db_reset = std::env::var("RESET_DATABASE")
-            .map(|val| val.to_lowercase() == "true" || val == "1")
-            .unwrap_or_default();
+        let is_db_reset = reset_requested(
+            cfg!(debug_assertions),
+            std::env::var("RESET_DATABASE").ok().as_deref(),
+        );
 
         let db_path = app_data_dir.join(DATABASE_FILENAME);
         if !db_path.exists() {
@@ -73,9 +73,32 @@ impl Database {
     }
 }
 
+/// Whether `RESET_DATABASE` asks for the database to be deleted before it is opened.
+/// Only a debug build listens: a release binary never deletes the user's portfolio.
+fn reset_requested(debug_build: bool, variable: Option<&str>) -> bool {
+    debug_build && variable.is_some_and(|value| value.to_lowercase() == "true" || value == "1")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // #040 — `just dev --reset-db` sets the variable; a debug build obeys it.
+    #[test]
+    fn a_debug_build_obeys_the_reset_variable() {
+        assert!(reset_requested(true, Some("true")));
+        assert!(reset_requested(true, Some("TRUE")));
+        assert!(reset_requested(true, Some("1")));
+        assert!(!reset_requested(true, Some("false")));
+        assert!(!reset_requested(true, None));
+    }
+
+    // #040 — a release binary ignores the variable, whatever it holds.
+    #[test]
+    fn a_release_build_ignores_the_reset_variable() {
+        assert!(!reset_requested(false, Some("true")));
+        assert!(!reset_requested(false, Some("1")));
+    }
 
     // SPF-023 — the OS-scheduled headless run and the interactive app share
     // this database as two processes; WAL is the config that makes their

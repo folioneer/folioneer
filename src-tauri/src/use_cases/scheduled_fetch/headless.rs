@@ -12,6 +12,7 @@ use crate::context::sync::{
     SyncDevice, SyncRun, SyncStateRepository,
 };
 use crate::core::{Database, BACKEND};
+use crate::shared::infrastructure::app_directories;
 use crate::shared::infrastructure::change_recorder::ChangeRecorder;
 use crate::shared::infrastructure::container::AppContainer;
 use crate::shared::infrastructure::scheduler::platform_scheduler;
@@ -19,32 +20,6 @@ use crate::shared::infrastructure::scheduler::platform_scheduler;
 use super::orchestrator::ScheduledFetchOrchestrator;
 use super::repository::SqliteScheduledFetchRepository;
 use crate::use_cases::shared::price_fetch_log::SqlitePriceFetchLogRepository;
-
-/// The application identifier Tauri derives its per-app directories from
-/// (`tauri.conf.json` → `identifier`). The headless path has no Tauri handle,
-/// so it reproduces `app_local_data_dir()` = platform data-local dir + this
-/// identifier; a mismatch would silently split the two entries onto two
-/// databases (guarded by a test below).
-const APP_IDENTIFIER: &str = "com.folioneer.desktop";
-
-/// Reproduces Tauri's `app_local_data_dir()` without an app handle.
-pub fn resolve_app_local_data_dir() -> Option<PathBuf> {
-    dirs::data_local_dir().map(|base| base.join(APP_IDENTIFIER))
-}
-
-/// Reproduces Tauri's `app_log_dir()` without an app handle, so the headless
-/// run logs into the same file the interactive app uses (macOS puts logs
-/// under `~/Library/Logs`, everywhere else they sit next to the app data).
-fn resolve_app_log_dir() -> Option<PathBuf> {
-    #[cfg(target_os = "macos")]
-    {
-        dirs::home_dir().map(|home| home.join("Library/Logs").join(APP_IDENTIFIER))
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        resolve_app_local_data_dir().map(|data_dir| data_dir.join("logs"))
-    }
-}
 
 /// SYN-068 — after the scheduled fetch, verifies the passphrase check (SYN-055) and
 /// publishes the recorded price/rate changes as one segment; never applies — merging,
@@ -75,7 +50,7 @@ pub async fn publish_after_scheduled_fetch(device: Option<SyncDevice>, sync_run:
 pub async fn run() -> i32 {
     // A logging failure must not abandon the fetch — the subscriber is
     // best-effort; its absence falls back to the eprintln below only.
-    match resolve_app_log_dir() {
+    match app_directories::resolve_log_dir() {
         Some(log_dir) => {
             if let Err(error) = std::fs::create_dir_all(&log_dir)
                 .map_err(anyhow::Error::from)
@@ -87,7 +62,7 @@ pub async fn run() -> i32 {
         None => eprintln!("scheduled fetch: no platform log directory available"),
     }
 
-    let Some(data_dir) = resolve_app_local_data_dir() else {
+    let Some(data_dir) = app_directories::resolve_local_data_dir() else {
         tracing::error!(target: BACKEND, "scheduled fetch: no platform data directory available");
         return 1;
     };
@@ -182,17 +157,6 @@ pub async fn run() -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // The identifier must match tauri.conf.json — a drift would split the
-    // headless run and the app onto two databases.
-    #[test]
-    fn app_identifier_matches_tauri_conf() {
-        let conf = include_str!("../../../tauri.conf.json");
-        assert!(
-            conf.contains(&format!("\"identifier\": \"{APP_IDENTIFIER}\"")),
-            "APP_IDENTIFIER must match tauri.conf.json's identifier"
-        );
-    }
 
     // SYN-068 — a device with sync disabled (no SyncDevice) is a no-op: nothing is
     // published, and the call never panics.

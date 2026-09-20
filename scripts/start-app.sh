@@ -21,12 +21,14 @@ Folioneer - Start development server
 Usage: $(basename "$0") [OPTIONS]
 
 OPTIONS:
-  --reset-db         Reset database on startup
+  --reset-db         Reset the development database on startup
   --log-level LEVEL  Set logging level (trace|debug|info|warn|error)
   --help             Show this help
 
 NOTES:
   - GDK_BACKEND=x11 is automatically enabled for screenshot support
+  - A development run keeps its data in its own folder (com.folioneer.desktop.dev),
+    never the installed application's; `just dev-seed` fills it with a copy
 
 EXAMPLES:
   $(basename "$0") --reset-db --log-level trace
@@ -49,7 +51,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo -e "${BLUE}🚀 Starting Folioneer${NC}"
-[[ "$RESET_DB" == true ]] && echo -e "${YELLOW}⚠️  Database will be reset${NC}"
+[[ "$RESET_DB" == true ]] && echo -e "${YELLOW}⚠️  Development database will be reset${NC}"
 echo -e "${BLUE}📝 Log level: $LOG_LEVEL${NC}"
 
 # Check dependencies

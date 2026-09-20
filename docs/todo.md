@@ -197,17 +197,6 @@ Must carry over before deleting TXL: (1) add-transaction CTA + `AddTransactionMo
 
 <!-- Below: no direct user value — test infrastructure, conventions, dependency currency. -->
 
-## #040 — (tooling) — A development run opens the owner's real portfolio, and `--reset-db` deletes it
-
-Measured 2026-09-20: `just dev` runs `scripts/start-app.sh`, which runs `tauri dev`; the data folder is `app_local_data_dir()` for the identifier `com.folioneer.desktop` — the installed application's folder. Only E2E runs are redirected (`FOLIONEER_E2E_DATA_DIR`, debug builds). So a development run applies migrations still being written to the live database, takes part in multi-device sync as the real computer, and `just dev --reset-db` deletes the live database (`core/db.rs` removes the file when `RESET_DATABASE` is set — a variable the release binary honours too). CLAUDE.md rule 1 declares that folder read-only; the development command does not respect it.
-
-Proposal: a debug build resolves its own data and log folders (a development identifier passed by `start-app.sh`, or a variable on the model of the E2E one), and the headless scheduled-fetch resolver (`resolve_app_local_data_dir`) follows the same rule. `RESET_DATABASE` is ignored outside debug builds. A recipe seeds the development folder with a copy of the live database on request, reading the source without modifying it.
-
-**User value:** None directly — the owner's real portfolio can no longer be migrated, synced or deleted by a development run.
-**Done when:** `just dev` reads and writes nothing under the installed application's folder, proven by a test of the folder resolution in debug and release; `--reset-db` can only delete the development database and a release binary ignores `RESET_DATABASE`; a recipe copies the live database into the development folder without touching the source; the Commands section of CLAUDE.md says where a development run keeps its data.
-**Design:** none
-**Open questions:** none
-
 ## #034 — (licence) — What the application relies on that may not be used commercially: services and data
 
 The licence check of `just licence-check` reads software licences; it cannot see the terms of a service the application calls or of data it embeds, and those can forbid commercial use just as well. Four services are called today (measured 2026-09-20): Yahoo Finance's unofficial chart endpoint for every price (`query1.finance.yahoo.com`, ADR-017) — its terms reserve it for personal use and it can disappear without notice; Frankfurter and the ECB for exchange rates; OpenFIGI for the asset lookup. Embedded data includes the exchange-code list and the fonts and icons, the last two already covered by the licence check. None of this matters while the application is a free personal tool; it decides what can be sold around it, and a paid product standing on an endpoint it has no right to use is the first thing to break.

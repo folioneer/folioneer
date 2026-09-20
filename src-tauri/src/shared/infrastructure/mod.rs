@@ -1,5 +1,7 @@
 //! Shared infrastructure adapters reused by multiple bounded contexts.
 
+/// Where a build keeps its data and logs — development folders of their own for a debug build.
+pub mod app_directories;
 /// `ChangeRecorder` port — every synced repository write appends a change through it
 /// (SYN-020, ADR-019).
 pub mod change_recorder;

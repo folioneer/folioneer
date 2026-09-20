@@ -3,9 +3,9 @@
 //!
 //! Three platform adapters ship: [`systemd`] (Linux, fully verified), [`windows_task`]
 //! (Windows, unit-verified generated definitions only), and [`launchd`] (macOS,
-//! unit-verified generated definitions only) — SPF-017. [`NoopScheduler`] is used
-//! in E2E runs (`FOLIONEER_E2E_DATA_DIR`, debug builds only) so specs never
-//! touch the host's real task scheduler.
+//! unit-verified generated definitions only) — SPF-017. [`NoopScheduler`] is what a
+//! debug build gets, so a development or E2E run never touches the host's real
+//! task scheduler — the installed application owns it.
 
 /// macOS launchd adapter — generates the `.plist` definition (SPF-017).
 pub mod launchd;
@@ -32,9 +32,9 @@ pub trait DailyFetchScheduler: Send + Sync {
     async fn is_registered(&self) -> anyhow::Result<bool>;
 }
 
-/// Inert scheduler used for E2E runs (`FOLIONEER_E2E_DATA_DIR`, debug builds
-/// only) so specs exercise the full FE ↔ BE ↔ SQLite stack without touching the
-/// CI host's real task scheduler.
+/// Inert scheduler of a debug build: a development run leaves the installed
+/// application's daily schedule alone, and E2E specs exercise the full
+/// FE ↔ BE ↔ SQLite stack without touching the CI host's real task scheduler.
 #[derive(Debug, Default)]
 pub struct NoopScheduler;
 
@@ -53,11 +53,16 @@ impl DailyFetchScheduler for NoopScheduler {
     }
 }
 
-/// Returns the scheduler adapter for the current platform (SPF-017).
-/// E2E runs (`FOLIONEER_E2E_DATA_DIR`, debug builds only) get the
-/// [`NoopScheduler`] so specs never touch the host's real task scheduler.
+/// Whether a build gets the [`NoopScheduler`]: only a release build may register,
+/// remove or probe the host's daily schedule.
+fn uses_inert_scheduler(debug_build: bool) -> bool {
+    debug_build
+}
+
+/// Returns the scheduler adapter for the current platform (SPF-017); a debug build
+/// gets the [`NoopScheduler`].
 pub fn platform_scheduler() -> std::sync::Arc<dyn DailyFetchScheduler> {
-    if super::e2e_run::e2e_data_dir().is_some() {
+    if uses_inert_scheduler(cfg!(debug_assertions)) {
         return std::sync::Arc::new(NoopScheduler);
     }
     #[cfg(target_os = "linux")]
@@ -87,23 +92,19 @@ mod tests {
         assert!(!scheduler.is_registered().await.unwrap());
     }
 
-    // #033 — an E2E run names its data folder through the variable, and then gets the
-    // scheduler that never touches the host. The only test that sets the variable.
+    // #040 — only a release build owns the host's daily schedule: a development or E2E
+    // run must neither repoint it at a debug binary nor remove it.
+    #[test]
+    fn only_a_release_build_touches_the_host_schedule() {
+        assert!(!uses_inert_scheduler(false));
+        assert!(uses_inert_scheduler(true));
+    }
+
+    // #040 — tests run as a debug build, so the scheduler they get reports nothing
+    // registered even on a computer whose installed application has a daily schedule.
     #[tokio::test]
-    async fn an_e2e_run_is_recognised_and_gets_the_inert_scheduler() {
-        use super::super::e2e_run::{e2e_data_dir, E2E_DATA_DIR_VARIABLE};
-
-        std::env::remove_var(E2E_DATA_DIR_VARIABLE);
-        assert_eq!(e2e_data_dir(), None);
-
-        std::env::set_var(E2E_DATA_DIR_VARIABLE, "/tmp/e2e-run");
-        assert_eq!(
-            e2e_data_dir(),
-            Some(std::path::PathBuf::from("/tmp/e2e-run"))
-        );
+    async fn a_debug_build_gets_the_inert_scheduler() {
         let scheduler = platform_scheduler();
-        std::env::remove_var(E2E_DATA_DIR_VARIABLE);
-
         assert!(!scheduler.is_registered().await.unwrap());
     }
 }

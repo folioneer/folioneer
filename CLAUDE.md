@@ -106,7 +106,7 @@ Why: a 60-file mixed-layer PR sprawls across concerns; per-layer PRs keep each d
 
 ## 🛠 Commands
 
-- Dev: `./scripts/start-app.sh`
+- Dev: `just dev` — a debug build keeps its data and logs in its own folder (`com.folioneer.desktop.dev`, beside the installed application's), never touches the host's daily price-fetch schedule, and `--reset-db` deletes only that development database. `just dev-seed [--replace]` fills the folder with a copy of the installed database, detached from sync and from the daily fetch.
 - Loop: `just next-todo` — one ready entry of `docs/todo.md` § Next, headless (`docs/workflow-c.md` § 9)
 - Tests: `just test` (frontend) | `just test-rust` (backend) | `just test-unit` (both)
 - E2E tests: `just test-e2e` (local) | `just test-e2e-headless` (Linux headless). CI runs the suite on every pull request and every push to `main`; the local run on this machine is known-broken (`docs/lessons.md` L-011), so CI is the gate.

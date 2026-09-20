@@ -435,37 +435,25 @@ struct AppDirectories {
 }
 
 fn create_app_dirs(app: &tauri::AppHandle) -> anyhow::Result<AppDirectories> {
-    let path_resolver = app.path();
+    use shared::infrastructure::{app_directories, e2e_run};
 
-    // Allow E2E tests to inject an isolated data directory via env var so
-    // each test run starts with a clean database and leaves no residue.
-    // Debug builds only — `e2e_data_dir` answers `None` in a production binary.
-    if let Some(local_data_dir) = shared::infrastructure::e2e_run::e2e_data_dir() {
-        fs::create_dir_all(&local_data_dir)
-            .with_context(|| "Failed to create E2E data directory")?;
+    // A debug build keeps its data and logs in development folders of its own; an E2E
+    // run injects an isolated data folder so each run starts from a clean database.
+    // Only a release build opens the installed application's folders.
+    let (local_data_dir, log_dir) = if cfg!(debug_assertions) {
+        app_directories::development_directories(e2e_run::e2e_data_dir())
+            .with_context(|| "Failed to get the development directories")?
+    } else {
+        let path_resolver = app.path();
+        let local_data_dir = path_resolver
+            .app_local_data_dir()
+            .with_context(|| "Failed to get app local data directory")?;
         let log_dir = path_resolver
             .app_log_dir()
             .with_context(|| "Failed to get app log directory")?;
-        // The non-E2E branch below creates `log_dir` before returning. The E2E
-        // branch must do the same — `app_log_dir()` only resolves the path,
-        // it doesn't create the directory, and `initialize_tracing` will fail
-        // to open `app.log` if the parent doesn't exist.
-        fs::create_dir_all(&log_dir).with_context(|| "Failed to create log directory")?;
-        return Ok(AppDirectories {
-            local_data_dir,
-            log_dir,
-        });
-    }
-    let local_data_dir = {
-        path_resolver
-            .app_local_data_dir()
-            .with_context(|| "Failed to get app local data directory")?
+        (local_data_dir, log_dir)
     };
     fs::create_dir_all(&local_data_dir).with_context(|| "Failed to create data directory")?;
-
-    let log_dir = path_resolver
-        .app_log_dir()
-        .with_context(|| "Failed to get app log directory")?;
     fs::create_dir_all(&log_dir).with_context(|| "Failed to create log directory")?;
 
     Ok(AppDirectories {

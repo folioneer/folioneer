@@ -74,12 +74,13 @@ shared/               gold-layout shared infra (docs/backend-rules.md B0/B37)
   domain/
     record_change.rs  RecordChange / RecordKind / Operation / Origin — the per-device change-log vocabulary every BC writes in (SYN-020/021, ADR-019)
   infrastructure/
+    app_directories.rs where a build keeps its data and logs — the installed application's folders for a release build, development folders of their own for a debug build
     change_recorder.rs ChangeRecorder port — records one change on the live write connection so the record and its change row commit together (divergence #16)
     container.rs      AppContainer — boxes SQLite repos into the application services; consumed by both entry points (lib.rs setup, headless scheduled fetch)
     e2e_run.rs        the isolated data folder an E2E run injects through an environment variable (debug builds only)
     http.rs           shared reqwest client construction + capped body reads
     scheduler/        DailyFetchScheduler trait + per-OS adapters (systemd/schtasks/launchd)
-                      registering the daily scheduled fetch (SPF); NoopScheduler under E2E
+                      registering the daily scheduled fetch (SPF); NoopScheduler in every debug build
 
 lib.rs                composition root — wires services, use cases, dispatchers; calls app_handle.manage().
                       Also exposes run_scheduled_fetch_headless() — the OS-triggered `--scheduled-fetch`
