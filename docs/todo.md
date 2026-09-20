@@ -2,7 +2,7 @@
 
 <!-- Add new backlog items here. Format: ## #NNN — (domain) — Short title -->
 <!-- #NNN is a permanent reference: never renumbered, never reused. A new entry takes the -->
-<!-- next free number wherever it is placed. Next free: #035. -->
+<!-- next free number wherever it is placed. Next free: #036. -->
 <!-- Every entry ends with four lines: **User value:**, **Done when:**, **Design:** and -->
 <!-- **Open questions:**. Design is `none` until the agent proposes one (it does so before -->
 <!-- touching anything the user sees), then `proposed (screenshots/design/NNN-*.png)`, then -->
@@ -18,6 +18,17 @@
 <!-- takes the first ready one, never edits this list, and stops when it is empty. -->
 
 Nothing queued.
+
+## #035 — (frontend) — The Settings page cannot be scrolled when it is taller than the window
+
+Reported by the owner on 2026-09-20, on the Windows computer: with sync enabled, the Settings page is taller than a small window, and nothing below the fold can be reached — no scrollbar, no wheel scroll. The last setting ("Automatically record transaction price…") is cut off, and so would be anything added below the sync section.
+
+Cause, measured: the shell's content area never scrolls (`features/shell/Content.tsx`, `overflow-hidden`), so each page scrolls itself — the accounts, assets and currency views do. `SettingsPage.tsx` never did; it went unnoticed until the sync section made the page long.
+
+**User value:** Every setting can be reached whatever the size of the window.
+**Done when:** In a window shorter than the Settings page, the page scrolls vertically and its last control can be reached and used; a test proves the page scrolls itself inside the content area, and a screenshot shows the Settings page scrolled to its end in a short window.
+**Design:** none
+**Open questions:** none
 
 ## #009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
