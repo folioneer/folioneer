@@ -70,7 +70,7 @@ When the since-inception % and annualized-yield columns are suppressed by the Di
 
 ## #036 — (fullstack) — The application is complete without a price provider
 
-The application assumes a price provider always exists: `lib.rs` builds the Yahoo client unconditionally and hands it to the asset service, the scheduled fetch and the price history backfill. The owner's decision of 2026-09-20 (#034) is that the public build stops calling services whose terms forbid commercial use, so the public build will soon have no provider at all — and today that state does not exist.
+The application assumes a price provider always exists: `lib.rs` builds the Yahoo client unconditionally and hands it to the asset service, the scheduled fetch and the price history backfill. The owner's decision of 2026-09-20 is that the public build stops calling services whose terms it does not meet ([`external-dependencies.md`](external-dependencies.md) — Yahoo is the only one), so the public build will soon have no provider at all — and today that state does not exist.
 
 Proposal: the provider becomes optional at the composition root. The backend tells the frontend whether automatic prices are available; without them, the fetch actions, the scheduled daily fetch setting, the price history backfill and the fetch progress bar are absent, the scheduled fetch is not registered with the operating system, and nothing reports an error. Prices typed by hand work as they do today, and the application must read as complete, not as amputated. With a provider, nothing changes. MKT and SPF rules change: route through `/spec-writer`. Until #038 closes, the public build still carries Yahoo, so this entry ships the empty state without anyone meeting it yet.
 
@@ -161,7 +161,7 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 
 ## #039 — (service) — A hosted price feed the application can subscribe to (deferred)
 
-What is sold is what a server of the owner's provides (#034): first a price feed under a licence that allows it, later bank feeds, perhaps advice. The application stays free and open, so nothing sold can live in it — a switch in an AGPL client is one fork away from being flipped. The client is ordinary public code: one more price provider behind the seam of #036 and #037, which calls the owner's service with the subscriber's token. Deferred until #034 has named a licensed source and its cost, and until the application is worth showing (#030).
+What is sold is what a server of the owner's provides: first a price feed under a licence that allows it, later bank feeds, perhaps advice. The application stays free and open, so nothing sold can live in it — a switch in an AGPL client is one fork away from being flipped. The client is ordinary public code: one more price provider behind the seam of #036 and #037, which calls the owner's service with the subscriber's token. The inventory found no licensed replacement — finding and pricing one is this entry's first task. Deferred until then, and until the application is worth showing (#030).
 
 **User value:** A subscriber gets prices fetched for them, daily and on demand, without typing them and without the application standing on an endpoint it has no right to use.
 **Done when:** To be written when the entry is scheduled — the service, its licensed source, the subscription and the client each deserve their own entry.
@@ -169,7 +169,7 @@ What is sold is what a server of the owner's provides (#034): first a price feed
 **Open questions:**
 
 - [ ] Which words name the paid feeds? "Sync" already means multi-device sync in the vocabulary. (Recommended: "price feed" and "bank feed".)
-- [ ] Does multi-device sync through a folder the user owns stay free, a hosted sync being a separate paid offer? (Assumed yes in #034's answer.)
+- [ ] Does multi-device sync through a folder the user owns stay free, a hosted sync being a separate paid offer? (Assumed yes when the paid offer was settled, 2026-09-20.)
 
 ## #013 — (frontend) — Merge TXL per-asset page into the account journal (deferred)
 
@@ -185,34 +185,6 @@ Must carry over before deleting TXL: (1) add-transaction CTA + `AddTransactionMo
 ---
 
 <!-- Below: no direct user value — test infrastructure, conventions, dependency currency. -->
-
-## #034 — (licence) — What the application relies on that may not be used commercially: services and data
-
-The licence check of `just licence-check` reads software licences; it cannot see the terms of a service the application calls or of data it embeds, and those can forbid commercial use just as well. Four services are called today (measured 2026-09-20): Yahoo Finance's unofficial chart endpoint for every price (`query1.finance.yahoo.com`, ADR-017) — its terms reserve it for personal use and it can disappear without notice; Frankfurter and the ECB for exchange rates; OpenFIGI for the asset lookup. Embedded data includes the exchange-code list and the fonts and icons, the last two already covered by the licence check. None of this matters while the application is a free personal tool; it decides what can be sold around it, and a paid product standing on an endpoint it has no right to use is the first thing to break.
-
-Proposal: an inventory, one line per service and per embedded data set — who provides it, under which terms, what they say about commercial use and redistribution, and how the application degrades without it — kept as a project document and re-read before anything is sold. For each item whose terms forbid commercial use, a decision: keep it for the free application only, replace it (a licensed price feed has a cost; a bring-your-own-key provider moves the contract to the user), or make it optional. Nothing is replaced by this entry; it produces the facts and the decisions, and files an entry per replacement worth doing.
-
-**User value:** None today — the owner knows exactly what stands between the free application and anything sold around it, before building on it.
-**Done when:** A document lists every external service and embedded data set with its provider, its terms (linked and dated), its position on commercial use and redistribution, and what happens to the application without it; each item that forbids commercial use carries a recorded decision; a todo entry exists for each replacement decided; the release audit re-reads the document.
-**Design:** none
-**Open questions:**
-
-- [x] Is the paid offer the application itself, or a service around a free application? — **Hosted feeds around a free application** (2026-09-20, revised the same day): what is sold is what a server of the owner's provides — a price feed first, later bank feeds, perhaps advice (#039). The application stays free, multi-device sync through the user's own folder included. It no longer leans on "personal use": the public build stops calling any service whose terms forbid commercial use, Yahoo first (#036, #037, #038), and the owner keeps those for his own use in a private build. The inventory says which other services must leave the same way, and still records every item.
-
-## #038 — (release) — A private build channel for the owner, then Yahoo leaves the public repository
-
-Depends on #036; the extension file it overlays exists (ADR-020). Most of the work lives in a private repository, `folioneer/folioneer-private`; this entry tracks it and owns the one public commit that ends it. The private repository holds its own `extensions.rs` and the Yahoo client, pins the public repository as a submodule at a release tag, copies its files over the submodule, builds with the same action as the public release and publishes to its own releases — nothing of it appears on the public releases page. Same identifier, so the same data folder: installing a public build over it loses automatic prices and nothing else. The build says what it is (`X.Y.Z+private` in About). Order, always: the owner releases publicly, then the private workflow builds that tag.
-
-Updates: the private build reads an access token from a file in its configuration folder, never from the binary, and sends it through the headers of #037. Probe first, on a throwaway private release: private assets are probably served only through the API address, in which case the workflow writes its own `latest.json`. If the probe fails, the private build only notifies, and a recipe downloads and installs. The probe also says what a refusal looks like from that host: the application reports HTTP 401 and 403 as a refused access (UPD-028), and a host that answers 404 to a refused token needs that rule extended here.
-
-Last step, once the private build runs and updates itself on both of the owner's computers: the Yahoo client and its tests are deleted from the public repository, the public `extensions.rs` returns no provider, ADR-017 is superseded, the coverage floors are re-measured, and the next public release is the first without automatic prices.
-
-**User value:** None for a standard user, who keeps one installer and one update channel and never sees the other; the owner keeps automatic prices.
-**Done when:** The probe's result is recorded; the private workflow produces installers for Windows and Linux from a public tag; the owner's two computers run the private build, see their existing data and update from the private channel (or the fallback is in place); a refused token is reported in the application; then the public repository holds no Yahoo code, its harness is green with the re-measured floors, and ARCHITECTURE.md and the ADR index are current.
-**Design:** none
-**Open questions:**
-
-- [ ] If the probe shows self-update from private releases is not workable, is "notify, then a recipe downloads and installs" acceptable on both computers? (Recommended: yes — one user, two computers.)
 
 ## #030 — (site) — A landing page, once the application is worth showing (deferred)
 

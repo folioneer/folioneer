@@ -76,6 +76,8 @@ just licence-check
 
 `just licence-check` is the project's own gate, not an optional tool: it lists every shipped dependency whose licence is outside `licence-allowlist.json`. CI runs it on every pull request, so a failure here means `main` moved since, or the lockfiles changed locally.
 
+Then re-read [`docs/external-dependencies.md`](../../../docs/external-dependencies.md). `licence-check` reads the licence of what the application **ships**; that document records the terms of the services it **calls** and the reference data copied into the source, which no tool can check. Report any item whose terms are marked unverified, and any whose conditions the application has stopped meeting (the ECB asks to be cited as the source, and the rate rows do it).
+
 Non-zero exit is expected when tools are missing or issues are found — treat the output as informational and continue. If a command produces no output and exits non-zero, note the tool as unavailable in the report.
 
 If `cargo-outdated` or `cargo-audit` are missing, flag them in the report: `⚠️ {tool} not installed — install with: cargo install {tool}`
@@ -134,6 +136,11 @@ Get today's date (`date +%Y-%m-%d`) for the report heading.
 ### Licences (`licence-allowlist.json`)
 ✅ {N} crates and {N} npm packages ship, all under allowed licences ({N} by name)
 🔴 Licence: {package} — {licence} (replace it, or record a deliberate decision in licence-allowlist.json)
+
+### Services and embedded data (`docs/external-dependencies.md`)
+✅ {N} services and {N} embedded data sets recorded; terms last read {date}
+🟡 {service} — terms unverified since {date}; read them before anything is sold
+🔴 {service} — a condition the application no longer meets: {condition}
 
 ### Rust toolchain
 Installed: {output of rustc --version}
