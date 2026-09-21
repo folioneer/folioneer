@@ -2,7 +2,7 @@
 
 <!-- Add new backlog items here. Format: ## #NNN — (domain) — Short title -->
 <!-- #NNN is a permanent reference: never renumbered, never reused. A new entry takes the -->
-<!-- next free number wherever it is placed. Next free: #041. -->
+<!-- next free number wherever it is placed. Next free: #042. -->
 <!-- Every entry ends with four lines: **User value:**, **Done when:**, **Design:** and -->
 <!-- **Open questions:**. Design is `none` until the agent proposes one (it does so before -->
 <!-- touching anything the user sees), then `proposed (screenshots/design/NNN-*.png)`, then -->
@@ -228,6 +228,19 @@ Proposal: one static page, in French and English, in its own repository publishe
 - [ ] Ready when? (Recommended: after #025 and #026 have shipped.)
 - [ ] A domain from the start, or the free GitHub Pages address first? (`folioneer.com` and `folioneer.app` are registered; they are the natural choice.)
 - [ ] Is the Windows installer to be signed before strangers download it, and how? Today only the updater signature exists (it proves an update comes from the owner; SmartScreen ignores it) — no Windows code signing. The options, prices and eligibility to be checked again when the time comes: (a) SignPath Foundation — free, publisher shown as "SignPath Foundation", open-source licence and CI-built releases required; (b) a Certum open-source certificate — tens of euros a year, the owner's name shown, open-source project required, signing through their cloud service since keys must live on hardware; (c) Azure Trusted Signing — about ten dollars a month, eligibility of individuals depends on the country; (d) a standard certificate with cloud signing — a few hundred euros a year, no open-source condition; (e) no signing, and the page explains the warning. Even signed, the warning lasts until the certificate has earned reputation — which then carries over from one release to the next, whereas an unsigned installer starts from zero each time. (a) and (b) exist only while the licence is open source, which the AGPL-3.0-or-later is. (Recommended: (b) if the owner's name should show, (a) if free matters more.) Wiring any of them is one signing command in the Tauri configuration plus a credential in the release workflow.
+
+## #041 — (ci) — A pull request that changes no code pays for the full E2E run
+
+Every pull request runs the E2E suite: 13–15 minutes of Tauri build and WebDriver, measured over the runs of 2026-09-20. Entry #037 paid for four of them, about an hour, because each fix-up commit restarted it; the records-only pull requests #4 and #8 paid one each for changing nothing the suite can execute.
+
+`.github/workflows/e2e.yml` explains the absence of a path filter, and the reason is sound: `paths-ignore` on a **required** check leaves it "Expected" for ever, so the pull request can never merge. The conclusion does not follow, though — the job can always start and decide inside itself. The required check then reports within a minute, and the twenty-minute build happens only when code moved. Pushes to `main` already carry the filter, so `main`'s screenshot artifact is refreshed by code pushes only and the visual baseline is unaffected.
+
+Two traps for whoever takes this. The local classifier cannot be reused as it stands: `scripts/changed-scope.sh` answers `none` for `.github/*` and `scripts/*`, yet a change to `e2e.yml`, `wdio.conf.ts` or the capture helper is exactly when the suite must run — the skip condition has to be written for E2E rather than borrowed. And the job does more than run tests: it uploads the screenshot artifact, compares it against `main` and comments on the pull request, so a skipped run must leave those steps coherent rather than half-done.
+
+**User value:** None — CI minutes, and a faster answer on a pull request that changes no code.
+**Done when:** A pull request touching only Markdown, `docs/` or records reports the E2E check green in under a minute without building the application; a pull request touching `src/`, `src-tauri/`, `e2e/`, the workflow or the test tooling still runs the full suite; the screenshot comparison against `main` still runs on the pull requests that build; both paths are watched on a real pull request of each kind.
+**Design:** none
+**Open questions:** none
 
 ## #014 — (e2e) — Drive a second device in the E2E suite
 

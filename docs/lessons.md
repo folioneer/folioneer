@@ -104,3 +104,13 @@ Append-only; supersede in place if the underlying ecosystem changes.
 **Symptom** — After a mutation-testing run that did not end on its own (killed, out of memory, Ctrl-C), a source file carries a one-line change that reads like a bug: a flipped comparison, a returned default, a deleted call. The tool restores files only when it finishes a mutant.
 
 **Mitigation** — (1) Treat in-place mutation as a CI job, not a laptop task: it needs the memory of a full build plus the suite, repeatedly. (2) After any run that did not finish, `git status` before every other git command; `git checkout -- <tree>` restores the file. Never stash, commit or switch branches while such a run is alive. (3) A run that must stay local uses the copying mode, which leaves the working tree untouched.
+
+## L-014 — An overlay scrollbar fades on its own schedule and breaks a screenshot comparison
+
+**First observed**: 2026-09-21 (a Markdown-only pull request failed the visual gate twice on `sync-settings`, against a baseline built from its own parent commit)
+
+**Symptom** — A visual-regression gate reports a difference on screens the change cannot reach — a documentation-only pull request, or a backend one. The diff is a thin vertical bar at the right edge of a scrollable pane, a few pixels wide over several hundred rows, present in one capture and absent in the other although both ran the same code. A second run reproduces the same percentage, so it reads as systematic rather than flaky, and the obvious suspects — a stale baseline, a changed dependency — all check out clean.
+
+**Root cause** — WebKitGTK draws overlay scrollbars that fade in when a pane is touched and out again shortly after. Whether the capture lands before or after that fade is decided by the run's timing, not by the code. The pane only has to become scrollable for the screen to acquire the behaviour, so the regression appears in a change that never touched the screen. Measured here at 0.22 % of an 800×600 screen, against a 0.3 % threshold — on its own under the bar, and over it as soon as any other small difference joined, such as a temporary directory name rendered into the page.
+
+**Mitigation** — (1) Hide scrollbars in the capture path, alongside the transitions and hover states a capture already neutralises: `scrollbar-width: none` and `::-webkit-scrollbar { display: none }` injected for the shot and removed afterwards. (2) When a gate accuses a change that cannot have caused it, compare the two artifacts pixel by pixel and locate the differing columns before believing either verdict — the column range names the culprit in one step. (3) Keep run-varying text (temporary paths, clock times) out of captured screens, so the threshold's headroom is spent on real regressions.
