@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useAppStore } from "@/lib/store";
 import { AccountDetailsView } from "./AccountDetailsView";
 
 // ── Controlled orchestration hook ───────────────────────────────────────────
@@ -57,8 +58,24 @@ vi.mock("../interest_transaction/InterestModal", () => ({
 vi.mock("../fee_schedule/FeeScheduleModal", () => ({
   FeeScheduleModal: () => <div data-testid="fee-schedule-modal-mounted" />,
 }));
-vi.mock("./HoldingRow", () => ({ HoldingRow: () => <tr data-testid="holding-row" /> }));
-vi.mock("./ClosedHoldingRow", () => ({ ClosedHoldingRow: () => <tr /> }));
+// The rows are stubbed; they record the callbacks the view hands them, since a row
+// renders an action only when its callback is there (MKT-212).
+const { rowProps, closedRowProps } = vi.hoisted(() => ({
+  rowProps: [] as Record<string, unknown>[],
+  closedRowProps: [] as Record<string, unknown>[],
+}));
+vi.mock("./HoldingRow", () => ({
+  HoldingRow: (props: Record<string, unknown>) => {
+    rowProps.push(props);
+    return <tr data-testid="holding-row" />;
+  },
+}));
+vi.mock("./ClosedHoldingRow", () => ({
+  ClosedHoldingRow: (props: Record<string, unknown>) => {
+    closedRowProps.push(props);
+    return <tr />;
+  },
+}));
 
 const handlers = {
   handleDepositOpen: vi.fn(),
@@ -608,5 +625,47 @@ describe("AccountDetailsView — interest (INT-010/050)", () => {
     mockUseAccountDetailsView.mockReturnValue(makeView({ isAsOf: true, asOfDate: "2024-06-01" }));
     render(<AccountDetailsView />);
     expect(document.querySelector("#add-menu-interest")).toBeNull();
+  });
+});
+
+describe("AccountDetailsView — without an External provider (MKT-212)", () => {
+  const withHoldings = () =>
+    makeView({
+      holdings: [{ assetId: "a1" }],
+      closedHoldings: [{ assetId: "c1" }],
+      summary: { ...makeView().summary, hasClosedHoldings: true },
+      hasClosedHoldings: true,
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    rowProps.length = 0;
+    closedRowProps.length = 0;
+    mockUseRefreshAccountPrices.mockReturnValue({ isPending: false, refresh: vi.fn() });
+  });
+
+  afterEach(() => {
+    useAppStore.setState({ hasExternalProvider: true });
+  });
+
+  it("offers the account refresh, the backfill and the lock with an External provider", () => {
+    mockUseAccountDetailsView.mockReturnValue(withHoldings());
+    render(<AccountDetailsView />);
+
+    expect(document.querySelector("#account-details-refresh-prices")).toBeInTheDocument();
+    expect(rowProps.at(-1)?.onBackfillPriceHistory).toBeTypeOf("function");
+    expect(rowProps.at(-1)?.onTogglePriceRefreshLock).toBeTypeOf("function");
+    expect(closedRowProps.at(-1)?.onBackfillPriceHistory).toBeTypeOf("function");
+  });
+
+  it("offers none of them in a build without one", () => {
+    useAppStore.setState({ hasExternalProvider: false });
+    mockUseAccountDetailsView.mockReturnValue(withHoldings());
+    render(<AccountDetailsView />);
+
+    expect(document.querySelector("#account-details-refresh-prices")).toBeNull();
+    expect(rowProps.at(-1)?.onBackfillPriceHistory).toBeUndefined();
+    expect(rowProps.at(-1)?.onTogglePriceRefreshLock).toBeUndefined();
+    expect(closedRowProps.at(-1)?.onBackfillPriceHistory).toBeUndefined();
   });
 });

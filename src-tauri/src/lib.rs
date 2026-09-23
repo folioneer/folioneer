@@ -12,7 +12,10 @@
 #![cfg_attr(not(test), deny(clippy::unimplemented))]
 
 use crate::context::account::AccountService;
-use crate::context::asset::{AssetPriceRepository, AssetService, SqliteAssetPriceRepository};
+use crate::context::asset::{
+    AssetPriceRepository, AssetService, PriceProvider, SqliteAssetPriceRepository,
+};
+use crate::context::currency::CurrencyService;
 use crate::context::sync::{
     ChangeLogRepository, FirstPublish, FolderStore, FsFolderStore, Publisher,
     SqliteChangeLogRepository, SqliteChangeRecorder, SqliteSyncStateRepository, SyncRun,
@@ -32,6 +35,7 @@ use crate::use_cases::archive_asset::ArchiveAssetUseCase;
 use crate::use_cases::asset_price_fetch::dispatcher::Dispatcher as PriceFetchDispatcher;
 use crate::use_cases::asset_price_fetch::{AssetPriceFetchUseCase, FetchGuard};
 use crate::use_cases::asset_web_lookup::AssetWebLookupUseCase;
+use crate::use_cases::capabilities::Capabilities;
 use crate::use_cases::delete_asset::DeleteAssetUseCase;
 use crate::use_cases::fee_generation::{FeeGenerationOrchestrator, LaunchSyncSurface};
 use crate::use_cases::global_performance::GlobalPerformanceUseCase;
@@ -43,6 +47,7 @@ use crate::use_cases::portfolio_sync::{
 use crate::use_cases::price_freshness::PriceFreshnessUseCase;
 use crate::use_cases::price_history_backfill::PriceHistoryBackfillUseCase;
 use crate::use_cases::rate_history_backfill::RateHistoryBackfillUseCase;
+use crate::use_cases::scheduled_fetch::orchestrator::drop_schedule_without_provider;
 use crate::use_cases::scheduled_fetch::{
     ScheduledFetchOrchestrator, SqliteScheduledFetchRepository,
 };
@@ -173,9 +178,6 @@ pub fn run() {
                     }
                 });
 
-                let price_repo_for_fetch: Arc<dyn AssetPriceRepository> =
-                    Arc::new(SqliteAssetPriceRepository::new(db.pool.clone()));
-
                 // ----- multi-device sync (SYN) -----
                 let sync_state_repo: Arc<dyn SyncStateRepository> =
                     Arc::new(SqliteSyncStateRepository::new(db.pool.clone()));
@@ -195,14 +197,13 @@ pub fn run() {
                         .with_run(Arc::clone(&sync_run))
                         .with_event_bus(Arc::clone(&event_bus)),
                 );
+                let price_provider = providers.price;
                 let AppContainer {
                     account_service,
                     asset_service,
                     currency_service,
-                    price_provider,
                 } = AppContainer::build(
                     db.pool.clone(),
-                    providers.price,
                     Some(providers.rate),
                     Some(providers.rate_history),
                     Some(Arc::clone(&event_bus)),
@@ -313,73 +314,36 @@ pub fn run() {
                 app_handle.manage(AssetWebLookupUseCase::new(providers.asset_lookup));
 
                 // ----- asset price fetch (keyless Yahoo Finance, ADR-017) -----
-                let fetch_guard = Arc::new(FetchGuard::new());
                 // MKT-201 — this installation's fetch log, written by both fetch paths.
                 let price_fetch_log: Arc<dyn PriceFetchLogRepository> =
                     Arc::new(SqlitePriceFetchLogRepository::new(db.pool.clone()));
-                let dispatcher = Arc::new(
-                    PriceFetchDispatcher::new(
-                        Arc::clone(&price_provider),
-                        price_repo_for_fetch,
-                        Arc::clone(&event_bus),
-                        Arc::clone(&currency_service),
-                        Arc::new(|| chrono::Local::now().date_naive()),
-                    )
-                    .with_fetch_log(
-                        Arc::clone(&price_fetch_log),
-                        Arc::new(|| chrono::Local::now().naive_local()),
-                    ),
-                );
-                // MKT-200/201 — the header's price item.
+                // MKT-200/201 — the header's price item. It reads prices already
+                // recorded and this device's fetch log, so it is built whether or not
+                // anything can fetch.
                 app_handle.manage(Arc::new(PriceFreshnessUseCase::new(
                     account_service.clone(),
                     asset_service.clone(),
                     Arc::clone(&price_fetch_log),
                 )));
-                let asset_price_fetch_uc = Arc::new(AssetPriceFetchUseCase::new(
-                    account_service.clone(),
-                    asset_service.clone(),
-                    Arc::clone(&fetch_guard),
-                    Arc::clone(&dispatcher),
-                    Arc::clone(&currency_service),
-                ));
-                app_handle.manage(asset_price_fetch_uc);
-                app_handle.manage(Arc::clone(&fetch_guard));
 
-                // ----- scheduled daily price download (SPF) -----
-                let scheduled_fetch_orchestrator = Arc::new(
-                    ScheduledFetchOrchestrator::new(
-                        account_service.clone(),
-                        asset_service.clone(),
-                        Arc::clone(&price_provider),
-                        Arc::clone(&currency_service),
-                        Arc::new(SqliteScheduledFetchRepository::new(db.pool.clone())),
-                        platform_scheduler(),
-                        Arc::new(|| chrono::Local::now().naive_local()),
-                    )
-                    .with_fetch_log(price_fetch_log),
+                // MKT-210, MKT-211, SPF-070 — what fetches prices, and what the interface is told.
+                manage_price_fetching(
+                    &app_handle,
+                    price_provider,
+                    PriceFetchingParts {
+                        pool: db.pool.clone(),
+                        account_service: account_service.clone(),
+                        asset_service: asset_service.clone(),
+                        currency_service: Arc::clone(&currency_service),
+                        event_bus: Arc::clone(&event_bus),
+                        price_fetch_log,
+                    },
                 );
-                // SPF-015 — verify/repair the OS schedule against the stored
-                // configuration on every app start; failures are logged, never
-                // surfaced.
-                let self_heal_orchestrator = Arc::clone(&scheduled_fetch_orchestrator);
-                tauri::async_runtime::spawn(async move {
-                    self_heal_orchestrator.self_heal().await;
-                });
-                app_handle.manage(scheduled_fetch_orchestrator);
 
                 // FXR-110 — historical rate backfill for the Currency Rates view.
                 app_handle.manage(Arc::new(RateHistoryBackfillUseCase::new(
                     account_service.clone(),
                     Arc::clone(&currency_service),
-                )));
-
-                // MKT-190 — price history backfill of one holding.
-                app_handle.manage(Arc::new(PriceHistoryBackfillUseCase::new(
-                    account_service.clone(),
-                    asset_service.clone(),
-                    Arc::clone(&price_provider),
-                    Arc::new(|| chrono::Local::now().date_naive()),
                 )));
 
                 app_handle.manage(portfolio_sync_uc);
@@ -402,6 +366,97 @@ pub fn run() {
         .invoke_handler(invoke_handler)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// What the price-fetching paths of the composition root are built from.
+struct PriceFetchingParts {
+    pool: sqlx::SqlitePool,
+    account_service: Arc<AccountService>,
+    asset_service: Arc<AssetService>,
+    currency_service: Arc<CurrencyService>,
+    event_bus: Arc<SideEffectEventBus>,
+    price_fetch_log: Arc<dyn PriceFetchLogRepository>,
+}
+
+/// MKT-210, MKT-211, SPF-070 — the three paths that fetch prices exist only with an
+/// External provider, and the interface is told which kind of build this is. Without
+/// one no fetching use case is managed, so no command reaches a half-built one, and a
+/// scheduled fetch a build with a provider registered is taken away.
+fn manage_price_fetching<R: tauri::Runtime>(
+    app_handle: &tauri::AppHandle<R>,
+    price_provider: Option<Arc<dyn PriceProvider>>,
+    parts: PriceFetchingParts,
+) {
+    app_handle.manage(Capabilities {
+        external_provider: price_provider.is_some(),
+    });
+    let Some(price_provider) = price_provider else {
+        tauri::async_runtime::spawn(async {
+            drop_schedule_without_provider(platform_scheduler().as_ref()).await;
+        });
+        return;
+    };
+    let PriceFetchingParts {
+        pool,
+        account_service,
+        asset_service,
+        currency_service,
+        event_bus,
+        price_fetch_log,
+    } = parts;
+
+    let fetch_guard = Arc::new(FetchGuard::new());
+    let price_repo_for_fetch: Arc<dyn AssetPriceRepository> =
+        Arc::new(SqliteAssetPriceRepository::new(pool.clone()));
+    let dispatcher = Arc::new(
+        PriceFetchDispatcher::new(
+            Arc::clone(&price_provider),
+            price_repo_for_fetch,
+            Arc::clone(&event_bus),
+            Arc::clone(&currency_service),
+            Arc::new(|| chrono::Local::now().date_naive()),
+        )
+        .with_fetch_log(
+            Arc::clone(&price_fetch_log),
+            Arc::new(|| chrono::Local::now().naive_local()),
+        ),
+    );
+    app_handle.manage(Arc::new(AssetPriceFetchUseCase::new(
+        account_service.clone(),
+        asset_service.clone(),
+        Arc::clone(&fetch_guard),
+        Arc::clone(&dispatcher),
+        Arc::clone(&currency_service),
+    )));
+
+    // ----- scheduled daily price download (SPF) -----
+    let scheduled_fetch_orchestrator = Arc::new(
+        ScheduledFetchOrchestrator::new(
+            account_service.clone(),
+            asset_service.clone(),
+            Arc::clone(&price_provider),
+            Arc::clone(&currency_service),
+            Arc::new(SqliteScheduledFetchRepository::new(pool)),
+            platform_scheduler(),
+            Arc::new(|| chrono::Local::now().naive_local()),
+        )
+        .with_fetch_log(price_fetch_log),
+    );
+    // SPF-015 — verify/repair the OS schedule against the stored configuration on every
+    // app start; failures are logged, never surfaced.
+    let self_heal_orchestrator = Arc::clone(&scheduled_fetch_orchestrator);
+    tauri::async_runtime::spawn(async move {
+        self_heal_orchestrator.self_heal().await;
+    });
+    app_handle.manage(scheduled_fetch_orchestrator);
+
+    // MKT-190 — price history backfill of one holding.
+    app_handle.manage(Arc::new(PriceHistoryBackfillUseCase::new(
+        account_service,
+        asset_service,
+        price_provider,
+        Arc::new(|| chrono::Local::now().date_naive()),
+    )));
 }
 
 /// SYN-060/D9 — the launch sync the fee-generation use case runs before generating: one
@@ -473,4 +528,71 @@ pub(crate) fn initialize_tracing(log_dir: &std::path::Path) -> anyhow::Result<()
 
     tracing::trace!(target: BACKEND, "Logging initialized. Log file: {}", log_file.display());
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::asset::MockPriceProvider;
+
+    async fn parts() -> PriceFetchingParts {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("pool");
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .expect("migrations");
+        let recorder: Arc<dyn ChangeRecorder> = Arc::new(SqliteChangeRecorder::new(pool.clone()));
+        let AppContainer {
+            account_service,
+            asset_service,
+            currency_service,
+        } = AppContainer::build(pool.clone(), None, None, None, recorder);
+        PriceFetchingParts {
+            price_fetch_log: Arc::new(SqlitePriceFetchLogRepository::new(pool.clone())),
+            pool,
+            account_service,
+            asset_service,
+            currency_service,
+            event_bus: Arc::new(SideEffectEventBus::new()),
+        }
+    }
+
+    // MKT-210, MKT-211 — without an External provider no fetching use case exists, so
+    // no command can reach one, and the interface is told so.
+    #[tokio::test]
+    async fn a_build_without_an_external_provider_manages_no_fetching_use_case() {
+        let app = tauri::test::mock_app();
+
+        manage_price_fetching(app.handle(), None, parts().await);
+
+        assert!(!use_cases::capabilities::get_capabilities(app.state()).external_provider);
+        assert!(app.try_state::<Arc<AssetPriceFetchUseCase>>().is_none());
+        assert!(app.try_state::<Arc<ScheduledFetchOrchestrator>>().is_none());
+        assert!(app
+            .try_state::<Arc<PriceHistoryBackfillUseCase>>()
+            .is_none());
+    }
+
+    // MKT-211 — with one, the three fetching paths exist and the interface is told so.
+    #[tokio::test]
+    async fn a_build_with_an_external_provider_manages_the_three_fetching_use_cases() {
+        let app = tauri::test::mock_app();
+
+        manage_price_fetching(
+            app.handle(),
+            Some(Arc::new(MockPriceProvider::new())),
+            parts().await,
+        );
+
+        assert!(use_cases::capabilities::get_capabilities(app.state()).external_provider);
+        assert!(app.try_state::<Arc<AssetPriceFetchUseCase>>().is_some());
+        assert!(app.try_state::<Arc<ScheduledFetchOrchestrator>>().is_some());
+        assert!(app
+            .try_state::<Arc<PriceHistoryBackfillUseCase>>()
+            .is_some());
+    }
 }

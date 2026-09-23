@@ -1,12 +1,12 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PriceMovementReport } from "@/bindings";
 import { AccountManager } from "./AccountManager";
 
 const { mockNavigate, mockUsePriceMovementReport, mockStoreState } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
   mockUsePriceMovementReport: vi.fn(),
-  mockStoreState: { unpricedAssets: [] as unknown[] },
+  mockStoreState: { unpricedAssets: [] as unknown[], hasExternalProvider: true },
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -27,6 +27,7 @@ vi.mock("@/lib/store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/store")>();
   return {
     selectUnpricedModalOpen: actual.selectUnpricedModalOpen,
+    selectHasExternalProvider: actual.selectHasExternalProvider,
     useAppStore: (selector: (state: typeof mockStoreState) => unknown) => selector(mockStoreState),
   };
 });
@@ -147,5 +148,22 @@ describe("AccountManager — price movement dialog (PMV-013/018)", () => {
     fireEvent.click(screen.getByTestId("price-movement-dialog-stub"));
 
     expect(dismiss).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AccountManager — without an External provider (MKT-212)", () => {
+  afterEach(() => {
+    mockStoreState.hasExternalProvider = true;
+  });
+
+  it("offers the global refresh in a build with an External provider", () => {
+    render(<AccountManager />);
+    expect(document.querySelector("#account-manager-refresh-prices")).toBeInTheDocument();
+  });
+
+  it("offers no global refresh in a build without one", () => {
+    mockStoreState.hasExternalProvider = false;
+    render(<AccountManager />);
+    expect(document.querySelector("#account-manager-refresh-prices")).toBeNull();
   });
 });

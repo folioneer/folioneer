@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
+import { selectHasExternalProvider, useAppStore } from "@/lib/store";
 import { ScheduledFetchSection } from "./scheduled_fetch/ScheduledFetchSection";
 import { SyncSection } from "./sync/SyncSection";
 import { type LanguageChoice, useSettings } from "./useSettings";
@@ -21,6 +22,10 @@ export function SettingsPage() {
     autoFetch,
     toggleAutoFetch,
   } = useSettings();
+
+  // MKT-212, SPF-071 — without an External provider there is nothing to fetch on
+  // launch and no scheduled fetch to configure.
+  const hasExternalProvider = useAppStore(selectHasExternalProvider);
 
   useEffect(() => {
     logger.info("[SettingsPage] mounted");
@@ -54,27 +59,31 @@ export function SettingsPage() {
           </div>
         </section>
 
-        <section className="flex flex-col gap-2">
-          <label className="flex items-start gap-3 cursor-pointer group">
-            <input
-              id="settings-auto-fetch"
-              type="checkbox"
-              checked={autoFetch}
-              onChange={toggleAutoFetch}
-              className="accent-m3-primary w-4 h-4 mt-1"
-            />
-            <span className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-m3-on-surface group-hover:text-m3-primary transition-colors">
-                {t("settings.auto_fetch_label")}
-              </span>
-              <span className="text-xs text-m3-on-surface-variant">
-                {t("settings.auto_fetch_description")}
-              </span>
-            </span>
-          </label>
-        </section>
+        {hasExternalProvider && (
+          <>
+            <section className="flex flex-col gap-2">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  id="settings-auto-fetch"
+                  type="checkbox"
+                  checked={autoFetch}
+                  onChange={toggleAutoFetch}
+                  className="accent-m3-primary w-4 h-4 mt-1"
+                />
+                <span className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-m3-on-surface group-hover:text-m3-primary transition-colors">
+                    {t("settings.auto_fetch_label")}
+                  </span>
+                  <span className="text-xs text-m3-on-surface-variant">
+                    {t("settings.auto_fetch_description")}
+                  </span>
+                </span>
+              </label>
+            </section>
 
-        <ScheduledFetchSection />
+            <ScheduledFetchSection />
+          </>
+        )}
 
         <SyncSection />
 

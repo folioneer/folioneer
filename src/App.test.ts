@@ -10,6 +10,7 @@ vi.mock("@/features/shell/gateway", () => ({
 
 import { accountGateway } from "@/features/accounts/gateway";
 import { setAutoFetch } from "@/lib/autoFetchStorage";
+import { useAppStore } from "@/lib/store";
 // Import the testable launch helper extracted from App.tsx (MKT-121).
 import { maybeLaunchAutoFetch } from "./App";
 
@@ -17,6 +18,18 @@ describe("maybeLaunchAutoFetch — MKT-121 launch dispatch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear(); // auto-fetch off by default
+    useAppStore.setState({ hasExternalProvider: true });
+  });
+
+  // MKT-212 — a build without an External provider starts no auto-fetch, whatever
+  // the setting says.
+  it("does not dispatch in a build without an External provider, even with auto-fetch on", async () => {
+    setAutoFetch(true);
+    useAppStore.setState({ hasExternalProvider: false });
+
+    await maybeLaunchAutoFetch();
+
+    expect(accountGateway.fetchAllAssetPrices).not.toHaveBeenCalled();
   });
 
   // MKT-120 — auto-fetch disabled: no dispatch at all.

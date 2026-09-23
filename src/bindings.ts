@@ -944,6 +944,13 @@ async backfillHoldingPriceHistory(accountId: string, assetId: string) : Promise<
 }
 },
 /**
+ * Reports what this build can do, so the interface renders only what it permits
+ * (MKT-211). Infallible: the value is managed before any window exists.
+ */
+async getCapabilities() : Promise<Capabilities> {
+    return await TAURI_INVOKE("get_capabilities");
+},
+/**
  * Tauri command allowing the frontend to emit structured log entries
  * into the backend tracing system (visible in app logs and collect-logs output).
  */
@@ -1763,6 +1770,16 @@ account_id: string;
  * Identifier of the transaction being cancelled.
  */
 transaction_id: string }
+/**
+ * What this build can do (MKT-211). Settled at composition and constant for the run.
+ */
+export type Capabilities = { 
+/**
+ * Whether this build has an External provider. Without one no fetch task, no
+ * scheduled fetch and no price history backfill exists (MKT-210), and the
+ * interface offers none of them (MKT-212).
+ */
+external_provider: boolean }
 /**
  * Enriched view of a fully-closed position (quantity == 0, ACD-044).
  */

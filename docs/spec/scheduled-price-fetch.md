@@ -53,7 +53,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-014 — Local time and DST (backend)**: The trigger time is a local wall-clock time in the machine's timezone. Daylight-saving shifts do not change the wall-clock trigger.
 
-**SPF-015 — Self-heal on app start (backend)**: On every app start, when the configuration is enabled, the OS schedule is verified and silently repaired if missing or stale (e.g. the application moved after an update). When disabled, a leftover schedule is silently removed.
+**SPF-015 — Self-heal on app start (backend)**: On every app start — except in a build with no External provider (SPF-070) — when the configuration is enabled, the OS schedule is verified and silently repaired if missing or stale (e.g. the application moved after an update). When disabled, a leftover schedule is silently removed.
 
 **SPF-016 — No resident presence (backend)**: Outside its brief daily execution, nothing runs and nothing is visible — no tray icon, no background service, no window.
 
@@ -79,7 +79,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-030 — Close-of-day semantics (backend)**: The scheduled download records **daily closing prices**, never a live intraday quote. Each recorded price is dated to the trading day it closes — including during catch-up: a run executing the morning after a missed trigger records the previous day's close, not the morning's price.
 
-**SPF-031 — Backfill window (backend)**: Each run retrieves, per asset, the **daily close series** covering the days missing since the last successful scheduled run — a capability the price provider already exposes (its chart data carries dated daily history, ADR-017) — and records every completed trading-day close in that window, up to a maximum of 30 days back. Gaps older than 30 days are left untouched.
+**SPF-031 — Backfill window (backend)**: Each run retrieves, per asset, the **daily close series** covering the days missing since the last successful scheduled run — a capability the External provider already exposes (its chart data carries dated daily history, ADR-017) — and records every completed trading-day close in that window, up to a maximum of 30 days back. Gaps older than 30 days are left untouched.
 
 **SPF-032 — Non-trading days produce no rows (backend)**: Weekends and market holidays have no close; the run writes nothing for those dates. This is not a skip or an error.
 
@@ -93,7 +93,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-037 — Exchange-rate non-trading days (backend)**: Days for which the rate provider publishes no reference rate (weekends, ECB holidays) produce no rate rows, mirroring SPF-032. This is not a skip or an error.
 
-**SPF-038 — Per-pair silent skip (backend)**: A currency pair the provider cannot serve is silently skipped — nothing written, no error surfaced — and the run continues with the remaining pairs, mirroring SPF-041.
+**SPF-038 — Per-pair silent skip (backend)**: A currency pair the rate provider cannot serve is silently skipped — nothing written, no error surfaced — and the run continues with the remaining pairs, mirroring SPF-041.
 
 **SPF-039 — Price/rate failure independence (backend)**: Rate failures do not fail the price portion of the run, and vice versa; each portion's outcome is reflected in the run record independently of the other.
 
@@ -107,7 +107,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 ### Outcome & Visibility (050–059)
 
-**SPF-050 — Every run is recorded (backend)**: Every execution — successful, failed, or skipped by the once-per-day guard — records a `ScheduledFetchRun` with its trigger date, execution time, outcome, and update/skip counts.
+**SPF-050 — Every run is recorded (backend)**: Every execution — successful, failed, or skipped by the once-per-day guard — records a `ScheduledFetchRun`, except a leftover firing in a build with no External provider (SPF-072), with its trigger date, execution time, outcome, and update/skip counts.
 
 **SPF-051 — Transient retry within a run (backend)**: A run that cannot reach the provider at all retries up to **3 attempts** (with increasing delay) within the same execution before recording a failed run. Per-asset skips (SPF-041) and per-pair skips (SPF-038) are not retried.
 
@@ -120,6 +120,16 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 **SPF-060 — Configure in-flight state (frontend)**: While a configuration change (enable, disable, or time change) is being acknowledged, the toggle and time field are disabled and a pending indicator is shown, preventing double submission — consistent with MKT-027.
 
 **SPF-061 — Status loading state (frontend)**: While the section's status is being loaded, a loading indicator is shown in place of the status line. A load failure shows an inline error within the section; the rest of the Settings page is unaffected.
+
+### Without an External provider (070–079)
+
+**SPF-070 — No External provider, no scheduled fetch (backend)**: A build with no External provider (MKT-210) registers no scheduled fetch with the operating system, and removes at start-up one a build that had a provider left behind — and with it the scheduled refresh of exchange rates (SPF-035). The stored configuration is left as it is, so a build that regains a provider honours it again and the self-heal of SPF-015 puts the schedule back.
+
+**SPF-071 — No scheduled fetch section (frontend)**: In a build with no External provider (MKT-211) the Settings page shows no scheduled fetch section (SPF-010) — neither the toggle and trigger time nor the last-run status (SPF-052).
+
+**SPF-072 — A leftover that fires does nothing (backend)**: A scheduled fetch that outlived its build and fires, in a build with no External provider, before the start-up that would remove it (SPF-070) finds nothing to fetch: it records no run (SPF-050) and exits successfully.
+
+**SPF-073 — Configuring is refused (backend)**: In a build with no External provider, enabling, disabling or retiming the scheduled fetch, and reading its status, are refused before any work is done: nothing is registered, removed or written. The interface never asks (SPF-071).
 
 ---
 

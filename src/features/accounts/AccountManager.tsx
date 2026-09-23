@@ -3,7 +3,7 @@ import { TrendingUp } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
-import { selectUnpricedModalOpen, useAppStore } from "@/lib/store";
+import { selectHasExternalProvider, selectUnpricedModalOpen, useAppStore } from "@/lib/store";
 import { Button } from "@/ui/components/button/Button";
 import { IconButton } from "@/ui/components/button/IconButton";
 import { FAB } from "@/ui/components/fab/FAB";
@@ -22,6 +22,8 @@ export function AccountManager() {
   // dialog only tells them something, so it waits its turn rather than
   // stacking over it.
   const isUnpricedModalOpen = useAppStore(selectUnpricedModalOpen);
+  // MKT-212 — without an External provider there is no global refresh to offer.
+  const hasExternalProvider = useAppStore(selectHasExternalProvider);
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -56,16 +58,18 @@ export function AccountManager() {
               aria-label={t("account.action_global_performance")}
               title={t("account.action_global_performance")}
             />
-            <Button
-              id="account-manager-refresh-prices"
-              variant="tonal"
-              size="sm"
-              loading={isRefreshPending}
-              onClick={() => void refreshPrices()}
-              aria-label={t("account.refresh_prices")}
-            >
-              {t("account.refresh_prices")}
-            </Button>
+            {hasExternalProvider && (
+              <Button
+                id="account-manager-refresh-prices"
+                variant="tonal"
+                size="sm"
+                loading={isRefreshPending}
+                onClick={() => void refreshPrices()}
+                aria-label={t("account.refresh_prices")}
+              >
+                {t("account.refresh_prices")}
+              </Button>
+            )}
           </>
         }
         table={<AccountTable searchTerm={query} onAccountClick={handleAccountClick} />}

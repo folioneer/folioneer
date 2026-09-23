@@ -333,7 +333,7 @@ Recording every missed trading-day close since the last successful scheduled fet
 
 ### External provider
 
-A third-party HTTP service that returns current asset prices and their daily-close history. Currently Yahoo Finance — keyless, no credential required (ADR-017). "provider" in prose means an External provider.
+A third-party HTTP service that returns current asset prices and their daily-close history. Currently Yahoo Finance — keyless, no credential required (ADR-017). A build may have none, and then holds only prices typed by hand. "provider" in prose means an External provider.
 
 > Status: confirmed
 

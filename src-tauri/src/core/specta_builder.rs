@@ -3,8 +3,8 @@ use crate::{
     core::{logger, Event},
     use_cases::{
         account_creation, account_deletion, account_details, account_performance, account_summary,
-        archive_asset, asset_price_fetch, asset_web_lookup, delete_asset, fee_generation,
-        global_performance, holding_transaction, portfolio_sync, price_freshness,
+        archive_asset, asset_price_fetch, asset_web_lookup, capabilities, delete_asset,
+        fee_generation, global_performance, holding_transaction, portfolio_sync, price_freshness,
         price_history_backfill, rate_history_backfill, scheduled_fetch, update_checker,
     },
 };
@@ -187,6 +187,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             rate_history_backfill::backfill_currency_rate_history,
             price_freshness::get_price_freshness,
             price_history_backfill::backfill_holding_price_history,
+            capabilities::get_capabilities,
             // ----- core -----
             logger::log_frontend
         ])

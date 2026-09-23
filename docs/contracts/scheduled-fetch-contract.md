@@ -18,6 +18,8 @@ Traceability: `configure_scheduled_fetch` ← SPF-010, SPF-011, SPF-012, SPF-013
 
 The scheduled run itself, the once-per-day guard, catch-up, backfill, and start-time self-heal (SPF-015, SPF-020–SPF-033, SPF-040–SPF-053) are internal-only — no frontend caller, so no commands.
 
+In a build without an External provider (MKT-210) both commands are refused before any work is done (SPF-073): nothing is registered, removed or written, and the refusal carries no typed code, since no orchestrator exists to answer. The interface never calls them there — it shows no scheduled fetch section (SPF-071).
+
 ---
 
 ## Shared Types
@@ -61,3 +63,4 @@ None — SPF-024: the scheduled run never live-notifies a running app (separate 
 - 2026-07-12 — Added by `scheduled-price-fetch` spec: `configure_scheduled_fetch`, `get_scheduled_fetch_status`
 - 2026-07-12 — contract-reviewer fix: `ScheduledFetchStatus.last_run` → `Option<ScheduledFetchRun>` (fresh-install state)
 - 2026-07-12 — SPF-017: all three desktop platforms ship adapters; no platform-support flag needed on the wire
+- 2026-09-23 — SPF-070–073: in a build without an External provider both commands are refused before any work, untyped; no new command, type or error.

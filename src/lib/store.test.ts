@@ -28,6 +28,11 @@ vi.mock("../features/categories/gateway", () => ({
   categoryGateway: { getCategories: vi.fn().mockResolvedValue({ status: "ok", data: [] }) },
 }));
 
+const mockGetCapabilities = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ external_provider: true }),
+);
+vi.mock("../features/shell/gateway", () => ({ getCapabilities: mockGetCapabilities }));
+
 vi.mock("./logger", () => ({
   logger: { error: vi.fn(), info: vi.fn(), debug: mockDebug },
 }));
@@ -447,6 +452,25 @@ describe("store — price-fetch progress (MKT-180)", () => {
     });
     expect(useAppStore.getState().priceFetch).toEqual({ active: false, done: 0, total: 0 });
 
+    cleanup();
+  });
+});
+
+describe("store — the build's capabilities (MKT-211)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAppStore.setState({ isInitialized: false, hasExternalProvider: true });
+  });
+
+  // MKT-211 — init reads the answer before the application counts as initialised, so
+  // no screen is drawn from the default.
+  it("holds the build's answer once initialised", async () => {
+    mockGetCapabilities.mockResolvedValueOnce({ external_provider: false });
+
+    const cleanup = useAppStore.getState().init();
+    await vi.waitFor(() => expect(useAppStore.getState().isInitialized).toBe(true));
+
+    expect(useAppStore.getState().hasExternalProvider).toBe(false);
     cleanup();
   });
 });

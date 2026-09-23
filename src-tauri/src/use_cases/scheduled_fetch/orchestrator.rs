@@ -430,6 +430,29 @@ pub fn backfill_window(
     (from, today)
 }
 
+/// SPF-070 — a build with no External provider owns no scheduled fetch: it registers
+/// none, and removes one a build that had a provider left with the operating system,
+/// so nothing wakes up to fetch what cannot be fetched. The stored configuration is
+/// untouched, so a build that regains a provider honours it again (SPF-015).
+///
+/// Failures are logged, never surfaced: this runs at start-up, and a schedule that
+/// could not be removed is retried at the next one.
+pub async fn drop_schedule_without_provider(scheduler: &dyn DailyFetchScheduler) {
+    match scheduler.is_registered().await {
+        Ok(false) => {}
+        Ok(true) => {
+            if let Err(error) = scheduler.remove().await {
+                tracing::warn!(target: crate::core::logger::BACKEND, err = ?error, "no External provider: leftover schedule not removed (SPF-070)");
+            } else {
+                tracing::info!(target: crate::core::logger::BACKEND, "no External provider: leftover schedule removed (SPF-070)");
+            }
+        }
+        Err(error) => {
+            tracing::warn!(target: crate::core::logger::BACKEND, err = ?error, "no External provider: schedule state unreadable (SPF-070)");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::repository::MockScheduledFetchRepository;
@@ -439,6 +462,52 @@ mod tests {
     use crate::context::currency::{MockCurrencyPairRepository, MockCurrencyRateRepository};
     use crate::shared::infrastructure::scheduler::MockDailyFetchScheduler;
     use crate::use_cases::shared::price_fetch_log::MockPriceFetchLogRepository;
+
+    // SPF-070 — a build without a provider removes the daily download a build that had
+    // one left behind, so nothing wakes up to fetch what cannot be fetched.
+    #[tokio::test]
+    async fn a_leftover_schedule_is_removed_when_there_is_no_provider() {
+        let mut scheduler = MockDailyFetchScheduler::new();
+        scheduler
+            .expect_is_registered()
+            .times(1)
+            .returning(|| Ok(true));
+        scheduler.expect_remove().times(1).returning(|| Ok(()));
+
+        drop_schedule_without_provider(&scheduler).await;
+    }
+
+    // SPF-070 — nothing registered, nothing to remove: the start-up path stays quiet.
+    #[tokio::test]
+    async fn nothing_is_removed_when_no_schedule_is_registered() {
+        let mut scheduler = MockDailyFetchScheduler::new();
+        scheduler
+            .expect_is_registered()
+            .times(1)
+            .returning(|| Ok(false));
+        scheduler.expect_remove().never();
+
+        drop_schedule_without_provider(&scheduler).await;
+    }
+
+    // SPF-070 — a scheduler that cannot be read or cannot remove is logged, never
+    // surfaced: the application starts, and the next start tries again.
+    #[tokio::test]
+    async fn a_scheduler_that_fails_does_not_break_the_start_up() {
+        let mut unreadable = MockDailyFetchScheduler::new();
+        unreadable
+            .expect_is_registered()
+            .returning(|| Err(anyhow::anyhow!("scheduler unavailable")));
+        unreadable.expect_remove().never();
+        drop_schedule_without_provider(&unreadable).await;
+
+        let mut stubborn = MockDailyFetchScheduler::new();
+        stubborn.expect_is_registered().returning(|| Ok(true));
+        stubborn
+            .expect_remove()
+            .returning(|| Err(anyhow::anyhow!("removal refused")));
+        drop_schedule_without_provider(&stubborn).await;
+    }
     use mockall::Sequence;
 
     fn today() -> NaiveDate {

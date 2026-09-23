@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useAppStore } from "@/lib/store";
 import { PriceFreshnessIndicator } from "./PriceFreshnessIndicator";
 
 const { mockUsePriceFreshness } = vi.hoisted(() => ({ mockUsePriceFreshness: vi.fn() }));
@@ -78,5 +79,26 @@ describe("PriceFreshnessIndicator (MKT-202)", () => {
     render(<PriceFreshnessIndicator />);
 
     expect(screen.getByTestId("price-freshness")).toHaveTextContent("price_freshness.none");
+  });
+});
+
+describe("PriceFreshnessIndicator — without an External provider (MKT-212)", () => {
+  afterEach(() => {
+    useAppStore.setState({ hasExternalProvider: true });
+  });
+
+  // Prices typed by hand are recorded prices: the date stays, the fetch line goes.
+  it("keeps the newest price date and says nothing about fetching", () => {
+    useAppStore.setState({ hasExternalProvider: false });
+    mockUsePriceFreshness.mockReturnValue({
+      visible: true,
+      newestPriceDate: "2026-09-15",
+      lastFetchAt: null,
+    });
+    render(<PriceFreshnessIndicator />);
+
+    const item = screen.getByTestId("price-freshness");
+    expect(item).toHaveTextContent('price_freshness.as_of:{"date":"9/15/2026"}');
+    expect(item).not.toHaveAttribute("title");
   });
 });

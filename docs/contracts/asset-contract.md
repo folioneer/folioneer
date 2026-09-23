@@ -1,7 +1,7 @@
 # Contract — Asset
 
 > Domain: `asset`
-> Last updated by: market-price (MKT-190–203)
+> Last updated by: market-price (MKT-190–213)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Per-command reachable codes are listed in the "Errors" column of each table below. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic chain preserved server-side via `tracing::error!`).
 >
@@ -83,6 +83,16 @@
 | Command               | Args | Return           | Errors          |
 | --------------------- | ---- | ---------------- | --------------- |
 | `get_price_freshness` | —    | `PriceFreshness` | `DatabaseError` |
+
+### Capabilities
+
+> `get_capabilities` is implemented in `use_cases/capabilities/`. It returns the answer the composition root settled for the run (MKT-211): whether the build has an External provider. Infallible — the value exists before any window opens.
+>
+> In a build without one, `fetch_all_asset_prices`, `fetch_account_asset_prices` and `backfill_holding_price_history` are refused before any work is done (MKT-210): nothing is fetched or written, and the refusal carries no typed code, since no use case exists to answer. The interface never calls them there (MKT-212).
+
+| Command            | Args | Return         | Errors                                           |
+| ------------------ | ---- | -------------- | ------------------------------------------------ |
+| `get_capabilities` | —    | `Capabilities` | _(none — infallible; settled at start, MKT-211)_ |
 
 ### Web Lookup
 
@@ -175,6 +185,12 @@ struct AssetPrice {
 struct PriceFreshness {
     newest_price_date: Option<String>, // YYYY-MM-DD; None without a held, priced asset
     last_fetch_at: Option<String>,     // local wall-clock YYYY-MM-DDTHH:MM:SS; None if this device never fetched
+}
+```
+
+```rust
+struct Capabilities {
+    external_provider: bool, // whether this build has an External provider (MKT-211); constant for the run
 }
 ```
 
@@ -298,3 +314,4 @@ struct PriceHistoryBackfillOutcome {
 - 2026-09-11 — Amended by `price-movement` spec (PMV): `fetch_all_asset_prices` gains a `trigger: FetchTrigger` arg so the backend knows which action started it (PMV-010); new `FetchTrigger`, `PriceMovementReport` and `PriceMovementRow` shared types; `AssetPriceFetchCompleted` payload gains `movement: Option<PriceMovementReport>`. No new command and no new error variant — a report that cannot be produced leaves the fetch's own outcome untouched (PMV-014). Both readings use the rates in force at refresh start, so the reference-currency total intentionally diverges from the freshly converted dashboard total (PMV-020, FXR-075).
 - 2026-09-14 — Amended by `price-movement` spec (PMV-027, PMV-028, PMV-046): `PriceMovementRow.movement_amount` and `PriceMovementReport.total_movement_amount` carry the signed amount moved. No new command, type or error.
 - 2026-09-15 — Amended by `market-price` spec (MKT-190–199): new `backfill_holding_price_history` command and `PriceHistoryBackfillOutcome` shared type; not subject to the fetch in-flight guard (MKT-199); `AssetPriceUpdated` also published by a backfill that recorded at least one close.
+- 2026-09-23 — Amended by `market-price` spec (MKT-210–213): new `get_capabilities` command and `Capabilities` shared type. In a build without an External provider the fetch and backfill commands are refused before any work, with the runtime's untyped refusal; the interface never calls them (MKT-212).

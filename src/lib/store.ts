@@ -11,6 +11,7 @@ import {
 import { accountGateway } from "../features/accounts/gateway";
 import { assetGateway } from "../features/assets/gateway";
 import { categoryGateway } from "../features/categories/gateway";
+import { getCapabilities } from "../features/shell/gateway";
 import { type SnackbarVariant, useSnackbarStore } from "../ui/components/snackbar/snackbarStore";
 import { logger } from "./logger";
 
@@ -44,6 +45,8 @@ interface AppState {
   // MKT-180 — in-flight price-fetch progress; drives the shell progress bar and
   // the MKT-181 re-fetch coalescing in the view hooks.
   priceFetch: { active: boolean; done: number; total: number };
+  // MKT-211 — whether this build has an External provider; read before the router mounts.
+  hasExternalProvider: boolean;
 
   // Loading states
   isLoadingAssets: boolean;
@@ -76,6 +79,12 @@ interface AppState {
 export const selectUnpricedModalOpen = (state: AppState): boolean =>
   state.unpricedAssets.length > 0;
 
+/**
+ * MKT-212 — whether the interface may offer what needs an External provider: a fetch
+ * task, a price history backfill, the price refresh lock, the scheduled fetch.
+ */
+export const selectHasExternalProvider = (state: AppState): boolean => state.hasExternalProvider;
+
 export const useAppStore = create<AppState>((set, get) => {
   return {
     appName: "Folioneer",
@@ -85,6 +94,9 @@ export const useAppStore = create<AppState>((set, get) => {
     accounts: [],
     unpricedAssets: [],
     priceFetch: { active: false, done: 0, total: 0 },
+    // Every build has had an External provider until now; `init` reads the real answer
+    // before `isInitialized` flips, so no screen renders from this default.
+    hasExternalProvider: true,
     isLoadingAssets: false,
     isLoadingCategories: false,
     isLoadingAccounts: false,
@@ -155,8 +167,24 @@ export const useAppStore = create<AppState>((set, get) => {
         }
       };
 
+      // MKT-211 — settled for the run; a failure keeps the default and is logged.
+      const fetchCapabilities = async () => {
+        try {
+          const capabilities = await getCapabilities();
+          set({ hasExternalProvider: capabilities.external_provider });
+        } catch (e) {
+          logger.error("[store] failed to read the build's capabilities", e);
+        }
+      };
+
       // initial parallelized fetch
-      Promise.all([fetchAssets(), fetchCategories(), fetchAccounts(), fetchMetadata()]).then(() => {
+      Promise.all([
+        fetchAssets(),
+        fetchCategories(),
+        fetchAccounts(),
+        fetchMetadata(),
+        fetchCapabilities(),
+      ]).then(() => {
         set({ isInitialized: true });
       });
 

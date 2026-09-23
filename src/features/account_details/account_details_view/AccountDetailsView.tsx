@@ -19,6 +19,7 @@ import {
 } from "@/lib/closedSectionStorage";
 import { logger } from "@/lib/logger";
 import { PERF_PERIODS, type StoredPerfPeriod } from "@/lib/perfPeriodStorage";
+import { selectHasExternalProvider, useAppStore } from "@/lib/store";
 import { Button } from "@/ui/components/button/Button";
 import { IconButton } from "@/ui/components/button/IconButton";
 import { FAB } from "@/ui/components/fab/FAB";
@@ -49,6 +50,8 @@ export function AccountDetailsView() {
   const { accountId } = useParams({ from: "/accounts/$accountId" });
   const navigate = useNavigate();
   const view = useAccountDetailsView(accountId);
+  // MKT-212 — without an External provider nothing here may start a fetch.
+  const hasExternalProvider = useAppStore(selectHasExternalProvider);
   const { isPending: isRefreshPending, refresh: refreshPrices } =
     useRefreshAccountPrices(accountId);
   const { scrollAreaRef, scrollbarRef, scrollbar } = usePinnedScrollbar();
@@ -189,8 +192,9 @@ export function AccountDetailsView() {
                   aria-label={t("account_details.action_journal")}
                   title={t("account_details.action_journal")}
                 />
-                {/* MKT-131 — per-account "Refresh prices"; hidden in read-only as-of */}
-                {!view.isAsOf && (
+                {/* MKT-131 — per-account "Refresh prices"; hidden in read-only as-of and
+                    in a build without an External provider (MKT-212) */}
+                {!view.isAsOf && hasExternalProvider && (
                   <IconButton
                     id="account-details-refresh-prices"
                     shape="square"
@@ -383,8 +387,12 @@ export function AccountDetailsView() {
                         onPriceHistory={view.handlePriceHistory}
                         onDeposit={view.handleDepositOpen}
                         onWithdraw={view.handleWithdrawalOpen}
-                        onTogglePriceRefreshLock={view.handleTogglePriceRefreshLock}
-                        onBackfillPriceHistory={view.handleBackfillPriceHistory}
+                        onTogglePriceRefreshLock={
+                          hasExternalProvider ? view.handleTogglePriceRefreshLock : undefined
+                        }
+                        onBackfillPriceHistory={
+                          hasExternalProvider ? view.handleBackfillPriceHistory : undefined
+                        }
                         isBackfillingPriceHistory={view.backfillingAssetIds.includes(row.assetId)}
                         onManageFee={
                           view.managementFeesEnabled ? view.handleFeeScheduleOpen : undefined
@@ -481,7 +489,9 @@ export function AccountDetailsView() {
                             row={row}
                             accountId={accountId}
                             onBackfillPriceHistory={
-                              view.isAsOf ? undefined : view.handleBackfillPriceHistory
+                              view.isAsOf || !hasExternalProvider
+                                ? undefined
+                                : view.handleBackfillPriceHistory
                             }
                             isBackfillingPriceHistory={view.backfillingAssetIds.includes(
                               row.assetId,

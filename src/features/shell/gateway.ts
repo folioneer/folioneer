@@ -1,5 +1,6 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  Capabilities,
   Event,
   FeeGenerationError,
   PortfolioSyncError,
@@ -9,6 +10,11 @@ import type {
   SyncStatus,
 } from "@/bindings";
 import { commands, events } from "@/bindings";
+
+// MKT-211 — what this build can do, read once at start-up by the app store.
+export function getCapabilities(): Promise<Capabilities> {
+  return commands.getCapabilities();
+}
 
 // SYN-063 — the shell indicator reads the sync status through its own gateway (F26).
 export function getSyncStatus(): Promise<Result<SyncStatus, PortfolioSyncError>> {

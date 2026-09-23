@@ -38,6 +38,14 @@ The two figures behind the header's price item (MKT-202). A read model, never pe
 | `newest_price_date` | Latest observation date among the prices of the held assets (ISO 8601 date, e.g. `2026-09-15`); absent without a held, priced asset (MKT-200).                |
 | `last_fetch_at`     | Moment this device last fetched prices, as a local date and time without offset (e.g. `2026-09-19T08:14:00`); absent when the device never fetched (MKT-201). |
 
+### Capabilities
+
+What this build can do, as reported to the interface (MKT-211). A read model, settled when the application starts and constant for the run; never persisted.
+
+| Field               | Business meaning                                                                                                                    |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `external_provider` | Whether this build has an External provider; without one no fetch task, price history backfill or scheduled fetch exists (MKT-210). |
+
 ### HoldingDetail (extended)
 
 The `HoldingDetail` DTO defined in the ACD spec gains five new fields populated by this feature.
@@ -390,9 +398,21 @@ The header tells how recent the portfolio's prices are. Prices travel with the s
 
 **MKT-201 — Last fetch on this device (backend)**: The application keeps, as device-local data that is never synced (SYN-023), the moment this device last fetched prices: the end of an in-app fetch task (MKT-122, MKT-130, MKT-132) that priced at least one asset (MKT-119 `ok > 0`), or the execution of a scheduled download (SPF-050) that updated at least one asset, whichever is later. A task or a run that priced nothing — nothing in scope, provider unreachable, every asset skipped — leaves the moment unchanged. An in-app task records the moment before it announces its completion (MKT-119). A device that ran scheduled downloads before this record existed starts from its last successful one; a device that has never fetched has no such moment.
 
-**MKT-202 — Header display (frontend)**: The header shows, on every view and whether or not sync is enabled, "Prices as of" the newest price date (MKT-200) with its own icon; the item's tooltip tells when this device last fetched prices (MKT-201), or that it never did. With no newest price date the item says that no price is recorded yet. The item is absent until its figures have been read, and stays absent when the read fails.
+**MKT-202 — Header display (frontend)**: The header shows, on every view and whether or not sync is enabled, "Prices as of" the newest price date (MKT-200) with its own icon; the item's tooltip tells when this device last fetched prices (MKT-201), or that it never did — except in a build with no External provider, where the item has no tooltip and says nothing about fetching (MKT-212). With no newest price date the item says that no price is recorded yet. The item is absent until its figures have been read, and stays absent when the read fails.
 
 **MKT-203 — Reactivity (frontend)**: The header item reads its two figures when the application starts, and again after a fetch task completes (`AssetPriceFetchCompleted`), after a price is recorded outside a fetch task (`AssetPriceUpdated`, ignored while a fetch task runs — MKT-181), after a transaction changes what is held (`TransactionUpdated`), and after a sync applied changes (`SyncCompleted`). A scheduled download runs outside the application and raises no event in it: when it runs while the application is open, the item shows its result at the next of these events or at the next start.
+
+### Without an External provider (210–219)
+
+A build may be composed without an External provider ([ADR-020](../adr/020-one-extension-file-per-build.md)); why the public build is heading there is recorded in [`external-dependencies.md`](../external-dependencies.md). Prices typed by hand are then the only prices, and the application must read as complete rather than as one with a broken half.
+
+**MKT-210 — A build may have no External provider (backend)**: The External provider is optional at composition. A build composed without one has no fetch task — no auto-fetch (MKT-121/122), no global refresh (MKT-130), no account refresh (MKT-131/132) — and no price history backfill (MKT-190). Starting any of them is refused before any work is done: nothing is fetched, nothing is written, and no moment of last fetch is recorded (MKT-201). The scheduled fetch follows the same rule (SPF-070).
+
+**MKT-211 — One answer, settled at start (backend)**: The application reports to its interface whether this build has an External provider. That single answer governs every fetch task, the price history backfill and the scheduled fetch alike. It is settled when the application starts and does not change while it runs.
+
+**MKT-212 — The interface offers nothing that cannot run (frontend)**: In a build with no External provider (MKT-211) the interface renders no control that starts a fetch task, no price history backfill action on a holding or a closed position, and no price refresh lock (MKT-153), which only matters to a fetch. The Settings page shows no auto-fetch setting (MKT-120) and no scheduled fetch section (SPF-071), and the application starts no auto-fetch (MKT-121). Nothing is greyed out and nothing mentions a feature to come: the controls are absent. The header's price item (MKT-202) keeps "Prices as of" the newest price date — prices typed by hand are recorded prices — and has no tooltip: it says nothing about fetching.
+
+**MKT-213 — What remains, and what cannot be reached (frontend + backend)**: Everything computed from prices already recorded is unchanged, and so is recording a price by hand (MKT-020) and editing its history (MKT-070). What answers a fetch task cannot be reached, since none runs: the manual fill of unpriced assets (MKT-172), the fetch progress in the shell (MKT-180), the fetch-outcome snackbar (MKT-145) and the price-movement report (PMV-010). The same holds for the automatic refresh of exchange rates, which rides on the fetch tasks (FXR-075) and on the scheduled fetch (SPF-035): in such a build a rate is refreshed only by the rate-history download (FXR-110).
 
 ---
 
@@ -870,4 +890,6 @@ A "Fill missing price history" icon button in the actions of each active, non-ca
 - [x] **MKT-171 — scope of the unpriced list.** Resolved: the list includes the full MKT-114 skip set (no-data, fetch error, and symbol-underivable). List length equals the `skipped` count.
 - [x] **MKT-175 — save model.** Resolved: per-row immediate record on confirm, reusing `record_asset_price`; no batch command.
 
-None — all questions have been resolved.
+**MKT-213 — exchange rates without an External provider.** Decided 2026-09-23: rates get a refresh of their own, independent of the fetch tasks, so a build without an External provider keeps them current. Not built yet; until it is, such a build refreshes rates only through the rate-history download (FXR-110). No build ships without an External provider before then.
+
+No other question is open.

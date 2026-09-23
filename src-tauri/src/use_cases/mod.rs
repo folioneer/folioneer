@@ -20,6 +20,8 @@ pub mod archive_asset;
 pub mod asset_price_fetch;
 /// Asset Web Lookup: OpenFIGI search to pre-fill the Add Asset form (WEB).
 pub mod asset_web_lookup;
+/// What this build can do, read by the interface (MKT-211).
+pub mod capabilities;
 /// Delete asset: guards hard-deletion against existing transactions.
 pub mod delete_asset;
 /// Fee generation: lazy catch-up management fee deduction across all active schedules (FEE-040+).

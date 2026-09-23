@@ -46,8 +46,10 @@ pub async fn publish_after_scheduled_fetch(device: Option<SyncDevice>, sync_run:
 /// The external data sources the headless run fetches from, built by the composition
 /// root once logging is up so a client that cannot start is logged like any failure.
 pub struct HeadlessProviders {
-    /// Daily closes of the assets in the fetch scope.
-    pub price: Arc<dyn PriceProvider>,
+    /// Daily closes of the assets in the fetch scope, from the External provider.
+    /// `None` in a build composed without one (MKT-210), where this run has nothing
+    /// to do (SPF-072).
+    pub price: Option<Arc<dyn PriceProvider>>,
     /// Exchange rates of the pairs in the fetch scope.
     pub rate_history: Arc<dyn RateHistoryProvider>,
 }
@@ -57,6 +59,19 @@ pub struct HeadlessProviders {
 /// and returns a process exit code — `0` unless the run record itself could
 /// not be written.
 pub async fn run(build_providers: impl FnOnce() -> anyhow::Result<HeadlessProviders>) -> i32 {
+    // SPF-072 — no External provider, nothing to fetch. Such a build removes its
+    // schedule at start-up (SPF-070), so reaching here means one outlived its build and
+    // fired before the next start. It is decided first: no log file, no data folder,
+    // no database, no recorded run — the run answers success having done nothing.
+    let fetchable = match build_providers() {
+        Ok(HeadlessProviders {
+            price: Some(price_provider),
+            rate_history,
+        }) => Ok((price_provider, rate_history)),
+        Ok(HeadlessProviders { price: None, .. }) => return 0,
+        Err(error) => Err(error),
+    };
+
     // A logging failure must not abandon the fetch — the subscriber is
     // best-effort; its absence falls back to the eprintln below only.
     match app_directories::resolve_log_dir() {
@@ -71,6 +86,15 @@ pub async fn run(build_providers: impl FnOnce() -> anyhow::Result<HeadlessProvid
         None => eprintln!("scheduled fetch: no platform log directory available"),
     }
 
+    // A client that cannot start is reported once logging is up.
+    let (price_provider, rate_history) = match fetchable {
+        Ok(providers) => providers,
+        Err(error) => {
+            tracing::error!(target: BACKEND, err = %format!("{error:#}"), "scheduled fetch: HTTP client initialization failed");
+            return 1;
+        }
+    };
+
     let Some(data_dir) = app_directories::resolve_local_data_dir() else {
         tracing::error!(target: BACKEND, "scheduled fetch: no platform data directory available");
         return 1;
@@ -84,23 +108,14 @@ pub async fn run(build_providers: impl FnOnce() -> anyhow::Result<HeadlessProvid
     };
     let pool = database.pool;
 
-    let providers = match build_providers() {
-        Ok(providers) => providers,
-        Err(error) => {
-            tracing::error!(target: BACKEND, err = %format!("{error:#}"), "scheduled fetch: HTTP client initialization failed");
-            return 1;
-        }
-    };
-
     // No event bus: the headless run must never publish side-effect events
     // (SPF-024 — there is no window to forward them to).
     let change_recorder: Arc<dyn ChangeRecorder> =
         Arc::new(SqliteChangeRecorder::new(pool.clone()));
     let container = AppContainer::build(
         pool.clone(),
-        providers.price,
         None,
-        Some(providers.rate_history),
+        Some(rate_history),
         None,
         Arc::clone(&change_recorder),
     );
@@ -111,7 +126,7 @@ pub async fn run(build_providers: impl FnOnce() -> anyhow::Result<HeadlessProvid
     let orchestrator = ScheduledFetchOrchestrator::new(
         container.account_service,
         container.asset_service,
-        container.price_provider,
+        price_provider,
         container.currency_service,
         repository,
         platform_scheduler(),
@@ -159,6 +174,24 @@ pub async fn run(build_providers: impl FnOnce() -> anyhow::Result<HeadlessProvid
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // SPF-072 — a scheduled fetch that fires in a build without an External provider
+    // does nothing and answers success. The rate-history mock has no expectation, so
+    // any attempt to fetch rates on the way would fail the test.
+    #[tokio::test]
+    async fn a_leftover_in_a_build_without_an_external_provider_does_nothing() {
+        use crate::context::currency::MockRateHistoryProvider;
+
+        let exit_code = run(|| {
+            Ok(HeadlessProviders {
+                price: None,
+                rate_history: Arc::new(MockRateHistoryProvider::new()),
+            })
+        })
+        .await;
+
+        assert_eq!(exit_code, 0);
+    }
 
     // SYN-068 — a device with sync disabled (no SyncDevice) is a no-op: nothing is
     // published, and the call never panics.

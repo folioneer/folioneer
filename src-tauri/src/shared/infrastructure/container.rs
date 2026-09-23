@@ -12,8 +12,7 @@ use crate::context::account::{
     SqliteTransactionRepository,
 };
 use crate::context::asset::{
-    AssetService, PriceProvider, SqliteAssetCategoryRepository, SqliteAssetPriceRepository,
-    SqliteAssetRepository,
+    AssetService, SqliteAssetCategoryRepository, SqliteAssetPriceRepository, SqliteAssetRepository,
 };
 use crate::context::currency::{
     CurrencyService, RateHistoryProvider, RateProvider, SqliteCurrencyPairRepository,
@@ -38,8 +37,6 @@ pub struct AppContainer {
     pub asset_service: Arc<AssetService>,
     /// Currency pair and rate service.
     pub currency_service: Arc<CurrencyService>,
-    /// External price quote source supplied by the entry point.
-    pub price_provider: Arc<dyn PriceProvider>,
 }
 
 impl AppContainer {
@@ -53,7 +50,6 @@ impl AppContainer {
     /// record (SYN-020, D1).
     pub fn build(
         pool: Pool<Sqlite>,
-        price_provider: Arc<dyn PriceProvider>,
         rate_provider: Option<Arc<dyn RateProvider>>,
         rate_history_provider: Option<Arc<dyn RateHistoryProvider>>,
         event_bus: Option<Arc<SideEffectEventBus>>,
@@ -122,7 +118,6 @@ impl AppContainer {
             account_service: Arc::new(account_service),
             asset_service: Arc::new(asset_service),
             currency_service: Arc::new(currency_service),
-            price_provider,
         }
     }
 }
@@ -130,7 +125,6 @@ impl AppContainer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::asset::MockPriceProvider;
     use crate::context::currency::domain::rate_provider::{
         MockRateHistoryProvider, MockRateProvider,
     };
@@ -155,14 +149,7 @@ mod tests {
     #[tokio::test]
     async fn build_without_optional_dependencies_wires_functional_services() {
         let pool = make_pool().await;
-        let container = AppContainer::build(
-            pool,
-            Arc::new(MockPriceProvider::new()) as Arc<dyn PriceProvider>,
-            None,
-            None,
-            None,
-            Arc::new(NoopChangeRecorder),
-        );
+        let container = AppContainer::build(pool, None, None, None, Arc::new(NoopChangeRecorder));
 
         let accounts = container
             .account_service
@@ -180,7 +167,6 @@ mod tests {
 
         let _container = AppContainer::build(
             pool,
-            Arc::new(MockPriceProvider::new()) as Arc<dyn PriceProvider>,
             Some(Arc::new(MockRateProvider::new()) as Arc<dyn RateProvider>),
             Some(Arc::new(MockRateHistoryProvider::new()) as Arc<dyn RateHistoryProvider>),
             Some(Arc::clone(&event_bus)),
@@ -201,7 +187,6 @@ mod tests {
         let pool = make_pool().await;
         let _container = AppContainer::build(
             pool,
-            Arc::new(MockPriceProvider::new()) as Arc<dyn PriceProvider>,
             None,
             None,
             None,

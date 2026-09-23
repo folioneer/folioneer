@@ -27,4 +27,6 @@ pub use infrastructure::{
 };
 
 #[cfg(test)]
+pub use domain::rate_provider::MockRateHistoryProvider;
+#[cfg(test)]
 pub use domain::{MockCurrencyPairRepository, MockCurrencyRateRepository};

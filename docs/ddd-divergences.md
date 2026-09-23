@@ -214,6 +214,18 @@ Read this when:
 
 ---
 
+## 18. A use case with no orchestrator
+
+**Pattern**: A use case has an orchestrator as its entry point after `api.rs` (B22), which coordinates the bounded contexts it spans.
+
+**Practice**: `use_cases/capabilities/` is `mod.rs` and `api.rs` only. `get_capabilities` returns a `Capabilities` value the composition root managed when it decided which External provider the build has (ADR-020, MKT-211).
+
+**Trade**: There is nothing to coordinate: the answer is a fact about how the application was composed, settled before the first window opens and constant for the run. An orchestrator would hold one field and forward it. Precedent: `update_checker`'s `UpdateState`, also managed at composition and read by commands.
+
+**When to revisit**: If a capability ever needs computing — from a subscription, a licence check, a reachable service — give the use case its orchestrator then.
+
+---
+
 ## What we follow strictly (not divergences)
 
 For reference, the patterns this codebase enforces tightly:

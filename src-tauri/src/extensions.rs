@@ -14,8 +14,10 @@ use crate::use_cases::update_checker::UpdateChannel;
 
 /// The external data sources of a build.
 pub struct Providers {
-    /// Asset prices — latest quote and daily closes (ADR-017).
-    pub price: Arc<dyn PriceProvider>,
+    /// The External provider — latest quotes and daily closes (ADR-017). `None` in a
+    /// build composed without one: no fetch task, no scheduled fetch and no price
+    /// history backfill exists (MKT-210).
+    pub price: Option<Arc<dyn PriceProvider>>,
     /// Latest exchange rates, tried in order (ADR-009).
     pub rate: Arc<dyn RateProvider>,
     /// Exchange-rate history, for the rate backfills.
@@ -33,7 +35,7 @@ pub fn providers() -> anyhow::Result<Providers> {
         Arc::new(ReqwestEcbClient::new()?) as Arc<dyn RateProvider>,
     ]));
     Ok(Providers {
-        price: Arc::new(ReqwestYahooClient::new()?),
+        price: Some(Arc::new(ReqwestYahooClient::new()?)),
         rate,
         rate_history: frankfurter,
         asset_lookup: Arc::new(ReqwestOpenFigiClient::new()),
@@ -56,7 +58,10 @@ mod tests {
     fn the_public_build_plugs_in_every_external_data_source() {
         let providers = providers().expect("providers");
 
-        assert_eq!(Arc::strong_count(&providers.price), 1);
+        assert_eq!(
+            Arc::strong_count(providers.price.as_ref().expect("price")),
+            1
+        );
         assert_eq!(Arc::strong_count(&providers.rate), 1);
         assert_eq!(Arc::strong_count(&providers.asset_lookup), 1);
         // The rate provider chain holds the same client as the rate history.
