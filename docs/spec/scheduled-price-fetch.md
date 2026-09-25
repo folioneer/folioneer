@@ -123,7 +123,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 ### Without an External provider (070–079)
 
-**SPF-070 — No External provider, no scheduled fetch (backend)**: A build with no External provider (MKT-210) registers no scheduled fetch with the operating system, and removes at start-up one a build that had a provider left behind — and with it the scheduled refresh of exchange rates (SPF-035). The stored configuration is left as it is, so a build that regains a provider honours it again and the self-heal of SPF-015 puts the schedule back.
+**SPF-070 — No External provider, no scheduled fetch (backend)**: A build with no External provider (MKT-210) registers no scheduled fetch with the operating system, and removes at start-up one a build that had a provider left behind — and with it the scheduled refresh of exchange rates (SPF-035); rates still refresh at launch (FXR-075). The stored configuration is left as it is, so a build that regains a provider honours it again and the self-heal of SPF-015 puts the schedule back.
 
 **SPF-071 — No scheduled fetch section (frontend)**: In a build with no External provider (MKT-211) the Settings page shows no scheduled fetch section (SPF-010) — neither the toggle and trigger time nor the last-run status (SPF-052).
 

@@ -1,7 +1,6 @@
 use crate::context::account::{AccountError, AccountServiceContract};
 use crate::context::asset::{Asset, AssetError, AssetServiceContract};
 use crate::context::currency::CurrencyService;
-use crate::use_cases::shared::scope::build_fx_pairs;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -19,9 +18,7 @@ pub struct AssetPriceFetchUseCase {
     asset_service: Arc<dyn AssetServiceContract>,
     fetch_guard: Arc<FetchGuard>,
     dispatcher: Arc<Dispatcher>,
-    /// The frozen-rate source the Price Movement baseline resolves against
-    /// (PMV-020) — the same service the task's FX refresh (FXR-075) later
-    /// writes through, which is why the baseline captures before the loop.
+    /// The frozen-rate source the Price Movement baseline resolves against (PMV-020).
     currency_service: Arc<CurrencyService>,
 }
 
@@ -65,9 +62,6 @@ impl AssetPriceFetchUseCase {
         let accounts = self.account_service.get_all().await?;
 
         let mut asset_ids: HashSet<String> = HashSet::new();
-        // FXR-071 — collect (account_currency, asset_id) for every active holding so
-        // foreign pairs can be derived, including assets with no fetchable price.
-        let mut fx_inputs: Vec<(String, String)> = Vec::new();
         for account in &accounts {
             let holdings = self
                 .account_service
@@ -75,22 +69,19 @@ impl AssetPriceFetchUseCase {
                 .await?;
             for holding in holdings {
                 if holding.quantity > 0 {
-                    fx_inputs.push((account.currency.clone(), holding.asset_id.clone()));
                     asset_ids.insert(holding.asset_id);
                 }
             }
         }
 
-        let (scope, currency_by_asset) = self.build_scope(asset_ids).await?;
+        let (scope, _) = self.build_scope(asset_ids).await?;
         if scope.is_empty() {
             return Err(FetchPriceTask::NoFetchableHoldings.into());
         }
 
-        let fx_pairs = build_fx_pairs(fx_inputs, &currency_by_asset);
         // PMV-010/015 — only a user-started Global refresh reports movement. The
         // capture is handed over unawaited: it runs inside the spawned task, before
-        // any price is written (still refresh start, PMV-020) and before the FX
-        // refresh that piggybacks on it (FXR-075), so this command keeps
+        // any price is written (still refresh start, PMV-020), so this command keeps
         // acknowledging immediately (MKT-130).
         let movement_capture = match trigger {
             FetchTrigger::Manual => Some(Arc::new(PriceMovementCapture::new(
@@ -100,7 +91,7 @@ impl AssetPriceFetchUseCase {
             ))),
             FetchTrigger::Launch => None,
         };
-        Arc::clone(&self.dispatcher).spawn(scope, fx_pairs, lease, movement_capture);
+        Arc::clone(&self.dispatcher).spawn(scope, lease, movement_capture);
         Ok(())
     }
 
@@ -135,25 +126,22 @@ impl AssetPriceFetchUseCase {
             .account_service
             .get_holdings_for_account(&account.id)
             .await?;
-        let mut asset_ids: HashSet<String> = HashSet::new();
-        // FXR-071 — pairs for this account's active foreign holdings.
-        let mut fx_inputs: Vec<(String, String)> = Vec::new();
-        for holding in holdings.into_iter().filter(|holding| holding.quantity > 0) {
-            fx_inputs.push((account.currency.clone(), holding.asset_id.clone()));
-            asset_ids.insert(holding.asset_id);
-        }
+        let asset_ids: HashSet<String> = holdings
+            .into_iter()
+            .filter(|holding| holding.quantity > 0)
+            .map(|holding| holding.asset_id)
+            .collect();
 
-        let (scope, currency_by_asset) = self.build_scope(asset_ids).await?;
+        let (scope, _) = self.build_scope(asset_ids).await?;
         if scope.is_empty() {
             return Err(FetchPriceTask::NoFetchableHoldings.into());
         }
 
-        let fx_pairs = build_fx_pairs(fx_inputs, &currency_by_asset);
         // PMV-010 — an account-scoped fetch never reports movement; `Launch` is
         // the trigger value that never produces a report, same as the launch
         // auto-fetch. `fetch_for_account` carries no trigger of its own on the
         // wire (unchanged contract) — this is purely an internal `spawn` value.
-        Arc::clone(&self.dispatcher).spawn(scope, fx_pairs, lease, None);
+        Arc::clone(&self.dispatcher).spawn(scope, lease, None);
         Ok(())
     }
 
@@ -179,9 +167,8 @@ mod tests {
         SqliteAssetPriceRepository, SqliteAssetRepository,
     };
     use crate::context::currency::{
-        CurrencyPair, CurrencyService, SqliteCurrencyPairRepository, SqliteCurrencyRateRepository,
+        CurrencyService, SqliteCurrencyPairRepository, SqliteCurrencyRateRepository,
     };
-    use crate::core::cash::system_cash_asset_id;
     use crate::core::SideEffectEventBus;
     use chrono::NaiveDate;
     use sqlx::sqlite::SqlitePoolOptions;
@@ -225,7 +212,6 @@ mod tests {
             Arc::new(MockPriceProvider::new()),
             Arc::new(SqliteAssetPriceRepository::new(pool.clone())),
             Arc::clone(&bus),
-            Arc::clone(&currency_service),
             Arc::new(|| NaiveDate::from_ymd_opt(2026, 6, 1).expect("valid date")),
         ));
         AssetPriceFetchUseCase::new(
@@ -235,80 +221,6 @@ mod tests {
             dispatcher,
             currency_service,
         )
-    }
-
-    fn pairs_as_tuples(pairs: &[CurrencyPair]) -> Vec<(String, String)> {
-        pairs
-            .iter()
-            .map(|pair| (pair.from_currency.clone(), pair.to_currency.clone()))
-            .collect()
-    }
-
-    // FXR-071 — a foreign holding yields one (asset_currency → account_currency) pair.
-    #[test]
-    fn build_fx_pairs_creates_pair_for_foreign_holding() {
-        let currency_by_asset = HashMap::from([("asset-usd".to_string(), "USD".to_string())]);
-        let pairs = build_fx_pairs(
-            vec![("EUR".to_string(), "asset-usd".to_string())],
-            &currency_by_asset,
-        );
-        assert_eq!(
-            pairs_as_tuples(&pairs),
-            vec![("USD".to_string(), "EUR".to_string())]
-        );
-    }
-
-    // FXR-013 — a holding whose currency equals the account currency yields no pair.
-    #[test]
-    fn build_fx_pairs_skips_same_currency_holding() {
-        let currency_by_asset = HashMap::from([("asset-eur".to_string(), "EUR".to_string())]);
-        let pairs = build_fx_pairs(
-            vec![("EUR".to_string(), "asset-eur".to_string())],
-            &currency_by_asset,
-        );
-        assert!(
-            pairs.is_empty(),
-            "same-currency holding must not yield a pair"
-        );
-    }
-
-    // FXR-071 — a cash holding is filtered before the currency map is consulted.
-    #[test]
-    fn build_fx_pairs_skips_cash_holding() {
-        let cash_id = system_cash_asset_id("USD");
-        let pairs = build_fx_pairs(vec![("EUR".to_string(), cash_id)], &HashMap::new());
-        assert!(pairs.is_empty(), "cash holding must not yield a pair");
-    }
-
-    // FXR-071 — a holding whose asset is absent from the map is skipped without error.
-    #[test]
-    fn build_fx_pairs_skips_missing_asset() {
-        let pairs = build_fx_pairs(
-            vec![("EUR".to_string(), "ghost".to_string())],
-            &HashMap::new(),
-        );
-        assert!(pairs.is_empty(), "missing asset must not yield a pair");
-    }
-
-    // FXR-071 — two foreign holdings resolving to the same pair are de-duplicated.
-    #[test]
-    fn build_fx_pairs_dedups_repeated_pair() {
-        let currency_by_asset = HashMap::from([
-            ("asset-a".to_string(), "USD".to_string()),
-            ("asset-b".to_string(), "USD".to_string()),
-        ]);
-        let pairs = build_fx_pairs(
-            vec![
-                ("EUR".to_string(), "asset-a".to_string()),
-                ("EUR".to_string(), "asset-b".to_string()),
-            ],
-            &currency_by_asset,
-        );
-        assert_eq!(
-            pairs_as_tuples(&pairs),
-            vec![("USD".to_string(), "EUR".to_string())],
-            "the same pair from two assets must appear once"
-        );
     }
 
     // MKT-116 — build_scope surfaces a repository failure as a typed DatabaseError
@@ -361,7 +273,6 @@ mod tests {
             Arc::new(MockPriceProvider::new()),
             Arc::new(SqliteAssetPriceRepository::new(pool.clone())),
             Arc::clone(&bus),
-            Arc::clone(&currency_service),
             Arc::new(|| NaiveDate::from_ymd_opt(2026, 6, 1).expect("valid date")),
         ));
         let use_case = AssetPriceFetchUseCase::new(

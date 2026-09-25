@@ -129,7 +129,6 @@ async fn freshness_read_on_completion(provider: Arc<dyn PriceProvider>) -> Price
             provider,
             Arc::new(SqliteAssetPriceRepository::new(pool.clone())),
             Arc::clone(&bus),
-            Arc::clone(&currency_service),
             Arc::new(|| chrono::NaiveDate::from_ymd_opt(2026, 9, 19).expect("valid date")),
         )
         .with_fetch_log(

@@ -399,8 +399,8 @@ mod tests {
 
     // PMV-020 — both readings use the rate resolved at refresh start. The
     // "after" reading here can ONLY see `baseline.snapshot.rates` — there is no
-    // other rate source in this function's signature — so a later FX refresh
-    // (FXR-075) cannot leak into it. This pins the exact converted value.
+    // other rate source in this function's signature — so a rate recorded later
+    // (FXR-075, FXR-110) cannot leak into it. This pins the exact converted value.
     #[test]
     fn after_reading_uses_the_rate_frozen_in_the_baseline_snapshot() {
         let mut snapshot = empty_snapshot();

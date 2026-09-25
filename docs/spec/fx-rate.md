@@ -141,21 +141,23 @@ This feature does not add fields to `HoldingDetail`; it changes the **conditions
 
 **FXR-056 — CurrencyPairUpdated event registration (frontend + backend)**: `CurrencyPairUpdated` is added to the event-bus enum, published by the `currency` bounded context whenever a pair is declared on this device (FXR-054). The Currency Rates view re-fetches its pair list on receipt; a pair applied or removed from another device reaches it through `SyncCompleted` (SYN-064). The global store treats it as a locally-handled event (no global re-fetch). `ARCHITECTURE.md` registers it in the event-bus table.
 
-### Auto-Fetch from External Provider (070–089)
+### Rate Refresh (070–089)
 
 **FXR-070 — Provider chain (backend)**: Fetching a pair's current rate follows the ADR-009 chain: **Frankfurter** primary → **ECB XML feed** fallback (when Frankfurter is unreachable) → on total External failure, no row is written and the pair falls back to its last cached rate (FXR-035) or to Manual entry. No keyed or market-spot provider is ever consulted (ADR-009 rejected Yahoo/Stooq spot rates and BYOK providers).
 
-**FXR-071 — Fetch scope is the persisted pair set (backend)**: A fetch task first ensures every active (`quantity > 0`), non-cash foreign-currency holding in its scope has a persisted pair (FXR-013), then fetches **all persisted `CurrencyPair`s**. Because pairs persist (FXR-014), a pair whose holding has closed is still refreshed, keeping its rate current for when it is needed again and for the Currency Rates view. Pairs are few by construction (one per distinct cross-currency relationship the user has ever held or declared), so refreshing all of them is cheap. Example: on a EUR account, buying a USD asset ensures `(USD → EUR)`; that pair keeps refreshing even after the position is sold.
+**FXR-071 — Refresh scope is the persisted pair set (backend)**: Every rate refresh — at launch (FXR-075), through "Update rates" (FXR-110) and in the scheduled fetch (SPF-035) — first ensures every active (`quantity > 0`), non-cash foreign-currency holding in its scope has a persisted pair (FXR-013), then fetches **all persisted `CurrencyPair`s**. Because pairs persist (FXR-014), a pair whose holding has closed is still refreshed, keeping its rate current for when it is needed again and for the Currency Rates view. Pairs are few by construction (one per distinct cross-currency relationship the user has ever held or declared), so refreshing all of them is cheap. Example: on a EUR account, buying a USD asset ensures `(USD → EUR)`; that pair keeps refreshing even after the position is sold.
 
-**FXR-072 — Empty scope (backend)**: When no persisted pair exists (no foreign holding has ever been held and none declared), the FX portion of the fetch task has nothing to do; it makes no external calls and is not treated as an error. (The surrounding price-fetch task, FXR-075, follows its own MKT-111 empty-scope behaviour independently.)
+**FXR-072 — Empty scope (backend)**: When no persisted pair exists (no foreign holding has ever been held and none declared), a rate refresh has nothing to do; it makes no external calls and is not treated as an error.
 
-**FXR-073 — Per-pair failure is skipped silently (backend)**: Within a fetch task, a pair whose rate cannot be obtained from any External tier is skipped (no row written, logged as a warning); the task continues with the remaining pairs. Valuation for the skipped pair degrades per FXR-034.
+**FXR-073 — Per-pair failure is skipped silently (backend)**: Within the launch rate refresh (FXR-075), a pair whose rate cannot be obtained from any External tier is skipped (no row written, logged as a warning); the task continues with the remaining pairs. Valuation for the skipped pair degrades per FXR-034.
 
-**FXR-074 — CurrencyRateUpdated on fetch success (backend)**: Every successful rate write produced by a fetch publishes `CurrencyRateUpdated` (FXR-026).
+**FXR-074 — CurrencyRateUpdated on fetch success (backend)**: Every rate the launch rate refresh writes publishes `CurrencyRateUpdated` (FXR-026); "Update rates" publishes it once, when it wrote at least one rate.
 
-**FXR-075 — Fetch trigger — piggyback on price refresh (frontend + backend)**: FX rate fetching piggybacks on the existing asset-price fetch tasks — launch auto-fetch (MKT-121/122), global refresh (MKT-130), and account refresh (MKT-131/132). The same user action ("Refresh prices") that fetches asset prices for a scope also fetches the FX pairs needed to value that scope's holdings (FXR-071). No separate FX trigger or button is introduced. The launch fetch obeys the same auto-fetch setting (MKT-120); manual refreshes are fire-and-forget and surface feedback consistent with MKT-115. In a build with no External provider none of these tasks exists, so rates are refreshed only by the rate-history download (FXR-110) — MKT-213.
+**FXR-075 — Launch rate refresh (frontend + backend)**: Every start of the interface, once the application is initialised, records the latest published rate of every persisted pair (FXR-071). The headless scheduled run is not a start of the interface; it records rates itself (SPF-035). The launch refresh runs in every build, whether or not it has an External provider (MKT-210), and whatever the auto-fetch setting (MKT-120), which governs prices only. It is silent: nothing is shown, and a failure leaves the stored rates as they were (FXR-070, FXR-073).
 
-**FXR-076 — In-flight guard shared with price fetch (backend)**: Because FX fetch runs inside the existing price-fetch tasks (FXR-075), it is covered by the single-fetch-at-a-time guard already defined in MKT-113 — no separate FX in-flight guard exists. A pair fetch that fails does not abort the surrounding price-fetch task; it degrades per FXR-073.
+**FXR-077 — Price fetch tasks carry no rate (backend)**: The fetch tasks (MKT-122, MKT-130, MKT-132) fetch prices only; no rate is fetched, and no pair is followed, by any of them. Rates refresh through FXR-075, FXR-110 and the scheduled fetch (SPF-035).
+
+**FXR-076 — No in-flight guard for rates (backend)**: A rate refresh runs outside the price fetch guard (MKT-113) and has no guard of its own. Every write is an upsert by `(pair, date)` (FXR-025, ADR-012), so two refreshes that overlap write the same rows and a price fetch running at the same time is unaffected.
 
 ### Cross-Rate Computation (080–089)
 
@@ -173,19 +175,19 @@ This feature does not add fields to `HoldingDetail`; it changes the **conditions
 
 **FXR-091 — No-rate indication (frontend)**: When a foreign-currency holding has no usable rate (FXR-034), the affected columns show the same "—" as a holding with no recorded price; "no FX rate" and "no market price" are not distinguished in v1 (parallels MKT-032's deferred disambiguation). The staleness label (FXR-090) still communicates freshness when a rate does exist.
 
-### Historical Rate Backfill (110–119)
+### Update Rates (110–119)
 
-Historical valuations (yearly/monthly performance, as-of-date views) need a rate **at each historical date**; the fetch paths above only ever write current rates, so an account whose history predates its pairs values foreign holdings at 0 in the past (FXR-034) and its performance percentages degrade to "—" (PRF-032). The backfill fills the historical rate series in one action.
+Historical valuations (yearly/monthly performance, as-of-date views) need a rate **at each historical date**; the launch refresh only ever writes current rates, so an account whose history predates its pairs values foreign holdings at 0 in the past (FXR-034) and its performance percentages degrade to "—" (PRF-032). "Update rates" fills the historical rate series, and today's rate with it, in one action.
 
-**FXR-110 — Backfill action (frontend)**: The Currency Rates view offers a "Download rate history" action. While the download is in progress the action is disabled with a pending indicator; on success a snackbar reports how many rates were written and the view refreshes; on failure a snackbar reports the error.
+**FXR-110 — Update rates action (frontend)**: The Currency Rates view offers one "Update rates" action, an outlined button, in every build. While the update is in progress the action is disabled with a pending indicator; on success a snackbar reports how many rates were written and the view refreshes; on failure a snackbar reports the error.
 
-**FXR-111 — Range anchor (backend)**: The backfill covers the full span any valuation can ask for: from the **earliest transaction date across all accounts** through today. When no transaction exists, or no pair is persisted, the action succeeds quietly with zero writes.
+**FXR-111 — Range anchor (backend)**: "Update rates" covers the full span any valuation can ask for: from the **earliest transaction date across all accounts** through today. When no transaction exists, or — after the pairs of active foreign holdings are ensured (FXR-112) — no pair is persisted, the action succeeds quietly with zero writes.
 
-**FXR-112 — Dated daily series (backend)**: For every persisted pair (FXR-071 scope), the backfill records one dated rate per day the provider published, via the same dated-series semantics as the scheduled fetch (SPF-035–038): absent days write nothing, a pair the provider cannot serve is silently skipped (FXR-073), cross-rates compute per FXR-080–083, and rows carry the provider source (FXR-102).
+**FXR-112 — Dated daily series (backend)**: After ensuring the pairs of active foreign holdings (FXR-071), for every persisted pair "Update rates" records one dated rate per day the rate provider chain (FXR-070) published, via the same dated-series semantics as the scheduled fetch (SPF-035–038): absent days write nothing, a pair no External tier serves on a day is silently skipped that day (SPF-038), cross-rates compute per FXR-080–083, and rows carry the provider source (FXR-102).
 
-**FXR-113 — Existing rows follow latest-write-wins (backend)**: Backfilled rows upsert by `(pair, date)` per ADR-012 — a manual rate previously entered on a covered date is overwritten, exactly as the current-rate fetch overwrites a same-day manual rate.
+**FXR-113 — Existing rows follow latest-write-wins (backend)**: Rows written by "Update rates" upsert by `(pair, date)` per ADR-012 — a manual rate previously entered on a covered date is overwritten, exactly as the launch rate refresh (FXR-075) overwrites a same-day manual rate.
 
-**FXR-114 — Total provider failure is surfaced (backend)**: Unlike the piggybacked fetch (FXR-073/SPF-039, silent), a user-triggered backfill whose provider is entirely unreachable is rejected with a specific error so the frontend can report it (FXR-110). Per-pair skips within a reachable provider remain silent.
+**FXR-114 — Total provider failure is surfaced (backend)**: Unlike the launch rate refresh (FXR-075) and the scheduled fetch (SPF-038), which surface nothing to the user, an "Update rates" for which every External tier (FXR-070) is unreachable is rejected with a specific error so the frontend can report it (FXR-110). Per-pair skips within a reachable tier remain silent.
 
 ### Source Field on CurrencyRate (100–109)
 
@@ -223,7 +225,7 @@ Manual rate entry
              → publish CurrencyRateUpdated                              (FXR-026)
     → Account Details / Performance re-fetch                            (FXR-036)
 
-Auto-fetch (trigger per Open Questions)
+Rate refresh at launch (FXR-075)
     → ensure a pair exists for each active foreign holding              (FXR-013)
     → scope = all persisted CurrencyPairs                               (FXR-071)
     → if none persisted: nothing to fetch (not an error)                (FXR-072)
@@ -233,6 +235,14 @@ Auto-fetch (trigger per Open Questions)
         on any-tier failure or missing leg: skip silently               (FXR-073/083)
         on success: upsert at snapshot date, source=Frankfurter|Ecb     (FXR-081/102)
                     publish CurrencyRateUpdated                         (FXR-074)
+
+Update rates (FXR-110)
+    → ensure a pair exists for each active foreign holding              (FXR-112)
+    → range = earliest transaction date → today; none: zero writes      (FXR-111)
+    → fetch the EUR daily series for the range                          (FXR-070)
+    → every tier unreachable: reject, snackbar reports the error        (FXR-114)
+    → per pair and published day: upsert the cross-rate                 (FXR-112/113)
+    → snackbar reports the count; the view refreshes                    (FXR-110)
 ```
 
 ---
@@ -241,7 +251,7 @@ Auto-fetch (trigger per Open Questions)
 
 ### Entry Point
 
-A dedicated **Currency Rates** view (FXR-051) lets the user view, add, edit, and delete rates, mirroring the asset-price history surface. The conversion itself is invisible — foreign-currency holdings simply start showing real numbers in Account Details instead of "—". A foreign-currency holding row's "—" is also a shortcut into a pre-filled manual-entry form (FXR-012). FX rates refresh transparently whenever the user refreshes prices (FXR-075); no separate FX refresh button exists.
+A dedicated **Currency Rates** view (FXR-051) lets the user view, add, edit, and delete rates, mirroring the asset-price history surface. The conversion itself is invisible — foreign-currency holdings simply start showing real numbers in Account Details instead of "—". A foreign-currency holding row's "—" is also a shortcut into a pre-filled manual-entry form (FXR-012). Rates refresh silently at every launch (FXR-075); "Update rates" fills every day up to today on demand (FXR-110).
 
 ### Main Component
 
@@ -250,14 +260,14 @@ The Currency Rates view (a page), structured like the Asset catalog: a list of d
 ### States
 
 - **Empty**: foreign-currency holdings show "—" until a rate exists (FXR-034); a hint points to recording or fetching a rate.
-- **Loading**: spinner while a fetch is acknowledged (consistent with MKT-133).
-- **Error**: inline validation errors on the manual form (FXR-029); a concurrent-fetch rejection surfaces via snackbar (FXR-076, MKT-115 style).
+- **Loading**: "Update rates" shows a pending indicator while it runs (FXR-110).
+- **Error**: inline validation errors on the manual form (FXR-029); a failed "Update rates" surfaces via snackbar (FXR-114).
 - **Success**: foreign-currency holdings show converted P&L, performance %, total return, and contribute to Global Value; a staleness label indicates the rate's age (FXR-090).
 
 ### User Flow
 
 1. User opens an account holding a USD asset under a EUR account; the row currently shows "—" for P&L.
-2. User records (or refreshes) the `USD → EUR` rate.
+2. User records the `USD → EUR` rate, or runs "Update rates" (FXR-110); the rate also arrives by itself at the next launch (FXR-075).
 3. Backend stores the rate and publishes `CurrencyRateUpdated`.
 4. Account Details re-fetches; the row now shows unrealized P&L, performance %, and total return in EUR, and the account's Global Value includes the holding.
 5. A "Rate as of today / Nd old" label communicates the rate's freshness.
@@ -266,8 +276,8 @@ The Currency Rates view (a page), structured like the Asset catalog: a list of d
 
 ## Open Questions
 
-- [x] **v1 UI scope** — resolved: FX mirrors the asset-price model — auto-fetch (same mechanism, piggybacked) + manual management on a dedicated page with full add/edit/delete (FXR-050–053).
-- [x] **Fetch trigger** — resolved: FX fetch piggybacks on the existing price-refresh tasks and shares MKT-113's in-flight guard (FXR-075/076).
+- [x] **v1 UI scope** — resolved: FX mirrors the asset-price model — automatic refresh + manual management on a dedicated page with full add/edit/delete (FXR-050–053).
+- [x] **Fetch trigger** — resolved: rates refresh on their own, at every launch and through "Update rates", in every build and independently of the price fetch (FXR-075/076, FXR-110).
 - [x] **Manual entry point** — resolved: a dedicated Currency Rates view plus a shortcut from a foreign-currency holding row's "—" via the shell URL-modal mount (FXR-012).
 - [x] **No-rate vs no-price diagnostic** — resolved: merged into the existing "—" for v1, parallel to MKT-032's deferred disambiguation (FXR-091).
 

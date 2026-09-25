@@ -412,7 +412,7 @@ A build may be composed without an External provider ([ADR-020](../adr/020-one-e
 
 **MKT-212 — The interface offers nothing that cannot run (frontend)**: In a build with no External provider (MKT-211) the interface renders no control that starts a fetch task, no price history backfill action on a holding or a closed position, and no price refresh lock (MKT-153), which only matters to a fetch. The Settings page shows no auto-fetch setting (MKT-120) and no scheduled fetch section (SPF-071), and the application starts no auto-fetch (MKT-121). Nothing is greyed out and nothing mentions a feature to come: the controls are absent. The header's price item (MKT-202) keeps "Prices as of" the newest price date — prices typed by hand are recorded prices — and has no tooltip: it says nothing about fetching.
 
-**MKT-213 — What remains, and what cannot be reached (frontend + backend)**: Everything computed from prices already recorded is unchanged, and so is recording a price by hand (MKT-020) and editing its history (MKT-070). What answers a fetch task cannot be reached, since none runs: the manual fill of unpriced assets (MKT-172), the fetch progress in the shell (MKT-180), the fetch-outcome snackbar (MKT-145) and the price-movement report (PMV-010). The same holds for the automatic refresh of exchange rates, which rides on the fetch tasks (FXR-075) and on the scheduled fetch (SPF-035): in such a build a rate is refreshed only by the rate-history download (FXR-110).
+**MKT-213 — What remains, and what cannot be reached (frontend + backend)**: Everything computed from prices already recorded is unchanged, and so is recording a price by hand (MKT-020) and editing its history (MKT-070). What answers a fetch task cannot be reached, since none runs: the manual fill of unpriced assets (MKT-172), the fetch progress in the shell (MKT-180), the fetch-outcome snackbar (MKT-145) and the price-movement report (PMV-010). Exchange rates are unaffected: they refresh on their own, at launch (FXR-075) and through "Update rates" (FXR-110).
 
 ---
 
@@ -889,7 +889,5 @@ A "Fill missing price history" icon button in the actions of each active, non-ca
 
 - [x] **MKT-171 — scope of the unpriced list.** Resolved: the list includes the full MKT-114 skip set (no-data, fetch error, and symbol-underivable). List length equals the `skipped` count.
 - [x] **MKT-175 — save model.** Resolved: per-row immediate record on confirm, reusing `record_asset_price`; no batch command.
-
-**MKT-213 — exchange rates without an External provider.** Decided 2026-09-23: rates get a refresh of their own, independent of the fetch tasks, so a build without an External provider keeps them current. Not built yet; until it is, such a build refreshes rates only through the rate-history download (FXR-110). No build ships without an External provider before then.
 
 No other question is open.

@@ -4,7 +4,7 @@
 
 A Global refresh currently ends in a snackbar carrying counts — how many prices were updated, how many assets were skipped (MKT-115, MKT-119). The user learns that the fetch ran, but not what the new prices did to the portfolio. Price Movement closes that gap: when the user runs a Global refresh, the application reports each account's value before and after the fetch, together with the movement attributable to the new prices alone.
 
-The isolation matters. An account's value also moves when the user records a purchase, a sale or a deposit, and the same refresh rewrites currency rates (FXR-075), so a naive comparison of two stored totals would credit price movement with changes the prices did not cause. Every figure in this report is therefore computed over the same holdings, quantities and currency rates, so the only thing that differs between the two readings is the price of each asset.
+The isolation matters. An account's value also moves when the user records a purchase, a sale or a deposit, and currency rates change on their own (FXR-075, FXR-110), so a naive comparison of two stored totals would credit price movement with changes the prices did not cause. Every figure in this report is therefore computed over the same holdings, quantities and currency rates, so the only thing that differs between the two readings is the price of each asset.
 
 This is a **feature spec** spanning the `account`, `asset` and `currency` bounded contexts. It reads the existing account valuation; it introduces no new stored record. All monetary values are micro-units per [ADR-001](../adr/001-use-i64-for-monetary-amounts.md), and everything is recomputed rather than stored per [ADR-013](../adr/013-recompute-account-performance-on-read.md).
 
@@ -73,7 +73,7 @@ One account's share of the report.
 
 ### The comparison (020–029)
 
-**PMV-020 — Movement is measured at constant holdings and constant rates (backend)**: Both readings are computed over the same holdings, the same quantities and the same currency rates — those in force when the refresh started, for every conversion the readings need (holding to account currency, and account to reference currency). Only the asset prices differ between the two readings. Because the same refresh also fetches currency rates (FXR-075), the later reading deliberately ignores any rate the refresh obtained; a currency move is not a price move.
+**PMV-020 — Movement is measured at constant holdings and constant rates (backend)**: Both readings are computed over the same holdings, the same quantities and the same currency rates — those in force when the refresh started, for every conversion the readings need (holding to account currency, and account to reference currency). Only the asset prices differ between the two readings. Any rate recorded while the price refresh runs, whatever wrote it (FXR-075, FXR-110, SPF-035, FXR-025, a sync), is ignored by the later reading; a currency move is not a price move.
 
 **PMV-021 — "Before" uses the prices in force when the refresh started (backend)**: The earlier reading values each holding at the price the portfolio carried at the moment the refresh began.
 

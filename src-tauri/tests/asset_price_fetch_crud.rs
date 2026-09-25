@@ -85,7 +85,6 @@ async fn build_ctx() -> Ctx {
             Arc::new(NoOpProvider),
             price_repo,
             Arc::clone(&bus),
-            Arc::clone(&currency_service),
             Arc::new(|| chrono::Local::now().date_naive()),
         ));
 
@@ -275,7 +274,6 @@ async fn fetch_for_account_passes_exchange_qualified_symbol_to_provider() {
         provider,
         price_repo,
         Arc::clone(&bus),
-        Arc::clone(&currency_service),
         Arc::new(|| chrono::Local::now().date_naive()),
     ));
     let use_case = AssetPriceFetchUseCase::new(
@@ -401,7 +399,6 @@ async fn fetch_for_account_skips_locked_asset() {
         Arc::new(NoOpProvider),
         price_repo,
         Arc::clone(&bus),
-        Arc::clone(&currency_service),
         Arc::new(|| chrono::Local::now().date_naive()),
     ));
     let use_case = AssetPriceFetchUseCase::new(
@@ -518,7 +515,6 @@ async fn fetch_for_account_includes_unblocked_asset() {
         Arc::new(NoOpProvider),
         price_repo,
         Arc::clone(&bus),
-        Arc::clone(&currency_service),
         Arc::new(|| chrono::Local::now().date_naive()),
     ));
     let use_case = AssetPriceFetchUseCase::new(
@@ -618,7 +614,6 @@ async fn fetch_publishes_completion_event_with_counts() {
         Arc::new(OkProvider),
         Arc::new(SqliteAssetPriceRepository::new(pool.clone())),
         Arc::clone(&bus),
-        Arc::clone(&currency_service),
         Arc::new(|| chrono::Local::now().date_naive()),
     ));
     let use_case = AssetPriceFetchUseCase::new(
@@ -763,7 +758,6 @@ async fn fetch_completion_event_unpriced_list_contains_skipped_asset_with_last_p
         Arc::new(NoDataProvider),
         Arc::new(SqliteAssetPriceRepository::new(pool.clone())),
         Arc::clone(&bus),
-        Arc::clone(&currency_service),
         Arc::new(|| chrono::Local::now().date_naive()),
     ));
     let use_case = folioneer_lib::use_cases::asset_price_fetch::AssetPriceFetchUseCase::new(
@@ -924,7 +918,6 @@ async fn fetch_completion_unpriced_entry_has_none_last_price_when_never_priced()
         Arc::new(NoDataProvider),
         Arc::new(SqliteAssetPriceRepository::new(pool.clone())),
         Arc::clone(&bus),
-        Arc::clone(&currency_service),
         Arc::new(|| chrono::Local::now().date_naive()),
     ));
     let use_case = folioneer_lib::use_cases::asset_price_fetch::AssetPriceFetchUseCase::new(
@@ -1053,7 +1046,6 @@ async fn fetch_completion_unpriced_list_excludes_successfully_fetched_asset() {
         Arc::new(OkProvider),
         Arc::new(SqliteAssetPriceRepository::new(pool.clone())),
         Arc::clone(&bus),
-        Arc::clone(&currency_service),
         Arc::new(|| chrono::Local::now().date_naive()),
     ));
     let use_case = folioneer_lib::use_cases::asset_price_fetch::AssetPriceFetchUseCase::new(
@@ -1204,7 +1196,6 @@ async fn fetch_completion_unpriced_len_equals_skipped_count_in_mixed_outcome() {
         Arc::new(ErrForSymbolProvider { err_symbol: "AERR" }),
         Arc::new(SqliteAssetPriceRepository::new(pool.clone())),
         Arc::clone(&bus),
-        Arc::clone(&currency_service),
         Arc::new(|| chrono::Local::now().date_naive()),
     ));
     let use_case = folioneer_lib::use_cases::asset_price_fetch::AssetPriceFetchUseCase::new(
@@ -1354,7 +1345,6 @@ async fn fetch_completion_locked_asset_absent_from_unpriced_list() {
             Arc::new(NoDataProvider),
             Arc::new(SqliteAssetPriceRepository::new(pool.clone())),
             Arc::clone(&bus),
-            Arc::clone(&currency_service),
             Arc::new(|| chrono::Local::now().date_naive()),
         ),
     );
@@ -1377,5 +1367,118 @@ async fn fetch_completion_locked_asset_absent_from_unpriced_list() {
             ))
         ),
         "MKT-151/171: locked asset excluded from scope → NoFetchableHoldings (no completion event, no unpriced entry); got: {result:?}"
+    );
+}
+
+/// FXR-075 — a price fetch fetches no exchange rate: once the whole task has ended (its
+/// in-flight lease released), a USD holding in a EUR account has no pair followed and
+/// no rate recorded. Rates refresh through their own task.
+#[tokio::test]
+async fn a_price_fetch_leaves_exchange_rates_alone() {
+    use folioneer_lib::context::account::UpdateFrequency;
+    use folioneer_lib::context::asset::{
+        AssetClass, CreateAssetDTO, PriceProvider, SYSTEM_CATEGORY_ID,
+    };
+    use folioneer_lib::use_cases::asset_price_fetch::dispatcher::Dispatcher;
+    use folioneer_lib::use_cases::asset_price_fetch::FetchTrigger;
+
+    struct PricedProvider;
+    #[async_trait::async_trait]
+    impl PriceProvider for PricedProvider {
+        async fn fetch_price(
+            &self,
+            _symbol: &str,
+        ) -> anyhow::Result<Option<folioneer_lib::context::asset::Quote>> {
+            Ok(Some(folioneer_lib::context::asset::Quote {
+                price: 100_000_000,
+                date: None,
+            }))
+        }
+    }
+
+    let pool = make_pool().await;
+    let bus = Arc::new(SideEffectEventBus::new());
+    let account_service = Arc::new(AccountService::new(
+        Box::new(SqliteAccountRepository::new(pool.clone())),
+        Box::new(SqliteHoldingRepository::new(pool.clone())),
+        Box::new(SqliteTransactionRepository::new(pool.clone())),
+    ));
+    let asset_service = Arc::new(AssetService::new(
+        Box::new(SqliteAssetRepository::new(pool.clone())),
+        Box::new(SqliteAssetCategoryRepository::new(pool.clone())),
+        Box::new(SqliteAssetPriceRepository::new(pool.clone())),
+    ));
+    let asset = asset_service
+        .create_asset(CreateAssetDTO {
+            name: "Apple".to_string(),
+            reference: "AAPL".to_string(),
+            isin: None,
+            class: AssetClass::Stocks,
+            currency: "USD".to_string(),
+            risk_level: 4,
+            category_id: SYSTEM_CATEGORY_ID.to_string(),
+            exchange: None,
+            interest_bearing: false,
+        })
+        .await
+        .expect("seed asset");
+    let account = account_service
+        .create(
+            "Test".to_string(),
+            String::new(),
+            "EUR".to_string(),
+            UpdateFrequency::ManualMonth,
+            false,
+        )
+        .await
+        .expect("seed account");
+    account_service
+        .open_holding(
+            &account.id,
+            asset.id.clone(),
+            "2024-01-01".to_string(),
+            1_000_000,
+            100_000_000,
+        )
+        .await
+        .expect("seed holding");
+
+    let currency_service = Arc::new(CurrencyService::new(
+        Box::new(SqliteCurrencyPairRepository::new(pool.clone())),
+        Box::new(SqliteCurrencyRateRepository::new(pool.clone())),
+    ));
+    let dispatcher = Arc::new(Dispatcher::new(
+        Arc::new(PricedProvider),
+        Arc::new(SqliteAssetPriceRepository::new(pool.clone())),
+        Arc::clone(&bus),
+        Arc::new(|| chrono::Local::now().date_naive()),
+    ));
+    let fetch_guard = Arc::new(FetchGuard::new());
+    let use_case = AssetPriceFetchUseCase::new(
+        account_service.clone(),
+        asset_service.clone(),
+        Arc::clone(&fetch_guard),
+        dispatcher,
+        Arc::clone(&currency_service),
+    );
+
+    use_case
+        .fetch_all(FetchTrigger::Launch)
+        .await
+        .expect("dispatch");
+
+    // The lease is dropped when the spawned task ends, rates step included.
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while fetch_guard.try_acquire().is_none() {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the fetch task ends");
+
+    let pairs = currency_service.list_currency_pairs().await.expect("pairs");
+    assert!(
+        pairs.is_empty(),
+        "a price fetch must not follow or refresh any pair, got: {pairs:?}"
     );
 }

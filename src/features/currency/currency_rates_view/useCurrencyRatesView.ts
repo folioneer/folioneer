@@ -106,8 +106,8 @@ export function useCurrencyRatesView(): UseCurrencyRatesViewResult {
     setRatesError(null);
   }, []);
 
-  // FXR-110 — user-triggered full-history download; the view refreshes via
-  // the caller's snackbar path + the CurrencyRateUpdated re-fetch above.
+  // FXR-110 — "Update rates": this view re-fetches on success below; the other
+  // views re-fetch on the CurrencyRateUpdated the update publishes (FXR-074).
   const backfillHistory = useCallback(async () => {
     setIsBackfilling(true);
     const result = await backfillCurrencyRateHistory();

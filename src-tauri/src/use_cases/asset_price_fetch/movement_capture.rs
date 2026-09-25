@@ -48,7 +48,7 @@ impl PriceMovementCapture {
     /// (PMV-014: the fetch itself is never aborted or altered by reporting).
     /// This is where PMV-020's frozen rates are threaded: every rate the two
     /// readings will ever need is resolved once here, before the per-asset
-    /// fetch loop, so the FX refresh piggybacked after it (FXR-075) can never
+    /// fetch loop, so a rate recorded meanwhile (FXR-075, FXR-110) can never
     /// leak into either reading.
     pub async fn capture(
         &self,
@@ -85,7 +85,7 @@ impl PriceMovementCapture {
             };
 
             // PMV-040/042 — the account -> reference-currency leg, resolved here so
-            // the FX refresh piggybacked after the fetch loop (FXR-075) cannot move it.
+            // a rate recorded during the fetch loop (FXR-075, FXR-110) cannot move it.
             let reference_key = (account.currency.clone(), REFERENCE_CURRENCY.to_string());
             if let std::collections::hash_map::Entry::Vacant(e) = rates.entry(reference_key) {
                 match self

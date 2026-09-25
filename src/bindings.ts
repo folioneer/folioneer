@@ -906,13 +906,27 @@ async getScheduledFetchStatus() : Promise<Result<ScheduledFetchStatus, Scheduled
 }
 },
 /**
- * Backfills the historical exchange-rate series for every persisted pair,
- * from the earliest transaction date across all accounts through today
- * (FXR-110–114). Returns the number of rate rows written.
+ * "Update rates": follows the pairs of active foreign holdings, then backfills
+ * the historical exchange-rate series for every persisted pair, from the
+ * earliest transaction date across all accounts through today (FXR-110–114).
+ * Returns the number of rate rows written.
  */
 async backfillCurrencyRateHistory() : Promise<Result<number, RateHistoryBackfillError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("backfill_currency_rate_history") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Records the current rate of every persisted pair, after ensuring the pairs of
+ * active foreign holdings (FXR-075). Called once at launch; a provider failure is
+ * silent.
+ */
+async refreshCurrencyRates() : Promise<Result<null, RateRefreshError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("refresh_currency_rates") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2047,8 +2061,8 @@ export type CurrencyError =
 { code: "RateNotFound"; from_currency: string; to_currency: string; date: string } | 
 /**
  * The external rate provider could not be reached at all during a
- * user-triggered history backfill (FXR-114). The piggybacked fetch paths
- * never raise this — they degrade silently (FXR-073).
+ * user-triggered history backfill (FXR-114). The launch rate refresh and the
+ * scheduled fetch never raise this — they degrade silently (FXR-073).
  */
 { code: "ProviderUnreachable" } | 
 /**
@@ -3428,6 +3442,15 @@ export type RateHistoryBackfillError =
  * The external rate provider could not be reached at all (FXR-114).
  */
 { code: "ProviderUnreachable" } | 
+/**
+ * An unexpected database error occurred.
+ */
+{ code: "DatabaseError" }
+/**
+ * Flat wire-facing error enum for `refresh_currency_rates` (FXR-075). A provider
+ * failure is never an error here: the launch refresh is silent (FXR-070/073).
+ */
+export type RateRefreshError = 
 /**
  * An unexpected database error occurred.
  */

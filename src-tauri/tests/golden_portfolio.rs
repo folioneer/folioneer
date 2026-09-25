@@ -400,7 +400,6 @@ async fn refresh_report(p: &Portfolio) -> Value {
         Arc::new(FixedQuotes),
         Arc::new(SqliteAssetPriceRepository::new(p.pool.clone())),
         Arc::clone(&p.bus),
-        Arc::clone(&p.currency_service),
         Arc::new(|| {
             chrono::NaiveDate::parse_from_str(REFRESH_DAY, "%Y-%m-%d").expect("refresh day")
         }),

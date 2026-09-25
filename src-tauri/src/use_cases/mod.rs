@@ -38,6 +38,8 @@ pub mod price_freshness;
 pub mod price_history_backfill;
 /// Historical exchange-rate backfill for every persisted pair (FXR-110–114).
 pub mod rate_history_backfill;
+/// Launch rate refresh for every persisted pair, in every build (FXR-075).
+pub mod rate_refresh;
 /// Scheduled Price Fetch: daily download of closing prices and exchange rates, even while the app is closed (SPF spec).
 pub mod scheduled_fetch;
 /// Shared stateless valuation helpers reused across performance/summary use cases — owned by neither.

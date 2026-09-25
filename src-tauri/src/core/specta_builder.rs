@@ -5,7 +5,8 @@ use crate::{
         account_creation, account_deletion, account_details, account_performance, account_summary,
         archive_asset, asset_price_fetch, asset_web_lookup, capabilities, delete_asset,
         fee_generation, global_performance, holding_transaction, portfolio_sync, price_freshness,
-        price_history_backfill, rate_history_backfill, scheduled_fetch, update_checker,
+        price_history_backfill, rate_history_backfill, rate_refresh, scheduled_fetch,
+        update_checker,
     },
 };
 
@@ -98,6 +99,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .typ::<scheduled_fetch::ScheduledFetchStatus>()
         .typ::<scheduled_fetch::ScheduledFetchError>()
         .typ::<rate_history_backfill::RateHistoryBackfillError>()
+        .typ::<rate_refresh::RateRefreshError>()
         .typ::<price_freshness::PriceFreshness>()
         .typ::<price_freshness::PriceFreshnessError>()
         .typ::<price_history_backfill::PriceHistoryBackfillError>()
@@ -185,6 +187,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             scheduled_fetch::configure_scheduled_fetch,
             scheduled_fetch::get_scheduled_fetch_status,
             rate_history_backfill::backfill_currency_rate_history,
+            rate_refresh::refresh_currency_rates,
             price_freshness::get_price_freshness,
             price_history_backfill::backfill_holding_price_history,
             capabilities::get_capabilities,

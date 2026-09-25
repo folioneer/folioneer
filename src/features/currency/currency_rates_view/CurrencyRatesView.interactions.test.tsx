@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CurrencyPairSummary, CurrencyRate } from "@/bindings";
+import { useSnackbarStore } from "@/ui/components/snackbar/snackbarStore";
 import * as viewHook from "./useCurrencyRatesView";
 
 // Stub child modals so the view's open/close/success wiring is testable in
@@ -240,5 +241,53 @@ describe("CurrencyRatesView interactions", () => {
     render(<CurrencyRatesView />);
 
     expect(screen.getByTestId("action-backfill-history")).toBeDisabled();
+  });
+
+  // FXR-110 — one outlined "Update rates" action, with its own running label
+  it("offers the update as one outlined Update rates action", () => {
+    mockHook({});
+    render(<CurrencyRatesView />);
+
+    const action = screen.getByTestId("action-backfill-history");
+    expect(action).toHaveTextContent("currency.action_update_rates");
+    expect(action).toHaveClass("border-m3-outline");
+  });
+
+  it("names the update as running while it runs", () => {
+    mockHook({ isBackfilling: true });
+    render(<CurrencyRatesView />);
+
+    expect(screen.getByTestId("action-backfill-history")).toHaveTextContent(
+      "currency.update_running",
+    );
+  });
+
+  it("reports how many rates the update wrote", async () => {
+    const user = userEvent.setup();
+    const backfillHistory = vi.fn().mockResolvedValue({ status: "ok" as const, ratesWritten: 42 });
+    mockHook({ backfillHistory });
+    render(<CurrencyRatesView />);
+
+    await user.click(screen.getByTestId("action-backfill-history"));
+
+    expect(useSnackbarStore.getState().message).toBe("currency.update_success");
+  });
+
+  // FXR-114 — a failed update is reported as an error, with its presented message
+  it("reports a failed update as an error", async () => {
+    const user = userEvent.setup();
+    const backfillHistory = vi.fn().mockResolvedValue({
+      status: "error" as const,
+      message: { key: "currency.error_provider_unreachable" },
+    });
+    mockHook({ backfillHistory });
+    render(<CurrencyRatesView />);
+
+    await user.click(screen.getByTestId("action-backfill-history"));
+
+    expect(useSnackbarStore.getState()).toMatchObject({
+      message: "currency.error_provider_unreachable",
+      variant: "error",
+    });
   });
 });

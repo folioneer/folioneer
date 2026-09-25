@@ -7,9 +7,10 @@ use tauri::State;
 use super::error::RateHistoryBackfillError;
 use super::orchestrator::RateHistoryBackfillUseCase;
 
-/// Backfills the historical exchange-rate series for every persisted pair,
-/// from the earliest transaction date across all accounts through today
-/// (FXR-110–114). Returns the number of rate rows written.
+/// "Update rates": follows the pairs of active foreign holdings, then backfills
+/// the historical exchange-rate series for every persisted pair, from the
+/// earliest transaction date across all accounts through today (FXR-110–114).
+/// Returns the number of rate rows written.
 #[tauri::command]
 #[specta::specta]
 pub async fn backfill_currency_rate_history(

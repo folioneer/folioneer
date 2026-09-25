@@ -16,7 +16,7 @@
 | CSH     | Cash Tracking               | Cash-as-Holding (one per currency); Deposit/Withdrawal; Buy/Sell re-linked to cash                                                                         | active   |
 | PRF     | Account Performance         | Per-account value-over-time table: month/year rows, net-of-flows perf (MoM/YTD/all-time)                                                                   | planning |
 | DIV     | Cash Dividend               | Cash dividend transaction: income credited to cash, attributed to the paying asset                                                                         | active   |
-| FXR     | Foreign Exchange Rate       | Currency-pair rates (fetch + manual) for live multi-currency holding valuation                                                                             | planning |
+| FXR     | Foreign Exchange Rate       | Currency-pair rates (fetch + manual) for live multi-currency holding valuation                                                                             | active   |
 | KEY     | API Key Management          | BYOK provider API keys + Connections dialog — RETIRED by ADR-017 (price fetch moved to keyless Yahoo Finance)                                              | retired  |
 | FSD     | Free Share Distribution     | Bonus shares received at zero cost: quantity event, no cash, cost basis unchanged                                                                          | active   |
 | FEE     | Management Fee Deduction    | Quantity-reducing fee paid in shares (recurring % schedule + one-off); cost basis unchanged, fees surfaced per holding                                     | active   |

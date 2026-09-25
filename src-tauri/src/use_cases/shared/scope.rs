@@ -3,6 +3,7 @@
 //! exclusions are defined once. Extracted from
 //! `use_cases::asset_price_fetch::orchestrator::build_scope`.
 
+use crate::context::account::{AccountError, AccountServiceContract};
 use crate::context::asset::{
     derive_yahoo_symbol_with_exchange, Asset, AssetError, AssetServiceContract,
 };
@@ -87,6 +88,43 @@ pub fn build_fx_pairs(
         }
     }
     pairs
+}
+
+/// A lookup that failed while deriving the pairs of active foreign holdings.
+#[derive(Debug)]
+pub enum HoldingPairsError {
+    /// Listing the accounts or their holdings failed.
+    Account(AccountError),
+    /// Loading a held asset failed.
+    Asset(AssetError),
+}
+
+/// Derives the pair of every active (`quantity > 0`), non-cash foreign holding across
+/// all accounts (FXR-071/013) — the pairs a rate refresh ensures before it fetches.
+pub async fn holding_fx_pairs(
+    account_service: &dyn AccountServiceContract,
+    asset_service: &dyn AssetServiceContract,
+) -> Result<Vec<CurrencyPair>, HoldingPairsError> {
+    let accounts = account_service
+        .get_all()
+        .await
+        .map_err(HoldingPairsError::Account)?;
+    let mut asset_ids: HashSet<String> = HashSet::new();
+    let mut inputs: Vec<(String, String)> = Vec::new();
+    for account in accounts {
+        let holdings = account_service
+            .get_holdings_for_account(&account.id)
+            .await
+            .map_err(HoldingPairsError::Account)?;
+        for holding in holdings.into_iter().filter(|holding| holding.quantity > 0) {
+            inputs.push((account.currency.clone(), holding.asset_id.clone()));
+            asset_ids.insert(holding.asset_id);
+        }
+    }
+    let (_, currency_by_asset) = build_scope(asset_service, asset_ids)
+        .await
+        .map_err(HoldingPairsError::Asset)?;
+    Ok(build_fx_pairs(inputs, &currency_by_asset))
 }
 
 #[cfg(test)]
@@ -209,5 +247,79 @@ mod tests {
         ids.insert("broken-id".to_string());
         let error = build_scope(&asset_service, ids).await.unwrap_err();
         assert!(matches!(error, AssetError::DatabaseError), "got: {error:?}");
+    }
+
+    fn pairs_as_tuples(pairs: &[CurrencyPair]) -> Vec<(String, String)> {
+        pairs
+            .iter()
+            .map(|pair| (pair.from_currency.clone(), pair.to_currency.clone()))
+            .collect()
+    }
+
+    // FXR-071 — a foreign holding yields one (asset_currency → account_currency) pair.
+    #[test]
+    fn build_fx_pairs_creates_pair_for_foreign_holding() {
+        let currency_by_asset = HashMap::from([("asset-usd".to_string(), "USD".to_string())]);
+        let pairs = build_fx_pairs(
+            vec![("EUR".to_string(), "asset-usd".to_string())],
+            &currency_by_asset,
+        );
+        assert_eq!(
+            pairs_as_tuples(&pairs),
+            vec![("USD".to_string(), "EUR".to_string())]
+        );
+    }
+
+    // FXR-013 — a holding whose currency equals the account currency yields no pair.
+    #[test]
+    fn build_fx_pairs_skips_same_currency_holding() {
+        let currency_by_asset = HashMap::from([("asset-eur".to_string(), "EUR".to_string())]);
+        let pairs = build_fx_pairs(
+            vec![("EUR".to_string(), "asset-eur".to_string())],
+            &currency_by_asset,
+        );
+        assert!(
+            pairs.is_empty(),
+            "same-currency holding must not yield a pair"
+        );
+    }
+
+    // FXR-071 — a cash holding is filtered before the currency map is consulted.
+    #[test]
+    fn build_fx_pairs_skips_cash_holding() {
+        let cash_id = system_cash_asset_id("USD");
+        let pairs = build_fx_pairs(vec![("EUR".to_string(), cash_id)], &HashMap::new());
+        assert!(pairs.is_empty(), "cash holding must not yield a pair");
+    }
+
+    // FXR-071 — a holding whose asset is absent from the map is skipped without error.
+    #[test]
+    fn build_fx_pairs_skips_missing_asset() {
+        let pairs = build_fx_pairs(
+            vec![("EUR".to_string(), "ghost".to_string())],
+            &HashMap::new(),
+        );
+        assert!(pairs.is_empty(), "missing asset must not yield a pair");
+    }
+
+    // FXR-071 — two foreign holdings resolving to the same pair are de-duplicated.
+    #[test]
+    fn build_fx_pairs_dedups_repeated_pair() {
+        let currency_by_asset = HashMap::from([
+            ("asset-a".to_string(), "USD".to_string()),
+            ("asset-b".to_string(), "USD".to_string()),
+        ]);
+        let pairs = build_fx_pairs(
+            vec![
+                ("EUR".to_string(), "asset-a".to_string()),
+                ("EUR".to_string(), "asset-b".to_string()),
+            ],
+            &currency_by_asset,
+        );
+        assert_eq!(
+            pairs_as_tuples(&pairs),
+            vec![("USD".to_string(), "EUR".to_string())],
+            "the same pair from two assets must appear once"
+        );
     }
 }

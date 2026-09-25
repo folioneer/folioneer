@@ -34,6 +34,7 @@ Terms are quoted as read on the date beside each one. They change; re-read befor
 - **Commercial use**: allowed. The documentation answers the question directly — _"Yes, absolutely. See each provider's terms for details on the underlying data."_
 - **Quotas**: none. _"There are no quotas. Requests are rate-limited to prevent abuse, but there are no monthly or daily caps."_
 - **Self-hosting**: supported, via the project's own deployment guide — so a paid service is not hostage to the public instance.
+- **When it is called**: at every launch of the interface when at least one currency pair is followed, whatever the auto-fetch setting (FXR-075); on "Update rates" (FXR-110); in the scheduled fetch (SPF-035).
 - **Underlying data**: rates from central banks, the ECB among them. The provider's answer defers to those sources, so the ECB's condition below travels with the rates Frankfurter serves.
 - **Decision**: keep. No action.
 

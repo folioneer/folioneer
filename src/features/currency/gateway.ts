@@ -7,6 +7,7 @@ import {
   type Event,
   events,
   type RateHistoryBackfillError,
+  type RateRefreshError,
   type Result,
 } from "../../bindings";
 
@@ -67,7 +68,12 @@ export async function getCurrencyRates(
   return await commands.getCurrencyRates(fromCurrency, toCurrency);
 }
 
-/** FXR-110 — downloads the full dated rate history for every persisted pair. */
+/** FXR-075 — the launch rate refresh: records the current rate of every persisted pair. */
+export async function refreshCurrencyRates(): Promise<Result<null, RateRefreshError>> {
+  return await commands.refreshCurrencyRates();
+}
+
+/** FXR-110 — "Update rates": downloads the full dated rate history for every persisted pair. */
 export async function backfillCurrencyRateHistory(): Promise<
   Result<number, RateHistoryBackfillError>
 > {
@@ -91,5 +97,6 @@ export const currencyGateway = {
   getCurrencyPairs,
   getCurrencyRates,
   backfillCurrencyRateHistory,
+  refreshCurrencyRates,
   subscribeToEvents,
 };

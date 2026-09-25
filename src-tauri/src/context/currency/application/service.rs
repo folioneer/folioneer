@@ -59,7 +59,7 @@ impl CurrencyService {
     }
 
     /// Attaches the external rate provider chain used by `refresh_all_rates`
-    /// (ADR-009, FXR-070). Without it, the auto-fetch path is a no-op.
+    /// (ADR-009, FXR-070). Without it, the launch rate refresh is a no-op.
     pub fn with_rate_provider(mut self, provider: Arc<dyn RateProvider>) -> Self {
         self.rate_provider = Some(provider);
         self
@@ -392,7 +392,19 @@ impl CurrencyService {
         }))
     }
 
-    /// Auto-fetches and stores current rates for every persisted pair (FXR-070–074).
+    /// Ensures each `scope_pairs` entry persists (FXR-071/013), before a rate refresh
+    /// lists the persisted pairs.
+    async fn ensure_pairs(&self, scope_pairs: Vec<CurrencyPair>) -> StdResult<(), CurrencyError> {
+        for pair in scope_pairs {
+            self.pair_repo.upsert_pair(pair).await.map_err(|e| {
+                tracing::error!(target: BACKEND, err = ?e, "ensure_pairs: pair ensure failure");
+                CurrencyError::DatabaseError
+            })?;
+        }
+        Ok(())
+    }
+
+    /// Fetches and stores current rates for every persisted pair (FXR-070–075).
     ///
     /// Ensures each `scope_pairs` entry persists first (FXR-071/013), then refreshes
     /// all persisted pairs from one EUR-base snapshot (FXR-080/081). A pair whose
@@ -403,12 +415,7 @@ impl CurrencyService {
         &self,
         scope_pairs: Vec<CurrencyPair>,
     ) -> StdResult<(), CurrencyError> {
-        for pair in scope_pairs {
-            self.pair_repo.upsert_pair(pair).await.map_err(|e| {
-                tracing::error!(target: BACKEND, err = ?e, "refresh_all_rates: pair ensure failure");
-                CurrencyError::DatabaseError
-            })?;
-        }
+        self.ensure_pairs(scope_pairs).await?;
 
         let pairs = self
             .pair_repo
@@ -449,6 +456,12 @@ impl CurrencyService {
                 cross_rate_micros(eur_leg(&pair.from_currency), eur_leg(&pair.to_currency))
             else {
                 // FXR-073/083 — a missing EUR leg makes the pair unfetchable; skip it.
+                tracing::warn!(
+                    target: BACKEND,
+                    from_currency = %pair.from_currency,
+                    to_currency = %pair.to_currency,
+                    "refresh_all_rates: no rate published for the pair; skipping"
+                );
                 continue;
             };
             let rate = CurrencyRate::from_storage(
@@ -482,12 +495,7 @@ impl CurrencyService {
         from: &str,
         to: &str,
     ) -> StdResult<(), CurrencyError> {
-        for pair in scope_pairs {
-            self.pair_repo.upsert_pair(pair).await.map_err(|e| {
-                tracing::error!(target: BACKEND, err = ?e, "refresh_all_rates_range: pair ensure failure");
-                CurrencyError::DatabaseError
-            })?;
-        }
+        self.ensure_pairs(scope_pairs).await?;
 
         let pairs = self
             .pair_repo
@@ -520,15 +528,18 @@ impl CurrencyService {
     }
 
     /// FXR-110–114 — strict variant of [`Self::refresh_all_rates_range`] for
-    /// the user-triggered history backfill: fetches the dated daily series for
-    /// every persisted pair over `[from, to]` and returns the number of rate
+    /// the user-triggered history backfill: ensures each `scope_pairs` entry
+    /// persists (FXR-071), fetches the dated daily series for every persisted
+    /// pair over `[from, to]` and returns the number of rate
     /// rows written. A total provider failure is surfaced (FXR-114) instead of
     /// swallowed; per-pair/per-day skips stay silent (FXR-112).
     pub async fn backfill_rates_range(
         &self,
+        scope_pairs: Vec<CurrencyPair>,
         from: &str,
         to: &str,
     ) -> StdResult<u32, CurrencyError> {
+        self.ensure_pairs(scope_pairs).await?;
         let pairs = self
             .pair_repo
             .list_pairs_with_latest_rate()
@@ -548,7 +559,12 @@ impl CurrencyService {
             tracing::error!(target: BACKEND, err = ?e, "backfill_rates_range: history provider unreachable");
             CurrencyError::ProviderUnreachable
         })?;
-        Ok(self.write_snapshot_rates(&pairs, snapshots).await)
+        let written = self.write_snapshot_rates(&pairs, snapshots).await;
+        // FXR-074 — one notice for the whole update, when it wrote anything.
+        if written > 0 {
+            self.notify_rate_updated();
+        }
+        Ok(written)
     }
 
     /// Writes one cross-rate row per `(pair, published day)` from the EUR
@@ -2171,7 +2187,7 @@ mod tests {
         );
 
         let error = svc
-            .backfill_rates_range("2019-01-01", "2026-07-14")
+            .backfill_rates_range(vec![], "2019-01-01", "2026-07-14")
             .await
             .unwrap_err();
         assert!(
@@ -2182,6 +2198,54 @@ mod tests {
 
     // FXR-112 — the backfill writes one dated row per published day per pair
     // and returns the written count.
+    // FXR-074 — "Update rates" publishes one CurrencyRateUpdated when it wrote a rate,
+    // so every view valuing foreign holdings re-fetches.
+    #[tokio::test]
+    async fn backfill_rates_range_announces_the_update_once() {
+        use crate::context::currency::domain::rate_provider::MockRateHistoryProvider;
+        use std::collections::HashMap;
+
+        let mut pair_repo = MockCurrencyPairRepository::new();
+        pair_repo
+            .expect_list_pairs_with_latest_rate()
+            .returning(|| {
+                Ok(vec![CurrencyPairSummary {
+                    from_currency: "USD".to_string(),
+                    to_currency: "EUR".to_string(),
+                    latest_rate: None,
+                    latest_rate_date: None,
+                    latest_rate_source: None,
+                }])
+            });
+        let mut rate_repo = MockCurrencyRateRepository::new();
+        rate_repo.expect_upsert_rate().returning(Ok);
+        let mut history_provider = MockRateHistoryProvider::new();
+        history_provider.expect_fetch_eur_range().returning(|_, _| {
+            Ok(vec![EurSnapshot {
+                date: "2019-01-02".to_string(),
+                rates: HashMap::from([("USD".to_string(), 1_140_000_i64)]),
+                source: CurrencyRateSource::Frankfurter,
+            }])
+        });
+        let bus = Arc::new(SideEffectEventBus::new());
+        let mut rx = bus.subscribe();
+        let svc = make_service_with_history_provider(
+            pair_repo,
+            rate_repo,
+            Arc::new(history_provider) as Arc<dyn RateHistoryProvider>,
+        )
+        .with_event_bus(Arc::clone(&bus));
+
+        let written = svc
+            .backfill_rates_range(vec![], "2019-01-01", "2019-01-02")
+            .await
+            .unwrap();
+
+        assert_eq!(written, 1);
+        assert!(rx.has_changed().unwrap(), "the update must be announced");
+        assert_eq!(*rx.borrow_and_update(), Event::CurrencyRateUpdated);
+    }
+
     #[tokio::test]
     async fn backfill_rates_range_returns_written_count() {
         use crate::context::currency::domain::rate_provider::MockRateHistoryProvider;
@@ -2230,7 +2294,7 @@ mod tests {
         );
 
         let written = svc
-            .backfill_rates_range("2019-01-01", "2026-07-14")
+            .backfill_rates_range(vec![], "2019-01-01", "2026-07-14")
             .await
             .unwrap();
         assert_eq!(written, 2);
@@ -2257,7 +2321,7 @@ mod tests {
         );
 
         let written = svc
-            .backfill_rates_range("2019-01-01", "2026-07-14")
+            .backfill_rates_range(vec![], "2019-01-01", "2026-07-14")
             .await
             .unwrap();
         assert_eq!(written, 0);

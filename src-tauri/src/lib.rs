@@ -47,6 +47,7 @@ use crate::use_cases::portfolio_sync::{
 use crate::use_cases::price_freshness::PriceFreshnessUseCase;
 use crate::use_cases::price_history_backfill::PriceHistoryBackfillUseCase;
 use crate::use_cases::rate_history_backfill::RateHistoryBackfillUseCase;
+use crate::use_cases::rate_refresh::RateRefreshUseCase;
 use crate::use_cases::scheduled_fetch::orchestrator::drop_schedule_without_provider;
 use crate::use_cases::scheduled_fetch::{
     ScheduledFetchOrchestrator, SqliteScheduledFetchRepository,
@@ -340,9 +341,16 @@ pub fn run() {
                     },
                 );
 
-                // FXR-110 — historical rate backfill for the Currency Rates view.
+                // FXR-110 — "Update rates" in the Currency Rates view.
                 app_handle.manage(Arc::new(RateHistoryBackfillUseCase::new(
                     account_service.clone(),
+                    asset_service.clone(),
+                    Arc::clone(&currency_service),
+                )));
+                // FXR-075 — the launch rate refresh, in every build.
+                app_handle.manage(Arc::new(RateRefreshUseCase::new(
+                    account_service.clone(),
+                    asset_service.clone(),
                     Arc::clone(&currency_service),
                 )));
 
@@ -413,7 +421,6 @@ fn manage_price_fetching<R: tauri::Runtime>(
             Arc::clone(&price_provider),
             price_repo_for_fetch,
             Arc::clone(&event_bus),
-            Arc::clone(&currency_service),
             Arc::new(|| chrono::Local::now().date_naive()),
         )
         .with_fetch_log(

@@ -146,23 +146,9 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
 
-## #042 — (fullstack) — Exchange rates refresh on their own, whatever the build
-
-Exchange rates have no fetch of their own: they ride on the three fetch tasks (FXR-075) and on the scheduled fetch (SPF-035). A build without an External provider (#036) has none of those, so its rates would stop refreshing although Frankfurter and the ECB are free to call ([`external-dependencies.md`](external-dependencies.md)) — every multi-currency total would quietly age until the user ran the rate-history download by hand. The owner decided on 2026-09-23 that rates get a refresh of their own. Until this lands MKT-213 states the gap, and #038 waits on it, so no build ever ships without both.
-
-Proposal: a rate refresh that is its own task, independent of the External provider — at launch and on demand from the Currency Rates view — with the price fetch tasks no longer its only carrier. With an External provider, nothing a user sees changes. FXR-075 and MKT-213 change; route the rules through `/spec-writer`.
-
-**User value:** In the free application exchange rates stay current by themselves, so totals across currencies are right without the user thinking about rates.
-**Done when:** In a build with no External provider, exchange rates refresh at launch and when the user asks from the Currency Rates view; with one, nothing a user sees changes and the existing tests and the golden portfolio are unchanged; FXR-075 and MKT-213 say so and their rules are covered by tests; the design is validated and screenshots of the Currency Rates view are committed.
-**Design:** none
-**Open questions:**
-
-- [ ] At launch, do rates refresh always, or only when a setting allows it? The auto-fetch setting (MKT-120) is absent in a build without an External provider. (Recommended: always — one request per currency pair, permitted, and a stale rate silently distorts every total.)
-- [ ] With an External provider, does the price fetch keep carrying the rates, or does every build refresh them through the new task alone? (Recommended: the new task alone — one path to test, and the price fetch stops being the reason rates refresh.)
-
 ## #038 — (release) — A private build channel for the owner, then Yahoo leaves the public repository
 
-Depends on #036 and #042 — Yahoo cannot leave the public build before exchange rates refresh without it; the extension file it overlays exists (ADR-020). Most of the work lives in a private repository, `folioneer/folioneer-private`; this entry tracks it and owns the one public commit that ends it. The private repository holds its own `extensions.rs` and the Yahoo client, pins the public repository as a submodule at a release tag, copies its files over the submodule, builds with the same action as the public release and publishes to its own releases — nothing of it appears on the public releases page. Same identifier, so the same data folder: installing a public build over it loses automatic prices and nothing else. The build says what it is (`X.Y.Z+private` in About). Order, always: the owner releases publicly, then the private workflow builds that tag.
+Its prerequisites have landed: a build without an External provider offers nothing it cannot run (#036), exchange rates refresh without one (#042), and the extension file it overlays exists (ADR-020). Most of the work lives in a private repository, `folioneer/folioneer-private`; this entry tracks it and owns the one public commit that ends it. The private repository holds its own `extensions.rs` and the Yahoo client, pins the public repository as a submodule at a release tag, copies its files over the submodule, builds with the same action as the public release and publishes to its own releases — nothing of it appears on the public releases page. Same identifier, so the same data folder: installing a public build over it loses automatic prices and nothing else. The build says what it is (`X.Y.Z+private` in About). Order, always: the owner releases publicly, then the private workflow builds that tag.
 
 Updates: the private build reads an access token from a file in its configuration folder, never from the binary, and sends it through the headers of #037. Probe first, on a throwaway private release: private assets are probably served only through the API address, in which case the workflow writes its own `latest.json`. If the probe fails, the private build only notifies, and a recipe downloads and installs. The probe also says what a refusal looks like from that host: the application reports HTTP 401 and 403 as a refused access (UPD-028), and a host that answers 404 to a refused token needs that rule extended here.
 

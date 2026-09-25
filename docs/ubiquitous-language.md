@@ -189,6 +189,18 @@ What one unit of a currency is worth in another on a given day. Used to convert 
 
 > Status: confirmed
 
+### Rate refresh
+
+Recording the latest published exchange rate of every followed currency pair. It happens by itself at every launch, whether or not the application fetches prices, and in the scheduled fetch; "Update rates" is the one the user starts.
+
+> Status: confirmed
+
+### Update rates
+
+The action in the Currency Rates view that records one exchange rate per day, for every followed pair, from the first transaction up to today — so past values can be converted as well as current ones.
+
+> Status: confirmed
+
 ### CurrencyRateSource
 
 Where a currency rate came from: `Manual` (entered by the user), or `Frankfurter` / `Ecb` (fetched from a provider). Informational only — it does not change which rate applies.

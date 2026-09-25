@@ -1,7 +1,6 @@
 use crate::context::asset::{
     Asset, AssetPrice, AssetPriceRepository, AssetPriceSource, PriceProvider,
 };
-use crate::context::currency::{CurrencyPair, CurrencyService};
 use crate::core::event_bus::{Event, UnpricedAsset};
 use crate::core::logger::BACKEND;
 use crate::core::SideEffectEventBus;
@@ -29,7 +28,6 @@ pub struct Dispatcher {
     provider: Arc<dyn PriceProvider>,
     price_repo: Arc<dyn AssetPriceRepository>,
     event_bus: Arc<SideEffectEventBus>,
-    currency_service: Arc<CurrencyService>,
     clock: Clock,
     fetch_log: Option<(Arc<dyn PriceFetchLogRepository>, FetchMomentClock)>,
 }
@@ -40,14 +38,12 @@ impl Dispatcher {
         provider: Arc<dyn PriceProvider>,
         price_repo: Arc<dyn AssetPriceRepository>,
         event_bus: Arc<SideEffectEventBus>,
-        currency_service: Arc<CurrencyService>,
         clock: Clock,
     ) -> Self {
         Self {
             provider,
             price_repo,
             event_bus,
-            currency_service,
             clock,
             fetch_log: None,
         }
@@ -65,8 +61,7 @@ impl Dispatcher {
     }
 
     /// Spawns a Tokio background task that fetches prices for the pre-derived
-    /// `(Asset, symbol)` scope, then refreshes FX rates for `fx_pairs` plus all
-    /// persisted pairs (FXR-075/076 — same task, same in-flight lease). The `lease`
+    /// `(Asset, symbol)` scope; it fetches no exchange rate (FXR-075). The `lease`
     /// is moved into the task; its `Drop` releases the in-flight guard at task end,
     /// panic included (MKT-113).
     ///
@@ -79,7 +74,6 @@ impl Dispatcher {
     pub fn spawn(
         self: Arc<Self>,
         scope: Vec<(Asset, String)>,
-        fx_pairs: Vec<CurrencyPair>,
         lease: FetchGuardLease,
         movement_capture: Option<Arc<PriceMovementCapture>>,
     ) {
@@ -192,17 +186,6 @@ impl Dispatcher {
                 movement: movement_baseline
                     .map(|baseline| build_report(baseline, &fetched, &unpriced_asset_ids)),
             });
-
-            // FXR-075/076 — piggyback FX rate refresh on the same task and lease.
-            // refresh_all_rates degrades internally (per-pair skips, provider
-            // failure → no-op); a returned error is logged without aborting.
-            if let Err(e) = self.currency_service.refresh_all_rates(fx_pairs).await {
-                tracing::warn!(
-                    target: BACKEND,
-                    err = ?e,
-                    "asset_price_fetch: FX rate refresh failed; prices already fetched"
-                );
-            }
         });
     }
 

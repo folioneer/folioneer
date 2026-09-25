@@ -161,7 +161,6 @@ where
         provider(asset.id.clone()),
         Arc::new(SqliteAssetPriceRepository::new(pool.clone())),
         Arc::clone(&bus),
-        Arc::clone(&currency_service),
         Arc::new(|| chrono::Local::now().date_naive()),
     ));
     let use_case = AssetPriceFetchUseCase::new(

@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { accountGateway } from "@/features/accounts/gateway";
+import { refreshCurrencyRates } from "@/features/currency/gateway";
 import { shellGateway } from "@/features/shell/gateway";
 import { getAutoFetch } from "@/lib/autoFetchStorage";
 import { logger } from "@/lib/logger";
@@ -30,6 +31,21 @@ export async function maybeLaunchAutoFetch(): Promise<void> {
     }
   } catch (error) {
     logger.error("[App] auto-fetch dispatch threw", { error });
+  }
+}
+
+/**
+ * FXR-075 — the launch rate refresh: every build, whatever the auto-fetch setting.
+ * Silent — an error is logged, never shown.
+ */
+export async function launchRateRefresh(): Promise<void> {
+  try {
+    const result = await refreshCurrencyRates();
+    if (result.status === "error") {
+      logger.warn("[App] rate refresh returned error", { code: result.error.code });
+    }
+  } catch (error) {
+    logger.error("[App] rate refresh threw", { error });
   }
 }
 
@@ -62,6 +78,7 @@ function App() {
     if (!isInitialized) return;
     // MKT-121 — decision lives in maybeLaunchAutoFetch (unit-tested).
     void maybeLaunchAutoFetch();
+    void launchRateRefresh();
   }, [isInitialized]);
 
   // R18 — critical migration error: app blocked with error message

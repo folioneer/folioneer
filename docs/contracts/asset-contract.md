@@ -215,9 +215,9 @@ enum FetchTrigger { Launch, Manual }
 ```rust
 // PMV-020+ — what a manual global refresh did to the portfolio's value. Both readings are
 // computed over the same holdings, quantities and rates, so only prices differ between them
-// (PMV-020). Both readings use the rates in force when the refresh STARTED — the same refresh
-// also fetches FX (FXR-075), and the later reading deliberately ignores what it obtained, so the
-// reference-currency total will briefly differ from the dashboard's freshly converted one.
+// (PMV-020). Both readings use the rates in force when the refresh STARTED — a rate recorded
+// meanwhile (FXR-075, FXR-110) is ignored by the later reading, so the reference-currency total
+// can briefly differ from the dashboard's freshly converted one.
 // Account values come from the application's own Global Value computation (PMV-023,
 // account-contract AccountSummary.total_global_value) — never a second valuation path. Produced only when `trigger == Manual`; carried in AssetPriceFetchCompleted.
 // Asset counts are NOT repeated here — the event's existing `ok` / `skipped` carry them.

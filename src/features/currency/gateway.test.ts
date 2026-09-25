@@ -485,3 +485,32 @@ describe("currencyGateway — getCurrencyRates", () => {
     expect(result).toEqual({ status: "error", error: { code: "DatabaseError" } });
   });
 });
+
+// ---------------------------------------------------------------------------
+// refreshCurrencyRates
+// ---------------------------------------------------------------------------
+
+describe("currencyGateway — refreshCurrencyRates", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // FXR-075 — ok pass-through of the launch rate refresh
+  it("passes through the ok result (FXR-075)", async () => {
+    mockInvoke.mockResolvedValue(null);
+
+    const result = await currencyGateway.refreshCurrencyRates();
+
+    expect(result).toEqual({ status: "ok", data: null });
+    expect(mockInvoke).toHaveBeenCalledWith("refresh_currency_rates");
+  });
+
+  // FXR-075 — typed error pass-through (F27)
+  it("passes through a typed error", async () => {
+    mockInvoke.mockRejectedValue({ code: "DatabaseError" });
+
+    const result = await currencyGateway.refreshCurrencyRates();
+
+    expect(result).toEqual({ status: "error", error: { code: "DatabaseError" } });
+  });
+});

@@ -4,15 +4,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/features/accounts/gateway", () => ({
   accountGateway: { fetchAllAssetPrices: vi.fn() },
 }));
+vi.mock("@/features/currency/gateway", () => ({ refreshCurrencyRates: vi.fn() }));
 vi.mock("@/features/shell/gateway", () => ({
   shellGateway: { onMigrationError: vi.fn(() => Promise.resolve(() => {})) },
 }));
 
 import { accountGateway } from "@/features/accounts/gateway";
+import { refreshCurrencyRates } from "@/features/currency/gateway";
 import { setAutoFetch } from "@/lib/autoFetchStorage";
 import { useAppStore } from "@/lib/store";
 // Import the testable launch helper extracted from App.tsx (MKT-121).
-import { maybeLaunchAutoFetch } from "./App";
+import { launchRateRefresh, maybeLaunchAutoFetch } from "./App";
 
 describe("maybeLaunchAutoFetch — MKT-121 launch dispatch", () => {
   beforeEach(() => {
@@ -60,5 +62,34 @@ describe("maybeLaunchAutoFetch — MKT-121 launch dispatch", () => {
     });
 
     await expect(maybeLaunchAutoFetch()).resolves.toBeUndefined();
+  });
+});
+
+describe("launchRateRefresh — FXR-075 launch rate refresh", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  // FXR-075 — rates refresh at every launch, in a build without an External provider
+  // and with auto-fetch off alike.
+  it("refreshes rates in a build without an External provider, with auto-fetch off", async () => {
+    setAutoFetch(false);
+    useAppStore.setState({ hasExternalProvider: false });
+    vi.mocked(refreshCurrencyRates).mockResolvedValue({ status: "ok", data: null });
+
+    await launchRateRefresh();
+
+    expect(refreshCurrencyRates).toHaveBeenCalledTimes(1);
+  });
+
+  // FXR-075 — the launch refresh is silent: an error is logged, never thrown.
+  it("does not throw when the refresh returns an error", async () => {
+    vi.mocked(refreshCurrencyRates).mockResolvedValue({
+      status: "error",
+      error: { code: "DatabaseError" },
+    });
+
+    await expect(launchRateRefresh()).resolves.toBeUndefined();
   });
 });

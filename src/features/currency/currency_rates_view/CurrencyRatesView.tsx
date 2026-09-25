@@ -27,11 +27,11 @@ export function CurrencyRatesView() {
   } = useCurrencyRatesView();
   const showSnackbar = useSnackbar();
 
-  // FXR-110 — one-click historical download; outcome lands in a snackbar.
+  // FXR-110 — "Update rates": one-click download up to today; outcome lands in a snackbar.
   const handleBackfill = async () => {
     const outcome = await backfillHistory();
     if (outcome.status === "ok") {
-      showSnackbar(t("currency.backfill_success", { count: outcome.ratesWritten }), "success");
+      showSnackbar(t("currency.update_success", { count: outcome.ratesWritten }), "success");
     } else {
       // FXR-114 — the failure is surfaced distinctly, not as a neutral toast.
       showSnackbar(t(outcome.message.key, outcome.message.vars), "error");
@@ -119,7 +119,7 @@ export function CurrencyRatesView() {
           <h2 className="text-xl font-medium text-m3-on-surface">{t("currency.view_title")}</h2>
           <div className="flex items-center gap-2">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               id="action-backfill-history"
               data-testid="action-backfill-history"
@@ -127,7 +127,7 @@ export function CurrencyRatesView() {
               disabled={isBackfilling}
               onClick={() => void handleBackfill()}
             >
-              {t(isBackfilling ? "currency.backfill_running" : "currency.action_backfill_history")}
+              {t(isBackfilling ? "currency.update_running" : "currency.action_update_rates")}
             </Button>
             <Button
               variant="tonal"
