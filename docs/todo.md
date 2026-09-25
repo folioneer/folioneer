@@ -150,7 +150,9 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 
 Its prerequisites have landed: a build without an External provider offers nothing it cannot run (#036), exchange rates refresh without one (#042), and the extension file it overlays exists (ADR-020). Most of the work lives in a private repository, `folioneer/folioneer-private`; this entry tracks it and owns the one public commit that ends it. The private repository holds its own `extensions.rs` and the Yahoo client, pins the public repository as a submodule at a release tag, copies its files over the submodule, builds with the same action as the public release and publishes to its own releases — nothing of it appears on the public releases page. Same identifier, so the same data folder: installing a public build over it loses automatic prices and nothing else. The build says what it is (`X.Y.Z+private` in About). Order, always: the owner releases publicly, then the private workflow builds that tag.
 
-Updates: the private build reads an access token from a file in its configuration folder, never from the binary, and sends it through the headers of #037. Probe first, on a throwaway private release: private assets are probably served only through the API address, in which case the workflow writes its own `latest.json`. If the probe fails, the private build only notifies, and a recipe downloads and installs. The probe also says what a refusal looks like from that host: the application reports HTTP 401 and 403 as a refused access (UPD-028), and a host that answers 404 to a refused token needs that rule extended here.
+Updates: the private build reads an access token from a file in its configuration folder (`update-token`), never from the binary, and sends it in the `Authorization` header of #037. Probe of 2026-09-25, on a throwaway pre-release ([L-015](lessons.md)): self-update works. Assets are served only through the API address (the web address answers 404 even with a token), so the workflow writes its own `latest.json` with API addresses and commits it, read through `raw.githubusercontent.com`; a refused token answers 404 there, so UPD-028 counts 404 as a refusal on a channel that sends credentials. The probe used the owner's `gh` session token; the fine-grained token is first tried on the owner's computer.
+
+State on 2026-09-25: `folioneer/folioneer-private` holds the overlay (`extensions.rs` and the Yahoo client beside it, compiled and tested against `main`), the `public/` submodule, and a **Private release** workflow (manual, one public tag: Windows, then Linux, then the update file committed). Waiting on the owner: a public release carrying the extension file (only `v0.1.0` exists, which predates it), the two signing secrets in the private repository, and the token file on each computer — the private README lists them.
 
 The inventory of 2026-09-21 ([`external-dependencies.md`](external-dependencies.md)) sharpened why this is owed: Yahoo's terms forbid automated access itself (§2.4.9), not only commercial use, so the free application is outside them today, whatever is sold.
 
@@ -161,7 +163,8 @@ Last step, once the private build runs and updates itself on both of the owner's
 **Design:** none
 **Open questions:**
 
-- [ ] If the probe shows self-update from private releases is not workable, is "notify, then a recipe downloads and installs" acceptable on both computers? (Recommended: yes — one user, two computers.)
+- [ ] How does the private build say what it is? `X.Y.Z+private` as the version risks the Windows installer's version rules (unverified), so private releases are named "(private)" and the About page shows the public version number meanwhile. (Recommended: a line on the About page fed by the extension file — a small public change with a design mock.)
+- [x] If the probe shows self-update from private releases is not workable, is "notify, then a recipe downloads and installs" acceptable on both computers? (Recommended: yes — one user, two computers.) — Yes (2026-09-25); not needed, the probe showed self-update works.
 
 ## #039 — (service) — A hosted price feed the application can subscribe to (deferred)
 

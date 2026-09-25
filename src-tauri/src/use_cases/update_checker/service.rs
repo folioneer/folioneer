@@ -90,7 +90,8 @@ fn channel_updater<R: Runtime>(
 
 /// Whether the update server refuses this build's access (UPD-028). The updater plugin
 /// hides the response status, so a failed check on a channel that sends headers is
-/// followed by one request of our own; 401 and 403 are a refusal. A channel without
+/// followed by one request of our own; 401, 403 and 404 are a refusal — a host hiding
+/// what a credential cannot reach answers 404 to a refused token. A channel without
 /// headers is never probed — an anonymous failure stays silent (UPD-021).
 async fn access_refused(channel: &UpdateChannel) -> bool {
     match channel.endpoints.first() {
@@ -125,7 +126,9 @@ async fn access_refused_at(address: &Url, channel: &UpdateChannel) -> bool {
     match request.send().await {
         Ok(response) => matches!(
             response.status(),
-            reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN
+            reqwest::StatusCode::UNAUTHORIZED
+                | reqwest::StatusCode::FORBIDDEN
+                | reqwest::StatusCode::NOT_FOUND
         ),
         Err(error) => {
             tracing::warn!(target: BACKEND, error = %error.without_url(), "Update access probe failed");
@@ -447,11 +450,11 @@ mod tests {
         assert!(request.contains("authorization: bearer channel-token"));
     }
 
-    // UPD-028 — a server answering 401 or 403 to a channel that sends headers refuses
-    // this build's access.
+    // UPD-028 — a server answering 401, 403 or 404 to a channel that sends headers refuses
+    // this build's access; a host hiding what a credential cannot reach answers 404.
     #[tokio::test]
-    async fn a_401_or_403_answer_to_a_channel_with_headers_is_a_refusal() {
-        for status in ["401 Unauthorized", "403 Forbidden"] {
+    async fn a_401_403_or_404_answer_to_a_channel_with_headers_is_a_refusal() {
+        for status in ["401 Unauthorized", "403 Forbidden", "404 Not Found"] {
             let (endpoint, served) = serve_once(status).await;
 
             let refused =
@@ -480,10 +483,10 @@ mod tests {
             .contains("authorization: bearer expired"));
     }
 
-    // UPD-028 — any other answer is not a refusal: a missing release stays a silent failure.
+    // UPD-028 — any other answer is not a refusal: a server failing stays a silent failure.
     #[tokio::test]
-    async fn a_404_answer_is_not_a_refusal() {
-        let (endpoint, _served) = serve_once("404 Not Found").await;
+    async fn a_server_error_is_not_a_refusal() {
+        let (endpoint, _served) = serve_once("500 Internal Server Error").await;
 
         assert!(!access_refused(&channel(endpoint, &[("authorization", "Bearer valid")])).await);
     }
