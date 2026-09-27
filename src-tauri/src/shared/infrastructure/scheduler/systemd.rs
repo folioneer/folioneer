@@ -5,15 +5,16 @@
 use super::DailyFetchScheduler;
 use anyhow::Context;
 use async_trait::async_trait;
+use std::ffi::OsString;
 use std::path::PathBuf;
 use std::process::Command;
 
 /// systemd unit name for the scheduled-fetch service (no `.service` suffix).
 pub const UNIT_NAME: &str = "folioneer-fetch";
 
-/// Generates the `folioneer-fetch.service` unit content. `exe_path` is the
-/// current executable's absolute path (SPF-015 self-heal re-registers when it
-/// changes); the unit invokes it with `--scheduled-fetch` (SPF-020).
+/// Generates the `folioneer-fetch.service` unit content. `exe_path` is the file the
+/// schedule starts — the executable, or the AppImage file of an AppImage run (SPF-017);
+/// the unit invokes it with `--scheduled-fetch` (SPF-020).
 pub fn service_unit_content(exe_path: &str) -> String {
     format!(
         "[Unit]\nDescription=Folioneer scheduled price download\n\n[Service]\nType=oneshot\nExecStart={exe_path} --scheduled-fetch\n"
@@ -28,6 +29,16 @@ pub fn timer_unit_content(trigger_time: &str) -> String {
     format!(
         "[Unit]\nDescription=Folioneer scheduled price download timer\n\n[Timer]\nOnCalendar=*-*-* {trigger_time}:00\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n"
     )
+}
+
+/// The file the schedule must start (SPF-017). An AppImage runs from a temporary mount
+/// that disappears when it exits, so its own file — which the AppImage runtime names in
+/// `APPIMAGE` — is the one to schedule, not the executable inside the mount.
+fn scheduled_executable(appimage: Option<OsString>, current_exe: PathBuf) -> PathBuf {
+    appimage
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or(current_exe)
 }
 
 /// Production [`DailyFetchScheduler`] backed by `systemctl --user` (SPF-017).
@@ -54,8 +65,10 @@ fn run_systemctl_user(arguments: &[&str]) -> anyhow::Result<()> {
 }
 
 fn register_blocking(trigger_time: &str) -> anyhow::Result<()> {
-    let executable_path =
-        std::env::current_exe().context("failed to resolve the current executable path")?;
+    let executable_path = scheduled_executable(
+        std::env::var_os("APPIMAGE"),
+        std::env::current_exe().context("failed to resolve the current executable path")?,
+    );
     let unit_directory = user_unit_directory()?;
     std::fs::create_dir_all(&unit_directory)
         .with_context(|| format!("failed to create {}", unit_directory.display()))?;
@@ -124,6 +137,31 @@ impl DailyFetchScheduler for SystemdScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // SPF-017 — run as an AppImage, the schedule starts the AppImage file itself: the
+    // executable inside its temporary mount is gone once the application exits.
+    #[test]
+    fn an_appimage_schedules_its_own_file_not_its_mount() {
+        let scheduled = scheduled_executable(
+            Some(OsString::from(
+                "/home/owner/Applications/Folioneer.AppImage",
+            )),
+            PathBuf::from("/tmp/.mount_FolionAbc123/usr/bin/folioneer"),
+        );
+
+        assert_eq!(
+            scheduled,
+            PathBuf::from("/home/owner/Applications/Folioneer.AppImage")
+        );
+    }
+
+    // SPF-017 — any other installation schedules the running executable.
+    #[test]
+    fn an_installed_executable_schedules_itself() {
+        let scheduled = scheduled_executable(None, PathBuf::from("/usr/bin/folioneer"));
+
+        assert_eq!(scheduled, PathBuf::from("/usr/bin/folioneer"));
+    }
 
     // SPF-014/022 — the timer unit encodes the local trigger time and is Persistent.
     #[test]

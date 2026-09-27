@@ -57,7 +57,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-016 — No resident presence (backend)**: Outside its brief daily execution, nothing runs and nothing is visible — no tray icon, no background service, no window.
 
-**SPF-017 — All desktop platforms supported (backend)**: The schedule registration works on Linux, Windows, and macOS through each system's native scheduling facility. Behavior is identical across platforms; only Linux is covered by automated end-to-end verification (Windows and macOS registrations are verified by unit-level checks on the generated scheduling definitions).
+**SPF-017 — All desktop platforms supported (backend)**: The schedule registration works on Linux, Windows, and macOS through each system's native scheduling facility. Behavior is identical across platforms; only Linux is covered by automated end-to-end verification (Windows and macOS registrations are verified by unit-level checks on the generated scheduling definitions). On Linux, an application run as an AppImage schedules the AppImage file itself, never the executable inside the temporary folder it runs from, which is gone once it exits.
 
 **SPF-018 — Default trigger time (frontend)**: When the user enables the feature without choosing a time, the trigger time defaults to **22:15** local time (after the same-day NYSE close as seen from Europe; a machine off at that hour is covered by the catch-up, SPF-022).
 
