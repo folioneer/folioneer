@@ -33,10 +33,20 @@ pub fn timer_unit_content(trigger_time: &str) -> String {
 
 /// The file the schedule must start (SPF-017). An AppImage runs from a temporary mount
 /// that disappears when it exits, so its own file — which the AppImage runtime names in
-/// `APPIMAGE` — is the one to schedule, not the executable inside the mount.
-fn scheduled_executable(appimage: Option<OsString>, current_exe: PathBuf) -> PathBuf {
+/// `APPIMAGE` — is the one to schedule, not the executable inside the mount. `APPIMAGE` is
+/// trusted only when the running executable really sits inside the mount the runtime names
+/// in `APPDIR`: otherwise anyone able to set the variable could choose what the daily
+/// schedule starts.
+fn scheduled_executable(
+    appimage: Option<OsString>,
+    appdir: Option<OsString>,
+    current_exe: PathBuf,
+) -> PathBuf {
+    let running_from_the_mount = appdir
+        .filter(|mount| !mount.is_empty())
+        .is_some_and(|mount| current_exe.starts_with(mount));
     appimage
-        .filter(|path| !path.is_empty())
+        .filter(|path| running_from_the_mount && !path.is_empty())
         .map(PathBuf::from)
         .unwrap_or(current_exe)
 }
@@ -67,6 +77,7 @@ fn run_systemctl_user(arguments: &[&str]) -> anyhow::Result<()> {
 fn register_blocking(trigger_time: &str) -> anyhow::Result<()> {
     let executable_path = scheduled_executable(
         std::env::var_os("APPIMAGE"),
+        std::env::var_os("APPDIR"),
         std::env::current_exe().context("failed to resolve the current executable path")?,
     );
     let unit_directory = user_unit_directory()?;
@@ -146,6 +157,7 @@ mod tests {
             Some(OsString::from(
                 "/home/owner/Applications/Folioneer.AppImage",
             )),
+            Some(OsString::from("/tmp/.mount_FolionAbc123")),
             PathBuf::from("/tmp/.mount_FolionAbc123/usr/bin/folioneer"),
         );
 
@@ -158,9 +170,24 @@ mod tests {
     // SPF-017 — any other installation schedules the running executable.
     #[test]
     fn an_installed_executable_schedules_itself() {
-        let scheduled = scheduled_executable(None, PathBuf::from("/usr/bin/folioneer"));
+        let scheduled = scheduled_executable(None, None, PathBuf::from("/usr/bin/folioneer"));
 
         assert_eq!(scheduled, PathBuf::from("/usr/bin/folioneer"));
+    }
+
+    // SPF-017 — an `APPIMAGE` the running executable does not come from is ignored: the
+    // variable alone cannot choose what the daily schedule starts.
+    #[test]
+    fn an_appimage_variable_the_executable_does_not_come_from_is_ignored() {
+        for appdir in [None, Some(OsString::from("/tmp/.mount_Other999"))] {
+            let scheduled = scheduled_executable(
+                Some(OsString::from("/home/owner/.cache/not-folioneer")),
+                appdir,
+                PathBuf::from("/usr/bin/folioneer"),
+            );
+
+            assert_eq!(scheduled, PathBuf::from("/usr/bin/folioneer"));
+        }
     }
 
     // SPF-014/022 — the timer unit encodes the local trigger time and is Persistent.

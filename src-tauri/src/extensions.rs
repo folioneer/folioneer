@@ -4,7 +4,9 @@
 
 use std::sync::Arc;
 
-use crate::context::asset::{NoDataProvider, PriceProvider};
+#[cfg(debug_assertions)]
+use crate::context::asset::NoDataProvider;
+use crate::context::asset::PriceProvider;
 use crate::context::currency::{
     ChainedRateProvider, RateHistoryProvider, RateProvider, ReqwestEcbClient,
     ReqwestFrankfurterClient,
@@ -43,10 +45,16 @@ pub fn providers() -> anyhow::Result<Providers> {
     })
 }
 
-/// The public build's External provider: none. An E2E run gets one that answers "no data",
-/// so the fetch flows stay reachable by the suite without any network call.
+/// The public build's External provider: none. An E2E run — a debug build started by the
+/// suite — gets one that answers "no data", so the fetch flows stay reachable without any
+/// network call. A release build contains no such provider, whatever it is asked.
 fn price_provider(is_e2e_run: bool) -> anyhow::Result<Option<Arc<dyn PriceProvider>>> {
-    Ok(is_e2e_run.then(|| Arc::new(NoDataProvider) as Arc<dyn PriceProvider>))
+    #[cfg(debug_assertions)]
+    if is_e2e_run {
+        return Ok(Some(Arc::new(NoDataProvider) as Arc<dyn PriceProvider>));
+    }
+    let _ = is_e2e_run;
+    Ok(None)
 }
 
 /// The channel this build's updates come from: the endpoint of `tauri.conf.json`,

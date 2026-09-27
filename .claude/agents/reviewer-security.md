@@ -108,6 +108,14 @@ Apply to any `.rs` file that contains or is called by a `#[tauri::command]` func
 - 🟡 Every `unsafe` block must carry a comment explaining the invariant that makes it safe. A bare `unsafe { ... }` with no justification is a Warning.
 - 🔵 Prefer safe Rust equivalents wherever they exist. An `unsafe` block that could be replaced by a safe library call should be flagged as a Suggestion.
 
+### Test, dev and tooling seams
+
+A seam that exists for tests, development or tooling must never be reachable in an installed application (owner's rule, 2026-09-27).
+
+- 🔴 An environment variable, flag or file that changes behaviour (a data folder, a reset, a stub provider, a scheduler override) read by a release build. It must be gated on `cfg!(debug_assertions)` at least, with the release branch ignoring the input.
+- 🟡 A seam that carries behaviour (a stub, a fake provider, a reset path) compiled into release builds although unreachable there. Compile it out with `#[cfg(debug_assertions)]`.
+- 🟡 A value from the environment trusted in a release build to choose what the application runs or writes (a path, a URL) without a check that ties it to the running application — e.g. `APPIMAGE` honoured only when the executable sits inside `APPDIR`.
+
 ### Sensitive Data Exposure
 
 - 🔴 `#[tauri::command]` return types must not include raw secrets, plaintext passwords, private keys, or session tokens. If a command must return authentication material, flag it for explicit review of the necessity.
