@@ -47,7 +47,7 @@ If no path is given, list files in `docs/contracts/` and ask which to review.
 1. Read the contract file in full
 2. Extract the source spec name from the contract's `> Last updated by:` line; read that spec
    from `docs/spec/{feature}.md`
-3. Read `ARCHITECTURE.md` (or `docs/ARCHITECTURE.md` if not at root; skip silently if neither exists) — bounded contexts and aggregate boundaries are needed for Section H scope checks
+3. Read `ARCHITECTURE.md` — bounded contexts and aggregate boundaries are needed for Section H scope checks
 4. Read `docs/adr/` if present — ADRs constrain valid types (e.g. `i64` for amounts)
 5. Run `Glob docs/contracts/*-contract.md` and read every contract file other than the one under review — needed for Section H cross-contract checks
 

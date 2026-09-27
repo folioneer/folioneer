@@ -1,14 +1,14 @@
-# Design System Specification: The Clinical Atelier
+# Design System Specification
 
-> Auto-extracted from the ProjectSF Stitch project (projects/7705025027636758446)
+> The palette's name, "Clinical Atelier", is kept where `src/ui/global.css` cites it.
 
 ## 1. Overview & Creative North Star
 
-### Creative North Star: "The Empathetic Authority"
+### Creative North Star: "The Calm Ledger"
 
-In medical practice management, software often feels cold, rigid, and cluttered. This design system rejects the "spreadsheet-trapped-in-a-box" aesthetic. Instead, we embrace a "Clinical Atelier" approach: an environment that feels as high-end and intentional as a modern private clinic.
+Portfolio software often feels like a trading terminal or a spreadsheet: dense, loud, and anxious. Folioneer rejects the "spreadsheet-trapped-in-a-box" aesthetic. A private investor reviews accounts, holdings and performance at rest, so the interface should feel as calm and deliberate as a well-kept ledger.
 
-We move beyond standard Material 3 by utilizing **Editorial Asymmetry** and **Tonal Depth**. By breaking the rigid 12-column grid with intentional white space and overlapping "paper-on-glass" layers, we create a UI that breathes. This system prioritizes cognitive ease for practitioners, using high-contrast typography and soft tonal shifts to guide the eye without the "visual noise" of traditional borders and dividers.
+We move beyond standard Material 3 by utilizing **Editorial Asymmetry** and **Tonal Depth**. By breaking the rigid 12-column grid with intentional white space and overlapping "paper-on-glass" layers, we create a UI that breathes. This system prioritizes cognitive ease for the person reading their figures, using high-contrast typography and soft tonal shifts to guide the eye without the "visual noise" of traditional borders and dividers.
 
 ---
 
@@ -30,11 +30,11 @@ Treat the interface as physical layers of fine stationery.
 
 - **Base Layer:** `surface` (#FEF7FF) – The desk.
 - **Secondary Layer:** `surface-container-low` (#F8F1F9) – The clipboard.
-- **Primary Interaction Layer:** `surface-container-lowest` (#FFFFFF) – The active patient record.
+- **Primary Interaction Layer:** `surface-container-lowest` (#FFFFFF) – The active account or holding.
 
 ### The "Glass & Gradient" Rule
 
-To avoid a "flat" medical template look, floating elements (modals, dropdowns) should utilize **Glassmorphism**.
+To avoid a "flat" template look, floating elements (modals, dropdowns) should utilize **Glassmorphism**.
 
 - **Token:** `surface_container_lowest` at 85% opacity.
 - **Effect:** `backdrop-blur: 12px`.
@@ -46,8 +46,8 @@ To avoid a "flat" medical template look, floating elements (modals, dropdowns) s
 
 We use a dual-font pairing to balance authority with approachability.
 
-- **Display & Headlines (Manrope):** A modern geometric sans-serif with a high x-height. Use `display-lg` and `headline-md` for patient names and key health metrics to give them an "editorial" importance.
-- **Body & Labels (Inter):** Highly legible and neutral. Use `body-md` for all clinical notes.
+- **Display & Headlines (Manrope):** A modern geometric sans-serif with a high x-height. Use `display-lg` and `headline-md` for account names and key figures (portfolio total, performance) to give them an "editorial" importance.
+- **Body & Labels (Inter):** Highly legible and neutral. Use `body-md` for notes and table content.
 - **Hierarchy Tip:** Never use "Bold" for body text. Use `medium` weight with a shift to `on-surface-variant` (#494551) to create contrast. Save high-weight fonts exclusively for `headline` levels to maintain an airy, sophisticated feel.
 
 ---
@@ -80,14 +80,13 @@ Traditional structural lines create mental friction. We achieve depth through th
 
 ### Cards & Data Lists
 
-- **Forbid Dividers:** Do not use horizontal rules between patient records.
+- **Forbid Dividers:** Do not use horizontal rules between list items (accounts, holdings, transactions).
 - **The Alternative:** Use `8` (2rem) vertical spacing or alternating `surface` and `surface-container-low` backgrounds for list items.
-- **Medical Charts:** Use `tertiary_container` (#C9A74D) for highlight metrics to separate them from administrative data.
+- **Charts:** Use `tertiary_container` (#C9A74D) for highlight figures to separate them from reference data.
 
-### Specialized Medical Components
+### Summary Figures
 
-- **The "Vitals Grid":** Use asymmetric card sizes. The most critical vital takes up 60% of the container width using `headline-lg`, while secondary vitals stack vertically in the remaining 40%.
-- **Timeline Scrubber:** A horizontal "ghost" track using `outline-variant` at 10% opacity for tracking patient history without cluttering the screen.
+- **Key-figure grid:** Use asymmetric card sizes. The most important figure (a portfolio or account total) takes up 60% of the container width using `headline-lg`, while secondary figures stack vertically in the remaining 40%.
 
 ---
 
@@ -97,7 +96,7 @@ Traditional structural lines create mental friction. We achieve depth through th
 
 - **Do** use `surface-dim` for inactive sidebar states to push them into the background.
 - **Do** lean into `surface-container-highest` for "Active" states in navigation.
-- **Do** prioritize `tertiary` (#765B00) for "Pending" or "Cautionary" clinical alerts.
+- **Do** prioritize `tertiary` (#765B00) for "Pending" or "Cautionary" notices (a missing price, a sync that needs attention).
 
 ### Don't:
 
@@ -149,9 +148,9 @@ Traditional structural lines create mental friction. We achieve depth through th
 | Spacing scale | 2                 |
 | Color mode    | Light + Dark      |
 
-## 9. Dark Mode — Clinical Atelier Dark Palette
+## 9. Dark Mode — Dark Palette
 
-Applied via `.dark` class on `<html>`. Controlled by the theme toggle (day/night/auto). Source: Stitch screen "Modifier le groupe de paiement (Dark Mode)".
+Applied via `.dark` class on `<html>`. Controlled by the theme toggle (day/night/auto).
 
 | Token                       | Dark Value |
 | --------------------------- | ---------- |

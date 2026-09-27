@@ -68,9 +68,8 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
    each Done when clause with the test that proves it, findings that changed
    something, techdebt filed, screenshots. The commit title is the changelog line.
 9. **Merge**: `just merge`, which refuses until every check on the pull request is green.
-10. **Closure** in the same PR: the entry removed from `docs/todo.md`, and its plan
-    when this pull request is the plan's last; techdebt updated;
-    `ARCHITECTURE.md` if a module appeared; the spec if a rule changed.
+10. **Closure** in the same PR: the entry removed from `docs/todo.md`; techdebt
+    updated; `ARCHITECTURE.md` if a module appeared; the spec if a rule changed.
 11. **Next** entry, or stop (§ 8).
 
 **Release** — the human runs `just release -y` when they choose. It re-runs the full

@@ -22,7 +22,7 @@ Folioneer is a single-user Tauri 2 desktop app. React 19 + TypeScript on the fro
 | You need                                                                | Read                                                                                                                 |
 | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | Backend implementation patterns (row mapping, orchestrator shape, etc.) | [`docs/backend-patterns.md`](docs/backend-patterns.md)                                                               |
-| Generic DDD rules (kit-managed)                                         | [`docs/backend-rules.md`](docs/backend-rules.md), [`docs/ddd-reference.md`](docs/ddd-reference.md)                   |
+| Generic DDD rules                                                       | [`docs/backend-rules.md`](docs/backend-rules.md), [`docs/ddd-reference.md`](docs/ddd-reference.md)                   |
 | Intentional divergences from textbook DDD                               | [`docs/ddd-divergences.md`](docs/ddd-divergences.md)                                                                 |
 | Error model (per-BC enum + per-use-case composite)                      | [`docs/error-model.md`](docs/error-model.md)                                                                         |
 | Frontend rules + visual proof workflow                                  | [`docs/frontend-rules.md`](docs/frontend-rules.md), [`docs/frontend-visual-proof.md`](docs/frontend-visual-proof.md) |
@@ -201,7 +201,7 @@ These are the load-bearing architectural choices that aren't obvious from readin
 
 ## Maintenance
 
-This file describes what doesn't change often. Per-feature / per-use-case / per-migration details belong in source code, spec docs, or the kit pattern docs — not here.
+This file describes what doesn't change often. Per-feature / per-use-case / per-migration details belong in source code, spec docs, or the pattern docs — not here.
 
 Update this file when:
 

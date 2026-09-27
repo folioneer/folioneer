@@ -2,8 +2,8 @@
 """Deterministic data collection for the /whats-next skill.
 
 Emits a single JSON document on stdout describing every potential work source
-in the project (TODOs, planning docs, feature plans, open spec questions,
-in-flight git state, roadmap, tech debt). Sections whose source is missing
+in the project (the todo file, inline TODOs, open spec questions, in-flight
+git state, roadmap, tech debt, GitHub issues). Sections whose source is missing
 are emitted as empty — the consumer skips them silently.
 
 Usage:
@@ -82,7 +82,7 @@ def collect_todo_file() -> dict | None:
         only top-level entries count (nested `  - sub-item` lines are
         treated as continuation of the parent, not separate candidates).
     """
-    for name in ("docs/todo.md", "docs/TODO.md"):
+    for name in ("docs/todo.md",):
         path = ROOT / name
         text = _read(path)
         if text is None:
@@ -167,61 +167,6 @@ def _extract_open_questions(text: str) -> list[str]:
             if m:
                 items.append(m.group(1).strip())
     return items
-
-
-def collect_planning_docs() -> list[dict]:
-    """docs/plan-*.md at the docs root."""
-    out: list[dict] = []
-    docs = ROOT / "docs"
-    if not docs.is_dir():
-        return out
-    for path in sorted(docs.glob("plan-*.md")):
-        text = _read(path)
-        if text is None:
-            continue
-        title_match = re.search(r"^#\s+(.+?)\s*$", text, re.MULTILINE)
-        out.append(
-            {
-                "path": str(path.relative_to(ROOT)),
-                "title": title_match.group(1) if title_match else path.stem,
-                "open_questions": _extract_open_questions(text),
-            }
-        )
-    return out
-
-
-def collect_feature_plans() -> list[dict]:
-    """docs/plan/*-plan.md — extract unchecked items + completion status."""
-    out: list[dict] = []
-    plan_dir = ROOT / "docs" / "plan"
-    if not plan_dir.is_dir():
-        return out
-    for path in sorted(plan_dir.glob("*-plan.md")):
-        text = _read(path)
-        if text is None:
-            continue
-        unchecked: list[str] = []
-        total = 0
-        done = 0
-        for line in text.splitlines():
-            m = re.match(r"^\s*-\s+\[(?P<state>[ xX])\]\s+(?P<text>.+)$", line)
-            if not m:
-                continue
-            total += 1
-            if m.group("state").lower() == "x":
-                done += 1
-            else:
-                unchecked.append(m.group("text").strip())
-        out.append(
-            {
-                "path": str(path.relative_to(ROOT)),
-                "unchecked": unchecked,
-                "all_done": total > 0 and done == total,
-                "total": total,
-                "done": done,
-            }
-        )
-    return out
 
 
 def collect_spec_open_questions() -> list[dict]:
@@ -387,8 +332,6 @@ def main() -> int:
         "version": 2,
         "todo_file": collect_todo_file(),
         "inline_todos": collect_inline_todos(),
-        "planning_docs": collect_planning_docs(),
-        "feature_plans": collect_feature_plans(),
         "spec_open_questions": collect_spec_open_questions(),
         "in_flight": collect_in_flight(),
         "roadmap": collect_roadmap(),

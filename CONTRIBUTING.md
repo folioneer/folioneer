@@ -41,7 +41,6 @@ just start            # Start application
 just check            # Run all tests and linters
 just test             # Run frontend tests
 just test-rust        # Run backend tests
-just lint             # Run linter
 just format-fix       # Auto-fix formatting
 just generate-types   # Generate TS bindings
 ```

@@ -45,14 +45,14 @@ The user normally passes the spec path explicitly. If no document is specified, 
 1. Read the spec document: extract every rule identifier matching **TRIGRAM-NNN** format (e.g. REF-010, REF-020, REF-030, PAY-011).
 2. Extract their scope (`frontend`, `backend`, or `frontend + backend`) and description.
 3. Read the following for project conventions (skip silently if absent):
-   - `ARCHITECTURE.md` or `docs/ARCHITECTURE.md` (try root first; skip silently if neither exists) — bounded contexts, module layout, naming conventions (required for the Context alignment check in the output).
+   - `ARCHITECTURE.md` — bounded contexts, module layout, naming conventions (required for the Context alignment check in the output).
    - `docs/adr/` — global technical constraints (storage types, soft-delete, event naming).
    - `docs/backend-rules.md` — factory methods, service layer, repository traits.
    - `docs/frontend-rules.md` — gateway, hook, component patterns.
 
 ### Step 2 — Check backend implementation
 
-Read `ARCHITECTURE.md` or `docs/ARCHITECTURE.md` (whichever exists) to locate the backend module path. If absent, search for common backend roots (`src/`, `server/src/`, `src-tauri/src/`) and note the assumption. If no backend path is found, skip this step and note it in the summary.
+Read `ARCHITECTURE.md` to locate the backend module path. If absent, search for common backend roots (`src/`, `server/src/`, `src-tauri/src/`) and note the assumption. If no backend path is found, skip this step and note it in the summary.
 
 For each backend rule:
 
@@ -63,7 +63,7 @@ For each backend rule:
 
 ### Step 3 — Check frontend implementation
 
-Read `ARCHITECTURE.md` or `docs/ARCHITECTURE.md` (whichever exists) to locate the frontend module path. If absent, search for common frontend roots (`src/features/`, `client/src/`) and note the assumption. If no frontend path is found, skip this step and note it in the summary.
+Read `ARCHITECTURE.md` to locate the frontend module path. If absent, search for common frontend roots (`src/features/`, `client/src/`) and note the assumption. If no frontend path is found, skip this step and note it in the summary.
 
 For each frontend rule:
 
@@ -85,8 +85,8 @@ If `docs/contracts/{domain}-contract.md` exists for this feature's domain:
 
 For each command in the contract:
 
-- **Backend**: verify a handler function with that name exists in the backend module path (from `ARCHITECTURE.md` / `docs/ARCHITECTURE.md`). On Tauri projects, look for `#[tauri::command]`; on Axum projects, look for the function registered in the router.
-- **Frontend**: verify a gateway call to that command exists in the frontend module's `{domain}/gateway.ts` (path from `ARCHITECTURE.md` / `docs/ARCHITECTURE.md`)
+- **Backend**: verify a handler function with that name exists in the backend module path (from `ARCHITECTURE.md`). On Tauri projects, look for `#[tauri::command]`; on Axum projects, look for the function registered in the router.
+- **Frontend**: verify a gateway call to that command exists in the frontend module's `{domain}/gateway.ts` (path from `ARCHITECTURE.md`)
 - **Tests**: verify at least one `#[tokio::test]` (backend) and one `it(` or `test(` (frontend)
   references or is named after that command
 
@@ -110,7 +110,7 @@ Output the findings to the conversation using `## Output format` below.
 
 **Architecture & ADR Check:**
 
-- 🔴/✅ **Context alignment**: Is the code located in the correct directory according to `ARCHITECTURE.md` / `docs/ARCHITECTURE.md`?
+- 🔴/✅ **Context alignment**: Is the code located in the correct directory according to `ARCHITECTURE.md`?
 - 🔴/✅ **ADR Compliance**: Does the implementation follow active ADRs (e.g., i64 for amounts)?
 
 **Rules coverage:**

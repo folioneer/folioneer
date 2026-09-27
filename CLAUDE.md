@@ -108,6 +108,8 @@ Why: a 60-file mixed-layer PR sprawls across concerns; per-layer PRs keep each d
 
 - Dev: `just dev` — a debug build keeps its data and logs in its own folder (`com.folioneer.desktop.dev`, beside the installed application's), never touches the host's daily price-fetch schedule, and `--reset-db` deletes only that development database. `just dev-seed [--replace]` fills the folder with a copy of the installed database, detached from sync and from the daily fetch.
 - Loop: `just next-todo` — one ready entry of `docs/todo.md` § Next, headless (`docs/workflow-c.md` § 9)
+- Setup and figures: `just install` (dependencies) | `just stat` (lines of code per language)
+- A recipe exists because CI, a git hook, a skill, an agent or a script calls it, or because this section lists it as a tool people run; a recipe with neither is dead code and goes.
 - Tests: `just test` (frontend) | `just test-rust` (backend) | `just test-unit` (both)
 - E2E tests: `just test-e2e` (local) | `just test-e2e-headless` (Linux headless). CI runs the suite on every pull request that changes more than records (`scripts/e2e-scope.py`: Markdown, `docs/`, `.claude/` and committed screenshots alone skip it, green in a minute) and on every push to `main` that touches more than those records; the local run on this machine is known-broken (`docs/lessons.md` L-011), so CI is the gate.
 - Security audit: `/security-review` (IPC, capabilities, SQL injection, hardcoded secrets) — Claude Code built-in, run before release alongside `/dep-audit`

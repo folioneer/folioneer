@@ -13,10 +13,6 @@ install:
 dev *ARGS:
     ./scripts/start-app.sh {{ARGS}}
 
-# Start the application using Wayland backend (use when window doesn't appear with just dev)
-dev-wayland *ARGS:
-    GDK_BACKEND=wayland ./scripts/start-app.sh {{ARGS}}
-
 # Seed the development data folder with a copy of the installed application's database (read-only on the source)
 dev-seed *ARGS:
     python3 scripts/dev-seed.py {{ARGS}}
@@ -65,10 +61,6 @@ licence-check:
 test-scripts:
     python3 -m unittest discover -s scripts/tests -p "test_*.py"
 
-# Refuse a diff that edits a published sync format snapshot (SYN-038)
-sync-format-check *ARGS:
-    bash scripts/sync-format-check.sh {{ARGS}}
-
 # Check the mechanical architecture rules (scripts/arch-check.py); pass --write-allowlist to shrink arch-allowlist.json to today's state
 arch-check *ARGS:
     python3 scripts/arch-check.py {{ARGS}}
@@ -76,36 +68,6 @@ arch-check *ARGS:
 # The merge gate, locally, scoped to what moved (scripts/harness.sh): architecture rules always; lint + build, tests with coverage and the floor only for the layers the diff touches
 harness:
     bash scripts/harness.sh
-
-# Resource-capped check-full: runs the full quality suite in a memory-throttled, low-priority
-# cgroup so heavy builds stay responsive on low-RAM machines (requires a systemd user session)
-check-safe:
-    systemd-run --user --scope -p MemoryHigh=4G -p CPUWeight=20 nice -n19 just check-full
-
-# Resource-capped release: same memory guard around the full release flow
-release-safe *ARGS:
-    systemd-run --user --scope -p MemoryHigh=4G -p CPUWeight=20 nice -n19 just release {{ARGS}}
-
-# Collect logs for debugging
-collect-logs:
-    ./scripts/collect-logs.sh
-
-# Take a screenshot of the app
-screenshot:
-    ./scripts/screenshot.sh
-
-# Run linters only
-lint:
-    npm run lint
-    cd src-tauri && cargo clippy -- -D warnings
-
-# Clean build artifacts
-clean:
-    rm -rf dist src-tauri/target
-
-# ⚠️  Destructive: resets database and restarts app in dev mode
-reset-db:
-    ./scripts/start-app.sh --reset-db
 
 # Run pending database migrations. Override `URL=...` to target a different DB.
 db-migrate URL="sqlite:.local/dev_check.sqlite":
@@ -127,16 +89,6 @@ release *ARGS:
     @[ -f scripts/release.py ] || { echo "❌ scripts/release.py not found — restore it from git history"; exit 1; }
     python3 scripts/release.py {{ARGS}}
 
-# ⚠️  Destructive: removes stale remote-tracking branches
-clean-branches:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    git fetch --prune
-    # Portable equivalent of `xargs -r` (which is GNU-only — BSD/macOS
-    # xargs runs the command once with no arguments instead of skipping).
-    stale=$(git branch -vv | grep ': gone]' | awk '{print $1}')
-    [ -n "$stale" ] && echo "$stale" | xargs git branch -D || true
-
 # Count lines of code per language (cloc)
 stat:
     cloc . --vcs=git
@@ -148,19 +100,10 @@ merge:
     @[ -f scripts/merge.py ] || { echo "❌ scripts/merge.py not found — restore it from git history"; exit 1; }
     python3 scripts/merge.py
 
-# Mutation sweep of the logic code, in place (requires: cargo install cargo-mutants; scope in src-tauri/.cargo/mutants.toml; args pass through, e.g. `-f src/use_cases/fee_generation`; a killed run leaves a mutated file — `git checkout -- src-tauri/src`)
-mutants *ARGS:
-    cd src-tauri && cargo mutants --in-place {{ARGS}}
-
 # Run one ready entry of docs/todo.md § Next headless (docs/workflow-c.md § 9)
 next-todo:
     @[ -f scripts/next-todo.sh ] || { echo "❌ scripts/next-todo.sh not found — restore it from git history"; exit 1; }
     bash scripts/next-todo.sh
-
-# Prerequisites: sqlx must be on $PATH and DATABASE_URL must be set
-# Run pending database migrations
-migrate:
-    @if [ -d src-tauri ]; then cd src-tauri && sqlx migrate run; else echo "ℹ skipping migrate (no src-tauri/)"; fi
 
 # SQLX_OFFLINE=false forces online mode so `prepare` hits the dev DB even
 # though .cargo/config.toml sets SQLX_OFFLINE=true globally.
@@ -177,14 +120,3 @@ format:
     @if [ -d src-tauri ]; then cd src-tauri && cargo clippy --fix --allow-dirty --quiet; else echo "ℹ skipping clippy (no src-tauri/)"; fi
     @if [ -f package.json ]; then npm run format:fix; else echo "ℹ skipping format:fix (no package.json)"; fi
     @if [ -f package.json ]; then npx prettier --write "**/*.md" --ignore-path .gitignore; else echo "ℹ skipping prettier docs (no package.json)"; fi
-
-# ⚠️  Destructive: deletes local database and recreates schema
-clean-db:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if [ ! -d src-tauri ]; then
-        echo "ℹ skipping clean-db (no src-tauri/)"
-        exit 0
-    fi
-    rm -rf src-tauri/.local/*
-    cd src-tauri && sqlx database setup

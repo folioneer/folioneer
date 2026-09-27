@@ -1,6 +1,6 @@
 ---
 name: whats-next
-description: Surveys pending work across TODOs, planning docs, unfinished feature plans, open spec questions, in-flight git work, and open GitHub issues, then returns a value/effort table with a recommended next action. Use at session start to triage what to work on, especially after a gap when context has faded.
+description: Surveys pending work across the todo file, inline TODOs, tech debt, open spec questions, in-flight git work, and open GitHub issues, then returns a value/effort table with a recommended next action. Use at session start to triage what to work on, especially after a gap when context has faded.
 tools: Bash, Read, Grep, Glob, Write
 ---
 
@@ -43,7 +43,7 @@ Run the deterministic collector once:
 python3 scripts/whats-next.py
 ```
 
-The script emits a single JSON document covering nine sources: `todo_file`, `inline_todos`, `planning_docs`, `feature_plans`, `spec_open_questions`, `in_flight`, `roadmap`, `techdebt`, `gh_issues`. Sections whose source is absent are emitted as `null` or empty arrays — skip those silently.
+The script emits a single JSON document covering seven sources: `todo_file`, `inline_todos`, `spec_open_questions`, `in_flight`, `roadmap`, `techdebt`, `gh_issues`. Sections whose source is absent are emitted as `null` or empty arrays — skip those silently.
 
 `gh_issues` is empty (`[]`) when `gh` is not on PATH or the repo has no GitHub remote — skip silently. When populated, each entry has `number`, `title`, `url`, `updatedAt`.
 
@@ -57,7 +57,7 @@ This step prevents stale TODOs from polluting the recommendation. For every cand
 
 - TODO mentions a file/script/skill name → `Glob` to check it exists
 - TODO mentions a feature keyword → `git log --oneline --grep "{keyword}"` to find shipping commits
-- Feature-plan task references a function/module → `Grep` for it
+- Todo or tech-debt entry references a function/module → `Grep` for it
 - GitHub issue (`gh#NNN`) — open issues frequently have a fix shipped without the issue closing. Run `git log --oneline --grep "#NNN"` to find a closing or referencing commit; if found, mark the candidate as `⚠️ likely done` and surface as a cleanup candidate suggesting the issue be closed.
 
 Mark items as `🟢 pending`, `⚠️ likely done` (evidence of shipping), or `❓ unclear`. Items marked `⚠️ likely done` are reported as cleanup candidates, not work candidates.
@@ -104,8 +104,8 @@ If two items tie, prefer the one with explicit user signal (most recent edit, me
 
 | # | Item | Source | Value | Effort | Recommend |
 |---|------|--------|-------|--------|-----------|
-| 1 | {short description} | docs/TODO.md:NN | High | 2h | do now |
-| 2 | {short description} | docs/plan/foo-plan.md:NN | Medium | 1h | do next |
+| 1 | {short description} | docs/todo.md:NN | High | 2h | do now |
+| 2 | {short description} | docs/techdebt.md (DATE) | Medium | 1h | do next |
 | 3 | {short description} | docs/spec/bar.md (Open Q) | Low | ≤1h | defer |
 | 4 | {observation} | docs/techdebt.md (2026-04-02) | Medium | 1–3h | do next |
 | 5 | {issue title} | gh#42 | Medium | 2h | do next |
@@ -124,7 +124,7 @@ If two items tie, prefer the one with explicit user signal (most recent edit, me
 
 ### Suggested next action
 **#1 — {item title}**
-Source: {source — e.g. `docs/TODO.md:NN`, `docs/plan/foo-plan.md`, `docs/techdebt.md (DATE)`}
+Source: {source — e.g. `docs/todo.md:NN`, `docs/techdebt.md (DATE)`, `docs/spec/{feature}.md`}
 Value/Effort: {value} / {effort}
 Why: {1–2 sentences explaining the value/effort win and any dependency context}
 First step: {concrete file or command to start with}
@@ -134,8 +134,6 @@ First step: {concrete file or command to start with}
 - Inline TODOs: N
 - Techdebt: N
 - GH issues: N
-- Planning docs: N
-- Feature plans: N
 - Open questions: N
 - Roadmap: n/a | present
 ```
@@ -146,7 +144,7 @@ If nothing is pending:
 
 ```
 ## What's Next — {date}
-✅ No pending items found across TODOs, plans, specs, or in-flight git work.
+✅ No pending items found across TODOs, tech debt, specs, or in-flight git work.
 ```
 
 ---

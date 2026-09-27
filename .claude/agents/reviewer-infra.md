@@ -321,14 +321,12 @@ Always perform these checks across files together:
 
 - 🔴 The `check` recipe must invoke the quality check script (e.g. `python3 scripts/check.py`) with flags consistent with what CI runs — drift between `just check` and the CI workflow means "green locally" ≠ "green in CI"
 - 🟡 If `scripts/release.py` is the canonical release tool, the `release` recipe should delegate to it — no release logic should live directly in the justfile
-- 🟡 Database-related recipes (`migrate`, `clean-db`) should document required prerequisites (running DB, correct `DATABASE_URL`) in their doc comment
-- 🟡 The `generate-types` recipe uses `--features generate-bindings` — verify this matches the feature name declared in `src-tauri/Cargo.toml`
-- 🔵 A `prepare-sqlx` recipe (`cd src-tauri && cargo sqlx prepare`) would make it easy for developers to regenerate `.sqlx/` files before releasing — currently undiscoverable
+- 🟡 Database-related recipes (`db-migrate`, `prepare-sqlx`) should document required prerequisites (correct `DATABASE_URL`) in their doc comment
+- 🟡 A recipe needs a caller — CI, a git hook, a skill, an agent or a script — or a line in `CLAUDE.md` § Commands as a tool people run; a new recipe with neither is dead code, and a change that removes a recipe's last caller removes the recipe
 
 ### Safety
 
-- 🟡 Destructive recipes (e.g. `clean-db` which deletes `.local/*`) should print a warning or require confirmation — `just` has no built-in "are you sure?" prompt
-- 🔵 `clean-branches` uses `git branch -D` (force delete) — flag for awareness; stale branch detection via `': gone]'` grep is fragile if git output format changes
+- 🟡 Destructive recipes (deleting files or data) should print a warning or require confirmation — `just` has no built-in "are you sure?" prompt
 
 ---
 
