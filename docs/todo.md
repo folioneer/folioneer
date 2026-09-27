@@ -17,7 +17,14 @@
 <!-- The human's queue: references (#NNN or TD-NNN) in the order to work them. The agent -->
 <!-- takes the first ready one, never edits this list, and stops when it is empty. -->
 
-Nothing queued.
+1. #046
+2. #048
+3. TD-033
+4. #047
+5. #044
+6. TD-042
+7. #012
+8. TD-035
 
 ## #009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
