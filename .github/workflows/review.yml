@@ -53,7 +53,7 @@ jobs:
           # never fires on a file the agent would refuse (an empty-result halt
           # writes no report, and no report fails the check).
           backend=$(has '^src-tauri/.*\.rs$')
-          frontend=$( { grep -Ev '^e2e/' <<<"$files" || true; } | grep -Eq '\.(ts|tsx)$' && echo true || echo false)
+          frontend=$(has '^src/.*\.(ts|tsx)$')
           sql=$(has '^src-tauri/migrations/')
           # reviewer-infra FP: the .mjs and the two gate files are in
           # the agent's own `## Files in scope` list.

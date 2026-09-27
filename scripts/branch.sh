@@ -16,7 +16,7 @@ set -euo pipefail
 # diff (BASE..HEAD) unioned with uncommitted work (staged, unstaged, untracked)
 # — one path per line, no headers. Filters narrow the list:
 #   --rust          *.rs
-#   --frontend      *.ts / *.tsx, excluding e2e/
+#   --frontend      *.ts / *.tsx under src/
 #   --arch          *.rs / *.ts / *.tsx, excluding e2e/
 #   --e2e           e2e/**/*.test.ts
 #   --migrations    src-tauri/migrations/* (or migrations/* at the root)
@@ -73,10 +73,7 @@ files)
         case "$1" in
         --uncommitted-only) UNCOMMITTED_ONLY=1 ;;
         --rust) FILTER='\.rs$' ;;
-        --frontend)
-            FILTER='\.(ts|tsx)$'
-            EXCLUDE='^e2e/'
-            ;;
+        --frontend) FILTER='^src/.*\.(ts|tsx)$' ;;
         --arch)
             FILTER='\.(rs|ts|tsx)$'
             EXCLUDE='^e2e/'

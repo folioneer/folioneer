@@ -400,6 +400,10 @@ class QualityChecker:
             self._record_failure(name, str(e))
             return False
 
+    def runs_sqlx_prepare_check(self) -> bool:
+        """The full SQLx check runs in CI and for a release (--strict), not in the local loop."""
+        return self.strict_mode or os.environ.get("CI") == "true"
+
     def check_sqlx(self) -> bool:
         if self._maybe_skip_for_stack(
             "sqlx",
@@ -435,6 +439,14 @@ class QualityChecker:
                 "Unstaged changes in .sqlx/. Run 'just prepare-sqlx' and stage the result.",
             )
             return False
+
+        if not self.runs_sqlx_prepare_check():
+            # `cargo sqlx prepare --check` makes cargo rebuild the crate afterwards
+            # (about three minutes here); locally the offline build already fails
+            # on a query missing from .sqlx/, and CI runs the full check.
+            self._vprint(f"{INFO}⏩ SQLx prepare check left to CI.{RESET}")
+            self._set_metric("sqlx", STATUS_PASS)
+            return True
 
         success = self.run_step(
             "SQLx Prepare Check",

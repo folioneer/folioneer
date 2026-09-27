@@ -63,7 +63,7 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
 4. **Implement** to green, the right way (§ 6). Logic that lands in the frontend is a
    harness failure, not a style remark.
 5. **Self-check** — `just harness`: architecture rules, lint, type-check, build, both
-   suites with coverage, the coverage floors.
+   suites; `just harness --coverage` adds the coverage floors, run before the first push.
 6. **Self-review** — run the reviewer agents that match the diff (§ 7); apply the
    triage policy; run them again until no 🔴 remains. CI runs them again on every
    push as the enforced record.
@@ -98,9 +98,13 @@ deleted in the closure commit; the visual proofs are the record.
 
 ## 5. The harness
 
-`just harness` locally; the same set as required checks on every pull request. Both
-measure coverage only for a layer the change touched (`scripts/changed-scope.sh`): a
-docs, strings or CI change pays lint and build, never a coverage run. The git hooks
+`just harness` locally; the same set as required checks on every pull request, except
+coverage and the E2E suite, which are CI's (`just harness --coverage` measures coverage
+locally too). Both run only the layers a change touched (`scripts/changed-scope.sh`): a
+docs, strings or CI change pays lint and build, never a coverage run. The full SQLx
+check (`cargo sqlx prepare --check`) runs only in CI and for a release: it makes cargo
+rebuild the crate, and the local offline build already fails on a query missing from
+`.sqlx/`. The git hooks
 run only the fast checks for the same scope; a Markdown-only change costs Prettier
 and nothing else.
 

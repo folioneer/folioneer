@@ -45,7 +45,7 @@ If no `.ts` / `.tsx` files under `src/` are in the branch diff, halt with the re
 
 ### Step 1 — Discover changed frontend files
 
-Run `bash scripts/branch.sh files --frontend`. The `--frontend` filter excludes `e2e/` paths — E2E test files are `reviewer-e2e`'s lane and must not be reviewed here. If the result is empty, halt — output the empty-result refusal in `## Output format` and stop.
+Run `bash scripts/branch.sh files --frontend`. The `--frontend` filter keeps `.ts` / `.tsx` files under `src/` only — E2E test files are `reviewer-e2e`'s lane, and root config files (`wdio.conf.ts`, `vite.config.ts`) are `reviewer-infra`'s. If the result is empty, halt — output the empty-result refusal in `## Output format` and stop.
 
 ### Step 2 — Load conventions
 

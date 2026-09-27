@@ -3,14 +3,20 @@
 #
 # The diff against main (committed, staged, unstaged and untracked files) is
 # classified by scripts/changed-scope.sh, and only the layers it touches pay
-# their lint, build, tests and coverage. Architecture rules, the sync format
-# snapshot invariant, the scripts' own unit tests and the dependency licence
-# check always run. A
-# docs or strings change measures no coverage: nothing it did can move the
-# number, and CI measures it the same way.
+# their lint, build and tests. Architecture rules, the sync format snapshot
+# invariant, the scripts' own unit tests and the dependency licence check always
+# run. Coverage is CI's gate; `--coverage` measures it here too, against the
+# floors — before a first push, when patch coverage must hold.
 #
-# Use: just harness          (or: bash scripts/harness.sh)
+# Use: just harness [--coverage]   (or: bash scripts/harness.sh [--coverage])
 set -euo pipefail
+
+coverage=false
+case "$#:${1:-}" in
+    0:) ;;
+    1:--coverage) coverage=true ;;
+    *) echo "usage: harness.sh [--coverage]" >&2; exit 2 ;;
+esac
 
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 cd "$PROJECT_ROOT"
@@ -37,28 +43,26 @@ bash scripts/sync-format-check.sh "$base"
 python3 -m unittest discover -s scripts/tests -p "test_*.py"
 python3 scripts/licence-check.py
 
+if [ "$scope" = none ] || [ "$scope" = docs ]; then
+    echo -e "${GREEN}✅ No code moved — architecture rules only.${NC}"
+    exit 0
+fi
+
 case "$scope" in
-    none|docs)
-        echo -e "${GREEN}✅ No code moved — architecture rules only.${NC}"
-        ;;
-    frontend)
-        python3 scripts/check.py --frontend --skip-tests
-        just coverage-fe
-        just coverage-gate --frontend
-        ;;
-    backend)
-        python3 scripts/check.py --backend --skip-tests
-        just coverage-be
-        just coverage-gate --backend
-        ;;
-    both)
-        python3 scripts/check.py --skip-tests
-        just coverage-fe
-        just coverage-be
-        just coverage-gate
-        ;;
-    *)
-        echo "unknown scope: $scope" >&2
-        exit 1
-        ;;
+    frontend) layer=(--frontend) ;;
+    backend) layer=(--backend) ;;
+    both) layer=() ;;
+    *) echo "unknown scope: $scope" >&2; exit 1 ;;
+esac
+
+if [ "$coverage" = false ]; then
+    python3 scripts/check.py "${layer[@]}"
+    exit 0
+fi
+
+python3 scripts/check.py "${layer[@]}" --skip-tests
+case "$scope" in
+    frontend) just coverage-fe; just coverage-gate --frontend ;;
+    backend) just coverage-be; just coverage-gate --backend ;;
+    both) just coverage-fe; just coverage-be; just coverage-gate ;;
 esac
