@@ -65,9 +65,9 @@ test-scripts:
 arch-check *ARGS:
     python3 scripts/arch-check.py {{ARGS}}
 
-# The merge gate, locally, scoped to what moved (scripts/harness.sh): architecture rules always; lint + build, tests with coverage and the floor only for the layers the diff touches
-harness:
-    bash scripts/harness.sh
+# The merge gate, locally, scoped to what moved (scripts/harness.sh): architecture rules always; lint, build and tests for the layers the diff touches; --coverage adds coverage and its floors
+harness *ARGS:
+    bash scripts/harness.sh {{ARGS}}
 
 # Run pending database migrations. Override `URL=...` to target a different DB.
 db-migrate URL="sqlite:.local/dev_check.sqlite":
@@ -120,3 +120,13 @@ format:
     @if [ -d src-tauri ]; then cd src-tauri && cargo clippy --fix --allow-dirty --quiet; else echo "ℹ skipping clippy (no src-tauri/)"; fi
     @if [ -f package.json ]; then npm run format:fix; else echo "ℹ skipping format:fix (no package.json)"; fi
     @if [ -f package.json ]; then npx prettier --write "**/*.md" --ignore-path .gitignore; else echo "ℹ skipping prettier docs (no package.json)"; fi
+
+# Create a git worktree beside this checkout on a new branch off main, sharing node_modules so its git hooks run (usage: just worktree <branch>)
+worktree BRANCH:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dir="../$(basename "$PWD")-$(echo "{{BRANCH}}" | tr '/' '-')"
+    [ -d node_modules ] || { echo "❌ no node_modules here — run just install first"; exit 1; }
+    git worktree add -b "{{BRANCH}}" "$dir" main
+    ln -s "$PWD/node_modules" "$dir/node_modules"
+    echo "✅ $dir on {{BRANCH}} — remove with: git worktree remove $dir"

@@ -6,7 +6,7 @@ on:
   # run leaves a required check "Expected" forever and the PR can never merge.
   # Instead the job starts every time and decides inside itself (#041): a pull
   # request of records only (scripts/e2e-scope.py) reports green in a minute,
-  # anything the suite can execute pays for the ~20-min Tauri build. Pushes to
+  # anything the suite can execute pays for the build and the suite. Pushes to
   # main keep the filter — nothing gates on them.
   pull_request:
     branches: [main]

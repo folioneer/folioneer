@@ -66,7 +66,8 @@ control; i18n for every string; one event per action. Gold layout for new files.
 
 ## Step 5 — Harness
 
-`just harness`. Fix until green. A coverage floor under its value is fixed with
+`just harness` while working; `just harness --coverage` before the first push, so the
+coverage CI judges holds. Fix until green. A coverage floor under its value is fixed with
 tests, never by editing `coverage-gates.json` downward; an architecture violation is
 fixed in code, never by editing `arch-allowlist.json` upward.
 

@@ -135,6 +135,10 @@ export const config: Options.Testrunner = {
     process.env.LANG = "en_US.UTF-8";
     process.env.LANGUAGE = "en";
     process.env.LC_ALL = "en_US.UTF-8";
+    // No accessibility bus runs under Xvfb: without this, GTK waits ~30 s for one at
+    // every application start (the AT-SPI warning in the log), once per spec file.
+    // The suite drives the app through WebDriver, not assistive technology.
+    process.env.NO_AT_BRIDGE = "1";
     // Ephemeral DB: wipe any leftover from a previous interrupted run, then
     // create a fresh dir and expose it to the binary via env var.
     if (existsSync(E2E_DATA_DIR)) rmSync(E2E_DATA_DIR, { recursive: true, force: true });
