@@ -19,7 +19,7 @@ Produce or supersede an ADR — `docs/adr/{NNN}-{slug}.md` — and keep `docs/ad
 
 ## When to use
 
-- **A decision passes the 3-criteria gate** (see below) — typically flagged via `ADR-SUGGESTED` in a spec's `## Open Questions` by `spec-writer` or `spec-reviewer`
+- **A decision passes the 3-criteria gate** (see below) — typically flagged as a possible ADR candidate by `spec-reviewer`, or by the main agent while running an entry
 - **Superseding a past decision** — a prior ADR is no longer correct; the new one explains why
 - **Indexing existing ADRs** — refresh `docs/adr/README.md` after manual edits or imports
 
@@ -71,7 +71,7 @@ This block is the canonical source for the gate. `adr-reviewer` references it; d
 
 ### 1. Identify intent and validate the gate
 
-a. **Resolve intent**. The user or another agent (e.g. `spec-writer`) will request one of:
+a. **Resolve intent**. The user or the main agent will request one of:
 
 - **Create** a new ADR
 - **Supersede** an existing ADR
@@ -81,7 +81,7 @@ If the intent is ambiguous, use `AskUserQuestion`.
 
 b. **Validate the 3-criteria gate** before writing anything. Use `AskUserQuestion` to confirm each of the three criteria holds (one yes/no per criterion). If any criterion fails, refuse per the Output format and exit. Do not proceed silently.
 
-c. **Always confirm before writing**. Even when the intent is unambiguous (e.g. invoked by `spec-writer` after an `ADR-SUGGESTED`), surface the proposed decision to the user with `AskUserQuestion` and wait for explicit approval. Never auto-create.
+c. **Always confirm before writing**. Even when the intent is unambiguous (e.g. requested by the main agent while running an entry), surface the proposed decision to the user with `AskUserQuestion` and wait for explicit approval. Never auto-create.
 
 ---
 
@@ -193,6 +193,6 @@ If `docs/adr/` does not exist, create it together with `README.md`.
 
 ADRs are deliberately rare. Most decisions belong in the spec (rules), in convention docs (coding standards), or are obvious from the code itself. The 3-criteria gate exists to keep `docs/adr/` valuable: a directory with five real ADRs is a reference; a directory with fifty mixed-quality ADRs is noise.
 
-The interactive confirmation in Step 1.c is non-negotiable. `spec-writer` flags `ADR-SUGGESTED` candidates as part of its Open Questions output, but the user — not the agent chain — decides whether to elevate them. That gate prevents agents from filling `docs/adr/` with auto-generated decisions the user never ratified.
+The interactive confirmation in Step 1.c is non-negotiable. Reviewers and the main agent may flag ADR candidates, but the user — not the agent chain — decides whether to elevate them. That gate prevents agents from filling `docs/adr/` with auto-generated decisions the user never ratified.
 
 `adr-reviewer` is the paired validator. It runs after this skill produces or supersedes a file, and it cross-references back to the canonical 3-criteria gate above. Edit the gate language here only — the reviewer follows.

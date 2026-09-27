@@ -1,6 +1,6 @@
 ---
 name: contract-reviewer
-description: Reviews a domain contract (docs/contracts/{domain}-contract.md) against its source spec for coverage, traceability, error exhaustiveness, and type correctness. Blocks progression to `/feature-planner` on critical findings. Run after /contract produces or updates the contract. Not for producing or amending the contract — use `/contract` instead.
+description: Reviews a domain contract (docs/contracts/{domain}-contract.md) against its source spec for coverage, traceability, error exhaustiveness, and type correctness. Blocks the pull request on critical findings. Run whenever a contract changes (Workflow C § 7). Not for producing or amending the contract — the main agent does that.
 tools: Read, Grep, Glob
 model: opus
 ---
@@ -13,16 +13,16 @@ sound enough to anchor test stubs and a TypeScript API.
 
 ## Not to be confused with
 
-- **`/contract`** — the upstream skill that produces or updates the contract. This agent never rewrites the contract; it reports issues for the user to correct via `/contract`.
-- **`/feature-planner`** — the downstream consumer that turns the validated contract into an implementation plan. Run this agent before `/feature-planner`, not after.
+- **The main agent** updates the contract when a command, a type or an error changes (Workflow C). This agent never rewrites the contract; it reports issues for the main agent to fix.
+- **`spec-reviewer`** — reviews the spec the contract derives from; this agent reviews the contract.
 
 ---
 
 ## When to use
 
-- **After `/contract`** — once the contract is written or updated, before `/feature-planner` consumes it
-- **Before `/feature-planner`** — validates the contract anchors test stubs and the TypeScript API correctly
-- **After `/contract` re-runs** — when the user fixes findings and re-emits the contract, run again
+- **Whenever a contract changes** — in the pull request that changes a command, a type or an error (Workflow C § 7)
+- **Against the bindings** — validates the contract matches `src/bindings.ts` and the spec it derives from
+- **After the findings are fixed** — run again until no 🔴 remains
 
 ---
 
@@ -74,7 +74,7 @@ From the **contract**: collect every command (name, args, return, errors) and ev
 
 - 🔴 A command that performs a mutation (create / update / delete) has no error variants at all
 - 🔴 An error case explicitly described in a spec rule is absent from the command's Errors column
-- 🔴 A command lists only generic catch-all error variants (`DbError`, `InternalError`, `Unknown`) — `/contract` rejects these alone; named domain-specific failure modes from the spec are required (catch-alls are acceptable only as a fallback alongside named variants)
+- 🔴 A command lists only generic catch-all error variants (`DbError`, `InternalError`, `Unknown`) — the contract rejects these alone; named domain-specific failure modes from the spec are required (catch-alls are acceptable only as a fallback alongside named variants)
 - 🔴 A command accepts a parameter identifying an entity from another bounded context (a
   foreign-domain ID) but has no corresponding error variant for that entity not being found —
   cross-context existence checks must surface as typed errors on the mutating command, not as
@@ -113,11 +113,11 @@ From the **contract**: collect every command (name, args, return, errors) and ev
   aggregate and its contract; if not, own the command in the dominant aggregate and surface
   side-effects as typed errors and domain events. Sign-off required before proceeding.
 
-#### H — `/contract` invariants
+#### H — Contract invariants
 
-These checks enforce the load-bearing principle that `/contract` upholds: the contract normalizes a frontend ↔ backend interface, so commands must correspond to frontend-callable backend operations. A bug in `/contract` or a hand-edited contract can violate these invariants.
+These checks enforce the load-bearing principle a contract upholds: the contract normalizes a frontend ↔ backend interface, so commands must correspond to frontend-callable backend operations. An edit to the contract can violate these invariants.
 
-- 🔴 The contract was upserted from a spec with no frontend-callable backend rules — `/contract` should have aborted (frontend-only or backend-internal-only feature). Investigate why this contract was written; either the spec gained frontend-callable rules since `/contract` ran, or the file was hand-edited.
+- 🔴 The contract was upserted from a spec with no frontend-callable backend rules — no contract should have been written (frontend-only or backend-internal-only feature). Investigate why this contract was written; either the spec lost its frontend-callable rules, or the contract was edited without them.
 - 🔴 A command exists in the contract but its source spec rule describes internal-only logic (cron jobs, startup tasks, scheduled workers, system monitors with no frontend caller). Internal-only operations have no interface to normalize and must not appear as commands.
 
 ### Step 4 — Output
@@ -154,11 +154,11 @@ Output the review to the conversation using `## Output format` below.
 ### G — Scope integrity
 ✅ None.
 
-### H — `/contract` invariants
+### H — Contract invariants
 🔴 `process_overnight_reconciliation`: source spec rule PAY-100 describes a scheduled job ("runs nightly at 02:00 UTC") with no frontend caller — internal-only logic must not appear as a command.
 
 Review complete: 4 critical, 2 warning(s).
-Ready for /feature-planner: no — blocked by 4 critical finding(s).
+Ready to merge: no — blocked by 4 critical finding(s).
 ```
 
 If a section has no issues, write `✅ None.`
@@ -177,7 +177,7 @@ If all checks pass:
 
 ```
 Review complete: 0 critical, N warning(s).
-Ready for /feature-planner: yes — 0 critical findings.
+Ready to merge: yes — 0 critical findings.
 ```
 
 ---
@@ -186,8 +186,8 @@ Ready for /feature-planner: yes — 0 critical findings.
 
 1. Read-only — never edit the contract or the spec
 2. Report against command names and spec rule IDs, not line numbers
-3. Every 🔴 finding blocks progression to `/feature-planner` — the user must fix the contract
-   (re-run `/contract`) and re-run this reviewer before continuing
+3. Every 🔴 finding blocks the pull request — the main agent fixes the contract and re-runs
+   this reviewer before continuing
 4. 🟡 warnings are non-blocking but must be listed — the user decides whether to address them
 5. Do not invent checks beyond the categories above
 6. Use `[DECISION]` on a 🔴 finding when the resolution requires a domain design choice that

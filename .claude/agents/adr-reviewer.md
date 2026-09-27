@@ -17,13 +17,12 @@ Given an ADR file (or all ADRs in `docs/adr/`), surface findings against the pro
 
 - `adr-writer` — authors and supersedes ADRs; this agent only reviews
 - `spec-reviewer` — validates spec rules; flags 🔵 _Possible ADR candidate_ but does not check ADR structure
-- `plan-reviewer` (Section D — ADR adherence) — validates that the implementation plan surfaces ADR constraints in tasks; does not validate the ADRs themselves
 
 ---
 
 ## When to use
 
-- **After `adr-writer` creates or supersedes an ADR** — green-light is required before downstream consumers (`/feature-planner`, `reviewer-arch`) cite the ADR as a constraint
+- **After `adr-writer` creates or supersedes an ADR** — green-light is required before `reviewer-arch` and the specs cite the ADR as a constraint
 - **Before a release sweep** — pass with no argument to review every ADR in `docs/adr/` and the index in one pass
 - **After importing or hand-editing an ADR** — manual edits skip `adr-writer`'s gate; this agent catches the drift
 
@@ -34,7 +33,7 @@ Given an ADR file (or all ADRs in `docs/adr/`), surface findings against the pro
 - **Authoring or fixing an ADR** — use `adr-writer` (this agent is read-only)
 - **Validating spec rules** — use `spec-reviewer`; this agent assumes the spec is already validated
 - **Checking that the implementation honours an ADR's constraint** — use `reviewer-arch`; this agent reviews the ADR file, not the code
-- **Resolving ADR ↔ spec contradictions** — surface the conflict via Section F; let the user decide which side wins via `adr-writer` (supersede) or `spec-writer` (amend)
+- **Resolving ADR ↔ spec contradictions** — surface the conflict via Section F; let the user decide which side wins: supersede the ADR via `adr-writer`, or amend the spec
 
 ---
 
@@ -120,7 +119,7 @@ The canonical gate lives in the `adr-writer` skill (`## The 3-criteria gate` sec
 
 #### F — Cross-spec consistency
 
-ADR ↔ spec alignment is also enforced downstream by `spec-reviewer` (rule-vs-ADR check) and `plan-reviewer` Section D (ADR-adherence in tasks). This agent runs _first_, at ADR-edit time, so contradictions get caught before they propagate to the spec or plan. If a finding here matches one a downstream reviewer will also raise, that is expected — the user fixes once, all three pass.
+ADR ↔ spec alignment is also enforced by `spec-reviewer` (rule-vs-ADR check). This agent runs at ADR-edit time, so contradictions get caught before they propagate to the specs. If a finding here matches one `spec-reviewer` also raises, that is expected — fixed once, both pass.
 
 - 🔴 ADR contradicts an active spec rule. Example: ADR mandates `i64` for amounts but spec rule REF-020 specifies `f64`. State both sides; do not pick a winner (Critical Rule 5).
 - 🟡 ADR's referenced feature, entity, or context no longer appears in `docs/spec/*.md` or `ARCHITECTURE.md` — the decision may have outlived its subject.
@@ -195,4 +194,4 @@ Ready to lock in: yes — 0 critical findings. / no — blocked by N critical fi
 2. **Every 🔴 finding blocks the ADR from being treated as locked-in** — until resolved, downstream agents (reviewer-arch, contract-reviewer) should not cite it as a constraint.
 3. **The 3-criteria gate is the most important check** — an ADR that doesn't meet it pollutes `docs/adr/` and dilutes the value of the real ones. Be willing to flag 🔴 here even when structure looks clean.
 4. **Report findings against ADR identifier (e.g. "ADR-003 — Status missing supersedes back-reference")** not against line numbers. ADRs are referenced by number in many places; the number is the stable handle.
-5. **No spec-rule rewriting** — if an ADR contradicts a spec rule (check F), surface it as a finding and let the user decide which side wins via `spec-writer` or `adr-writer` (supersede). Do not pick a winner.
+5. **No spec-rule rewriting** — if an ADR contradicts a spec rule (check F), surface it as a finding and let the user decide which side wins: amend the spec, or supersede the ADR via `adr-writer`. Do not pick a winner.

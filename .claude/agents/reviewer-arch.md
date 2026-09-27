@@ -29,7 +29,6 @@ Reserved for the sweep the human runs before `just release` — not for per-PR r
 - `reviewer-e2e` — owns `e2e/**/*.test.ts`; this agent excludes E2E test files (scenarios are not DDD-architecture surfaces)
 - `reviewer-sql` — owns `migrations/*.sql`; this agent ignores migration files
 - `reviewer-security` — owns Tauri commands, capabilities, IPC boundaries, unsafe Rust; skip security-sensitive surfaces here
-- `/feature-planner` — translates spec to plan; this agent reviews implementation, not the plan
 
 ---
 

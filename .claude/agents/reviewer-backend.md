@@ -28,7 +28,6 @@ Reserved for the sweep the human runs before `just release` — not for per-PR r
 - `reviewer-sql` — owns `migrations/*.sql`; this agent ignores migration files
 - `reviewer-security` — owns Tauri commands, capabilities, IPC boundaries, unsafe Rust; this agent skips security-sensitive surfaces
 - `reviewer-frontend` — owns `.ts` / `.tsx`; this agent ignores frontend code
-- `test-writer-backend` — writes failing tests before implementation; this agent reviews code after implementation
 
 ---
 

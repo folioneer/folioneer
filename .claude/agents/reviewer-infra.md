@@ -52,6 +52,8 @@ Run `bash scripts/branch.sh files` and filter to the in-scope paths listed in `#
 
 Deleted files are out of scope.
 
+Whether a path exists is read from the commit under review, never from the working tree: in CI the `.claude/` folder may hold the base branch's copy. Before reporting that a changed or deleted file is still referenced, confirm the referring file exists with `git cat-file -e HEAD:<path>`; a reference from a file this diff deletes is no finding.
+
 ### Step 2 — Load conventions
 
 Read `docs/backend-rules.md` if it exists and apply any project-specific infra conventions on top of those below; skip silently if absent. All convention-doc reads are best-effort — never halt on absent files.

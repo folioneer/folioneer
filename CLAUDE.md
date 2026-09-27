@@ -65,7 +65,7 @@ A part with nothing in it gets one line.
 
 **Workflow C** (`docs/workflow-c.md`) is the workflow: `/next-todo` runs the first ready entry of `docs/todo.md` § Next end to end — branch, design gate, acceptance tests first, implement, `just harness`, reviewers with the triage policy, PR, merge on green, closure. One entry per invocation.
 
-Key skills: `/next-todo` (run an entry), `/design-proposal NNN` (mocks for the human to validate), `/visual-proof` (screenshots of changed components), `/review-triage` (grading axes for reviewer findings), `/techdebt` (entry format), `/spec-writer` (business rules for a feature the human is designing in chat), `/contract` (the wire record when commands change), `/adr-writer` (architecture decisions), `/dep-audit` (dependency CVEs, and the terms of the services called — [`docs/external-dependencies.md`](docs/external-dependencies.md)), `/prune` (dead-code audit), `/session-reflect` (end-of-session rule audit).
+Key skills: `/next-todo` (run an entry), `/design-proposal NNN` (mocks for the human to validate), `/visual-proof` (screenshots of changed components), `/review-triage` (grading axes for reviewer findings), `/techdebt` (entry format), `/adr-writer` (architecture decisions), `/dep-audit` (dependency CVEs, and the terms of the services called — [`docs/external-dependencies.md`](docs/external-dependencies.md)), `/prune` (dead-code audit), `/whats-next` (backlog triage).
 Key recipes: `just harness` (the merge gate, locally), `just arch-check` (architecture rules; `--write-allowlist` only lowers the frozen debt), `just coverage-gate` (floors; run `coverage-fe` / `coverage-be` first), `just check` (lint/format), `just check-full` (tests + build + lint), `just format` (auto-fix), `just generate-types` (regenerate Specta bindings), `just merge` (rebase, refuse unless every check on the pull request is green, fast-forward, push, delete branch), `just release` (full validation → semver bump → CHANGELOG → commit + tag + push).
 Key agents: the reviewers matched to the diff, locally until no 🔴 remains and in CI on every push (`docs/workflow-c.md` § 7); `reviewer-security` also before every release; `spec-checker` before closing an entry that carries spec rules; `spec-reviewer` / `contract-reviewer` / `adr-reviewer` when those documents change.
 
@@ -84,7 +84,7 @@ The convention docs are project files: when a rule changes, edit the doc in the 
 
 ### After completion — update the source doc
 
-When work resolves a todo entry, an open question, or a tech-debt observation, update the source doc in the same PR. `docs/techdebt.md` for non-actionable smells, `/spec-writer` + `spec-reviewer` for new business rules, `/contract` + `contract-reviewer` for the matching contract, `/adr-writer` + `adr-reviewer` for architectural decisions. When an empirical failure mode bites (especially external tooling), append an `L-NNN` entry to [`docs/lessons.md`](docs/lessons.md) — symptom / trigger / root cause / mitigation, one screen. Update `ARCHITECTURE.md` if new files/modules were added.
+When work resolves a todo entry, an open question, or a tech-debt observation, update the source doc in the same PR. `docs/techdebt.md` for non-actionable smells, the spec rules written by the main agent + `spec-reviewer`, the matching contract updated by the main agent + `contract-reviewer`, `/adr-writer` + `adr-reviewer` for architectural decisions. When an empirical failure mode bites (especially external tooling), append an `L-NNN` entry to [`docs/lessons.md`](docs/lessons.md) — symptom / trigger / root cause / mitigation, one screen. Update `ARCHITECTURE.md` if new files/modules were added.
 
 ### Task tracking (within a conversation)
 
@@ -119,7 +119,7 @@ Why: a 60-file mixed-layer PR sprawls across concerns; per-layer PRs keep each d
 
 - New code MUST use confirmed UL terms in identifiers, comments, and log messages.
 - Do not extend usage of a discrepant term — fix it or flag it before adding more callsites.
-- When spawning reviewer, spec-writer, or feature-planner agents, include the UL doc in the prompt so they can check term consistency.
+- When spawning reviewer agents, include the UL doc in the prompt so they can check term consistency.
 
 ## 🏗 Architecture Summary
 

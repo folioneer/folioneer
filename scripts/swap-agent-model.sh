@@ -8,8 +8,7 @@ FROM="${1:?from model required}"
 TO="${2:?to model required}"
 AGENTS=(
   contract-reviewer reviewer-arch reviewer-backend reviewer-frontend
-  reviewer-infra reviewer-security spec-reviewer test-writer-backend
-  test-writer-e2e test-writer-frontend
+  reviewer-infra reviewer-security spec-reviewer
 )
 cd "$(dirname "$0")/.."
 for name in "${AGENTS[@]}"; do
