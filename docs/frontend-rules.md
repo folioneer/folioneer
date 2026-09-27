@@ -195,9 +195,9 @@ The reviewer-frontend lane flags any literal string passed to those props.
 
 **F27** — Typed backend errors MUST flow through a 4-layer pipeline. Each layer has one job; silently dropping the error branch is forbidden at every layer. This is the FE consuming side of the backend rejection-layer rule (`ddd-reference.md` § Errors).
 
-1. **Gateway** returns `Result<T, *CommandError>` unchanged — no translation, no swallow. (Already enforced by Specta-generated bindings.)
+1. **Gateway** returns `Result<T, *CommandError>` unchanged — no translation, no swallow, no `throw` (architecture rule A10).
 2. **Hook** branches on `result.status`. For `error`, it MUST either (a) return the typed error as state for the component to render, OR (b) dispatch to a snackbar/toast store. Silently dropping the error branch — or coercing it to a stringified message — is forbidden.
-3. **Presenter** owns the typed-error → i18n-key mapping. The presenter (`shared/presenter.ts`) is a pure function that returns a key string (e.g. `"record_price.error.duplicate_date"`) — no `useTranslation`, no React, no runtime concerns. Trivially unit-testable. Components never inspect `error.code` directly.
+3. **Presenter** owns the typed-error → i18n-key mapping. The presenter (`shared/presenter.ts`) is a pure function that returns a key string (e.g. `"record_price.error.duplicate_date"`) — no `useTranslation`, no React, no runtime concerns. Trivially unit-testable. Components never inspect `error.code` directly. Architecture rule A11 fails on a presenter importing React or react-i18next.
 4. **Component** owns the runtime translation. It calls `t(key)` via `useTranslation` to render the string, surfaced inline (form context) or via snackbar (action context). The component knows nothing about the error's domain shape.
 
 The presenter / component split mirrors the selector / view split in modern React: selectors return data, views handle runtime presentation. Mixing the two would couple the presenter to React's runtime and force tests to mock `useTranslation`.

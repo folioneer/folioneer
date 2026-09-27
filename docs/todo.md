@@ -244,28 +244,6 @@ Decided by the owner on 2026-09-27: a todo entry becomes `TODO-NNN` (today `#NNN
 
 - [ ] Rewrite existing references, or only new ones? (Recommended: rewrite every live file in one pull request, so one format exists at a time; the changelog and git history keep the old form.)
 
-## #050 — (tooling) — One home per rule, a doc map, and instructions that load by path
-
-The rule base must stay meaningful for agents: short, organised, never contradicting itself. Measured 2026-09-27: `CLAUDE.md` is loaded on every turn (248 lines) and restates `ARCHITECTURE.md` (213 lines, part map, part rules, part ADR index); rules are spread over `CLAUDE.md`, `backend-rules`, `frontend-rules`, `e2e-rules`, `i18n-rules`, `test_convention`, `frontend-visual-proof`, `COMMIT_POLICY`, `backend-patterns`, `ddd-reference`, `ddd-divergences` and the ADRs, and two of them contradicted each other (ADR-004 against B24). Research on instruction files (arXiv 2602.11988, 2026) finds they add about 20 % to every request's cost and help only with what an agent cannot infer from the code; Claude Code loads `.claude/rules/*.md` with a `paths:` header when a matching file is read (not when one is written — check first).
-
-Organisation (owner, 2026-09-27) — each kind of rule has one home, others link to it and never restate it:
-
-- **Domain** — the specs (`docs/spec/`, `TRIGRAM-NNN`: business rules) and the vocabulary (`ubiquitous-language.md`: what the domain words mean), both validated by the owner.
-- **Rules** (`docs/*-rules.md`, `B`/`F`/`E`/… IDs) — code organisation, patterns and conventions: backend, frontend, E2E, i18n, and the conventions renamed into the family (`test-rules`, `commit-rules`, `visual-proof-rules`); `backend-patterns` becomes examples under the rules they illustrate; a divergence sits next to the rule it bends.
-- **ADRs** — technical choices costly to reverse, each with its guard; code organisation is not an ADR (ADR-022 withdraws 003/004/005/007 into the rules).
-- **Contracts**, **workflow** (`docs/workflow.md`), **records** (todo, techdebt, lessons, roadmap), **reference** (background only).
-- **Map** — `ARCHITECTURE.md` says where code lives (about 60 lines); the rules it carries move home.
-- **Index** — `CLAUDE.md`: authority, forbidden actions and pointers; everything else is linked.
-
-Aligned with #047: its rule "no business decision in `src/`" lands in `frontend-rules` and `backend-rules` with an ID and an `arch-check` guard, and the frontend rules load whenever `src/` is read, so #047's migration meets the rule by itself.
-
-**User value:** None directly — an agent reads less, finds each rule in one place, and cannot follow one document into breaking another.
-**Done when:** `docs/README.md` states the doc kinds, their homes and the precedence (under 40 lines); every rule has exactly one home — a script lists rule IDs and flags one defined in two places (seen red); the conventions are renamed into the `*-rules.md` family and every reference updated; `ARCHITECTURE.md` is a map of at most 80 lines; `CLAUDE.md` is at most half its current length and keeps only what cannot be inferred; the backend, frontend, E2E and test rules load by path, proved on a sample edit; the reviewer findings of the last 20 pull requests are counted per rule and the most frequent rule becomes a mechanical check (seen red).
-**Design:** none
-**Open questions:**
-
-- [x] Will agents other than Claude work on this repository? — Only Claude for now (owner, 2026-09-27): stay with `CLAUDE.md` alone; no `AGENTS.md`.
-
 ## #014 — (e2e) — Drive a second device in the E2E suite
 
 The multi-device sync E2E covers the single-device critical path only (plan § Halt Artifact H1): `wdio.conf.ts` launches one binary with one `VAULT_COMPASS_E2E_DATA_DIR` and `maxInstances: 1`, so joining a folder another device created (SYN-014/036) is proven by the two-database integration test `src-tauri/tests/sync_two_devices.rs`, not through the UI. A real two-device E2E needs an `e2e/helpers/second_device.ts` that launches a second binary against its own data directory plus a wdio multi-remote configuration — a separate, pre-requisite task before any join scenario is written.

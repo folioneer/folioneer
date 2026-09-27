@@ -134,3 +134,13 @@ Append-only; supersede in place if the underlying ecosystem changes.
 **Root cause** — GitHub retargets pull requests whose _base_ is the renamed branch, but closes those whose _head_ it is. The commits stay on the renamed branch.
 
 **Mitigation** — Name a branch right when it is created. To rename one that already has an open pull request, open a new pull request from the renamed branch and link the closed one; renaming never needs a force-push.
+
+## L-017 — An import inside a path-scoped rule loads at launch, defeating the scope
+
+**First observed**: 2026-09-28 (#050, `.claude/rules/*.md` with a `paths:` header)
+
+**Symptom** — A rule scoped to `src/**` is in the session's context although only a file outside that path was read.
+
+**Root cause** — A rule file's `@path` imports are expanded when the session starts, whatever its `paths:` scope; only the rule's own text waits for a matching read. A canary phrase in a scoped rule without imports loaded only after a matching read.
+
+**Mitigation** — Put no imports in a scoped rule: write a short instruction that names the document to read. Prove a scope with a control — the same question after reading a non-matching file — and log the files the session read (`claude -p … --output-format stream-json`), since a model may read more than asked.

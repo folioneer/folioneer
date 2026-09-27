@@ -27,6 +27,10 @@ Rules (frontend under `src/`, backend under `src-tauri/src/`):
       concrete implementation a context defines (`Sqlite…`, `Fs…`); repository
       traits and services are allowed (B24). A composition root that wires
       the implementations (`use_cases/scheduled_fetch/headless.rs`) is exempt.
+  A10 a gateway never throws: it returns the `Result` of `commands.*` unchanged
+      and the hook branches on it (F27, rule 1)
+  A11 a presenter imports neither React nor react-i18next: it maps a typed
+      error to an i18n key and the component translates (F27, rule 3)
 
 The allowlist is a ratchet: a count above its recorded value fails, a count
 below it fails too until `--write-allowlist` lowers the record. Nothing is
@@ -127,6 +131,28 @@ def a1_gateway_only() -> list[str]:
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if "commands." in line:
                 hits.append(f"A1 {rel(path)}:{number}: `commands.` outside a gateway")
+    return hits
+
+
+def a10_gateways_never_throw() -> list[str]:
+    hits = []
+    for path in frontend_sources(FEATURES):
+        if not path.name.lower().endswith("gateway.ts"):
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if re.search(r"\bthrow\b", without_comments(line)):
+                hits.append(f"A10 {rel(path)}:{number}: a gateway throws — return the Result unchanged")
+    return hits
+
+
+def a11_presenters_stay_pure() -> list[str]:
+    hits = []
+    for path in frontend_sources(FEATURES):
+        if not path.name.lower().endswith("presenter.ts"):
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if re.search(r"from [\"'](react|react-i18next)[\"']", without_comments(line)):
+                hits.append(f"A11 {rel(path)}:{number}: a presenter imports React — return an i18n key")
     return hits
 
 
@@ -370,6 +396,8 @@ def main() -> int:
     hits += ratchet_pairs(state["cross_feature_imports"], recorded.get("cross_feature_imports", []))
     hits += a3_cross_context()
     hits += a9_use_cases_call_services()
+    hits += a10_gateways_never_throw()
+    hits += a11_presenters_stay_pure()
     hits += a4_typed_wire_errors()
     hits += a5_no_raw_interactive()
     hits += ratchet_counts("A6", "id-less interactive tags", state["missing_ids"], recorded.get("missing_ids", {}))
@@ -389,7 +417,7 @@ def main() -> int:
         sum(recorded.get("math_usage", {}).values()),
     )
     print(
-        "✅ architecture check: A1–A9 hold "
+        "✅ architecture check: A1–A11 hold "
         f"(frozen debt: {frozen[0]} cross-feature imports, {frozen[1]} id-less tags, {frozen[2]} Math. uses)"
     )
     return 0
