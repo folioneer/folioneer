@@ -272,6 +272,17 @@ Decided by the owner on 2026-09-27: a todo entry becomes `TODO-NNN` (today `#NNN
 
 - [ ] Rewrite existing references, or only new ones? (Recommended: rewrite every live file in one pull request, so one format exists at a time; the changelog and git history keep the old form.)
 
+## #050 — (tooling) — Instruction files: shorter, scoped by path, readable by other agents
+
+Filed 2026-09-27 after a survey of agent instruction files. Two open formats now span the tools: `AGENTS.md` (read by Codex, Copilot, Cursor, Gemini CLI, OpenCode and 30-odd others) and Agent Skills (`SKILL.md`, which `.claude/skills/` already follows). Research on these files (arXiv 2602.11988, 2026) finds they add about 20 % to every request's cost and help only with what an agent cannot infer from the repository. `CLAUDE.md` is loaded on every turn (248 lines measured the same day) and repeats what `ARCHITECTURE.md` and the rules docs already say; the "mandatory pre-read by task type" is a manual step that path-scoped rules make automatic (`.claude/rules/*.md` with a `paths:` header in Claude Code, `applyTo:` in Copilot) — with known Claude Code bugs to check first: such a rule loads when a matching file is read, not when one is written.
+
+**User value:** None directly — each agent turn carries less text and the right rules arrive by themselves.
+**Done when:** `CLAUDE.md` keeps only what cannot be inferred from the code (workflow, authority, forbidden actions, conventions the code does not show) and is at most half its current length; the backend, frontend, E2E and test rules load by path (or by an equivalent the tool supports reliably, proved on a sample edit); nothing is lost — every removed line is either inferable, in another doc that is read when needed, or dead.
+**Design:** none
+**Open questions:**
+
+- [ ] Will agents other than Claude work on this repository? (If yes: the tool-agnostic part moves to `AGENTS.md` and `CLAUDE.md` imports it with `@AGENTS.md`, adding only what is Claude-specific. If no: stay with `CLAUDE.md` alone.)
+
 ## #014 — (e2e) — Drive a second device in the E2E suite
 
 The multi-device sync E2E covers the single-device critical path only (plan § Halt Artifact H1): `wdio.conf.ts` launches one binary with one `VAULT_COMPASS_E2E_DATA_DIR` and `maxInstances: 1`, so joining a folder another device created (SYN-014/036) is proven by the two-database integration test `src-tauri/tests/sync_two_devices.rs`, not through the UI. A real two-device E2E needs an `e2e/helpers/second_device.ts` that launches a second binary against its own data directory plus a wdio multi-remote configuration — a separate, pre-requisite task before any join scenario is written.
