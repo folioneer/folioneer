@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # next-todo.sh — run one ready entry of docs/todo.md § Next headless.
 #
-# The local form of the scheduled runner (docs/workflow-c.md § 9): one entry per
+# The local form of the scheduled runner (docs/workflow.md § 9): one entry per
 # run, three hours of wall clock, nothing asked of a human. Edits are accepted
 # (`--permission-mode acceptEdits`); a print-mode run has nobody to answer a
 # prompt, so a command outside .claude/settings.json's allow list is denied and

@@ -8,17 +8,13 @@
 Focus on what the user can do and how it solves the problem.
 Avoid implementation details, file paths, or architecture discussion. -->
 
-## Tests
+## Proof
 
-<!-- Provide a summary of test results -->
-
-- [ ] All React tests passing
-- [ ] All Rust tests passing
-- [ ] Build successful
-- [ ] Linters OK (oxlint, biome, clippy)
+<!-- What proves the change: the tests added or changed, and a screenshot for anything visible.
+CI runs the full gate on every pull request; no checklist to tick by hand. -->
 
 ---
 
 **First contribution?** Add the agreement line from [CLA.md](../CLA.md) to this description — a pull request cannot be merged without it.
 
-**Reference:** See [docs/workflow-c.md](../docs/workflow-c.md) for how work moves.
+**Reference:** See [docs/workflow.md](../docs/workflow.md) for how work moves.

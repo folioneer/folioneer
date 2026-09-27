@@ -1,6 +1,6 @@
 ---
 name: review-triage
-description: Triages reviewer-* findings against the (a)/(b)/(c) per-task discipline before any are applied. Reads `.review/` reports, grades each finding, emits a per-row Follow-up table, and applies the Workflow C policy per grade without halting. Applied after every reviewer batch under Workflow C; also usable standalone after ad-hoc reviewer runs. Routes (b) rows to `/techdebt` — does not replace it.
+description: Triages reviewer-* findings against the (a)/(b)/(c) per-task discipline before any are applied. Reads `.review/` reports, grades each finding, emits a per-row Follow-up table, and applies the workflow's policy per grade without halting. Applied after every reviewer batch under the workflow; also usable standalone after ad-hoc reviewer runs. Routes (b) rows to `/techdebt` — does not replace it.
 tools: Read, Glob, Bash, Write
 ---
 
@@ -93,7 +93,7 @@ Format per `## Output format` below. Every row carries:
 
 ### Step 5 — Apply the policy per grade
 
-No halt. Under Workflow C (`docs/workflow-c.md` § 7) every grade has a mechanical
+No halt. Under the workflow (`docs/workflow.md` § 7) every grade has a mechanical
 follow-up: (a) fix in the PR, (b) `TD-NNN` entry in `docs/techdebt.md`, (c) one-off
 inline `// <reviewer> FP: <reason> — see PR #NN`, (c) pattern → edit the reviewer
 prompt in the same PR. A `[DECISION]` critical becomes an open question on the entry.
@@ -192,7 +192,7 @@ When the batch is clean, the saved report is one line: `## review-triage — {da
 
 The (a)/(b)/(c) discipline this skill encodes is per-task rule 5 in the downstream project's CLAUDE.md (§ Per-task Discipline). The skill is self-contained — it works in projects whose CLAUDE.md doesn't carry the rule, because the grading axes live in Step 3 above.
 
-Under Workflow C (`docs/workflow-c.md` § 7), after a reviewer batch reviewer-\* agents save reports to `.review/`; the next checkbox is `/review-triage`; the agent applies the policy per grade — no halt — and records the table in the PR body.
+Under the workflow (`docs/workflow.md` § 7), after a reviewer batch reviewer-\* agents save reports to `.review/`; the next checkbox is `/review-triage`; the agent applies the policy per grade — no halt — and records the table in the PR body.
 
 If the user picks "Adjust grades" in Step 5, the skill exits without applying anything; the user responds in chat with grade corrections, then re-runs the skill (or the main agent applies the corrected grades manually). The consolidated halt is the design trade — per-row prompting would create 4-12 questions per batch.
 

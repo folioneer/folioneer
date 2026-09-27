@@ -1,4 +1,4 @@
-# Workflow C — the human sets expectations, the harness holds the line
+# Workflow — the human sets expectations, the harness holds the line
 
 The operating manual for how work moves from `docs/todo.md` to a release. Decided
 on 2026-09-12; this document is the rule set, the git history records how it was built.
@@ -44,7 +44,9 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
 1. **Pick** — headless: the first ready entry in Next. In chat: the entry the human
    names (`/next-todo #NNN`); the sentence is the queue, and open questions are asked
    together, once, before anything starts, their answers written into the entry.
-   Branch `c/NNN-slug` (or `c/td-NNN-slug`) off fresh `main`.
+   Branch `<type>/NNN-slug` (or `<type>/td-NNN-slug`) off fresh `main`, where `<type>` is
+   the commit type the change will carry (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`,
+   `ci`); work outside an entry is `<type>/slug`.
 2. **Design gate** — if the entry changes what the user sees (a new screen, a moved or
    added control, a changed layout or wording pattern): produce the proposal (§ 4).
    Headless: set `Design: proposed (screenshots/design/NNN-*.png)`, merge that as a
@@ -54,7 +56,10 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
 3. **Acceptance first** — turn Done when into failing tests: Rust for logic, Vitest for
    rendering, E2E for what a user does. Test names carry `#NNN` (or the `TRIGRAM-NNN`
    rule when the domain has a spec; the agent writes the rule from Done when in the
-   same commit). Confirm red.
+   same commit). A feature in a domain without a spec starts one (`docs/spec/<feature>.md`,
+   its trigram registered in `docs/spec-index.md`). A new or changed command updates the
+   domain's contract (`docs/contracts/<domain>-contract.md`, created with the domain's
+   first command) in the same commit. Confirm red.
 4. **Implement** to green, the right way (§ 6). Logic that lands in the frontend is a
    harness failure, not a style remark.
 5. **Self-check** — `just harness`: architecture rules, lint, type-check, build, both
@@ -68,9 +73,8 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
    each Done when clause with the test that proves it, findings that changed
    something, techdebt filed, screenshots. The commit title is the changelog line.
 9. **Merge**: `just merge`, which refuses until every check on the pull request is green.
-10. **Closure** in the same PR: the entry removed from `docs/todo.md`, and its plan
-    when this pull request is the plan's last; techdebt updated;
-    `ARCHITECTURE.md` if a module appeared; the spec if a rule changed.
+10. **Closure** in the same PR: the entry removed from `docs/todo.md`; techdebt
+    updated; `ARCHITECTURE.md` if a module appeared; the spec if a rule changed.
 11. **Next** entry, or stop (§ 8).
 
 **Release** — the human runs `just release -y` when they choose. It re-runs the full

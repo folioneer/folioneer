@@ -270,15 +270,6 @@ Remove an entry once it has been resolved.
 - User value: None visible today — the market value column and an edited opening balance stop depending on frontend arithmetic, so the two layers cannot disagree on a figure.
 - Done when: `HoldingDetail` carries the market value computed by the backend and the presenter only formats it; the opening-balance correction sends the total and the backend derives the unit price with the rule the creation path uses (TRX-047); the two `math_usage` entries leave `arch-allowlist.json`.
 
-## 2026-09-20 — TD-034 — The contributor documents describe a workflow that no longer exists
-
-- Found by: the main agent, while adding the contribution terms
-- Where: CONTRIBUTING.md (Quality Check, Alternative: Direct Commands, the sample output), .github/pull_request_template.md (the Tests checklist), COMMIT_POLICY.md
-- Severity: 🔵
-- Observation: CONTRIBUTING.md still sends a contributor to `./scripts/check.sh` (gone; the script is `scripts/check.py` behind `just check`), quotes test counts from long ago (110 React, 50 Rust) and offers raw `npm` / `cargo` commands the project rules forbid; the pull-request template asks for a hand-ticked test checklist that CI now answers; none of them mentions the harness, the reviewers or `just merge`; COMMIT_POLICY.md still opens with the name of another project it was copied from. The dead link to a pull-request policy was replaced in #029; the rest was left alone as a second story. Harmless while the only contributor is the owner; it is the first thing an outside contributor reads.
-- User value: None — a newcomer can follow the documents and arrive at a mergeable pull request.
-- Done when: CONTRIBUTING.md and the pull-request template describe `just` recipes, the harness and the checks a pull request passes as they are today, with no command the project forbids.
-
 ## 2026-09-20 — TD-035 — A release leaves the lockfile's own version behind
 
 - Found by: reviewer-infra

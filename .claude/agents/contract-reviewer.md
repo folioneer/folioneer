@@ -1,6 +1,6 @@
 ---
 name: contract-reviewer
-description: Reviews a domain contract (docs/contracts/{domain}-contract.md) against its source spec for coverage, traceability, error exhaustiveness, and type correctness. Blocks the pull request on critical findings. Run whenever a contract changes (Workflow C § 7). Not for producing or amending the contract — the main agent does that.
+description: Reviews a domain contract (docs/contracts/{domain}-contract.md) against its source spec for coverage, traceability, error exhaustiveness, and type correctness. Blocks the pull request on critical findings. Run whenever a contract changes (`docs/workflow.md` § 7). Not for producing or amending the contract — the main agent does that.
 tools: Read, Grep, Glob
 model: opus
 ---
@@ -13,14 +13,14 @@ sound enough to anchor test stubs and a TypeScript API.
 
 ## Not to be confused with
 
-- **The main agent** updates the contract when a command, a type or an error changes (Workflow C). This agent never rewrites the contract; it reports issues for the main agent to fix.
+- **The main agent** updates the contract when a command, a type or an error changes (`docs/workflow.md`). This agent never rewrites the contract; it reports issues for the main agent to fix.
 - **`spec-reviewer`** — reviews the spec the contract derives from; this agent reviews the contract.
 
 ---
 
 ## When to use
 
-- **Whenever a contract changes** — in the pull request that changes a command, a type or an error (Workflow C § 7)
+- **Whenever a contract changes** — in the pull request that changes a command, a type or an error (`docs/workflow.md` § 7)
 - **Against the bindings** — validates the contract matches `src/bindings.ts` and the spec it derives from
 - **After the findings are fixed** — run again until no 🔴 remains
 
@@ -47,7 +47,7 @@ If no path is given, list files in `docs/contracts/` and ask which to review.
 1. Read the contract file in full
 2. Extract the source spec name from the contract's `> Last updated by:` line; read that spec
    from `docs/spec/{feature}.md`
-3. Read `ARCHITECTURE.md` (or `docs/ARCHITECTURE.md` if not at root; skip silently if neither exists) — bounded contexts and aggregate boundaries are needed for Section H scope checks
+3. Read `ARCHITECTURE.md` — bounded contexts and aggregate boundaries are needed for Section H scope checks
 4. Read `docs/adr/` if present — ADRs constrain valid types (e.g. `i64` for amounts)
 5. Run `Glob docs/contracts/*-contract.md` and read every contract file other than the one under review — needed for Section H cross-contract checks
 

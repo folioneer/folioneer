@@ -1,6 +1,6 @@
 # Backend Patterns
 
-Project-owned recipes for idiomatic backend code. Companion to the kit-managed `docs/backend-rules.md` (generic DDD rules) and `docs/ddd-reference.md` (general DDD vocabulary). Both kit docs stay generic; this file captures the **HOW** for this codebase.
+Project-owned recipes for idiomatic backend code. Companion to `docs/backend-rules.md` (generic DDD rules) and `docs/ddd-reference.md` (general DDD vocabulary). Both stay generic; this file captures the **HOW** for this codebase.
 
 Read this when:
 
@@ -115,7 +115,7 @@ See: `src-tauri/src/use_cases/asset_price_fetch/orchestrator.rs`, `src-tauri/src
 
 ## What this file is NOT
 
-- **Not a substitute for `docs/backend-rules.md`** (kit-managed). The kit doc carries generic DDD rules (B0–B43). This file carries this codebase's idiomatic shapes for applying them.
+- **Not a substitute for `docs/backend-rules.md`**, which carries generic DDD rules (B0–B43). This file carries this codebase's idiomatic shapes for applying them.
 - **Not for divergences from textbook DDD** — those go to `docs/ddd-divergences.md`.
 - **Not for architectural layout** — that's `ARCHITECTURE.md`.
 - **Not for tech debt** — that's `docs/techdebt.md`.

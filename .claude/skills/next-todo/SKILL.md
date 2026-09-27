@@ -1,13 +1,13 @@
 ---
 name: next-todo
-description: Runs the first ready entry of the human's Next queue in docs/todo.md end to end under Workflow C — branch, design gate, acceptance tests, implementation, harness, reviewers, PR, merge on green, closure — without asking the human anything; questions go into the entry. Use to advance the backlog autonomously, one entry per invocation.
+description: Runs the first ready entry of the human's Next queue in docs/todo.md end to end under the project workflow — branch, design gate, acceptance tests, implementation, harness, reviewers, PR, merge on green, closure — without asking the human anything; questions go into the entry. Use to advance the backlog autonomously, one entry per invocation.
 tools: Read, Glob, Grep, Write, Edit, Bash, Agent, TaskCreate, TaskUpdate, Monitor
 ---
 
 # Skill — `next-todo`
 
 One invocation, one entry, from `docs/todo.md` § Next to a merged pull request. The
-rules are `docs/workflow-c.md`; this file is the checklist.
+rules are `docs/workflow.md`; this file is the checklist.
 
 ## Step 0 — Preconditions
 
@@ -29,7 +29,8 @@ rules are `docs/workflow-c.md`; this file is the checklist.
 - The opening brief first (CLAUDE.md § Opening and closing a piece of work): Task,
   Scope, Design, Touching. Chat: the first message. Headless: the top of the PR body.
 
-- `git checkout -b c/NNN-<slug>` (or `c/td-NNN-<slug>`).
+- `git checkout -b <type>/NNN-<slug>` (or `<type>/td-NNN-<slug>`), `<type>` being the commit
+  type the change will carry (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `ci`).
 - `TaskCreate` one task per step below; mark each `in_progress` / `completed` as you go.
 
 ## Step 2 — Design gate
@@ -50,7 +51,11 @@ which renders the mocks and flips the line to `proposed (…)`.
 - Translate every clause of Done when into a failing test: Rust for logic, Vitest for
   rendering, E2E for what a user does. Name each test with the ref (`#NNN`) or the spec
   rule (`TRIGRAM-NNN`); when the domain has a spec and the entry adds a rule, write the
-  rule in `docs/spec/<feature>.md` in the same commit.
+  rule in `docs/spec/<feature>.md` in the same commit. A domain without a spec gets one,
+  its trigram registered in `docs/spec-index.md`.
+- A new or changed Tauri command updates `docs/contracts/<domain>-contract.md` (created
+  with the domain's first command) in the same commit; `spec-reviewer` and
+  `contract-reviewer` run on those files in Step 6.
 - Run the suites; confirm the new tests are red. If a clause cannot become a test,
   write it as an open question on the entry, commit that, and stop.
 
@@ -67,7 +72,7 @@ fixed in code, never by editing `arch-allowlist.json` upward.
 
 ## Step 6 — Reviewers
 
-Launch the reviewer agents that match the diff (`docs/workflow-c.md` § 7) in one
+Launch the reviewer agents that match the diff (`docs/workflow.md` § 7) in one
 batch. Grade every finding with `/review-triage`'s axes and apply the policy: (a) fix,
 (b) `TD-NNN` entry, (c) one-off inline comment, (c) pattern → edit the reviewer prompt,
 `[DECISION]` → open question on the entry. Re-run the reviewers until no 🔴 remains.
@@ -101,8 +106,7 @@ repos/{owner}/{repo}/issues/<n>/comments`), grade every finding with
 ## Step 9 — Closure
 
 On the same branch before the merge, or as a follow-up docs PR if forgotten: the
-entry is removed from `docs/todo.md` (and its plan, when this is the plan's last pull
-request); techdebt entries the work resolved are removed; `ARCHITECTURE.md` if a
+entry is removed from `docs/todo.md`; techdebt entries the work resolved are removed; `ARCHITECTURE.md` if a
 module appeared; design proposal images deleted. Then the closing brief (CLAUDE.md §
 Opening and closing a piece of work): what changed for the user, what the project
 accumulated; the PR number and where anything still owed was filed.

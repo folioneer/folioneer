@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> Full architecture reference: [ARCHITECTURE.md](ARCHITECTURE.md) · How work moves: [docs/workflow-c.md](docs/workflow-c.md)
+> Full architecture reference: [ARCHITECTURE.md](ARCHITECTURE.md) · How work moves: [docs/workflow.md](docs/workflow.md)
 
 ## 🔧 First-time Setup
 
@@ -16,7 +16,7 @@ They block direct commits to `main`, validate the conventional-commit format, re
 
 ## 🧭 Who decides what
 
-Four human touchpoints, everything else is the agent's job behind the harness (`docs/workflow-c.md` § 1):
+Four human touchpoints, everything else is the agent's job behind the harness (`docs/workflow.md` § 1):
 
 - The **human** writes `docs/todo.md` (user value, done-when) and its **Next** queue, validates a **design** before anything the user sees changes, and cuts **releases**.
 - The **agent** owns `docs/techdebt.md`, does the task end to end and merges on green. No pull request is validated by a human.
@@ -40,7 +40,7 @@ Each task ships under these constraints (in priority order):
    - **Never maintain known dead code.** Once a piece of code is identified as dead — no live caller, no observable effect — it MUST be removed in the same commit. Surface the audit (live vs dead table) in the PR body and delete.
    - **No transition comments** — no tombstones like `// X was migrated to Y in PR N`. Git history carries the trail. Doc comments describe what the code IS, not what it USED TO BE.
 4. **Coverage when a real gap surfaces** — if a task lands you next to an untested branch / unverified invariant / missing translation assertion in the touched module, add a focused test. The floors in `coverage-gates.json` are a ratchet: raise them in the change that lifts coverage, never lower them.
-5. **Challenge reviewer returns** — every reviewer finding is graded on `/review-triage`'s axes and the outcome recorded in the PR body (`docs/workflow-c.md` § 7): (a) **actionable in scope** → fix now; (b) **actionable but bigger** → `TD-NNN` in `docs/techdebt.md`; (c) **false positive** → one-off: inline `// <reviewer> FP: <reason> — see PR #NN`; pattern: edit the reviewer prompt in the same PR. A `[DECISION]` critical becomes an open question on the entry. "Pre-existing" alone never decides the grade; it only routes through the boyscout test.
+5. **Challenge reviewer returns** — every reviewer finding is graded on `/review-triage`'s axes and the outcome recorded in the PR body (`docs/workflow.md` § 7): (a) **actionable in scope** → fix now; (b) **actionable but bigger** → `TD-NNN` in `docs/techdebt.md`; (c) **false positive** → one-off: inline `// <reviewer> FP: <reason> — see PR #NN`; pattern: edit the reviewer prompt in the same PR. A `[DECISION]` critical becomes an open question on the entry. "Pre-existing" alone never decides the grade; it only routes through the boyscout test.
 6. **PR size target ≤1000 LOC** — insertions + deletions. Not a hard cap; split when a PR crosses it OR tells two stories. The "two stories" check overrides the number.
 
 ## 🧾 Opening and closing a piece of work
@@ -63,13 +63,13 @@ A part with nothing in it gets one line.
 
 ## 🔄 Workflows
 
-**Workflow C** (`docs/workflow-c.md`) is the workflow: `/next-todo` runs the first ready entry of `docs/todo.md` § Next end to end — branch, design gate, acceptance tests first, implement, `just harness`, reviewers with the triage policy, PR, merge on green, closure. One entry per invocation.
+**The workflow** (`docs/workflow.md`): `/next-todo` runs the first ready entry of `docs/todo.md` § Next end to end — branch, design gate, acceptance tests first, implement, `just harness`, reviewers with the triage policy, PR, merge on green, closure. One entry per invocation.
 
 Key skills: `/next-todo` (run an entry), `/design-proposal NNN` (mocks for the human to validate), `/visual-proof` (screenshots of changed components), `/review-triage` (grading axes for reviewer findings), `/techdebt` (entry format), `/adr-writer` (architecture decisions), `/dep-audit` (dependency CVEs, and the terms of the services called — [`docs/external-dependencies.md`](docs/external-dependencies.md)), `/prune` (dead-code audit), `/whats-next` (backlog triage).
 Key recipes: `just harness` (the merge gate, locally), `just arch-check` (architecture rules; `--write-allowlist` only lowers the frozen debt), `just coverage-gate` (floors; run `coverage-fe` / `coverage-be` first), `just check` (lint/format), `just check-full` (tests + build + lint), `just format` (auto-fix), `just generate-types` (regenerate Specta bindings), `just merge` (rebase, refuse unless every check on the pull request is green, fast-forward, push, delete branch), `just release` (full validation → semver bump → CHANGELOG → commit + tag + push).
-Key agents: the reviewers matched to the diff, locally until no 🔴 remains and in CI on every push (`docs/workflow-c.md` § 7); `reviewer-security` also before every release; `spec-checker` before closing an entry that carries spec rules; `spec-reviewer` / `contract-reviewer` / `adr-reviewer` when those documents change.
+Key agents: the reviewers matched to the diff, locally until no 🔴 remains and in CI on every push (`docs/workflow.md` § 7); `reviewer-security` also before every release; `spec-checker` before closing an entry that carries spec rules; `spec-reviewer` / `contract-reviewer` / `adr-reviewer` when those documents change.
 
-**Only prescribed agents.** Launch exclusively the agents this file, a skill or `docs/workflow-c.md` names. Implementation and review fixes are done by the main agent directly — never a general-purpose "implementer" or "fix" agent; a fresh agent lacks the session's settled decisions and drifts.
+**Only prescribed agents.** Launch exclusively the agents this file, a skill or `docs/workflow.md` names. Implementation and review fixes are done by the main agent directly — never a general-purpose "implementer" or "fix" agent; a fresh agent lacks the session's settled decisions and drifts.
 
 ### Mandatory pre-read by task type
 
@@ -107,7 +107,9 @@ Why: a 60-file mixed-layer PR sprawls across concerns; per-layer PRs keep each d
 ## 🛠 Commands
 
 - Dev: `just dev` — a debug build keeps its data and logs in its own folder (`com.folioneer.desktop.dev`, beside the installed application's), never touches the host's daily price-fetch schedule, and `--reset-db` deletes only that development database. `just dev-seed [--replace]` fills the folder with a copy of the installed database, detached from sync and from the daily fetch.
-- Loop: `just next-todo` — one ready entry of `docs/todo.md` § Next, headless (`docs/workflow-c.md` § 9)
+- Loop: `just next-todo` — one ready entry of `docs/todo.md` § Next, headless (`docs/workflow.md` § 9)
+- Setup and figures: `just install` (dependencies) | `just stat` (lines of code per language)
+- A recipe exists because CI, a git hook, a skill, an agent or a script calls it, or because this section lists it as a tool people run; a recipe with neither is dead code and goes.
 - Tests: `just test` (frontend) | `just test-rust` (backend) | `just test-unit` (both)
 - E2E tests: `just test-e2e` (local) | `just test-e2e-headless` (Linux headless). CI runs the suite on every pull request that changes more than records (`scripts/e2e-scope.py`: Markdown, `docs/`, `.claude/` and committed screenshots alone skip it, green in a minute) and on every push to `main` that touches more than those records; the local run on this machine is known-broken (`docs/lessons.md` L-011), so CI is the gate.
 - Security audit: `/security-review` (IPC, capabilities, SQL injection, hardcoded secrets) — Claude Code built-in, run before release alongside `/dep-audit`
@@ -170,7 +172,7 @@ If any of the three fails, **DO NOT refactor** — match the current project sta
 
 ## 📏 Standards
 
-- **Nothing about credentials in public text.** PR bodies, PR comments and commit messages never mention secrets, tokens, keys or how they are handled; that belongs in the workflow file's own comments and in `docs/workflow-c.md`.
+- **Nothing about credentials in public text.** PR bodies, PR comments and commit messages never mention secrets, tokens, keys or how they are handled; that belongs in the workflow file's own comments and in `docs/workflow.md`.
 - **Concise by default.** Everything the agent writes for a reader — review reports, PR bodies, techdebt entries, docs, commit bodies, chat — states each fact once, in the fewest words that keep it verifiable. A finding is one line: location, claim, fix. A PR body says what changed and what proves it, in under 20 lines; the triage table lists only findings that changed something. No restating the diff, no narrative of how something was found, no alternatives the reader did not ask for, no paragraph where a line does. A sentence that a reader cannot act on is cut.
 - **Commits**: Conventional commits (`feat:`, `fix:`, etc.). **Titles target the user, not the developer** — `feat`/`fix` titles are copied into `CHANGELOG.md` (titles only; bodies stay in git history) and shown in-app by the What's-new dialog. Describe the user-visible outcome in plain words: no layer tags (`(FE)`/`(BE)`/"frontend"/"backend"), no rule IDs or trigrams (`SPL-040`), no code identifiers, no abbreviations. The technical why stays in the body (≤2 lines). Titles are ≤72 characters (hook-enforced).
 - **One entry, one commit.** A todo entry, a techdebt entry, or a run of record and documentation updates that follow one another lands on `main` as one commit: review fixes, coverage fix-ups and closure edits belong inside it. Before the first push, run what CI will judge (patch coverage on the changed lines included) and fold everything locally (`git commit --amend`). After a push, a fix is a `git commit --fixup <sha>` commit: `just merge` folds it into the commit it names, and since folding leaves the tested tree as it was, the green checks stand. Never force-push by hand to squash.

@@ -215,7 +215,7 @@ The main agent only sees your terminal message; the file ensures `/review-triage
 
 ## Notes
 
-This agent is the **scenario-quality lane** for E2E tests: the main agent writes the scenarios (Workflow C), this agent audits them.
+This agent is the **scenario-quality lane** for E2E tests: the main agent writes the scenarios (`docs/workflow.md`), this agent audits them.
 
 The split from `reviewer-frontend` happened because the two agents had distinct concerns and distinct trigger surfaces. `reviewer-frontend` audits `.ts` / `.tsx` under `src/` (component code, gateway, presenter). This agent audits `.test.ts` under `e2e/` (scenarios, helpers, selector strategy). They never run on the same file.
 

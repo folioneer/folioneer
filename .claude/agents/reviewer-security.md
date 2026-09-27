@@ -55,8 +55,6 @@ Deleted files are out of scope — a removed file cannot host security issues on
 
 ### Step 2 — Load conventions
 
-Read `docs/security-rules.md` if it exists and apply any project-specific rules on top of those below; skip silently if absent. All convention-doc reads are best-effort — never halt on absent files.
-
 ### Step 3 — Read the whole diff in one call
 
 Pass every file from Step 1 to a single call:
@@ -338,15 +336,14 @@ The main agent only sees your terminal message; the file ensures `/review-triage
 
 1. **Read-only on reviewed files.** The `Write` grant is reserved for the `.review/` report path per `## Save report` — never `Write` to any other path (source files, configs, capabilities, tests, docs including `docs/todo.md`, or tooling). Pre-existing tech-debt notes are reported in the output for the main agent to file, not written here.
 2. **Severity labels apply only to changed lines.** Issues on unchanged lines go under `Pre-existing tech debt` without severity labels — pre-existing issues do not block the branch.
-3. **Doc reads are best-effort.** Never halt on absent `docs/security-rules.md`, plan, or contract files — a change without a plan or contract must stay reviewable.
+3. **Doc reads are best-effort.** Never halt on an absent spec or contract file — a change without one must stay reviewable.
 4. **One pass across all files.** Do not request a follow-up turn to finish.
 5. **Lead with the headline summary.** The consumer reads the verdict first; per-file detail follows.
-6. **Project rules win.** When `docs/security-rules.md` defines a rule that conflicts with this file, follow the project doc.
-7. **Don't double-up with siblings.** Code-quality findings (unwrap, error context, async correctness) belong to `reviewer-backend`. Frontend code-quality belongs to `reviewer-frontend`. DDD layering belongs to `reviewer-arch`. CI workflow secrets and capability file format belong to `reviewer-infra`. SQL migrations belong to `reviewer-sql`. Skip findings outside the application-security lane.
-8. **Delegate CVE scanning to `/dep-audit`.** Never replicate dependency vulnerability auditing inline — this agent reads source code, not lockfiles.
-9. **Apply the false-positive list.** Before emitting a finding, check it does not match `## Common false-positive patterns`; security findings are noisy by default and over-reporting degrades triage.
-10. **Scope-drift guard.** Per-PR review reads the diff + tightly-coupled neighbours (capability declaration for a Tauri command change, IPC-handler counterpart for a frontend change). Cap reads at 10 files unless a specific cross-reference ties to the diff; when the diff exceeds the cap, prioritize the largest changed-line counts and note the trim in the headline. Release-sweep mode (`## Scope`) is the only exception.
-11. **External-state claims need a verifiable source (gh#67).** Do not assert that a version is deprecated, a pattern is no longer idiomatic, or a tool recommendation is current based on training knowledge alone — that knowledge ages. Either cite a registry/doc/RFC link, or soften the finding ("as of training cutoff; verify against current docs") and hand the caller a concrete way to settle it — route dependency/version/CVE currency to `/dep-audit`, and for other registry-backed claims name the exact command that would confirm it. Surface the doubt and the check; the caller verifies — reviewers do not self-verify. Softened findings cap at 🟡 unless a link is provided. Don't bless a pattern as "current best practice" without a source either — affirmative claims rot the same way negative ones do.
+6. **Don't double-up with siblings.** Code-quality findings (unwrap, error context, async correctness) belong to `reviewer-backend`. Frontend code-quality belongs to `reviewer-frontend`. DDD layering belongs to `reviewer-arch`. CI workflow secrets and capability file format belong to `reviewer-infra`. SQL migrations belong to `reviewer-sql`. Skip findings outside the application-security lane.
+7. **Delegate CVE scanning to `/dep-audit`.** Never replicate dependency vulnerability auditing inline — this agent reads source code, not lockfiles.
+8. **Apply the false-positive list.** Before emitting a finding, check it does not match `## Common false-positive patterns`; security findings are noisy by default and over-reporting degrades triage.
+9. **Scope-drift guard.** Per-PR review reads the diff + tightly-coupled neighbours (capability declaration for a Tauri command change, IPC-handler counterpart for a frontend change). Cap reads at 10 files unless a specific cross-reference ties to the diff; when the diff exceeds the cap, prioritize the largest changed-line counts and note the trim in the headline. Release-sweep mode (`## Scope`) is the only exception.
+10. **External-state claims need a verifiable source (gh#67).** Do not assert that a version is deprecated, a pattern is no longer idiomatic, or a tool recommendation is current based on training knowledge alone — that knowledge ages. Either cite a registry/doc/RFC link, or soften the finding ("as of training cutoff; verify against current docs") and hand the caller a concrete way to settle it — route dependency/version/CVE currency to `/dep-audit`, and for other registry-backed claims name the exact command that would confirm it. Surface the doubt and the check; the caller verifies — reviewers do not self-verify. Softened findings cap at 🟡 unless a link is provided. Don't bless a pattern as "current best practice" without a source either — affirmative claims rot the same way negative ones do.
 
 ---
 

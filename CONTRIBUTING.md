@@ -22,85 +22,38 @@ A pull request from someone who has not agreed cannot be merged.
    # Or see: https://github.com/casey/just#installation
    ```
 
-2. **Setup and start developing**:
+2. **Set up and start developing**:
 
    ```bash
-   just dev              # Setup git hooks + start app
-   just start            # Start app with hot reload
-   just --list           # See all available commands
+   git config core.hooksPath .githooks   # the commit and push checks
+   just install                          # dependencies
+   just dev                              # start the app with hot reload
+   just --list                           # every recipe
    ```
 
 3. **Read the policies:**
-   - [How work moves](./docs/workflow-c.md) - Branches, pull requests, the checks a change passes
-   - [Commit Policy](./COMMIT_POLICY.md) - Commit message format
+   - [How work moves](./docs/workflow.md) — branches, pull requests, the checks a change passes
+   - [Commit Policy](./COMMIT_POLICY.md) — commit message format
 
-## Common Commands (using just)
+Always go through a `just` recipe when one exists; do not run `npm`, `cargo` or `sqlx` directly for something the `justfile` covers.
 
-```bash
-just start            # Start application
-just check            # Run all tests and linters
-just test             # Run frontend tests
-just test-rust        # Run backend tests
-just lint             # Run linter
-just format-fix       # Auto-fix formatting
-just generate-types   # Generate TS bindings
-```
-
-See `justfile` or run `just --list` for all available commands.
-
-## Quality Check
-
-Run all tests and linters before pushing:
+## Common Commands
 
 ```bash
-just check              # Full quality check
-just check-verbose      # Detailed output
-
-# Or run the script directly:
-./scripts/check.sh
+just check            # lint and format check, fast
+just format           # auto-fix formatting on both layers
+just test             # frontend tests
+just test-rust        # backend tests
+just harness          # the merge gate, locally: architecture rules, lint, build, tests with coverage for what changed
+just generate-types   # regenerate the TypeScript bindings after changing a command
 ```
 
-Output example:
+## What a pull request passes
 
-```
-| Check              | Status              |
-|:-------------------|:--------------------|
-| React Tests        | ✅ 110 passing      |
-| Rust Lib Tests     | ✅ 50 passing       |
-| Build Application  | ✅ Pass             |
-| Oxlint (main)      | ✅ 0 warnings       |
-| Biome              | ✅ Pass             |
-| Clippy (lib)       | ✅ Pass             |
-```
-
-## Alternative: Direct Commands
-
-If you prefer not to use `just`, you can run commands directly:
-
-### Testing
-
-```bash
-npm test                    # Frontend tests
-cd src-tauri && cargo test  # Backend tests
-```
-
-### Linting
-
-```bash
-npm run lint                              # Frontend
-cd src-tauri && cargo clippy -- -D warnings  # Backend
-```
-
-### GitHub CLI
-
-```bash
-gh pr create                    # Create PR
-gh pr view <NUMBER> --comments  # View PR with comments
-gh pr list                      # List open PRs
-```
+The git hooks run the fast checks for what a commit or push touches. On the pull request, CI runs the full gate: lint and types, both test suites with coverage floors, the architecture rules, the licence check, the E2E suite on the real application (skipped when only records change), and the reviewer agents matched to the diff. A pull request merges only when every check is green. Details: [docs/workflow.md](./docs/workflow.md).
 
 ## Getting Help
 
-- Check [Architecture Guide](./ARCHITECTURE.md) for system design
-- Check [Testing Guide](./TESTING.md) for testing practices
-- See recent merged PRs for examples
+- [Architecture Guide](./ARCHITECTURE.md) for system design
+- [Test conventions](./docs/test_convention.md) for testing practices
+- Recent merged pull requests for examples

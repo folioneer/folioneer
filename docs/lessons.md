@@ -124,3 +124,13 @@ Append-only; supersede in place if the underlying ecosystem changes.
 **Root cause** — For a private repository, GitHub serves release assets only through the API address (`api.github.com/repos/{owner}/{repo}/releases/assets/{id}` with `Accept: application/octet-stream`, answered by a 302 to a short-lived signed address); the web address (`/releases/download/…`) and the manifest generated with web addresses are unusable. `raw.githubusercontent.com` does serve a private file with a valid token, but answers 404, never 401, to a bad one — it hides what the credential cannot reach. The API answers 401 to a malformed token and 404 to one without access.
 
 **Mitigation** — (1) Write the update manifest yourself, with the API asset addresses, and serve it from a fixed address (a file in the repository, read through `raw.githubusercontent.com`). (2) Send the credential in `Authorization` only: it is the header HTTP clients drop when the 302 leaves for the signed host, which would reject it. (3) On a channel that sends credentials, treat 404 as a refusal as well as 401/403. (4) Probe the transport with `curl` on a throwaway release before building anything on it — three requests per address (valid, none, invalid token) settle it.
+
+## L-016 — Renaming a pull request's head branch closes the pull request
+
+**First observed**: 2026-09-27 (a cleanup branch renamed to a new naming convention through the branch-rename API)
+
+**Symptom** — After renaming a branch on GitHub, the open pull request built from it shows as closed; its head still names the old branch, and it cannot be reopened.
+
+**Root cause** — GitHub retargets pull requests whose _base_ is the renamed branch, but closes those whose _head_ it is. The commits stay on the renamed branch.
+
+**Mitigation** — Name a branch right when it is created. To rename one that already has an open pull request, open a new pull request from the renamed branch and link the closed one; renaming never needs a force-push.
