@@ -6,6 +6,8 @@
 //! managed rather than computing one.
 
 /// Tauri commands of the capabilities use case.
+#[cfg(feature = "app")]
 pub mod api;
 
+#[cfg(feature = "app")]
 pub use api::*;

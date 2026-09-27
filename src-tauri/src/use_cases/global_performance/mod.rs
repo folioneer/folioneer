@@ -3,8 +3,10 @@
 //! aggregated in the reference currency; single-account scopes reuse the shared
 //! performance series engine.
 
+#[cfg(feature = "app")]
 mod api;
 mod orchestrator;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use orchestrator::GlobalPerformanceUseCase;

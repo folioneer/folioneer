@@ -3,12 +3,14 @@
 //! on the dates that carry no price, so past valuations stop showing gaps.
 
 /// Tauri command handler (`backfill_holding_price_history`).
+#[cfg(feature = "app")]
 pub mod api;
 /// Flat wire-facing error enum (`PriceHistoryBackfillError`).
 pub mod error;
 /// Orchestrator resolving the held period and fetching the closes in windows.
 pub mod orchestrator;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use error::{PriceHistoryBackfillError, PriceHistoryBackfillTask};
 pub use orchestrator::PriceHistoryBackfillUseCase;

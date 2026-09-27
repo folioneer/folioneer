@@ -3,6 +3,7 @@
 //! per-account refresh (MKT-132).
 
 /// Tauri command handlers for fetch tasks.
+#[cfg(feature = "app")]
 pub mod api;
 /// Background task dispatcher — runs per-asset HTTP fetch + upsert.
 pub mod dispatcher;
@@ -20,6 +21,7 @@ mod serde_check;
 /// Which action started an all-accounts fetch (PMV-010/015).
 pub mod trigger;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use error::{FetchAccountAssetPricesError, FetchAllAssetPricesError, FetchPriceTask};
 pub use guard::FetchGuard;

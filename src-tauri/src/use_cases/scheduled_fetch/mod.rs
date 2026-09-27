@@ -4,6 +4,7 @@
 //! the application invisibly.
 
 /// Tauri command handlers (`configure_scheduled_fetch`, `get_scheduled_fetch_status`).
+#[cfg(feature = "app")]
 pub mod api;
 /// Flat wire-facing error enum (`ScheduledFetchError`).
 pub mod error;
@@ -14,6 +15,7 @@ pub mod orchestrator;
 /// Use-case-owned persistence (`ScheduledFetchRepository`, configuration + run records).
 pub mod repository;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use error::ScheduledFetchError;
 pub use orchestrator::ScheduledFetchOrchestrator;

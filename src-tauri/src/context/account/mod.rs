@@ -1,4 +1,5 @@
 /// Account management API handlers.
+#[cfg(feature = "app")]
 mod api;
 /// Account domain models and traits.
 mod domain;
@@ -9,6 +10,7 @@ mod repository;
 /// Account business logic service.
 mod service;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use domain::*;
 pub use error::AccountError;

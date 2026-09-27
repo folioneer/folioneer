@@ -174,6 +174,7 @@ Target:
 - [x] Where do messages live for a client without the web interface? — Owner, 2026-09-27: the command line speaks English only; its text is minimal and lives in Rust, with no translation.
 - [x] Sorting and searching a table: view state or a query parameter? — A query parameter (owner, 2026-09-27); the interface holds only the user's choice.
 - [x] An ADR? — No (owner, 2026-09-27).
+- [x] ADR-020 guard (reviewer-arch `[DECISION]`, PR #48): the `app` feature decides whether the Tauri shell compiles, not which data source or update channel a build ships — owner, 2026-09-28: amend the sign to "a feature flag deciding which external data source or update channel a build ships" (done in PR #48).
 
 ## #044 — (fullstack) — Record holdings from the command line, without a window
 

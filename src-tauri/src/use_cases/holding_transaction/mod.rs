@@ -6,6 +6,7 @@
 //! Will use `ensure_cash_asset(currency)` (CSH-010 helper) once cash-tracking lands.
 
 /// Tauri command handlers for transaction-recording operations.
+#[cfg(feature = "app")]
 mod api;
 /// Use-case-owned typed errors (composite + application leaf).
 mod error;
@@ -14,6 +15,7 @@ mod orchestrator;
 /// Shared helpers used by the orchestrator.
 mod shared;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use error::{
     DividendError, DividendTask, FreeSharesError, FreeSharesTask, InterestError, InterestTask,

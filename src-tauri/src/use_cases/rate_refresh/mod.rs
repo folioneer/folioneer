@@ -3,12 +3,14 @@
 //! Independent of the External provider and of the price fetch tasks.
 
 /// Tauri command handler (`refresh_currency_rates`).
+#[cfg(feature = "app")]
 pub mod api;
 /// Flat wire-facing error enum (`RateRefreshError`).
 pub mod error;
 /// Orchestrator deriving the holding pairs and delegating to the currency service.
 pub mod orchestrator;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use error::RateRefreshError;
 pub use orchestrator::RateRefreshUseCase;

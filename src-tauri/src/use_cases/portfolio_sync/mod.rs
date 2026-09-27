@@ -3,6 +3,7 @@
 //! BC-local commands (`pause_sync`, `leave_sync`, `rename_sync_device`,
 //! `dismiss_conflict_notice`) stay on `context::sync::api` instead.
 
+#[cfg(feature = "app")]
 mod api;
 mod applier;
 mod error;
@@ -10,6 +11,7 @@ mod orchestrator;
 mod rank_stamper;
 mod snapshot;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use applier::ServiceChangeApplier;
 pub use error::{PortfolioSyncError, PortfolioSyncTask};

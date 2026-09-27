@@ -21,3 +21,8 @@ flags:
     paths:
       - src-tauri/src/
     carryforward: false
+
+# The Tauri shell's composition root (B46) is wiring proven by the E2E suite on the real
+# app, not by unit tests; the local llvm-cov gate still measures it.
+ignore:
+  - "src-tauri/src/app.rs"

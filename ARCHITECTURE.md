@@ -25,7 +25,9 @@ core/                legacy shared bucket: db.rs, event_bus/ (Event enum), logge
                      specta_builder.rs (the command registry), cash.rs
 shared/              gold shared code: domain/record_change.rs (change-log vocabulary),
                      infrastructure/ (app_directories, change_recorder, container, e2e_run, http, scheduler/)
-lib.rs               composition root — wires services, use cases and dispatchers for the window
+lib.rs               the crate root: modules, the headless entry, tracing — the application core
+app.rs               the Tauri shell (feature `app`, B46): wires services, use cases and dispatchers
+                     into the window
 extensions.rs        the one file a build differs by: external data sources and update channel (ADR-020)
 main.rs              entry point; `--scheduled-fetch` runs the daily download without a window
 ```

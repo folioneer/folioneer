@@ -19,5 +19,7 @@ pub use logger::{BACKEND, FRONTEND};
 pub mod specta_types;
 
 /// Tauri-Specta builder configuration.
+#[cfg(feature = "app")]
 mod specta_builder;
+#[cfg(feature = "app")]
 pub use specta_builder::create_specta_builder;

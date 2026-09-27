@@ -34,5 +34,5 @@ Alternatives considered:
 
 ## Guard
 
-- **Reversal looks like**: an external client constructed outside `extensions.rs`, or a feature flag or optional private dependency deciding what a build contains.
+- **Reversal looks like**: an external client constructed outside `extensions.rs`, or a feature flag or optional private dependency deciding which external data source or update channel a build ships (the `app` feature, which decides whether the Tauri shell compiles — B46 — is not one).
 - **Guard**: tests `the_public_build_updates_from_the_configured_endpoint_without_headers` and `the_public_build_names_no_distribution_channel` (`src-tauri/src/extensions.rs`); `reviewer-arch` matches the sign.

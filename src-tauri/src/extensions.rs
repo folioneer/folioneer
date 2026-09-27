@@ -13,6 +13,7 @@ use crate::context::currency::{
 };
 use crate::shared::infrastructure::e2e_run;
 use crate::use_cases::asset_web_lookup::{OpenFigiClient, ReqwestOpenFigiClient};
+#[cfg(feature = "app")]
 use crate::use_cases::update_checker::UpdateChannel;
 
 /// The external data sources of a build.
@@ -22,10 +23,14 @@ pub struct Providers {
     /// history backfill exists (MKT-210).
     pub price: Option<Arc<dyn PriceProvider>>,
     /// Latest exchange rates, tried in order (ADR-009).
+    // Read only by the Tauri shell; the headless core leaves it unread.
+    #[cfg_attr(not(feature = "app"), allow(dead_code))]
     pub rate: Arc<dyn RateProvider>,
     /// Exchange-rate history, for the rate backfills.
     pub rate_history: Arc<dyn RateHistoryProvider>,
     /// Asset lookup by ISIN or name.
+    // Read only by the Tauri shell; the headless core leaves it unread.
+    #[cfg_attr(not(feature = "app"), allow(dead_code))]
     pub asset_lookup: Arc<dyn OpenFigiClient>,
 }
 
@@ -57,6 +62,7 @@ fn price_provider(is_e2e_run: bool) -> anyhow::Result<Option<Arc<dyn PriceProvid
     Ok(None)
 }
 
+#[cfg(feature = "app")]
 /// The channel this build's updates come from: the endpoint of `tauri.conf.json`,
 /// with no request header.
 pub fn update_channel() -> UpdateChannel {
@@ -66,6 +72,8 @@ pub fn update_channel() -> UpdateChannel {
 /// The name of the distribution channel this build belongs to, shown beside its version
 /// (UPD-030) — which build this is, unlike the update channel above, which says where its
 /// updates come from. The public build belongs to none.
+// Read only by the Tauri shell; the headless core leaves it unread.
+#[cfg_attr(not(feature = "app"), allow(dead_code))]
 pub fn distribution_channel() -> Option<&'static str> {
     None
 }
@@ -111,6 +119,7 @@ mod tests {
 
     // #037 — the public build sends no header of its own and names no endpoint: its
     // updates come from the address in `tauri.conf.json`, anonymously.
+    #[cfg(feature = "app")]
     #[test]
     fn the_public_build_updates_from_the_configured_endpoint_without_headers() {
         let channel = update_channel();

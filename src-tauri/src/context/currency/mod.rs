@@ -1,4 +1,5 @@
 /// External API and Tauri command handlers (boundary, BC root per B39).
+#[cfg(feature = "app")]
 pub mod api;
 /// Application layer (the `CurrencyService` orchestrator).
 pub mod application;
@@ -14,6 +15,7 @@ pub mod infrastructure;
 // `#[specta::specta]`-generated companion items re-exported alongside the fns.
 // The boundary helper `rate_f64_to_micros` is private, so only the six commands
 // surface here.
+#[cfg(feature = "app")]
 pub use api::*;
 pub use application::{CurrencyService, ResolvedRate};
 pub use domain::{

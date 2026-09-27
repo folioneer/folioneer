@@ -4,12 +4,14 @@
 //! as-of views) can resolve rates instead of valuing foreign holdings at 0.
 
 /// Tauri command handler (`backfill_currency_rate_history`).
+#[cfg(feature = "app")]
 pub mod api;
 /// Flat wire-facing error enum (`RateHistoryBackfillError`).
 pub mod error;
 /// Orchestrator resolving the range anchor and delegating to the currency service.
 pub mod orchestrator;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use error::RateHistoryBackfillError;
 pub use orchestrator::RateHistoryBackfillUseCase;

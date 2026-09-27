@@ -3,8 +3,10 @@
 //! CSH-010 / CSH-012). The `add_account` command lives here (not in the account
 //! bounded context) because creation now spans the account and asset contexts.
 
+#[cfg(feature = "app")]
 mod api;
 mod orchestrator;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use orchestrator::AccountCreationUseCase;

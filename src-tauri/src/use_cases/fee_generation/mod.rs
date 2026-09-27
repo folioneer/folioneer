@@ -5,12 +5,14 @@
 //! (FEE-040/041/042/043/044/045/047/070).
 
 /// Tauri command handler for `apply_due_fee_deductions`.
+#[cfg(feature = "app")]
 mod api;
 /// Use-case-owned typed errors.
 mod error;
 /// Fee generation orchestrator.
 pub mod orchestrator;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use error::FeeGenerationError;
 pub use orchestrator::{FeeGenerationOrchestrator, LaunchSyncSurface};

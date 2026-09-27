@@ -4,6 +4,7 @@
 
 /// External API and Tauri command handlers (boundary, BC root per B39) — the four BC-local
 /// commands (D3): `pause_sync`, `leave_sync`, `rename_sync_device`, `dismiss_conflict_notice`.
+#[cfg(feature = "app")]
 pub mod api;
 /// Application layer (gold layout, B0/B38): device lifecycle, the sync run and its apply
 /// executor, the join rebuild, the settling-interval batcher, and enrolling as the first
@@ -19,6 +20,7 @@ pub mod error;
 /// SQLite-backed change-log and sync state repositories.
 pub mod infrastructure;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use application::{FirstPublish, JoinError, Publisher, SyncGate, SyncRun, SyncService};
 pub use domain::{

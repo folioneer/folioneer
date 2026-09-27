@@ -20,23 +20,40 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [[bin]]
 name = "generate_bindings"
 path = "dev/generate_bindings.rs"
+required-features = ["app"]
 
 [[bin]]
 name = "folioneer"
 path = "src/main.rs"
+required-features = ["app"]
+
+# `app` is the Tauri shell: the window, the Tauri commands (`api.rs` adapters), the
+# command registry and the updater. Without it the crate is the application core —
+# contexts, use cases, persistence and the headless entry — with no Tauri dependency.
+[features]
+default = ["app"]
+app = [
+    "dep:tauri",
+    "dep:tauri-build",
+    "dep:tauri-specta",
+    "dep:specta-typescript",
+    "dep:tauri-plugin-window-state",
+    "dep:tauri-plugin-updater",
+    "dep:tauri-plugin-dialog",
+]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2", features = [], optional = true }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = [], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "macros"] }
 tokio = { version = "1", features = ["full"] }
 specta = { version = "2.0.0-rc.22", features = ["derive"] }
-tauri-specta = { version = "2.0.0-rc.21", features = ["javascript", "typescript", "derive"] }
-specta-typescript = "0.0.9"
+tauri-specta = { version = "2.0.0-rc.21", features = ["javascript", "typescript", "derive"], optional = true }
+specta-typescript = { version = "0.0.9", optional = true }
 async-trait = "0.1.89"
 anyhow = "1.0.101"
 thiserror = "2"
@@ -45,8 +62,8 @@ chrono = { version = "0.4", features = ["serde"] }
 dirs = "6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-tauri-plugin-window-state = "2.4.1"
-tauri-plugin-updater = "2.10.1"
+tauri-plugin-window-state = { version = "2.4.1", optional = true }
+tauri-plugin-updater = { version = "2.10.1", optional = true }
 iso_currency = "0.5.3"
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "cookies"] }
 sha2 = "0.10"
@@ -58,7 +75,7 @@ argon2 = "0.5.3"
 password-hash = "0.5"
 chacha20poly1305 = "0.11"
 zeroize = { version = "1", features = ["derive"] }
-tauri-plugin-dialog = "2"
+tauri-plugin-dialog = { version = "2", optional = true }
 
 [dev-dependencies]
 mockall = "0.13"

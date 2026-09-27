@@ -267,6 +267,17 @@ jobs:
       - name: Quality checks
         # --skip-tests: the suite runs once, under llvm-cov, two steps below.
         run: python3 scripts/check.py --backend --skip-tests
+      # The application core builds without the Tauri shell (#047, B46): no `app`
+      # feature, and no Tauri crate in its dependency tree.
+      - name: Core builds without Tauri
+        working-directory: src-tauri
+        run: |
+          set -euo pipefail
+          cargo check --lib --no-default-features
+          tree=$(cargo tree -e normal,build --no-default-features --prefix none)
+          if grep -E '^tauri' <<<"$tree"; then
+            echo "::error::a Tauri crate is a dependency of the core"; exit 1
+          fi
       - name: Install cargo-llvm-cov
         # Pinned to full SHA — mutable tags are a supply-chain risk.
         uses: taiki-e/install-action@f48d2f8ba2b452934c948b7be1a768079c3632ff  # v2.79.6

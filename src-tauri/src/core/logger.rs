@@ -8,6 +8,7 @@ pub const BACKEND: &str = "backend";
 
 /// Tauri command allowing the frontend to emit structured log entries
 /// into the backend tracing system (visible in app logs and collect-logs output).
+#[cfg(feature = "app")]
 #[tauri::command]
 #[specta::specta]
 pub fn log_frontend(level: String, message: String) {

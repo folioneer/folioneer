@@ -137,6 +137,14 @@ of the kind it removed, never a generic one followed by a specific one. A new ev
 `core/event_bus/event.rs`, published after persistence, and subscribed in the feature hook that
 re-fetches.
 
+**B46** — Tauri lives only in the `app` feature (on by default): the `api.rs` adapters, `app.rs`
+(the composition root of the window), the command registry, the logger's frontend command and the
+updater. Everything else — contexts, use cases, persistence, the headless entry — is the application
+core and builds without it (`cargo check --lib --no-default-features`), so any other adapter (the
+command line, a server) reuses it. A type an adapter and the core both need lives in the core (e.g.
+`context/asset/dto.rs`). CI's "Core builds without Tauri" step fails when a Tauri crate enters the
+core's dependency tree.
+
 **B16** — `api.rs` is the framework boundary — the only layer that knows Tauri exists.
 Its sole responsibilities are:
 

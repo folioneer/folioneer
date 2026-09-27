@@ -2,12 +2,14 @@
 //! installation last fetched prices — the two figures behind the header's price item.
 
 /// Tauri command handler (`get_price_freshness`).
+#[cfg(feature = "app")]
 pub mod api;
 /// Flat wire-facing error enum (`PriceFreshnessError`).
 pub mod error;
 /// Orchestrator reading the newest held price date and the last fetch on this device.
 pub mod orchestrator;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use error::PriceFreshnessError;
 pub use orchestrator::{PriceFreshness, PriceFreshnessUseCase};

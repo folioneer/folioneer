@@ -5,12 +5,14 @@
 //! The concrete HTTP client ([`ReqwestOpenFigiClient`]) is also re-exported so
 //! that the composition root (`extensions.rs`) can plug it in at startup.
 
+#[cfg(feature = "app")]
 pub mod api;
 /// Typed application-layer error for the web-lookup use case.
 pub mod error;
 pub mod orchestrator;
 pub mod primary_listing_processor;
 
+#[cfg(feature = "app")]
 pub use api::*;
 pub use error::WebLookupError;
 pub use orchestrator::{AssetWebLookupUseCase, LookupMode, OpenFigiClient, ReqwestOpenFigiClient};
