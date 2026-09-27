@@ -146,17 +146,6 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
 
-## #045 — (fullstack) — "Computers synced on" shows a sync that exchanged nothing
-
-The header's sync item reads "Ordinateurs synchronisés le 27/09/2026 14:52" while the sync folder — a USB key — was unplugged, and its warning icon rightly says sync needs attention. A run that cannot reach the folder still ends normally: it records the failure and stamps its end as the moment of the last sync, and the header shows that moment as "synchronised on". Seen by the owner on 2026-09-27 on Linux and on Windows, at the launch sync (SYN-060). The date and the warning contradict each other, and the date is the one a user trusts.
-
-**User value:** The header's sync date says when the computers last exchanged changes, so the user can tell how current the other computer's data is.
-**Done when:** A run that cannot reach the folder, or fails before exchanging anything, leaves the header's date unchanged; a run that exchanged changes, or confirmed there was nothing to exchange, updates it; the warning still names the failure; the rule is in the sync spec and covered by tests.
-**Design:** none
-**Open questions:**
-
-- [ ] Show the last successful sync, keeping the failed attempt only behind the warning — or relabel the date "last attempt"? (Recommended: the last successful sync — the header promises "your computers are in sync as of…", and the warning already covers the attempt.)
-
 ## #044 — (fullstack) — Run Folioneer from the command line, without a window
 
 The same installed program answers a few commands in a terminal, without opening a window: a summary (portfolio total, accounts), a refresh of prices and exchange rates, an export, and an import once #025 exists. Linux and Windows first; macOS when a macOS build exists (none does today). It builds on what the scheduled fetch already does — the program already starts without a window for it.

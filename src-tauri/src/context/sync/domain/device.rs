@@ -196,6 +196,10 @@ pub trait SyncStateRepository: Send + Sync {
     /// every cursor, every held-back change, and every notice. The local portfolio is
     /// untouched.
     async fn discard_device_state(&self) -> Result<(), SyncError>;
+    /// Records `completed_at` as the end of this device's last successful sync (SYN-063).
+    async fn record_last_sync(&self, completed_at: &str) -> Result<(), SyncError>;
+    /// When this device's last successful sync ended, or `None` if none has (SYN-063).
+    async fn get_last_sync(&self) -> Result<Option<String>, SyncError>;
 
     /// Reads the cursor for `device_id`, or `None` if never advanced.
     async fn get_cursor(&self, device_id: &str) -> Result<Option<SyncCursor>, SyncError>;

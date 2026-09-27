@@ -168,6 +168,26 @@ impl SyncStateRepository for SqliteSyncStateRepository {
         Ok(())
     }
 
+    async fn record_last_sync(&self, completed_at: &str) -> Result<(), SyncError> {
+        sqlx::query!(
+            "UPDATE sync_device SET last_synced_at = ? WHERE id = 1",
+            completed_at
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|error| SyncError::database("record_last_sync: update failed", error))?;
+        Ok(())
+    }
+
+    async fn get_last_sync(&self) -> Result<Option<String>, SyncError> {
+        let last_synced_at: Option<Option<String>> =
+            sqlx::query_scalar!("SELECT last_synced_at FROM sync_device WHERE id = 1")
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|error| SyncError::database("last_sync: read failed", error))?;
+        Ok(last_synced_at.flatten())
+    }
+
     async fn discard_device_state(&self) -> Result<(), SyncError> {
         let mut transaction =
             self.pool.begin().await.map_err(|error| {
@@ -419,6 +439,33 @@ mod tests {
         let pool = make_pool().await;
         let repo = SqliteSyncStateRepository::new(pool);
         assert!(repo.get_device().await.unwrap().is_none());
+    }
+
+    // SYN-063 — the last successful sync survives saving the device again (a rename).
+    #[tokio::test]
+    async fn the_last_successful_sync_is_kept_across_device_saves() {
+        let pool = make_pool().await;
+        let repo = SqliteSyncStateRepository::new(pool);
+        repo.save_device(&sample_device()).await.unwrap();
+        assert_eq!(repo.get_last_sync().await.unwrap(), None);
+
+        repo.record_last_sync("2026-09-27T12:52:00Z").await.unwrap();
+        let mut renamed = sample_device();
+        renamed.device_name = "Laptop".into();
+        repo.save_device(&renamed).await.unwrap();
+
+        assert_eq!(
+            repo.get_last_sync().await.unwrap().as_deref(),
+            Some("2026-09-27T12:52:00Z")
+        );
+    }
+
+    // SYN-063 — no device, no last sync.
+    #[tokio::test]
+    async fn without_a_device_there_is_no_last_sync() {
+        let repo = SqliteSyncStateRepository::new(make_pool().await);
+
+        assert_eq!(repo.get_last_sync().await.unwrap(), None);
     }
 
     // SYN-070/072 — saving again overwrites the singleton (paused + renamed).

@@ -81,7 +81,7 @@ struct SyncStatus {
     device_name: Option<String>,                     // None while disabled
     folder: Option<String>,                          // None while disabled
     app_version: String,                             // the application running on this device (SYN-063); stated whether or not sync is enabled
-    last_sync_completed_at: Option<String>,          // None when never synced
+    last_sync_completed_at: Option<String>,          // end of the last run without a failure (SYN-063); kept across restarts; None when never synced
     roster: Vec<RosterEntry>,                        // every other device (SYN-037)
     held_back_count: u32,                            // SYN-041
     oldest_held_back_since: Option<String>,          // None when held_back_count == 0
@@ -193,6 +193,7 @@ Record identity per kind follows CFR-012: accounts, categories, assets, transact
 
 ## Changelog
 
+- 2026-09-27 — #045 (SYN-063): `last_sync_completed_at` is the end of the last run without a failure, stored on the device; a failed run leaves it unchanged. No shape change.
 - 2026-09-19 — SYN-037/063 amended: `SyncStatus.app_version` and `RosterEntry.app_version` added. No command, error or event changes; the manifest's new field is ignored by older builds, so the data format version stays 1 (SYN-038 pins the written form).
 - 2026-09-19 — SYN-064 amended (reverses the 2026-09-12 entry): applying a change raises no event of its own; one `SyncCompleted` per run that applied changes or whose failures or paused state changed, raised after the apply commits, and one per join; every view that shows synced data reloads on it
 - 2026-09-12 — Events row amended: applied holding notes and currency pairs now raise `HoldingNoteUpdated` / `CurrencyPairUpdated` (SYN-064), so `SyncCompleted` no longer stands in for them
