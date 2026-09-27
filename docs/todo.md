@@ -2,7 +2,7 @@
 
 <!-- Add new backlog items here. Format: ## #NNN — (domain) — Short title -->
 <!-- #NNN is a permanent reference: never renumbered, never reused. A new entry takes the -->
-<!-- next free number wherever it is placed. Next free: #046. -->
+<!-- next free number wherever it is placed. Next free: #047. -->
 <!-- Every entry ends with four lines: **User value:**, **Done when:**, **Design:** and -->
 <!-- **Open questions:**. Design is `none` until the agent proposes one (it does so before -->
 <!-- touching anything the user sees), then `proposed (screenshots/design/NNN-*.png)`, then -->
@@ -212,6 +212,19 @@ Proposal: one static page, in French and English, in its own repository publishe
 - [ ] Ready when? (Recommended: after #025 and #026 have shipped.)
 - [ ] A domain from the start, or the free GitHub Pages address first? (`folioneer.com` and `folioneer.app` are registered; they are the natural choice.)
 - [ ] Is the Windows installer to be signed before strangers download it, and how? Today only the updater signature exists (it proves an update comes from the owner; SmartScreen ignores it) — no Windows code signing. The options, prices and eligibility to be checked again when the time comes: (a) SignPath Foundation — free, publisher shown as "SignPath Foundation", open-source licence and CI-built releases required; (b) a Certum open-source certificate — tens of euros a year, the owner's name shown, open-source project required, signing through their cloud service since keys must live on hardware; (c) Azure Trusted Signing — about ten dollars a month, eligibility of individuals depends on the country; (d) a standard certificate with cloud signing — a few hundred euros a year, no open-source condition; (e) no signing, and the page explains the warning. Even signed, the warning lasts until the certificate has earned reputation — which then carries over from one release to the next, whereas an unsigned installer starts from zero each time. (a) and (b) exist only while the licence is open source, which the AGPL-3.0-or-later is. (Recommended: (b) if the owner's name should show, (a) if free matters more.) Wiring any of them is one signing command in the Tauri configuration plus a credential in the release workflow.
+
+## #046 — (tooling) — The quality loop is slow where it does not need to be
+
+The quality goals stay; the time they cost does not have to. Measured on 2026-09-27: the local harness takes 10–20 minutes — the Rust crate compiles twice (the normal build and llvm-cov's instrumented one), cargo is capped at two jobs on a 5.2 GB machine, and a harness run in the background is killed. `just merge` rebases, and a rebase re-runs every check (about 20 minutes with E2E) — four times that day on pull requests whose files did not overlap. A worktree has no `node_modules`, so its hooks fail until linked. The reviewer agents run locally and again in CI on each push.
+
+Decided by the owner on 2026-09-27: done after v0.3.0; the local gate may be faster than CI's as long as CI keeps the full gate (coverage, E2E) on every pull request.
+
+Proposal: measure first — time each harness step and each CI job — then change what the numbers point at. Candidates: a local gate of lint, types, tests and architecture rules in minutes, coverage left to CI; a faster linker (mold) and cargo-nextest; cached build outputs (sccache) shared by the local and instrumented builds; no CI re-run when a rebase leaves the pull request's own changes and the files they build on unchanged; a `just worktree` recipe that sets up hooks and dependencies; reviewer triggers narrowed to the lanes a diff touches.
+
+**User value:** None directly — changes reach the owner sooner, at the same quality.
+**Done when:** Before and after timings of each harness step and CI job are recorded; the local gate finishes in under five minutes on this machine; CI still runs coverage and E2E on every pull request that changes code; a rebase that changes nothing a pull request builds on does not re-run its checks; hooks work in a fresh worktree.
+**Design:** none
+**Open questions:** none
 
 ## #043 — (tooling) — The agent tooling still describes workflows that no longer run
 
