@@ -163,23 +163,25 @@ Target:
 **Open questions:**
 
 - [x] Before or with #044? — Before (owner, 2026-09-27): the command line calls the application API instead of reaching into services.
-- [ ] Where do messages live for a client without the web interface? (Recommended: Rust owns an English and French catalog for the command line; the window keeps its own translations of the same codes.)
-- [ ] Sorting and searching a table: view state or a query parameter? (Recommended: a query parameter — any other interface needs it too — with the interface holding only the user's choice.)
-- [ ] An ADR? (Recommended: yes — costly to reverse and it shapes every later feature.)
+- [x] Where do messages live for a client without the web interface? — Owner, 2026-09-27: the command line speaks English only; its text is minimal and lives in Rust, with no translation.
+- [x] Sorting and searching a table: view state or a query parameter? — A query parameter (owner, 2026-09-27); the interface holds only the user's choice.
+- [x] An ADR? — No (owner, 2026-09-27).
 
-## #044 — (fullstack) — Run Folioneer from the command line, without a window
+## #044 — (fullstack) — Record holdings from the command line, without a window
 
-The same installed program answers a few commands in a terminal, without opening a window: a summary (portfolio total, accounts), a refresh of prices and exchange rates, an export, and an import once #025 exists. Linux and Windows first; macOS when a macOS build exists (none does today). It builds on what the scheduled fetch already does — the program already starts without a window for it.
+The same installed program answers commands in a terminal without opening a window. First, adding an existing asset to an existing account as an opening balance (quantity and total cost, no cash movement); second, a buy or a sell of an existing asset in an existing account. Linux and Windows first; macOS when a macOS build exists (none does today). It calls the application API #047 builds, and starts the way the scheduled fetch already does.
 
-**User value:** Check the portfolio or refresh it from a terminal or a script, without opening the application.
-**Done when:** To be written once the open questions are answered — at least: the chosen commands work on Linux and Windows without a window, print readable text, and exit with a code a script can test.
+On Windows the release program is built without a console (`windows_subsystem = "windows"` in `main.rs`), so as it stands PowerShell shows none of its output and does not wait for its exit code: the command line needs a console of its own — attaching to the parent's, or a second small executable. From WSL, a Windows program can be started by its `/mnt/c/…` path and works on the Windows data; the Linux build run inside WSL would open a separate, empty portfolio.
+
+**User value:** Record a holding, a buy or a sell from a terminal or a script, without opening the application.
+**Done when:** On Linux and Windows (PowerShell), without a window: a command adds an opening balance of an existing asset to an existing account, and commands record a buy and a sell, each validated by the same Rust rules as the window; each prints minimal English text by default and JSON with `--json`, and exits with a code a script can test (0 done, non-zero refused, with the reason); a writing command refuses while the application window is open; the Windows program's output reaches PowerShell and its exit code is returned; the full path to call it from PowerShell is documented, and calling it from WSL is documented if it works.
 **Design:** none
 **Open questions:**
 
-- [ ] Which commands come first? (Recommended: `summary` and `refresh`; export and import later.)
-- [ ] What happens when the application is open while a command writes? (Recommended: writing commands refuse while it runs; reading commands always work.)
-- [ ] Plain text only, or JSON as well? (Recommended: text by default, `--json` for scripts.)
-- [ ] How is it started on Windows, where the installer adds nothing to the `PATH`? (Recommended: document the full path first; a `PATH` entry later.)
+- [x] Which commands come first? — Owner, 2026-09-27: adding an existing asset to an existing account (an opening balance, not a buy or a sell); then a buy or a sell of an existing asset in an existing account.
+- [x] What happens when the application is open while a command writes? — The command refuses (owner, 2026-09-27).
+- [x] Plain text only, or JSON as well? — Text by default, `--json` for scripts (owner, 2026-09-27).
+- [x] How is it started on Windows? — The full path from PowerShell, documented; from WSL too if it works (owner, 2026-09-27).
 
 ## #039 — (service) — A hosted price feed the application can subscribe to (deferred)
 
@@ -235,6 +237,33 @@ Proposal: measure first — time each harness step and each CI job — then chan
 **Done when:** Before and after timings of each harness step and CI job are recorded; the local gate finishes in under five minutes on this machine; CI still runs coverage and E2E on every pull request that changes code; a rebase that changes nothing a pull request builds on does not re-run its checks; hooks work in a fresh worktree.
 **Design:** none
 **Open questions:** none
+
+## #048 — (tooling) — An ADR exists to stop an agent reversing a decision
+
+The owner keeps ADRs for one purpose (2026-09-27): ensure an agent does not reverse an architectural decision. Today nothing ties the 16 ADRs to that purpose: the admission gate asks whether a decision is complex, not obvious and costly to reverse, but no reviewer reads the ADRs, and an ADR does not say what a reversal would look like in a diff. The ADR-017 → ADR-021 exchange shows the cost of the ceremony without the protection.
+
+Proposal:
+
+- **Gate:** one question replaces the three criteria — would an agent reading only the code plausibly undo this, and would undoing it be costly?
+- **Template:** Context, Decision, and two new lines: **Reversal looks like** (the concrete signs in a diff, e.g. "a dependency on the private repository in `Cargo.toml`") and **Guard** (the architecture rule, test or reviewer check that fails on it). Pros and cons shrink to what the guard protects.
+- **Reviewers:** `reviewer-arch` reads every accepted ADR's reversal signs and reports a matching diff as a 🔴 `[DECISION]` — an open question for the owner, never fixed or waived by the agent. Only the owner supersedes an ADR.
+- **Audit:** each existing ADR gets its reversal signs and guard, or is marked superseded when nothing is left to protect.
+
+**User value:** None directly — a decision the owner took stays taken without the owner watching every pull request.
+**Done when:** `adr-writer` and `adr-reviewer` use the one-question gate and the new template; every accepted ADR states its reversal signs and guard, and each mechanical guard has been seen red; `reviewer-arch` flags a diff that matches a reversal sign as a 🔴 `[DECISION]` (proved on a sample diff).
+**Design:** none
+**Open questions:** none
+
+## #049 — (tooling) — References name what they point at: TODO-NNN, DEBT-NNN, ghNN
+
+Decided by the owner on 2026-09-27: a todo entry becomes `TODO-NNN` (today `#NNN`), a tech-debt entry `DEBT-NNN` (today `TD-NNN`), and a GitHub issue `ghNN`. Today `#043` reads like pull request #43 on GitHub, where it also links to the wrong thing. Measured the same day: `TD-NNN` appears 53 times in 10 files, a `#0NN` todo reference in 47 files, `gh#NN` 16 times; three scripts parse the formats (`scripts/next-todo.sh`, `scripts/check.py`, `scripts/release.py`), as do the skills (`/next-todo`, `/techdebt`, `/review-triage`, `/whats-next`), `CLAUDE.md` and `docs/workflow-c.md`.
+
+**User value:** None directly — a reference says what it points at and no longer collides with a pull request number.
+**Done when:** The three formats are written into `CLAUDE.md`, `docs/workflow-c.md` and the skills; the scripts parse and emit the new forms, with a test each; every live file uses them (`docs/todo.md`, `docs/techdebt.md`, specs, lessons, code comments and test names); a check fails on an old-form reference in a changed file (seen red); `CHANGELOG.md` and git history stay as they are.
+**Design:** none
+**Open questions:**
+
+- [ ] Rewrite existing references, or only new ones? (Recommended: rewrite every live file in one pull request, so one format exists at a time; the changelog and git history keep the old form.)
 
 ## #014 — (e2e) — Drive a second device in the E2E suite
 
