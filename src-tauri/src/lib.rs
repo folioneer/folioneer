@@ -327,7 +327,12 @@ pub fn run() {
                     Arc::clone(&price_fetch_log),
                 )));
 
-                // MKT-210, MKT-211, SPF-070 — what fetches prices, and what the interface is told.
+                // MKT-211, UPD-030 — what the interface is told about this build.
+                app_handle.manage(Capabilities::of_build(
+                    price_provider.is_some(),
+                    extensions::distribution_channel(),
+                ));
+                // MKT-210, SPF-070 — what fetches prices.
                 manage_price_fetching(
                     &app_handle,
                     price_provider,
@@ -386,18 +391,14 @@ struct PriceFetchingParts {
     price_fetch_log: Arc<dyn PriceFetchLogRepository>,
 }
 
-/// MKT-210, MKT-211, SPF-070 — the three paths that fetch prices exist only with an
-/// External provider, and the interface is told which kind of build this is. Without
-/// one no fetching use case is managed, so no command reaches a half-built one, and a
-/// scheduled fetch a build with a provider registered is taken away.
+/// MKT-210, SPF-070 — the three paths that fetch prices exist only with an External
+/// provider. Without one no fetching use case is managed, so no command reaches a
+/// half-built one, and a scheduled fetch a build with a provider registered is taken away.
 fn manage_price_fetching<R: tauri::Runtime>(
     app_handle: &tauri::AppHandle<R>,
     price_provider: Option<Arc<dyn PriceProvider>>,
     parts: PriceFetchingParts,
 ) {
-    app_handle.manage(Capabilities {
-        external_provider: price_provider.is_some(),
-    });
     let Some(price_provider) = price_provider else {
         tauri::async_runtime::spawn(async {
             drop_schedule_without_provider(platform_scheduler().as_ref()).await;
@@ -568,15 +569,14 @@ mod tests {
         }
     }
 
-    // MKT-210, MKT-211 — without an External provider no fetching use case exists, so
-    // no command can reach one, and the interface is told so.
+    // MKT-210 — without an External provider no fetching use case exists, so no command
+    // can reach one.
     #[tokio::test]
     async fn a_build_without_an_external_provider_manages_no_fetching_use_case() {
         let app = tauri::test::mock_app();
 
         manage_price_fetching(app.handle(), None, parts().await);
 
-        assert!(!use_cases::capabilities::get_capabilities(app.state()).external_provider);
         assert!(app.try_state::<Arc<AssetPriceFetchUseCase>>().is_none());
         assert!(app.try_state::<Arc<ScheduledFetchOrchestrator>>().is_none());
         assert!(app
@@ -584,7 +584,7 @@ mod tests {
             .is_none());
     }
 
-    // MKT-211 — with one, the three fetching paths exist and the interface is told so.
+    // MKT-210 — with one, the three fetching paths exist.
     #[tokio::test]
     async fn a_build_with_an_external_provider_manages_the_three_fetching_use_cases() {
         let app = tauri::test::mock_app();
@@ -595,7 +595,6 @@ mod tests {
             parts().await,
         );
 
-        assert!(use_cases::capabilities::get_capabilities(app.state()).external_provider);
         assert!(app.try_state::<Arc<AssetPriceFetchUseCase>>().is_some());
         assert!(app.try_state::<Arc<ScheduledFetchOrchestrator>>().is_some());
         assert!(app

@@ -177,6 +177,7 @@
     "title": "À propos",
     "description": "Folioneer est un gestionnaire de portefeuille personnel conçu pour suivre vos actifs financiers sur plusieurs comptes. Il vous permet d'enregistrer vos achats, de surveiller vos positions et de suivre votre coût de revient dans le temps. Toutes les données sont stockées localement sur votre appareil.",
     "version_label": "Version",
+    "channel_private": "Build privé",
     "check_updates": "Vérifier les mises à jour",
     "checking": "Vérification…",
     "up_to_date": "L'application est à jour.",
@@ -343,7 +344,9 @@
   "shell": {
     "sidebar_collapse": "Réduire le menu",
     "sidebar_expand": "Développer le menu",
-    "sidebar_version": "Version : {{version}}"
+    "sidebar_version": "Version : {{version}}",
+    "sidebar_version_channel": "Version : {{version}} · {{channel}}",
+    "channel_private": "privé"
   },
   "app": {
     "migration_error": "Une erreur est survenue lors de la mise à jour de la base de données. Veuillez contacter le support.",

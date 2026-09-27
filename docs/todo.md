@@ -163,7 +163,7 @@ Last step, once the private build runs and updates itself on both of the owner's
 **Design:** none
 **Open questions:**
 
-- [ ] How does the private build say what it is? `X.Y.Z+private` as the version risks the Windows installer's version rules (unverified), so private releases are named "(private)" and the About page shows the public version number meanwhile. (Recommended: a line on the About page fed by the extension file — a small public change with a design mock.)
+- [x] How does the private build say what it is? `X.Y.Z+private` as the version risks the Windows installer's version rules (unverified), so private releases are named "(private)" and the About page shows the public version number meanwhile. (Recommended: a line on the About page fed by the extension file — a small public change with a design mock.) — A channel name beside the version, not inside it: an About chip and a sidebar suffix, fed by the extension file (UPD-030), landed before the first private release (2026-09-27).
 - [x] If the probe shows self-update from private releases is not workable, is "notify, then a recipe downloads and installs" acceptable on both computers? (Recommended: yes — one user, two computers.) — Yes (2026-09-25); not needed, the probe showed self-update works.
 
 ## #039 — (service) — A hosted price feed the application can subscribe to (deferred)

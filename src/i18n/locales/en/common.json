@@ -177,6 +177,7 @@
     "title": "About",
     "description": "Folioneer is a personal portfolio manager designed to track your financial assets across multiple accounts. It lets you record purchases, monitor your positions, and follow your cost basis over time. All data is stored locally on your device.",
     "version_label": "Version",
+    "channel_private": "Private build",
     "check_updates": "Check for updates",
     "checking": "Checking…",
     "up_to_date": "The application is up to date.",
@@ -343,7 +344,9 @@
   "shell": {
     "sidebar_collapse": "Collapse menu",
     "sidebar_expand": "Expand menu",
-    "sidebar_version": "Version: {{version}}"
+    "sidebar_version": "Version: {{version}}",
+    "sidebar_version_channel": "Version: {{version}} · {{channel}}",
+    "channel_private": "private"
   },
   "app": {
     "migration_error": "A database migration error occurred. Please contact support.",

@@ -465,12 +465,28 @@ describe("store — the build's capabilities (MKT-211)", () => {
   // MKT-211 — init reads the answer before the application counts as initialised, so
   // no screen is drawn from the default.
   it("holds the build's answer once initialised", async () => {
-    mockGetCapabilities.mockResolvedValueOnce({ external_provider: false });
+    mockGetCapabilities.mockResolvedValueOnce({
+      external_provider: false,
+      distribution_channel: null,
+    });
 
     const cleanup = useAppStore.getState().init();
     await vi.waitFor(() => expect(useAppStore.getState().isInitialized).toBe(true));
 
     expect(useAppStore.getState().hasExternalProvider).toBe(false);
+    cleanup();
+  });
+  // UPD-030 — the channel the build belongs to is held for the version display.
+  it("holds the build's channel once initialised", async () => {
+    mockGetCapabilities.mockResolvedValueOnce({
+      external_provider: true,
+      distribution_channel: "private",
+    });
+
+    const cleanup = useAppStore.getState().init();
+    await vi.waitFor(() => expect(useAppStore.getState().isInitialized).toBe(true));
+
+    expect(useAppStore.getState().distributionChannel).toBe("private");
     cleanup();
   });
 });

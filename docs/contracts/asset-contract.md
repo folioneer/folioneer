@@ -86,7 +86,7 @@
 
 ### Capabilities
 
-> `get_capabilities` is implemented in `use_cases/capabilities/`. It returns the answer the composition root settled for the run (MKT-211): whether the build has an External provider. Infallible — the value exists before any window opens.
+> `get_capabilities` is implemented in `use_cases/capabilities/`. It returns the answer the composition root settled for the run (MKT-211): whether the build has an External provider, and the distribution channel it belongs to (UPD-030). Infallible — the value exists before any window opens.
 >
 > In a build without one, `fetch_all_asset_prices`, `fetch_account_asset_prices` and `backfill_holding_price_history` are refused before any work is done (MKT-210): nothing is fetched or written, and the refusal carries no typed code, since no use case exists to answer. The interface never calls them there (MKT-212).
 
@@ -191,6 +191,7 @@ struct PriceFreshness {
 ```rust
 struct Capabilities {
     external_provider: bool, // whether this build has an External provider (MKT-211); constant for the run
+    distribution_channel: Option<String>, // the distribution channel the build belongs to, shown beside its version (UPD-030); None for the public build
 }
 ```
 
@@ -315,3 +316,4 @@ struct PriceHistoryBackfillOutcome {
 - 2026-09-14 — Amended by `price-movement` spec (PMV-027, PMV-028, PMV-046): `PriceMovementRow.movement_amount` and `PriceMovementReport.total_movement_amount` carry the signed amount moved. No new command, type or error.
 - 2026-09-15 — Amended by `market-price` spec (MKT-190–199): new `backfill_holding_price_history` command and `PriceHistoryBackfillOutcome` shared type; not subject to the fetch in-flight guard (MKT-199); `AssetPriceUpdated` also published by a backfill that recorded at least one close.
 - 2026-09-23 — Amended by `market-price` spec (MKT-210–213): new `get_capabilities` command and `Capabilities` shared type. In a build without an External provider the fetch and backfill commands are refused before any work, with the runtime's untyped refusal; the interface never calls them (MKT-212).
+- 2026-09-27 — Amended by `update` spec (UPD-030): `Capabilities` gains `distribution_channel`, the distribution channel the build belongs to.

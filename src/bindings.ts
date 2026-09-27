@@ -1785,7 +1785,9 @@ account_id: string;
  */
 transaction_id: string }
 /**
- * What this build can do (MKT-211). Settled at composition and constant for the run.
+ * What the interface is told about this build: what it can do and which distribution
+ * channel it belongs to (MKT-211, UPD-030). Settled
+ * at composition and constant for the run.
  */
 export type Capabilities = { 
 /**
@@ -1793,7 +1795,12 @@ export type Capabilities = {
  * scheduled fetch and no price history backfill exists (MKT-210), and the
  * interface offers none of them (MKT-212).
  */
-external_provider: boolean }
+external_provider: boolean; 
+/**
+ * The distribution channel this build belongs to, shown beside its version;
+ * `None` for the public build (UPD-030).
+ */
+distribution_channel: string | null }
 /**
  * Enriched view of a fully-closed position (quantity == 0, ACD-044).
  */

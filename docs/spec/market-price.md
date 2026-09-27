@@ -40,11 +40,12 @@ The two figures behind the header's price item (MKT-202). A read model, never pe
 
 ### Capabilities
 
-What this build can do, as reported to the interface (MKT-211). A read model, settled when the application starts and constant for the run; never persisted.
+What the interface is told about this build: what it can do and which distribution channel it belongs to (MKT-211). A read model, settled when the application starts and constant for the run; never persisted.
 
-| Field               | Business meaning                                                                                                                    |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `external_provider` | Whether this build has an External provider; without one no fetch task, price history backfill or scheduled fetch exists (MKT-210). |
+| Field                  | Business meaning                                                                                                                                     |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `external_provider`    | Whether this build has an External provider; without one no fetch task, price history backfill or scheduled fetch exists (MKT-210).                  |
+| `distribution_channel` | The distribution channel the build belongs to — its name, as the build reports it — named beside its version; absent for the public build (UPD-030). |
 
 ### HoldingDetail (extended)
 
@@ -408,7 +409,7 @@ A build may be composed without an External provider ([ADR-020](../adr/020-one-e
 
 **MKT-210 — A build may have no External provider (backend)**: The External provider is optional at composition. A build composed without one has no fetch task — no auto-fetch (MKT-121/122), no global refresh (MKT-130), no account refresh (MKT-131/132) — and no price history backfill (MKT-190). Starting any of them is refused before any work is done: nothing is fetched, nothing is written, and no moment of last fetch is recorded (MKT-201). The scheduled fetch follows the same rule (SPF-070).
 
-**MKT-211 — One answer, settled at start (backend)**: The application reports to its interface whether this build has an External provider. That single answer governs every fetch task, the price history backfill and the scheduled fetch alike. It is settled when the application starts and does not change while it runs.
+**MKT-211 — Answers about the build, settled at start (backend)**: The application reports to its interface whether this build has an External provider, together with its distribution channel (UPD-030). The External provider answer governs every fetch task, the price history backfill and the scheduled fetch alike. These answers are settled when the application starts and do not change while it runs.
 
 **MKT-212 — The interface offers nothing that cannot run (frontend)**: In a build with no External provider (MKT-211) the interface renders no control that starts a fetch task, no price history backfill action on a holding or a closed position, and no price refresh lock (MKT-153), which only matters to a fetch. The Settings page shows no auto-fetch setting (MKT-120) and no scheduled fetch section (SPF-071), and the application starts no auto-fetch (MKT-121). Nothing is greyed out and nothing mentions a feature to come: the controls are absent. The header's price item (MKT-202) keeps "Prices as of" the newest price date — prices typed by hand are recorded prices — and has no tooltip: it says nothing about fetching.
 

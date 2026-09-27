@@ -47,6 +47,8 @@ interface AppState {
   priceFetch: { active: boolean; done: number; total: number };
   // MKT-211 — whether this build has an External provider; read before the router mounts.
   hasExternalProvider: boolean;
+  // UPD-030/031 — the distribution channel this build belongs to; null for the public build.
+  distributionChannel: string | null;
 
   // Loading states
   isLoadingAssets: boolean;
@@ -97,6 +99,7 @@ export const useAppStore = create<AppState>((set, get) => {
     // Every build has had an External provider until now; `init` reads the real answer
     // before `isInitialized` flips, so no screen renders from this default.
     hasExternalProvider: true,
+    distributionChannel: null,
     isLoadingAssets: false,
     isLoadingCategories: false,
     isLoadingAccounts: false,
@@ -167,11 +170,14 @@ export const useAppStore = create<AppState>((set, get) => {
         }
       };
 
-      // MKT-211 — settled for the run; a failure keeps the default and is logged.
+      // MKT-211, UPD-030 — settled for the run; a failure keeps the defaults and is logged.
       const fetchCapabilities = async () => {
         try {
           const capabilities = await getCapabilities();
-          set({ hasExternalProvider: capabilities.external_provider });
+          set({
+            hasExternalProvider: capabilities.external_provider,
+            distributionChannel: capabilities.distribution_channel,
+          });
         } catch (e) {
           logger.error("[store] failed to read the build's capabilities", e);
         }

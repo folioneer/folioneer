@@ -17,6 +17,7 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
   const { t } = useTranslation("common");
   const { checkStatus, handleCheckForUpdate } = useAboutPage();
   const currentVersion = useAppStore((state) => state.appVersion);
+  const distributionChannel = useAppStore((state) => state.distributionChannel);
   const navigate = useNavigate();
 
   // WNW-080 — re-open the current version's changelog via the shell-mounted
@@ -36,6 +37,16 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
         <div className="flex items-baseline gap-3">
           <span className="text-m3-on-surface-variant text-sm">{t("about.version_label")}</span>
           <span className="text-m3-on-surface font-medium font-mono">{currentVersion}</span>
+          {/* UPD-031 — the channel of a build that belongs to one; the public build shows none. */}
+          {distributionChannel && (
+            <span
+              id="about-channel"
+              data-testid="about-channel"
+              className="rounded-full bg-m3-secondary-container px-2.5 py-0.5 text-xs font-medium text-m3-on-secondary-container"
+            >
+              {t(`about.channel_${distributionChannel}`, { defaultValue: distributionChannel })}
+            </span>
+          )}
         </div>
 
         <p className="text-xs text-m3-on-surface-variant">{t("about.license")}</p>

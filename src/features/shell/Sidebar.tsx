@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger";
 import { useAppStore } from "@/lib/store";
 import { IconButton } from "@/ui/components";
 import { NAV_ITEMS } from "./navItems";
+import { SidebarVersion } from "./SidebarVersion";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface SidebarProps {
 export function Sidebar({ isOpen, toggleDrawer }: SidebarProps) {
   const { t } = useTranslation("common");
   const appVersion = useAppStore((state) => state.appVersion);
+  const distributionChannel = useAppStore((state) => state.distributionChannel);
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -105,16 +107,11 @@ export function Sidebar({ isOpen, toggleDrawer }: SidebarProps) {
         </button>
       </nav>
 
-      <div className="px-3 py-4 flex flex-col items-center justify-center min-h-12">
-        <span
-          className={`
-            font-mono text-[14px] tracking-tight transition-opacity duration-300
-            ${isOpen ? "opacity-60" : "opacity-40"}
-          `}
-        >
-          {isOpen ? t("shell.sidebar_version", { version: appVersion }) : `v${appVersion}`}
-        </span>
-      </div>
+      <SidebarVersion
+        appVersion={appVersion}
+        distributionChannel={distributionChannel}
+        isOpen={isOpen}
+      />
 
       <AboutModal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />
     </aside>

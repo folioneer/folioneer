@@ -1,4 +1,4 @@
-# Business Rules — Application Update
+# Business Rules — Application Update (UPD)
 
 ## Context
 
@@ -74,6 +74,12 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-029 — Refused access banner (frontend)**: When an access is refused (UPD-028) — at the startup check, a manual check or a download — the banner shows a message naming the refusal and a "Dismiss" button. It offers no "Retry": trying again cannot succeed until the credentials are fixed and the application restarted. Dismissing closes the banner for the session; it returns at the next launch while the access is still refused.
 
+### Build identity
+
+**UPD-030 — A build may belong to a distribution channel (backend)**: A build may belong to a distribution channel — the owner's private build, a future beta — which says which build it is. It is independent of the update channel of UPD-028, which says where updates come from: a build may have either without the other. The public build belongs to none. A channel is never written into the version number, which is the same in every channel. The build reports its channel with the other answers about itself, settled when the application starts (MKT-211).
+
+**UPD-031 — The channel is named beside the version (frontend)**: A build that belongs to a distribution channel (UPD-030) names it beside its version: on the About page as a chip after the version number ("Private build"), and in the sidebar footer after the version ("· private"), on a second line when the sidebar is collapsed. A channel with no translated name shows the name the build reports. The public build shows its version alone. The application is drawn only once the answer has been read (MKT-211), so the name never appears late.
+
 ### Manual check
 
 **UPD-025 (was R25) — Manual check entry point (frontend)**: The "About" page exposes the current version number and a "Check for updates" button. When the user clicks this button, a check is triggered using the same mechanism as UPD-001.
@@ -134,6 +140,8 @@ Two entry points:
 
 1. **Automatic** — triggered at startup, once the UI is fully loaded (UPD-001).
 2. **Manual** — "Check for updates" button on the "About" page (UPD-025).
+
+The version, on the About page and in the sidebar footer, is followed by the build's distribution channel when it has one (UPD-031).
 
 ### Main component
 

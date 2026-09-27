@@ -48,6 +48,13 @@ pub fn update_channel() -> UpdateChannel {
     UpdateChannel::default()
 }
 
+/// The name of the distribution channel this build belongs to, shown beside its version
+/// (UPD-030) — which build this is, unlike the update channel above, which says where its
+/// updates come from. The public build belongs to none.
+pub fn distribution_channel() -> Option<&'static str> {
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -76,5 +83,11 @@ mod tests {
 
         assert!(channel.endpoints.is_empty());
         assert!(channel.headers.is_empty());
+    }
+
+    // UPD-030 — the public build names no channel: its version shows alone.
+    #[test]
+    fn the_public_build_names_no_distribution_channel() {
+        assert_eq!(distribution_channel(), None);
     }
 }
