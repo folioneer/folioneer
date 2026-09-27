@@ -230,8 +230,8 @@ impl PortfolioSyncOrchestrator {
             .await?
             .ok_or(SyncError::SyncDisabled)?;
         device.ensure_not_paused()?;
-        let report = self.sync_run.run(&device, &self.applier).await?;
-        self.sync_service.remember_run(&report);
+        let mut report = self.sync_run.run(&device, &self.applier).await?;
+        self.sync_service.remember_run(&mut report).await;
         Ok(report)
     }
 
@@ -259,7 +259,7 @@ impl PortfolioSyncOrchestrator {
             .await
             .map_err(|problem| SyncError::FolderUnavailable { problem })?;
         let resumed = device.resume()?;
-        let report = self.sync_run.run(&resumed, &self.applier).await?;
+        let mut report = self.sync_run.run(&resumed, &self.applier).await?;
         if let Some(problem) = report.failures.iter().find_map(|failure| match failure {
             SyncFailure::FolderUnavailable { problem } => Some(*problem),
             _ => None,
@@ -269,7 +269,7 @@ impl PortfolioSyncOrchestrator {
         if !report.failures.contains(&SyncFailure::PortfolioReset) {
             self.state_repo.save_device(&resumed).await?;
         }
-        self.sync_service.remember_run(&report);
+        self.sync_service.remember_run(&mut report).await;
         Ok(report)
     }
 
@@ -1077,6 +1077,7 @@ mod tests {
             .expect_list_undismissed_notices()
             .returning(|| Ok(vec![]));
         state_repo.expect_list_held_back().returning(|| Ok(vec![]));
+        state_repo.expect_get_last_sync().returning(|| Ok(None));
         let ctx = build_ctx_with_state_repo(
             &pool,
             Arc::new(state_repo),

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT last_synced_at FROM sync_device WHERE id = 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "last_synced_at",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "c78c1141b61a12cb94d6875fa2b953f3b24e7cf755f2fc9b6fdcdb07e600ff07"
+}
