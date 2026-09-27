@@ -22,8 +22,11 @@ Rules (frontend under `src/`, backend under `src-tauri/src/`):
       file in the allowlist (display rounding and documented previews)
   A8  feature code carries no literal user-facing attribute text
       (`aria-label`, `placeholder`, `title`, `label`) — strings come from i18n
-  A9  a use case imports no bounded context's repository or infrastructure
-      module outside its test modules — it calls the context's service (ADR-004)
+  A9  a use case depends on no bounded context's infrastructure outside its
+      test modules: no `repository` / `infrastructure` module path and no
+      concrete implementation a context defines (`Sqlite…`, `Fs…`); repository
+      traits and services are allowed (B24). A composition root that wires
+      the implementations (`use_cases/scheduled_fetch/headless.rs`) is exempt.
 
 The allowlist is a ratchet: a count above its recorded value fails, a count
 below it fails too until `--write-allowlist` lowers the record. Nothing is
@@ -160,14 +163,30 @@ def a3_cross_context() -> list[str]:
     return hits
 
 
+A9_COMPOSITION_ROOTS = {"src-tauri/src/use_cases/scheduled_fetch/headless.rs"}
+
+
+def context_implementations() -> set[str]:
+    """The concrete infrastructure types the bounded contexts define."""
+    names = set()
+    for path in CONTEXTS.rglob("*.rs"):
+        names.update(re.findall(r"pub struct ((?:Sqlite|Fs)\w+)", path.read_text(encoding="utf-8")))
+    return names
+
+
 def a9_use_cases_call_services() -> list[str]:
+    implementations = context_implementations()
     hits = []
     for path in sorted(USE_CASES.rglob("*.rs")):
+        if rel(path) in A9_COMPOSITION_ROOTS:
+            continue
         for number, line in production_lines(path.read_text(encoding="utf-8")):
             for match in re.finditer(r"crate::context::(\w+)::(repository|infrastructure)\b", line):
                 hits.append(
-                    f"A9 {rel(path)}:{number}: imports `{match.group(1)}::{match.group(2)}` — call its service"
+                    f"A9 {rel(path)}:{number}: imports `{match.group(1)}::{match.group(2)}` — use a trait or service"
                 )
+            for name in sorted(set(re.findall(r"\b(?:Sqlite|Fs)\w+", line)) & implementations):
+                hits.append(f"A9 {rel(path)}:{number}: uses the implementation `{name}` — use a trait or service")
     return hits
 
 
