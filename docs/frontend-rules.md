@@ -250,7 +250,7 @@ Client-side validation (no backend round-trip) follows the same pipeline: valida
 - API call arguments and success/error handling
 - Do NOT write tests that only verify rendering or DOM structure
 
-> Visual changes additionally require committed screenshots — see [`frontend-visual-proof.md`](frontend-visual-proof.md).
+> Visual changes additionally require committed screenshots — see [`visual-proof-rules.md`](visual-proof-rules.md).
 
 **F19** — When using `renderHook`, NEVER create objects or functions inside the render callback. The callback runs on every render; inline factories produce new references each render. If used as a `useEffect` dependency, this causes an infinite loop → OOM crash. Always extract stable references before calling `renderHook`.
 
@@ -327,3 +327,13 @@ Promotion destinations (see F28): generic UI hooks → `ui/hooks/`; generic comp
 - Pending, empty and error states are explicit elements with their own `id`, not the absence of content.
 
 A flaky E2E step is read as a symptom of a breach of this rule: the fix goes to the component or hook that made it fragile, not to a retry or a longer wait in the test.
+
+**F30** — A gateway calls `commands.*` exactly as `src/bindings.ts` declares it: the same
+parameters, in the same order, positional — never wrapped in an object.
+
+> ✅ `commands.addAsset(name, assetClass, categoryId, currency, riskLevel, reference)`
+> ❌ `commands.addAsset({ name, assetClass, categoryId, currency, riskLevel, reference })`
+
+**F31** — A feature never imports a sibling feature's modal. The opener sets a `?modal=…` URL
+parameter (`openModalSearch` / `patchModalSearch` in `src/lib/modalSearch.ts`) and a mount in
+`features/shell/` renders the modal (F26 — `shell/` is the one place sibling imports are allowed).

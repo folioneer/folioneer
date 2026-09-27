@@ -62,7 +62,7 @@ export function PriceMovementDialog({ report, isOpen, onDismiss }: PriceMovement
  * Separate from the chrome so the report can be rendered and asserted without
  * the dialog's overlay machinery — which is also what lets the visual preview
  * put four states on one page, where four `fixed inset-0` dialogs could not
- * (`docs/frontend-visual-proof.md`).
+ * (`docs/visual-proof-rules.md`).
  */
 export function PriceMovementReportBody({ report }: { report: PriceMovementReport }) {
   const { t, i18n } = useTranslation();

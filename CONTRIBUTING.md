@@ -33,7 +33,7 @@ A pull request from someone who has not agreed cannot be merged.
 
 3. **Read the policies:**
    - [How work moves](./docs/workflow.md) — branches, pull requests, the checks a change passes
-   - [Commit Policy](./COMMIT_POLICY.md) — commit message format
+   - [Commit Policy](./docs/commit-rules.md) — commit message format
 
 Always go through a `just` recipe when one exists; do not run `npm`, `cargo` or `sqlx` directly for something the `justfile` covers.
 
@@ -55,5 +55,5 @@ The git hooks run the fast checks for what a commit or push touches. On the pull
 ## Getting Help
 
 - [Architecture Guide](./ARCHITECTURE.md) for system design
-- [Test conventions](./docs/test_convention.md) for testing practices
+- [Test conventions](./docs/test-rules.md) for testing practices
 - Recent merged pull requests for examples

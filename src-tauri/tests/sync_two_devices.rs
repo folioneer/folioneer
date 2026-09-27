@@ -1,6 +1,6 @@
 //! Tier-3 integration: two installations ("Desktop", "Laptop") sharing one encrypted
 //! folder converge on the same portfolio (SYN-013/014/036/065/080/083, CFR-040/041/042/044).
-//! Per `test_convention.md` Tier 3: only the crate's public API is used — two `SqlitePool`s,
+//! Per `test-rules.md` Tier 3: only the crate's public API is used — two `SqlitePool`s,
 //! one `tempfile::tempdir()` folder, real BC services on each side (`Ctx { orchestrator, … }`,
 //! mirroring `management_fee_crud.rs`'s and `sync_first_publish.rs`'s shape).
 //!

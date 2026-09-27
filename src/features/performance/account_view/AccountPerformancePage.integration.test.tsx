@@ -11,7 +11,7 @@ import type {
 import * as gateway from "../gateway";
 import { AccountPerformancePage } from "./AccountPerformancePage";
 
-// Mock the gateway so no real Tauri calls fire (F27, docs/test_convention.md § Mocking gateway modules)
+// Mock the gateway so no real Tauri calls fire (F27, docs/test-rules.md § Mocking gateway modules)
 vi.mock("../gateway");
 
 // Mock the router — AccountPerformancePage reads accountId from route params

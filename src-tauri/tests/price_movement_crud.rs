@@ -4,7 +4,7 @@
 //!
 //! Exercises the full stack through the public API: orchestrator constructor →
 //! AccountService / AssetService → real in-memory SQLite, mirroring
-//! `asset_price_fetch_crud.rs`. No mocks — per test_convention.md Tier 3.
+//! `asset_price_fetch_crud.rs`. No mocks — per test-rules.md Tier 3.
 
 use folioneer_lib::context::account::{
     AccountService, SqliteAccountRepository, SqliteHoldingRepository, SqliteTransactionRepository,

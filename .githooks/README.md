@@ -11,10 +11,10 @@ This directory contains git hooks that enforce code quality standards.
   - Conventional commit format (`type: description`)
   - Valid types: `feat`, `fix`, `docs`, `test`, `chore`, `refactor`
   - Title under 72 characters
-  - No co-author lines (not allowed per COMMIT_POLICY.md)
+  - No co-author lines (not allowed per docs/commit-rules.md)
   - No test results in commit messages (those go in PRs)
   - Proper lowercase and no periods in title
-- **Action:** Rejects commit if message violates COMMIT_POLICY.md
+- **Action:** Rejects commit if message violates docs/commit-rules.md
 
 ### pre-commit
 

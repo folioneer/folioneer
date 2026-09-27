@@ -3,7 +3,7 @@
 //! Exercises the full stack through the public `folioneer_lib` API:
 //! `AccountService::{upsert_holding_note, delete_holding_note}` over the real
 //! `SqliteHoldingNoteRepository` and in-memory SQLite. No mocks — per
-//! test_convention.md Tier 3 constraint. Mirrors `free_shares_crud.rs` /
+//! test-rules.md Tier 3 constraint. Mirrors `free_shares_crud.rs` /
 //! `management_fee_crud.rs` in structure.
 
 use folioneer_lib::context::account::{

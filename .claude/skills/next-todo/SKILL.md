@@ -47,7 +47,7 @@ which renders the mocks and flips the line to `proposed (…)`.
 
 ## Step 3 — Acceptance first
 
-- Read the convention docs the entry's layers require (CLAUDE.md § Mandatory pre-read).
+- Read the convention docs the entry's layers require (CLAUDE.md § Where things are).
 - Translate every clause of Done when into a failing test: Rust for logic, Vitest for
   rendering, E2E for what a user does. Name each test with the ref (`#NNN`) or the spec
   rule (`TRIGRAM-NNN`); when the domain has a spec and the entry adds a rule, write the

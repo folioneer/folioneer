@@ -3,7 +3,7 @@
 //! Exercises the full stack through the public `folioneer_lib` API:
 //! `HoldingTransactionUseCase` → `AccountService` / `AssetService` →
 //! `AccountPerformanceUseCase` over real in-memory SQLite. No mocks — per
-//! test_convention.md Tier 3 constraint. Mirrors `free_shares_crud.rs`, the
+//! test-rules.md Tier 3 constraint. Mirrors `free_shares_crud.rs`, the
 //! quantity-adding sibling of the quantity-reducing fee deduction.
 
 use folioneer_lib::context::account::{

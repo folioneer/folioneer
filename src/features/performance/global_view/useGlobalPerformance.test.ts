@@ -11,7 +11,7 @@ import type {
 } from "@/bindings";
 import { useAppStore } from "@/lib/store";
 
-// Mock the gateway so no real Tauri calls fire (docs/test_convention.md § Mocking gateway modules)
+// Mock the gateway so no real Tauri calls fire (docs/test-rules.md § Mocking gateway modules)
 vi.mock("../gateway");
 
 const { mockShowSnackbar } = vi.hoisted(() => ({ mockShowSnackbar: vi.fn() }));

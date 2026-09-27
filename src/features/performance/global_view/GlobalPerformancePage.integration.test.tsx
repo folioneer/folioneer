@@ -13,7 +13,7 @@ import { useAppStore } from "@/lib/store";
 import * as gateway from "../gateway";
 import { GlobalPerformancePage } from "./GlobalPerformancePage";
 
-// Mock the gateway so no real Tauri calls fire (F27, docs/test_convention.md § Mocking gateway modules)
+// Mock the gateway so no real Tauri calls fire (F27, docs/test-rules.md § Mocking gateway modules)
 vi.mock("../gateway");
 
 // Mock the router — the page renders back/add-transaction links

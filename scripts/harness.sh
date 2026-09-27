@@ -39,6 +39,7 @@ scope=$(printf '%s\n' "$changed" | bash scripts/changed-scope.sh)
 echo -e "${BLUE}🔍 Harness scope: ${scope}${NC}"
 
 python3 scripts/arch-check.py
+python3 scripts/rule-homes.py
 bash scripts/sync-format-check.sh "$base"
 python3 -m unittest discover -s scripts/tests -p "test_*.py"
 python3 scripts/licence-check.py

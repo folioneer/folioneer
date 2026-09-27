@@ -1,7 +1,7 @@
 //! Integration tests for the asset-price fetch orchestrator (MKT-122, MKT-132, MKT-111, MKT-113).
 //!
 //! These tests exercise the full stack through the public API: orchestrator constructor →
-//! AccountService / AssetService → real in-memory SQLite. No mocks — per test_convention.md
+//! AccountService / AssetService → real in-memory SQLite. No mocks — per test-rules.md
 //! Tier 3 constraint.
 
 use folioneer_lib::context::account::{

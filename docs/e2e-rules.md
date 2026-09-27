@@ -1,7 +1,7 @@
 # E2E Testability Rules
 
 Defines what makes a component reliably driveable from the Tauri WebDriver E2E suite.
-Read together with `frontend-rules.md` and `test_convention.md`.
+Read together with `frontend-rules.md` and `test-rules.md`.
 
 > Rule numbers (E1, E2, …) are stable IDs — once assigned, they never change. New rules are appended; deprecated rules keep their number with a note.
 

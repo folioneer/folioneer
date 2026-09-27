@@ -5,7 +5,7 @@ import type { SyncStatus } from "@/bindings";
 // Capture the gateway's SyncCompleted callback so the test can fire the event.
 let capturedEventListener: (() => void) | null = null;
 
-// 1. Mock the gateway module before importing the hook (test_convention.md § Mocking gateway modules)
+// 1. Mock the gateway module before importing the hook (test-rules.md § Mocking gateway modules)
 vi.mock("../gateway", () => ({
   getSyncStatus: vi.fn(),
   onSyncCompleted: vi.fn((cb: () => void) => {

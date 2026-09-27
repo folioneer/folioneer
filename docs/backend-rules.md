@@ -42,7 +42,7 @@ src-tauri/src/
 
 **B2** — `context/{bc}/infrastructure/{aggregate}.rs` MUST only contain the database implementation of the repository trait declared in the same BC's `domain/{aggregate_root}.rs`. No business logic.
 
-**B3** — `shared/infrastructure/specta_builder.rs` is the ONLY place where Tauri commands are registered.
+**B3** — `core/specta_builder.rs` (moving to `shared/infrastructure/` with the gold layout) is the ONLY place where Tauri commands are registered; a `#[tauri::command]` not registered there silently breaks IPC.
 
 **B4** — A bounded context MAY contain multiple aggregate roots. Each aggregate root lives as a file in `context/{bc}/domain/{aggregate_root}.rs`. Aggregates within the same BC reference each other by ID only — never by direct object reference.
 
@@ -98,6 +98,14 @@ happens to the aggregate, not the internal mechanism.
 > ✅ `root.perform_action()` — `root.cancel(reason)`
 > ❌ `root.status = Status::Cancelled` — `root.with_status(...)`
 
+**B44** — State-dependent changes are mutating Aggregate Root methods, never service code:
+`update_from(self, …) -> Result<Self, DomainError>` applies an edit (state invariants, then input
+validation); `archive(self)` / `unarchive(self)` flip the archive flag; `ensure_<predicate>(&self)`
+is the fail-fast guard before an action that builds no new aggregate (e.g. delete). Every
+state-dependent rejection (`Archived`, `CashAssetNotEditable`, `SystemReadonly`, `SystemProtected`, …)
+lives here and returns a typed domain error, never `anyhow`. The repository only uses factories
+(B7), never struct literals.
+
 **B12** — Boy scout rule: when a use case or service needs to mutate an aggregate field
 directly, extract an Aggregate Root method for that mutation first, then call the method.
 Never add a new direct field mutation to an aggregate from outside its own type.
@@ -122,6 +130,12 @@ Service-layer checks are appropriate ONLY for cross-aggregate invariants (unique
 - Outside the context, never import `crate::context::{domain}::domain::{Entity}` — always import `crate::context::{domain}::{Entity}`.
 
 **B15** — SHOULD always publish a `{Domain}Updated` event when its state changes (create, update, delete, etc.). The BC Application Service (`service.rs`) is responsible for event emission. If no Application Service exists, the `api.rs` handler is responsible.
+
+**B45** — An action publishes exactly one event. The bus is a `tokio::sync::watch` channel: two
+back-to-back `send()`s deliver only the second to every subscriber. A removal publishes the event
+of the kind it removed, never a generic one followed by a specific one. A new event is declared in
+`core/event_bus/event.rs`, published after persistence, and subscribed in the feature hook that
+re-fetches.
 
 **B16** — `api.rs` is the framework boundary — the only layer that knows Tauri exists.
 Its sole responsibilities are:

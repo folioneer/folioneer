@@ -115,6 +115,9 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       - name: Architecture check
         run: python3 scripts/arch-check.py
+      # scripts/rule-homes.py: every rule ID is defined in one document only (#050).
+      - name: One home per rule
+        run: python3 scripts/rule-homes.py
 
   licences:
     name: Licences — what the application ships

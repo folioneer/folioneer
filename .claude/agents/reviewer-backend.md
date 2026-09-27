@@ -79,7 +79,7 @@ Use the format in `## Output format` below. Lead with the headline summary.
 
 ### Error handling
 
-- Application services and Tauri command surfaces must return typed `Result<T, {BC}Error>` (BC-scoped) or `Result<T, {UseCase}Error>` (cross-BC composite) per [`docs/error-model.md`](../docs/error-model.md) — one flat enum per BC + use-case composites via `#[serde(untagged)]` + `#[from]` (BC enums and a `{UseCase}Task` sub-enum carrying use-case-specific codes). Repositories MAY use `anyhow::Error` as trait error type; infra failures translate to the BC's `{BC}Error::DatabaseError` at the service call site. (🟡)
+- Application services and Tauri command surfaces must return typed `Result<T, {BC}Error>` (BC-scoped) or `Result<T, {UseCase}Error>` (cross-BC composite) per [`docs/error-model.md`](../../docs/error-model.md) — one flat enum per BC + use-case composites via `#[serde(untagged)]` + `#[from]` (BC enums and a `{UseCase}Task` sub-enum carrying use-case-specific codes). Repositories MAY use `anyhow::Error` as trait error type; infra failures translate to the BC's `{BC}Error::DatabaseError` at the service call site. (🟡)
 - `Result<T, String>` on a wire-visible signature (Tauri command, or service method that composes into one) (🔴 — wire-contract violation; FE bindings lose typing)
 - `anyhow::Result<T>` returned from a service or use-case method that surfaces to a Tauri command (🔴 — `error-model.md` anti-pattern; breaks the Specta-derived FE union)
 - Per-BC `*ApplicationError` / `*DomainError` split — collapse into a single flat `{BC}Error` per `error-model.md` § The rule (🟡)

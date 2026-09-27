@@ -4,7 +4,7 @@
 /// `ScheduledFetchOrchestrator` → real in-memory SQLite (via
 /// `SqliteScheduledFetchRepository`). The OS scheduler is the inert
 /// `NoopScheduler` — the same adapter used by E2E runs — so these tests never
-/// touch the host's real task scheduler. No mocks — per test_convention.md
+/// touch the host's real task scheduler. No mocks — per test-rules.md
 /// Tier 3 constraint.
 use chrono::NaiveDate;
 use folioneer_lib::context::account::{

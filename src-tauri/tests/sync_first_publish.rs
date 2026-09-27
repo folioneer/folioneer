@@ -2,7 +2,7 @@
 //! API: seed a small portfolio via the real BC services, enable sync into a tempdir, and assert
 //! the folder + database wiring is genuinely reachable end-to-end.
 //!
-//! Per `test_convention.md` Tier 3: only the public API is used, and `sync_now` is exercised
+//! Per `test-rules.md` Tier 3: only the public API is used, and `sync_now` is exercised
 //! through the same public surface a second time after a new transaction.
 
 use std::sync::Arc;

@@ -2,7 +2,7 @@
 //!
 //! Exercises the full stack through the public `folioneer_lib` API:
 //! `HoldingTransactionUseCase` → `AccountService` / `AssetService` → real
-//! in-memory SQLite. No mocks — per test_convention.md Tier 3 constraint.
+//! in-memory SQLite. No mocks — per test-rules.md Tier 3 constraint.
 //! Mirrors `free_shares_crud.rs`, the sibling zero-cash transaction suite.
 
 use folioneer_lib::context::account::{

@@ -14,7 +14,7 @@ import * as gateway from "./gateway";
 import { useUnpricedPrices } from "./useUnpricedPrices";
 
 // Stable test fixtures — defined outside renderHook callback to avoid
-// infinite-loop from new reference on every render (per test_convention.md).
+// infinite-loop from new reference on every render (per test-rules.md).
 const makeAsset = (overrides: Partial<UnpricedAsset> = {}): UnpricedAsset => ({
   asset_id: "asset-1",
   name: "Air Liquide",

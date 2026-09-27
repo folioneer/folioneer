@@ -883,9 +883,9 @@ A "Fill missing price history" icon button in the actions of each active, non-ca
 
 ## Open Questions / Deferred
 
-**MKT-032 — disambiguating the "No price available" state.** The current rule merges two upstream causes (provider returned N/D vs no fetch has run yet under a manual-update-frequency account) into one diagnostic. Distinguishing them requires BE telemetry (per-asset last-fetch-attempt + outcome) not currently exposed on `HoldingDetail`. Defer until a real user-pain signal warrants the BE surface change.
+**Deferred on MKT-032 — disambiguating the "No price available" state.** The current rule merges two upstream causes (provider returned N/D vs no fetch has run yet under a manual-update-frequency account) into one diagnostic. Distinguishing them requires BE telemetry (per-asset last-fetch-attempt + outcome) not currently exposed on `HoldingDetail`. Defer until a real user-pain signal warrants the BE surface change.
 
-**MKT-153 — toggling the lock from the Asset management table.** This phase exposes the lock only from the Account Details holding row, where the price discrepancy is observed. Surfacing the same toggle in the Asset management table (assets view) — so an asset can be locked without holding it in an open account — is deferred until a need surfaces; the flag and commands (MKT-150, MKT-156) already support it.
+**Deferred on MKT-153 — toggling the lock from the Asset management table.** This phase exposes the lock only from the Account Details holding row, where the price discrepancy is observed. Surfacing the same toggle in the Asset management table (assets view) — so an asset can be locked without holding it in an open account — is deferred until a need surfaces; the flag and commands (MKT-150, MKT-156) already support it.
 
 - [x] **Companion ADR for the price-refresh lock** — resolved: [ADR-014](../adr/014-price-refresh-lock-scope-exclusion.md) records the decision, fulfilling [ADR-012](../adr/012-latest-write-wins-source-as-metadata.md)'s decision-point-4 deferral. The pin is implemented as fetch-scope exclusion, leaving ADR-012's latest-write-wins write path intact.
 

@@ -20,16 +20,22 @@ Must be one of the following:
 
 | Type       | Purpose                                 | Example                                       |
 | ---------- | --------------------------------------- | --------------------------------------------- |
-| `feat`     | A new feature                           | `feat: add patient search functionality`      |
+| `feat`     | A new feature                           | `feat: add asset search`                      |
 | `fix`      | A bug fix                               | `fix: correct date validation in forms`       |
 | `docs`     | Documentation changes                   | `docs: update README with setup instructions` |
-| `test`     | Adding or updating tests                | `test: add unit tests for patient service`    |
+| `test`     | Adding or updating tests                | `test: add unit tests for account service`    |
 | `chore`    | Build, dependencies, or tooling         | `chore: upgrade React to 18.3`                |
 | `refactor` | Code restructuring (no behavior change) | `refactor: extract validation logic`          |
 
+### Titles and the changelog
+
+- **A title is the user-visible outcome in plain words.** `feat` / `fix` titles are copied into `CHANGELOG.md` (titles only; bodies stay in git history) and shown by the What's-new dialog: no layer tags (`(FE)`, "backend"), no rule IDs or trigrams, no code identifiers, no abbreviations. The technical why stays in the body, two lines at most. At most 72 characters (hook-enforced).
+- **One changelog line per user-visible change.** A `feat` / `fix` commit adds user-visible value of its own. A commit that does not (a review fix of an unreleased feature, the second layer of a feature another commit announced) is folded into its feature commit or typed `refactor` / `chore` / `test` / `docs`. Two near-identical `feat` / `fix` titles in one release are the tell.
+- **One entry, one commit.** An entry — or a run of record and documentation updates that follow one another — lands on `main` as one commit: review fixes, coverage fix-ups and closure edits belong inside it. Before the first push run what CI will judge (`just harness --coverage`) and fold locally with `git commit --amend`; after a push, a fix is a `git commit --fixup <sha>` that `just merge` folds. Never force-push to squash.
+
 ### Choosing the type
 
-`feat` and `fix` are the only types that reach `CHANGELOG.md` and the What's-new dialog, so they are reserved for a change a user notices — and their titles are written for that user (see CLAUDE.md § Standards). The other four never reach it; pick between them by **what the change touches**, not by how large or how visible it feels:
+`feat` and `fix` are the only types that reach `CHANGELOG.md` and the What's-new dialog, so they are reserved for a change a user notices — and their titles are written for that user (§ Titles and the changelog below). The other four never reach it; pick between them by **what the change touches**, not by how large or how visible it feels:
 
 - `refactor` — production code changed: restructured, or given behaviour only a future build reaches.
 - `chore` — production code untouched: build, dependencies, tooling, scripts, release mechanics, repository hygiene.
@@ -55,7 +61,7 @@ A change that touches production code is never `chore`, however invisible it is 
 **Commits** describe WHAT changed and WHY (max 5 lines, no test results):
 
 ```
-feat: add patient tracking fields
+feat: add holding note fields
 
 Populate latestProcedureType and latestFund when creating procedures.
 Improves UX by reducing required data entry.
@@ -65,7 +71,7 @@ Improves UX by reducing required data entry.
 
 ```
 ## Summary
-Add latestProcedureType, latestFund, latestDate fields to Patient.
+Add note_text, note_threshold_price and note_alarm_triggered to HoldingDetail.
 Automatically populate recent service type and fund when creating procedures.
 
 ## Tests
@@ -94,7 +100,7 @@ Commit types automatically determine version bumps following SemVer:
 
 #### Good Examples
 
-- `feat: add patient appointment scheduling`
+- `feat: add asset price alarms`
 - `fix: handle null values in reimbursement calculator`
 - `docs: add database schema documentation`
 - `test: add integration tests for Tauri bridge`
@@ -103,10 +109,10 @@ Commit types automatically determine version bumps following SemVer:
 #### Bad Examples
 
 - `Updated stuff` - Too vague
-- `FEAT: Add patient search` - Wrong capitalization
+- `FEAT: Add asset search` - Wrong capitalization
 - `fix: Fixed the bug.` - Unnecessary period, passive voice
 - `chore: upgrade deps and fix linter and update readme` - Too many things
-- `feat: add patient search\n\nCo-Authored-By: John Doe <john@example.com>` - Never use co-author footers
+- `feat: add asset search\n\nCo-Authored-By: John Doe <john@example.com>` - Never use co-author footers
 
 ## Pre-Commit Checklist
 
@@ -215,7 +221,7 @@ npm run lint
 # 3. Commit
 /commit
 # Select: feat
-# Message: "add patient appointment scheduling"
+# Message: "add asset price alarms"
 ```
 
 ### Fixing a Bug
@@ -247,9 +253,9 @@ npm run lint
 Breaking changes that require a MAJOR version bump should be handled through a manual release process. Document incompatible API changes in the commit body for reference:
 
 ```
-feat: redesign patient data model
+feat: redesign holding data model
 
-This change modifies the patient API response format.
+This change modifies the holding API response format.
 Requires manual version bump to next major version.
 ```
 
@@ -279,7 +285,7 @@ The script will:
 6. Create commit and git tag
    - **Note:** If git hooks are configured (`git config core.hooksPath .githooks`), the pre-commit hook will run all quality checks (tests, linting, formatting) before allowing the release commit. This ensures releases only happen from clean code.
 
-See [Contributing Guidelines](./CONTRIBUTING.md) for git hook setup.
+See [Contributing Guidelines](../CONTRIBUTING.md) for git hook setup.
 
 **Example flow:**
 
@@ -303,9 +309,9 @@ git push && git push --tags
 
 ## Related Documentation
 
-- [Contributing Guidelines](./CONTRIBUTING.md) - General contribution workflow
-- [Testing Strategy](./TESTING.md) - Testing requirements
-- [Architecture](./ARCHITECTURE.md) - System design and structure
+- [Contributing Guidelines](../CONTRIBUTING.md) - General contribution workflow
+- [Testing Strategy](test-rules.md) - Testing requirements
+- [Architecture](../ARCHITECTURE.md) - System design and structure
 
 ## Quality Assurance
 
@@ -332,14 +338,14 @@ Then commit again.
 
 ### "Tests failed"
 
-See [Testing Strategy](./TESTING.md) for debugging help.
+See [Testing Strategy](test-rules.md) for debugging help.
 
 ### "Commit message too long"
 
 The recommended limit is 72 characters. Try to be more concise:
 
-- ❌ `feat: add ability for users to search and filter patients by various criteria including name date and status`
-- ✅ `feat: add patient search and filtering`
+- ❌ `feat: add ability for users to search and filter assets by various criteria including name date and status`
+- ✅ `feat: add asset search and filtering`
 
 ### "Can't remember commit types"
 

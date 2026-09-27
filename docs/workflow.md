@@ -134,9 +134,9 @@ The `main-protection` ruleset lists the same checks; the owner's laptop bypasses
   and maps error codes to i18n keys. It never decides, validates business rules,
   aggregates or derives. If a step can skip the UI, it lives in Rust.
 - **Gold layouts** for new code (`docs/backend-rules.md` B0/B37–B43,
-  `docs/frontend-rules.md` F0/F26–F28); bit-by-bit for existing code (CLAUDE.md).
+  `docs/frontend-rules.md` F0/F26–F28); bit-by-bit for existing code (§ 10).
 - **Typed errors** on the wire (`docs/error-model.md`); factories and aggregate-root
-  methods on domain objects (CLAUDE.md § Critical Patterns).
+  methods on domain objects (`docs/backend-rules.md` B7, B44).
 - **Stable ids** on every interactive element; text from i18n; one event per action on
   the bus.
 - **Ubiquitous language** in every identifier (`docs/ubiquitous-language.md`).
@@ -201,3 +201,28 @@ state in git and the two files.
 
 Until a runner is switched on, a human types `/next-todo` in a session and the same
 rules apply.
+
+## 10. Gold layouts, bit by bit
+
+Three gold targets exist: the backend layout (B0, B37–B43), the frontend layout (F0, F28; the
+remaining crossings frozen in `arch-allowlist.json`) and the error model (landed,
+`docs/error-model.md`). New code follows them. Existing code touched by a task is brought to gold
+in the same pull request only when all three hold — otherwise it keeps the standard around it:
+
+- **Size**: about 50 lines of conformance change at most.
+- **Locality**: inside the files the task already touches.
+- **Mechanical**: a rename, an import, a signature or type swap; any design judgement ("which
+  layer?", "what name?") is its own entry.
+
+The "two stories" check overrides the number: a pull request that tells the feature and a layout
+migration tells two stories, and the migration waits. A mixed-standard codebase is acceptable; a
+half-done migration that leaves neither standard intact is not. The larger migrations are
+tracked in `docs/techdebt.md` (TD-008, TD-009) and run when queued.
+
+## 11. Splitting a feature by layer
+
+A feature touching backend and frontend ships as one pull request per layer when either layer
+exceeds about 20 files or 500 lines, in this order: spec, contract, migration, backend and the
+generated bindings (mergeable alone — the bindings are unused); then gateway, hooks, presenter,
+components and strings, branched off the merged backend; then E2E and closure. Each diff stays
+one story and CI signs each off on its own.

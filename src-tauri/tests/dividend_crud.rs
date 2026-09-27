@@ -3,7 +3,7 @@
 //!
 //! All tests exercise the full stack through the public `folioneer_lib` API:
 //! `HoldingTransactionUseCase` → `AccountService` / `AssetService` → real in-memory
-//! SQLite. No mocks — per test_convention.md Tier 3 constraint.
+//! SQLite. No mocks — per test-rules.md Tier 3 constraint.
 
 use folioneer_lib::context::account::{
     AccountService, SqliteAccountRepository, SqliteFeeScheduleRepository,
