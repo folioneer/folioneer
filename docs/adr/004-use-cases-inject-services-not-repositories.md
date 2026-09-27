@@ -19,3 +19,8 @@ Any data access or mutation a use case needs from a bounded context must go thro
 
 - **Pros**: business invariants and event publication defined in services are never bypassed; single access path per context; consistent with the Component → Hook → Gateway → Command → Service → Repository data-flow rule.
 - **Cons**: occasionally requires adding a thin pass-through method to a service for data the repository already exposes; slightly more boilerplate when the use case only needs a simple read.
+
+## Guard
+
+- **Reversal looks like**: a use case importing a context's `repository` or `infrastructure` module, or taking a repository as a dependency.
+- **Guard**: architecture rule A9 (`scripts/arch-check.py`) for an import that names the `repository` or `infrastructure` module; `reviewer-arch` for a repository taken through a context's root re-export. Two such cases exist today (TD-045).

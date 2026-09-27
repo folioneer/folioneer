@@ -57,6 +57,7 @@ Read whichever of these exist, together in one step:
 - `docs/backend-rules.md` — Rust DDD structure (bounded context layout, repositories, services, error handling)
 - `docs/frontend-rules.md` — frontend feature layout (gateway pattern, smart/dumb components, module colocation)
 - `docs/ddd-reference.md` — DDD concept glossary and error-flow guidance
+- the `## Guard` section of every accepted ADR in `docs/adr/` (status `Accepted…`, not `Superseded…`) — its **Reversal looks like** line, for `### ADR Guard` below
 
 Apply project-specific rules on top of the rules in this file. If none of those docs exists, proceed with the rules below only.
 
@@ -122,6 +123,13 @@ Rust domain entities must follow the three-factory-method convention:
 - `restore(...)` — alias for `with_id` when the semantic is clearer (optional, project-policy)
 
 - Reconstructing a persisted entity via `new` (which would generate a fresh ID) (🔴)
+
+### ADR Guard
+
+An ADR exists to stop an agent reversing a decision the owner took. For every accepted ADR, compare its **Reversal looks like** signs with the changed lines:
+
+- A changed line matching a reversal sign (🔴 [DECISION]) — name the ADR and the sign: `reverses ADR-004: use case imports context::currency::repository`. The fix is never to edit, waive or supersede the ADR: it becomes an open question for the owner, who alone supersedes an ADR.
+- A change that touches the area an ADR guards without matching a sign — no finding.
 
 ---
 

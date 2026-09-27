@@ -19,3 +19,8 @@ The sequential service call pattern from ADR-003 is preserved. This is an extens
 
 - **Pros**: Account Details remains the single cross-context use case that assembles all holding-level data; no new use case or data denormalization required; consistent with ADR-004 (services only, no repository access).
 - **Cons**: `account_details` now depends on three services instead of two; one additional query per account detail load.
+
+## Guard
+
+- **Reversal looks like**: the account details use case assembling realized P&L from repositories instead of `TransactionService`.
+- **Guard**: architecture rule A9 (`scripts/arch-check.py`).

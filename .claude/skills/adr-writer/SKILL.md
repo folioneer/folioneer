@@ -1,6 +1,6 @@
 ---
 name: adr-writer
-description: Authors and supersedes Architecture Decision Records (docs/adr/*.md). Run when a decision passes the 3-criteria gate (genuinely complex / not obvious from context / costly to reverse). After authoring or superseding, run `adr-reviewer` to validate quality before locking in. Not for tentative decisions — those stay in the spec's `## Open Questions` until ratified.
+description: Authors and supersedes Architecture Decision Records (docs/adr/*.md). Run when an agent reading only the code could plausibly undo a costly decision. After authoring or superseding, run `adr-reviewer` to validate quality before locking in. Not for tentative decisions — those stay in the spec's `## Open Questions` until ratified.
 model: opus
 ---
 
@@ -18,7 +18,7 @@ Produce or supersede an ADR — `docs/adr/{NNN}-{slug}.md` — and keep `docs/ad
 
 ## When to use
 
-- **A decision passes the 3-criteria gate** (see below) — typically flagged as a possible ADR candidate by `spec-reviewer`, or by the main agent while running an entry
+- **A decision passes the gate** (see below) — typically flagged as a possible ADR candidate by `spec-reviewer`, or by the main agent while running an entry
 - **Superseding a past decision** — a prior ADR is no longer correct; the new one explains why
 - **Indexing existing ADRs** — refresh `docs/adr/README.md` after manual edits or imports
 
@@ -29,7 +29,7 @@ Produce or supersede an ADR — `docs/adr/{NNN}-{slug}.md` — and keep `docs/ad
 - **Tentative or unresolved decisions** — keep them in the spec's `## Open Questions` until a final choice is made; ADRs are ratified-only
 - **Coding standards or naming preferences** — these belong in convention docs (`docs/backend-rules.md`, `docs/frontend-rules.md`), not ADRs
 - **Decisions self-evident from the spec** — if the rule already states the choice and the rationale, an ADR adds noise
-- **Reversible single-function choices** — fail criterion 3 ("costly to reverse"); no ADR needed
+- **Reversible single-function choices** — fail the gate (cheap to undo); no ADR needed
 - **Validating an existing ADR** — use the `adr-reviewer` agent; this skill produces, it does not validate
 
 ---
@@ -47,20 +47,20 @@ Reports the produced paths and the assigned ADR number to the conversation.
 If the gate fails (Step 1.b) or the user declines the proposed decision (Step 2), do not write any file. Report:
 
 ```
-ℹ️ No ADR created — {which criterion failed} ({one-line rationale}).
+ℹ️ No ADR created — {why the gate fails} ({one-line rationale}).
 ```
 
 and exit. Silence is not an acceptable refusal; downstream callers parse this marker.
 
 ---
 
-## The 3-criteria gate
+## The gate
 
-ADRs are rare. Write one only when **all three** conditions hold:
+An ADR exists for one purpose: to stop an agent reversing an architectural decision. Write one only when the answer to this question is yes:
 
-1. **Genuinely complex** — the decision involves real trade-offs with no obvious right answer.
-2. **Not obvious from context** — a future developer reading the code or the spec could not reasonably infer why this choice was made.
-3. **Costly to reverse** — undoing the decision later would require significant rework across the codebase.
+> **Would an agent reading only the code plausibly undo this, and would undoing it be costly?**
+
+If the code or a spec rule already makes the choice obvious, or undoing it is cheap, no ADR.
 
 This block is the canonical source for the gate. `adr-reviewer` references it; do not restate it elsewhere in the kit without cross-linking back here.
 
@@ -78,7 +78,7 @@ a. **Resolve intent**. The user or the main agent will request one of:
 
 If the intent is ambiguous, use `AskUserQuestion`.
 
-b. **Validate the 3-criteria gate** before writing anything. Use `AskUserQuestion` to confirm each of the three criteria holds (one yes/no per criterion). If any criterion fails, refuse per the Output format and exit. Do not proceed silently.
+b. **Validate the gate** before writing anything. Use `AskUserQuestion` to confirm the gate question holds. If it does not, refuse per the Output format and exit. Do not proceed silently.
 
 c. **Always confirm before writing**. Even when the intent is unambiguous (e.g. requested by the main agent while running an entry), surface the proposed decision to the user with `AskUserQuestion` and wait for explicit approval. Never auto-create.
 
@@ -109,8 +109,13 @@ c. **Always confirm before writing**. Even when the intent is unambiguous (e.g. 
 
 ## Consequences
 
-- **Pros**: {Concrete benefits — what becomes easier or possible.}
-- **Cons**: {Concrete costs — what becomes harder or constrained.}
+- **Pros**: {What the guard protects — what stays possible because of this choice.}
+- **Cons**: {What becomes harder or constrained.}
+
+## Guard
+
+- **Reversal looks like**: {The concrete signs of a reversal in a diff — a type, an import, a table, a call.}
+- **Guard**: {The architecture rule, test or reviewer check that fails on it — the exact test that would go red on this reversal, not merely related coverage; a mechanical guard is seen red once before the ADR is accepted.}
 ```
 
 #### Worked example
@@ -140,6 +145,13 @@ rounding), `Decimal` crate (rejected for SQLite friction).
 - **Pros**: deterministic arithmetic, lossless SQLite storage, no FE/BE drift.
 - **Cons**: every callsite must convert between minor units and display form;
   no native fractional currencies (e.g. some Middle-Eastern subdivisions).
+
+## Guard
+
+- **Reversal looks like**: an `f64` or `REAL` field for an amount in a domain type,
+  a command signature or a migration.
+- **Guard**: `reviewer-sql` (type affinity) and `reviewer-backend`; `reviewer-arch`
+  matches the sign.
 ```
 
 ---
@@ -184,14 +196,15 @@ If `docs/adr/` does not exist, create it together with `README.md`.
 4. **Always update the index** after creating or superseding — both rows on supersede.
 5. **One decision per ADR** — split multiple decisions into separate ADRs; the reviewer enforces this.
 6. **Decisions only, no implementation** — describe what was chosen and why, not how it is implemented in code.
-7. **Validate the 3-criteria gate before writing** — refuse explicitly if any criterion fails.
+7. **Validate the gate before writing** — refuse explicitly when it fails.
+8. **Every ADR states its reversal signs and its guard** — `reviewer-arch` reads them on every pull request.
 
 ---
 
 ## Notes
 
-ADRs are deliberately rare. Most decisions belong in the spec (rules), in convention docs (coding standards), or are obvious from the code itself. The 3-criteria gate exists to keep `docs/adr/` valuable: a directory with five real ADRs is a reference; a directory with fifty mixed-quality ADRs is noise.
+ADRs are deliberately rare. Most decisions belong in the spec (rules), in convention docs (coding standards), or are obvious from the code itself. The gate exists to keep `docs/adr/` valuable: a directory with five real ADRs is a reference; a directory with fifty mixed-quality ADRs is noise.
 
 The interactive confirmation in Step 1.c is non-negotiable. Reviewers and the main agent may flag ADR candidates, but the user — not the agent chain — decides whether to elevate them. That gate prevents agents from filling `docs/adr/` with auto-generated decisions the user never ratified.
 
-`adr-reviewer` is the paired validator. It runs after this skill produces or supersedes a file, and it cross-references back to the canonical 3-criteria gate above. Edit the gate language here only — the reviewer follows.
+`adr-reviewer` is the paired validator. It runs after this skill produces or supersedes a file, and it cross-references back to the canonical gateiteria gate above. Edit the gate language here only — the reviewer follows.

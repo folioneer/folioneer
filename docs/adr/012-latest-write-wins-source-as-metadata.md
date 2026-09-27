@@ -35,3 +35,8 @@ Alternatives considered:
 
 - **Pros**: the fetch is a single unconditional upsert; onboarding and "the fetch fills in what I placeholder-typed" work naturally; every entry persists at write time, so no "my new manual entry didn't persist" surprise; the `source` field still does real work (history badges, debugging); no precedence matrix to test.
 - **Cons**: a user who intentionally overrode a fetched value must re-override after each subsequent fetch on the same date (typically once per day at most, often zero times because the fetch only writes today); when a pin mechanism is later needed, the data model gains a flag and the write path gains a check — contained and additive, not a model reversal.
+
+## Guard
+
+- **Reversal looks like**: a price or rate upsert that skips or prefers a row by its source.
+- **Guard**: test `cfr_050_observations_latest_write_wins_whatever_the_source`.

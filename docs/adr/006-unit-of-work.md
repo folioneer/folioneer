@@ -122,3 +122,8 @@ combination it needs.
 - `docs/ddd-reference.md` — Unit of Work section
 - `docs/backend-rules.md` — B22
 - `core/uow.rs` — implementation
+
+## Guard
+
+- **Reversal looks like**: a use case writing two aggregates through separate service calls that each commit, or opening its own `pool.begin()` for them, instead of the unit of work (not yet implemented — TD-005).
+- **Guard**: `reviewer-arch` matches the sign.

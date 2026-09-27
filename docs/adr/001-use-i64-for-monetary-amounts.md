@@ -21,3 +21,8 @@ All new financial amounts within the `Transaction` entity, and any future financ
   - **Migration**: Existing `REAL` fields in `asset_accounts` and `asset_prices` will eventually need to be migrated to `i64` to maintain consistency across the entire financial domain. This is an anticipated future refactoring.
   - **Conversion Overhead**: Requires explicit conversion logic at the application layer when interacting with external systems or displaying values to users.
   - **Storage Size**: `i64` might use slightly more storage than `REAL` for very small numbers, but this is negligible for typical financial values and outweighed by precision benefits.
+
+## Guard
+
+- **Reversal looks like**: an `f64` or `REAL` field for an amount, price, quantity or rate in a domain type, a command signature or a migration.
+- **Guard**: `reviewer-sql` (type affinity) and `reviewer-backend`; `reviewer-arch` matches the sign.

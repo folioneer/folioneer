@@ -15,3 +15,8 @@ ADR-017 is withdrawn in full. Neither of its two choices holds any longer: there
 
 - **Pros**: no record states an architecture the code has left; a paid feed or any keyed provider can be designed without first overturning a standing decision.
 - **Cons**: until a new source is decided, nothing records how prices will reach users other than the owner; the question stays open in #039.
+
+## Guard
+
+- **Reversal looks like**: an automated price source plugged into the public `extensions.rs`.
+- **Guard**: test `the_public_build_plugs_in_every_external_data_source_but_prices`.

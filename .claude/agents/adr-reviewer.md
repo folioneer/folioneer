@@ -64,7 +64,7 @@ For each ADR file, extract:
 - Filename pattern: `{NNN}-{slug}.md`
 - Title from the `# ADR {NNN} — {Title}` heading
 - `Date`, `Status` from the metadata block
-- Section presence: `## Context`, `## Decision`, `## Consequences`
+- Section presence: `## Context`, `## Decision`, `## Consequences`, `## Guard`
 - Whether `Status` references another ADR (`Accepted — supersedes ADR-{NNN}` or `Superseded by ADR-{NNN}`)
 
 For the index, extract: every row's ADR number, title, status, and link target.
@@ -76,17 +76,19 @@ For the index, extract: every row's ADR number, title, status, and link target.
 - 🔴 Filename does not match `{NNN}-{slug}.md` (e.g., `adr-soft-delete.md`, `003_soft_delete.md`, missing zero-padding)
 - 🔴 Title heading missing or does not match `# ADR {NNN} — {Title}` format
 - 🔴 Required section missing: `## Context`, `## Decision`, `## Consequences`
+- 🔴 An accepted ADR has no `## Guard` section, or it lacks either line: **Reversal looks like** (concrete signs in a diff) and **Guard** (the rule, test or reviewer check that fails on them)
+- 🟡 **Reversal looks like** is abstract ("the design changes") rather than a sign a reviewer can match in a diff (a type, an import, a table, a call)
 - 🔴 `Date` line missing or not in `YYYY-MM-DD` form
 - 🔴 `Status` line missing
 - 🟡 Numbering gap: ADR-001 and ADR-003 exist but ADR-002 does not (and is not recorded as removed/skipped)
 - 🟡 Slug in filename does not reflect the title (e.g., title "Use i64 for monetary amounts" but filename `003-misc.md`)
 - 🔵 No blank line separating metadata from `## Context` (style nit)
 
-#### B — ADR appropriateness (3-criteria gate)
+#### B — ADR appropriateness (the gate)
 
-The canonical gate lives in the `adr-writer` skill (`## The 3-criteria gate` section). An ADR must meet **all three** criteria from there. Critical Rule 3 below covers why this gate matters; apply it as the most important check.
+The canonical gate lives in the `adr-writer` skill (`## The gate` section): would an agent reading only the code plausibly undo this, and would undoing it be costly? Critical Rule 3 below covers why this gate matters; apply it as the most important check.
 
-- 🔴 Decision fails the 3-criteria gate — belongs in the spec, in a code comment, or as a coding standard, not as an ADR. State which criterion fails and how. Example findings: `"Fails criterion 2 — obvious from spec REF-020 which already states this rule"`, `"Fails criterion 3 — single helper function, trivial to reverse"`, `"Fails criterion 1 — naming preference, no trade-off involved"`.
+- 🔴 Decision fails the gate — the code or a spec rule already makes the choice obvious, or undoing it is cheap; it belongs in the spec, a code comment or a coding standard. Example findings: `"Obvious from spec REF-020, which already states this rule"`, `"Single helper function, cheap to undo"`.
 - 🟡 Decision overlaps an existing ADR (same problem space, similar trade-off). Flag potential consolidation or supersedes relationship.
 - 🟡 Decision feels like a coding standard or naming preference rather than an architectural choice.
 
@@ -192,6 +194,6 @@ Ready to lock in: yes — 0 critical findings. / no — blocked by N critical fi
 
 1. **Never modify ADRs** — `adr-writer` is the only authority that creates or edits ADR files. Report findings; the user re-runs `adr-writer` to fix.
 2. **Every 🔴 finding blocks the ADR from being treated as locked-in** — until resolved, downstream agents (reviewer-arch, contract-reviewer) should not cite it as a constraint.
-3. **The 3-criteria gate is the most important check** — an ADR that doesn't meet it pollutes `docs/adr/` and dilutes the value of the real ones. Be willing to flag 🔴 here even when structure looks clean.
+3. **The gate is the most important check** — an ADR that doesn't meet it pollutes `docs/adr/` and dilutes the value of the real ones. Be willing to flag 🔴 here even when structure looks clean.
 4. **Report findings against ADR identifier (e.g. "ADR-003 — Status missing supersedes back-reference")** not against line numbers. ADRs are referenced by number in many places; the number is the stable handle.
 5. **No spec-rule rewriting** — if an ADR contradicts a spec rule (check F), surface it as a finding and let the user decide which side wins: amend the spec, or supersede the ADR via `adr-writer`. Do not pick a winner.

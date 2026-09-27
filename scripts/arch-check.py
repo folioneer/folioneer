@@ -22,6 +22,8 @@ Rules (frontend under `src/`, backend under `src-tauri/src/`):
       file in the allowlist (display rounding and documented previews)
   A8  feature code carries no literal user-facing attribute text
       (`aria-label`, `placeholder`, `title`, `label`) — strings come from i18n
+  A9  a use case imports no bounded context's repository or infrastructure
+      module outside its test modules — it calls the context's service (ADR-004)
 
 The allowlist is a ratchet: a count above its recorded value fails, a count
 below it fails too until `--write-allowlist` lowers the record. Nothing is
@@ -40,6 +42,7 @@ FRONTEND = ROOT / "src"
 FEATURES = FRONTEND / "features"
 BACKEND = ROOT / "src-tauri" / "src"
 CONTEXTS = BACKEND / "context"
+USE_CASES = BACKEND / "use_cases"
 
 COMPOSITION_ROOT = "shell"
 DEV_PAGES = ("design-system",)
@@ -154,6 +157,17 @@ def a3_cross_context() -> list[str]:
             for other in re.findall(r"crate::context::(\w+)", line):
                 if other != context:
                     hits.append(f"A3 {rel(path)}:{number}: reaches into context `{other}`")
+    return hits
+
+
+def a9_use_cases_call_services() -> list[str]:
+    hits = []
+    for path in sorted(USE_CASES.rglob("*.rs")):
+        for number, line in production_lines(path.read_text(encoding="utf-8")):
+            for match in re.finditer(r"crate::context::(\w+)::(repository|infrastructure)\b", line):
+                hits.append(
+                    f"A9 {rel(path)}:{number}: imports `{match.group(1)}::{match.group(2)}` — call its service"
+                )
     return hits
 
 
@@ -336,6 +350,7 @@ def main() -> int:
     hits += a1_gateway_only()
     hits += ratchet_pairs(state["cross_feature_imports"], recorded.get("cross_feature_imports", []))
     hits += a3_cross_context()
+    hits += a9_use_cases_call_services()
     hits += a4_typed_wire_errors()
     hits += a5_no_raw_interactive()
     hits += ratchet_counts("A6", "id-less interactive tags", state["missing_ids"], recorded.get("missing_ids", {}))
@@ -355,7 +370,7 @@ def main() -> int:
         sum(recorded.get("math_usage", {}).values()),
     )
     print(
-        "✅ architecture check: A1–A8 hold "
+        "✅ architecture check: A1–A9 hold "
         f"(frozen debt: {frozen[0]} cross-feature imports, {frozen[1]} id-less tags, {frozen[2]} Math. uses)"
     )
     return 0

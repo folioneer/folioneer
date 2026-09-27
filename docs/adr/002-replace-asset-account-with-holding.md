@@ -30,3 +30,8 @@ Replace the `AssetAccount` entity and its underlying `asset_accounts` table with
 - **Domain clarity**: `Holding` maps directly to the business concept "a position held in an account."
 - **ADR-001 alignment**: `holdings` becomes the first table in the `account/` context fully compliant with the i64 micro-unit standard.
 - **Breaking change scope**: Internal only — no public API surface is affected.
+
+## Guard
+
+- **Reversal looks like**: an `AssetAccount` type or an `asset_accounts` table reappearing, or a holding field stored as `REAL`.
+- **Guard**: `reviewer-arch` and `reviewer-sql` match the sign.

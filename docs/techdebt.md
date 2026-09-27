@@ -351,3 +351,13 @@ Remove an entry once it has been resolved.
 - Observation: The 23 spec files run their tests in about 80 seconds in total, yet the step takes 13–15 minutes: each file starts the app and waits ~30 s (10 s for one of them) between `RUNNING` and the webview's first log line. Disabling the accessibility bus (`NO_AT_BRIDGE=1`) removed its warning but not the wait (run of 2026-09-27), so the cause lies elsewhere — the WebDriver session start, the app's own start-up, or a timeout in the webview.
 - User value: None directly — code pull requests merge ten minutes sooner; the wait may also be felt by a user if it is the app's own start-up.
 - Done when: an E2E run with timestamped start-up logs (driver, app setup, first render) names the step that waits; it is removed or shortened at its cause, and the E2E job's time before and after is recorded.
+
+## 2026-09-27 — TD-045 — Two use cases take a bounded context's repository instead of its service
+
+- Found by: reviewer-infra (#048, reviewing architecture rule A9)
+- Where: `src-tauri/src/use_cases/asset_price_fetch/dispatcher.rs` (`Arc<dyn AssetPriceRepository>`), `src-tauri/src/use_cases/portfolio_sync/orchestrator.rs` (`Arc<dyn SyncStateRepository>`)
+- Severity: 🟡
+- Observation: ADR-004 says a use case injects services, never repositories. These two take a context's repository trait through the context's root re-export, which rule A9 (path-based: it names the `repository` or `infrastructure` module) does not see. Use-case-owned repositories (`ScheduledFetchRepository`, `PriceFetchLogRepository`) and the headless composition root are not concerned.
+- Open question for the owner: does ADR-004 hold — the two move to their context's service and A9 learns to match repository types — or is it amended to allow a use case to write through a context's repository trait?
+- User value: None directly — one rule for how use cases reach a context, enforced mechanically.
+- Done when: the owner's answer is applied: either both use cases call services and A9 fails on a repository type taken by a use case (seen red), or ADR-004 is superseded with the exception stated and its guard updated.

@@ -15,3 +15,8 @@ Recompute period values and performance metrics on demand in the account-perform
 
 - **Pros**: no new table or migration; no cache-invalidation logic; always consistent with source data including backdated edits; aligns with the existing replay-everywhere architecture; the simplest correct implementation for v1.
 - **Cons**: read cost scales with transaction count × number of periods (acceptable at personal scale, but not unbounded); the computation repeats on every page load with no cross-load memoization; if data volume grows or sub-daily granularity is later introduced, a cached or persisted approach may become necessary — re-incurring the invalidation work deferred here.
+
+## Guard
+
+- **Reversal looks like**: a persisted performance snapshot or period table, or a migration adding one.
+- **Guard**: `reviewer-sql` and `reviewer-arch` match the sign.

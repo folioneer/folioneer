@@ -32,3 +32,8 @@ Both issues were first documented in an analogous Tauri 2 + React 19 + WebKitGTK
 - E2E suites that touch ComboboxField-gated flows are smaller and more stable.
 - The backend contract for those commands is still exercised end-to-end via IPC tests in the same E2E suite.
 - Any future replacement of HeadlessUI Combobox with a native `<select>` or a WebKit-compatible alternative would allow the IPC tests to be promoted back to full UI tests without architectural changes.
+
+## Guard
+
+- **Reversal looks like**: an E2E spec typing into a `ComboboxField`.
+- **Guard**: `reviewer-e2e`; `reviewer-arch` matches the sign.
