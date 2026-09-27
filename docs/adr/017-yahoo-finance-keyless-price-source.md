@@ -1,7 +1,7 @@
 # ADR 017 — Yahoo Finance is the sole keyless price source; no user-supplied API keys
 
 **Date**: 2026-06-12
-**Status**: Accepted
+**Status**: Superseded by ADR-021
 
 ## Context
 

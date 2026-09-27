@@ -30,17 +30,16 @@
  *   file's Global refresh runs; the report's rows are exactly what this file
  *   seeds.
  *
- *   One account holding one asset whose reference (ZZ-NOPE-PMV) Yahoo Finance
- *   cannot resolve (no exchange set, so MKT-110 branch 2 uses the bare
- *   reference as the symbol — the same technique as
- *   account_details/manual_price_fill.test.ts). Yahoo returns no data for it
- *   either online or offline (offline: the request times out), so the asset
- *   always lands in the MKT-114 skip set and the account's reading is always
- *   marked incomplete (PMV-032), regardless of network state. The holding has
+ *   One account holding one asset (reference ZZ-NOPE-PMV, no exchange set, so
+ *   MKT-110 branch 2 uses the bare reference as the symbol — the same technique
+ *   as account_details/manual_price_fill.test.ts). An E2E run's External
+ *   provider answers "no data" for every symbol (src-tauri/src/extensions.rs),
+ *   so the asset always lands in the MKT-114 skip set and the account's reading is always
+ *   marked incomplete (PMV-032). The holding has
  *   never had a price recorded, so both the "before" and "after" readings
  *   value it at 0 (a missing price contributes 0) and the account's value
- *   cannot move — "nothing moved" (PMV-060) is therefore the deterministic
- *   report state, online or offline.
+ *   cannot move — "nothing moved" (PMV-060) is therefore the only possible
+ *   report state.
  *
  *   That same unresolvable asset is what puts the unupdated-prices modal on
  *   screen (MKT-170), which is what makes the PMV-018 ordering observable here
@@ -71,12 +70,9 @@ import { seedAccount, seedAsset, seedBuy, seedCategory } from "../helpers/seed";
 
 /**
  * Upper bound for the fetch to complete after clicking "Refresh prices".
- * Mirrors MODAL_APPEARS_TIMEOUT in manual_price_fill.test.ts: the fetch task
- * calls Yahoo once for the single bogus symbol (10 s per-request timeout,
- * yahoo_client.rs) plus IPC + event propagation plus the "before"/"after"
- * valuation reads. In practice this completes in a few seconds because the
- * bogus symbol fails fast; the wide ceiling guards offline CI where the TCP
- * handshake itself may time out.
+ * Mirrors MODAL_APPEARS_TIMEOUT in manual_price_fill.test.ts: the E2E provider
+ * answers at once, so this covers IPC, event propagation and the
+ * "before"/"after" valuation reads on a slow CI runner.
  */
 const FETCH_COMPLETES_TIMEOUT = 35_000;
 
@@ -94,7 +90,7 @@ describe("price_movement", () => {
     const catId = await seedCategory("E2E Cat PMV");
     accountId = await seedAccount("E2E PMV Account");
 
-    // Bogus reference guarantees Yahoo can never resolve it (see file header).
+    // The E2E provider has no data for any symbol (see file header).
     assetId = await seedAsset("E2E PMV Unresolvable Asset", catId, {
       reference: "ZZ-NOPE-PMV",
     });

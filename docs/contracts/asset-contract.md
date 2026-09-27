@@ -61,7 +61,7 @@
 >
 > A fetch task that priced at least one asset records the moment it ends in this installation's fetch log before it publishes `AssetPriceFetchCompleted` (MKT-201); a failed write never fails the task.
 >
-> Both commands are keyless (ADR-017): they fetch from Yahoo Finance with no API key and no fetch-mode argument. The former `use_api_key: bool` parameter was removed when the BYOK/Stooq path was retired.
+> Both commands take no API key and no fetch-mode argument: they fetch through the build's External provider, and a build without one refuses them (MKT-210). The former `use_api_key: bool` parameter was removed when the BYOK/Stooq path was retired.
 
 | Command                      | Args                    | Return | Errors                                                                                                                                        |
 | ---------------------------- | ----------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -196,7 +196,7 @@ struct Capabilities {
 ```
 
 ```rust
-// AssetPriceSource variants (MKT-100) — keyless Yahoo Finance is the sole provider (ADR-017)
+// AssetPriceSource variants (MKT-100) — YahooFinance is written by a Yahoo Finance provider (the owner's private build)
 enum AssetPriceSource { Manual, YahooFinance }
 // Manual:       every user-driven write — manual entry (MKT-020+), transaction
 //               auto-record follow-up (MKT-050+), price-history edit (MKT-083+);
@@ -305,6 +305,7 @@ struct PriceHistoryBackfillOutcome {
 
 ## Changelog
 
+- 2026-09-27 — #038: the public build has no External provider; `YahooFinance` is written only by a Yahoo Finance provider (the owner's private build). No wire change.
 - 2026-09-19 — Amended by `market-price` spec (MKT-200–203): new `get_price_freshness` command and `PriceFreshness` shared type. No event added; the header item re-reads on `AssetPriceFetchCompleted`, `AssetPriceUpdated`, `TransactionUpdated` and `SyncCompleted`.
 - 2026-09-19 — SYN-064 amended: applied assets, categories and prices raise no event of their own; `SyncCompleted` is the re-fetch trigger for what a sync applied
 - 2026-08-22 — Amended by `sync-conflict-resolution` spec: `Asset.category` resolves to the default category when the stored category stands removed (CFR-030); `update_asset.CategoryNotFound` and `update_category.DuplicateName` notes (CFR-030/035).

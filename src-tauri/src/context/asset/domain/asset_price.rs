@@ -109,13 +109,14 @@ pub struct PriceHistoryBackfillOutcome {
     pub already_priced: u32,
 }
 
-/// External price-data provider trait (MKT-110, ADR-017).
+/// External price-data provider trait (MKT-110). A build plugs one in, or none (MKT-210,
+/// ADR-020).
 /// Returns the latest price as i64 micros (ADR-001) with its observation date (MKT-117).
 #[cfg_attr(test, mockall::automock)]
 #[async_trait::async_trait]
 pub trait PriceProvider: Send + Sync {
-    /// Fetches the latest quote for the given provider symbol. Keyless (ADR-017):
-    /// the provider (Yahoo Finance) requires no credential.
+    /// Fetches the latest quote for the given provider symbol. The provider takes no
+    /// user-supplied credential.
     ///
     /// - `Ok(Some(quote))` — the provider returned a usable price and (optionally) its
     ///   observation date.
@@ -140,7 +141,7 @@ pub trait PriceProvider: Send + Sync {
     ///
     /// Defaulted so existing single-purpose fakes (e.g. integration-test
     /// providers exercising only `fetch_price`) do not need to implement a
-    /// method they never call; `ReqwestYahooClient` overrides it.
+    /// method they never call; a real provider overrides it.
     async fn fetch_daily_closes(
         &self,
         symbol: &str,

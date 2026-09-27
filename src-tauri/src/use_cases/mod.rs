@@ -16,7 +16,7 @@ pub mod account_performance;
 pub mod account_summary;
 /// Archive asset: guards archiving against active holdings across bounded contexts (OQ-6).
 pub mod archive_asset;
-/// Asset price auto-fetch: retrieves prices from Yahoo on launch and user demand (MKT-100+).
+/// Asset price auto-fetch: retrieves prices from the build's External provider on launch and user demand (MKT-100+).
 pub mod asset_price_fetch;
 /// Asset Web Lookup: OpenFIGI search to pre-fill the Add Asset form (WEB).
 pub mod asset_web_lookup;

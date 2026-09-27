@@ -4,17 +4,18 @@
 
 use std::sync::Arc;
 
-use crate::context::asset::{PriceProvider, ReqwestYahooClient};
+use crate::context::asset::{NoDataProvider, PriceProvider};
 use crate::context::currency::{
     ChainedRateProvider, RateHistoryProvider, RateProvider, ReqwestEcbClient,
     ReqwestFrankfurterClient,
 };
+use crate::shared::infrastructure::e2e_run;
 use crate::use_cases::asset_web_lookup::{OpenFigiClient, ReqwestOpenFigiClient};
 use crate::use_cases::update_checker::UpdateChannel;
 
 /// The external data sources of a build.
 pub struct Providers {
-    /// The External provider — latest quotes and daily closes (ADR-017). `None` in a
+    /// The External provider — latest quotes and daily closes (ADR-020). `None` in a
     /// build composed without one: no fetch task, no scheduled fetch and no price
     /// history backfill exists (MKT-210).
     pub price: Option<Arc<dyn PriceProvider>>,
@@ -35,11 +36,17 @@ pub fn providers() -> anyhow::Result<Providers> {
         Arc::new(ReqwestEcbClient::new()?) as Arc<dyn RateProvider>,
     ]));
     Ok(Providers {
-        price: Some(Arc::new(ReqwestYahooClient::new()?)),
+        price: price_provider(e2e_run::e2e_data_dir().is_some())?,
         rate,
         rate_history: frankfurter,
         asset_lookup: Arc::new(ReqwestOpenFigiClient::new()),
     })
+}
+
+/// The public build's External provider: none. An E2E run gets one that answers "no data",
+/// so the fetch flows stay reachable by the suite without any network call.
+fn price_provider(is_e2e_run: bool) -> anyhow::Result<Option<Arc<dyn PriceProvider>>> {
+    Ok(is_e2e_run.then(|| Arc::new(NoDataProvider) as Arc<dyn PriceProvider>))
 }
 
 /// The channel this build's updates come from: the endpoint of `tauri.conf.json`,
@@ -59,20 +66,39 @@ pub fn distribution_channel() -> Option<&'static str> {
 mod tests {
     use super::*;
 
-    // #037 — the public build plugs in a source for prices, rates, rate history and
-    // asset lookup; a missing one would leave a feature silently dead.
+    // #038 — the public build plugs in rates, rate history and asset lookup, and no
+    // External provider: prices are entered by hand (MKT-210).
     #[test]
-    fn the_public_build_plugs_in_every_external_data_source() {
+    fn the_public_build_plugs_in_every_external_data_source_but_prices() {
         let providers = providers().expect("providers");
 
-        assert_eq!(
-            Arc::strong_count(providers.price.as_ref().expect("price")),
-            1
-        );
+        assert!(providers.price.is_none());
         assert_eq!(Arc::strong_count(&providers.rate), 1);
         assert_eq!(Arc::strong_count(&providers.asset_lookup), 1);
         // The rate provider chain holds the same client as the rate history.
         assert_eq!(Arc::strong_count(&providers.rate_history), 2);
+    }
+
+    // #038 — an E2E run gets an External provider that answers "no data" for every
+    // symbol, latest quote and daily closes alike, without calling anything.
+    #[tokio::test]
+    async fn an_e2e_run_gets_a_provider_that_answers_no_data() {
+        assert!(price_provider(false).expect("provider").is_none());
+
+        let provider = price_provider(true)
+            .expect("provider")
+            .expect("an E2E run has a provider");
+
+        assert!(provider
+            .fetch_price("AAPL")
+            .await
+            .expect("answer")
+            .is_none());
+        assert!(provider
+            .fetch_daily_closes("AAPL", "2026-01-01", "2026-01-31")
+            .await
+            .expect("answer")
+            .is_none());
     }
 
     // #037 — the public build sends no header of its own and names no endpoint: its

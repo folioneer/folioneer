@@ -7,7 +7,7 @@ use super::error::{FetchAccountAssetPricesError, FetchAllAssetPricesError};
 use super::orchestrator::AssetPriceFetchUseCase;
 use super::trigger::FetchTrigger;
 
-/// Dispatches an all-accounts auto-fetch task (MKT-122, MKT-130). Keyless (ADR-017).
+/// Dispatches an all-accounts auto-fetch task (MKT-122, MKT-130).
 /// Returns `Ok(())` immediately after successful dispatch; per-asset results
 /// arrive asynchronously via `AssetPriceUpdated` events (MKT-112). `trigger`
 /// states which action started the fetch (PMV-010/015) — only `Manual`
@@ -21,7 +21,7 @@ pub async fn fetch_all_asset_prices(
     uc.fetch_all(trigger).await
 }
 
-/// Dispatches a per-account price-fetch task (MKT-132, MKT-131). Keyless (ADR-017).
+/// Dispatches a per-account price-fetch task (MKT-132, MKT-131).
 /// Returns `Ok(())` immediately after successful dispatch.
 #[tauri::command]
 #[specta::specta]

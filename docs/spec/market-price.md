@@ -2,7 +2,7 @@
 
 ## Context
 
-The Market Price feature allows users to record the current market value of a financial asset manually. It is the first phase of market price support; automated price feeds are a future feature that will slot into the same data model.
+The Market Price feature allows users to record the current market value of a financial asset manually. Automated prices slot into the same data model when the build has an External provider (MKT-210).
 
 A price is recorded per asset (not per holding) and is timestamped: multiple entries can accumulate over time, one per date per asset. The Account Details view uses the most recently dated price to display the current value, unrealized gain/loss, and performance percentage for each active holding.
 
@@ -235,7 +235,7 @@ This section extends the buy/sell transaction flow defined in `docs/spec/financi
 
 These rules apply to all paths that write `AssetPrice` (manual entry MKT-020+, transaction auto-record MKT-050+, auto-fetch — see "Auto-Fetch from External Provider" — and the price history backfill MKT-190+).
 
-**MKT-100 — `AssetPriceSource` enum (backend)**: `AssetPrice.source` is of type `AssetPriceSource`, with variants `Manual | YahooFinance`. Exposed on the frontend wire surface. (Per ADR-017 the provider is keyless Yahoo Finance; the former `Stooq` / `Finnhub` variants are removed.)
+**MKT-100 — `AssetPriceSource` enum (backend)**: `AssetPrice.source` is of type `AssetPriceSource`, with variants `Manual | YahooFinance`. Exposed on the frontend wire surface. (`YahooFinance` is written by a Yahoo Finance provider — the owner's private build; the public build has none, MKT-210. The former `Stooq` / `Finnhub` variants are removed.)
 
 **MKT-101 — `source: Manual` on user-driven paths (backend)**: Every user-driven write sets `source = Manual` — both `record_asset_price` (manual entry MKT-020+, transaction auto-record MKT-050+) and `update_asset_price` (price-history edit MKT-083, MKT-084). An auto-fetched row edited via the price-history flow therefore becomes `Manual`. The frontend never passes a source value.
 
@@ -243,7 +243,7 @@ These rules apply to all paths that write `AssetPrice` (manual entry MKT-020+, t
 
 ### Auto-Fetch from External Provider (110–149)
 
-This section adds an automated price-update mechanism that complements the existing manual entry paths (MKT-020+, MKT-050+). Auto-fetch retrieves current prices from an external provider on app launch and on user demand. The choice of external provider is captured in [ADR-017](../adr/017-yahoo-finance-keyless-price-source.md): the keyless Yahoo Finance `/v8/finance/chart/` JSON endpoint, the sole automated source (no API key, no proof-of-work).
+This section adds an automated price-update mechanism that complements the existing manual entry paths (MKT-020+, MKT-050+). Auto-fetch retrieves current prices from an External provider on app launch and on user demand. Which External provider a build plugs in is decided by its extension file ([ADR-020](../adr/020-one-extension-file-per-build.md)): the public build has none (MKT-210); the owner's private build uses the keyless Yahoo Finance `/v8/finance/chart/` JSON endpoint, whose conventions the rules below follow.
 
 #### Fetch task definitions
 
@@ -253,7 +253,7 @@ This section adds an automated price-update mechanism that complements the exist
 
 #### Shared behaviors (110–119)
 
-**MKT-110 — Symbol derivation (backend)**: The Yahoo Finance provider symbol is resolved per ADR-017 with the following precedence:
+**MKT-110 — Symbol derivation (backend)**: The provider symbol — Yahoo Finance's convention, used by the owner's private build — is resolved with the following precedence:
 
 1. If `Asset.exchange` is set, the symbol is `Asset.reference` joined by `.` to the Yahoo venue suffix of the exchange (e.g. `VOD` + LSE → `VOD.L`, `BMW` + XETRA → `BMW.DE`, `MC` + Euronext Paris → `MC.PA`); the suffix is produced by a per-provider mapper from the canonical `Exchange`. US venues (NYSE/Nasdaq) map to an **empty** suffix, so the symbol is the bare reference (`AAPL`) — Yahoo addresses US listings without a suffix.
 2. If `Asset.exchange` is unset, the symbol is the bare `Asset.reference`. This branch preserves the US-ticker happy path and covers legacy assets created before the exchange field existed.
@@ -279,7 +279,7 @@ The launch auto-fetch (MKT-121) shows no dispatch snackbar; its outcome is silen
 
 **MKT-116 — System cash assets excluded (backend)**: System cash assets (per CSH spec, identified by their `system-cash-*` reference) are excluded from every fetch task scope (launch MKT-122, global refresh MKT-130, account refresh MKT-132). They have no external market price.
 
-**MKT-117 — Provider returns the observation date (backend)**: `PriceProvider::fetch_price` returns the provider's observation date alongside the price (the date the quote is _for_, not the time of the fetch). The Yahoo adapter derives this from the chart response's regular-market timestamp (epoch seconds, converted to the exchange-local ISO date). A provider that does not supply a date returns it as absent.
+**MKT-117 — Provider returns the observation date (backend)**: `PriceProvider::fetch_price` returns the provider's observation date alongside the price (the date the quote is _for_, not the time of the fetch). A Yahoo Finance adapter — the owner's private build supplies one through its extension file (ADR-020), verified there — derives it from the chart response's regular-market timestamp (epoch seconds, converted to the exchange-local ISO date). A provider that does not supply a date returns it as absent.
 
 **MKT-118 — Fetched price is dated by the observation date, with a today fallback (backend)**: When a fetch writes an `AssetPrice`, it uses the provider's observation date (MKT-117) as `AssetPrice.date` — keyed and upserted by `(asset_id, observation_date)` per MKT-025 — provided that date is a well-formed ISO `yyyy-mm-dd` not in the future. When the observation date is absent, malformed, or in the future, it falls back to the current local date. The price is always recorded; an unusable observation date never causes a skip (contrast MKT-114, which skips only on price/network/parse failure). Effect: a fetch on a non-trading day dates the row at the last trading day, so the staleness label (MKT-140) reads honestly (e.g. "Updated 2d ago" on a Sunday), and repeated non-trading-day fetches are idempotent on that row rather than minting a new current-dated row.
 
@@ -293,7 +293,7 @@ The launch auto-fetch (MKT-121) shows no dispatch snackbar; its outcome is silen
 
 **MKT-122 — Auto-fetch start (backend)**: The auto-fetch task scope is all active holdings across all accounts (subject to MKT-111, MKT-116). Auto-fetch is acknowledged synchronously; per-asset results are signaled via `AssetPriceUpdated` (MKT-112).
 
-**MKT-125 — Sub-unit (pence) quotes normalized to the major ISO unit (backend)**: Applies to every fetch-write path (launch MKT-122, global refresh MKT-130, account refresh MKT-132) and to the price history backfill (MKT-192). Some venues quote in a currency's minor unit — Yahoo reports London (LSE) prices in `GBp` (pence), Johannesburg in `ZAc` (cents), Tel Aviv in `ILA` (agorot). When the provider's quoted currency is one of the recognised minor-unit codes (`GBp`, `ZAc`, `ILA`), the adapter divides the price by 100 and persists it under the corresponding major ISO currency (`GBp → GBP`, `ZAc → ZAR`, `ILA → ILS`). Any currency code **not** in that recognised minor-unit set — including every major ISO code — is treated as already major and stored unchanged (no division). A minor-unit code is never persisted as a currency. (Known limitation: a minor-unit code outside the recognised set would be stored unscaled; the recognised set is widened if such a venue surfaces.)
+**MKT-125 — Sub-unit (pence) quotes normalized to the major ISO unit (backend)**: Binds the External provider's adapter, which a build supplies through its extension file (ADR-020) and verifies there. Applies to every fetch-write path (launch MKT-122, global refresh MKT-130, account refresh MKT-132) and to the price history backfill (MKT-192). Some venues quote in a currency's minor unit — Yahoo reports London (LSE) prices in `GBp` (pence), Johannesburg in `ZAc` (cents), Tel Aviv in `ILA` (agorot). When the provider's quoted currency is one of the recognised minor-unit codes (`GBp`, `ZAc`, `ILA`), the adapter divides the price by 100 and persists it under the corresponding major ISO currency (`GBp → GBP`, `ZAc → ZAR`, `ILA → ILS`). Any currency code **not** in that recognised minor-unit set — including every major ISO code — is treated as already major and stored unchanged (no division). A minor-unit code is never persisted as a currency. (Known limitation: a minor-unit code outside the recognised set would be stored unscaled; the recognised set is widened if such a venue surfaces.)
 
 #### Manual refresh (130–134)
 
@@ -405,7 +405,7 @@ The header tells how recent the portfolio's prices are. Prices travel with the s
 
 ### Without an External provider (210–219)
 
-A build may be composed without an External provider ([ADR-020](../adr/020-one-extension-file-per-build.md)); why the public build is heading there is recorded in [`external-dependencies.md`](../external-dependencies.md). Prices typed by hand are then the only prices, and the application must read as complete rather than as one with a broken half.
+A build may be composed without an External provider ([ADR-020](../adr/020-one-extension-file-per-build.md)); the public build is composed without one since #038, for the reasons recorded in [`external-dependencies.md`](../external-dependencies.md). Prices typed by hand are then the only prices, and the application must read as complete rather than as one with a broken half.
 
 **MKT-210 — A build may have no External provider (backend)**: The External provider is optional at composition. A build composed without one has no fetch task — no auto-fetch (MKT-121/122), no global refresh (MKT-130), no account refresh (MKT-131/132) — and no price history backfill (MKT-190). Starting any of them is refused before any work is done: nothing is fetched, nothing is written, and no moment of last fetch is recorded (MKT-201). The scheduled fetch follows the same rule (SPF-070).
 
@@ -503,7 +503,7 @@ App launch
         └─ dispatch background job, return                                 (MKT-122)
     → background job:
         for each active holding asset:
-            ├─ derive provider symbol from Asset.reference                (MKT-110, ADR-017)
+            ├─ derive provider symbol from Asset.reference                (MKT-110)
             ├─ if symbol unmappable OR provider fetch fails: skip silently (MKT-114, logged warning)
             └─ on success: upsert (asset_id, date, price, source=YahooFinance) (MKT-025, MKT-102, MKT-125)
                           publish AssetPriceUpdated                       (MKT-112)

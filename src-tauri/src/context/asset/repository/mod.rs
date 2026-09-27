@@ -4,10 +4,10 @@ mod asset;
 mod asset_price;
 /// Asset category persistence logic.
 mod category;
-/// Yahoo Finance HTTP price provider (ADR-017).
-mod yahoo_client;
+/// The External provider of an E2E run: no data for any symbol (ADR-020).
+mod no_data_provider;
 
 pub use asset::SqliteAssetRepository;
 pub use asset_price::SqliteAssetPriceRepository;
 pub use category::SqliteAssetCategoryRepository;
-pub use yahoo_client::ReqwestYahooClient;
+pub use no_data_provider::NoDataProvider;

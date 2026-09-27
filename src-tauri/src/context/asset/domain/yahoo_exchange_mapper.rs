@@ -1,5 +1,5 @@
 /// Yahoo Finance outbound mapper: resolves a canonical `Exchange` to its Yahoo
-/// venue suffix (MKT-110, ADR-017).
+/// venue suffix (MKT-110).
 ///
 /// Pure adapter translating the asset BC's canonical `Exchange` value object to
 /// the Yahoo Finance symbol-suffix scheme (`{ticker}.{suffix}`, e.g. `VOD.L`).

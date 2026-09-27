@@ -10,7 +10,7 @@ This spec is a **feature spec**: it extends the price-write model owned by the `
 
 **Accepted limitation — uninstall leftover**: uninstalling the application without disabling the schedule first may leave the OS entry registered; it then fails harmlessly once per day. Disabling before uninstall removes it cleanly.
 
-All financial values are stored as i64 micro-units per [ADR-001](../adr/001-use-i64-for-monetary-amounts.md). Price writes follow latest-write-wins per [ADR-012](../adr/012-latest-write-wins-source-as-metadata.md); the provider is keyless Yahoo Finance per [ADR-017](../adr/017-yahoo-finance-keyless-price-source.md).
+All financial values are stored as i64 micro-units per [ADR-001](../adr/001-use-i64-for-monetary-amounts.md). Price writes follow latest-write-wins per [ADR-012](../adr/012-latest-write-wins-source-as-metadata.md); the provider is the build's External provider ([ADR-020](../adr/020-one-extension-file-per-build.md)) — none in the public build (SPF-070).
 
 ---
 
@@ -79,7 +79,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-030 — Close-of-day semantics (backend)**: The scheduled download records **daily closing prices**, never a live intraday quote. Each recorded price is dated to the trading day it closes — including during catch-up: a run executing the morning after a missed trigger records the previous day's close, not the morning's price.
 
-**SPF-031 — Backfill window (backend)**: Each run retrieves, per asset, the **daily close series** covering the days missing since the last successful scheduled run — a capability the External provider already exposes (its chart data carries dated daily history, ADR-017) — and records every completed trading-day close in that window, up to a maximum of 30 days back. Gaps older than 30 days are left untouched.
+**SPF-031 — Backfill window (backend)**: Each run retrieves, per asset, the **daily close series** covering the days missing since the last successful scheduled run — a capability the External provider already exposes (its chart data carries dated daily history, MKT-117) — and records every completed trading-day close in that window, up to a maximum of 30 days back. Gaps older than 30 days are left untouched.
 
 **SPF-032 — Non-trading days produce no rows (backend)**: Weekends and market holidays have no close; the run writes nothing for those dates. This is not a skip or an error.
 

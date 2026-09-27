@@ -13,7 +13,8 @@
 | [ADR-012](012-latest-write-wins-source-as-metadata.md)       | Latest-Write-Wins; Source Field is Metadata                                   | Accepted                      |
 | [ADR-013](013-recompute-account-performance-on-read.md)      | Recompute Account Performance on Read                                         | Accepted                      |
 | [ADR-014](014-price-refresh-lock-scope-exclusion.md)         | Per-Asset Price-Refresh Lock via Fetch-Scope Exclusion                        | Accepted                      |
-| [ADR-017](017-yahoo-finance-keyless-price-source.md)         | Yahoo Finance is the Sole Keyless Price Source; No API Keys                   | Accepted                      |
+| [ADR-017](017-yahoo-finance-keyless-price-source.md)         | Yahoo Finance is the Sole Keyless Price Source; No API Keys                   | Superseded by ADR-021         |
 | [ADR-018](018-lazy-catch-up-management-fee-generation.md)    | Lazy Catch-Up Generation for Recurring Management Fees                        | Accepted                      |
 | [ADR-019](019-per-device-change-log-multi-device-sync.md)    | Per-Device Change Log for Multi-Device Sync                                   | Accepted                      |
 | [ADR-020](020-one-extension-file-per-build.md)               | One Extension File Decides a Build's External Data Sources and Update Channel | Accepted                      |
+| [ADR-021](021-withdraw-the-keyless-price-source.md)          | Withdraw the Keyless Price Source Decision                                    | Accepted — supersedes ADR-017 |

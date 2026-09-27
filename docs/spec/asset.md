@@ -34,7 +34,7 @@ Subjective risk score from 1 (low risk) to 5 (high risk). The frontend suggests 
 
 ### `reference`
 
-Security ticker (e.g. `AAPL`) or free-form identifier entered by the user (e.g. `APPART-PARIS-15`) for non-quoted assets. Required. For assets that also have an ISIN, the canonical ISO 6166 identity is stored separately in `isin` (see below); `reference` holds the ticker symbol used for market-data provider lookups (Yahoo Finance, etc.).
+Security ticker (e.g. `AAPL`) or free-form identifier entered by the user (e.g. `APPART-PARIS-15`) for non-quoted assets. Required. For assets that also have an ISIN, the canonical ISO 6166 identity is stored separately in `isin` (see below); `reference` holds the ticker symbol used for market-data provider lookups (the External provider, etc.).
 
 ### `isin`
 

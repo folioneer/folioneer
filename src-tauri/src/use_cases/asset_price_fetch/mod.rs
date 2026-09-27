@@ -1,5 +1,5 @@
-//! Auto-fetch use case: retrieves prices from Yahoo for all active, derivable
-//! holdings on launch (MKT-122), on global refresh (MKT-130), and on
+//! Auto-fetch use case: retrieves prices from the build's External provider for all
+//! active, derivable holdings on launch (MKT-122), on global refresh (MKT-130), and on
 //! per-account refresh (MKT-132).
 
 /// Tauri command handlers for fetch tasks.

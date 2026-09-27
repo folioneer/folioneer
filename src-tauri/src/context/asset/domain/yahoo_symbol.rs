@@ -1,5 +1,4 @@
-/// Derives the Yahoo Finance provider symbol using the MKT-110 precedence rule
-/// (ADR-017).
+/// Derives the Yahoo Finance provider symbol using the MKT-110 precedence rule.
 ///
 /// Precedence:
 ///   1. `exchange` is `Some` AND the mapper returns a suffix:

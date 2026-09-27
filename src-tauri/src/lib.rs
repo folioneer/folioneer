@@ -314,7 +314,7 @@ pub fn run() {
 
                 app_handle.manage(AssetWebLookupUseCase::new(providers.asset_lookup));
 
-                // ----- asset price fetch (keyless Yahoo Finance, ADR-017) -----
+                // ----- asset price fetch (the build's External provider, ADR-020) -----
                 // MKT-201 — this installation's fetch log, written by both fetch paths.
                 let price_fetch_log: Arc<dyn PriceFetchLogRepository> =
                     Arc::new(SqlitePriceFetchLogRepository::new(db.pool.clone()));

@@ -112,7 +112,7 @@ pub(crate) fn parse_frankfurter_snapshot(body: &str) -> Result<EurSnapshot> {
         .into_iter()
         .map(|(code, value)| {
             // Reject non-finite or non-positive rates from an anomalous/compromised
-            // feed before the micros cast (mirrors the Yahoo client guard).
+            // feed before the micros cast.
             if !value.is_finite() || value <= 0.0 {
                 anyhow::bail!("Frankfurter rate out of range for {code}: {value}");
             }

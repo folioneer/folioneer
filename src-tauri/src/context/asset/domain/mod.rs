@@ -12,7 +12,8 @@ pub mod isin;
 pub mod openfigi_exchange_mapper;
 /// Yahoo outbound exchange mapper — `Exchange` → Yahoo suffix (MKT-110).
 pub mod yahoo_exchange_mapper;
-/// Yahoo provider symbol derivation from asset reference (MKT-110, ADR-017).
+/// Provider symbol derivation from asset reference, in Yahoo Finance's convention (MKT-110):
+/// the fetch scope and the price history backfill hand it to the build's External provider.
 pub mod yahoo_symbol;
 
 pub use asset::*;

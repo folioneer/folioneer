@@ -18,13 +18,11 @@
  *                 the entered value
  *
  * Seed strategy:
- *   Two assets whose references (ZZ-NOPE-1 / ZZ-NOPE-2) cannot be resolved by
- *   Yahoo Finance. Both assets are intentionally seeded WITHOUT an exchange
- *   value so MKT-110 branch 2 applies (bare reference as symbol). Yahoo
- *   Finance returns no data for unknown symbols (online) or the request times
- *   out (offline); either way, both assets land in the MKT-114 skip set and
- *   appear in the unpriced list. The test outcome is therefore deterministic
- *   regardless of network state.
+ *   Two assets (references ZZ-NOPE-1 / ZZ-NOPE-2), seeded WITHOUT an exchange
+ *   value so MKT-110 branch 2 applies (bare reference as symbol). An E2E run's
+ *   External provider answers "no data" for every symbol and calls nothing
+ *   (src-tauri/src/extensions.rs), so both assets land in the MKT-114 skip set
+ *   and appear in the unpriced list, deterministically.
  *
  *   Both assets are bought in the same account so
  *   fetch_account_asset_prices scopes to them. Cash asset is excluded from
@@ -40,12 +38,9 @@
  *
  * Timing notes:
  *   fetch_account_asset_prices is fire-and-forget (returns () once dispatched).
- *   The background job calls Yahoo for each asset. With bogus symbols, Yahoo
- *   returns quickly (404 / no-data); per-request timeout is 10 s (yahoo_client.rs).
- *   The MODAL_APPEARS_TIMEOUT (35 s) is the outer ceiling for the event to fire
- *   and the modal to mount. In practice the job completes in < 5 s because the
- *   bogus requests fail fast. The long ceiling guards offline CI where the TCP
- *   handshake itself may time out (2 × 10 s + overhead).
+ *   The background job asks the E2E provider for each asset, which answers at
+ *   once. The MODAL_APPEARS_TIMEOUT (35 s) is the outer ceiling for the event to
+ *   fire and the modal to mount on a slow CI runner.
  */
 
 import assert from "node:assert";
@@ -62,9 +57,8 @@ import { seedAccount, seedAsset, seedBuy, seedCategory } from "../helpers/seed";
 
 /**
  * Upper bound for the unupdated-prices modal to auto-open after clicking
- * "Refresh prices". Covers two sequential Yahoo requests (10 s timeout each)
- * plus IPC + event propagation. In practice the job completes in < 5 s because
- * bogus symbols fail fast; 35 s guards the offline case.
+ * "Refresh prices": the provider answers at once, so this covers IPC, the
+ * spacing between requests and event propagation on a slow CI runner.
  */
 const MODAL_APPEARS_TIMEOUT = 35_000;
 
@@ -78,15 +72,14 @@ describe("manual_price_fill", () => {
   let astId2: string;
 
   // Seed shared prerequisites once via IPC — no UI interaction needed for setup.
-  // Two distinct assets with bogus Yahoo references + one account holding both.
+  // Two distinct assets the E2E provider has no data for + one account holding both.
   before(async () => {
     const catId = await seedCategory("E2E Cat MKT170");
     accId = await seedAccount("E2E MKT-170 Account");
 
     // seedAsset lets us pass an explicit reference (the "ticker"). We pass
-    // ZZ-NOPE-1 / ZZ-NOPE-2 — strings guaranteed never to be real Yahoo
-    // symbols. No exchange is set, so MKT-110 branch 2 resolves the symbol
-    // to the bare reference, and Yahoo returns no data for both.
+    // ZZ-NOPE-1 / ZZ-NOPE-2 — no exchange is set, so MKT-110 branch 2 resolves
+    // the symbol to the bare reference, and the E2E provider has no data for it.
     astId1 = await seedAsset("E2E Unpriced Asset One", catId, { reference: "ZZ-NOPE-1" });
     astId2 = await seedAsset("E2E Unpriced Asset Two", catId, { reference: "ZZ-NOPE-2" });
 

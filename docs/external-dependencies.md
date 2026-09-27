@@ -12,7 +12,7 @@ Terms are quoted as read on the date beside each one. They change; re-read befor
 
 | Service                                                         | Used for                                 | Commercial use  | Without it                                       |
 | --------------------------------------------------------------- | ---------------------------------------- | --------------- | ------------------------------------------------ |
-| [Yahoo Finance](#yahoo-finance) `query1.finance.yahoo.com`      | every asset price and daily close        | ⚠️ forbidden    | no automatic prices; manual entry still works    |
+| [Yahoo Finance](#yahoo-finance) `query1.finance.yahoo.com`      | every asset price and daily close        | ⚠️ forbidden    | left the public build (#038); manual entry       |
 | [Frankfurter](#frankfurter) `api.frankfurter.dev`               | exchange rates, latest and historical    | ✅ allowed      | the ECB fallback covers the latest rates         |
 | [European Central Bank](#european-central-bank) `ecb.europa.eu` | exchange rates, fallback (ADR-009)       | ✅ with credit  | Frankfurter alone; no fallback                   |
 | [OpenFIGI](#openfigi) `api.openfigi.com`                        | asset lookup by ISIN or name             | ✅ data; ⚠️ API | the asset form is filled by hand                 |
@@ -25,7 +25,7 @@ Terms are quoted as read on the date beside each one. They change; re-read befor
 - **Automated access**: forbidden **irrespective of commerce**. §2.4.9 forbids to _"access or collect data … using any automated means, devices, programs, algorithms or methodologies, including but not limited to robots, spiders, scrapers"_. §2.4.10 forbids building _"any database, archive, mobile application, data feed, widget or any other aggregated data source that competes with or constitutes a material substitute"_.
 - **Redistribution**: §2.8 forbids reproducing or distributing any portion of the Services for commercial purposes.
 - **What this means here**: the usual reading — "fine while it is a free personal tool" — does not survive §2.4.9. An application that fetches prices on a schedule is automated access whether or not anyone is paid. So this is not only a question of what may be sold; the free application is already outside these terms today.
-- **Decision** (2026-09-21): it leaves the public build. #036 makes the application whole without a price provider, #037 provided the seam, #038 moves the client into the owner's private build and deletes it here. The private build remains one person fetching their own holdings, which is what the endpoint is tolerated for in practice, but it is not what §2.4.9 permits, and this document does not pretend otherwise.
+- **Decision** (2026-09-21): it leaves the public build — done on 2026-09-27 (#038): the public build calls Yahoo no longer and holds no client for it; the owner's private build keeps it. The private build remains one person fetching their own holdings, which is what the endpoint is tolerated for in practice, but it is not what §2.4.9 permits, and this document does not pretend otherwise.
 - **Also**: the endpoint can change shape or disappear without notice (ADR-017), which is a second, independent reason not to build anything sold on it.
 
 ### Frankfurter
@@ -57,7 +57,7 @@ Terms are quoted as read on the date beside each one. They change; re-read befor
 
 - **Provider**: GitHub. The updater reads `releases/latest/download/latest.json` from the public repository and downloads the installer beside it.
 - **Commercial use**: allowed — distributing releases of one's own software is what the service is for, and nothing in it restricts the software to non-commercial terms.
-- **Note**: this is the one service the **private** build will not use as it stands; #038 points its updater at a private repository, which is the same service under the same terms plus authentication.
+- **Note**: the **private** build's updater reads a private repository instead (#038) — the same service under the same terms, plus authentication.
 - **Decision**: keep. No action.
 
 ---
@@ -79,7 +79,7 @@ Terms are quoted as read on the date beside each one. They change; re-read befor
 
 ## What this changes
 
-- Of five services called, **one** forbids what the application does: Yahoo Finance, and it forbids it today rather than only when something is sold. That entry's decision is already queued as #036 → #037 → #038.
+- Of five services called, **one** forbids what the application does: Yahoo Finance, and it forbade it before anything was sold. The public build stopped calling it on 2026-09-27 (#036 → #037 → #038).
 - The exchange rates are clean on both paths, and the ECB's one condition — cite the source — the application already meets.
 - **One item is unverified**: the OpenFIGI API's own terms. No replacement entry is filed for it, because nothing yet says one is needed; the obligation is to read them, and it is recorded here and in the release audit rather than as a backlog entry that might sit unread.
 - No replacement entry is filed beyond those that already exist: #039 holds the hosted price feed that replaces Yahoo for whoever subscribes.

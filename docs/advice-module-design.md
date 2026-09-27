@@ -55,7 +55,7 @@ existing engine changes.
 _(all measured 2026-07-31)_
 
 - **Daily bars** carry `open, high, low, close, volume` plus `adjclose`. The
-  current Yahoo client parses only `close`; the rest is present in the same
+  private build's Yahoo client parses only `close`; the rest is present in the same
   payload and simply discarded today.
 - **Fundamentals are closed.** `quoteSummary` answers `401 Invalid Crumb`
   without a cookie/crumb handshake. Since ADR-017 removed the key

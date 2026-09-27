@@ -25,18 +25,17 @@
  *     in WebKitGTK; covered by FE hook unit tests (useRefreshGlobalPrices.test.ts,
  *     useRefreshAccountPrices.test.ts).
  *
- *   MKT-122 / fetch dispatch on a populated account — Would hit real Yahoo HTTP
- *     and write a Yahoo price as a side effect, polluting the DB across tests.
- *     The "dispatched" snackbar path (mkt.fetch_dispatched) is covered by FE unit
- *     tests. The Yahoo HTTP client itself is covered by BE integration tests in
- *     src-tauri/tests/.
+ *   MKT-122 / fetch dispatch on a populated account — the E2E provider has no
+ *     data for any symbol, so a dispatch here only re-runs what
+ *     manual_price_fill.test.ts covers. The "dispatched" snackbar path
+ *     (mkt.fetch_dispatched) is covered by FE unit tests.
  *
  *   MKT-132 (AccountNotFound) — The UI button always passes a valid accountId from
  *     the router URL param; the error is not reachable via normal UI interaction.
  *     Covered by BE Tier 2/3 tests.
  *
- *   MKT-121 (auto-fetch on launch) — Requires controlling whether Yahoo responds,
- *     which is a network dependency. The mount-once effect is covered by FE unit tests.
+ *   MKT-121 (auto-fetch on launch) — Requires the setting enabled before the
+ *     application starts. The mount-once effect is covered by FE unit tests.
  *
  *   MKT-116 (cash asset exclusion) — The cash row is excluded inside the BE use case
  *     before any HTTP call; verified by BE Tier 3 integration tests.

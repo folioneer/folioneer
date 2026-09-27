@@ -97,7 +97,7 @@ How recent the portfolio's prices are, told by two figures. The **newest price d
 
 ### AssetPriceSource
 
-A value-object enum qualifying the provenance of an `AssetPrice` record. Variants: `Manual` (user-entered via manual entry or transaction auto-record) and `YahooFinance` (keyless auto-fetch, ADR-017). Metadata for traceability per ADR-012 — does not influence read/write precedence (latest-write-wins).
+A value-object enum qualifying the provenance of an `AssetPrice` record. Variants: `Manual` (user-entered via manual entry or transaction auto-record) and `YahooFinance` (written by a fetch through a Yahoo Finance provider, as in the owner's private build). Metadata for traceability per ADR-012 — does not influence read/write precedence (latest-write-wins).
 
 > Status: confirmed
 
@@ -291,7 +291,7 @@ The cumulative cost of Management Fee Deductions attributed to a holding, in the
 
 ### Fetch task
 
-A backend job that retrieves current prices from an external provider and upserts `AssetPrice` records. Umbrella term for the three named instances below.
+A backend job that retrieves current prices from an External provider and upserts `AssetPrice` records. Umbrella term for the three named instances below.
 
 > Status: confirmed
 
@@ -345,7 +345,7 @@ Recording every missed trading-day close since the last successful scheduled fet
 
 ### External provider
 
-A third-party HTTP service that returns current asset prices and their daily-close history. Currently Yahoo Finance — keyless, no credential required (ADR-017). A build may have none, and then holds only prices typed by hand. "provider" in prose means an External provider.
+A third-party HTTP service that returns current asset prices and their daily-close history, with no credential asked of the user. A build may have none, and then holds only prices typed by hand — the public build has none.
 
 > Status: confirmed
 

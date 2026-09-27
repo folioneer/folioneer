@@ -146,26 +146,6 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
 
-## #038 — (release) — A private build channel for the owner, then Yahoo leaves the public repository
-
-Its prerequisites have landed: a build without an External provider offers nothing it cannot run (#036), exchange rates refresh without one (#042), and the extension file it overlays exists (ADR-020). Most of the work lives in a private repository, `folioneer/folioneer-private`; this entry tracks it and owns the one public commit that ends it. The private repository holds its own `extensions.rs` and the Yahoo client, pins the public repository as a submodule at a release tag, copies its files over the submodule, builds with the same action as the public release and publishes to its own releases — nothing of it appears on the public releases page. Same identifier, so the same data folder: installing a public build over it loses automatic prices and nothing else. The build says what it is (`X.Y.Z+private` in About). Order, always: the owner releases publicly, then the private workflow builds that tag.
-
-Updates: the private build reads an access token from a file in its configuration folder (`update-token`), never from the binary, and sends it in the `Authorization` header of #037. Probe of 2026-09-25, on a throwaway pre-release ([L-015](lessons.md)): self-update works. Assets are served only through the API address (the web address answers 404 even with a token), so the workflow writes its own `latest.json` with API addresses and commits it, read through `raw.githubusercontent.com`; a refused token answers 404 there, so UPD-028 counts 404 as a refusal on a channel that sends credentials. The probe used the owner's `gh` session token; the fine-grained token is first tried on the owner's computer.
-
-State on 2026-09-27: public `v0.2.0` released; the private workflow built and published "Folioneer v0.2.0 (private)" on its first run, its update file carrying API addresses (a download through one answered 200). The owner's two computers run it, each with its own fine-grained token, which answers 200 on the update file — the fine-grained token's first real test. On Windows the token had to sit in the configuration folder (`AppData\Roaming`), not beside the data (`AppData\Local`); the private build now also looks there, accepts `update-token.txt` and strips a byte-order mark (from its next build). What remains is the last step below.
-
-The inventory of 2026-09-21 ([`external-dependencies.md`](external-dependencies.md)) sharpened why this is owed: Yahoo's terms forbid automated access itself (§2.4.9), not only commercial use, so the free application is outside them today, whatever is sold.
-
-Last step, once the private build runs and updates itself on both of the owner's computers: the Yahoo client and its tests are deleted from the public repository, the public `extensions.rs` returns no provider, ADR-017 is superseded, the coverage floors are re-measured, and the next public release is the first without automatic prices.
-
-**User value:** None for a standard user, who keeps one installer and one update channel and never sees the other; the owner keeps automatic prices.
-**Done when:** The probe's result is recorded; the private workflow produces installers for Windows and Linux from a public tag; the owner's two computers run the private build, see their existing data and update from the private channel (or the fallback is in place); a refused token is reported in the application; then the public repository holds no Yahoo code, its harness is green with the re-measured floors, and ARCHITECTURE.md and the ADR index are current.
-**Design:** none
-**Open questions:**
-
-- [x] How does the private build say what it is? `X.Y.Z+private` as the version risks the Windows installer's version rules (unverified), so private releases are named "(private)" and the About page shows the public version number meanwhile. (Recommended: a line on the About page fed by the extension file — a small public change with a design mock.) — A channel name beside the version, not inside it: an About chip and a sidebar suffix, fed by the extension file (UPD-030), landed before the first private release (2026-09-27).
-- [x] If the probe shows self-update from private releases is not workable, is "notify, then a recipe downloads and installs" acceptable on both computers? (Recommended: yes — one user, two computers.) — Yes (2026-09-25); not needed, the probe showed self-update works.
-
 ## #045 — (fullstack) — "Computers synced on" shows a sync that exchanged nothing
 
 The header's sync item reads "Ordinateurs synchronisés le 27/09/2026 14:52" while the sync folder — a USB key — was unplugged, and its warning icon rightly says sync needs attention. A run that cannot reach the folder still ends normally: it records the failure and stamps its end as the moment of the last sync, and the header shows that moment as "synchronised on". Seen by the owner on 2026-09-27 on Linux and on Windows, at the launch sync (SYN-060). The date and the warning contradict each other, and the date is the one a user trusts.

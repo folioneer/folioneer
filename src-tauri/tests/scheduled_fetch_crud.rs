@@ -11,7 +11,7 @@ use folioneer_lib::context::account::{
     AccountService, SqliteAccountRepository, SqliteHoldingRepository, SqliteTransactionRepository,
 };
 use folioneer_lib::context::asset::{
-    AssetService, ReqwestYahooClient, SqliteAssetCategoryRepository, SqliteAssetPriceRepository,
+    AssetService, PriceProvider, Quote, SqliteAssetCategoryRepository, SqliteAssetPriceRepository,
     SqliteAssetRepository,
 };
 use folioneer_lib::context::currency::{
@@ -36,6 +36,16 @@ async fn make_pool() -> sqlx::Pool<sqlx::Sqlite> {
     pool
 }
 
+/// A provider these tests never reach: configuring the schedule fetches nothing.
+struct UnusedProvider;
+
+#[async_trait::async_trait]
+impl PriceProvider for UnusedProvider {
+    async fn fetch_price(&self, _symbol: &str) -> anyhow::Result<Option<Quote>> {
+        Ok(None)
+    }
+}
+
 /// Builds an orchestrator wired to real in-memory SQLite and a `NoopScheduler`,
 /// with "now" fixed to 2026-06-10T23:00:00 (after the default 22:15 trigger).
 async fn build_orchestrator() -> ScheduledFetchOrchestrator {
@@ -55,7 +65,7 @@ async fn build_orchestrator() -> ScheduledFetchOrchestrator {
         Box::new(SqliteCurrencyPairRepository::new(pool.clone())),
         Box::new(SqliteCurrencyRateRepository::new(pool.clone())),
     ));
-    let price_provider = Arc::new(ReqwestYahooClient::new().expect("build yahoo client"));
+    let price_provider = Arc::new(UnusedProvider);
     let repository = Arc::new(SqliteScheduledFetchRepository::new(pool.clone()));
     let scheduler = Arc::new(NoopScheduler);
     let now = NaiveDate::from_ymd_opt(2026, 6, 10)
