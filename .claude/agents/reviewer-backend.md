@@ -1,6 +1,6 @@
 ---
 name: reviewer-backend
-description: Audits Rust code quality after backend implementation — typed error handling per `error-model.md` (no `anyhow::Result` or `Result<T, String>` on wire-visible signatures), no `unwrap()` in production paths, async correctness, trait-based repositories, idiomatic patterns, inline test conventions. Run alongside `reviewer-arch` on any `.rs` change (the two are complementary lanes — code quality vs DDD layering, both should fire). Not for migrations (use `reviewer-sql`) or security-sensitive surfaces (use `reviewer-security`). Default diff-scoped; opt-in release-sweep mode when the invoking prompt contains `release-sweep`.
+description: Reviews changed Rust code: typed errors, no unwrap in production, async correctness, repositories, test conventions. Use on any .rs change.
 tools: Read, Grep, Glob, Bash, Write
 model: sonnet
 ---

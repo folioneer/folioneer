@@ -1,6 +1,6 @@
 ---
 name: reviewer-e2e
-description: Audits Tauri WebDriver E2E test files (`e2e/**/*.test.ts`) added or modified on the branch — selector strategy (E1–E4 stable `id`), async patterns (E10 explicit timeouts), no-mock discipline, test independence, locale invariance, helper usage. Only triggers when E2E test files are added or modified. Not for frontend `.tsx` code (see `reviewer-frontend`) or the implementation the tests exercise (see `reviewer-arch` / `reviewer-backend`). Default diff-scoped; opt-in release-sweep mode when the invoking prompt contains `release-sweep`.
+description: Reviews changed E2E specs (e2e/**/*.test.ts): stable-id selectors, explicit timeouts, no mocks, independence, helpers. Use when E2E specs change.
 tools: Read, Grep, Glob, Bash, Write
 model: sonnet
 ---

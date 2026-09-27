@@ -1,6 +1,6 @@
 ---
 name: reviewer-arch
-description: Audits DDD layering across `.rs`, `.ts`, and `.tsx` files — bounded context isolation, gateway pattern, factory methods, data flow direction, dead code, English-only. Run alongside `reviewer-backend` on any `.rs` change and alongside `reviewer-frontend` on any `.ts` / `.tsx` change (the agents are complementary lanes — DDD layering vs language-specific code quality, both should fire). Not for E2E test files under `e2e/` (use `reviewer-e2e`), migrations (use `reviewer-sql`), or security-sensitive surfaces (use `reviewer-security`). Default diff-scoped; opt-in release-sweep mode when the invoking prompt contains `release-sweep`.
+description: Reviews DDD layering in changed .rs/.ts/.tsx files: context isolation, gateway, factories, data flow, dead code. Use with reviewer-backend or reviewer-frontend.
 tools: Read, Grep, Glob, Bash, Write
 model: sonnet
 ---

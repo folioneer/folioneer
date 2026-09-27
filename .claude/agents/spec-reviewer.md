@@ -1,6 +1,6 @@
 ---
 name: spec-reviewer
-description: Reviews a feature spec doc (docs/spec/*.md) for quality and contractability before implementation. Run whenever a spec changes, before the contract follows it (`docs/workflow.md` § 7). Not for verifying test coverage of rules — use `spec-checker` instead.
+description: Reviews a feature spec (docs/spec/*.md) for clear, testable, contractable rules. Use whenever a spec changes.
 tools: Read, Grep, Glob
 model: opus
 ---

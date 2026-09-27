@@ -1,6 +1,6 @@
 ---
 name: reviewer-infra
-description: Infrastructure and CI reviewer for Tauri 2 / Rust projects. Reviews GitHub Actions workflows, config files (tauri.conf.json, capabilities/*.json, Cargo.toml, package.json, justfile), scripts, and git hooks. Checks CI/local consistency, script quality, capability file format. Delegates dependency audit to /dep-audit before releases. Use when any workflow, config, capability, script, or hook file is modified. Not for general `.rs` / `.ts` / `.tsx` code quality (use `reviewer-backend` / `reviewer-frontend`), DDD layering (`reviewer-arch`), migrations (`reviewer-sql`), or application-code security (`reviewer-security`). Default diff-scoped; opt-in release-sweep mode (full infra audit + CI Improvement Opportunities) when the invoking prompt contains `release-sweep`.
+description: Reviews CI workflows, scripts, hooks, justfile and config (tauri.conf, capabilities, Cargo.toml, package.json). Use when any of them changes.
 tools: Read, Glob, Bash, Write
 model: sonnet
 ---

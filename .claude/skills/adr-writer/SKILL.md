@@ -1,7 +1,6 @@
 ---
 name: adr-writer
 description: Authors and supersedes Architecture Decision Records (docs/adr/*.md). Run when a decision passes the 3-criteria gate (genuinely complex / not obvious from context / costly to reverse). After authoring or superseding, run `adr-reviewer` to validate quality before locking in. Not for tentative decisions — those stay in the spec's `## Open Questions` until ratified.
-tools: Read, Glob, Write, AskUserQuestion
 model: opus
 ---
 

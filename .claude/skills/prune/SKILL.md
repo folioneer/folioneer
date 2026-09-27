@@ -1,7 +1,6 @@
 ---
 name: prune
 description: Audit the project for structural simplification — fewer lines, methods, and unnecessary code — without touching architecture or DDD structure. Coverage report is mandatory; refuses to proceed without one. Read-only; produces a prioritized report for human review.
-tools: Bash, Read, Grep, Glob, Write
 ---
 
 # Skill — `prune`

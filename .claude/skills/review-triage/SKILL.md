@@ -1,7 +1,6 @@
 ---
 name: review-triage
 description: Triages reviewer-* findings against the (a)/(b)/(c) per-task discipline before any are applied. Reads `.review/` reports, grades each finding, emits a per-row Follow-up table, and applies the workflow's policy per grade without halting. Applied after every reviewer batch under the workflow; also usable standalone after ad-hoc reviewer runs. Routes (b) rows to `/techdebt` — does not replace it.
-tools: Read, Glob, Bash, Write
 ---
 
 # Skill — `review-triage`

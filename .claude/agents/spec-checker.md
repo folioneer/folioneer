@@ -1,6 +1,6 @@
 ---
 name: spec-checker
-description: Verifies that all business rules (TRIGRAM-NNN, e.g. REF-010, REF-020) in a feature spec doc are fully implemented in code and covered by tests. Use when implementation is complete and ready for spec compliance check.
+description: Checks that every rule (TRIGRAM-NNN) of a feature spec is implemented and tested. Use before closing an entry that carries spec rules.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---

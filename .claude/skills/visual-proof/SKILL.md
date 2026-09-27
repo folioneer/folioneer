@@ -1,7 +1,6 @@
 ---
 name: visual-proof
 description: Captures and commits visual proof screenshots for any `.tsx` / `.css` change. Generates a full preview for every component state (idle/loading/results/empty/error) in both light and dark mode, captures with Playwright via `scripts/visual-proof-capture.mjs`, and reports any console errors found. Auto-discovers project config on first run.
-tools: Read, Glob, Grep, Write, Bash, AskUserQuestion
 ---
 
 # Skill — `visual-proof`

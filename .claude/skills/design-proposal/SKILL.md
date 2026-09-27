@@ -1,7 +1,7 @@
 ---
 name: design-proposal
 description: Produces the design proposal a todo entry needs before anything the user sees changes — rendered mocks of the target state in light and dark under screenshots/design/NNN-*.png plus a five-line note — and flips the entry's Design line to proposed. Invoked as `/design-proposal NNN`. The human validates by editing the entry.
-tools: Read, Glob, Grep, Write, Edit, Bash
+argument-hint: "[NNN]"
 ---
 
 # Skill — `design-proposal`

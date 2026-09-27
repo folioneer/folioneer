@@ -1,6 +1,6 @@
 ---
 name: contract-reviewer
-description: Reviews a domain contract (docs/contracts/{domain}-contract.md) against its source spec for coverage, traceability, error exhaustiveness, and type correctness. Blocks the pull request on critical findings. Run whenever a contract changes (`docs/workflow.md` § 7). Not for producing or amending the contract — the main agent does that.
+description: Reviews a domain contract (docs/contracts/*.md) against its spec: coverage, errors, types. Use whenever a contract changes.
 tools: Read, Grep, Glob
 model: opus
 ---

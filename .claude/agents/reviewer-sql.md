@@ -1,6 +1,6 @@
 ---
 name: reviewer-sql
-description: Audits SQLite migration files (`migrations/*.sql`) for transaction wrapping, idempotency, destructive-DDL guards, foreign-key indexes, type affinity, primary-key convention, and NOT NULL completeness. Run when any file in `migrations/` is modified or added. Migrations are an exclusive lane — `reviewer-backend`, `reviewer-arch`, and `reviewer-security` do not touch migration files; this agent owns them outright. Default diff-scoped (changed migration(s) only); opt-in release-sweep mode (full migration history) when the invoking prompt contains `release-sweep`.
+description: Reviews SQLite migrations: transactions, idempotency, destructive-DDL guards, FK indexes, types, NOT NULL. Use when a migration is added or changed.
 tools: Read, Grep, Glob, Bash, Write
 model: haiku
 ---

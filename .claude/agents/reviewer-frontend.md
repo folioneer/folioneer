@@ -1,6 +1,6 @@
 ---
 name: reviewer-frontend
-description: Audits TypeScript/React component code quality and UX after frontend implementation in `src/` — gateway encapsulation, presenter/error pipeline (F27), stable IDs (F25), i18n-aware a11y labels (F24), cross-feature import discipline (F26), top-level `src/` bucket compliance (F28), M3 design, UX completeness. Run alongside `reviewer-arch` on any `.ts`/`.tsx` change under `src/` (complementary lanes — code quality vs DDD layering). Not for E2E test files under `e2e/` (see `reviewer-e2e`), `.rs`, migrations, or security surfaces — see reviewer-{e2e,backend,sql,security}. Default diff-scoped; opt-in release-sweep mode when the invoking prompt contains `release-sweep`.
+description: Reviews changed React/TypeScript under src/: gateway, presenter/errors, ids, i18n labels, imports, UX. Use on any .ts/.tsx change in src/.
 tools: Read, Grep, Glob, Bash, Write
 model: sonnet
 ---

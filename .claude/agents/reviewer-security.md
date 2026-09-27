@@ -1,6 +1,6 @@
 ---
 name: reviewer-security
-description: Security reviewer for Tauri 2 / React 19 / Rust projects. Audits the IPC command layer (input validation, path traversal, SQL injection, unsafe), frontend security (XSS, eval, storage misuse), secrets and credentials in source, capability surface, and cross-layer compound risks. Use when a NEW `#[tauri::command]` is added, `capabilities/*.json` is modified, or input parsing / unsafe / auth / crypto / secret-handling changes; skip return-type or rename refactors of existing commands. Not for general `.rs` / `.ts` / `.tsx` code quality (use `reviewer-backend` / `reviewer-frontend`), DDD layering (`reviewer-arch`), migrations (`reviewer-sql`), or CI / config / capability format (`reviewer-infra`). Default diff-scoped; opt-in release-sweep mode when the invoking prompt contains `release-sweep`.
+description: Reviews IPC commands, capabilities, input parsing, secrets, unsafe and frontend XSS risks. Use when a command, capability or security-sensitive code changes.
 tools: Read, Grep, Glob, Bash, Write
 model: sonnet
 ---

@@ -1,7 +1,7 @@
 ---
 name: next-todo
 description: Runs the first ready entry of the human's Next queue in docs/todo.md end to end under the project workflow — branch, design gate, acceptance tests, implementation, harness, reviewers, PR, merge on green, closure — without asking the human anything; questions go into the entry. Use to advance the backlog autonomously, one entry per invocation.
-tools: Read, Glob, Grep, Write, Edit, Bash, Agent, TaskCreate, TaskUpdate, Monitor
+argument-hint: "[#NNN | TD-NNN]"
 ---
 
 # Skill — `next-todo`

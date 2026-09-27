@@ -1,7 +1,6 @@
 ---
 name: whats-next
 description: Surveys pending work across the todo file, inline TODOs, tech debt, open spec questions, in-flight git work, and open GitHub issues, then returns a value/effort table with a recommended next action. Use at session start to triage what to work on, especially after a gap when context has faded.
-tools: Bash, Read, Grep, Glob, Write
 ---
 
 # Skill — `whats-next`

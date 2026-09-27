@@ -1,7 +1,6 @@
 ---
 name: techdebt
 description: Produces a normalized tech-debt entry in chat — date-stamped, with auto-filled git context (branch + short commit). The entry is text-only output; the main agent decides whether to append it to `docs/techdebt.md` (the convention), file a GitHub issue, or surface it elsewhere per the downstream CLAUDE.md's policy. Use when a reviewer surfaces a `[DECISION]` critical or pre-existing tech-debt observation worth recording, or when the main agent notices a non-actionable smell during work.
-tools: Bash
 ---
 
 # Skill — `techdebt`

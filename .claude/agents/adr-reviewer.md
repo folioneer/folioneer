@@ -1,6 +1,6 @@
 ---
 name: adr-reviewer
-description: Quality gate on ADRs (docs/adr/*.md) — structure, the 3-criteria gate, status/supersedes integrity, index integrity, content quality, cross-spec consistency. Run after adr-writer creates or supersedes an ADR, and before a release sweep. Not for ADR authoring — use `adr-writer` instead.
+description: Reviews ADRs (docs/adr/*.md) for structure, admission gate, status and index integrity. Use after an ADR is created or superseded, and before a release.
 tools: Read, Grep, Glob
 model: sonnet
 ---
