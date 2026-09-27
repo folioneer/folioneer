@@ -2,7 +2,7 @@
 
 <!-- Add new backlog items here. Format: ## #NNN — (domain) — Short title -->
 <!-- #NNN is a permanent reference: never renumbered, never reused. A new entry takes the -->
-<!-- next free number wherever it is placed. Next free: #044. -->
+<!-- next free number wherever it is placed. Next free: #046. -->
 <!-- Every entry ends with four lines: **User value:**, **Done when:**, **Design:** and -->
 <!-- **Open questions:**. Design is `none` until the agent proposes one (it does so before -->
 <!-- touching anything the user sees), then `proposed (screenshots/design/NNN-*.png)`, then -->
@@ -152,7 +152,7 @@ Its prerequisites have landed: a build without an External provider offers nothi
 
 Updates: the private build reads an access token from a file in its configuration folder (`update-token`), never from the binary, and sends it in the `Authorization` header of #037. Probe of 2026-09-25, on a throwaway pre-release ([L-015](lessons.md)): self-update works. Assets are served only through the API address (the web address answers 404 even with a token), so the workflow writes its own `latest.json` with API addresses and commits it, read through `raw.githubusercontent.com`; a refused token answers 404 there, so UPD-028 counts 404 as a refusal on a channel that sends credentials. The probe used the owner's `gh` session token; the fine-grained token is first tried on the owner's computer.
 
-State on 2026-09-25: `folioneer/folioneer-private` holds the overlay (`extensions.rs` and the Yahoo client beside it, compiled and tested against `main`), the `public/` submodule, and a **Private release** workflow (manual, one public tag: Windows, then Linux, then the update file committed). Waiting on the owner: a public release carrying the extension file (only `v0.1.0` exists, which predates it), the two signing secrets in the private repository, and the token file on each computer — the private README lists them.
+State on 2026-09-27: public `v0.2.0` released; the private workflow built and published "Folioneer v0.2.0 (private)" on its first run, its update file carrying API addresses (a download through one answered 200). The owner's two computers run it, each with its own fine-grained token, which answers 200 on the update file — the fine-grained token's first real test. On Windows the token had to sit in the configuration folder (`AppData\Roaming`), not beside the data (`AppData\Local`); the private build now also looks there, accepts `update-token.txt` and strips a byte-order mark (from its next build). What remains is the last step below.
 
 The inventory of 2026-09-21 ([`external-dependencies.md`](external-dependencies.md)) sharpened why this is owed: Yahoo's terms forbid automated access itself (§2.4.9), not only commercial use, so the free application is outside them today, whatever is sold.
 
@@ -165,6 +165,31 @@ Last step, once the private build runs and updates itself on both of the owner's
 
 - [x] How does the private build say what it is? `X.Y.Z+private` as the version risks the Windows installer's version rules (unverified), so private releases are named "(private)" and the About page shows the public version number meanwhile. (Recommended: a line on the About page fed by the extension file — a small public change with a design mock.) — A channel name beside the version, not inside it: an About chip and a sidebar suffix, fed by the extension file (UPD-030), landed before the first private release (2026-09-27).
 - [x] If the probe shows self-update from private releases is not workable, is "notify, then a recipe downloads and installs" acceptable on both computers? (Recommended: yes — one user, two computers.) — Yes (2026-09-25); not needed, the probe showed self-update works.
+
+## #045 — (fullstack) — "Computers synced on" shows a sync that exchanged nothing
+
+The header's sync item reads "Ordinateurs synchronisés le 27/09/2026 14:52" while the sync folder — a USB key — was unplugged, and its warning icon rightly says sync needs attention. A run that cannot reach the folder still ends normally: it records the failure and stamps its end as the moment of the last sync, and the header shows that moment as "synchronised on". Seen by the owner on 2026-09-27 on Linux and on Windows, at the launch sync (SYN-060). The date and the warning contradict each other, and the date is the one a user trusts.
+
+**User value:** The header's sync date says when the computers last exchanged changes, so the user can tell how current the other computer's data is.
+**Done when:** A run that cannot reach the folder, or fails before exchanging anything, leaves the header's date unchanged; a run that exchanged changes, or confirmed there was nothing to exchange, updates it; the warning still names the failure; the rule is in the sync spec and covered by tests.
+**Design:** none
+**Open questions:**
+
+- [ ] Show the last successful sync, keeping the failed attempt only behind the warning — or relabel the date "last attempt"? (Recommended: the last successful sync — the header promises "your computers are in sync as of…", and the warning already covers the attempt.)
+
+## #044 — (fullstack) — Run Folioneer from the command line, without a window
+
+The same installed program answers a few commands in a terminal, without opening a window: a summary (portfolio total, accounts), a refresh of prices and exchange rates, an export, and an import once #025 exists. Linux and Windows first; macOS when a macOS build exists (none does today). It builds on what the scheduled fetch already does — the program already starts without a window for it.
+
+**User value:** Check the portfolio or refresh it from a terminal or a script, without opening the application.
+**Done when:** To be written once the open questions are answered — at least: the chosen commands work on Linux and Windows without a window, print readable text, and exit with a code a script can test.
+**Design:** none
+**Open questions:**
+
+- [ ] Which commands come first? (Recommended: `summary` and `refresh`; export and import later.)
+- [ ] What happens when the application is open while a command writes? (Recommended: writing commands refuse while it runs; reading commands always work.)
+- [ ] Plain text only, or JSON as well? (Recommended: text by default, `--json` for scripts.)
+- [ ] How is it started on Windows, where the installer adds nothing to the `PATH`? (Recommended: document the full path first; a `PATH` entry later.)
 
 ## #039 — (service) — A hosted price feed the application can subscribe to (deferred)
 

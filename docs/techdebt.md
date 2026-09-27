@@ -181,6 +181,7 @@ Remove an entry once it has been resolved.
 
 - Found by: manual (an E2E run, attempt 1, on a pull request that touched no app code)
 - Seen again: a `main` push run, attempt 1 (2026-09-15, after a change that touched no E2E or assets code) — same `before each` hook, same stale node handle on an `element` call; attempt 2 green.
+- Seen again: PR #18, a records-only pull request, attempt 1 (2026-09-27); attempt 2 green.
 - Where: e2e/assets/assets.test.ts (`beforeEach`), e2e/helpers/modal.ts (`dismissLeftoverModal`), e2e/helpers/navigation.ts (`navigateToAssets`)
 - Severity: 🟡
 - Observation: The hook failed with `stale element reference` while creating a node handle for an `element` call — an element located by one step had been replaced by a re-render before the next step used it. It is the second distinct once-only E2E failure in two days (TD-016 is the first); both sit in setup or navigation code shared by many specs, so each has many chances to fire per run. With E2E as a required check, every such failure costs a re-run before a green PR can merge.
@@ -312,3 +313,12 @@ Remove an entry once it has been resolved.
 - Observation: in such a build `fetch_all_asset_prices`, `fetch_account_asset_prices`, `configure_scheduled_fetch`, `get_scheduled_fetch_status` and `backfill_holding_price_history` reach no managed state, so Tauri refuses the call before the command body runs. That satisfies MKT-210 and SPF-070 — nothing is fetched or written, and the message names only the command and its argument, both public in `bindings.ts` — but the refusal is a plain string, not a `{ code }` error, so the error model's typed pipeline does not see it. Nothing calls these commands today: the interface hides every control that would (MKT-212).
 - User value: None today.
 - Done when: a call to any of those commands in a build without an External provider answers a typed code the frontend presenter can map, through one shared guard rather than five hand-written checks — worth doing when a second optional capability (a bank feed, the advice module) makes the pattern repeat.
+
+## 2026-09-27 — TD-039 — The currency rates spec's rate edit can hit a stale element
+
+- Found by: the main agent (PR #18, a records-only pull request, E2E attempt 1 after a rebase; attempt 2 green)
+- Where: e2e/currency/currency_rates.test.ts (`FXR-052: editing a rate via the UI updates the rate row`)
+- Severity: 🟡
+- Observation: The test failed with `stale element reference` while creating a node handle for an `element` call — the same failure as TD-019, in a different spec. The Currency Rates view re-fetches its pairs and rates on `CurrencyRateUpdated`, so the row a step located can be re-rendered before the next step uses it. The same pull request hit TD-019 on its first run: two once-only failures on a change the suite cannot execute (see #041).
+- User value: None — suite reliability.
+- Done when: the test re-locates the row after the edit is saved, or waits for the view's re-fetch to settle; a month of pull-request runs shows no failure of it.
