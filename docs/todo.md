@@ -233,22 +233,6 @@ Proposal: one static page, in French and English, in its own repository publishe
 - [ ] A domain from the start, or the free GitHub Pages address first? (`folioneer.com` and `folioneer.app` are registered; they are the natural choice.)
 - [ ] Is the Windows installer to be signed before strangers download it, and how? Today only the updater signature exists (it proves an update comes from the owner; SmartScreen ignores it) — no Windows code signing. The options, prices and eligibility to be checked again when the time comes: (a) SignPath Foundation — free, publisher shown as "SignPath Foundation", open-source licence and CI-built releases required; (b) a Certum open-source certificate — tens of euros a year, the owner's name shown, open-source project required, signing through their cloud service since keys must live on hardware; (c) Azure Trusted Signing — about ten dollars a month, eligibility of individuals depends on the country; (d) a standard certificate with cloud signing — a few hundred euros a year, no open-source condition; (e) no signing, and the page explains the warning. Even signed, the warning lasts until the certificate has earned reputation — which then carries over from one release to the next, whereas an unsigned installer starts from zero each time. (a) and (b) exist only while the licence is open source, which the AGPL-3.0-or-later is. (Recommended: (b) if the owner's name should show, (a) if free matters more.) Wiring any of them is one signing command in the Tauri configuration plus a credential in the release workflow.
 
-## #048 — (tooling) — An ADR exists to stop an agent reversing a decision
-
-The owner keeps ADRs for one purpose (2026-09-27): ensure an agent does not reverse an architectural decision. Today nothing ties the 16 ADRs to that purpose: the admission gate asks whether a decision is complex, not obvious and costly to reverse, but no reviewer reads the ADRs, and an ADR does not say what a reversal would look like in a diff. The ADR-017 → ADR-021 exchange shows the cost of the ceremony without the protection.
-
-Proposal:
-
-- **Gate:** one question replaces the three criteria — would an agent reading only the code plausibly undo this, and would undoing it be costly?
-- **Template:** Context, Decision, and two new lines: **Reversal looks like** (the concrete signs in a diff, e.g. "a dependency on the private repository in `Cargo.toml`") and **Guard** (the architecture rule, test or reviewer check that fails on it). Pros and cons shrink to what the guard protects.
-- **Reviewers:** `reviewer-arch` reads every accepted ADR's reversal signs and reports a matching diff as a 🔴 `[DECISION]` — an open question for the owner, never fixed or waived by the agent. Only the owner supersedes an ADR.
-- **Audit:** each existing ADR gets its reversal signs and guard, or is marked superseded when nothing is left to protect.
-
-**User value:** None directly — a decision the owner took stays taken without the owner watching every pull request.
-**Done when:** `adr-writer` and `adr-reviewer` use the one-question gate and the new template; every accepted ADR states its reversal signs and guard, and each mechanical guard has been seen red; `reviewer-arch` flags a diff that matches a reversal sign as a 🔴 `[DECISION]` (proved on a sample diff).
-**Design:** none
-**Open questions:** none
-
 ## #049 — (tooling) — References name what they point at: TODO-NNN, DEBT-NNN, ghNN
 
 Decided by the owner on 2026-09-27: a todo entry becomes `TODO-NNN` (today `#NNN`), a tech-debt entry `DEBT-NNN` (today `TD-NNN`), and a GitHub issue `ghNN`. Today `#043` reads like pull request #43 on GitHub, where it also links to the wrong thing. Measured the same day: `TD-NNN` appears 53 times in 10 files, a `#0NN` todo reference in 47 files, `gh#NN` 16 times; three scripts parse the formats (`scripts/next-todo.sh`, `scripts/check.py`, `scripts/release.py`), as do the skills (`/next-todo`, `/techdebt`, `/review-triage`, `/whats-next`), `CLAUDE.md` and `docs/workflow-c.md`.

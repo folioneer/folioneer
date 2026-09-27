@@ -31,3 +31,8 @@ Alternatives considered:
 - **Pros**: the public repository stays self-contained and always compiles; a private build, and later a beta channel, is a one-file difference; removing a source from the public build is an edit of one function; the advice module's hook question is closed.
 - **Cons**: the replacement is a file overlay performed outside this repository, so nothing here can check that a replacement still compiles against a new release — the build that overlays it finds out. What the file returns is therefore a contract: changing its shape is announced in the changelog's technical notes.
 - This decision does not affect ADR-017: Yahoo Finance remains the price source the public file plugs in.
+
+## Guard
+
+- **Reversal looks like**: an external client constructed outside `extensions.rs`, or a feature flag or optional private dependency deciding what a build contains.
+- **Guard**: tests `the_public_build_updates_from_the_configured_endpoint_without_headers` and `the_public_build_names_no_distribution_channel` (`src-tauri/src/extensions.rs`); `reviewer-arch` matches the sign.

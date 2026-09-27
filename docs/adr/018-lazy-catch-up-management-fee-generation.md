@@ -15,3 +15,8 @@ Generate due deductions by **lazy catch-up on app start**: a single shell-mounte
 
 - **Pros**: no resident process or platform timer; survives the app being closed for months (the gap backfills on next open); the per-schedule date cursor makes generation idempotent; reuses the one-off record path, so there is a single deduction code path to test; deductions are real transactions, consistent with cost-basis replay and the Management Fees aggregation (FEE-052/053).
 - **Cons**: fees materialize when the user next opens the app, not on the calendar date — an account never reopened accrues nothing until reopened (acceptable: an unused app has no live valuation to act on anyway); catch-up cost scales with the number of missed periods × active schedules on a cold open after a long gap (bounded and small at personal scale); a generation failure is best-effort and surfaced via a snackbar (F27) rather than blocking startup.
+
+## Guard
+
+- **Reversal looks like**: a background scheduler or OS timer generating fees, or a deduction written without advancing the period cursor.
+- **Guard**: tests `fee_041_generates_one_deduction_per_completed_period`, `fee_043_cursor_advances_for_skipped_periods` and `fee_070_apply_due_fee_deductions_is_idempotent`.

@@ -29,3 +29,8 @@ Alternatives considered:
 
 - **Pros**: a manual correction on a locked asset survives every refresh with zero re-typing; ADR-012's simpler write/read model is fully preserved (no precedence check, no source-aware ordering); the mechanism reuses the existing MKT-116 scope-exclusion shape, so the fetch pipeline gains one predicate, not a new code path; the flag is additive and reversible by an unlock.
 - **Cons**: a locked asset's price goes stale silently — its staleness label keeps aging and the user must remember to unlock it when they again want live updates; the lock is asset-wide, so a user holding the same asset in multiple accounts cannot lock it in one and fetch it in another (an accepted limit given the per-asset price model); adds one persisted column and a small surface (two commands + a row toggle) to maintain.
+
+## Guard
+
+- **Reversal looks like**: the lock checked at write time instead of by scope exclusion, or a locked asset reaching a provider call.
+- **Guard**: tests `build_scope_excludes_locked_asset_from_scope_but_keeps_currency_map` and `backfill_rejects_a_locked_asset_without_a_request`.

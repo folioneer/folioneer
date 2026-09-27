@@ -30,3 +30,8 @@ Rationale:
 
 - **Pros**: clean context boundaries; each service remains the single source of truth for its data; straightforward to test with service mocks; no raw SQL in the use case layer.
 - **Cons**: N+1 query risk if the pattern is applied naively to list views in the future (not a concern here given the single-account scope); slightly more round-trips than a JOIN.
+
+## Guard
+
+- **Reversal looks like**: a use case reading another context's tables directly, or one SQL query joining two contexts' tables.
+- **Guard**: architecture rules A3 and A9 (`scripts/arch-check.py`).

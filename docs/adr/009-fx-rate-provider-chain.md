@@ -31,3 +31,8 @@ Alternatives considered:
 
 - **Pros**: no API key on any tier; both External tiers share the same authoritative source, so values are consistent across fallback transitions and across consecutive launches; manual override respected; deterministic cross-rate math from a documented base; one fetch per pair per day suffices for a portfolio-valuation use case.
 - **Cons**: EUR-base only — every non-EUR pair requires cross-rate computation, adding test cases; both tiers depend on ECB's ~16:00 CET publication, so early-morning launches operate on yesterday's rate (acceptable but worth surfacing as a staleness indicator in PFD); daily granularity only — disqualifies the system for trading or intraday use; if both Frankfurter and ECB are simultaneously unreachable (rare), the dashboard falls back to last cached rate or to Manual entry, never to a third-party best-effort rate.
+
+## Guard
+
+- **Reversal looks like**: the ECB fallback removed from the rate chain, or a rate provider constructed outside `extensions.rs`.
+- **Guard**: test `chained_provider_falls_back_to_second_when_first_fails`; `reviewer-arch` matches the sign.
