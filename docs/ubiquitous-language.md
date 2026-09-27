@@ -161,6 +161,18 @@ The full economic value of an account: cash balance + Σ (market value of non-ca
 
 ## Dividend Domain Concepts (introduced by DIV spec)
 
+### Current value
+
+> Status: confirmed
+
+What a holding is worth at its latest recorded price, in the asset's own currency: price × quantity, with no exchange rate involved. Shown in the Current Value column of an account's holdings; none when no price has been recorded.
+
+### Weight
+
+> Status: confirmed
+
+The share of an account's Global Value that one holding represents, as a percentage — a holding worth 220 in an account worth 400 weighs 55 %. The cash line has a weight too; a holding without a market value has none.
+
 ### Dividends Received
 
 > Status: confirmed
@@ -185,7 +197,7 @@ A directed currency pair the system follows, e.g. USD → EUR. Used to value a h
 
 ### CurrencyRate
 
-What one unit of a currency is worth in another on a given day. Used to convert a foreign holding's current value into the account's currency. Distinct from a transaction's `exchange rate`, which is fixed at trade time for cost basis — a currency rate is current and changes over time.
+What one unit of a currency is worth in another on a given day. Used to convert a foreign holding's market value into the account's currency. Distinct from a transaction's `exchange rate`, which is fixed at trade time for cost basis — a currency rate is current and changes over time.
 
 > Status: confirmed
 
