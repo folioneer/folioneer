@@ -44,7 +44,6 @@ export function useCurrencyRatesView(): UseCurrencyRatesViewResult {
   const [isBackfilling, setIsBackfilling] = useState(false);
 
   const fetchPairs = useCallback(async () => {
-    setIsLoading(true);
     setError(null);
     const result = await getCurrencyPairs();
     if (result.status === "ok") {
@@ -68,6 +67,9 @@ export function useCurrencyRatesView(): UseCurrencyRatesViewResult {
   }, []);
 
   useEffect(() => {
+    // F29 — the loading state shows for the first load and a change of key only;
+    // a re-fetch after a change keeps the current rows on screen.
+    setIsLoading(true);
     void fetchPairs();
   }, [fetchPairs]);
 

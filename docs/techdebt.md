@@ -186,6 +186,7 @@ Remove an entry once it has been resolved.
 - Severity: 🟡
 - Observation: The hook failed with `stale element reference` while creating a node handle for an `element` call — an element located by one step had been replaced by a re-render before the next step used it. It is the second distinct once-only E2E failure in two days (TD-016 is the first); both sit in setup or navigation code shared by many specs, so each has many chances to fire per run. With E2E as a required check, every such failure costs a re-run before a green PR can merge.
 - User value: None — suite reliability.
+- Cause not found yet (2026-09-27): the F29 fix for TD-039 does not reach this hook — the assets spec's navigation and modal helpers depend on none of the hooks it changed. Next step: capture which element the `element` call was locating when it went stale (the failure screenshot and the hook's last command), then fix the component that replaces it.
 - Done when: the hook re-locates elements after each navigation step instead of reusing handles across renders, or the shared helpers wait for the route to settle before returning; a month of pull-request runs shows no before-each failure.
 
 ## 2026-09-13 — TD-021 — The rust-cache pin is labelled with the wrong tag in three workflows
@@ -321,4 +322,23 @@ Remove an entry once it has been resolved.
 - Severity: 🟡
 - Observation: The test failed with `stale element reference` while creating a node handle for an `element` call — the same failure as TD-019, in a different spec. The Currency Rates view re-fetches its pairs and rates on `CurrencyRateUpdated`, so the row a step located can be re-rendered before the next step uses it. The same pull request hit TD-019 on its first run: two once-only failures on a change the suite cannot execute (see #041).
 - User value: None — suite reliability.
+- Cause fixed (2026-09-27): views no longer unmount their rows on an event-driven re-fetch (F29), and the currency rates drill-ins locate a row's cell with one selector instead of chaining from a row handle. The entry closes after a month of pull-request runs without this failure.
 - Done when: the test re-locates the row after the edit is saved, or waits for the view's re-fetch to settle; a month of pull-request runs shows no failure of it.
+
+## 2026-09-27 — TD-041 — Clickable table rows have no interactive element of their own
+
+- Found by: the main agent (TD-039 review — nine E2E steps click `td:first-child` to open a row)
+- Where: `src/features/currency/currency_rates_view/CurrencyRatesView.tsx` (`pair-row-*`), the account rows of `src/features/accounts/`, and every row whose `<tr>` carries `onClick`; the E2E specs clicking `… td:first-child`
+- Severity: 🔵
+- Observation: The rows are opened by an `onClick` on the `<tr>`, made focusable with `tabIndex` and a key handler. WebDriver cannot click a `<tr>` (its centre hit-tests to a cell), so specs click the first cell and rely on the event bubbling — a click on the wrong cell, or a cell that stops propagation, breaks them. Assistive technology meets a row announced as a row, not as a control that opens something.
+- User value: Screen-reader and keyboard users meet a real link or button to open each row; the E2E suite clicks that control directly.
+- Done when: each clickable row holds one link or button (with an `id` and an accessible name) that opens it, the row stays clickable for the mouse, and no E2E spec clicks `td:first-child`.
+
+## 2026-09-27 — TD-042 — A quick change of key can show the previous key's data as loaded
+
+- Found by: reviewer-frontend (the F29 change to the view hooks)
+- Where: `src/features/account_details/account_details_view/useAccountDetails.ts`, `account_details/price_history/usePriceHistory.ts`, `accounts/useAccountSummaries.ts`, `transactions/account_journal/useAccountJournal.ts`, and `fetchRates` in `currency/currency_rates_view/useCurrencyRatesView.ts`
+- Severity: 🔵
+- Observation: These hooks have no request-sequence guard, unlike the two performance hooks. When the key changes twice quickly (another account, another asset), an earlier fetch that answers last overwrites the newer data, and its `finally` clears the loading flag while the current fetch is still pending — the previous key's rows show as loaded for a moment. Predates F29; the change only moved where the flag is raised.
+- User value: Switching accounts or assets quickly never shows the one left behind.
+- Done when: each listed hook drops a response that a newer fetch has superseded, as the performance hooks do, with a test per hook.

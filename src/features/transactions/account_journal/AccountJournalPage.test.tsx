@@ -77,6 +77,7 @@ const makeHook = (over: Record<string, unknown> = {}) => ({
   transactionById: new Map<string, Transaction>([["tx-1", tx()]]),
   hasTransactions: true,
   refresh: vi.fn().mockResolvedValue(undefined),
+  reload: vi.fn().mockResolvedValue(undefined),
   ...over,
 });
 
@@ -92,13 +93,13 @@ describe("AccountJournalPage", () => {
     expect(container.querySelectorAll(".animate-pulse .h-10").length).toBeGreaterThan(0);
   });
 
-  it("renders an error with a retry that refreshes", () => {
-    const refresh = vi.fn();
-    mockUseAccountJournal.mockReturnValue(makeHook({ error: { key: "x" }, refresh }));
+  it("renders an error with a retry that reloads", () => {
+    const reload = vi.fn();
+    mockUseAccountJournal.mockReturnValue(makeHook({ error: { key: "x" }, reload }));
     render(<AccountJournalPage />);
     expect(screen.getByText("transaction.error_load")).toBeInTheDocument();
     fireEvent.click(screen.getByText("action.retry"));
-    expect(refresh).toHaveBeenCalled();
+    expect(reload).toHaveBeenCalled();
   });
 
   it("renders the empty state when the account has no transactions", () => {

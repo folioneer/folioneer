@@ -90,7 +90,6 @@ export function useGlobalPerformance(): UseGlobalPerformanceResult {
 
   const fetchPerformance = useCallback(async () => {
     const requestSeq = ++requestSeqRef.current;
-    setIsLoading(true);
     setError(null);
     try {
       const result = await globalPerformanceGateway.getGlobalPerformance(
@@ -123,6 +122,9 @@ export function useGlobalPerformance(): UseGlobalPerformanceResult {
 
   // Fetch on mount and on every scope change (GPF-010).
   useEffect(() => {
+    // F29 — the loading state shows for the first load and a change of key only;
+    // a re-fetch after a change keeps the current rows on screen.
+    setIsLoading(true);
     fetchPerformance();
   }, [fetchPerformance]);
 
@@ -238,10 +240,16 @@ export function useGlobalPerformance(): UseGlobalPerformanceResult {
     return parts.length === 0 ? null : parts.join(" — ");
   }, [scope.accountId, scope.assetId, accountOptions, assetOptions]);
 
+  // F29 — a retry the user asks for shows the loading state; a re-fetch after a change does not.
+  const retryPerformance = useCallback(() => {
+    setIsLoading(true);
+    return fetchPerformance();
+  }, [fetchPerformance]);
+
   return {
     isLoading,
     error,
-    retry: fetchPerformance,
+    retry: retryPerformance,
     monthViewAvailable,
     isEmpty,
     viewMode,

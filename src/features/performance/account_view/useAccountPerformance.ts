@@ -78,7 +78,6 @@ export function useAccountPerformance(accountId: string): UseAccountPerformanceR
 
   const fetchPerformance = useCallback(async () => {
     const requestSeq = ++requestSeqRef.current;
-    setIsLoading(true);
     setError(null);
     try {
       const result = await accountPerformanceGateway.getAccountPerformance(
@@ -112,6 +111,9 @@ export function useAccountPerformance(accountId: string): UseAccountPerformanceR
 
   // PRF-014 / PRF-080 — fetch on mount, on accountId change, and on asset-scope change.
   useEffect(() => {
+    // F29 — the loading state shows for the first load and a change of key only;
+    // a re-fetch after a change keeps the current rows on screen.
+    setIsLoading(true);
     fetchPerformance();
   }, [fetchPerformance]);
 
@@ -215,10 +217,16 @@ export function useAccountPerformance(accountId: string): UseAccountPerformanceR
     return assetOptions.find((option) => option.assetId === selectedAssetId)?.assetName ?? null;
   }, [assetOptions, selectedAssetId]);
 
+  // F29 — a retry the user asks for shows the loading state; a re-fetch after a change does not.
+  const retryPerformance = useCallback(() => {
+    setIsLoading(true);
+    return fetchPerformance();
+  }, [fetchPerformance]);
+
   return {
     isLoading,
     error,
-    retry: fetchPerformance,
+    retry: retryPerformance,
     monthViewAvailable,
     isEmpty,
     viewMode,

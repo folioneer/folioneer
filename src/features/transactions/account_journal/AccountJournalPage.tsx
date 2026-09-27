@@ -36,6 +36,7 @@ export function AccountJournalPage() {
     transactionById,
     hasTransactions,
     refresh,
+    reload,
   } = useAccountJournal();
 
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -143,7 +144,7 @@ export function AccountJournalPage() {
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 py-12">
               <span className="text-m3-error text-sm">{t("transaction.error_load")}</span>
-              <Button variant="secondary" size="sm" onClick={() => refresh()}>
+              <Button variant="secondary" size="sm" onClick={() => reload()}>
                 {t("action.retry")}
               </Button>
             </div>

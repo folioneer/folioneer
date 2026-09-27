@@ -35,8 +35,16 @@ export function PriceHistoryModal({
 }: PriceHistoryModalProps) {
   const { t, i18n } = useTranslation();
   const showSnackbar = useSnackbar();
-  const { prices, isLoading, fetchError, deleteError, deletingDate, confirmDelete, refetch } =
-    usePriceHistory({ assetId: holding.asset_id });
+  const {
+    prices,
+    isLoading,
+    fetchError,
+    deleteError,
+    deletingDate,
+    confirmDelete,
+    refetch,
+    reload,
+  } = usePriceHistory({ assetId: holding.asset_id });
 
   const [editTarget, setEditTarget] = useState<AssetPrice | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AssetPrice | null>(null);
@@ -118,7 +126,7 @@ export function PriceHistoryModal({
             <p role="alert" className="text-sm text-m3-error">
               {t("price_history.fetch_error")}
             </p>
-            <Button variant="secondary" size="sm" onClick={refetch}>
+            <Button variant="secondary" size="sm" onClick={reload}>
               {t("action.retry")}
             </Button>
           </div>

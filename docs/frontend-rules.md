@@ -317,3 +317,13 @@ The only authorised cross-feature navigation wiring points are:
 Net effect: no import path under `src/features/` may reference a sibling feature's folder. (An import is cross-feature when it reaches into `features/<other>/…`; imports from `ui/`, `infra/`, `shell/`, and `src/`-root singletons are not.)
 
 Promotion destinations (see F28): generic UI hooks → `ui/hooks/`; generic components → `ui/`; app-wide stores → `infra/cache/` (BE/FE data) or `infra/settings/` (FE prefs); cross-cutting platform adapters → `infra/`. Domain-shared artifacts are NOT promoted — they signal a feature cut too small; merge the views instead.
+
+## Instrumentability
+
+**F29** — The frontend MUST be deterministically instrumentable: the same state renders the same DOM, and what a test or an assistive technology holds stays valid until the state it shows changes. Concretely:
+
+- A re-fetch after a change keeps the current content mounted. The loading state shows for the first load and for a change of key (another account, another date) only — never for an event-driven re-fetch, which would unmount and remount every row.
+- Every control a user or a test must reach carries a stable `id` (F25) and an accessible name; a clickable container holds a real control of its own rather than relying on a click bubbling from a child (TD-041).
+- Pending, empty and error states are explicit elements with their own `id`, not the absence of content.
+
+A flaky E2E step is read as a symptom of a breach of this rule: the fix goes to the component or hook that made it fragile, not to a retry or a longer wait in the test.

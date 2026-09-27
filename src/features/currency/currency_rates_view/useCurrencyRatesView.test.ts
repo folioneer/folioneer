@@ -197,4 +197,18 @@ describe("useCurrencyRatesView", () => {
     });
     expect(gateway.getCurrencyPairs).toHaveBeenCalledTimes(1); // mount only — no refetch
   });
+  // F29 — a change re-fetches the pairs without a loading state: the rows stay mounted.
+  it("keeps the pairs on screen while a change re-fetches them", async () => {
+    const { result } = renderHook(() => useCurrencyRatesView());
+    await act(async () => {});
+    expect(result.current.isLoading).toBe(false);
+    vi.mocked(gateway.getCurrencyPairs).mockReturnValue(new Promise(() => {}));
+
+    act(() => {
+      eventCallback?.("CurrencyRateUpdated");
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.pairs).toEqual([PAIR]);
+  });
 });

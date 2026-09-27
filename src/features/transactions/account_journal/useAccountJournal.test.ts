@@ -286,4 +286,45 @@ describe("useAccountJournal", () => {
     expect(result.current.error).not.toBeNull();
     expect(result.current.hasTransactions).toBe(false);
   });
+  // F29 — a change re-fetches the journal without a loading state: the rows stay mounted.
+  it("keeps the journal on screen while a change re-fetches it", async () => {
+    const { result } = renderHook(() => useAccountJournal());
+    await act(async () => {});
+    expect(result.current.isLoading).toBe(false);
+    const shown = result.current.filteredSortedRows.length;
+    mockGetAll.mockReturnValue(new Promise(() => {}));
+
+    act(() => {
+      eventCallback?.("TransactionUpdated");
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.filteredSortedRows.length).toBe(shown);
+  });
+  // F29 — a retry the user asks for (the Retry button) shows the loading state.
+  it("shows the loading state while the user retries", async () => {
+    const { result } = renderHook(() => useAccountJournal());
+    await act(async () => {});
+    expect(result.current.isLoading).toBe(false);
+    mockGetAll.mockReturnValue(new Promise(() => {}));
+
+    act(() => {
+      void result.current.reload();
+    });
+
+    expect(result.current.isLoading).toBe(true);
+  });
+  // F29 — the refresh after a delete or an edit keeps the rows on screen.
+  it("keeps the journal on screen while it refreshes after a change", async () => {
+    const { result } = renderHook(() => useAccountJournal());
+    await act(async () => {});
+    expect(result.current.isLoading).toBe(false);
+    mockGetAll.mockReturnValue(new Promise(() => {}));
+
+    act(() => {
+      void result.current.refresh();
+    });
+
+    expect(result.current.isLoading).toBe(false);
+  });
 });

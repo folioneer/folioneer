@@ -524,4 +524,40 @@ describe("useAccountDetails — holdings display grouping (ACD-051)", () => {
     await act(async () => {});
     expect(result.current.holdings.map((r) => r.assetId)).toEqual(["stock-a", "unknown-1"]);
   });
+  // F29 — a change re-fetches the details without a loading state: the rows stay mounted.
+  it("keeps the details on screen while a change re-fetches them", async () => {
+    let capturedCallback: ((type: string) => void) | null = null;
+    const { accountDetailsGateway } = await import("../gateway");
+    (accountDetailsGateway.subscribeToEvents as ReturnType<typeof vi.fn>).mockImplementation(
+      (cb: (type: string) => void) => {
+        capturedCallback = cb;
+        return Promise.resolve(() => {});
+      },
+    );
+    mockGetAccountDetails.mockResolvedValue({ status: "ok", data: makeResponse() });
+    const { result } = renderHook(() => useAccountDetails("account-1"));
+    await act(async () => {});
+    expect(result.current.isLoading).toBe(false);
+    mockGetAccountDetails.mockReturnValue(new Promise(() => {}));
+
+    act(() => {
+      capturedCallback?.("TransactionUpdated");
+    });
+
+    expect(result.current.isLoading).toBe(false);
+  });
+  // F29 — a retry the user asks for (the Retry button) shows the loading state.
+  it("shows the loading state while the user retries", async () => {
+    mockGetAccountDetails.mockResolvedValue({ status: "ok", data: makeResponse() });
+    const { result } = renderHook(() => useAccountDetails("account-1"));
+    await act(async () => {});
+    expect(result.current.isLoading).toBe(false);
+    mockGetAccountDetails.mockReturnValue(new Promise(() => {}));
+
+    act(() => {
+      void result.current.reload();
+    });
+
+    expect(result.current.isLoading).toBe(true);
+  });
 });

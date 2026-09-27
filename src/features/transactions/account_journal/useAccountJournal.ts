@@ -38,7 +38,6 @@ export function useAccountJournal() {
   const [filters, setFilters] = useState<JournalFilters>(EMPTY_FILTERS);
 
   const fetchTransactions = useCallback(async (): Promise<void> => {
-    setIsLoading(true);
     setError(null);
     try {
       const res = await transactionGateway.getAllTransactionsForAccount(accountId);
@@ -58,6 +57,9 @@ export function useAccountJournal() {
   }, [accountId]);
 
   useEffect(() => {
+    // F29 — the loading state shows for the first load and a change of key only;
+    // a re-fetch after a change keeps the current rows on screen.
+    setIsLoading(true);
     fetchTransactions();
   }, [fetchTransactions]);
 
@@ -166,6 +168,12 @@ export function useAccountJournal() {
     });
   }, [transactions, filters, assets, accounts, sortDirection, cashByTxId]);
 
+  // F29 — a retry the user asks for shows the loading state; a re-fetch after a change does not.
+  const reloadTransactions = useCallback(() => {
+    setIsLoading(true);
+    return fetchTransactions();
+  }, [fetchTransactions]);
+
   return {
     accountId,
     isLoading,
@@ -181,5 +189,6 @@ export function useAccountJournal() {
     transactionById,
     hasTransactions: transactions.length > 0,
     refresh: fetchTransactions,
+    reload: reloadTransactions,
   };
 }

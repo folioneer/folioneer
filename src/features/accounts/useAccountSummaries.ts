@@ -28,7 +28,6 @@ export function useAccountSummaries(): UseAccountSummariesResult {
   const [error, setError] = useState<I18nMessage | null>(null);
 
   const fetchSummaries = useCallback(async () => {
-    setIsLoading(true);
     setError(null);
     try {
       const result = await accountGateway.getAccountSummaries();
@@ -48,6 +47,9 @@ export function useAccountSummaries(): UseAccountSummariesResult {
   }, []);
 
   useEffect(() => {
+    // F29 — the loading state shows for the first load and a change of key only;
+    // a re-fetch after a change keeps the current rows on screen.
+    setIsLoading(true);
     fetchSummaries();
   }, [fetchSummaries]);
 
@@ -81,5 +83,11 @@ export function useAccountSummaries(): UseAccountSummariesResult {
     };
   }, [fetchSummaries]);
 
-  return { summaries, portfolioTotal, isLoading, error, refetch: fetchSummaries };
+  // F29 — a retry the user asks for shows the loading state; a re-fetch after a change does not.
+  const reloadSummaries = useCallback(() => {
+    setIsLoading(true);
+    return fetchSummaries();
+  }, [fetchSummaries]);
+
+  return { summaries, portfolioTotal, isLoading, error, refetch: reloadSummaries };
 }

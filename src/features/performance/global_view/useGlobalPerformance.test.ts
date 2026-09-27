@@ -500,4 +500,39 @@ describe("useGlobalPerformance", () => {
     expect(result.current.rows[0]?.year).toBe(2025);
     expect(result.current.isLoading).toBe(false);
   });
+  // F29 — a change re-fetches the performance without a loading state.
+  it("keeps the performance on screen while a change re-fetches it", async () => {
+    let capturedCallback: ((type: Event["type"]) => void) | null = null;
+    vi.mocked(gateway.globalPerformanceGateway.subscribeToEvents).mockImplementation((cb) => {
+      capturedCallback = cb;
+      return Promise.resolve(() => {});
+    });
+    const { result } = renderHook(() => useGlobalPerformance());
+    await act(async () => {});
+    expect(result.current.isLoading).toBe(false);
+    vi.mocked(gateway.globalPerformanceGateway.getGlobalPerformance).mockReturnValue(
+      new Promise(() => {}),
+    );
+
+    act(() => {
+      capturedCallback?.("TransactionUpdated");
+    });
+
+    expect(result.current.isLoading).toBe(false);
+  });
+  // F29 — a retry the user asks for (the Retry button) shows the loading state.
+  it("shows the loading state while the user retries", async () => {
+    const { result } = renderHook(() => useGlobalPerformance());
+    await act(async () => {});
+    expect(result.current.isLoading).toBe(false);
+    vi.mocked(gateway.globalPerformanceGateway.getGlobalPerformance).mockReturnValue(
+      new Promise(() => {}),
+    );
+
+    act(() => {
+      void result.current.retry();
+    });
+
+    expect(result.current.isLoading).toBe(true);
+  });
 });

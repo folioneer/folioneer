@@ -191,4 +191,34 @@ describe("usePriceHistory", () => {
     });
     expect(result.current.deleteError).toBeNull();
   });
+  // F29 — a re-fetch after a change keeps the prices on screen: no loading state.
+  it("keeps the prices on screen while they are re-fetched", async () => {
+    const rows = [makePrice({ date: "2026-03-20", price: 105_000_000 })];
+    mockGetAssetPrices.mockResolvedValue({ status: "ok", data: rows });
+    const { result } = renderHook(() => usePriceHistory({ assetId: "asset-1" }));
+    await act(async () => {});
+    expect(result.current.isLoading).toBe(false);
+    mockGetAssetPrices.mockReturnValue(new Promise(() => {}));
+
+    act(() => {
+      void result.current.refetch();
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.prices).toEqual(rows);
+  });
+  // F29 — a retry the user asks for (the Retry button) shows the loading state.
+  it("shows the loading state while the user retries", async () => {
+    mockGetAssetPrices.mockResolvedValue({ status: "ok", data: [] });
+    const { result } = renderHook(() => usePriceHistory({ assetId: "asset-1" }));
+    await act(async () => {});
+    expect(result.current.isLoading).toBe(false);
+    mockGetAssetPrices.mockReturnValue(new Promise(() => {}));
+
+    act(() => {
+      void result.current.reload();
+    });
+
+    expect(result.current.isLoading).toBe(true);
+  });
 });

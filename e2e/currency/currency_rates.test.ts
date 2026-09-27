@@ -167,13 +167,13 @@ describe("currency_rates", () => {
 
     // Drill in to the pair by clicking its row.
     // id="pair-row-USD-EUR" is required — see selector inventory below.
-    const pairRow = await $(`#pair-row-${PAIR_FROM}-${PAIR_TO}`);
-    await pairRow.waitForExist({ timeout: 10000 });
     // Click the first cell (an interactable leaf) rather than the <tr> itself —
     // a row is never pointer-interactable in WebDriver (its centre hit-tests to a
     // child cell). The click bubbles to the row's onClick. Matches the
     // account_performance E2E precedent (`#account-row-{id} td:first-child`).
-    await pairRow.$("td:first-child").click();
+    const pairCell = await $(`#pair-row-${PAIR_FROM}-${PAIR_TO} td:first-child`);
+    await pairCell.waitForExist({ timeout: 10000 });
+    await pairCell.click();
 
     // "Record rate" button appears in the drill-in panel header.
     const recordRateBtn = await $("#currency-rates-action-record-rate");
@@ -234,13 +234,13 @@ describe("currency_rates", () => {
     await $("#action-add-pair").waitForExist({ timeout: 10000 });
 
     // Drill in to the pair.
-    const pairRow = await $(`#pair-row-${PAIR_FROM}-${PAIR_TO}`);
-    await pairRow.waitForExist({ timeout: 10000 });
     // Click the first cell (an interactable leaf) rather than the <tr> itself —
     // a row is never pointer-interactable in WebDriver (its centre hit-tests to a
     // child cell). The click bubbles to the row's onClick. Matches the
     // account_performance E2E precedent (`#account-row-{id} td:first-child`).
-    await pairRow.$("td:first-child").click();
+    const pairCell = await $(`#pair-row-${PAIR_FROM}-${PAIR_TO} td:first-child`);
+    await pairCell.waitForExist({ timeout: 10000 });
+    await pairCell.click();
 
     // Click the edit button for the seeded rate row.
     // id="action-edit-rate-USD-EUR-2020-04-10" — already present in CurrencyRatesView.tsx.
@@ -304,13 +304,13 @@ describe("currency_rates", () => {
     await $("#action-add-pair").waitForExist({ timeout: 10000 });
 
     // Drill in to the pair.
-    const pairRow = await $(`#pair-row-${PAIR_FROM}-${PAIR_TO}`);
-    await pairRow.waitForExist({ timeout: 10000 });
     // Click the first cell (an interactable leaf) rather than the <tr> itself —
     // a row is never pointer-interactable in WebDriver (its centre hit-tests to a
     // child cell). The click bubbles to the row's onClick. Matches the
     // account_performance E2E precedent (`#account-row-{id} td:first-child`).
-    await pairRow.$("td:first-child").click();
+    const pairCell = await $(`#pair-row-${PAIR_FROM}-${PAIR_TO} td:first-child`);
+    await pairCell.waitForExist({ timeout: 10000 });
+    await pairCell.click();
 
     // Click the delete button for the seeded rate row.
     // id="action-delete-rate-USD-EUR-2020-04-11" — already present in CurrencyRatesView.tsx.

@@ -18,6 +18,8 @@ export interface UsePriceHistoryResult {
   deleteError: I18nMessage | null;
   deletingDate: string | null;
   refetch: () => void;
+  /** Re-fetches behind the loading state (the Retry button after an error, F29). */
+  reload: () => void;
   /** Returns true on success, false on failure. */
   confirmDelete: (date: string) => Promise<boolean>;
 }
@@ -30,7 +32,6 @@ export function usePriceHistory({ assetId }: UsePriceHistoryProps): UsePriceHist
   const [deletingDate, setDeletingDate] = useState<string | null>(null);
 
   const loadPrices = useCallback(async () => {
-    setIsLoading(true);
     try {
       const result = await accountDetailsGateway.getAssetPrices(assetId);
       if (result.status === "ok") {
@@ -49,6 +50,9 @@ export function usePriceHistory({ assetId }: UsePriceHistoryProps): UsePriceHist
   }, [assetId]);
 
   useEffect(() => {
+    // F29 — the loading state shows for the first load and a change of key only;
+    // a re-fetch after a change keeps the current rows on screen.
+    setIsLoading(true);
     loadPrices();
   }, [loadPrices]);
 
@@ -69,6 +73,12 @@ export function usePriceHistory({ assetId }: UsePriceHistoryProps): UsePriceHist
     [assetId, loadPrices],
   );
 
+  // F29 — a retry the user asks for shows the loading state; a re-fetch after a change does not.
+  const reload = useCallback(() => {
+    setIsLoading(true);
+    return loadPrices();
+  }, [loadPrices]);
+
   return {
     prices,
     isLoading,
@@ -76,6 +86,7 @@ export function usePriceHistory({ assetId }: UsePriceHistoryProps): UsePriceHist
     deleteError,
     deletingDate,
     refetch: loadPrices,
+    reload,
     confirmDelete,
   };
 }

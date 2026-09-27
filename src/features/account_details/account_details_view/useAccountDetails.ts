@@ -19,7 +19,10 @@ const UNKNOWN_ERROR: I18nMessage = { key: "error.Unknown" };
 interface UseAccountDetailsResult {
   isLoading: boolean;
   error: I18nMessage | null;
+  /** Re-fetches in place, keeping the rows on screen (after a change). */
   retry: () => void;
+  /** Re-fetches behind the loading state (the Retry button after an error, F29). */
+  reload: () => void;
   holdings: HoldingRowViewModel[];
   /** Raw active HoldingDetail records — used to pass to PriceModal (MKT-013). */
   holdingDetails: HoldingDetail[];
@@ -39,7 +42,6 @@ export function useAccountDetails(accountId: string, asOfDate = ""): UseAccountD
   const assets = useCachedAssets();
 
   const fetchDetails = useCallback(async () => {
-    setIsLoading(true);
     setError(null);
     try {
       const result = await accountDetailsGateway.getAccountDetails(accountId, asOfDate || null);
@@ -59,6 +61,9 @@ export function useAccountDetails(accountId: string, asOfDate = ""): UseAccountD
 
   // ACD-037 — fetch on mount and on accountId change
   useEffect(() => {
+    // F29 — the loading state shows for the first load and a change of key only;
+    // a re-fetch after a change keeps the current rows on screen.
+    setIsLoading(true);
     fetchDetails();
   }, [fetchDetails]);
 
@@ -125,10 +130,17 @@ export function useAccountDetails(accountId: string, asOfDate = ""): UseAccountD
     [data],
   );
 
+  // F29 — a retry the user asks for shows the loading state; a re-fetch after a change does not.
+  const reload = useCallback(() => {
+    setIsLoading(true);
+    return fetchDetails();
+  }, [fetchDetails]);
+
   return {
     isLoading,
     error,
     retry: fetchDetails,
+    reload,
     holdings,
     holdingDetails,
     closedHoldings,

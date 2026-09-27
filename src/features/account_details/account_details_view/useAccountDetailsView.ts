@@ -402,7 +402,7 @@ export function useAccountDetailsView(accountId: string) {
     // Data layer (re-exposed)
     isLoading: data.isLoading,
     error: data.error,
-    retry: data.retry,
+    retry: data.reload,
     summary: data.summary,
     holdings: data.holdings,
     holdingDetails: data.holdingDetails,

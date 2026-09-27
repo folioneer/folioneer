@@ -258,4 +258,59 @@ describe("useAccountSummaries — bulk-fetch coalescing (MKT-181)", () => {
     });
     expect(mockGetAccountSummaries.mock.calls.length).toBe(initialCalls + 1);
   });
+  // F29 — a change re-fetches the summaries without a loading state: the rows stay mounted.
+  it("keeps the summaries on screen while a change re-fetches them", async () => {
+    let capturedCallback: ((type: string) => void) | null = null;
+    mockSubscribeToEvents.mockImplementation((cb: (type: string) => void) => {
+      capturedCallback = cb;
+      return Promise.resolve(() => {});
+    });
+    mockGetAccountSummaries.mockResolvedValue({
+      status: "ok",
+      data: {
+        summaries: [],
+        total: {
+          total_global_value: 0,
+          total_unrealized_pnl: null,
+          currency: "EUR",
+          incomplete: false,
+        },
+      },
+    });
+    const { result } = renderHook(() => useAccountSummaries());
+    await act(async () => {});
+    expect(result.current.isLoading).toBe(false);
+    mockGetAccountSummaries.mockReturnValue(new Promise(() => {}));
+
+    act(() => {
+      capturedCallback?.("AccountUpdated");
+    });
+
+    expect(result.current.isLoading).toBe(false);
+  });
+  // F29 — a retry the user asks for (the Retry button) shows the loading state.
+  it("shows the loading state while the user retries", async () => {
+    mockGetAccountSummaries.mockResolvedValue({
+      status: "ok",
+      data: {
+        summaries: [],
+        total: {
+          total_global_value: 0,
+          total_unrealized_pnl: null,
+          currency: "EUR",
+          incomplete: false,
+        },
+      },
+    });
+    const { result } = renderHook(() => useAccountSummaries());
+    await act(async () => {});
+    expect(result.current.isLoading).toBe(false);
+    mockGetAccountSummaries.mockReturnValue(new Promise(() => {}));
+
+    act(() => {
+      void result.current.refetch();
+    });
+
+    expect(result.current.isLoading).toBe(true);
+  });
 });
