@@ -514,9 +514,12 @@ impl Account {
                     unit_price,
                     Self::compute_sell_total(quantity, unit_price, exchange_rate, fees),
                 ),
-                // TRX-061 — a typed total is ignored on every other transaction
-                // type: the type-specific recompute applies as if it were absent.
-                (TransactionType::OpeningBalance, _) => (
+                // TRX-051 — the typed total cost is stored verbatim and the unit
+                // price derived by the TRX-047 rule, as at creation.
+                (TransactionType::OpeningBalance, Some(total)) => {
+                    Self::derive_opening_balance_from_total(total, quantity)?
+                }
+                (TransactionType::OpeningBalance, None) => (
                     unit_price,
                     Self::compute_opening_balance_total(quantity, unit_price),
                 ),
@@ -725,11 +728,8 @@ impl Account {
         // TRX-045 — a zero-cost position is valid (e.g. a mined / gifted /
         // airdropped asset seeded as a starting position); only a negative
         // total cost is rejected.
-        if total_cost < 0 {
-            return Err(AccountError::InvalidTotalCost.into());
-        }
-        const MICRO: i128 = 1_000_000;
-        let unit_price = (total_cost as i128 * MICRO / quantity as i128) as i64;
+        let (unit_price, total_cost) =
+            Self::derive_opening_balance_from_total(total_cost, quantity)?;
         let tx = Transaction::new(
             self.id.clone(),
             asset_id.clone(),
@@ -1763,6 +1763,24 @@ impl Account {
             exchange_rate,
         )?;
         Ok((unit_price, total))
+    }
+
+    /// TRX-047 — an opening balance's unit price from its total cost:
+    /// `floor(total_cost × MICRO / quantity)`; a negative total cost (TRX-045) and a
+    /// non-positive quantity (TRX-044) are rejected.
+    /// Returns `(unit_price, total_cost)`.
+    fn derive_opening_balance_from_total(total_cost: i64, quantity: i64) -> Result<(i64, i64)> {
+        if quantity <= 0 {
+            return Err(AccountError::QuantityNotPositive.into());
+        }
+        if total_cost < 0 {
+            return Err(AccountError::InvalidTotalCost.into());
+        }
+        const MICRO: i128 = 1_000_000;
+        Ok((
+            (total_cost as i128 * MICRO / quantity as i128) as i64,
+            total_cost,
+        ))
     }
 
     /// Computes total_amount for an OpeningBalance correction (TRX-051).
@@ -3500,6 +3518,80 @@ mod tests {
 
     // TRX-051 (backend) — correct_transaction on an OpeningBalance row recomputes
     // total_amount = quantity * unit_price / MICRO (not TRX-026 purchase formula)
+    // TRX-051 / TD-033 — an opening balance corrected with its typed total cost stores
+    // that total verbatim and derives the unit price by the TRX-047 rule.
+    #[test]
+    fn trx_051_opening_balance_correction_keeps_the_typed_total_and_derives_the_unit_price() {
+        let mut acc = cash_seeded_account();
+        let tx = acc
+            .open_holding(
+                "asset-1".to_string(),
+                "2024-01-01".to_string(),
+                micro(2),
+                micro(200),
+            )
+            .unwrap()
+            .clone();
+
+        let corrected = acc
+            .correct_transaction(
+                &tx.id,
+                "2024-01-01".to_string(),
+                micro(3),
+                0,
+                1_000_000,
+                0,
+                Some(micro(100)),
+                None,
+            )
+            .unwrap();
+
+        assert_eq!(corrected.total_amount, micro(100));
+        assert_eq!(corrected.unit_price, 33_333_333, "floor(100 / 3) in micros");
+    }
+
+    // TRX-045 / TD-033 — a corrected opening balance rejects a negative total cost.
+    #[test]
+    fn trx_051_opening_balance_correction_rejects_a_negative_total() {
+        let mut acc = cash_seeded_account();
+        let tx = acc
+            .open_holding(
+                "asset-1".to_string(),
+                "2024-01-01".to_string(),
+                micro(2),
+                micro(200),
+            )
+            .unwrap()
+            .clone();
+
+        let negative = acc.correct_transaction(
+            &tx.id,
+            "2024-01-01".to_string(),
+            micro(2),
+            0,
+            1_000_000,
+            0,
+            Some(-1),
+            None,
+        );
+        assert!(negative.is_err());
+
+        let zero_quantity = acc.correct_transaction(
+            &tx.id,
+            "2024-01-01".to_string(),
+            0,
+            0,
+            1_000_000,
+            0,
+            Some(micro(100)),
+            None,
+        );
+        assert!(
+            zero_quantity.is_err(),
+            "a zero quantity is refused, not divided by"
+        );
+    }
+
     #[test]
     fn correct_transaction_on_opening_balance_recomputes_total_from_qty_and_price() {
         let mut acc = cash_seeded_account();

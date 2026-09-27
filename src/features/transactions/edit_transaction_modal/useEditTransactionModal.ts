@@ -191,21 +191,19 @@ export function useEditTransactionModal({
     setIsSubmitting(true);
 
     try {
-      // TRX-051: for OpeningBalance, compute unit_price = total_cost / quantity (TRX-047 formula)
-      const unitPriceMicro =
-        isOpeningBalance && microValues.qtyMicro > 0
-          ? Math.floor((microValues.priceMicro * 1_000_000) / microValues.qtyMicro)
-          : microValues.priceMicro;
-
       const result = await correctTransaction(transaction.id, transaction.account_id, {
         date: formData.date,
         quantity: microValues.qtyMicro,
-        unit_price: unitPriceMicro,
+        unit_price: isOpeningBalance ? 0 : microValues.priceMicro,
         exchange_rate: microValues.rateMicro,
         fees: microValues.feesMicro,
-        // TRX-061 / SEL-051 — total mode ships the typed total; the backend
-        // re-derives the authoritative unit price from it.
-        total_amount: isTotalMode ? microValues.totalMicro : null,
+        // TRX-051 / TRX-061 / SEL-051 — an opening balance's total cost, or a total
+        // typed in total mode, is sent as is; the backend derives the unit price.
+        total_amount: isOpeningBalance
+          ? microValues.priceMicro
+          : isTotalMode
+            ? microValues.totalMicro
+            : null,
         note: isOpeningBalance ? null : formData.note || null,
       });
 

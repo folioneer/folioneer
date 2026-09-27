@@ -90,6 +90,12 @@ pub struct HoldingDetail {
     /// Holding, price × quantity × FX for a priced non-cash holding. None when no
     /// price is recorded or a foreign holding has no usable rate (FXR-034).
     pub market_value: Option<i64>,
+    /// Current price × quantity in the asset's own currency, micros (MKT-143). None
+    /// when no price is recorded; independent of any exchange rate.
+    pub current_value: Option<i64>,
+    /// Share of `total_global_value` in micro-percent (55 % = 55_000_000, ACD-052).
+    /// None when the holding has no market value or the Global Value is not positive.
+    pub weight_pct: Option<i64>,
     /// Annual rate of the active recurring fee schedule for this (account, asset),
     /// in micro-percent (1% = 1_000_000, FEE-032). None when no active schedule
     /// exists; always None in the as-of view — the schedule is today's configuration,
@@ -170,6 +176,24 @@ pub struct AccountDetailsResponse {
     /// account-currency micros (ACD-053). Negative when withdrawals exceed deposits.
     /// The as-of view counts only transactions dated on or before the as-of date.
     pub total_net_cash_input: i64,
+}
+
+/// MKT-143 — current price × quantity in the asset's own currency; None without a price.
+fn current_value_of(quantity: i64, current_price: Option<i64>) -> Option<i64> {
+    current_price.map(|price| (quantity as i128 * price as i128 / 1_000_000) as i64)
+}
+
+/// ACD-052 — each holding's share of the Global Value in micro-percent; None when the
+/// holding has no market value or the Global Value is not positive.
+fn assign_weights(details: &mut [HoldingDetail], total_global_value: i64) {
+    for detail in details.iter_mut() {
+        detail.weight_pct = match detail.market_value {
+            Some(value) if total_global_value > 0 => {
+                Some((value as i128 * 100_000_000 / total_global_value as i128) as i64)
+            }
+            _ => None,
+        };
+    }
 }
 
 /// Orchestrates a cross-context read of account + asset data (ADR-003, ADR-004).
@@ -505,10 +529,12 @@ impl AccountDetailsUseCase {
                 dividends_received,
                 total_return_pct,
                 fx_rate_date,
-                management_fees,                               // FEE-052
-                market_value,                                  // ACD-052
-                fee_rate_percent_micros,                       // FEE-074
-                period_performance,                            // ACD-054
+                management_fees, // FEE-052
+                market_value,    // ACD-052
+                current_value: current_value_of(holding.quantity, current_price), // MKT-143
+                weight_pct: None, // ACD-052 — set once the Global Value is known
+                fee_rate_percent_micros, // FEE-074
+                period_performance, // ACD-054
                 note_text: note.map(|note| note.text.clone()), // HNO-040
                 note_threshold_price: note.and_then(|note| note.threshold_price),
                 note_threshold_direction: note.and_then(|note| note.threshold_direction),
@@ -566,6 +592,8 @@ impl AccountDetailsUseCase {
         closed_details.sort_by(|a, b| a.asset_name.cmp(&b.asset_name));
 
         // DIV-073 — total_dividends_received computed above from the single transaction fetch.
+
+        assign_weights(&mut details, total_global_value);
 
         Ok(AccountDetailsResponse {
             account_name: account.name,
@@ -876,6 +904,8 @@ impl AccountDetailsUseCase {
                 fx_rate_date,
                 management_fees: *management_fees_by_asset.get(asset_id).unwrap_or(&0), // FEE-052
                 market_value,                                                           // ACD-052
+                current_value: current_value_of(reconstruction.quantity, current_price), // MKT-143
+                weight_pct: None, // ACD-052 — set once the Global Value is known
                 fee_rate_percent_micros: None, // FEE-074 — as-of view carries no schedule info
                 // ACD-054 — windowed returns are live-view only; the as-of view carries all-None.
                 period_performance: HoldingPeriodPerformance::default(),
@@ -926,6 +956,8 @@ impl AccountDetailsUseCase {
                 fx_rate_date: None,
                 management_fees: 0, // cash holdings never have management fees
                 market_value: Some(cash_balance), // ACD-052 — cash value is its balance
+                current_value: None, // MKT-143 — cash carries no price
+                weight_pct: None,   // ACD-052 — set once the Global Value is known
                 fee_rate_percent_micros: None, // FEE-074
                 period_performance: HoldingPeriodPerformance::default(), // ACD-054
                 note_text: None,    // HNO-040 — no notes in the as-of view
@@ -949,6 +981,8 @@ impl AccountDetailsUseCase {
         };
 
         let total_holding_count = (details.len() + closed_details.len()) as i64;
+
+        assign_weights(&mut details, total_global_value);
 
         Ok(AccountDetailsResponse {
             account_name: account.name,
@@ -2237,6 +2271,152 @@ mod tests {
         // 2 units × 110.00 = 220.00 in account currency
         assert_eq!(resp.holdings[0].market_value, Some(220_000_000));
         assert_eq!(resp.total_global_value, 220_000_000);
+    }
+
+    async fn held_asset(
+        pool: &sqlx::SqlitePool,
+        asset_svc: &AssetService,
+        account_id: &str,
+        name: &str,
+        currency: &str,
+        quantity: i64,
+        price: Option<f64>,
+    ) -> String {
+        let asset = asset_svc
+            .create_asset(CreateAssetDTO {
+                name: name.to_string(),
+                reference: name.to_string(),
+                isin: None,
+                class: AssetClass::Stocks,
+                currency: currency.to_string(),
+                risk_level: 1,
+                category_id: SYSTEM_CATEGORY_ID.to_string(),
+                exchange: None,
+                interest_bearing: false,
+            })
+            .await
+            .unwrap();
+        SqliteHoldingRepository::new(pool.clone())
+            .upsert(
+                Holding::new(
+                    account_id.to_string(),
+                    asset.id.clone(),
+                    quantity,
+                    100_000_000,
+                    0,
+                    None,
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        if let Some(price) = price {
+            asset_svc
+                .record_asset_price(&asset.id, "2026-01-01", price)
+                .await
+                .unwrap();
+        }
+        asset.id
+    }
+
+    // MKT-143 / TD-033 — the current value is price × quantity in the asset's own
+    // currency, computed by the backend even when no rate converts it to the account's.
+    #[tokio::test]
+    async fn mkt_143_current_value_is_price_times_quantity_in_the_asset_currency() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let account = account_svc
+            .create(
+                "A".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .unwrap();
+        held_asset(
+            &pool,
+            &asset_svc,
+            &account.id,
+            "US",
+            "USD",
+            2_000_000,
+            Some(110.0),
+        )
+        .await;
+        held_asset(&pool, &asset_svc, &account.id, "NP", "EUR", 1_000_000, None).await;
+
+        let uc = AccountDetailsUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let resp = uc.get_account_details(&account.id, None).await.unwrap();
+
+        let us = resp.holdings.iter().find(|h| h.asset_name == "US").unwrap();
+        assert_eq!(us.current_value, Some(220_000_000));
+        assert_eq!(us.market_value, None, "no USD→EUR rate");
+        let unpriced = resp.holdings.iter().find(|h| h.asset_name == "NP").unwrap();
+        assert_eq!(unpriced.current_value, None);
+    }
+
+    // ACD-052 / TD-033 — the weight is the holding's share of the Global Value in
+    // micro-percent, None for a holding without a market value.
+    #[tokio::test]
+    async fn acd_052_weight_is_the_holding_share_of_the_global_value() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let account = account_svc
+            .create(
+                "A".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .unwrap();
+        held_asset(
+            &pool,
+            &asset_svc,
+            &account.id,
+            "X",
+            "EUR",
+            2_000_000,
+            Some(110.0),
+        )
+        .await;
+        held_asset(
+            &pool,
+            &asset_svc,
+            &account.id,
+            "Y",
+            "EUR",
+            1_000_000,
+            Some(180.0),
+        )
+        .await;
+        held_asset(&pool, &asset_svc, &account.id, "NP", "EUR", 1_000_000, None).await;
+
+        let uc = AccountDetailsUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let resp = uc.get_account_details(&account.id, None).await.unwrap();
+
+        let weight = |name: &str| {
+            resp.holdings
+                .iter()
+                .find(|h| h.asset_name == name)
+                .unwrap()
+                .weight_pct
+        };
+        assert_eq!(resp.total_global_value, 400_000_000);
+        assert_eq!(weight("X"), Some(55_000_000), "220 / 400 = 55 %");
+        assert_eq!(weight("Y"), Some(45_000_000));
+        assert_eq!(weight("NP"), None);
     }
 
     // ACD-052 — market_value is None for an unpriced holding and for a foreign

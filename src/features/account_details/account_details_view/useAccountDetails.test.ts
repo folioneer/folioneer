@@ -138,6 +138,8 @@ const makeHolding = (overrides: Partial<HoldingDetail> = {}): HoldingDetail => (
   note_threshold_price: null,
   note_threshold_direction: null,
   note_alarm_triggered: false,
+  current_value: null,
+  weight_pct: null,
   inconsistency: null,
   period_performance: {
     ytd: null,
@@ -186,11 +188,11 @@ describe("useAccountDetails — cash row (CSH-092 / CSH-095)", () => {
   });
 
   // ACD-052 — the hook wires the account total into every row's weight %
-  it("computes weightPct from market_value and total_global_value (ACD-052)", async () => {
+  it("shows the backend's weight of each holding (ACD-052)", async () => {
     mockGetAccountDetails.mockResolvedValue({
       status: "ok",
       data: makeResponse({
-        holdings: [makeHolding({ market_value: 220_000_000 })],
+        holdings: [makeHolding({ market_value: 220_000_000, weight_pct: 22_000_000 })],
         total_holding_count: 1,
         total_global_value: 1_000_000_000,
       }),

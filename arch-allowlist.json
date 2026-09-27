@@ -110,10 +110,8 @@
     "src/features/update/update_banner/UpdateBanner.tsx": 4
   },
   "math_usage": {
-    "src/features/account_details/shared/presenter.ts": 1,
     "src/features/account_details/split_transaction/useSplitTransaction.ts": 4,
     "src/features/currency/shared/presenter.ts": 1,
-    "src/features/shell/PriceFetchProgressBar.tsx": 1,
-    "src/features/transactions/edit_transaction_modal/useEditTransactionModal.ts": 1
+    "src/features/shell/PriceFetchProgressBar.tsx": 1
   }
 }

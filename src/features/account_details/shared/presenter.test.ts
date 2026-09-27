@@ -51,6 +51,8 @@ const makeHolding = (overrides: Partial<HoldingDetail> = {}): HoldingDetail => (
   note_threshold_price: null,
   note_threshold_direction: null,
   note_alarm_triggered: false,
+  current_value: null,
+  weight_pct: null,
   inconsistency: null,
   period_performance: {
     ytd: null,
@@ -114,12 +116,14 @@ describe("toHoldingRow", () => {
   });
 
   it("formats currentValue as current_price × quantity with 2 decimals (MKT-143)", () => {
-    const row = toHoldingRow(makeHolding({ current_price: 150_000_000, quantity: 2_000_000 }));
+    const row = toHoldingRow(
+      makeHolding({ current_price: 150_000_000, current_value: 300_000_000 }),
+    );
     expect(row.currentValue).toBe("300,00");
   });
 
   it("shows currentValue as a dash when no price is recorded (MKT-143)", () => {
-    const row = toHoldingRow(makeHolding({ current_price: null }));
+    const row = toHoldingRow(makeHolding({ current_price: null, current_value: null }));
     expect(row.currentValue).toBe("—");
   });
 
@@ -859,32 +863,18 @@ describe("toPriceableAssets", () => {
 });
 
 describe("toHoldingRow — weight % (ACD-052)", () => {
-  it("formats the weight of a priced holding against the Global Value", () => {
-    // 220.00 of a 1000.00 account → 22.00%
-    const row = toHoldingRow(makeHolding({ market_value: 220_000_000 }), 1_000_000_000);
+  it("formats the backend's weight with 2 decimals", () => {
+    const row = toHoldingRow(makeHolding({ weight_pct: 22_000_000 }));
     expect(row.weightPct).toBe("22,00%");
   });
 
-  it("renders the dash when the holding has no market value", () => {
-    const row = toHoldingRow(makeHolding({ market_value: null }), 1_000_000_000);
+  it("renders the dash when the holding has no weight", () => {
+    const row = toHoldingRow(makeHolding({ weight_pct: null }));
     expect(row.weightPct).toBe("—");
   });
 
-  it("renders the dash when the Global Value is zero", () => {
-    const row = toHoldingRow(makeHolding({ market_value: 220_000_000 }), 0);
-    expect(row.weightPct).toBe("—");
-  });
-
-  it("computes the cash row weight from its balance", () => {
-    // cash 250.00 of a 1000.00 account → 25.00%
-    const row = toHoldingRow(
-      makeHolding({
-        asset_id: "system-cash-eur",
-        quantity: 250_000_000,
-        market_value: 250_000_000,
-      }),
-      1_000_000_000,
-    );
+  it("formats the cash row weight too", () => {
+    const row = toHoldingRow(makeHolding({ asset_id: "system-cash-eur", weight_pct: 25_000_000 }));
     expect(row.isCash).toBe(true);
     expect(row.weightPct).toBe("25,00%");
   });
@@ -1071,6 +1061,8 @@ describe("toHoldingRow — note fields (HNO-041)", () => {
         note_threshold_price: 150_000_000,
         note_threshold_direction: "Below",
         note_alarm_triggered: false,
+        current_value: null,
+        weight_pct: null,
       }),
     );
     expect(row.noteText).toBe("alert note");
@@ -1085,6 +1077,8 @@ describe("toHoldingRow — note fields (HNO-041)", () => {
         note_threshold_price: 150_000_000,
         note_threshold_direction: "Above",
         note_alarm_triggered: true,
+        current_value: null,
+        weight_pct: null,
       }),
     );
     expect(row.noteHasAlarm).toBe(true);

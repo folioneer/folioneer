@@ -38,6 +38,7 @@
         "current_price": 138000000,
         "current_price_date": "2025-12-31",
         "current_price_source": "Manual",
+        "current_value": 2050737960,
         "dividends_received": 0,
         "fee_rate_percent_micros": null,
         "fx_rate_date": null,
@@ -59,7 +60,8 @@
         "quantity": 14860420,
         "realized_pnl": -55423145,
         "total_return_pct": -2186367,
-        "unrealized_pnl": -45838882
+        "unrealized_pnl": -45838882,
+        "weight_pct": 25962855
       },
       {
         "asset_currency": "USD",
@@ -70,6 +72,7 @@
         "current_price": null,
         "current_price_date": null,
         "current_price_source": null,
+        "current_value": null,
         "dividends_received": 0,
         "fee_rate_percent_micros": null,
         "fx_rate_date": null,
@@ -91,7 +94,8 @@
         "quantity": 5848000000,
         "realized_pnl": 0,
         "total_return_pct": null,
-        "unrealized_pnl": null
+        "unrealized_pnl": null,
+        "weight_pct": 74037144
       }
     ],
     "total_cost_basis": 2096576842,
@@ -116,6 +120,7 @@
         "current_price": 136000000,
         "current_price_date": "2025-12-31",
         "current_price_source": "Manual",
+        "current_value": 6058800000,
         "dividends_received": 75500000,
         "fee_rate_percent_micros": null,
         "fx_rate_date": null,
@@ -137,7 +142,8 @@
         "quantity": 44550000,
         "realized_pnl": 287000000,
         "total_return_pct": 49799757,
-        "unrealized_pnl": 1963800040
+        "unrealized_pnl": 1963800040,
+        "weight_pct": 25102023
       },
       {
         "asset_currency": "USD",
@@ -148,6 +154,7 @@
         "current_price": 138000000,
         "current_price_date": "2025-12-31",
         "current_price_source": "Manual",
+        "current_value": 1380000000,
         "dividends_received": 0,
         "fee_rate_percent_micros": null,
         "fx_rate_date": "2025-07-01",
@@ -169,7 +176,8 @@
         "quantity": 10000000,
         "realized_pnl": 0,
         "total_return_pct": 1776367,
-        "unrealized_pnl": 22400000
+        "unrealized_pnl": 22400000,
+        "weight_pct": 5317214
       },
       {
         "asset_currency": "EUR",
@@ -180,6 +188,7 @@
         "current_price": null,
         "current_price_date": null,
         "current_price_source": null,
+        "current_value": null,
         "dividends_received": 0,
         "fee_rate_percent_micros": null,
         "fx_rate_date": null,
@@ -201,7 +210,8 @@
         "quantity": 13402500000,
         "realized_pnl": 0,
         "total_return_pct": null,
-        "unrealized_pnl": null
+        "unrealized_pnl": null,
+        "weight_pct": 55527474
       },
       {
         "asset_currency": "EUR",
@@ -212,6 +222,7 @@
         "current_price": 212000000,
         "current_price_date": "2025-12-31",
         "current_price_source": "Manual",
+        "current_value": 3392000000,
         "dividends_received": 0,
         "fee_rate_percent_micros": null,
         "fx_rate_date": null,
@@ -233,7 +244,8 @@
         "quantity": 16000000,
         "realized_pnl": 0,
         "total_return_pct": 111471321,
-        "unrealized_pnl": 1788000000
+        "unrealized_pnl": 1788000000,
+        "weight_pct": 14053288
       }
     ],
     "total_cost_basis": 6959999959,

@@ -371,6 +371,8 @@ describe("presentAssetScopeOptions", () => {
     note_threshold_price: null,
     note_threshold_direction: null,
     note_alarm_triggered: false,
+    current_value: null,
+    weight_pct: null,
     inconsistency: null,
     period_performance: {
       ytd: null,

@@ -807,7 +807,7 @@ async lookupAsset(query: string, mode: LookupMode) : Promise<Result<AssetLookupR
 }
 },
 /**
- * Dispatches an all-accounts auto-fetch task (MKT-122, MKT-130). Keyless (ADR-017).
+ * Dispatches an all-accounts auto-fetch task (MKT-122, MKT-130).
  * Returns `Ok(())` immediately after successful dispatch; per-asset results
  * arrive asynchronously via `AssetPriceUpdated` events (MKT-112). `trigger`
  * states which action started the fetch (PMV-010/015) — only `Manual`
@@ -822,7 +822,7 @@ async fetchAllAssetPrices(trigger: FetchTrigger) : Promise<Result<null, FetchAll
 }
 },
 /**
- * Dispatches a per-account price-fetch task (MKT-132, MKT-131). Keyless (ADR-017).
+ * Dispatches a per-account price-fetch task (MKT-132, MKT-131).
  * Returns `Ok(())` immediately after successful dispatch.
  */
 async fetchAccountAssetPrices(accountId: string) : Promise<Result<null, FetchAccountAssetPricesError>> {
@@ -1924,9 +1924,9 @@ exchange_rate: number;
 fees: number; 
 /**
  * All-in total typed by the user in account currency (micro-units) —
- * TRX-061 / SEL-051. When provided on a Purchase or Sell correction it is
- * stored verbatim and `unit_price` is derived from it; ignored on every
- * other transaction type.
+ * TRX-061 / SEL-051 / TRX-051. When provided on a Purchase, Sell or
+ * OpeningBalance correction it is stored verbatim and `unit_price` is derived
+ * from it; ignored on every other transaction type.
  */
 total_amount: number | null; 
 /**
@@ -2752,6 +2752,16 @@ management_fees: number;
  * price is recorded or a foreign holding has no usable rate (FXR-034).
  */
 market_value: number | null; 
+/**
+ * Current price × quantity in the asset's own currency, micros (MKT-143). None
+ * when no price is recorded; independent of any exchange rate.
+ */
+current_value: number | null; 
+/**
+ * Share of `total_global_value` in micro-percent (55 % = 55_000_000, ACD-052).
+ * None when the holding has no market value or the Global Value is not positive.
+ */
+weight_pct: number | null; 
 /**
  * Annual rate of the active recurring fee schedule for this (account, asset),
  * in micro-percent (1% = 1_000_000, FEE-032). None when no active schedule

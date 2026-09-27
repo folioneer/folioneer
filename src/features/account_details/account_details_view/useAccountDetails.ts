@@ -112,7 +112,7 @@ export function useAccountDetails(accountId: string, asOfDate = ""): UseAccountD
       return classById.get(row.assetId) === "Stocks" ? 1 : 2;
     };
     return data.holdings
-      .map((detail) => toHoldingRow(detail, data.total_global_value))
+      .map(toHoldingRow)
       .sort(
         (a, b) =>
           groupRank(a) - groupRank(b) ||

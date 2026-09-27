@@ -224,8 +224,8 @@ describe("useEditTransactionModal", () => {
     expect(result.current.formData.unitPrice).toBe("100.000");
   });
 
-  // TRX-051: submit recomputes unit_price = round(total_cost * 1M / quantity); fees=0, rate=1M, note=null
-  it("TRX-051: submit sends computed unit_price, zero fees, unit exchange_rate, null note", async () => {
+  // TRX-051 / TD-033: submit sends the typed total cost; the backend derives the unit price
+  it("TRX-051: submit sends the typed total cost, zero fees, unit exchange_rate, null note", async () => {
     mockCorrectTransaction.mockResolvedValue({
       data: { id: "tx-ob" },
       error: null,
@@ -245,7 +245,8 @@ describe("useEditTransactionModal", () => {
       "tx-ob",
       "account-1",
       expect.objectContaining({
-        unit_price: 50 * MICRO, // round(100M * 1M / 2M) = 50M
+        total_amount: 100 * MICRO,
+        unit_price: 0,
         exchange_rate: 1 * MICRO,
         fees: 0,
         note: null,

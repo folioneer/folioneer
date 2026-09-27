@@ -32,15 +32,17 @@ Represents the current state of a financial position within the account. Persist
 
 Read projection for **open** positions (`quantity > 0`). Enriched by `AccountDetailsUseCase` with asset metadata. Defined as a Rust struct with `#[derive(Type, Serialize)]`.
 
-| Field             | Source                       | Business meaning                                                                       |
-| ----------------- | ---------------------------- | -------------------------------------------------------------------------------------- |
-| `asset_id`        | `Holding`                    | ID of the held asset.                                                                  |
-| `asset_name`      | `AssetService`               | Display name of the asset.                                                             |
-| `asset_reference` | `AssetService`               | Ticker or user-defined reference.                                                      |
-| `quantity`        | `Holding`                    | Current number of units held (i64 micros). Always > 0.                                 |
-| `average_price`   | `Holding`                    | VWAP purchase price in account currency (i64 micros).                                  |
-| `cost_basis`      | computed                     | `quantity × average_price` (i128 intermediate, per ACD-023/ACD-024). Not stored in DB. |
-| `realized_pnl`    | `Holding.total_realized_pnl` | Cumulative realized P&L from partial sells (i64 micros). Zero if none. See SEL-042.    |
+| Field             | Source                       | Business meaning                                                                                                                              |
+| ----------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `asset_id`        | `Holding`                    | ID of the held asset.                                                                                                                         |
+| `asset_name`      | `AssetService`               | Display name of the asset.                                                                                                                    |
+| `asset_reference` | `AssetService`               | Ticker or user-defined reference.                                                                                                             |
+| `quantity`        | `Holding`                    | Current number of units held (i64 micros). Always > 0.                                                                                        |
+| `average_price`   | `Holding`                    | VWAP purchase price in account currency (i64 micros).                                                                                         |
+| `cost_basis`      | computed                     | `quantity × average_price` (i128 intermediate, per ACD-023/ACD-024). Not stored in DB.                                                        |
+| `realized_pnl`    | `Holding.total_realized_pnl` | Cumulative realized P&L from partial sells (i64 micros). Zero if none. See SEL-042.                                                           |
+| `market_value`    | computed                     | Value in account currency (i64 micros), the holding's contribution to `total_global_value`; `None` when unpriced or no usable rate (ACD-052). |
+| `weight_pct`      | computed                     | Share of `total_global_value` in micro-percent; `None` when `market_value` is `None` or the Global Value is not positive (ACD-052).           |
 
 ### ClosedHoldingDetail (Backend DTO)
 
@@ -68,7 +70,7 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 | `total_realized_pnl`  | Sum of `total_realized_pnl` across **all** holdings (open + closed) in the account (per SEL-042/ACD-045).                                       |
 | `total_global_value`  | Cash + Σ(market value of non-cash active holdings); see CSH-094 for the formula and missing-price treatment. Account-currency micros (ADR-001). |
 
-> **MKT extension**: `docs/spec/market-price.md` adds `total_unrealized_pnl: Option<i64>` to this response and five new fields to `HoldingDetail` (`asset_currency`, `current_price`, `current_price_date`, `unrealized_pnl`, `performance_pct`). See the MKT spec for definitions.
+> **MKT extension**: `docs/spec/market-price.md` adds `total_unrealized_pnl: Option<i64>` to this response and six new fields to `HoldingDetail` (`asset_currency`, `current_price`, `current_price_date`, `unrealized_pnl`, `performance_pct`, `current_value`). See the MKT spec for definitions.
 
 > **CSH extension**: `docs/spec/cash-tracking.md` adds `total_global_value: i64` to this response (CSH-094) and amends ACD-034 with a cash-specific exception (CSH-098). The Cash Holding is **always** included in `holdings` (CSH-090), exempt from ACD-020's `quantity > 0` filter — it appears even at `quantity = 0` (CSH-097) and is never placed in `closed_holdings`. Asset metadata is enriched via `AssetService` like any other asset (ACD-022).
 
@@ -106,7 +108,7 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 
 **ACD-051 — Holdings display grouping (frontend)**: The active holdings table groups rows by asset class ahead of the backend `asset_name` sort (ACD-033): the Cash Holding first (per CSH-092), then `Stocks`, then all other asset classes. Within each group, rows keep ascending `asset_name` order. Asset class is read from the loaded asset catalog (the global asset store); a holding whose asset is not yet loaded is treated as "other" until the catalog resolves.
 
-**ACD-052 — Holding weight in the Global Value**: Each `HoldingDetail` exposes `market_value: Option<i64>` — the holding's value in account-currency micros, exactly its contribution to `total_global_value` (CSH-094): the balance for the Cash Holding, price × quantity × FX for a priced non-cash holding, `None` when no price is recorded or a foreign holding has no usable rate (FXR-034). The frontend renders a "Weight %" column right after Current Value: `market_value / total_global_value × 100`, 2 decimals; "—" when `market_value` is `None` or the Global Value is not positive. The cash row shows its weight too; both the live and the as-of views carry the field.
+**ACD-052 — Holding weight in the Global Value (frontend + backend)**: Each `HoldingDetail` exposes `market_value: Option<i64>` — the holding's value in account-currency micros, its contribution to `total_global_value` (CSH-094): the balance for the Cash Holding, price × quantity × FX for a priced non-cash holding, `None` when no price is recorded or a foreign holding has no usable rate (FXR-034); a `None` counts as 0 in the Global Value. It also exposes `weight_pct: Option<i64>` — `market_value × 100_000_000 / total_global_value`, micro-percent (55 % = 55_000_000), `i128` intermediate, truncated; `None` when `market_value` is `None` or `total_global_value ≤ 0`. The frontend renders `weight_pct` as a "Weight %" column right after Current Value, formatted with 2 decimals (rounded), "—" when it is `None`. The Cash Holding row shows its weight too (its Current Value cell stays blank, MKT-143); both the live and the as-of views carry both fields.
 
 **ACD-053 — Net cash input since inception**: `AccountDetailsResponse` exposes `total_net_cash_input: i64` — Σ `Deposit` amounts − Σ `Withdrawal` amounts across the account's whole transaction history, in account-currency micros; negative when withdrawals exceed deposits; `0` when no cash transactions exist. The as-of view counts only transactions dated on or before the as-of date. The frontend displays the figure in the summary header next to the Global Value.
 
@@ -217,7 +219,9 @@ UPDATE holdings SET
   - Quantity
   - Avg. Price
   - Realized P&L (`—` when zero or no sells)
+  - Current Price (MKT-031)
   - Current Value (current price × quantity, asset currency; `—` when no price — MKT-143)
+  - Weight % (share of the Global Value; `—` when none — ACD-052)
   - Actions: Buy, Sell, Inspect
 - **Closed Positions Section** (rendered only when `closed_holdings` non-empty, per ACD-047):
   - Section heading "Closed positions"

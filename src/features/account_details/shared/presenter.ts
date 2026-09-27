@@ -412,14 +412,11 @@ export function toPriceableAssets(holdings: HoldingRowViewModel[]): PriceableAss
 }
 
 /**
- * ACD-052 — weight of a holding in the account's Global Value, formatted as a
- * percentage with 2 decimals. "—" when the holding carries no market value
- * (unpriced / no usable FX rate) or when the Global Value is not positive.
+ * ACD-052 — the backend's weight of a holding in the account's Global Value
+ * (micro-percent), formatted with 2 decimals; "—" when it has none.
  */
-function formatWeightPct(marketValue: number | null, totalGlobalValue: number): string {
-  if (marketValue === null || totalGlobalValue <= 0) return DASH;
-  const weightPctMicros = Math.round((marketValue / totalGlobalValue) * 100_000_000);
-  return `${microToFormatted(weightPctMicros, 2)}%`;
+function formatWeightPct(weightPctMicros: number | null): string {
+  return weightPctMicros === null ? DASH : `${microToFormatted(weightPctMicros, 2)}%`;
 }
 
 function formatPerformancePctCell(valueMicroPercent: number | null): PerformancePctCell {
@@ -475,10 +472,7 @@ export function performanceColumnKey(period: StoredPerfPeriod): string {
     : `account_details.column_performance_pct_${period}`;
 }
 
-// reviewer-frontend FP: the default is deliberate — weight legitimately dashes when
-// no account total is supplied; the wiring is covered by the useAccountDetails
-// ACD-052 test — next-batch 2026-07-04
-export function toHoldingRow(detail: HoldingDetail, totalGlobalValue = 0): HoldingRowViewModel {
+export function toHoldingRow(detail: HoldingDetail): HoldingRowViewModel {
   const isCash = isCashAsset(detail.asset_id);
   if (isCash) {
     // Cash row variant (CSH-090/091): no cost basis, average price, realized PnL or
@@ -504,7 +498,7 @@ export function toHoldingRow(detail: HoldingDetail, totalGlobalValue = 0): Holdi
       periodPerformance: CASH_PERIOD_PERFORMANCE,
       dividendsReceived: "",
       managementFees: "",
-      weightPct: formatWeightPct(detail.market_value, totalGlobalValue),
+      weightPct: formatWeightPct(detail.weight_pct),
       feeRatePct: null,
       totalReturnPct: "",
       totalReturnPctRaw: null,
@@ -528,15 +522,8 @@ export function toHoldingRow(detail: HoldingDetail, totalGlobalValue = 0): Holdi
     quantity: microToFormattedQuantity(detail.quantity),
     quantityMicro: detail.quantity,
     averagePrice: microToFormattedPrice(detail.average_price),
-    // MKT-143 — market value = current_price × quantity in the asset's native
-    // currency; "—" when no price has been recorded. Dividing the price out of
-    // micros before multiplying keeps the intermediate below MAX_SAFE_INTEGER
-    // (vs price_micros × qty_micros); the sub-micro float drift is absorbed by
-    // microToFormatted's 2-decimal rounding.
-    currentValue:
-      detail.current_price !== null
-        ? microToFormatted((detail.current_price / 1_000_000) * detail.quantity, 2)
-        : DASH,
+    // MKT-143 — the backend's current price × quantity, asset currency.
+    currentValue: detail.current_value !== null ? microToFormatted(detail.current_value, 2) : DASH,
     realizedPnl: microToFormatted(detail.realized_pnl, 2),
     realizedPnlRaw: detail.realized_pnl,
     canEnterPrice: true,
@@ -550,7 +537,7 @@ export function toHoldingRow(detail: HoldingDetail, totalGlobalValue = 0): Holdi
     periodPerformance: toPeriodPerformance(detail.period_performance),
     dividendsReceived: microToFormatted(detail.dividends_received, 2),
     managementFees: microToFormatted(detail.management_fees, 2),
-    weightPct: formatWeightPct(detail.market_value, totalGlobalValue),
+    weightPct: formatWeightPct(detail.weight_pct),
     // FEE-074 — annual rate of the active fee schedule, shown next to the fees.
     feeRatePct:
       detail.fee_rate_percent_micros !== null

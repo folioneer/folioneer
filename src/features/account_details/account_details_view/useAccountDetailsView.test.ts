@@ -398,6 +398,8 @@ const makeHoldingDetail = (overrides: Record<string, unknown> = {}) => ({
   note_threshold_price: null,
   note_threshold_direction: null,
   note_alarm_triggered: false,
+  current_value: null,
+  weight_pct: null,
   period_performance: {
     ytd: null,
     one_year: null,
@@ -855,6 +857,8 @@ describe("useAccountDetailsView — holding-note modal target (HNO-042)", () => 
       note_threshold_price: 150_000_000,
       note_threshold_direction: "Below",
       note_alarm_triggered: true,
+      current_value: null,
+      weight_pct: null,
     });
     const { result } = renderHook(() => useAccountDetailsView("acc-1"));
     await act(async () => {});

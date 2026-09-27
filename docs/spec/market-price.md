@@ -49,7 +49,7 @@ What the interface is told about this build: what it can do and which distributi
 
 ### HoldingDetail (extended)
 
-The `HoldingDetail` DTO defined in the ACD spec gains five new fields populated by this feature.
+The `HoldingDetail` DTO defined in the ACD spec gains six new fields populated by this feature.
 
 | Field                  | Business meaning                                                                                                                                                                                                                            |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -59,6 +59,7 @@ The `HoldingDetail` DTO defined in the ACD spec gains five new fields populated 
 | `current_price_source` | Provenance of the price observation used as `current_price` (see `AssetPriceSource` — `Manual` or `YahooFinance`). `None` when `current_price` is `None`. Surfaced so the FE can render the source badge per MKT-142 without a per-row IPC. |
 | `unrealized_pnl`       | Unrealized gain or loss in account currency (i64 micros). `None` when no price exists or when asset and account currencies differ (MKT-034). `0` when current price equals average price (not `None`).                                      |
 | `performance_pct`      | `unrealized_pnl / cost_basis × 100`, expressed as i64 micros (e.g. 5.25 % = 5 250 000). `None` when `unrealized_pnl` is `None` or `cost_basis` is zero. `0` when `unrealized_pnl` is zero.                                                  |
+| `current_value`        | `current_price × quantity` in asset currency (i64 micros, i128 intermediate), independent of any exchange rate (MKT-143). `None` when `current_price` is `None`.                                                                            |
 
 ### AccountDetailsResponse (extended)
 
@@ -313,7 +314,7 @@ The launch auto-fetch (MKT-121) shows no dispatch snackbar; its outcome is silen
 
 **MKT-142 — Source badge in Current Price column (frontend)**: The Account Details "Current Price" column displays a badge alongside the price (or near the staleness label MKT-140) showing the source of the most recent `AssetPrice` record. Same styling as MKT-141.
 
-**MKT-143 — Current Value column (frontend)**: The Account Details active-holdings table includes a "Current Value" column, placed immediately after "Current Price", showing the holding's market value as `current_price × quantity` in the asset's native currency. When `current_price` is `None`, the column shows the same neutral placeholder as the other market columns ("—"). The system cash row leaves the cell blank, consistent with its other market columns. This is a presentation-only derivation — no new `HoldingDetail` field is introduced.
+**MKT-143 — Current Value column (frontend + backend)**: The Account Details active-holdings table includes a "Current Value" column, placed immediately after "Current Price", showing the holding's current value as `current_price × quantity` in the asset's native currency. The backend computes it as `HoldingDetail.current_value: Option<i64>` (micros, asset currency, i128 intermediate, independent of any exchange rate); the frontend only formats it. When `current_price` is `None`, `current_value` is `None` and the column shows the same neutral placeholder as the other market columns ("—"). The Cash Holding row leaves the cell blank, consistent with its other market columns.
 
 **MKT-145 — Fetch-outcome snackbar (frontend)**: On `AssetPriceFetchCompleted` (MKT-119), the frontend shows a snackbar only when `skipped > 0`: an error snackbar ("Couldn't update prices (N)") when `ok == 0`, otherwise an info snackbar summarizing the partial result ("Updated N · M couldn't be updated"). A fully successful fetch (`skipped == 0`) shows nothing, so the launch auto-fetch (MKT-121) stays silent on the happy path while failures surface from any entry point. Handled globally (the event is not correlated to a specific trigger). This snackbar is superseded by the unupdated-prices modal whenever that modal auto-opens for the same signal (MKT-173) — the two never appear together for one completion event.
 

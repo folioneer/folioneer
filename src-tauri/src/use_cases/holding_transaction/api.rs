@@ -100,9 +100,9 @@ pub struct CorrectTransactionDTO {
     /// Corrected fees in account currency (micro-units).
     pub fees: i64,
     /// All-in total typed by the user in account currency (micro-units) —
-    /// TRX-061 / SEL-051. When provided on a Purchase or Sell correction it is
-    /// stored verbatim and `unit_price` is derived from it; ignored on every
-    /// other transaction type.
+    /// TRX-061 / SEL-051 / TRX-051. When provided on a Purchase, Sell or
+    /// OpeningBalance correction it is stored verbatim and `unit_price` is derived
+    /// from it; ignored on every other transaction type.
     pub total_amount: Option<i64>,
     /// Optional user note.
     pub note: Option<String>,

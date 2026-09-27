@@ -261,15 +261,6 @@ Remove an entry once it has been resolved.
 - User value: None — one look for every two-way entry toggle.
 - Done when: a generic two-option toggle lives in `src/ui/components/` and both forms use it.
 
-## 2026-09-20 — TD-033 — Two figures are still derived in the frontend
-
-- Found by: a scan of production frontend code for derivation (chat, 2026-09-20)
-- Where: src/features/account_details/shared/presenter.ts (`currentValue`, MKT-143), src/features/transactions/edit_transaction_modal/useEditTransactionModal.ts (`unitPriceMicro`, TRX-051)
-- Severity: 🟡
-- Observation: the holdings presenter computes a holding's market value as `current_price / 1_000_000 × quantity` in floating point, while the backend already values every holding for the account totals; and the edit form of an opening balance computes the unit price it sends to the backend as `floor(total × 1_000_000 / quantity)`, so a stored figure is decided by the frontend, with an intermediate that leaves JavaScript's exact-integer range once the total passes about 9,007 currency units. Both are among the 8 `Math.` / arithmetic uses the architecture check freezes (A7); the other derivation it freezes, the split preview, is documented (SPL-061). Nothing else in feature code aggregates or derives: no `reduce`, and every `sort` is a table's column order.
-- User value: None visible today — the market value column and an edited opening balance stop depending on frontend arithmetic, so the two layers cannot disagree on a figure.
-- Done when: `HoldingDetail` carries the market value computed by the backend and the presenter only formats it; the opening-balance correction sends the total and the backend derives the unit price with the rule the creation path uses (TRX-047); the two `math_usage` entries leave `arch-allowlist.json`.
-
 ## 2026-09-20 — TD-035 — A release leaves the lockfile's own version behind
 
 - Found by: reviewer-infra
