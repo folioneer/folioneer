@@ -226,19 +226,6 @@ Proposal: inventory `.claude/skills/` and `.claude/agents/` against what Workflo
 
 - [x] Delete `/spec-writer` and `/contract` too, or keep them for features designed in chat? (Recommended: keep both.) — Delete them too; keep only what is really used (2026-09-27).
 
-## #041 — (ci) — A pull request that changes no code pays for the full E2E run
-
-Every pull request runs the E2E suite: 13–15 minutes of Tauri build and WebDriver, measured over the runs of 2026-09-20. Entry #037 paid for four of them, about an hour, because each fix-up commit restarted it; the records-only pull requests #4 and #8 paid one each for changing nothing the suite can execute.
-
-`.github/workflows/e2e.yml` explains the absence of a path filter, and the reason is sound: `paths-ignore` on a **required** check leaves it "Expected" for ever, so the pull request can never merge. The conclusion does not follow, though — the job can always start and decide inside itself. The required check then reports within a minute, and the twenty-minute build happens only when code moved. Pushes to `main` already carry the filter, so `main`'s screenshot artifact is refreshed by code pushes only and the visual baseline is unaffected.
-
-Two traps for whoever takes this. The local classifier cannot be reused as it stands: `scripts/changed-scope.sh` answers `none` for `.github/*` and `scripts/*`, yet a change to `e2e.yml`, `wdio.conf.ts` or the capture helper is exactly when the suite must run — the skip condition has to be written for E2E rather than borrowed. And the job does more than run tests: it uploads the screenshot artifact, compares it against `main` and comments on the pull request, so a skipped run must leave those steps coherent rather than half-done.
-
-**User value:** None — CI minutes, and a faster answer on a pull request that changes no code.
-**Done when:** A pull request touching only Markdown, `docs/` or records reports the E2E check green in under a minute without building the application; a pull request touching `src/`, `src-tauri/`, `e2e/`, the workflow or the test tooling still runs the full suite; the screenshot comparison against `main` still runs on the pull requests that build; both paths are watched on a real pull request of each kind.
-**Design:** none
-**Open questions:** none
-
 ## #014 — (e2e) — Drive a second device in the E2E suite
 
 The multi-device sync E2E covers the single-device critical path only (plan § Halt Artifact H1): `wdio.conf.ts` launches one binary with one `VAULT_COMPASS_E2E_DATA_DIR` and `maxInstances: 1`, so joining a folder another device created (SYN-014/036) is proven by the two-database integration test `src-tauri/tests/sync_two_devices.rs`, not through the UI. A real two-device E2E needs an `e2e/helpers/second_device.ts` that launches a second binary against its own data directory plus a wdio multi-remote configuration — a separate, pre-requisite task before any join scenario is written.

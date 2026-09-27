@@ -1,17 +1,18 @@
 name: E2E
 
 on:
-  # Every pull request and every push to main run the full suite. The ~20-min
-  # Tauri build is the price of merging on green: nothing reaches main that the
-  # real app has not passed. Pull requests carry no path filter on purpose: a
-  # filtered-out run leaves a required check "Expected" forever and the PR can
-  # never merge, so doc-only PRs pay for the run too. Pushes to main keep the
-  # filter — nothing gates on them.
+  # Every pull request runs this job, and every push to main that touches more
+  # than records. Pull requests carry no path filter on purpose: a filtered-out
+  # run leaves a required check "Expected" forever and the PR can never merge.
+  # Instead the job starts every time and decides inside itself (#041): a pull
+  # request of records only (scripts/e2e-scope.py) reports green in a minute,
+  # anything the suite can execute pays for the ~20-min Tauri build. Pushes to
+  # main keep the filter — nothing gates on them.
   pull_request:
     branches: [main]
   push:
     branches: [main]
-    paths-ignore: ["**/*.md", "docs/**"]
+    paths-ignore: ["**/*.md", "docs/**", ".claude/**", "screenshots/**"]
   # Run on demand against any branch — useful before merging a change to the
   # test tooling itself.
   workflow_dispatch:
@@ -44,7 +45,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
+      - name: Decide whether the suite must run
+        # A pull request of records only (Markdown, docs/, .claude/, committed
+        # visual proofs) changes nothing the suite executes: every step below is
+        # skipped and the required check reports green. A list that cannot be
+        # read proves nothing, so the suite runs. Pushes and manual runs always run.
+        id: scope
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" != "pull_request" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if ! files=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename'); then
+            echo "run=true" >> "$GITHUB_OUTPUT"; echo "File list unreadable — the suite runs."; exit 0
+          fi
+          run=$(printf '%s\n' "$files" | python3 scripts/e2e-scope.py)
+          # Anything but a clear answer fails the step rather than skipping the suite.
+          [[ "$run" == true || "$run" == false ]] || { echo "::error::e2e-scope.py answered '$run'"; exit 1; }
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          if [[ "$run" == false ]]; then
+            echo "Records only — the suite is skipped." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Install Linux dependencies
+        if: steps.scope.outputs.run == 'true'
         # webkit2gtk-driver provides WebKitWebDriver (used by tauri-driver on Linux);
         # xvfb provides the virtual framebuffer for headless rendering.
         shell: bash
@@ -55,21 +84,25 @@ jobs:
             webkit2gtk-driver xvfb libdbus-1-dev imagemagick
 
       - name: Setup Node.js
+        if: steps.scope.outputs.run == 'true'
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
         with:
           node-version: 22
           cache: npm
 
       - name: Setup Rust
+        if: steps.scope.outputs.run == 'true'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Rust
+        if: steps.scope.outputs.run == 'true'
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2.9.1
         with:
           workspaces: src-tauri
           prefix-key: linux-e2e-rust-${{ hashFiles('src-tauri/Cargo.lock') }}
 
       - name: Cache tauri-driver binary
+        if: steps.scope.outputs.run == 'true'
         id: cache-tauri-driver
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
         with:
@@ -77,15 +110,17 @@ jobs:
           key: tauri-driver-2.0.5-${{ runner.os }}
 
       - name: Install tauri-driver
-        if: steps.cache-tauri-driver.outputs.cache-hit != 'true'
+        if: steps.scope.outputs.run == 'true' && steps.cache-tauri-driver.outputs.cache-hit != 'true'
         shell: bash
         run: cargo install tauri-driver --version 2.0.5 --locked
 
       - name: Install frontend dependencies
+        if: steps.scope.outputs.run == 'true'
         shell: bash
         run: npm ci
 
       - name: Run E2E (headless via Xvfb)
+        if: steps.scope.outputs.run == 'true'
         # `test:e2e:ci` is the project's xvfb wrapper around `test:e2e` (see package.json).
         shell: bash
         run: npm run test:e2e:ci
@@ -95,7 +130,7 @@ jobs:
         # Uploaded pass or fail: on a failure the captures taken before the
         # failing step are still the best picture of what the app showed. A
         # cancelled run (superseded by a newer push) uploads nothing.
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         id: upload-screens
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
@@ -113,7 +148,7 @@ jobs:
         # this purpose). Small text differences (a price age, a date) stay
         # under the threshold; layout and theme breakage do not. No baseline (no
         # green main run with an artifact) skips the comparison with a note.
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.scope.outputs.run == 'true' }}
         id: visual
         shell: bash
         env:
@@ -168,7 +203,7 @@ jobs:
           fi
 
       - name: Upload the visual diffs
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.scope.outputs.run == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: e2e-visual-diff
@@ -177,7 +212,7 @@ jobs:
           retention-days: 14
 
       - name: Upload E2E failure screenshots
-        if: failure()
+        if: failure() && steps.scope.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: e2e-failure-screenshots
@@ -193,7 +228,7 @@ jobs:
         # the comment is refused; that must never turn a green suite red.
         # Skipped on a cancelled run so a superseded run cannot overwrite the
         # comment the newer run is about to post.
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.scope.outputs.run == 'true' }}
         continue-on-error: true
         shell: bash
         env:
@@ -236,7 +271,7 @@ jobs:
           fi
 
       - name: Fail on a visual regression
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.visual.outputs.verdict == 'regression' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.scope.outputs.run == 'true' && steps.visual.outputs.verdict == 'regression' }}
         shell: bash
         run: |
           echo "::error::Visual regression — see the e2e-visual-diff artifact and the PR comment."
