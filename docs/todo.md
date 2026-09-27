@@ -281,7 +281,7 @@ Filed 2026-09-27 after a survey of agent instruction files. Two open formats now
 **Design:** none
 **Open questions:**
 
-- [ ] Will agents other than Claude work on this repository? (If yes: the tool-agnostic part moves to `AGENTS.md` and `CLAUDE.md` imports it with `@AGENTS.md`, adding only what is Claude-specific. If no: stay with `CLAUDE.md` alone.)
+- [x] Will agents other than Claude work on this repository? — Only Claude for now (owner, 2026-09-27): stay with `CLAUDE.md` alone; no `AGENTS.md`.
 
 ## #014 — (e2e) — Drive a second device in the E2E suite
 
