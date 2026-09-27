@@ -1,4 +1,4 @@
-//! The `ChangeApplier` port (D4, ADR-004): what the apply executor needs from the owning
+//! The `ChangeApplier` port (D4, B24): what the apply executor needs from the owning
 //! bounded contexts — the state each record currently has on this device, the children an
 //! account owns, and the verbatim writes that run no entry guards (CFR-017). The use case
 //! implements it over the account, asset, and currency services, the way `PortfolioSnapshot`

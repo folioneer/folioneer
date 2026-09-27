@@ -1,5 +1,5 @@
 //! Cross-BC orchestration for the seven sync commands that read from or write into the
-//! account/asset/currency bounded contexts (D3, ADR-003/ADR-004): a first publish reads the
+//! account/asset/currency bounded contexts (D3, B18/B24): a first publish reads the
 //! whole portfolio, a join rebuilds it, a run applies other devices' changes through the
 //! owning services (`ServiceChangeApplier`), and status enriches with inconsistent holdings.
 //! Injects each BC's service — never a repository, never a sibling use case (B18).
@@ -32,7 +32,7 @@ impl From<JoinError> for PortfolioSyncError {
 }
 
 /// Everything `PortfolioSyncOrchestrator` needs: the three services it reads from and
-/// writes into (ADR-004), and the sync context's own device lifecycle, first publish, run,
+/// writes into (B24), and the sync context's own device lifecycle, first publish, run,
 /// state, and folder components.
 pub struct PortfolioSyncDependencies {
     /// Owner of accounts, transactions, holding notes, fee schedules, and catch-up positions.

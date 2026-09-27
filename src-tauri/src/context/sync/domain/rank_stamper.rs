@@ -1,6 +1,6 @@
 //! The `RankStamper` port (CFR-014, D6): stamps every synced row that has never been ranked
 //! with the first segment's rank, on the enrolment transaction's connection (SYN-013). The use
-//! case implements it over the owning bounded contexts' services (ADR-004), the way
+//! case implements it over the owning bounded contexts' services (B24), the way
 //! `PortfolioSnapshot` reads them — each context stamps its own tables.
 
 use sqlx::SqliteConnection;

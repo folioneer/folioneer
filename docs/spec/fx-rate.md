@@ -12,7 +12,7 @@ In V1 a currency rate exists **only to value foreign holdings** — it is a side
 
 The valuation rate (current market price → account currency) and the per-transaction `exchange_rate` (cost / realized side) are **two distinct concepts and never interact**: recording or refreshing an FX rate never re-rates historical cost basis or already-realized P&L, and editing a transaction's frozen `exchange_rate` never touches a `CurrencyRate` row.
 
-This feature is owned by a new `currency` bounded context. The cross-context valuation that consumes rates lives in the existing `use_cases/account_details/` and `use_cases/account_performance/` use cases (per ADR-003 / ADR-004: use cases inject services, not repositories).
+This feature is owned by a new `currency` bounded context. The cross-context valuation that consumes rates lives in the existing `use_cases/account_details/` and `use_cases/account_performance/` use cases (per B18 / B24: use cases compose contexts through services or repository traits, never infrastructure).
 
 Decisions inherited and applied without re-asking:
 

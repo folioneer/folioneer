@@ -1,7 +1,7 @@
 # ADR 003 — Cross-Context Use Case Orchestration via Sequential Service Calls
 
 **Date**: 2026-04-16
-**Status**: Accepted — amended by ADR-005 (TransactionService added to account_details)
+**Status**: Superseded by ADR-022
 
 ## Context
 

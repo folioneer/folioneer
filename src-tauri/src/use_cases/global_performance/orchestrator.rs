@@ -27,7 +27,7 @@ const IDENTITY_RATE_MICROS: i64 = 1_000_000;
 /// Orchestrates the portfolio-wide performance read (GPF spec): all accounts —
 /// or one asset's positions across all accounts — aggregated in the reference
 /// currency, with the single-account scopes served by the shared performance
-/// series engine (ADR-003, ADR-013).
+/// series engine (B18, ADR-013).
 pub struct GlobalPerformanceUseCase {
     account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,

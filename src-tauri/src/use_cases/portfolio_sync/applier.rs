@@ -1,5 +1,5 @@
 //! `ServiceChangeApplier` — the `ChangeApplier` port over the account, asset, and currency
-//! services (ADR-004, CFR-017): routes each synced record kind to the service that owns it,
+//! services (B24, CFR-017): routes each synced record kind to the service that owns it,
 //! reads the state it holds, and writes prevailing changes through the services' apply
 //! entry points, which run no entry guards. The cash asset a change refers to is seeded
 //! first (SYN-027/CFR-033). Every call rides the apply transaction's connection (SYN-065).

@@ -6,7 +6,7 @@ The Global Performance feature presents how the user's whole portfolio — every
 
 Accounts are denominated in different currencies, so a cross-account aggregation needs one reporting currency. The reference currency is fixed to **EUR** (user decision): every aggregated figure — end values, flows, bridge terms, gains — is converted to EUR before summation, using the same carry-forward rate resolution as holding valuation (FXR-035/042) and the same missing-rate degradation to `0` (FXR-034).
 
-This is a **feature spec** spanning the `account`, `asset`, and `currency` bounded contexts, orchestrated by `use_cases/global_performance/` (ADR-003, ADR-004). The per-account series machinery is shared with `account_performance` through `use_cases/shared/` (B18); the aggregation reuses it per account and sums the converted results. All monetary values are `i64` micro-units per [ADR-001](../adr/001-use-i64-for-monetary-amounts.md); everything is recomputed on read per [ADR-013](../adr/013-recompute-account-performance-on-read.md).
+This is a **feature spec** spanning the `account`, `asset`, and `currency` bounded contexts, orchestrated by `use_cases/global_performance/` (B18, B24). The per-account series machinery is shared with `account_performance` through `use_cases/shared/` (B18); the aggregation reuses it per account and sums the converted results. All monetary values are `i64` micro-units per [ADR-001](../adr/001-use-i64-for-monetary-amounts.md); everything is recomputed on read per [ADR-013](../adr/013-recompute-account-performance-on-read.md).
 
 ---
 

@@ -275,7 +275,7 @@ impl AccountService {
     // Holding reads
     // -------------------------------------------------------------------------
 
-    /// Retrieves all holdings for a given account (ACD-022, ADR-004).
+    /// Retrieves all holdings for a given account (ACD-022, B24).
     pub async fn get_holdings_for_account(
         &self,
         account_id: &str,
@@ -1540,7 +1540,7 @@ pub trait AccountServiceContract: Send + Sync {
     ) -> StdResult<Account, AccountError>;
     /// Seeds the account's 0-balance Cash Holding (CSH-012).
     async fn seed_cash_holding(&self, account_id: &str) -> StdResult<(), AccountError>;
-    /// Retrieves all holdings for a given account (ACD-022, ADR-004).
+    /// Retrieves all holdings for a given account (ACD-022, B24).
     async fn get_holdings_for_account(
         &self,
         account_id: &str,

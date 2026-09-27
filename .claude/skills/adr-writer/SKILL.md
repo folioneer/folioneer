@@ -60,7 +60,7 @@ An ADR exists for one purpose: to stop an agent reversing an architectural decis
 
 > **Would an agent reading only the code plausibly undo this, and would undoing it be costly?**
 
-If the code or a spec rule already makes the choice obvious, or undoing it is cheap, no ADR.
+If the code or a spec rule already makes the choice obvious, or undoing it is cheap, no ADR. An ADR records a **technical** choice (a data representation, a storage or sync design, a build boundary); how code is organised, a pattern or a testing convention is a rule in the `docs/*-rules.md` family, never an ADR (ADR-022).
 
 This block is the canonical source for the gate. `adr-reviewer` references it; do not restate it elsewhere in the kit without cross-linking back here.
 
@@ -158,9 +158,9 @@ rounding), `Decimal` crate (rejected for SQLite friction).
 
 ### 3. Supersede an existing ADR
 
-1. List `docs/adr/` and identify the ADR to supersede. If `docs/adr/` is empty or missing, inform the user there is nothing to supersede and offer to create a new ADR (Step 2) instead.
+1. List `docs/adr/` and identify the ADR (or ADRs — one new ADR may supersede several, as ADR-022 does) to supersede. If `docs/adr/` is empty or missing, inform the user there is nothing to supersede and offer to create a new ADR (Step 2) instead.
 2. If the target ADR's status is already `Superseded by ADR-{X}`, the chain has been continued elsewhere. Refuse and point the user at ADR-{X} as the current decision.
-3. Create the new ADR following Step 2 with `Status: Accepted — supersedes ADR-{OLD}`.
+3. Create the new ADR following Step 2 with `Status: Accepted — supersedes ADR-{OLD}` (a comma-separated list when several); each superseded ADR gets its own `Superseded by ADR-{NEW}`.
 4. Patch the superseded ADR — change only its `Status` line to `Superseded by ADR-{NEW}`. Leave Context, Decision, Consequences untouched (history must remain readable).
 5. Update the index (Step 4) — **both** rows must change: the new ADR's row, and the superseded ADR's row (its Status column now reads `Superseded by ADR-{NEW}`).
 
@@ -192,7 +192,7 @@ If `docs/adr/` does not exist, create it together with `README.md`.
 
 1. **ADR numbers are permanent** — once assigned, never reused, even on supersede or removal.
 2. **Never delete an ADR** — supersede it. Past decisions remain readable in their historical form.
-3. **Status is one of three values** — `Accepted`, `Accepted — supersedes ADR-{NNN}`, `Superseded by ADR-{NNN}`. `Deprecated`, `Proposed`, `Rejected`, and free-form values are not allowed; tentative state belongs in the spec's `## Open Questions`.
+3. **Status is one of three values** — `Accepted`, `Accepted — supersedes ADR-{NNN}` (or a comma-separated list, `ADR-{NNN}, ADR-{MMM}`, when one ADR supersedes several), `Superseded by ADR-{NNN}`. `Deprecated`, `Proposed`, `Rejected`, and free-form values are not allowed; tentative state belongs in the spec's `## Open Questions`.
 4. **Always update the index** after creating or superseding — both rows on supersede.
 5. **One decision per ADR** — split multiple decisions into separate ADRs; the reviewer enforces this.
 6. **Decisions only, no implementation** — describe what was chosen and why, not how it is implemented in code.

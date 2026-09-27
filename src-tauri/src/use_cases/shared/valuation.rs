@@ -61,7 +61,7 @@ pub struct PerformanceMetric {
 /// Preloads metadata + price history for every distinct non-cash asset in the
 /// transaction set, so the per-period valuation never re-queries the asset BC.
 /// Shared with `account_summary` so the YTD computation reuses one loading pass
-/// (ADR-004 service-level reuse).
+/// (B24 service-level reuse).
 pub(crate) async fn load_priced_assets(
     asset_service: &dyn AssetServiceContract,
     transactions: &[Transaction],
@@ -188,7 +188,7 @@ pub(crate) fn opening_balance_flow_value(
 
 /// Pre-resolves FX rates for each foreign holding currency at the caller-supplied
 /// dates only (FXR-035/042). Identity pairs are excluded — same-currency holdings
-/// need no conversion. Shared with `account_summary` (ADR-004 service-level reuse).
+/// need no conversion. Shared with `account_summary` (B24 service-level reuse).
 pub(crate) async fn load_rate_map_for_dates(
     currency_service: &CurrencyService,
     priced_assets: &HashMap<String, PricedAsset>,

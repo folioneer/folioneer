@@ -259,7 +259,7 @@ pub fn run() {
                 );
 
                 // The first-device publish reads and ranks the whole portfolio through the
-                // owning contexts' services (ADR-004); a join and a run write through them.
+                // owning contexts' services (B24); a join and a run write through them.
                 let first_publish = Arc::new(FirstPublish::new(
                     sync_change_log,
                     Arc::clone(&sync_state_repo),

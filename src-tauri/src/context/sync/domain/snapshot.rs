@@ -1,6 +1,6 @@
 //! The `PortfolioSnapshot` port (SYN-013/026): every synced record this installation
 //! currently holds, in the shape a `Created` change carries. The use case implements it
-//! over the owning bounded contexts' services (ADR-004), so the first segment's content is
+//! over the owning bounded contexts' services (B24), so the first segment's content is
 //! serialized exactly as the repositories' change capture serializes it.
 
 use crate::context::sync::error::SyncError;

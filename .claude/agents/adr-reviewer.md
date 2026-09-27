@@ -89,12 +89,13 @@ For the index, extract: every row's ADR number, title, status, and link target.
 The canonical gate lives in the `adr-writer` skill (`## The gate` section): would an agent reading only the code plausibly undo this, and would undoing it be costly? Critical Rule 3 below covers why this gate matters; apply it as the most important check.
 
 - 🔴 Decision fails the gate — the code or a spec rule already makes the choice obvious, or undoing it is cheap; it belongs in the spec, a code comment or a coding standard. Example findings: `"Obvious from spec REF-020, which already states this rule"`, `"Single helper function, cheap to undo"`.
+- 🔴 The decision is a code-organisation, pattern or testing convention rather than a technical choice — it belongs in the `docs/*-rules.md` family (ADR-022)
 - 🟡 Decision overlaps an existing ADR (same problem space, similar trade-off). Flag potential consolidation or supersedes relationship.
 - 🟡 Decision feels like a coding standard or naming preference rather than an architectural choice.
 
 #### C — Status & supersedes integrity
 
-- 🔴 `Status` value is not one of the three permitted by `adr-writer` Critical Rule 3 (`Accepted`, `Accepted — supersedes ADR-{NNN}`, `Superseded by ADR-{NNN}`). `Deprecated`, `Proposed`, `Rejected`, and free-form values are explicitly disallowed; tentative state belongs in the spec's `## Open Questions`.
+- 🔴 `Status` value is not one of the three permitted by `adr-writer` Critical Rule 3 (`Accepted`, `Accepted — supersedes ADR-{NNN}` — or a comma-separated list of ADRs —, `Superseded by ADR-{NNN}`). `Deprecated`, `Proposed`, `Rejected`, and free-form values are explicitly disallowed; tentative state belongs in the spec's `## Open Questions`.
 - 🔴 `Status: Accepted — supersedes ADR-{X}` but ADR-{X} does not exist on disk
 - 🔴 `Status: Accepted — supersedes ADR-{X}` but ADR-{X}'s status is not `Superseded by ADR-{this}` (back-reference broken)
 - 🔴 `Status: Superseded by ADR-{Y}` but ADR-{Y} does not exist on disk

@@ -128,7 +128,7 @@ Rust domain entities must follow the three-factory-method convention:
 
 An ADR exists to stop an agent reversing a decision the owner took. For every accepted ADR, compare its **Reversal looks like** signs with the changed lines:
 
-- A changed line matching a reversal sign (🔴 [DECISION]) — name the ADR and the sign: `reverses ADR-004: use case imports context::currency::repository`. The fix is never to edit, waive or supersede the ADR: it becomes an open question for the owner, who alone supersedes an ADR.
+- A changed line matching a reversal sign (🔴 [DECISION]) — name the ADR and the sign: `reverses ADR-001: f64 field for an amount in HoldingDetail`. The fix is never to edit, waive or supersede the ADR: it becomes an open question for the owner, who alone supersedes an ADR.
 - A change that touches the area an ADR guards without matching a sign — no finding.
 
 ---

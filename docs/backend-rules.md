@@ -167,6 +167,9 @@ sqlx types in its public signature.
 **B24** — Use cases MAY depend on any domain abstraction: repository traits, domain entities,
 or bounded context services. They MUST NOT depend on infrastructure: concrete repository
 implementations, `sqlx::Pool`, `sqlx::Transaction`, `sqlx::query!`, or any other sqlx type.
+Architecture rule A9 (`scripts/arch-check.py`) fails on a context's `repository` / `infrastructure`
+module or concrete implementation in a use case; sqlx types in the sync use case are a recorded
+divergence (`docs/ddd-divergences.md`) until ADR-006's unit of work lands.
 
 **B25** — For write operations that must emit an event, use cases SHOULD go through the BC Application Service rather than the repository trait directly to ensure the event is properly fired.
 

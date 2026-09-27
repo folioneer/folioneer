@@ -1,5 +1,5 @@
 //! `ServiceRankStamper` — the `RankStamper` port over the account, asset, and currency
-//! services (ADR-004): each bounded context stamps its own tables with the first segment's
+//! services (B24): each bounded context stamps its own tables with the first segment's
 //! rank (CFR-014, D6) on the enrolment transaction's connection (SYN-013), the way
 //! `ServicePortfolioSnapshot` reads them.
 

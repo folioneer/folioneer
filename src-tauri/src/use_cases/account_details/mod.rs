@@ -1,4 +1,4 @@
-//! Account Details use case: cross-context read orchestrating account + asset data (ADR-003).
+//! Account Details use case: cross-context read orchestrating account + asset data (B18).
 
 mod api;
 mod orchestrator;

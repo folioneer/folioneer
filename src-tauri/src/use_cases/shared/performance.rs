@@ -85,7 +85,7 @@ pub struct AccountPerformanceResponse {
 /// Computes per-period performance for a single account (PRF-016, PRF-020–035,
 /// PRF-040–043), optionally scoped to one asset's position (PRF-080–084).
 /// Orchestrates a cross-context read of account transactions and asset price
-/// history (ADR-003, ADR-013).
+/// history (B18, ADR-013).
 pub(crate) async fn account_performance_series(
     account_service: &dyn AccountServiceContract,
     asset_service: &dyn AssetServiceContract,

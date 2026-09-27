@@ -13,7 +13,7 @@ vi.mock("./useDividendTransaction", () => ({
 }));
 
 // ComboboxField cannot be driven via jsdom events (HeadlessUI), so stub it: expose
-// the item ids it received and let a click select the first item (ADR-007 boundary).
+// the item ids it received and let a click select the first item (E11 boundary).
 vi.mock("@/ui/components/field/ComboboxField", () => ({
   ComboboxField: ({
     id,

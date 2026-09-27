@@ -5,7 +5,7 @@ use std::result::Result as StdResult;
 use std::sync::Arc;
 
 /// Orchestrates account creation across the account and asset bounded contexts
-/// (ACC-025). Injects `AccountService` + `AssetService` per ADR-003 / ADR-004 —
+/// (ACC-025). Injects `AccountService` + `AssetService` per B18 / B24 —
 /// no `account` → `asset` import is introduced.
 pub struct AccountCreationUseCase {
     account_service: Arc<dyn AccountServiceContract>,

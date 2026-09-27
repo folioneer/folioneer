@@ -4,9 +4,9 @@
 
 The `Account Details` feature provides a view of a specific account's current positions and their cost basis. It allows users to drill down into an account to see their active holdings, the quantity held, the volume-weighted average purchase price, and the total cost basis for each position.
 
-This feature consumes data from two bounded contexts: `account` (for Holding data including pre-computed realized P&L per ACD-043) and `asset` (for asset metadata: name, ticker, currency). Because these contexts must not import each other directly (B2), all cross-context reads are orchestrated by a dedicated `use_cases/account_details/` use case that injects `AccountService` and `AssetService` (per ADR-003, ADR-004).
+This feature consumes data from two bounded contexts: `account` (for Holding data including pre-computed realized P&L per ACD-043) and `asset` (for asset metadata: name, ticker, currency). Because these contexts must not import each other directly (B2), all cross-context reads are orchestrated by a dedicated `use_cases/account_details/` use case that injects `AccountService` and `AssetService` (per B18, B24).
 
-> **ACD-045 change:** `TransactionService` was previously injected to aggregate realized P&L via `get_realized_pnl_by_account` (SEL-038, ADR-005). This is superseded by ACD-043/ACD-045 — P&L is now pre-computed on the `Holding` entity during the transaction replay. `TransactionService` is no longer a dependency of `AccountDetailsUseCase`. SEL-038 is superseded for the account details aggregation path.
+> **ACD-045 change:** `TransactionService` was previously injected to aggregate realized P&L via `get_realized_pnl_by_account` (SEL-038, B18). This is superseded by ACD-043/ACD-045 — P&L is now pre-computed on the `Holding` entity during the transaction replay. `TransactionService` is no longer a dependency of `AccountDetailsUseCase`. SEL-038 is superseded for the account details aggregation path.
 
 > Cross-spec dependency: entry-point navigation behavior is owned by [Account Management](account.md) rule ACC-010.
 

@@ -1,5 +1,5 @@
 //! `ServicePortfolioSnapshot` — the `PortfolioSnapshot` port over the account, asset, and
-//! currency services (ADR-004): every synced record this installation holds (SYN-013/021),
+//! currency services (B24): every synced record this installation holds (SYN-013/021),
 //! system-seeded records excluded (SYN-027), serialized exactly as the repositories' change
 //! capture serializes them.
 

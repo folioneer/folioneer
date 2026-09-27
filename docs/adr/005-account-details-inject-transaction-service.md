@@ -1,7 +1,7 @@
 # ADR 005 — Inject TransactionService into account_details Use Case for Realized P&L
 
 **Date**: 2026-04-19
-**Status**: Accepted — amends ADR-003
+**Status**: Superseded by ADR-022
 
 ## Context
 

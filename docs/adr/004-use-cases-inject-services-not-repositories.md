@@ -1,7 +1,7 @@
 # ADR 004 — Use Cases Inject Services, Not Repositories
 
 **Date**: 2026-04-16
-**Status**: Accepted
+**Status**: Superseded by ADR-022
 
 ## Context
 

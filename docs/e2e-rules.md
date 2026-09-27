@@ -154,3 +154,11 @@ await modal.waitForExist({ timeout: 8000, reverse: true });
 ```
 
 Never rely on the WebdriverIO default timeout — always be explicit.
+
+## E11 — E2E tests stop at the `ComboboxField` boundary
+
+WebDriver's synthetic key events are not trusted, so they cannot drive the HeadlessUI combobox.
+
+- When the form can open with the asset pre-populated (a buy opened from a holding row), seed the data through IPC and use that path.
+- When the form cannot be submitted without typing into the combobox, the submit test calls the backend command directly (`browser.executeAsync` → `window.__TAURI_INTERNALS__.invoke(...)`); the frontend guard checks stay.
+- The full fill-and-submit flow is covered by RTL component tests.

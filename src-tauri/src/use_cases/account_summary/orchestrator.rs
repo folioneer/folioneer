@@ -77,7 +77,7 @@ pub struct AccountSummaries {
 }
 
 /// Orchestrates a cross-context read of account + asset data to build the
-/// Accounts-list view (ACC-021, ADR-003).
+/// Accounts-list view (ACC-021, B18).
 pub struct AccountSummaryUseCase {
     account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,

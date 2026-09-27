@@ -196,7 +196,7 @@ fn assign_weights(details: &mut [HoldingDetail], total_global_value: i64) {
     }
 }
 
-/// Orchestrates a cross-context read of account + asset data (ADR-003, ADR-004).
+/// Orchestrates a cross-context read of account + asset data (B18, B24).
 pub struct AccountDetailsUseCase {
     account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,

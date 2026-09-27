@@ -8,7 +8,7 @@ use std::result::Result as StdResult;
 use std::sync::Arc;
 
 /// Orchestrates a cross-context read of account transactions and asset price
-/// history to build per-period performance figures (ADR-003, ADR-013, PRF spec).
+/// history to build per-period performance figures (B18, ADR-013, PRF spec).
 pub struct AccountPerformanceUseCase {
     account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,
