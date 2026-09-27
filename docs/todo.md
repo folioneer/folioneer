@@ -2,7 +2,7 @@
 
 <!-- Add new backlog items here. Format: ## #NNN — (domain) — Short title -->
 <!-- #NNN is a permanent reference: never renumbered, never reused. A new entry takes the -->
-<!-- next free number wherever it is placed. Next free: #043. -->
+<!-- next free number wherever it is placed. Next free: #044. -->
 <!-- Every entry ends with four lines: **User value:**, **Done when:**, **Design:** and -->
 <!-- **Open questions:**. Design is `none` until the agent proposes one (it does so before -->
 <!-- touching anything the user sees), then `proposed (screenshots/design/NNN-*.png)`, then -->
@@ -207,6 +207,19 @@ Proposal: one static page, in French and English, in its own repository publishe
 - [ ] Ready when? (Recommended: after #025 and #026 have shipped.)
 - [ ] A domain from the start, or the free GitHub Pages address first? (`folioneer.com` and `folioneer.app` are registered; they are the natural choice.)
 - [ ] Is the Windows installer to be signed before strangers download it, and how? Today only the updater signature exists (it proves an update comes from the owner; SmartScreen ignores it) — no Windows code signing. The options, prices and eligibility to be checked again when the time comes: (a) SignPath Foundation — free, publisher shown as "SignPath Foundation", open-source licence and CI-built releases required; (b) a Certum open-source certificate — tens of euros a year, the owner's name shown, open-source project required, signing through their cloud service since keys must live on hardware; (c) Azure Trusted Signing — about ten dollars a month, eligibility of individuals depends on the country; (d) a standard certificate with cloud signing — a few hundred euros a year, no open-source condition; (e) no signing, and the page explains the warning. Even signed, the warning lasts until the certificate has earned reputation — which then carries over from one release to the next, whereas an unsigned installer starts from zero each time. (a) and (b) exist only while the licence is open source, which the AGPL-3.0-or-later is. (Recommended: (b) if the owner's name should show, (a) if free matters more.) Wiring any of them is one signing command in the Tauri configuration plus a credential in the release workflow.
+
+## #043 — (tooling) — The agent tooling still describes workflows that no longer run
+
+Workflow C (`/next-todo`, docs/workflow-c.md) is the only way work moves, but part of the agent tooling was written for the Workflows A and B it replaced and still presents itself that way. `/spec-writer`, `/contract`, `/feature-planner`, and the agents `feature-planner`, `plan-reviewer`, `spec-reviewer` and `spec-checker` call themselves steps of "Workflow A"; no document defines Workflows A or B any more. `feature-planner`, `plan-reviewer` and the three `test-writer-*` agents have not been run since Workflow C landed — the main agent writes the acceptance tests and needs no plan file — and `/start` is already gone. Each stale description costs a wrong mental model in every session that reads it, and an unused agent is one more thing a reviewer or a skill can point at.
+
+Proposal: inventory `.claude/skills/` and `.claude/agents/` against what Workflow C and CLAUDE.md actually prescribe; keep only what is really used and delete the rest — at least `/feature-planner` and its agent, `plan-reviewer`, the `test-writer-*` agents, `/spec-writer` and `/contract` (the owner, 2026-09-27); rewrite the "When to use" sections of what stays (`spec-reviewer` and `spec-checker` run on every entry that carries rules) so they name Workflow C; and remove every mention of Workflows A and B, including CLAUDE.md's key-skills and key-agents lines.
+
+**User value:** None — sessions read one accurate description of how work moves, and the tooling carries no dead part.
+**Done when:** Every skill and agent left in `.claude/` is prescribed by CLAUDE.md, a skill or docs/workflow-c.md, and says so in Workflow C's terms; no file mentions Workflow A or B; CLAUDE.md, ARCHITECTURE.md and docs/workflow-c.md list exactly what exists.
+**Design:** none
+**Open questions:**
+
+- [x] Delete `/spec-writer` and `/contract` too, or keep them for features designed in chat? (Recommended: keep both.) — Delete them too; keep only what is really used (2026-09-27).
 
 ## #041 — (ci) — A pull request that changes no code pays for the full E2E run
 
