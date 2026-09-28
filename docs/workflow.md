@@ -130,9 +130,7 @@ The `main-protection` ruleset lists the same checks; the owner's laptop bypasses
 
 ## 6. The right way to code
 
-- **Logic in Rust, dumb frontend.** The frontend renders, holds ephemeral UI state,
-  and maps error codes to i18n keys. It never decides, validates business rules,
-  aggregates or derives. If a step can skip the UI, it lives in Rust.
+- **Logic in Rust, dumb frontend** (`docs/frontend-rules.md` F32, guarded by A12).
 - **Gold layouts** for new code (`docs/backend-rules.md` B0/B37–B43,
   `docs/frontend-rules.md` F0/F26–F28); bit-by-bit for existing code (§ 10).
 - **Typed errors** on the wire (`docs/error-model.md`); factories and aggregate-root

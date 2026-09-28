@@ -331,3 +331,75 @@ Remove an entry once it has been resolved.
 - Observation: The 23 spec files run their tests in about 80 seconds in total, yet the step takes 13–15 minutes: each file starts the app and waits ~30 s (10 s for one of them) between `RUNNING` and the webview's first log line. Disabling the accessibility bus (`NO_AT_BRIDGE=1`) removed its warning but not the wait (run of 2026-09-27), so the cause lies elsewhere — the WebDriver session start, the app's own start-up, or a timeout in the webview.
 - User value: None directly — code pull requests merge ten minutes sooner; the wait may also be felt by a user if it is the app's own start-up.
 - Done when: an E2E run with timestamped start-up logs (driver, app setup, first render) names the step that waits; it is removed or shortened at its cause, and the E2E job's time before and after is recorded.
+
+## 2026-09-28 — TD-046 — Feature `account_details` still makes 10 business decision(s) in the interface
+
+- Found by: architecture rule A12 (#047), first freeze
+- Where: `account_details/account_details_view/useAccountDetails.ts` (1), `account_details/account_details_view/useAccountDetailsView.ts` (3), `account_details/open_balance/OpenBalanceModal.tsx` (1), `account_details/shared/presenter.ts` (2), `account_details/shared/validateCashForm.ts` (1), `account_details/shared/validateFeeForm.ts` (1), `account_details/shared/validatePriceForm.ts` (1)
+- Severity: 🟡
+- Observation: validation, grouping, ordering or filtering by business meaning still runs in the frontend of `account_details` (F32). Each site is frozen in `arch-allowlist.json`; a new one fails the check.
+- User value: None directly — `account_details` behaves the same in the window, the command line and any later interface.
+- Done when: every frozen site of `account_details` moves into a core query, a draft check or a query parameter, with its rule tested in Rust; its `decision_sites` entries leave the allowlist (`just arch-check --write-allowlist`).
+
+## 2026-09-28 — TD-047 — Feature `accounts` still makes 3 business decision(s) in the interface
+
+- Found by: architecture rule A12 (#047), first freeze
+- Where: `accounts/account_table/useAccountTable.ts` (2), `accounts/shared/validateAccount.ts` (1)
+- Severity: 🟡
+- Observation: validation, grouping, ordering or filtering by business meaning still runs in the frontend of `accounts` (F32). Each site is frozen in `arch-allowlist.json`; a new one fails the check.
+- User value: None directly — `accounts` behaves the same in the window, the command line and any later interface.
+- Done when: every frozen site of `accounts` moves into a core query, a draft check or a query parameter, with its rule tested in Rust; its `decision_sites` entries leave the allowlist (`just arch-check --write-allowlist`).
+
+## 2026-09-28 — TD-048 — Feature `assets` still makes 6 business decision(s) in the interface
+
+- Found by: architecture rule A12 (#047), first freeze
+- Where: `assets/asset_table/useAssetTable.ts` (4), `assets/shared/validateAsset.ts` (1), `assets/useAssets.ts` (1)
+- Severity: 🟡
+- Observation: validation, grouping, ordering or filtering by business meaning still runs in the frontend of `assets` (F32). Each site is frozen in `arch-allowlist.json`; a new one fails the check.
+- User value: None directly — `assets` behaves the same in the window, the command line and any later interface.
+- Done when: every frozen site of `assets` moves into a core query, a draft check or a query parameter, with its rule tested in Rust; its `decision_sites` entries leave the allowlist (`just arch-check --write-allowlist`).
+
+## 2026-09-28 — TD-049 — Feature `categories` still makes 2 business decision(s) in the interface
+
+- Found by: architecture rule A12 (#047), first freeze
+- Where: `categories/category_table/useCategoryTable.ts` (2)
+- Severity: 🟡
+- Observation: validation, grouping, ordering or filtering by business meaning still runs in the frontend of `categories` (F32). Each site is frozen in `arch-allowlist.json`; a new one fails the check.
+- User value: None directly — `categories` behaves the same in the window, the command line and any later interface.
+- Done when: every frozen site of `categories` moves into a core query, a draft check or a query parameter, with its rule tested in Rust; its `decision_sites` entries leave the allowlist (`just arch-check --write-allowlist`).
+
+## 2026-09-28 — TD-050 — Feature `performance` still makes 9 business decision(s) in the interface
+
+- Found by: architecture rule A12 (#047), first freeze
+- Where: `performance/account_view/useAccountPerformance.ts` (2), `performance/global_view/useGlobalPerformance.ts` (3), `performance/shared/globalPresenter.ts` (3), `performance/shared/presenter.ts` (1)
+- Severity: 🟡
+- Observation: validation, grouping, ordering or filtering by business meaning still runs in the frontend of `performance` (F32). Each site is frozen in `arch-allowlist.json`; a new one fails the check.
+- User value: None directly — `performance` behaves the same in the window, the command line and any later interface.
+- Done when: every frozen site of `performance` moves into a core query, a draft check or a query parameter, with its rule tested in Rust; its `decision_sites` entries leave the allowlist (`just arch-check --write-allowlist`).
+
+## 2026-09-28 — TD-051 — Feature `transactions` still makes 7 business decision(s) in the interface
+
+- Found by: architecture rule A12 (#047), first freeze
+- Where: `transactions/account_journal/useAccountJournal.ts` (3), `transactions/add_transaction/AddTransactionModal.tsx` (1), `transactions/edit_transaction_modal/EditTransactionModal.tsx` (1), `transactions/shared/validateTransaction.ts` (1), `transactions/transaction_list/useTransactionList.ts` (1)
+- Severity: 🟡
+- Observation: validation, grouping, ordering or filtering by business meaning still runs in the frontend of `transactions` (F32). Each site is frozen in `arch-allowlist.json`; a new one fails the check.
+- User value: None directly — `transactions` behaves the same in the window, the command line and any later interface.
+- Done when: every frozen site of `transactions` moves into a core query, a draft check or a query parameter, with its rule tested in Rust; its `decision_sites` entries leave the allowlist (`just arch-check --write-allowlist`).
+
+## 2026-09-28 — TD-052 — Feature `unpriced_prices` still makes 2 business decision(s) in the interface
+
+- Found by: architecture rule A12 (#047), first freeze
+- Where: `unpriced_prices/useUnpricedPrices.ts` (2)
+- Severity: 🟡
+- Observation: validation, grouping, ordering or filtering by business meaning still runs in the frontend of `unpriced_prices` (F32). Each site is frozen in `arch-allowlist.json`; a new one fails the check.
+- User value: None directly — `unpriced_prices` behaves the same in the window, the command line and any later interface.
+- Done when: every frozen site of `unpriced_prices` moves into a core query, a draft check or a query parameter, with its rule tested in Rust; its `decision_sites` entries leave the allowlist (`just arch-check --write-allowlist`).
+
+## 2026-09-28 — TD-053 — Feature `whats_new` still makes 3 business decision(s) in the interface
+
+- Found by: architecture rule A12 (#047), first freeze
+- Where: `whats_new/parseChangelog.ts` (3)
+- Severity: 🟡
+- Observation: validation, grouping, ordering or filtering by business meaning still runs in the frontend of `whats_new` (F32). Each site is frozen in `arch-allowlist.json`; a new one fails the check.
+- User value: None directly — `whats_new` behaves the same in the window, the command line and any later interface.
+- Done when: every frozen site of `whats_new` moves into a core query, a draft check or a query parameter, with its rule tested in Rust; its `decision_sites` entries leave the allowlist (`just arch-check --write-allowlist`).

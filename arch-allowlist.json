@@ -113,5 +113,31 @@
     "src/features/account_details/split_transaction/useSplitTransaction.ts": 4,
     "src/features/currency/shared/presenter.ts": 1,
     "src/features/shell/PriceFetchProgressBar.tsx": 1
+  },
+  "decision_sites": {
+    "src/features/account_details/account_details_view/useAccountDetails.ts": 1,
+    "src/features/account_details/account_details_view/useAccountDetailsView.ts": 3,
+    "src/features/account_details/open_balance/OpenBalanceModal.tsx": 1,
+    "src/features/account_details/shared/presenter.ts": 2,
+    "src/features/account_details/shared/validateCashForm.ts": 1,
+    "src/features/account_details/shared/validateFeeForm.ts": 1,
+    "src/features/account_details/shared/validatePriceForm.ts": 1,
+    "src/features/accounts/account_table/useAccountTable.ts": 2,
+    "src/features/accounts/shared/validateAccount.ts": 1,
+    "src/features/assets/asset_table/useAssetTable.ts": 4,
+    "src/features/assets/shared/validateAsset.ts": 1,
+    "src/features/assets/useAssets.ts": 1,
+    "src/features/categories/category_table/useCategoryTable.ts": 2,
+    "src/features/performance/account_view/useAccountPerformance.ts": 2,
+    "src/features/performance/global_view/useGlobalPerformance.ts": 3,
+    "src/features/performance/shared/globalPresenter.ts": 3,
+    "src/features/performance/shared/presenter.ts": 1,
+    "src/features/transactions/account_journal/useAccountJournal.ts": 3,
+    "src/features/transactions/add_transaction/AddTransactionModal.tsx": 1,
+    "src/features/transactions/edit_transaction_modal/EditTransactionModal.tsx": 1,
+    "src/features/transactions/shared/validateTransaction.ts": 1,
+    "src/features/transactions/transaction_list/useTransactionList.ts": 1,
+    "src/features/unpriced_prices/useUnpricedPrices.ts": 2,
+    "src/features/whats_new/parseChangelog.ts": 3
   }
 }

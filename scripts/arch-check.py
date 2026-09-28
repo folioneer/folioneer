@@ -31,6 +31,9 @@ Rules (frontend under `src/`, backend under `src-tauri/src/`):
       and the hook branches on it (F27, rule 1)
   A11 a presenter imports neither React nor react-i18next: it maps a typed
       error to an i18n key and the component translates (F27, rule 3)
+  A12 feature code makes no business decision (F32): no `validate*.ts` file and
+      no `.sort(` / `.filter(` — the core validates, groups, orders and filters;
+      today's sites are frozen per file in the allowlist and may only disappear
 
 The allowlist is a ratchet: a count above its recorded value fails, a count
 below it fails too until `--write-allowlist` lowers the record. Nothing is
@@ -40,6 +43,7 @@ ever added by the script.
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -346,6 +350,18 @@ def ratchet_pairs(actual: list[dict], recorded: list[dict]) -> list[str]:
     return hits
 
 
+def a12_decision_sites() -> dict[str, int]:
+    """Business decisions left in feature code, counted per file."""
+    counts: dict[str, int] = {}
+    for path in frontend_sources(FEATURES):
+        count = 1 if re.match(r"validate.*\.ts$", path.name) else 0
+        for line in path.read_text(encoding="utf-8").splitlines():
+            count += len(re.findall(r"\.(?:sort|filter)\(", without_strings(without_comments(line))))
+        if count:
+            counts[rel(path)] = count
+    return counts
+
+
 def current_state() -> dict:
     crossings = a2_cross_feature()
     _, math_counts = a7_derivation()
@@ -353,7 +369,24 @@ def current_state() -> dict:
         "cross_feature_imports": sorted(crossings, key=lambda item: (item["from"], item["to"])),
         "missing_ids": dict(sorted(a6_missing_ids().items())),
         "math_usage": dict(sorted(math_counts.items())),
+        "decision_sites": dict(sorted(a12_decision_sites().items())),
     }
+
+
+def sections_on_main() -> set[str] | None:
+    """The allowlist sections recorded on main; None when main's copy cannot be read.
+
+    A section may be seeded only when main has never recorded it — a key deleted on a
+    branch is still judged against main, so it cannot launder growth.
+    """
+    for ref in ("origin/main", "main"):
+        result = subprocess.run(
+            ["git", "show", f"{ref}:{ALLOWLIST.name}"],
+            cwd=ALLOWLIST.parent, capture_output=True, text=True, check=False,
+        )
+        if result.returncode == 0:
+            return set(json.loads(result.stdout))
+    return None
 
 
 def write_allowlist(state: dict, recorded: dict) -> int:
@@ -363,7 +396,10 @@ def write_allowlist(state: dict, recorded: dict) -> int:
     pair = lambda item: (item["from"], item["to"])
     known = {pair(item) for item in recorded.get("cross_feature_imports", [])}
     grew += [f"{f} → {t}" for f, t in sorted({pair(i) for i in state["cross_feature_imports"]} - known)]
-    for section in ("missing_ids", "math_usage"):
+    on_main = sections_on_main()
+    for section in ("missing_ids", "math_usage", "decision_sites"):
+        if section not in recorded and on_main is not None and section not in on_main:
+            continue  # a rule new since main: its first freeze is today's state
         for file, count in state[section].items():
             if count > recorded.get(section, {}).get(file, 0):
                 grew.append(f"{file} ({section}: {count})")
@@ -405,6 +441,10 @@ def main() -> int:
     hits += reduce_hits
     hits += ratchet_counts("A7", "`Math.` uses", state["math_usage"], recorded.get("math_usage", {}))
     hits += a8_literal_attributes()
+    if "decision_sites" in recorded:
+        hits += ratchet_counts("A12", "business decisions", state["decision_sites"], recorded["decision_sites"])
+    else:
+        hits.append("A12 arch-allowlist.json has no decision_sites section yet — run --write-allowlist once")
 
     if hits:
         print(f"❌ architecture check: {len(hits)} violation(s)")
@@ -415,10 +455,12 @@ def main() -> int:
         len(recorded.get("cross_feature_imports", [])),
         sum(recorded.get("missing_ids", {}).values()),
         sum(recorded.get("math_usage", {}).values()),
+        sum(recorded.get("decision_sites", {}).values()),
     )
     print(
-        "✅ architecture check: A1–A11 hold "
-        f"(frozen debt: {frozen[0]} cross-feature imports, {frozen[1]} id-less tags, {frozen[2]} Math. uses)"
+        "✅ architecture check: A1–A12 hold "
+        f"(frozen debt: {frozen[0]} cross-feature imports, {frozen[1]} id-less tags, {frozen[2]} Math. uses, "
+        f"{frozen[3]} business decisions)"
     )
     return 0
 

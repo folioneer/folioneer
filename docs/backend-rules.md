@@ -145,6 +145,12 @@ command line, a server) reuses it. A type an adapter and the core both need live
 `context/asset/dto.rs`). CI's "Core builds without Tauri" step fails when a Tauri crate enters the
 core's dependency tree.
 
+**B47** — Every business decision an interface needs is a core query or command: a query
+shaped like the screen (rows grouped and ordered, final figures, flags saying what may be done),
+a draft check returning a code per field (`validate_*_draft`), and sorting or searching as query
+parameters. The frontend side of this rule is F32; the command line and any later interface get
+the same decisions from the same place.
+
 **B16** — `api.rs` is the framework boundary — the only layer that knows Tauri exists.
 Its sole responsibilities are:
 
