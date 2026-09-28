@@ -1,5 +1,10 @@
 {
+  "build": {
+    "beforeBuildCommand": "npm run build && npm run build:cli-sidecar"
+  },
   "bundle": {
-    "externalBin": ["binaries/folioneer-cli"]
+    "externalBin": [
+      "binaries/folioneer-cli"
+    ]
   }
 }
