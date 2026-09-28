@@ -32,11 +32,11 @@ The feature lives in `features/transactions/` and reads the account context. It 
 
 **TXL-015 — Back navigation (frontend)**: The view provides a "Back" link that navigates to `/accounts/:accountId`, where `accountId` is the value currently selected in the account dropdown (which may differ from the route param if the user has changed the filter).
 
-**TXL-016 — Sort direction reset on filter change (frontend)**: When the account or asset filter changes, the sort direction resets to the default (date descending). The sort direction is preserved when the transaction list re-fetches after an edit or delete (TXL-025) — only a filter change causes a reset.
+**TXL-016 — Sort direction reset on filter change (frontend)**: When the account or asset filter changes, the sort direction resets to the default (date descending). The sort direction is preserved when the transaction list re-fetches after an edit or delete (TXL-026) — only a filter change causes a reset.
 
 ### Data Display (020–029)
 
-**TXL-020 — Transaction fetch — backend (backend)**: The backend exposes an existing command that returns all transactions for a given `(accountId, assetId)` pair, ordered chronologically.
+**TXL-020 — Transaction fetch — backend (backend)**: The backend exposes an existing command that returns all transactions for a given `(accountId, assetId)` pair, ordered chronologically. The per-asset list reads the account journal filtered to the asset instead (TXL-024, TXL-060); the dedicated correction modals load the transaction they edit through this command.
 
 **TXL-021 — Transaction list loading — frontend (frontend)**: The transaction list is loaded on mount using the `accountId` and `assetId` from the route params, and reloaded whenever either filter changes to a complete selection.
 
@@ -44,7 +44,7 @@ The feature lives in `features/transactions/` and reads the account context. It 
 
 **TXL-023 — Type column value (frontend)**: The Type column displays the actual transaction type for each row: "Purchase" for purchase transactions, "Sell" for sell transactions (per SEL-040), "Opening balance" for opening-balance entries, "Deposit" for deposit transactions (per CSH-101), and "Withdrawal" for withdrawal transactions (per CSH-101). Sell rows are visually distinguished from Purchase rows.
 
-**TXL-024 — Default sort order (frontend)**: Transactions are displayed with the most recent date first (descending). The user can toggle the sort direction by clicking the Date column header.
+**TXL-024 — Default sort order (frontend)**: Transactions are displayed with the most recent date first (descending). The user can toggle the sort direction by clicking the Date column header. The rows come in that order from the account journal of the account filtered to the asset (TXL-060); the page does not reorder them (F32).
 
 **TXL-025 — Financial value formatting (frontend)**: All financial fields (unit price, exchange rate, fees, total amount, quantity) are formatted as decimal strings with three decimal places, per TRX-024 (micro-unit → decimal conversion at the display boundary, ADR-001).
 
@@ -76,7 +76,7 @@ The feature lives in `features/transactions/` and reads the account context. It 
 
 **TXL-052 — Incomplete filter state (frontend)**: If the asset dropdown has no selection (e.g. after an account change), the table area displays a prompt inviting the user to select an asset.
 
-**TXL-053 — Transaction fetch error state (frontend)**: If the transaction fetch (TXL-020/TXL-021) fails, the view displays a generic error message and a "Retry" button that re-triggers the fetch.
+**TXL-053 — Transaction fetch error state (frontend)**: If the transaction fetch (TXL-021, TXL-060) fails, the view displays a generic error message and a "Retry" button that re-triggers the fetch.
 
 **TXL-054 — Asset list fetch error state (frontend)**: If the TXL-013 backend call fails, the asset dropdown displays a generic error state and a retry action. The transaction table is not shown until the asset list is successfully loaded.
 
@@ -97,7 +97,7 @@ The feature lives in `features/transactions/` and reads the account context. It 
           ├─ Account dropdown pre-selected (TXL-011)
           ├─ Asset list fetched for account (TXL-013/014)
           ├─ Asset dropdown pre-selected (TXL-011)
-          ├─ Fetch transactions for (accountId, assetId) (TXL-020/021)
+          ├─ Fetch the asset's rows of the account journal (TXL-021/060)
           │
           └─ [Table renders, sorted by date desc (TXL-024)]
               │

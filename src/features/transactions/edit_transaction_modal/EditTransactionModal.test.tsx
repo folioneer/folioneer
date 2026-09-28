@@ -4,9 +4,17 @@ import type { Account, Asset, Transaction } from "@/bindings";
 import { useAppStore } from "@/lib/store";
 import { EditTransactionModal } from "./EditTransactionModal";
 
-// CSH-018 — Cash Assets must be filtered out of the asset combobox so the user
-// cannot retarget a transaction onto a system Cash Asset (Deposit/Withdrawal
-// owns that flow). The filter lives in EditTransactionModal.tsx line 40.
+// CSH-018 / TRX-064 — the asset combobox offers the core's list of non-cash assets, so the
+// user cannot retarget a transaction onto a system Cash Asset (Deposit/Withdrawal owns
+// that flow).
+vi.mock("../shared/useNonCashAssets", () => ({
+  // TRX-064 — the core's list: every asset but the Cash Assets.
+  useNonCashAssets: () => [
+    { id: "asset-stock-1", name: "Apple", class: "Stocks", is_archived: false, currency: "USD" },
+    { id: "asset-bond-1", name: "Bond", class: "Bonds", is_archived: false, currency: "EUR" },
+  ],
+}));
+
 vi.mock("@/ui/components/field/ComboboxField", () => ({
   ComboboxField: ({ id, items }: { id: string; items: { id: string; name: string }[] }) => (
     <div data-testid={`combobox-${id}`} data-item-ids={items.map((i) => i.id).join(",")} />
@@ -91,11 +99,11 @@ describe("EditTransactionModal", () => {
   });
 
   // CSH-018 — Cash Assets are filtered out of the asset combobox.
-  it("filters Cash assets from the asset combobox (CSH-018)", () => {
+  // CSH-018 / TRX-064 — the combobox offers the core's list of non-cash assets as is
+  it("offers the core's list of non-cash assets", () => {
     render(<EditTransactionModal isOpen onClose={() => {}} transaction={FAKE_TX} />);
     const combobox = screen.getByTestId("combobox-edit-trx-asset");
     const itemIds = combobox.getAttribute("data-item-ids")?.split(",") ?? [];
-    expect(itemIds).toContain("asset-stock-1");
-    expect(itemIds).not.toContain("system-cash-eur");
+    expect(itemIds).toEqual(["asset-stock-1", "asset-bond-1"]);
   });
 });

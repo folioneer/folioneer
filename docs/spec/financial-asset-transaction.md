@@ -148,7 +148,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-062 — Transaction draft check (backend)**: A transaction draft — a purchase or a sale as the user is still entering it: account, asset, date, quantity, and either a unit price with its exchange rate and fees or a typed total with its exchange rate and fees — is checked without writing anything. The check reports the first problem, in this order: no account, no asset, no date; a date recording rejects (unreadable, in the future, before 1900 — TRX-020); a quantity not strictly positive; negative fees (SEL-020); an exchange rate not strictly positive; for a typed total, a total not positive, a total below its fees for a purchase only (a sale has no fee floor — SEL-050), and a unit price derived from it that cannot be stored (TRX-061, SEL-051); a negative unit price; a total computed from the unit price that is not positive (TRX-020, SEL-020 — a sale whose fees reach its proceeds); then, for a new sale, a quantity above the quantity held, reporting both quantities (SEL-021). A corrected sale is not checked for oversell here: recording the correction replays the ledger (SEL-030). Each is the same rejection recording would meet. The check does not cover what depends on more than the draft, which recording still rejects: an unknown account or asset (TRX-020), cash short of a purchase (CSH-041), a sale of an archived asset (SEL-037) or of a closed position (SEL-012; the check reports it as an oversell with nothing held), and a later sale left oversold by a corrected purchase (SEL-032). With no problem, the check returns the unit price and total recording would store (TRX-026, TRX-060, SEL-023, SEL-050).
 
-**TRX-063 — Transaction forms follow the draft check (frontend)**: The purchase and sale forms, and the correction form of a purchase or a sale, send what the user entered to the draft check (TRX-062) as it changes, show its first problem inline and the unit price or total it returns, and enable saving only once the latest draft has been checked without a problem. While a check is running saving stays disabled; when the check itself fails (not a problem with the draft, an error reaching the data), the form shows a generic error and saving stays disabled. A rejection that recording still makes (TRX-062) shows as it does today, on save. The forms keep no copy of these rules (F32). The correction forms of other transaction types keep no copy either: what the user enters is checked on save, and recording's rejection is shown.
+**TRX-063 — Transaction forms follow the draft check (frontend)**: The purchase and sale forms, and the correction form of a purchase or a sale, send what the user entered to the draft check (TRX-062) as it changes, show the unit price or total it returns, and enable saving only once the latest draft has been checked without a problem; while a check is running, when it reports a problem, or when the check itself fails, saving stays disabled. A typed purchase total below its fees is shown on the Total field (TRX-060); the other problems keep saving disabled without a message of their own. A rejection that recording still makes (TRX-062) shows on save. The forms keep no copy of these rules (F32). The correction forms of other transaction types keep no copy either: saving needs the date, quantity and amount filled, what the user enters is checked on save, and recording's rejection is shown — except the dividend total shown while editing (TD-054).
 
 **TRX-064 — Assets a purchase or a sale is recorded on (frontend + backend)**: The backend lists the assets a purchase or a sale can be recorded on: every asset but the Cash Assets (CSH-018), archived ones included — a purchase on one asks the user to confirm (TRX-029), a sale of one is rejected on save (SEL-037). This rule sets no order. The add and edit transaction forms offer these assets.
 
@@ -197,7 +197,7 @@ Represents the current state of a position (asset held within an account). Compu
 - Unit Price (Amount field with asset currency suffix)
 - Exchange Rate (Number field, visible only if asset currency ≠ account currency)
 - Fees (Amount field with account currency suffix)
-- Total Amount (Amount field with account currency suffix, read-only, filled by the draft check — TRX-063)
+- Total Amount (Amount field with account currency suffix; read-only in unit-price mode, filled by the draft check — TRX-063; typed in total mode, TRX-060)
 - Note (Textarea, optional)
 
 _`transaction_type` is not shown in the form. It is hardcoded to `Purchase` until the `Sell` type is introduced._
@@ -207,7 +207,7 @@ _`transaction_type` is not shown in the form. It is hardcoded to `Purchase` unti
 - **Empty**: Form fields empty or defaulted.
 - **Checking**: The draft check (TRX-062) is running; Save is disabled.
 - **Loading**: Submitting the transaction.
-- **Error**: Inline validation errors or backend rejection message.
+- **Error**: A typed purchase total below its fees, on the Total field (TRX-060); a rejection on save.
 - **Success**: Modal closes, success notification.
 
 ### User Flow
@@ -216,7 +216,7 @@ _`transaction_type` is not shown in the form. It is hardcoded to `Purchase` unti
 2. Form opens with Asset pre-selected.
 3. User selects the target Account.
 4. User enters Quantity, Unit Price, and Fees.
-5. As the fields change, the draft check runs (TRX-062): the form shows its first problem inline, or fills the read-only Total Amount and enables Save (TRX-063).
+5. As the fields change, the draft check runs (TRX-062): the form fills the read-only Total Amount and enables Save once it checks clean (TRX-063).
 6. User clicks "Save".
 
 ## Cross-amendments

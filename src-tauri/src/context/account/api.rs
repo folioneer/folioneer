@@ -125,20 +125,6 @@ pub async fn get_account_journal(
         .await
 }
 
-/// Retrieves every transaction for an account across all assets, ordered
-/// chronologically by `(date, created_at)` (TRX-036).
-#[tauri::command]
-#[specta::specta]
-pub async fn get_all_transactions_for_account(
-    state: State<'_, AppState>,
-    account_id: String,
-) -> Result<Vec<Transaction>, AccountError> {
-    state
-        .account_service
-        .get_all_transactions_for_account(&account_id)
-        .await
-}
-
 // =============================================================================
 // Management Fee Schedule — DTOs + commands (FEE-030/060/062)
 // =============================================================================

@@ -14,6 +14,7 @@ import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { FormModal } from "@/ui/components/modal/FormModal";
 import { EntryModeToggle } from "../shared/EntryModeToggle";
 import { RecordPriceCheckbox } from "../shared/RecordPriceCheckbox";
+import { useNonCashAssets } from "../shared/useNonCashAssets";
 import { useEditTransactionModal } from "./useEditTransactionModal";
 
 interface EditTransactionModalProps {
@@ -39,7 +40,7 @@ export function EditTransactionModal({
   }, []);
 
   // CSH-018 — Cash Assets cannot be the target of a manual edit (Deposit/Withdrawal flow only).
-  const assets = useAppStore((state) => state.assets).filter((a) => a.class !== "Cash");
+  const assets = useNonCashAssets();
   const accounts = useAppStore((state) => state.accounts);
 
   const {

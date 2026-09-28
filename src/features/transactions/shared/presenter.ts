@@ -81,7 +81,7 @@ export function transactionDraftErrorToI18n(err: TransactionDraftError): I18nMes
 
 /**
  * F27 — Maps a transaction-load failure (`getTransactions` /
- * `getAllTransactionsForAccount`) to an i18n key. Pure function: no React, no
+ * `getAccountJournal`) to an i18n key. Pure function: no React, no
  * useTranslation. `AccountError` is a BC-wide union; only the read-path codes
  * are mapped and any unreachable variant falls through to `error.Unknown`.
  */

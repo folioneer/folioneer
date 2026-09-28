@@ -377,15 +377,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — `performance` behaves the same in the window, the command line and any later interface.
 - Done when: every frozen site of `performance` moves into a core query, a draft check or a query parameter, with its rule tested in Rust; its `decision_sites` entries leave the allowlist (`just arch-check --write-allowlist`).
 
-## 2026-09-28 — TD-051 — Feature `transactions` still makes 6 business decision(s) in the interface
-
-- Found by: architecture rule A12 (#047), first freeze
-- Where: `transactions/account_journal/useAccountJournal.ts` (3), `transactions/add_transaction/AddTransactionModal.tsx` (1), `transactions/edit_transaction_modal/EditTransactionModal.tsx` (1), `transactions/transaction_list/useTransactionList.ts` (1)
-- Severity: 🟡
-- Observation: validation, grouping, ordering or filtering by business meaning still runs in the frontend of `transactions` (F32). Each site is frozen in `arch-allowlist.json`; a new one fails the check.
-- User value: None directly — `transactions` behaves the same in the window, the command line and any later interface.
-- Done when: every frozen site of `transactions` moves into a core query, a draft check or a query parameter, with its rule tested in Rust; its `decision_sites` entries leave the allowlist (`just arch-check --write-allowlist`).
-
 ## 2026-09-28 — TD-052 — Feature `unpriced_prices` still makes 2 business decision(s) in the interface
 
 - Found by: architecture rule A12 (#047), first freeze

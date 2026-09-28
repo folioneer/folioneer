@@ -1,6 +1,6 @@
 import { useParams } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Transaction } from "@/bindings";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AccountJournal, JournalFilter, Transaction, TransactionType } from "@/bindings";
 import { accountMutationErrorToI18n } from "@/features/accounts/shared/presenter";
 import { logger } from "@/lib/logger";
 import { decimalToMicro } from "@/lib/microUnits";
@@ -25,56 +25,81 @@ interface JournalFilters {
 
 const EMPTY_FILTERS: JournalFilters = { assetId: "", type: "", amountMin: "", amountMax: "" };
 
+/** The form's filters and order as the account journal query takes them (TXL-060). */
+function toJournalFilter(filters: JournalFilters, sortDirection: "asc" | "desc"): JournalFilter {
+  return {
+    asset_id: filters.assetId || null,
+    transaction_type: (filters.type || null) as TransactionType | null,
+    amount_min: filters.amountMin.trim() !== "" ? decimalToMicro(filters.amountMin) : null,
+    amount_max: filters.amountMax.trim() !== "" ? decimalToMicro(filters.amountMax) : null,
+    newest_first: sortDirection === "desc",
+  };
+}
+
+/**
+ * TXL-061 — the account journal page: the core orders, filters and computes the cash
+ * columns (TXL-060); this hook sends the filters and shows what comes back.
+ */
 export function useAccountJournal() {
   const { accountId } = useParams({ from: "/accounts/$accountId/journal" });
   const assets = useAppStore((s) => s.assets);
   const accounts = useAppStore((s) => s.accounts);
 
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [journal, setJournal] = useState<AccountJournal | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<I18nMessage | null>(null);
   // Chronological, latest first (the journal default).
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [filters, setFilters] = useState<JournalFilters>(EMPTY_FILTERS);
+  const filter = useMemo(() => toJournalFilter(filters, sortDirection), [filters, sortDirection]);
+  // Only the answer to the latest request is shown; an earlier one arriving late is dropped.
+  const latestRequest = useRef(0);
 
-  const fetchTransactions = useCallback(async (): Promise<void> => {
+  const fetchJournal = useCallback(async (): Promise<void> => {
+    const request = ++latestRequest.current;
     setError(null);
     try {
-      const res = await transactionGateway.getAllTransactionsForAccount(accountId);
+      const res = await transactionGateway.getAccountJournal(accountId, filter);
+      if (request !== latestRequest.current) return;
       if (res.status === "ok") {
-        setTransactions(res.data);
+        setJournal(res.data);
       } else {
         setError(accountMutationErrorToI18n(res.error));
-        setTransactions([]);
+        setJournal(null);
       }
     } catch (e) {
+      if (request !== latestRequest.current) return;
       logger.error("Failed to fetch account journal", { error: e });
       setError(UNKNOWN_ERROR);
-      setTransactions([]);
+      setJournal(null);
     } finally {
-      setIsLoading(false);
+      if (request === latestRequest.current) setIsLoading(false);
     }
-  }, [accountId]);
+  }, [accountId, filter]);
 
+  // F29 — the loading state shows for the first load and a change of account only; a
+  // change of filter or order keeps the current rows on screen until the answer lands.
+  const shownAccount = useRef<string | null>(null);
   useEffect(() => {
-    // F29 — the loading state shows for the first load and a change of key only;
-    // a re-fetch after a change keeps the current rows on screen.
-    setIsLoading(true);
-    fetchTransactions();
-  }, [fetchTransactions]);
+    if (shownAccount.current !== accountId) {
+      shownAccount.current = accountId;
+      setIsLoading(true);
+    }
+    fetchJournal();
+  }, [accountId, fetchJournal]);
 
   // Re-fetch on TransactionUpdated so an edit/delete reflects without navigating away,
   // and once on SyncCompleted for everything a sync applied (SYN-064).
   useEffect(() => {
     const unlistenPromise = transactionGateway.subscribeToEvents((type) => {
       if (type === "TransactionUpdated" || type === "SyncCompleted") {
-        fetchTransactions();
+        fetchJournal();
       }
     });
     return () => {
       void unlistenPromise.then((unlisten) => unlisten());
     };
-  }, [fetchTransactions]);
+  }, [fetchJournal]);
 
   const setFilter = useCallback((field: keyof JournalFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -88,91 +113,48 @@ export function useAccountJournal() {
 
   const transactionById = useMemo(() => {
     const map = new Map<string, Transaction>();
-    for (const tx of transactions) map.set(tx.id, tx);
+    for (const row of journal?.rows ?? []) map.set(row.transaction.id, row.transaction);
     return map;
-  }, [transactions]);
+  }, [journal]);
 
-  // Asset options come from the transactions actually present (TXL-013 style).
-  const assetFilterOptions = useMemo(() => {
-    const ids = [...new Set(transactions.map((tx) => tx.asset_id))];
-    return ids.map((id) => ({ value: id, label: assets.find((a) => a.id === id)?.name ?? id }));
-  }, [transactions, assets]);
+  // The filter choices are the assets and types the whole account has (TXL-060).
+  const assetFilterOptions = useMemo(
+    () =>
+      (journal?.asset_ids ?? []).map((id) => ({
+        value: id,
+        label: assets.find((a) => a.id === id)?.name ?? id,
+      })),
+    [journal, assets],
+  );
 
-  const typeFilterOptions = useMemo(() => {
-    return [...new Set(transactions.map((tx) => tx.transaction_type))].map((type) => ({
-      value: type,
-      label: type,
-    }));
-  }, [transactions]);
+  const typeFilterOptions = useMemo(
+    () => (journal?.transaction_types ?? []).map((type) => ({ value: type, label: type })),
+    [journal],
+  );
 
-  // Bank-statement cash columns. Computed over the FULL chronological set (date ASC,
-  // created_at ASC) so each row's balance is the true cash balance at that point —
-  // independent of the display filters/sort. Signs mirror the backend cash replay:
-  // credit = Deposit/Sell/Dividend, debit = Withdrawal/Purchase, none = OpeningBalance/FreeShares.
-  const cashByTxId = useMemo(() => {
-    const ordered = [...transactions].sort((a, b) =>
-      a.date !== b.date ? a.date.localeCompare(b.date) : a.created_at.localeCompare(b.created_at),
-    );
-    const map = new Map<string, { cashOut: string; cashIn: string; balance: string }>();
-    let running = 0;
-    for (const tx of ordered) {
-      const isCredit =
-        tx.transaction_type === "Deposit" ||
-        tx.transaction_type === "Sell" ||
-        tx.transaction_type === "Dividend";
-      const isDebit = tx.transaction_type === "Withdrawal" || tx.transaction_type === "Purchase";
-      if (isCredit) running += tx.total_amount;
-      else if (isDebit) running -= tx.total_amount;
-      // Raw micro values → presenter formats them (F5); the arithmetic stays here.
-      map.set(
-        tx.id,
-        toCashStatementCells({
-          debitMicros: isDebit ? tx.total_amount : null,
-          creditMicros: isCredit ? tx.total_amount : null,
-          balanceMicros: running,
-        }),
-      );
-    }
-    return map;
-  }, [transactions]);
-
-  const filteredSortedRows = useMemo<TransactionRowViewModel[]>(() => {
-    const hasMin = filters.amountMin.trim() !== "";
-    const hasMax = filters.amountMax.trim() !== "";
-    const minMicro = hasMin ? decimalToMicro(filters.amountMin) : 0;
-    const maxMicro = hasMax ? decimalToMicro(filters.amountMax) : 0;
-
-    const filtered = transactions.filter((tx) => {
-      if (filters.assetId && tx.asset_id !== filters.assetId) return false;
-      if (filters.type && tx.transaction_type !== filters.type) return false;
-      if (hasMin && tx.total_amount < minMicro) return false;
-      if (hasMax && tx.total_amount > maxMicro) return false;
-      return true;
-    });
-
-    // Order on the raw transactions (which carry created_at) so same-date events
-    // tie-break by input order — matching the running-balance replay. Sorting rows
-    // by date alone would leave same-date rows in their stable input order even in
-    // desc view, flipping the balance column at each day boundary.
-    const ordered = [...filtered].sort((a, b) => {
-      const cmp = a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at);
-      return sortDirection === "asc" ? cmp : -cmp;
-    });
-
-    return ordered.map((tx) => {
-      const asset = assets.find((a) => a.id === tx.asset_id);
-      const account = accounts.find((a) => a.id === tx.account_id);
-      const row = toTransactionRow(tx, asset?.name ?? tx.asset_id, account?.name ?? tx.account_id);
-      const cash = cashByTxId.get(tx.id);
-      return cash ? { ...row, ...cash } : row;
-    });
-  }, [transactions, filters, assets, accounts, sortDirection, cashByTxId]);
+  const filteredSortedRows = useMemo<TransactionRowViewModel[]>(
+    () =>
+      (journal?.rows ?? []).map((row) => {
+        const tx = row.transaction;
+        const asset = assets.find((a) => a.id === tx.asset_id);
+        const account = accounts.find((a) => a.id === tx.account_id);
+        return {
+          ...toTransactionRow(tx, asset?.name ?? tx.asset_id, account?.name ?? tx.account_id),
+          ...toCashStatementCells({
+            debitMicros: row.cash_out,
+            creditMicros: row.cash_in,
+            balanceMicros: row.cash_balance,
+          }),
+        };
+      }),
+    [journal, assets, accounts],
+  );
 
   // F29 — a retry the user asks for shows the loading state; a re-fetch after a change does not.
   const reloadTransactions = useCallback(() => {
     setIsLoading(true);
-    return fetchTransactions();
-  }, [fetchTransactions]);
+    return fetchJournal();
+  }, [fetchJournal]);
 
   return {
     accountId,
@@ -187,8 +169,8 @@ export function useAccountJournal() {
     typeFilterOptions,
     filteredSortedRows,
     transactionById,
-    hasTransactions: transactions.length > 0,
-    refresh: fetchTransactions,
+    hasTransactions: journal?.has_transactions ?? false,
+    refresh: fetchJournal,
     reload: reloadTransactions,
   };
 }

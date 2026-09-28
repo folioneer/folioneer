@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Account, Asset, Transaction } from "@/bindings";
+import type { Account, AccountJournal, Asset, Transaction } from "@/bindings";
 import { microToFormatted } from "@/lib/microUnits";
 import { useAppStore } from "@/lib/store";
 import { useAccountJournal } from "./useAccountJournal";
@@ -9,12 +9,12 @@ vi.mock("@tanstack/react-router", () => ({
   useParams: () => ({ accountId: "account-1" }),
 }));
 
-const mockGetAll = vi.fn();
+const mockGetJournal = vi.fn();
 const mockSubscribe = vi.fn();
 
 vi.mock("../gateway", () => ({
   transactionGateway: {
-    getAllTransactionsForAccount: (...args: unknown[]) => mockGetAll(...args),
+    getAccountJournal: (...args: unknown[]) => mockGetJournal(...args),
     subscribeToEvents: (...args: unknown[]) => mockSubscribe(...args),
   },
 }));
@@ -41,6 +41,40 @@ const tx = (over: Partial<Transaction>): Transaction =>
     ...over,
   }) as Transaction;
 
+// What the core answers (TXL-060): rows in the order asked, cash columns computed.
+const JOURNAL: AccountJournal = {
+  rows: [
+    {
+      transaction: tx({
+        id: "b",
+        asset_id: "asset-2",
+        transaction_type: "Sell",
+        date: "2024-03-01",
+      }),
+      cash_out: null,
+      cash_in: 500 * MICRO,
+      cash_balance: 900 * MICRO,
+    },
+    {
+      transaction: tx({ id: "a", asset_id: "asset-1", date: "2024-01-01" }),
+      cash_out: 100 * MICRO,
+      cash_in: null,
+      cash_balance: 400 * MICRO,
+    },
+  ],
+  asset_ids: ["asset-1", "asset-2"],
+  transaction_types: ["Purchase", "Sell"],
+  has_transactions: true,
+};
+
+const NO_FILTER = {
+  asset_id: null,
+  transaction_type: null,
+  amount_min: null,
+  amount_max: null,
+  newest_first: true,
+};
+
 describe("useAccountJournal", () => {
   let eventCallback: ((type: string) => void) | undefined;
 
@@ -54,245 +88,144 @@ describe("useAccountJournal", () => {
       ] as Asset[],
       accounts: [{ id: "account-1", name: "My Account" }] as Account[],
     });
-    mockGetAll.mockResolvedValue({
-      status: "ok",
-      data: [
-        tx({ id: "a", asset_id: "asset-1", date: "2024-01-01", total_amount: 100 * MICRO }),
-        tx({
-          id: "b",
-          asset_id: "asset-2",
-          date: "2024-03-01",
-          transaction_type: "Sell",
-          total_amount: 500 * MICRO,
-        }),
-        tx({ id: "c", asset_id: "asset-1", date: "2024-02-01", total_amount: 300 * MICRO }),
-      ],
-    });
+    mockGetJournal.mockResolvedValue({ status: "ok", data: JOURNAL });
     mockSubscribe.mockImplementation(async (cb: (type: string) => void) => {
       eventCallback = cb;
       return () => {};
     });
   });
 
-  it("loads all account transactions, sorted latest-first by default", async () => {
-    const { result } = renderHook(() => useAccountJournal());
-    await act(async () => {});
-    expect(mockGetAll).toHaveBeenCalledWith("account-1");
-    expect(result.current.filteredSortedRows.map((r) => r.id)).toEqual(["b", "c", "a"]);
-  });
-
-  it("orders same-date events by created_at, applying the sort direction (regression)", async () => {
-    // All on the same day, fed in created_at order (as the backend returns them).
-    mockGetAll.mockResolvedValue({
-      status: "ok",
-      data: [
-        tx({
-          id: "A",
-          date: "2024-05-01",
-          transaction_type: "Deposit",
-          total_amount: 1000 * MICRO,
-          created_at: "2024-05-01T09:00:00.000Z",
-        }),
-        tx({
-          id: "B",
-          date: "2024-05-01",
-          transaction_type: "Purchase",
-          total_amount: 300 * MICRO,
-          created_at: "2024-05-01T10:00:00.000Z",
-        }),
-        tx({
-          id: "C",
-          date: "2024-05-01",
-          transaction_type: "Sell",
-          total_amount: 200 * MICRO,
-          created_at: "2024-05-01T11:00:00.000Z",
-        }),
-      ],
-    });
+  // TXL-061 — the journal loads newest first with no filter, rows in the order returned
+  it("loads the account journal newest first and shows its rows as returned", async () => {
     const { result } = renderHook(() => useAccountJournal());
     await act(async () => {});
 
-    // desc (default): newest-created first — NOT the input order (the bug showed
-    // input order here, flipping the balance column at the day boundary).
-    expect(result.current.filteredSortedRows.map((r) => r.id)).toEqual(["C", "B", "A"]);
-
-    // Each row still carries its true post-event balance from the chronological
-    // replay (A 1000 → B 700 → C 900), independent of display order.
-    const byId = Object.fromEntries(
-      result.current.filteredSortedRows.map((r) => [r.id, r.balance]),
-    );
-    expect(byId.A).toBe(microToFormatted(1000 * MICRO));
-    expect(byId.B).toBe(microToFormatted(700 * MICRO));
-    expect(byId.C).toBe(microToFormatted(900 * MICRO));
-
-    // asc: oldest-created first.
-    act(() => result.current.toggleSortDirection());
-    expect(result.current.filteredSortedRows.map((r) => r.id)).toEqual(["A", "B", "C"]);
-  });
-
-  it("filters by asset", async () => {
-    const { result } = renderHook(() => useAccountJournal());
-    await act(async () => {});
-    act(() => result.current.setFilter("assetId", "asset-1"));
-    expect(result.current.filteredSortedRows.map((r) => r.id)).toEqual(["c", "a"]);
-  });
-
-  it("filters by transaction type", async () => {
-    const { result } = renderHook(() => useAccountJournal());
-    await act(async () => {});
-    act(() => result.current.setFilter("type", "Sell"));
-    expect(result.current.filteredSortedRows.map((r) => r.id)).toEqual(["b"]);
-  });
-
-  it("filters by amount range (inclusive)", async () => {
-    const { result } = renderHook(() => useAccountJournal());
-    await act(async () => {});
-    act(() => {
-      result.current.setFilter("amountMin", "200");
-      result.current.setFilter("amountMax", "400");
-    });
-    expect(result.current.filteredSortedRows.map((r) => r.id)).toEqual(["c"]);
-  });
-
-  it("clears all filters", async () => {
-    const { result } = renderHook(() => useAccountJournal());
-    await act(async () => {});
-    act(() => result.current.setFilter("type", "Sell"));
-    expect(result.current.filteredSortedRows).toHaveLength(1);
-    act(() => result.current.clearFilters());
-    expect(result.current.filteredSortedRows).toHaveLength(3);
-  });
-
-  it("re-fetches on a TransactionUpdated event", async () => {
-    const { result } = renderHook(() => useAccountJournal());
-    await act(async () => {});
-    expect(mockGetAll).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      eventCallback?.("TransactionUpdated");
-    });
-    expect(mockGetAll).toHaveBeenCalledTimes(2);
-    // unrelated event is ignored
-    await act(async () => {
-      eventCallback?.("AssetUpdated");
-    });
-    expect(mockGetAll).toHaveBeenCalledTimes(2);
+    expect(mockGetJournal).toHaveBeenCalledWith("account-1", NO_FILTER);
+    expect(result.current.filteredSortedRows.map((r) => r.id)).toEqual(["b", "a"]);
     expect(result.current.hasTransactions).toBe(true);
   });
 
-  // #020 / SYN-064 — changes applied from another device arrive as one SyncCompleted.
+  // TXL-061 — each row shows the cash columns the core computed
+  it("shows the cash columns the core computed", async () => {
+    const { result } = renderHook(() => useAccountJournal());
+    await act(async () => {});
+
+    const [sale, purchase] = result.current.filteredSortedRows;
+    expect(sale).toEqual(
+      expect.objectContaining({
+        cashIn: microToFormatted(500 * MICRO),
+        cashOut: "",
+        balance: microToFormatted(900 * MICRO),
+      }),
+    );
+    expect(purchase).toEqual(
+      expect.objectContaining({ cashOut: microToFormatted(100 * MICRO), cashIn: "" }),
+    );
+  });
+
+  // TXL-061 — the filter choices are the assets and types the journal lists
+  it("offers the assets and types the journal lists", async () => {
+    const { result } = renderHook(() => useAccountJournal());
+    await act(async () => {});
+
+    expect(result.current.assetFilterOptions).toEqual([
+      { value: "asset-1", label: "Apple" },
+      { value: "asset-2", label: "Google" },
+    ]);
+    expect(result.current.typeFilterOptions.map((o) => o.value)).toEqual(["Purchase", "Sell"]);
+  });
+
+  // TXL-060 / TXL-061 — the chosen filters and order are sent to the core, amounts in micro-units
+  it("sends the chosen filters and order to the core", async () => {
+    const { result } = renderHook(() => useAccountJournal());
+    await act(async () => {});
+
+    await act(async () => {
+      result.current.setFilter("assetId", "asset-1");
+      result.current.setFilter("type", "Purchase");
+      result.current.setFilter("amountMin", "100");
+      result.current.setFilter("amountMax", "300.5");
+      result.current.toggleSortDirection();
+    });
+
+    expect(mockGetJournal).toHaveBeenLastCalledWith("account-1", {
+      asset_id: "asset-1",
+      transaction_type: "Purchase",
+      amount_min: 100 * MICRO,
+      amount_max: 300_500_000,
+      newest_first: false,
+    });
+
+    await act(async () => {
+      result.current.clearFilters();
+      result.current.toggleSortDirection();
+    });
+    expect(mockGetJournal).toHaveBeenLastCalledWith("account-1", NO_FILTER);
+  });
+
+  // TXL-061 — only the answer to the latest filters is shown
+  it("drops an answer to earlier filters that arrives late", async () => {
+    const { result } = renderHook(() => useAccountJournal());
+    await act(async () => {});
+    let answerEarlier: (value: unknown) => void = () => {};
+    mockGetJournal
+      .mockImplementationOnce(() => new Promise((resolve) => (answerEarlier = resolve)))
+      .mockResolvedValueOnce({
+        status: "ok",
+        data: { ...JOURNAL, rows: [JOURNAL.rows[1]] },
+      });
+
+    await act(async () => {
+      result.current.setFilter("type", "Sell");
+    });
+    await act(async () => {
+      result.current.setFilter("type", "Purchase");
+    });
+    await act(async () => {
+      answerEarlier({ status: "ok", data: JOURNAL });
+    });
+
+    expect(result.current.filteredSortedRows.map((r) => r.id)).toEqual(["a"]);
+  });
+
+  it("re-fetches on a TransactionUpdated event", async () => {
+    renderHook(() => useAccountJournal());
+    await act(async () => {});
+    expect(mockGetJournal).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      eventCallback?.("TransactionUpdated");
+    });
+    expect(mockGetJournal).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      eventCallback?.("AssetUpdated");
+    });
+    expect(mockGetJournal).toHaveBeenCalledTimes(2);
+  });
+
   it("re-fetches once when a sync completes", async () => {
     renderHook(() => useAccountJournal());
     await act(async () => {});
-    expect(mockGetAll).toHaveBeenCalledTimes(1);
     await act(async () => {
       eventCallback?.("SyncCompleted");
     });
-    expect(mockGetAll).toHaveBeenCalledTimes(2);
-  });
-
-  it("computes bank-statement cash columns + running balance over the full set", async () => {
-    mockGetAll.mockResolvedValue({
-      status: "ok",
-      data: [
-        tx({
-          id: "dep",
-          date: "2024-01-01",
-          transaction_type: "Deposit",
-          total_amount: 1000 * MICRO,
-        }),
-        tx({
-          id: "buy",
-          date: "2024-02-01",
-          transaction_type: "Purchase",
-          total_amount: 300 * MICRO,
-        }),
-        tx({
-          id: "div",
-          date: "2024-03-01",
-          transaction_type: "Dividend",
-          total_amount: 50 * MICRO,
-        }),
-        tx({ id: "sell", date: "2024-04-01", transaction_type: "Sell", total_amount: 200 * MICRO }),
-      ],
-    });
-    const { result } = renderHook(() => useAccountJournal());
-    await act(async () => {});
-    const byId = Object.fromEntries(result.current.filteredSortedRows.map((r) => [r.id, r]));
-
-    // Deposit/Dividend/Sell are credits (cash in); Purchase is a debit (cash out).
-    expect(byId.dep?.cashIn).toBe(microToFormatted(1000 * MICRO));
-    expect(byId.dep?.cashOut).toBe("");
-    expect(byId.buy?.cashOut).toBe(microToFormatted(300 * MICRO));
-    expect(byId.buy?.cashIn).toBe("");
-
-    // Running balance: 1000 → 700 → 750 → 950.
-    expect(byId.dep?.balance).toBe(microToFormatted(1000 * MICRO));
-    expect(byId.buy?.balance).toBe(microToFormatted(700 * MICRO));
-    expect(byId.div?.balance).toBe(microToFormatted(750 * MICRO));
-    expect(byId.sell?.balance).toBe(microToFormatted(950 * MICRO));
-  });
-
-  it("leaves cash columns blank for a non-cash type and keeps the balance flat", async () => {
-    mockGetAll.mockResolvedValue({
-      status: "ok",
-      data: [
-        tx({
-          id: "ob",
-          date: "2024-01-01",
-          transaction_type: "OpeningBalance",
-          total_amount: 500 * MICRO,
-        }),
-      ],
-    });
-    const { result } = renderHook(() => useAccountJournal());
-    await act(async () => {});
-    const row = result.current.filteredSortedRows[0];
-    expect(row?.cashOut).toBe("");
-    expect(row?.cashIn).toBe("");
-    expect(row?.balance).toBe(microToFormatted(0));
-  });
-
-  it("keeps the true full-history balance on a filtered row", async () => {
-    mockGetAll.mockResolvedValue({
-      status: "ok",
-      data: [
-        tx({
-          id: "dep",
-          date: "2024-01-01",
-          transaction_type: "Deposit",
-          total_amount: 1000 * MICRO,
-        }),
-        tx({
-          id: "buy",
-          asset_id: "asset-1",
-          date: "2024-02-01",
-          transaction_type: "Purchase",
-          total_amount: 300 * MICRO,
-        }),
-      ],
-    });
-    const { result } = renderHook(() => useAccountJournal());
-    await act(async () => {});
-    act(() => result.current.setFilter("type", "Purchase"));
-    // Only the Purchase row is visible, but its balance still reflects the prior Deposit.
-    expect(result.current.filteredSortedRows.map((r) => r.id)).toEqual(["buy"]);
-    expect(result.current.filteredSortedRows[0]?.balance).toBe(microToFormatted(700 * MICRO));
+    expect(mockGetJournal).toHaveBeenCalledTimes(2);
   });
 
   it("surfaces an i18n error when the load fails", async () => {
-    mockGetAll.mockResolvedValue({ status: "error", error: { code: "DatabaseError" } });
+    mockGetJournal.mockResolvedValue({ status: "error", error: { code: "DatabaseError" } });
     const { result } = renderHook(() => useAccountJournal());
     await act(async () => {});
     expect(result.current.error).not.toBeNull();
     expect(result.current.hasTransactions).toBe(false);
   });
+
   // F29 — a change re-fetches the journal without a loading state: the rows stay mounted.
   it("keeps the journal on screen while a change re-fetches it", async () => {
     const { result } = renderHook(() => useAccountJournal());
     await act(async () => {});
     expect(result.current.isLoading).toBe(false);
     const shown = result.current.filteredSortedRows.length;
-    mockGetAll.mockReturnValue(new Promise(() => {}));
+    mockGetJournal.mockReturnValue(new Promise(() => {}));
 
     act(() => {
       eventCallback?.("TransactionUpdated");
@@ -301,12 +234,13 @@ describe("useAccountJournal", () => {
     expect(result.current.isLoading).toBe(false);
     expect(result.current.filteredSortedRows.length).toBe(shown);
   });
+
   // F29 — a retry the user asks for (the Retry button) shows the loading state.
   it("shows the loading state while the user retries", async () => {
     const { result } = renderHook(() => useAccountJournal());
     await act(async () => {});
     expect(result.current.isLoading).toBe(false);
-    mockGetAll.mockReturnValue(new Promise(() => {}));
+    mockGetJournal.mockReturnValue(new Promise(() => {}));
 
     act(() => {
       void result.current.reload();
@@ -314,17 +248,26 @@ describe("useAccountJournal", () => {
 
     expect(result.current.isLoading).toBe(true);
   });
+
   // F29 — the refresh after a delete or an edit keeps the rows on screen.
   it("keeps the journal on screen while it refreshes after a change", async () => {
     const { result } = renderHook(() => useAccountJournal());
     await act(async () => {});
     expect(result.current.isLoading).toBe(false);
-    mockGetAll.mockReturnValue(new Promise(() => {}));
+    mockGetJournal.mockReturnValue(new Promise(() => {}));
 
     act(() => {
       void result.current.refresh();
     });
 
     expect(result.current.isLoading).toBe(false);
+  });
+
+  // A thrown load shows the generic error
+  it("shows the generic error when the load throws", async () => {
+    mockGetJournal.mockRejectedValue(new Error("down"));
+    const { result } = renderHook(() => useAccountJournal());
+    await act(async () => {});
+    expect(result.current.error).toEqual({ key: "error.Unknown" });
   });
 });

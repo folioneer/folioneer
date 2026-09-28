@@ -13,12 +13,41 @@ vi.mock("@tanstack/react-router", () => ({
 
 const mockGetAssetIdsForAccount = vi.fn();
 const mockGetTransactions = vi.fn();
+const mockGetJournal = vi.fn();
 const mockSubscribeToEvents = vi.fn();
+
+// The core's account journal filtered to the asset (TXL-060), standing in for the backend:
+// `mockGetTransactions` holds the asset's transactions oldest first, and the journal
+// returns them in the order asked.
+const journalOf = async (
+  accountId: string,
+  filter: { asset_id: string; newest_first: boolean },
+) => {
+  mockGetJournal(accountId, filter);
+  const res = await mockGetTransactions(accountId, filter.asset_id);
+  if (res.status !== "ok") return res;
+  const ordered = filter.newest_first ? [...res.data].reverse() : res.data;
+  return {
+    status: "ok",
+    data: {
+      rows: ordered.map((transaction: unknown) => ({
+        transaction,
+        cash_out: null,
+        cash_in: null,
+        cash_balance: 0,
+      })),
+      asset_ids: [],
+      transaction_types: [],
+      has_transactions: ordered.length > 0,
+    },
+  };
+};
 
 vi.mock("../gateway", () => ({
   transactionGateway: {
     getAssetIdsForAccount: (...args: unknown[]) => mockGetAssetIdsForAccount(...args),
-    getTransactions: (...args: unknown[]) => mockGetTransactions(...args),
+    getAccountJournal: (accountId: string, filter: { asset_id: string; newest_first: boolean }) =>
+      journalOf(accountId, filter),
     subscribeToEvents: (...args: unknown[]) => mockSubscribeToEvents(...args),
   },
 }));
@@ -92,16 +121,69 @@ describe("useTransactionList", () => {
     expect(rows.at(1)?.date).toBe("2024-01-01");
   });
 
-  // toggleSortDirection flips between asc and desc (TXL-024)
-  it("toggleSortDirection switches sort order", async () => {
+  // TXL-053 / TXL-024 — a retry after a failed load keeps the order the user chose
+  it("retries in the order the user chose", async () => {
+    const { result } = renderHook(() => useTransactionList());
+    await act(async () => {});
+    await act(async () => result.current.toggleSortDirection());
+    mockGetTransactions.mockResolvedValueOnce({
+      status: "error",
+      error: { code: "DatabaseError" },
+    });
+    await act(async () => result.current.toggleSortDirection());
+    await act(async () => result.current.toggleSortDirection());
+    expect(result.current.sortDirection).toBe("asc");
+
+    await act(async () => result.current.retryTransactions());
+
+    expect(mockGetJournal).toHaveBeenLastCalledWith(
+      "account-1",
+      expect.objectContaining({ newest_first: false }),
+    );
+  });
+
+  // F29 — flipping the order keeps the rows on screen until the answer lands, and an
+  // answer to an earlier order arriving late is dropped
+  it("keeps the rows on screen while the order flips, and drops a late earlier answer", async () => {
+    const { result } = renderHook(() => useTransactionList());
+    await act(async () => {});
+    let answerFirstFlip: (value: unknown) => void = () => {};
+    mockGetTransactions
+      .mockImplementationOnce(() => new Promise((resolve) => (answerFirstFlip = resolve)))
+      .mockResolvedValueOnce({ status: "ok", data: [makeTx("tx-2", "2024-03-01")] });
+
+    await act(async () => result.current.toggleSortDirection());
+    expect(result.current.isLoadingTransactions).toBe(false);
+    expect(result.current.sortedTransactions).toHaveLength(2);
+
+    await act(async () => result.current.toggleSortDirection());
+    await act(async () => {
+      answerFirstFlip({ status: "ok", data: [] });
+    });
+    expect(result.current.sortedTransactions.map((r) => r.id)).toEqual(["tx-2"]);
+  });
+
+  // TXL-024 — flipping the order asks the core for the other order; the page does not reorder
+  it("toggleSortDirection asks the core for the other order", async () => {
     const { result } = renderHook(() => useTransactionList());
     await act(async () => {});
     expect(result.current.sortDirection).toBe("desc");
-    act(() => result.current.toggleSortDirection());
+    expect(mockGetJournal).toHaveBeenLastCalledWith(
+      "account-1",
+      expect.objectContaining({ asset_id: "asset-1", newest_first: true }),
+    );
+
+    await act(async () => result.current.toggleSortDirection());
     expect(result.current.sortDirection).toBe("asc");
+    expect(mockGetJournal).toHaveBeenLastCalledWith(
+      "account-1",
+      expect.objectContaining({ newest_first: false }),
+    );
     expect(result.current.sortedTransactions.at(0)?.date).toBe("2024-01-01");
-    act(() => result.current.toggleSortDirection());
+
+    await act(async () => result.current.toggleSortDirection());
     expect(result.current.sortDirection).toBe("desc");
+    expect(result.current.sortedTransactions.at(0)?.date).toBe("2024-03-01");
   });
 
   // handleAccountChange resets asset, sort, and re-fetches (TXL-012, TXL-016)

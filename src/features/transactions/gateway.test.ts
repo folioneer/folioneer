@@ -55,6 +55,34 @@ const buyDto: BuyHoldingDTO = {
 describe("transactionGateway", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  // ── getAccountJournal (TXL-060) / getNonCashAssets (TRX-064) ─────────────────
+
+  it("getAccountJournal sends the account and filter and returns the journal", async () => {
+    const filter = {
+      asset_id: "ast-1",
+      transaction_type: null,
+      amount_min: null,
+      amount_max: 5_000_000,
+      newest_first: true,
+    };
+    const journal = { rows: [], asset_ids: [], transaction_types: [], has_transactions: false };
+    mockInvoke.mockResolvedValue(journal);
+    expect(await transactionGateway.getAccountJournal("acc-1", filter)).toEqual({
+      status: "ok",
+      data: journal,
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("get_account_journal", {
+      accountId: "acc-1",
+      filter,
+    });
+  });
+
+  it("getNonCashAssets returns the core's list", async () => {
+    mockInvoke.mockResolvedValue([]);
+    expect(await transactionGateway.getNonCashAssets()).toEqual({ status: "ok", data: [] });
+    expect(mockInvoke).toHaveBeenCalledWith("get_non_cash_assets");
+  });
+
   // ── validateTransactionDraft (TRX-062) ──────────────────────────────────────
 
   it("validateTransactionDraft sends the draft and returns the check's answer", async () => {

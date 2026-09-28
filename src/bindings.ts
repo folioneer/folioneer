@@ -267,18 +267,6 @@ async getTransactions(accountId: string, assetId: string) : Promise<Result<Trans
 }
 },
 /**
- * Retrieves every transaction for an account across all assets, ordered
- * chronologically by `(date, created_at)` (TRX-036).
- */
-async getAllTransactionsForAccount(accountId: string) : Promise<Result<Transaction[], AccountError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("get_all_transactions_for_account", { accountId }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
  * The account journal of an account: its transactions in date order, each with the cash
  * it moved and the cash balance after it, the rows `filter` keeps (TXL-060).
  */

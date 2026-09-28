@@ -130,7 +130,6 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             account::delete_account,
             account::get_asset_ids_for_account,
             account::get_transactions,
-            account::get_all_transactions_for_account,
             account::get_account_journal,
             account::get_holding_snapshot_as_of,
             account::create_fee_schedule,

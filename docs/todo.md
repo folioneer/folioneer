@@ -2,7 +2,7 @@
 
 <!-- Add new backlog items here. Format: ## #NNN — (domain) — Short title -->
 <!-- #NNN is a permanent reference: never renumbered, never reused. A new entry takes the -->
-<!-- next free number wherever it is placed. Next free: #047. -->
+<!-- next free number wherever it is placed. Next free: #053. -->
 <!-- Every entry ends with four lines: **User value:**, **Done when:**, **Design:** and -->
 <!-- **Open questions:**. Design is `none` until the agent proposes one (it does so before -->
 <!-- touching anything the user sees), then `proposed (screenshots/design/NNN-*.png)`, then -->
@@ -153,28 +153,6 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Are management fees part of this report, or a separate one? (Recommended: part of it — income without the cost of holding tells half the story, and the data is already there.)
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
-
-## #047 — (fullstack) — All logic in Rust; the interface only shows it
-
-The application should work without its window, and another interface (web, mobile, a command line) should be able to reuse everything but the view. The backend is nearly there: outside the 24 `api.rs` adapters, only four files depend on Tauri (`lib.rs`, the logger, the update checker, the command registry). The frontend is not: six `validate*.ts` files repeat rules Rust already enforces (TRX-020, TRX-060, SEL-022…), hooks decide what a screen contains (holdings grouped cash → Stocks → others in `useAccountDetails`, cash and archived assets left out in `useAssetTable` and `globalPresenter`), and presenters compute figures from other figures — 38 sort/filter/reduce sites outside tests, measured 2026-09-27.
-
-Target:
-
-- **Core:** the contexts, use cases and event bus build without Tauri; Tauri, the command line (#044) and any later server are adapters over one application API of commands and queries.
-- **Screen queries:** Rust returns what a screen shows — rows grouped and ordered, final figures, and flags saying what may be done (edit, sell, archive). The interface formats for the locale and lays out; it never decides.
-- **Validation:** a draft is checked by Rust (`validate_*_draft` returning the first problem, or the figures recording would store); the interface shows the codes as messages and keeps no copy of a rule.
-- **Rule and guard:** a backend/frontend rule, "no business decision in `src/`", checked by `scripts/arch-check.py`; the existing sites are frozen in `arch-allowlist.json` and removed feature by feature (one `TD-NNN` each), never in one change.
-
-**User value:** None directly — the command line (#044) and any later interface get the same behaviour as the window, and a rule lives in one place instead of two.
-**Done when:** The core builds and its tests pass with Tauri removed from its dependencies; the rule is in `docs/backend-rules.md` and `docs/frontend-rules.md` and the architecture check fails on a new validator or grouping in `src/` (seen red); every existing site is in the allowlist with a `TD-NNN` naming its feature; one feature (proposed: transactions — validation and the journal) is migrated end to end, its `validate*.ts` deleted and its rules tested in Rust only.
-**Design:** none — nothing the user sees changes.
-**Open questions:**
-
-- [x] Before or with #044? — Before (owner, 2026-09-27): the command line calls the application API instead of reaching into services.
-- [x] Where do messages live for a client without the web interface? — Owner, 2026-09-27: the command line speaks English only; its text is minimal and lives in Rust, with no translation.
-- [x] Sorting and searching a table: view state or a query parameter? — A query parameter (owner, 2026-09-27); the interface holds only the user's choice.
-- [x] An ADR? — No (owner, 2026-09-27).
-- [x] ADR-020 guard (reviewer-arch `[DECISION]`, PR #48): the `app` feature decides whether the Tauri shell compiles, not which data source or update channel a build ships — owner, 2026-09-28: amend the sign to "a feature flag deciding which external data source or update channel a build ships" (done in PR #48).
 
 ## #044 — (fullstack) — Record holdings from the command line, without a window
 

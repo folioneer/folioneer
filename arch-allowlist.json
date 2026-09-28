@@ -124,10 +124,6 @@
     "src/features/performance/global_view/useGlobalPerformance.ts": 3,
     "src/features/performance/shared/globalPresenter.ts": 3,
     "src/features/performance/shared/presenter.ts": 1,
-    "src/features/transactions/account_journal/useAccountJournal.ts": 3,
-    "src/features/transactions/add_transaction/AddTransactionModal.tsx": 1,
-    "src/features/transactions/edit_transaction_modal/EditTransactionModal.tsx": 1,
-    "src/features/transactions/transaction_list/useTransactionList.ts": 1,
     "src/features/unpriced_prices/useUnpricedPrices.ts": 2,
     "src/features/whats_new/parseChangelog.ts": 3
   }

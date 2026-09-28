@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Transaction } from "@/bindings";
 import { accountMutationErrorToI18n } from "@/features/accounts/shared/presenter";
 import { logger } from "@/lib/logger";
@@ -52,26 +52,47 @@ export function useTransactionList() {
     }
   }, []);
 
+  // TXL-024 / TXL-060 — the asset's transactions come from the account journal, in the
+  // order asked for; the page does not reorder them.
+  // Only the answer to the latest request is shown; an earlier one arriving late is dropped.
+  const latestRequest = useRef(0);
+  // F29 — the loading state shows for a first load or a change of asset only; a flip of the
+  // order or a refresh after a change keeps the current rows on screen.
   const fetchTransactions = useCallback(
-    async (accId: string, asId: string): Promise<Transaction[]> => {
-      setIsLoadingTransactions(true);
+    async (
+      accId: string,
+      asId: string,
+      newestFirst = true,
+      showLoading = true,
+    ): Promise<Transaction[]> => {
+      const request = ++latestRequest.current;
+      if (showLoading) setIsLoadingTransactions(true);
       setTransactionError(null);
       try {
-        const res = await transactionGateway.getTransactions(accId, asId);
+        const res = await transactionGateway.getAccountJournal(accId, {
+          asset_id: asId,
+          transaction_type: null,
+          amount_min: null,
+          amount_max: null,
+          newest_first: newestFirst,
+        });
+        const found = res.status === "ok" ? res.data.rows.map((row) => row.transaction) : [];
+        if (request !== latestRequest.current) return found;
         if (res.status === "ok") {
-          setTransactions(res.data);
-          return res.data;
+          setTransactions(found);
+          return found;
         }
         setTransactionError(accountMutationErrorToI18n(res.error));
         setTransactions([]);
         return [];
       } catch (e) {
+        if (request !== latestRequest.current) return [];
         logger.error("Failed to fetch transactions", { error: e });
         setTransactionError(UNKNOWN_ERROR);
         setTransactions([]);
         return [];
       } finally {
-        setIsLoadingTransactions(false);
+        if (request === latestRequest.current) setIsLoadingTransactions(false);
       }
     },
     [],
@@ -105,16 +126,21 @@ export function useTransactionList() {
   );
 
   const toggleSortDirection = useCallback(() => {
-    setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
-  }, []);
+    const next = sortDirection === "asc" ? "desc" : "asc";
+    setSortDirection(next);
+    if (selectedAssetId) {
+      fetchTransactions(selectedAccountId, selectedAssetId, next === "desc", false);
+    }
+  }, [sortDirection, selectedAccountId, selectedAssetId, fetchTransactions]);
 
   const refreshTransactions = useCallback(
     async (preserveSort = true): Promise<Transaction[]> => {
       if (!selectedAssetId) return [];
       if (!preserveSort) setSortDirection("desc");
-      return fetchTransactions(selectedAccountId, selectedAssetId);
+      const newestFirst = !preserveSort || sortDirection === "desc";
+      return fetchTransactions(selectedAccountId, selectedAssetId, newestFirst, false);
     },
-    [selectedAccountId, selectedAssetId, fetchTransactions],
+    [selectedAccountId, selectedAssetId, sortDirection, fetchTransactions],
   );
 
   // Re-fetch on TransactionUpdated so a correction/move reflects without a navigate-away,
@@ -148,11 +174,12 @@ export function useTransactionList() {
     fetchAssetIds(selectedAccountId);
   }, [selectedAccountId, fetchAssetIds]);
 
+  // A retry keeps the order the user chose (TXL-024) and shows the loading state (F29).
   const retryTransactions = useCallback(() => {
     if (selectedAssetId) {
-      fetchTransactions(selectedAccountId, selectedAssetId);
+      fetchTransactions(selectedAccountId, selectedAssetId, sortDirection === "desc");
     }
-  }, [selectedAccountId, selectedAssetId, fetchTransactions]);
+  }, [selectedAccountId, selectedAssetId, sortDirection, fetchTransactions]);
 
   const rows = useMemo<TransactionRowViewModel[]>(() => {
     return transactions.map((tx) => {
@@ -162,12 +189,7 @@ export function useTransactionList() {
     });
   }, [transactions, assets, accounts]);
 
-  const sortedTransactions = useMemo<TransactionRowViewModel[]>(() => {
-    return [...rows].sort((a, b) => {
-      const cmp = a.date.localeCompare(b.date);
-      return sortDirection === "asc" ? cmp : -cmp;
-    });
-  }, [rows, sortDirection]);
+  const sortedTransactions = rows;
 
   const transactionById = useMemo(() => {
     const map = new Map<string, Transaction>();

@@ -12,6 +12,7 @@ import { TextField } from "@/ui/components/field/TextField";
 import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { FormModal } from "@/ui/components/modal/FormModal";
 import { RecordPriceCheckbox } from "../shared/RecordPriceCheckbox";
+import { useNonCashAssets } from "../shared/useNonCashAssets";
 import { useAddTransaction } from "./useAddTransaction";
 
 interface AddTransactionModalProps {
@@ -37,8 +38,8 @@ export function AddTransactionModal({
     logger.info("[AddTransactionModal] mounted");
   }, []);
 
-  // CSH-018 — Cash Assets are managed via Deposit/Withdrawal flows; never selectable here.
-  const assets = useAppStore((state) => state.assets).filter((a) => a.class !== "Cash");
+  // CSH-018 / TRX-064 — Cash Assets are managed via Deposit/Withdrawal flows; the core leaves them out.
+  const assets = useNonCashAssets();
   const accounts = useAppStore((state) => state.accounts);
 
   const {

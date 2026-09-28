@@ -1,8 +1,11 @@
 import type {
   AccountError,
+  AccountJournal,
+  Asset,
   AssetError,
   BuyHoldingDTO,
   Event,
+  JournalFilter,
   SellHoldingDTO,
   Transaction,
   TransactionDraft,
@@ -50,10 +53,15 @@ export const transactionGateway = {
     return await commands.getTransactions(accountId, assetId);
   },
 
-  async getAllTransactionsForAccount(
+  async getAccountJournal(
     accountId: string,
-  ): Promise<Result<Transaction[], AccountError>> {
-    return await commands.getAllTransactionsForAccount(accountId);
+    filter: JournalFilter,
+  ): Promise<Result<AccountJournal, AccountError>> {
+    return await commands.getAccountJournal(accountId, filter);
+  },
+
+  async getNonCashAssets(): Promise<Result<Asset[], AssetError>> {
+    return await commands.getNonCashAssets();
   },
 
   async getAssetIdsForAccount(accountId: string): Promise<Result<string[], AccountError>> {
