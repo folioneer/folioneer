@@ -388,12 +388,12 @@ Remove an entry once it has been resolved.
 
 ## 2026-09-28 — TD-055 — The E2E input helper never checks that a typed value was kept
 
-- Found by: E2E flake on PR #53 (`buy_sell` TRX-010 failed once, passed on re-run; failure screenshot in the run's `e2e-failure-screenshots` artifact, run 36404088620)
+- Found by: E2E flake on PR #53 (`buy_sell` TRX-010 failed once, passed on re-run; failure screenshot in the run's `e2e-failure-screenshots` artifact, run 36404088620); again on PR #60 (`buy_sell` TRX-020, the sell dialog, run 36471606572)
 - Where: `e2e/helpers/react.ts` — `setReactInputValue`
 - Severity: 🟡
-- Observation: the Buy dialog kept the typed date and unit price but lost the quantity, so Save stayed disabled and the test timed out. The helper sets the value and dispatches `input`/`change` once, then returns without reading the field back, so a value the page dropped (the dialog still mounting, a controlled field re-synced) goes unnoticed until a later wait fails far from the cause.
+- Observation: the Buy dialog kept the typed date and unit price but lost the quantity, so Save stayed disabled and the test timed out. The helper sets the value and dispatches `input`/`change` once, then returns without reading the field back, so a value the page dropped (the dialog still mounting, a controlled field re-synced) goes unnoticed until a later wait fails far from the cause. Both times the field typed right after the date lost its value, and only since the trade forms run the draft check on every change (TRX-063): the form may drop a value set during a check's re-render, which a person typing would meet too.
 - User value: None directly — fewer red E2E runs to re-run, each worth 13–15 minutes of CI.
-- Done when: `setReactInputValue` waits until the field shows the value it set (re-dispatching once if not) and fails with the field's id when it never does; a unit check of the helper or a spec that clears a field mid-mount proves the retry.
+- Done when: the cause is found — a value the trade forms drop while a draft check answers is fixed in the form, with a test that sets a field while a check is in flight — and `setReactInputValue` waits until the field shows the value it set, failing with the field's id when it never does.
 
 ## 2026-09-28 — TD-056 — The core records a purchase or a sale of a Cash Asset
 
