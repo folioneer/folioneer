@@ -1,15 +1,56 @@
 use super::error::{
     DividendError, DividendTask, FreeSharesError, FreeSharesTask, InterestError, InterestTask,
     ManagementFeeError, ManagementFeeTask, OpenHoldingError, OpenHoldingTask, SplitError,
-    SplitTask,
+    SplitTask, TransactionDraftError, TransactionDraftTask,
 };
 use super::shared::ensure_cash_asset;
 use crate::context::account::{
-    AccountError, AccountServiceContract, ManagementFeeRemoval, Transaction,
+    Account, AccountError, AccountServiceContract, EnteredAmount, ManagementFeeRemoval,
+    Transaction, TransactionType,
 };
 use crate::context::asset::{AssetClass, AssetServiceContract};
 use crate::core::logger::BACKEND;
 use std::sync::Arc;
+
+/// Whether a transaction draft is a purchase or a sale (TRX-062).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, specta::Type)]
+pub enum DraftKind {
+    /// A purchase.
+    Purchase,
+    /// A sale of a held position.
+    Sell,
+}
+
+/// A transaction draft: a purchase or sale as the user is still entering it (TRX-062).
+/// Empty strings are fields not filled yet; amounts are in micros.
+#[derive(Debug, Clone, serde::Deserialize, specta::Type)]
+#[serde(deny_unknown_fields)]
+pub struct TransactionDraft {
+    /// Purchase or sale.
+    pub kind: DraftKind,
+    /// The account, empty until chosen.
+    pub account_id: String,
+    /// The asset, empty until chosen.
+    pub asset_id: String,
+    /// ISO date, empty until entered.
+    pub date: String,
+    /// Quantity.
+    pub quantity: i64,
+    /// What the user entered: a unit price or a typed total, with rate and fees.
+    pub entered: EnteredAmount,
+    /// The transaction being corrected, if any — a correction is not checked for
+    /// oversell here: recording it replays the ledger (SEL-030).
+    pub correcting: Option<String>,
+}
+
+/// What recording a draft would store (TRX-062): the form shows the total.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub struct TransactionDraftPreview {
+    /// Unit price in the asset's currency.
+    pub unit_price: i64,
+    /// Total in account currency.
+    pub total_amount: i64,
+}
 
 /// Single orchestrator for every operation that mutates a `Holding` through a `Transaction`:
 /// opening balance, buy, sell, correct, cancel.
@@ -33,6 +74,49 @@ impl HoldingTransactionUseCase {
             account_service,
             asset_service,
         }
+    }
+
+    /// Checks a transaction draft without writing anything (TRX-062): the first problem, or
+    /// the unit price and total recording it would store.
+    pub async fn validate_draft(
+        &self,
+        draft: TransactionDraft,
+    ) -> Result<TransactionDraftPreview, TransactionDraftError> {
+        let missing = |value: &str| value.trim().is_empty();
+        if missing(&draft.account_id) {
+            return Err(TransactionDraftTask::AccountMissing.into());
+        }
+        if missing(&draft.asset_id) {
+            return Err(TransactionDraftTask::AssetMissing.into());
+        }
+        if missing(&draft.date) {
+            return Err(TransactionDraftTask::DateMissing.into());
+        }
+        let transaction_type = match draft.kind {
+            DraftKind::Purchase => TransactionType::Purchase,
+            DraftKind::Sell => TransactionType::Sell,
+        };
+        let (unit_price, total_amount) =
+            Account::preview_trade(transaction_type, &draft.date, draft.quantity, draft.entered)?;
+        if draft.kind == DraftKind::Sell && draft.correcting.is_none() {
+            let available = self
+                .account_service
+                .get_holding_by_account_asset(&draft.account_id, &draft.asset_id)
+                .await?
+                .map(|holding| holding.quantity)
+                .unwrap_or(0);
+            if draft.quantity > available {
+                return Err(AccountError::Oversell {
+                    available,
+                    requested: draft.quantity,
+                }
+                .into());
+            }
+        }
+        Ok(TransactionDraftPreview {
+            unit_price,
+            total_amount,
+        })
     }
 
     /// Seeds a holding from a known quantity and total cost (TRX-042).
@@ -2490,5 +2574,134 @@ mod tests {
             .find(|h| h.asset_id == cash_asset.id)
             .expect("cash holding must exist");
         assert_eq!(cash.quantity, micro(550), "500 + 50 credited");
+    }
+}
+
+#[cfg(test)]
+mod draft_tests {
+    use super::*;
+    use crate::context::account::{Holding, MockAccountServiceContract};
+    use crate::context::asset::MockAssetServiceContract;
+
+    const M: i64 = 1_000_000;
+
+    fn draft(kind: DraftKind) -> TransactionDraft {
+        TransactionDraft {
+            kind,
+            account_id: "acc-1".into(),
+            asset_id: "asset-1".into(),
+            date: "2026-01-02".into(),
+            quantity: 2 * M,
+            entered: EnteredAmount::UnitPrice {
+                unit_price: 50 * M,
+                exchange_rate: M,
+                fees: 0,
+            },
+            correcting: None,
+        }
+    }
+
+    fn use_case(held: Option<i64>) -> HoldingTransactionUseCase {
+        let mut account = MockAccountServiceContract::new();
+        account
+            .expect_get_holding_by_account_asset()
+            .returning(move |account_id, asset_id| {
+                Ok(held.map(|quantity| {
+                    Holding::new(account_id.into(), asset_id.into(), quantity, M, 0, None)
+                        .expect("holding")
+                }))
+            });
+        HoldingTransactionUseCase::new(Arc::new(account), Arc::new(MockAssetServiceContract::new()))
+    }
+
+    fn code(result: Result<TransactionDraftPreview, TransactionDraftError>) -> String {
+        match result {
+            Ok(_) => "ok".into(),
+            Err(error) => serde_json::to_value(&error).expect("serialize")["code"]
+                .as_str()
+                .expect("code")
+                .to_string(),
+        }
+    }
+
+    // TRX-062 — a complete purchase previews what recording it would store.
+    #[tokio::test]
+    async fn trx_062_a_complete_purchase_previews_its_total() {
+        let preview = use_case(None)
+            .validate_draft(draft(DraftKind::Purchase))
+            .await;
+        assert_eq!(
+            preview.expect("valid"),
+            TransactionDraftPreview {
+                unit_price: 50 * M,
+                total_amount: 100 * M
+            }
+        );
+    }
+
+    // TRX-062 — fields not filled yet come first, in form order.
+    #[tokio::test]
+    async fn trx_062_fields_not_filled_are_reported_in_order() {
+        let mut d = draft(DraftKind::Purchase);
+        d.account_id = " ".into();
+        d.asset_id.clear();
+        d.date.clear();
+        assert_eq!(
+            code(use_case(None).validate_draft(d.clone()).await),
+            "AccountMissing"
+        );
+        d.account_id = "acc-1".into();
+        assert_eq!(
+            code(use_case(None).validate_draft(d.clone()).await),
+            "AssetMissing"
+        );
+        d.asset_id = "asset-1".into();
+        assert_eq!(code(use_case(None).validate_draft(d).await), "DateMissing");
+    }
+
+    // TRX-062 / SEL-022 — a sale above the quantity held is refused with both figures.
+    #[tokio::test]
+    async fn trx_062_a_sale_above_the_holding_is_an_oversell() {
+        let result = use_case(Some(M + M / 2))
+            .validate_draft(draft(DraftKind::Sell))
+            .await;
+        match result {
+            Err(TransactionDraftError::Account(AccountError::Oversell {
+                available,
+                requested,
+            })) => assert_eq!((available, requested), (M + M / 2, 2 * M)),
+            other => panic!("expected an oversell, got {other:?}"),
+        }
+        assert_eq!(
+            code(use_case(None).validate_draft(draft(DraftKind::Sell)).await),
+            "Oversell"
+        );
+        assert_eq!(
+            code(
+                use_case(Some(2 * M))
+                    .validate_draft(draft(DraftKind::Sell))
+                    .await
+            ),
+            "ok"
+        );
+    }
+
+    // TRX-062 / SEL-030 — a corrected sale is not checked for oversell here.
+    #[tokio::test]
+    async fn trx_062_a_corrected_sale_skips_the_oversell_check() {
+        let mut d = draft(DraftKind::Sell);
+        d.correcting = Some("tx-1".into());
+        assert_eq!(code(use_case(Some(0)).validate_draft(d).await), "ok");
+    }
+
+    // TRX-062 — a figure the account domain rejects comes back with the recording code.
+    #[tokio::test]
+    async fn trx_062_a_rejected_figure_keeps_the_recording_code() {
+        let mut d = draft(DraftKind::Purchase);
+        d.quantity = 0;
+        assert_eq!(
+            code(use_case(None).validate_draft(d).await),
+            "QuantityNotPositive"
+        );
     }
 }

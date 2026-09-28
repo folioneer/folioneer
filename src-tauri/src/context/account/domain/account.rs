@@ -1,7 +1,7 @@
 use super::fee_schedule::{FeeCatchUpPosition, FeeSchedule};
 use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot};
 use super::holding_note::HoldingNote;
-use super::transaction::{Transaction, TransactionType};
+use super::transaction::{EnteredAmount, Transaction, TransactionType};
 use crate::context::account::error::AccountError;
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
 use anyhow::{anyhow, Result};
@@ -1667,6 +1667,66 @@ impl Account {
             "cash_balance_as_of overflows i64: {value}"
         );
         value as i64
+    }
+
+    /// TRX-062 — the unit price and total a purchase or sale would record from what the
+    /// user entered, validated as recording it would be (TRX-020, TRX-026, TRX-060,
+    /// SEL-023, SEL-050). Returns `(unit_price, total_amount)`; nothing is written.
+    pub fn preview_trade(
+        transaction_type: TransactionType,
+        date: &str,
+        quantity: i64,
+        entered: EnteredAmount,
+    ) -> StdResult<(i64, i64), AccountError> {
+        Transaction::validate_date(date)?;
+        if quantity <= 0 {
+            return Err(AccountError::QuantityNotPositive);
+        }
+        let sell = transaction_type == TransactionType::Sell;
+        let (exchange_rate, fees) = match entered {
+            EnteredAmount::UnitPrice {
+                exchange_rate,
+                fees,
+                ..
+            }
+            | EnteredAmount::Total {
+                exchange_rate,
+                fees,
+                ..
+            } => (exchange_rate, fees),
+        };
+        if fees < 0 {
+            return Err(AccountError::FeesNegative);
+        }
+        if exchange_rate <= 0 {
+            return Err(AccountError::ExchangeRateNotPositive);
+        }
+        let (unit_price, total_amount) = match (entered, sell) {
+            (EnteredAmount::UnitPrice { unit_price, .. }, false) => (
+                unit_price,
+                Self::compute_purchase_total(quantity, unit_price, exchange_rate, fees),
+            ),
+            (EnteredAmount::UnitPrice { unit_price, .. }, true) => (
+                unit_price,
+                Self::compute_sell_total(quantity, unit_price, exchange_rate, fees),
+            ),
+            (EnteredAmount::Total { total, .. }, false) => {
+                Self::derive_purchase_from_total(total, quantity, exchange_rate, fees)?
+            }
+            (EnteredAmount::Total { total, .. }, true) => {
+                Self::derive_sell_from_total(total, quantity, exchange_rate, fees)?
+            }
+        };
+        Transaction::validate(
+            &transaction_type,
+            date,
+            quantity,
+            unit_price,
+            exchange_rate,
+            fees,
+            total_amount,
+        )?;
+        Ok((unit_price, total_amount))
     }
 
     /// Computes total_amount for a Purchase (TRX-026).
@@ -5591,5 +5651,165 @@ mod tests {
             changes_before,
             "rolled-back pending_change must not be kept"
         );
+    }
+}
+
+#[cfg(test)]
+mod preview_trade_tests {
+    use super::*;
+
+    const M: i64 = 1_000_000;
+
+    fn by_price(unit_price: i64, exchange_rate: i64, fees: i64) -> EnteredAmount {
+        EnteredAmount::UnitPrice {
+            unit_price,
+            exchange_rate,
+            fees,
+        }
+    }
+
+    fn by_total(total: i64, exchange_rate: i64, fees: i64) -> EnteredAmount {
+        EnteredAmount::Total {
+            total,
+            exchange_rate,
+            fees,
+        }
+    }
+
+    // TRX-062 / TRX-026 — a purchase by unit price: total = qty × price × rate + fees.
+    #[test]
+    fn trx_062_a_purchase_by_unit_price_previews_its_total() {
+        let preview = Account::preview_trade(
+            TransactionType::Purchase,
+            "2026-01-02",
+            2 * M,
+            by_price(50 * M, M, 3 * M),
+        );
+        assert_eq!(preview.expect("valid"), (50 * M, 103 * M));
+    }
+
+    // TRX-062 / SEL-023 — a sale by unit price: total = qty × price × rate − fees.
+    #[test]
+    fn trx_062_a_sale_by_unit_price_previews_its_net_total() {
+        let preview = Account::preview_trade(
+            TransactionType::Sell,
+            "2026-01-02",
+            2 * M,
+            by_price(50 * M, M, 3 * M),
+        );
+        assert_eq!(preview.expect("valid"), (50 * M, 97 * M));
+    }
+
+    // TRX-062 / TRX-060 — a purchase by total keeps the total and derives the unit price.
+    #[test]
+    fn trx_062_a_purchase_by_total_derives_the_unit_price() {
+        let preview = Account::preview_trade(
+            TransactionType::Purchase,
+            "2026-01-02",
+            2 * M,
+            by_total(103 * M, M, 3 * M),
+        );
+        assert_eq!(preview.expect("valid"), (50 * M, 103 * M));
+    }
+
+    // TRX-062 — the rejections recording would meet, before anything is written.
+    #[test]
+    fn trx_062_the_recording_rejections_apply_to_a_draft() {
+        let preview =
+            |kind, date, quantity, entered| Account::preview_trade(kind, date, quantity, entered);
+        assert!(matches!(
+            preview(
+                TransactionType::Purchase,
+                "2026-01-02",
+                0,
+                by_price(50 * M, M, 0)
+            ),
+            Err(AccountError::QuantityNotPositive)
+        ));
+        assert!(matches!(
+            preview(
+                TransactionType::Purchase,
+                "2026-01-02",
+                M,
+                by_price(50 * M, 0, 0)
+            ),
+            Err(AccountError::ExchangeRateNotPositive)
+        ));
+        assert!(matches!(
+            preview(
+                TransactionType::Purchase,
+                "2999-01-01",
+                M,
+                by_price(50 * M, M, 0)
+            ),
+            Err(AccountError::DateInFuture)
+        ));
+        assert!(matches!(
+            preview(
+                TransactionType::Purchase,
+                "2026-01-02",
+                M,
+                by_total(2 * M, M, 3 * M)
+            ),
+            Err(AccountError::TotalAmountBelowFees)
+        ));
+        assert!(matches!(
+            preview(TransactionType::Sell, "2026-01-02", M, by_total(0, M, 0)),
+            Err(AccountError::TotalAmountNotPositive)
+        ));
+        // A sale whose fees eat the whole proceeds, negative fees, and a typed total
+        // whose unit price cannot be stored.
+        assert!(matches!(
+            preview(TransactionType::Sell, "2026-01-02", M, by_price(M, M, M)),
+            Err(AccountError::TotalAmountNotPositive)
+        ));
+        assert!(matches!(
+            preview(
+                TransactionType::Purchase,
+                "2026-01-02",
+                M,
+                by_price(M, M, -1)
+            ),
+            Err(AccountError::FeesNegative)
+        ));
+        assert!(matches!(
+            preview(
+                TransactionType::Purchase,
+                "2026-01-02",
+                1,
+                by_total(i64::MAX, 1, 0)
+            ),
+            Err(AccountError::UnitPriceOutOfRange)
+        ));
+    }
+
+    // TRX-062 — the first problem follows one order: the date before the quantity,
+    // the quantity before the fees, the fees before the exchange rate.
+    #[test]
+    fn trx_062_the_first_problem_follows_the_listed_order() {
+        let first = |date, quantity, fees, rate| {
+            Account::preview_trade(
+                TransactionType::Purchase,
+                date,
+                quantity,
+                by_price(M, rate, fees),
+            )
+        };
+        assert!(matches!(
+            first("not a date", 0, -1, 0),
+            Err(AccountError::InvalidDate)
+        ));
+        assert!(matches!(
+            first("2026-01-02", 0, -1, 0),
+            Err(AccountError::QuantityNotPositive)
+        ));
+        assert!(matches!(
+            first("2026-01-02", M, -1, 0),
+            Err(AccountError::FeesNegative)
+        ));
+        assert!(matches!(
+            first("2026-01-02", M, 0, 0),
+            Err(AccountError::ExchangeRateNotPositive)
+        ));
     }
 }

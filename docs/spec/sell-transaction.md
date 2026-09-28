@@ -42,7 +42,7 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 
 **SEL-021 — Oversell guard (backend)**: The backend rejects the sell if the submitted `quantity` exceeds the current `Holding.quantity` for the `(account_id, asset_id)` pair at the moment of processing, returning a specific error message.
 
-**SEL-022 — Maximum quantity hint (frontend)**: The sell form displays the current `Holding.quantity` as the maximum sellable quantity. When the entered quantity exceeds this value, the form shows an inline validation error and the Save button is disabled until corrected.
+**SEL-022 — Maximum quantity hint (frontend)**: The sell form displays the current `Holding.quantity` as the maximum sellable quantity. When the draft check (TRX-062) reports the entered quantity above the holding — for a new sale, not a correction — the form shows its inline error and the Save button stays disabled until corrected (TRX-063).
 
 **SEL-023 — Sell total amount formula (backend)**: `total_amount` for a sell is computed by the backend as `floor(floor(quantity × unit_price / MICRO) × exchange_rate / MICRO) − fees`. Fees reduce the net proceeds. All values are `i64` micro-units (TRX-024); arithmetic uses `i128` intermediates to prevent overflow. `total_amount` is never received from the frontend. In total-entry mode the user-typed total is stored instead and this formula does not apply — see SEL-050.
 
@@ -145,14 +145,15 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 - Unit Price (amount field with asset currency suffix)
 - Exchange Rate (visible only if asset currency ≠ account currency, default: 1.0)
 - Fees (amount field with account currency suffix, default: 0)
-- Total Proceeds (read-only, auto-calculated from SEL-023)
+- Total Proceeds (read-only, filled by the draft check — TRX-063)
 - Note (textarea, optional)
 
 ### States
 
 - **Empty**: Fields at defaults; account and asset pre-filled.
+- **Checking**: The draft check (TRX-062) is running; Save is disabled.
 - **Loading**: Form submission in progress (spinner, fields disabled).
-- **Error**: Inline validation errors (quantity exceeds holding, invalid date, etc.) or backend rejection (oversell guard, closed position).
+- **Error**: The draft check's first problem inline (quantity above the holding, invalid date, etc.), a generic error when the check itself fails, or a rejection on save (closed position, archived asset).
 - **Success**: Modal closes; success snackbar; Account Details holdings refreshed.
 
 ### User Flow
@@ -161,6 +162,6 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 2. User clicks "Sell" on a holding row with `quantity > 0`.
 3. Sell form opens — account and asset pre-filled; maximum quantity displayed.
 4. User enters quantity, unit price, fees, and date.
-5. Total proceeds auto-calculated and shown read-only.
+5. As the fields change, the draft check runs (TRX-062): the form shows its first problem inline, or fills the read-only Total Proceeds and enables Save (TRX-063).
 6. User clicks "Save".
 7. On success: modal closes, holdings table updates, realized P&L appears in the holding row summary.

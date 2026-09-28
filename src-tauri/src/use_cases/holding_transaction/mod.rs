@@ -20,6 +20,8 @@ pub use api::*;
 pub use error::{
     DividendError, DividendTask, FreeSharesError, FreeSharesTask, InterestError, InterestTask,
     ManagementFeeError, ManagementFeeTask, OpenHoldingError, OpenHoldingTask, SplitError,
-    SplitTask,
+    SplitTask, TransactionDraftError, TransactionDraftTask,
 };
-pub use orchestrator::HoldingTransactionUseCase;
+pub use orchestrator::{
+    DraftKind, HoldingTransactionUseCase, TransactionDraft, TransactionDraftPreview,
+};

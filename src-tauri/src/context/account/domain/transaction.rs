@@ -571,7 +571,7 @@ impl Transaction {
     /// Validates business rules (TRX-020).
     /// total_amount is computed by the orchestrator (TRX-026) before this is called —
     /// no formula check here.
-    fn validate(
+    pub(super) fn validate(
         transaction_type: &TransactionType,
         date: &str,
         quantity: i64,
@@ -657,6 +657,31 @@ pub trait TransactionRepository: Send + Sync {
     async fn has_transactions_for_asset(&self, asset_id: &str) -> Result<bool>;
     /// Counts all transactions for a given account (ACC-020).
     async fn count_by_account(&self, account_id: &str) -> Result<u32>;
+}
+
+/// What the user entered for a purchase or sale (TRX-062): a unit price, or a typed
+/// total (TRX-060 / SEL-050), each with its exchange rate and fees, in micros.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, specta::Type)]
+#[serde(tag = "mode", deny_unknown_fields)]
+pub enum EnteredAmount {
+    /// A unit price in the asset's currency; the total is computed.
+    UnitPrice {
+        /// Price per unit.
+        unit_price: i64,
+        /// Asset to account currency rate.
+        exchange_rate: i64,
+        /// Fees in account currency.
+        fees: i64,
+    },
+    /// A typed total in account currency; the unit price is derived.
+    Total {
+        /// The total as typed (fees included for a purchase, net for a sale).
+        total: i64,
+        /// Asset to account currency rate.
+        exchange_rate: i64,
+        /// Fees in account currency.
+        fees: i64,
+    },
 }
 
 #[cfg(test)]

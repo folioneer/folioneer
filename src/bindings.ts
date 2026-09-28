@@ -594,6 +594,18 @@ async sellHolding(dto: SellHoldingDTO) : Promise<Result<Transaction, AccountErro
 }
 },
 /**
+ * Checks a transaction draft without writing anything (TRX-062): the unit price and total
+ * recording it would store, or the first problem as a code the form displays.
+ */
+async validateTransactionDraft(draft: TransactionDraft) : Promise<Result<TransactionDraftPreview, TransactionDraftError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("validate_transaction_draft", { draft }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Corrects an existing transaction and recalculates the affected holding
  * (TRX-031, TRX-061, SEL-051).
  */
@@ -2308,6 +2320,31 @@ export type DividendTask =
  * holdings (DIV-011).
  */
 { code: "DividendOnCashAsset" }
+/**
+ * Whether a transaction draft is a purchase or a sale (TRX-062).
+ */
+export type DraftKind = 
+/**
+ * A purchase.
+ */
+"Purchase" | 
+/**
+ * A sale of a held position.
+ */
+"Sell"
+/**
+ * What the user entered for a purchase or sale (TRX-062): a unit price, or a typed
+ * total (TRX-060 / SEL-050), each with its exchange rate and fees, in micros.
+ */
+export type EnteredAmount = 
+/**
+ * A unit price in the asset's currency; the total is computed.
+ */
+{ mode: "UnitPrice"; unit_price: number; exchange_rate: number; fees: number } | 
+/**
+ * A typed total in account currency; the unit price is derived.
+ */
+{ mode: "Total"; total: number; exchange_rate: number; fees: number }
 /**
  * All possible side-effect events that can be published across the application.
  * Each variant represents a specific business event that features may need to react to.
@@ -4064,6 +4101,83 @@ realized_pnl: number | null;
  * ISO 8601 timestamp of record creation — used for same-date tie-breaking (SEL-024).
  */
 created_at: string }
+/**
+ * A transaction draft: a purchase or sale as the user is still entering it (TRX-062).
+ * Empty strings are fields not filled yet; amounts are in micros.
+ */
+export type TransactionDraft = { 
+/**
+ * Purchase or sale.
+ */
+kind: DraftKind; 
+/**
+ * The account, empty until chosen.
+ */
+account_id: string; 
+/**
+ * The asset, empty until chosen.
+ */
+asset_id: string; 
+/**
+ * ISO date, empty until entered.
+ */
+date: string; 
+/**
+ * Quantity.
+ */
+quantity: number; 
+/**
+ * What the user entered: a unit price or a typed total, with rate and fees.
+ */
+entered: EnteredAmount; 
+/**
+ * The transaction being corrected, if any — a correction is not checked for
+ * oversell here: recording it replays the ledger (SEL-030).
+ */
+correcting: string | null }
+/**
+ * Failure surface of `validate_transaction_draft`: a field not filled yet, or the
+ * account-domain rejection recording the transaction would meet (TRX-020, TRX-060,
+ * SEL-022, SEL-050) — the same codes the recording commands return.
+ */
+export type TransactionDraftError = 
+/**
+ * Account-domain rejection (figures, oversell) or holding lookup failure.
+ */
+AccountError | 
+/**
+ * A field not filled yet.
+ */
+TransactionDraftTask
+/**
+ * What recording a draft would store (TRX-062): the form shows the total.
+ */
+export type TransactionDraftPreview = { 
+/**
+ * Unit price in the asset's currency.
+ */
+unit_price: number; 
+/**
+ * Total in account currency.
+ */
+total_amount: number }
+/**
+ * A field of a transaction draft not filled yet (TRX-062). The draft's figures are
+ * checked by the account domain, whose `AccountError` codes the composite carries.
+ */
+export type TransactionDraftTask = 
+/**
+ * No account chosen.
+ */
+{ code: "AccountMissing" } | 
+/**
+ * No asset chosen.
+ */
+{ code: "AssetMissing" } | 
+/**
+ * No date entered.
+ */
+{ code: "DateMissing" }
 /**
  * Type of financial transaction.
  */

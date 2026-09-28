@@ -147,7 +147,7 @@ core's dependency tree.
 
 **B47** — Every business decision an interface needs is a core query or command: a query
 shaped like the screen (rows grouped and ordered, final figures, flags saying what may be done),
-a draft check returning a code per field (`validate_*_draft`), and sorting or searching as query
+a draft check returning the first problem, or the figures recording would store (`validate_*_draft`), and sorting or searching as query
 parameters. The frontend side of this rule is F32; the command line and any later interface get
 the same decisions from the same place.
 

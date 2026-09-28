@@ -407,3 +407,59 @@ mod open_holding_error_wire_tests {
         assert_eq!(serde_json::to_value(&domain_level).unwrap(), expected);
     }
 }
+
+/// A field of a transaction draft not filled yet (TRX-062). The draft's figures are
+/// checked by the account domain, whose `AccountError` codes the composite carries.
+#[derive(Debug, thiserror::Error, serde::Serialize, specta::Type, Clone, PartialEq, Eq)]
+#[serde(tag = "code")]
+pub enum TransactionDraftTask {
+    /// No account chosen.
+    #[error("No account chosen")]
+    AccountMissing,
+    /// No asset chosen.
+    #[error("No asset chosen")]
+    AssetMissing,
+    /// No date entered.
+    #[error("No date entered")]
+    DateMissing,
+}
+
+/// Failure surface of `validate_transaction_draft`: a field not filled yet, or the
+/// account-domain rejection recording the transaction would meet (TRX-020, TRX-060,
+/// SEL-022, SEL-050) — the same codes the recording commands return.
+#[derive(Debug, thiserror::Error, serde::Serialize, specta::Type)]
+#[serde(untagged)]
+pub enum TransactionDraftError {
+    /// Account-domain rejection (figures, oversell) or holding lookup failure.
+    #[error(transparent)]
+    Account(#[from] AccountError),
+    /// A field not filled yet.
+    #[error(transparent)]
+    Draft(#[from] TransactionDraftTask),
+}
+
+#[cfg(test)]
+mod transaction_draft_error_wire_tests {
+    use super::*;
+
+    /// error-model.md — every `TransactionDraftError` variant serializes to a flat object
+    /// with a string `code`, and the draft's own codes differ from the account codes.
+    #[test]
+    fn each_variant_emits_a_code() {
+        let cases: Vec<TransactionDraftError> = vec![
+            TransactionDraftTask::AccountMissing.into(),
+            TransactionDraftTask::AssetMissing.into(),
+            TransactionDraftTask::DateMissing.into(),
+            AccountError::QuantityNotPositive.into(),
+            AccountError::Oversell {
+                available: 1,
+                requested: 2,
+            }
+            .into(),
+        ];
+        for err in cases {
+            let value = serde_json::to_value(&err).expect("serialize TransactionDraftError");
+            assert!(value["code"].is_string(), "no code in {value}");
+        }
+    }
+}

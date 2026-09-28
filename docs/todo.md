@@ -162,7 +162,7 @@ Target:
 
 - **Core:** the contexts, use cases and event bus build without Tauri; Tauri, the command line (#044) and any later server are adapters over one application API of commands and queries.
 - **Screen queries:** Rust returns what a screen shows — rows grouped and ordered, final figures, and flags saying what may be done (edit, sell, archive). The interface formats for the locale and lays out; it never decides.
-- **Validation:** a draft is checked by Rust (`validate_*_draft` returning a code per field); the interface shows the codes as messages and keeps no copy of a rule.
+- **Validation:** a draft is checked by Rust (`validate_*_draft` returning the first problem, or the figures recording would store); the interface shows the codes as messages and keeps no copy of a rule.
 - **Rule and guard:** a backend/frontend rule, "no business decision in `src/`", checked by `scripts/arch-check.py`; the existing sites are frozen in `arch-allowlist.json` and removed feature by feature (one `TD-NNN` each), never in one change.
 
 **User value:** None directly — the command line (#044) and any later interface get the same behaviour as the window, and a rule lives in one place instead of two.

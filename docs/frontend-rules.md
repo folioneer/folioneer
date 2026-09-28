@@ -341,7 +341,7 @@ parameter (`openModalSearch` / `patchModalSearch` in `src/lib/modalSearch.ts`) a
 **F32** — Feature code makes no business decision: it never validates a business rule, never
 groups, orders or filters by business meaning, and never derives a figure from others. The core
 does, through a query shaped like the screen (rows grouped and ordered, final figures, flags for
-what may be done) or a draft check returning a code per field; sorting and searching a table are
+what may be done) or a draft check returning the first problem and the figures it would record; sorting and searching a table are
 query parameters, the interface holding only the user's choice. A hook fetches and holds view
 state; a presenter formats. Architecture rule A12 fails on a new `validate*.ts` file or a new
 `.sort(` / `.filter(` in feature code; today's sites are frozen per file in `arch-allowlist.json`,

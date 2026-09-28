@@ -2,7 +2,9 @@
 #![allow(clippy::unreachable)]
 
 use super::error::{DividendError, OpenHoldingError};
-use super::HoldingTransactionUseCase;
+use super::{
+    HoldingTransactionUseCase, TransactionDraft, TransactionDraftError, TransactionDraftPreview,
+};
 use crate::context::account::{AccountError, ManagementFeeRemoval, Transaction};
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -479,4 +481,15 @@ pub async fn record_interest(
         dto.note,
     )
     .await
+}
+
+/// Checks a transaction draft without writing anything (TRX-062): the unit price and total
+/// recording it would store, or the first problem as a code the form displays.
+#[tauri::command]
+#[specta::specta]
+pub async fn validate_transaction_draft(
+    uc: State<'_, HoldingTransactionUseCase>,
+    draft: TransactionDraft,
+) -> Result<TransactionDraftPreview, TransactionDraftError> {
+    uc.validate_draft(draft).await
 }

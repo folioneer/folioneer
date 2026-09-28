@@ -139,6 +139,12 @@ A canonical reference to a trading venue, independent of any market-data provide
 
 A way of recording a Purchase or Sell from the all-in broker total (fees included, account currency) instead of the unit price. The typed total is stored verbatim as the transaction's `total_amount` and the unit price is derived from it (TRX-060, SEL-050).
 
+### Transaction draft
+
+> Status: confirmed
+
+A transaction as the user is still entering it — a purchase or a sale with its account, asset, date, quantity and either a unit price or a total. The application checks it before it can be recorded and shows its first problem, or the unit price and total recording would store.
+
 ## Cash Domain Concepts (introduced by CSH spec)
 
 ### Cash Asset
