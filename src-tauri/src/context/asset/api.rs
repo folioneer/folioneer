@@ -17,6 +17,14 @@ pub async fn get_assets(state: State<'_, AppState>) -> Result<Vec<Asset>, AssetE
     state.asset_service.get_all_assets().await
 }
 
+/// Fetches every asset a purchase or a sale can be recorded on: all but the Cash
+/// Assets, archived ones included (TRX-064).
+#[tauri::command]
+#[specta::specta]
+pub async fn get_non_cash_assets(state: State<'_, AppState>) -> Result<Vec<Asset>, AssetError> {
+    state.asset_service.get_non_cash_assets().await
+}
+
 /// Fetches all assets including archived ones.
 #[tauri::command]
 #[specta::specta]

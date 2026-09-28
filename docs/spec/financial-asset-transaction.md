@@ -150,6 +150,8 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-063 — Transaction forms follow the draft check (frontend)**: The purchase and sale forms, and the correction form of a purchase or a sale, send what the user entered to the draft check (TRX-062) as it changes, show its first problem inline and the unit price or total it returns, and enable saving only once the latest draft has been checked without a problem. While a check is running saving stays disabled; when the check itself fails (not a problem with the draft, an error reaching the data), the form shows a generic error and saving stays disabled. A rejection that recording still makes (TRX-062) shows as it does today, on save. The forms keep no copy of these rules (F32). The correction forms of other transaction types keep no copy either: what the user enters is checked on save, and recording's rejection is shown.
 
+**TRX-064 — Assets a purchase or a sale is recorded on (frontend + backend)**: The backend lists the assets a purchase or a sale can be recorded on: every asset but the Cash Assets (CSH-018), archived ones included — a purchase on one asks the user to confirm (TRX-029), a sale of one is rejected on save (SEL-037). This rule sets no order. The add and edit transaction forms offer these assets.
+
 ---
 
 ## Workflow

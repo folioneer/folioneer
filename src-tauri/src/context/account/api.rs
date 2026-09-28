@@ -4,7 +4,9 @@
 use super::domain::{
     Account, FeeFrequency, FeeSchedule, HoldingNote, ThresholdDirection, UpdateFrequency,
 };
-use crate::context::account::{AccountError, HoldingSnapshot, Transaction};
+use crate::context::account::{
+    AccountError, AccountJournal, HoldingSnapshot, JournalFilter, Transaction,
+};
 use crate::AppState;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -105,6 +107,21 @@ pub async fn get_holding_snapshot_as_of(
     state
         .account_service
         .holding_snapshot_as_of(&account_id, &asset_id, &date)
+        .await
+}
+
+/// The account journal of an account: its transactions in date order, each with the cash
+/// it moved and the cash balance after it, the rows `filter` keeps (TXL-060).
+#[tauri::command]
+#[specta::specta]
+pub async fn get_account_journal(
+    state: State<'_, AppState>,
+    account_id: String,
+    filter: JournalFilter,
+) -> Result<AccountJournal, AccountError> {
+    state
+        .account_service
+        .get_account_journal(&account_id, &filter)
         .await
 }
 

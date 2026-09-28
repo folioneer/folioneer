@@ -2,9 +2,9 @@
 
 ## Context
 
-The `Transaction List` feature lets a user browse, edit, and delete all transactions recorded for a specific financial asset within a specific account. It is the primary surface for reviewing the history of a position and the only place where individual transactions can be deleted.
+The `Transaction List` feature lets a user browse, edit, and delete all transactions recorded for a specific financial asset within a specific account, and — in the account journal (TXL-060/061) — every transaction of an account with its cash columns. It is the primary surface for reviewing the history of a position; the per-asset list and the account journal are where individual transactions are edited and deleted.
 
-The feature lives within the `transaction` bounded context (`features/transactions/`). It is accessed via a dedicated route (`/accounts/:accountId/transactions/:assetId`) so that `account_details` triggers navigation without importing from `transactions`. The page exposes two filter dropdowns (account + asset) so the user can switch context without leaving the view.
+The feature lives in `features/transactions/` and reads the account context. It is accessed via dedicated routes (`/accounts/:accountId/transactions/:assetId`, and `/accounts/:accountId/journal` for the account journal) so that `account_details` triggers navigation without importing from `transactions`. The page exposes two filter dropdowns (account + asset) so the user can switch context without leaving the view.
 
 > Cross-spec dependency: the entry-point inspect action on Account Details holding rows is defined in ACD-042 and references TXL-010. The `account-details.md` spec has been updated accordingly.
 
@@ -80,6 +80,12 @@ The feature lives within the `transaction` bounded context (`features/transactio
 
 **TXL-054 — Asset list fetch error state (frontend)**: If the TXL-013 backend call fails, the asset dropdown displays a generic error state and a retry action. The transaction table is not shown until the asset list is successfully loaded.
 
+### Account Journal (060–069)
+
+**TXL-060 — Account journal query (backend)**: The backend returns the account journal of an account: every transaction of the account, oldest first — by date, then in the order entered — or newest first when asked, each with the cash it took out, the cash it brought in, and the account's cash balance after it. The cash follows the cash balance rules: a deposit, a sale or a dividend brings in its total; a withdrawal or a purchase takes out its total; interest on the cash line brings in its credited quantity (INT-023); every other type — an opening balance, free shares, a management fee, a split (SPL-010), interest on another asset — moves no cash. The balance runs over every transaction of the account; a filter — one asset, one transaction type, a lowest and a highest recorded total, each optional and the bounds inclusive — only chooses which rows are returned. The recorded total is the one the transaction stores: interest, free shares, splits and management fees record none, and a lowest total above the highest keeps no row. With the rows come the assets and the transaction types the account has, in order of first appearance, and whether it has any transaction at all. An unknown account has an empty journal.
+
+**TXL-061 — Account journal display (frontend)**: The account journal page (`/accounts/:accountId/journal`), opened from the Account Details header, shows the account journal (TXL-060) for the filters the user chose, newest first by default or oldest first when the user flips the order; the filter choices are the assets and types the journal lists. While it loads it shows the loading state (TXL-050); when it fails, the error state with a retry (TXL-053). An account with no transaction shows the empty state (TXL-051); filters that keep no row show a "no transaction matches" message with a way to clear them. Each row has the edit and delete actions of TXL-030/TXL-040, and the journal refreshes after them (TXL-026). The page keeps no copy of the ordering, the filtering or the cash columns (F32).
+
 ---
 
 ## Workflow
@@ -102,13 +108,23 @@ The feature lives within the `transaction` bounded context (`features/transactio
                                    → success → refresh (TXL-042)
                                        → 0 records → navigate /accounts/:accountId (TXL-043)
                                    → failure → snackbar error (TXL-044)
+
+[User opens the journal from the Account Details header]
+  → Navigate to /accounts/:accountId/journal (TXL-061)
+          │
+          ├─ Fetch the account journal for the filters and order (TXL-060)
+          │
+          └─ [Table renders with Cash out / Cash in / Balance, newest first]
+              │
+              ├─ [Change a filter or flip the order] → fetch again (TXL-060)
+              └─ [Edit / delete a row] → as above → refresh (TXL-026)
 ```
 
 ---
 
 ## UX Draft
 
-### Entry Point
+### Per-Asset List — Entry Point
 
 - Inspect icon (e.g. magnifier) on each holding row in the Account Details view (ACD-042).
 
@@ -147,3 +163,7 @@ Actions per row: Edit icon button + Delete icon button.
 4. User can change the account or asset filter to browse other positions.
 5. User clicks Edit on a row → Edit modal opens → saves → table refreshes.
 6. User clicks Delete on a row → Confirmation dialog → confirms → row removed → table refreshes (or navigates back if last transaction).
+
+### Account Journal
+
+Reached from Account Details (`/accounts/:accountId/journal`). Filters: asset, type, lowest and highest total, and an order toggle (newest first by default). Table: the transaction columns (TXL-022) plus Cash out, Cash in and Balance; the balance is the account's cash after each row, whatever the filters (TXL-060/061).

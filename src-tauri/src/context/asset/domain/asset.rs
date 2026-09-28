@@ -245,7 +245,7 @@ impl Asset {
     }
 
     /// Returns true if this is the system Cash Asset (CSH-016 / CSH-017).
-    fn is_cash(&self) -> bool {
+    pub(crate) fn is_cash(&self) -> bool {
         self.class == AssetClass::Cash
     }
 

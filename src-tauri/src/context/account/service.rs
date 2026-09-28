@@ -1,8 +1,8 @@
 use super::domain::{
-    Account, AccountRepository, FeeCatchUpPosition, FeeCatchUpRepository, FeeSchedule,
-    FeeScheduleRepository, Holding, HoldingNote, HoldingNoteRepository, HoldingRepository,
-    HoldingSnapshot, ManagementFeeRemoval, ThresholdDirection, Transaction, TransactionRepository,
-    UpdateFrequency,
+    Account, AccountJournal, AccountRepository, FeeCatchUpPosition, FeeCatchUpRepository,
+    FeeSchedule, FeeScheduleRepository, Holding, HoldingNote, HoldingNoteRepository,
+    HoldingRepository, HoldingSnapshot, JournalFilter, ManagementFeeRemoval, ThresholdDirection,
+    Transaction, TransactionRepository, UpdateFrequency,
 };
 use super::error::AccountError;
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
@@ -371,6 +371,17 @@ impl AccountService {
                 tracing::error!(target: BACKEND, account_id = %account_id, err = ?e, "get_all_transactions_for_account: repository failure");
                 AccountError::DatabaseError
             })
+    }
+
+    /// TXL-060 — the account journal of an account: its transactions in date order with
+    /// their cash columns, the rows the filter keeps. An unknown account has an empty one.
+    pub async fn get_account_journal(
+        &self,
+        account_id: &str,
+        filter: &JournalFilter,
+    ) -> StdResult<AccountJournal, AccountError> {
+        let transactions = self.get_all_transactions_for_account(account_id).await?;
+        Ok(AccountJournal::from_transactions(transactions, filter))
     }
 
     /// Returns distinct asset IDs that have transactions for the given account (TXL-013).

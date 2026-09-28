@@ -57,6 +57,16 @@ impl AssetService {
         })
     }
 
+    /// TRX-064 — every asset a purchase or a sale can be recorded on: all but the Cash
+    /// Assets, archived ones included (TRX-029 confirms those).
+    pub async fn get_non_cash_assets(&self) -> StdResult<Vec<Asset>, AssetError> {
+        let assets = self.get_all_assets_with_archived().await?;
+        Ok(assets
+            .into_iter()
+            .filter(|asset| !asset.is_cash())
+            .collect())
+    }
+
     /// Retrieves all assets including archived ones.
     pub async fn get_all_assets_with_archived(&self) -> StdResult<Vec<Asset>, AssetError> {
         self.asset_repo
@@ -1069,6 +1079,35 @@ mod tests {
             exchange: None,
             interest_bearing: false,
         }
+    }
+
+    // TRX-064 — a purchase or a sale can be recorded on every asset but a Cash Asset,
+    // archived ones included.
+    #[tokio::test]
+    async fn trx_064_non_cash_assets_leave_out_cash_only() {
+        let mut ar = MockAssetRepository::new();
+        ar.expect_get_all_including_archived().returning(|| {
+            Ok(vec![
+                make_asset("aapl", false),
+                make_cash_asset("system-cash-usd"),
+                make_asset("old", true),
+            ])
+        });
+        let svc = make_svc(
+            ar,
+            MockAssetCategoryRepository::new(),
+            MockAssetPriceRepository::new(),
+        );
+
+        let ids: Vec<String> = svc
+            .get_non_cash_assets()
+            .await
+            .expect("assets")
+            .into_iter()
+            .map(|asset| asset.id)
+            .collect();
+
+        assert_eq!(ids, vec!["aapl", "old"]);
     }
 
     // R1 — empty name is rejected

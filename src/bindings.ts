@@ -31,6 +31,18 @@ async getAssetsWithArchived() : Promise<Result<Asset[], AssetError>> {
 }
 },
 /**
+ * Fetches every asset a purchase or a sale can be recorded on: all but the Cash
+ * Assets, archived ones included (TRX-064).
+ */
+async getNonCashAssets() : Promise<Result<Asset[], AssetError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_non_cash_assets") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Adds a new asset.
  */
 async addAsset(dto: CreateAssetDTO) : Promise<Result<Asset, AssetError>> {
@@ -261,6 +273,18 @@ async getTransactions(accountId: string, assetId: string) : Promise<Result<Trans
 async getAllTransactionsForAccount(accountId: string) : Promise<Result<Transaction[], AccountError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_all_transactions_for_account", { accountId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The account journal of an account: its transactions in date order, each with the cash
+ * it moved and the cash balance after it, the rows `filter` keeps (TXL-060).
+ */
+async getAccountJournal(accountId: string, filter: JournalFilter) : Promise<Result<AccountJournal, AccountError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_account_journal", { accountId, filter }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1319,6 +1343,27 @@ export type AccountError =
  * translation site. FE shows the i18n key `error.DatabaseError`.
  */
 { code: "DatabaseError" }
+/**
+ * The account journal of one account, filtered (TXL-060).
+ */
+export type AccountJournal = { 
+/**
+ * The rows the filter keeps, oldest first — by date, then in the order entered — or
+ * newest first when the filter asks.
+ */
+rows: JournalRow[]; 
+/**
+ * The assets the account has transactions for, in order of first appearance.
+ */
+asset_ids: string[]; 
+/**
+ * The transaction types the account has, in order of first appearance.
+ */
+transaction_types: TransactionType[]; 
+/**
+ * The account has at least one transaction, whatever the filter.
+ */
+has_transactions: boolean }
 /**
  * Top-level response for `get_account_performance` — recomputed on read
  * (ADR-013). Also returned by `get_global_performance`, whose cross-account
@@ -2994,6 +3039,53 @@ export type InterestTask =
  * The non-cash asset is not currently held (quantity = 0 or no holding) (INT-011).
  */
 { code: "AssetNotHeld" }
+/**
+ * Which rows of the account journal are listed, and in which order (TXL-060). A field
+ * left empty keeps every row; the amount bounds are inclusive and compare the recorded
+ * total, so a lowest total above the highest keeps no row.
+ */
+export type JournalFilter = { 
+/**
+ * Only the transactions of this asset.
+ */
+asset_id: string | null; 
+/**
+ * Only the transactions of this type.
+ */
+transaction_type: TransactionType | null; 
+/**
+ * Only the transactions whose total is at least this (micro-units).
+ */
+amount_min: number | null; 
+/**
+ * Only the transactions whose total is at most this (micro-units).
+ */
+amount_max: number | null; 
+/**
+ * Newest first instead of oldest first.
+ */
+newest_first: boolean }
+/**
+ * One transaction of the account journal with its cash columns.
+ */
+export type JournalRow = { 
+/**
+ * The transaction.
+ */
+transaction: Transaction; 
+/**
+ * Cash it took out (micro-units), or none.
+ */
+cash_out: number | null; 
+/**
+ * Cash it brought in (micro-units), or none.
+ */
+cash_in: number | null; 
+/**
+ * The account's cash balance after it, over every transaction of the account
+ * whatever the filter (micro-units).
+ */
+cash_balance: number }
 /**
  * Explicit lookup path selector passed by the frontend (WEB-014).
  * 

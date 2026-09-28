@@ -2,7 +2,7 @@
 ///
 /// Covers: delete, get_all, get_by_id, get_holdings_for_account,
 /// get_holding_by_account_asset, get_transaction_by_id, get_transactions,
-/// get_asset_ids_for_account, get_deletion_summary.
+/// get_asset_ids_for_account, get_account_journal, get_deletion_summary.
 ///
 /// Uses real SQLite repos against an in-memory DB (B27).
 mod common;
@@ -10,8 +10,8 @@ mod common;
 use common::micro;
 use folioneer_lib::context::account::AccountService;
 use folioneer_lib::context::account::{
-    AccountError, SqliteAccountRepository, SqliteHoldingRepository, SqliteTransactionRepository,
-    UpdateFrequency,
+    AccountError, JournalFilter, SqliteAccountRepository, SqliteHoldingRepository,
+    SqliteTransactionRepository, TransactionType, UpdateFrequency,
 };
 use sqlx::sqlite::SqlitePoolOptions;
 
@@ -686,4 +686,70 @@ async fn correct_transaction_rejects_moving_sell_before_buy_end_to_end() {
         persisted.date, "2024-07-01",
         "rejected correction must leave the sell's date unchanged"
     );
+}
+
+/// TXL-060 — the account journal reads the account's stored transactions: the seed deposit
+/// and a purchase, the purchase taking its total out of the running cash balance, and the
+/// filter keeping only the purchase. An unknown account has an empty journal.
+#[tokio::test]
+async fn txl_060_account_journal_reads_the_stored_transactions() {
+    let pool = make_pool().await;
+    let svc = make_service(&pool).await;
+    let asset_id = seed_asset(&pool).await;
+    let account = svc
+        .create(
+            "Journal".to_string(),
+            String::new(),
+            "EUR".to_string(),
+            UpdateFrequency::ManualMonth,
+            false,
+        )
+        .await
+        .unwrap();
+    seed_cash_for_account(&pool, &svc, &account.id, "EUR").await;
+    svc.buy_holding(
+        &account.id,
+        asset_id.clone(),
+        "2020-03-01".to_string(),
+        micro(2),
+        micro(100),
+        micro(1),
+        0,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    let journal = svc
+        .get_account_journal(&account.id, &JournalFilter::default())
+        .await
+        .unwrap();
+    assert_eq!(journal.rows.len(), 2);
+    let purchase = &journal.rows[1];
+    assert_eq!(
+        purchase.transaction.transaction_type,
+        TransactionType::Purchase
+    );
+    assert_eq!(purchase.cash_out, Some(micro(200)));
+    assert_eq!(purchase.cash_balance, 1_000_000_000_000 - micro(200));
+
+    let only_purchases = svc
+        .get_account_journal(
+            &account.id,
+            &JournalFilter {
+                transaction_type: Some(TransactionType::Purchase),
+                ..JournalFilter::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(only_purchases.rows.len(), 1);
+    assert_eq!(only_purchases.asset_ids.len(), 2);
+
+    let unknown = svc
+        .get_account_journal("no-such-account", &JournalFilter::default())
+        .await
+        .unwrap();
+    assert!(!unknown.has_transactions);
 }

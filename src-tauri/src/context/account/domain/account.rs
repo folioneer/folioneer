@@ -1,6 +1,7 @@
 use super::fee_schedule::{FeeCatchUpPosition, FeeSchedule};
 use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot};
 use super::holding_note::HoldingNote;
+use super::journal::CashEffect;
 use super::transaction::{EnteredAmount, Transaction, TransactionType};
 use crate::context::account::error::AccountError;
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
@@ -1628,10 +1629,35 @@ impl Account {
         }
     }
 
-    /// Cash balance as of `as_of_date` (inclusive), reconstructed from the cash-
-    /// affecting transactions: Deposit / Sell / Dividend credit, Withdrawal /
-    /// Purchase debit. ISO `YYYY-MM-DD` dates compare lexicographically, so a
-    /// string cut-off matches the chronological one. Clamped at 0. A read-only
+    /// The cash a transaction moves on the account's cash line: Deposit / Sell / Dividend
+    /// bring in their total, Withdrawal / Purchase take out theirs, interest on the cash
+    /// line brings in its quantity (INT-023); every other type moves no cash (SPL-010).
+    pub(crate) fn cash_effect(transaction: &Transaction) -> CashEffect {
+        match transaction.transaction_type {
+            TransactionType::Deposit | TransactionType::Sell | TransactionType::Dividend => {
+                CashEffect::In(transaction.total_amount)
+            }
+            TransactionType::Withdrawal | TransactionType::Purchase => {
+                CashEffect::Out(transaction.total_amount)
+            }
+            // INT-023 — interest on the cash line credits the balance by `quantity`;
+            // interest on a non-cash asset never touches cash.
+            TransactionType::Interest
+                if crate::core::cash::is_cash_asset(&transaction.asset_id) =>
+            {
+                CashEffect::In(transaction.quantity)
+            }
+            TransactionType::Interest
+            | TransactionType::OpeningBalance
+            | TransactionType::FreeShares
+            | TransactionType::ManagementFee
+            | TransactionType::Split => CashEffect::None,
+        }
+    }
+
+    /// Cash balance as of `as_of_date` (inclusive), reconstructed from the cash effect of
+    /// each transaction (`cash_effect`). ISO `YYYY-MM-DD` dates compare lexicographically,
+    /// so a string cut-off matches the chronological one. Clamped at 0. A read-only
     /// valuation over already-validated history, mirroring the placement of
     /// `reconstruct_holding_as_of`.
     pub(crate) fn cash_balance_as_of(transactions: &[Transaction], as_of_date: &str) -> i64 {
@@ -1640,26 +1666,7 @@ impl Account {
             if transaction.date.as_str() > as_of_date {
                 continue;
             }
-            match transaction.transaction_type {
-                TransactionType::Deposit | TransactionType::Sell | TransactionType::Dividend => {
-                    balance += transaction.total_amount as i128;
-                }
-                TransactionType::Withdrawal | TransactionType::Purchase => {
-                    balance -= transaction.total_amount as i128;
-                }
-                // INT-023 — interest on the cash line credits the balance by `quantity`;
-                // interest on a non-cash asset never touches cash.
-                TransactionType::Interest => {
-                    if crate::core::cash::is_cash_asset(&transaction.asset_id) {
-                        balance += transaction.quantity as i128;
-                    }
-                }
-                // A split has no cash leg (SPL-010).
-                TransactionType::OpeningBalance
-                | TransactionType::FreeShares
-                | TransactionType::ManagementFee
-                | TransactionType::Split => {}
-            }
+            balance += Self::cash_effect(transaction).signed() as i128;
         }
         let value = balance.max(0);
         debug_assert!(

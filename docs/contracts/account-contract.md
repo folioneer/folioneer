@@ -52,7 +52,7 @@
 
 ### Holdings & Transactions
 
-> Read paths (`get_asset_ids_for_account`, `get_transactions`) and mutation paths (`buy_holding`,
+> Read paths (`get_asset_ids_for_account`, `get_transactions`, `get_account_journal`) and mutation paths (`buy_holding`,
 > `sell_holding`, `correct_transaction`, `cancel_transaction`, `open_holding`) live behind a
 > single FE-visible surface. Mutation commands coordinate across the account and asset BCs
 > (cash-asset seeding, archived-asset guards, etc.). `validate_transaction_draft` checks a
@@ -62,6 +62,7 @@
 | ---------------------------- | ---------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `get_asset_ids_for_account`  | `account_id: String`                                 | `Vec<String>`             | `DatabaseError` (TXL-054) — returns empty list for unknown or empty account, never NotFound (TXL-013)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `get_transactions`           | `account_id: String, asset_id: String`               | `Vec<Transaction>`        | `DatabaseError` (TXL-020)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `get_account_journal`        | `account_id: String, filter: JournalFilter`          | `AccountJournal`          | `DatabaseError` (TXL-060) — an unknown account has an empty journal, never `AccountNotFound`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `get_holding_snapshot_as_of` | `account_id: String, asset_id: String, date: String` | `HoldingSnapshot`         | `InvalidDate` (TDI-012), `DatabaseError` — unknown account/asset yields an empty snapshot `{ quantity: 0, average_price: 0 }`, never NotFound (TDI-010)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `buy_holding`                | `BuyHoldingDTO`                                      | `Transaction`             | `AccountNotFound { account_id }` (TRX-020), `InvalidDate` (TRX-020), `DateInFuture` (TRX-020), `DateTooOld` (TRX-020), `QuantityNotPositive` (TRX-020), `UnitPriceNegative` (TRX-020), `ExchangeRateNotPositive` (TRX-020), `FeesNegative` (TRX-020), `TotalAmountNotPositive` (TRX-020), `InsufficientCash { current_balance_micros, currency }` (CSH-041), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                      |
 | `sell_holding`               | `SellHoldingDTO`                                     | `Transaction`             | `AccountNotFound { account_id }` (TRX-020), `InvalidDate` (TRX-020), `DateInFuture` (TRX-020), `DateTooOld` (TRX-020), `QuantityNotPositive` (TRX-020), `UnitPriceNegative` (TRX-020), `ExchangeRateNotPositive` (TRX-020), `FeesNegative` (SEL-020), `TotalAmountNotPositive` (TRX-020), `ClosedPosition` (SEL-012), `Oversell { available, requested }` (SEL-021), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                              |
@@ -509,6 +510,24 @@ enum TransactionDraftTask { AccountMissing, AssetMissing, DateMissing }  // serd
 // TransactionDraftError = AccountError | TransactionDraftTask  (untagged; each variant carries its own "code")
 ```
 
+```rust
+// Account journal (TXL-060)
+struct JournalFilter {                      // deny_unknown_fields; every field optional
+    asset_id: Option<String>,
+    transaction_type: Option<TransactionType>,
+    amount_min: Option<i64>,                // inclusive, compares total_amount
+    amount_max: Option<i64>,                // inclusive
+    newest_first: bool,                     // oldest first when false
+}
+struct JournalRow { transaction: Transaction, cash_out: Option<i64>, cash_in: Option<i64>, cash_balance: i64 }
+struct AccountJournal {
+    rows: Vec<JournalRow>,                  // oldest first (date, then order entered), or newest first
+    asset_ids: Vec<String>,                 // first appearance, whole account
+    transaction_types: Vec<TransactionType>, // first appearance, whole account
+    has_transactions: bool,                 // whatever the filter
+}
+```
+
 ---
 
 ## Events
@@ -556,3 +575,4 @@ enum TransactionDraftTask { AccountMissing, AssetMissing, DateMissing }  // serd
 - 2026-07-04 — Added by `interest-credit` spec: `record_interest` (+ `RecordInterestDTO`, `InterestError`); `TransactionType::Interest` variant + its zero-cost `Transaction` packing (INT-024); the Cash Asset as a valid target (INT-023); `AccountError::InterestAmountInvalid`; INT-040/041 cross-refs — edit/delete reuse `correct_transaction`/`cancel_transaction`. Same session: `add_account`/`update_account` DTOs gain `management_fees_enabled` (FEE-075) and `get_account_details` gains `HoldingDetail.market_value` + `fee_rate_percent_micros` and `AccountDetailsResponse.total_net_cash_input` (ACD-052/053, FEE-074).
 - 2026-07-05 — Input-column refresh: `get_account_details` gains `as_of_date: Option<String>` (as-of read-only view) and `get_account_performance` gains `asset_id: Option<String>` (position-scoped series, PRF-080) — both shipped earlier, now reflected in the tables above. No new command.
 - 2026-09-14 — Amended by `account` spec (ACC-027/028): `get_account_summaries` returns `AccountSummaries` — the rows plus a `PortfolioTotal` in the reference currency, flagged incomplete when an account with no usable rate held a non-zero figure; the accounts list re-fetches on `CurrencyRateUpdated` and `CurrencyPairUpdated` (ACC-033). No new command or error.
+- 2026-09-28 — TXL-060: `get_account_journal(account_id, JournalFilter) -> AccountJournal` — the account's transactions oldest first with `cash_out` / `cash_in` / `cash_balance` from the cash balance rules (interest on the cash line included, INT-023); the filter picks rows (and `newest_first` their order), the balance runs over all.

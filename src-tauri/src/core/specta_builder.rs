@@ -108,6 +108,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             // ----- asset BC -----
             asset::get_assets,
             asset::get_assets_with_archived,
+            asset::get_non_cash_assets,
             asset::add_asset,
             asset::update_asset,
             asset::unarchive_asset,
@@ -130,6 +131,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             account::get_asset_ids_for_account,
             account::get_transactions,
             account::get_all_transactions_for_account,
+            account::get_account_journal,
             account::get_holding_snapshot_as_of,
             account::create_fee_schedule,
             account::update_fee_schedule,

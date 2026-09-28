@@ -39,6 +39,14 @@ date, quantity, price, fees, and exchange rate. Owned directly by `Account` alon
 
 > Status: confirmed
 
+### Account journal
+
+Every transaction of an account in date order — same-day ones in the order they were
+entered — each with the cash it took out or brought in and the account's cash balance
+after it.
+
+> Status: confirmed
+
 ### Stock Split
 
 A corporate action that rescales a held position without changing its value: the share
