@@ -211,4 +211,24 @@ describe("useCurrencyRatesView", () => {
     expect(result.current.isLoading).toBe(false);
     expect(result.current.pairs).toEqual([PAIR]);
   });
+
+  // F29 — switching pairs quickly never shows the pair left behind.
+  it("drops an earlier pair's rates that arrive last (F29)", async () => {
+    const newer = { ...RATE, from_currency: "GBP" };
+    let answerFirst: (value: unknown) => void = () => {};
+    vi.mocked(gateway.getCurrencyRates)
+      .mockImplementationOnce(() => new Promise((resolve) => (answerFirst = resolve)) as never)
+      .mockResolvedValueOnce({ status: "ok", data: [newer] });
+    const { result } = renderHook(() => useCurrencyRatesView());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => result.current.selectPair("USD", "EUR"));
+    act(() => result.current.selectPair("GBP", "EUR"));
+    await waitFor(() => expect(result.current.rates).toEqual([newer]));
+    await act(async () => {
+      answerFirst({ status: "ok", data: [RATE] });
+    });
+
+    expect(result.current.rates).toEqual([newer]);
+  });
 });

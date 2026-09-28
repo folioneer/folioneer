@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AssetPrice } from "@/bindings";
 import { logger } from "@/lib/logger";
 import type { I18nMessage } from "@/ui/format/i18n";
@@ -31,9 +31,14 @@ export function usePriceHistory({ assetId }: UsePriceHistoryProps): UsePriceHist
   const [deleteError, setDeleteError] = useState<I18nMessage | null>(null);
   const [deletingDate, setDeletingDate] = useState<string | null>(null);
 
+  // F29 — only the answer to the latest request is shown; an earlier one arriving late is dropped.
+  const latestRequest = useRef(0);
+
   const loadPrices = useCallback(async () => {
+    const request = ++latestRequest.current;
     try {
       const result = await accountDetailsGateway.getAssetPrices(assetId);
+      if (request !== latestRequest.current) return;
       if (result.status === "ok") {
         setPrices(result.data);
         setFetchError(null);
@@ -42,10 +47,11 @@ export function usePriceHistory({ assetId }: UsePriceHistoryProps): UsePriceHist
         setFetchError(assetPriceMutationErrorToI18n(result.error));
       }
     } catch (err) {
+      if (request !== latestRequest.current) return;
       logger.error("[usePriceHistory] getAssetPrices threw", err);
       setFetchError(UNKNOWN_ERROR);
     } finally {
-      setIsLoading(false);
+      if (request === latestRequest.current) setIsLoading(false);
     }
   }, [assetId]);
 

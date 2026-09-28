@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CurrencyPairSummary, CurrencyRate } from "@/bindings";
 import { logger } from "@/lib/logger";
 import type { I18nMessage } from "@/ui/format/i18n";
@@ -55,9 +55,14 @@ export function useCurrencyRatesView(): UseCurrencyRatesViewResult {
     setIsLoading(false);
   }, []);
 
+  // F29 — only the answer to the latest request is shown; an earlier one arriving late is dropped.
+  const latestRatesRequest = useRef(0);
+
   const fetchRates = useCallback(async (fromCurrency: string, toCurrency: string) => {
+    const request = ++latestRatesRequest.current;
     setRatesError(null);
     const result = await getCurrencyRates(fromCurrency, toCurrency);
+    if (request !== latestRatesRequest.current) return;
     if (result.status === "ok") {
       setRates(result.data);
     } else {

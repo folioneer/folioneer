@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AccountDetailsResponse, HoldingDetail } from "@/bindings";
 import { accountMutationErrorToI18n } from "@/features/accounts/shared/presenter";
 import { logger } from "@/lib/logger";
@@ -41,10 +41,15 @@ export function useAccountDetails(accountId: string, asOfDate = ""): UseAccountD
   // ACD-051 — asset class is read from the loaded asset catalog to group holdings.
   const assets = useCachedAssets();
 
+  // F29 — only the answer to the latest request is shown; an earlier one arriving late is dropped.
+  const latestRequest = useRef(0);
+
   const fetchDetails = useCallback(async () => {
+    const request = ++latestRequest.current;
     setError(null);
     try {
       const result = await accountDetailsGateway.getAccountDetails(accountId, asOfDate || null);
+      if (request !== latestRequest.current) return;
       if (result.status === "ok") {
         setData(result.data);
       } else {
@@ -52,10 +57,11 @@ export function useAccountDetails(accountId: string, asOfDate = ""): UseAccountD
         setError(accountMutationErrorToI18n(result.error));
       }
     } catch (err) {
+      if (request !== latestRequest.current) return;
       logger.error("[useAccountDetails] fetch threw", { error: err });
       setError(UNKNOWN_ERROR);
     } finally {
-      setIsLoading(false);
+      if (request === latestRequest.current) setIsLoading(false);
     }
   }, [accountId, asOfDate]);
 

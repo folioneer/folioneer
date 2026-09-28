@@ -562,4 +562,28 @@ describe("useAccountDetails — holdings display grouping (ACD-051)", () => {
 
     expect(result.current.isLoading).toBe(true);
   });
+
+  // F29 — switching accounts quickly never shows the one left behind: an answer for the
+  // earlier account arriving last is dropped, and the loading state waits for the latest.
+  it("drops an earlier account's answer that arrives last (F29)", async () => {
+    let answerFirst: (value: unknown) => void = () => {};
+    mockGetAccountDetails
+      .mockImplementationOnce(() => new Promise((resolve) => (answerFirst = resolve)))
+      .mockResolvedValueOnce({ status: "ok", data: makeResponse() });
+    const { result, rerender } = renderHook(({ id }) => useAccountDetails(id), {
+      initialProps: { id: "account-1" },
+    });
+
+    rerender({ id: "account-2" });
+    await act(async () => {});
+    await act(async () => {
+      answerFirst({
+        status: "ok",
+        data: makeResponse({ closed_holdings: [makeClosedHolding()] }),
+      });
+    });
+
+    expect(result.current.closedHoldings).toHaveLength(0);
+    expect(result.current.isLoading).toBe(false);
+  });
 });

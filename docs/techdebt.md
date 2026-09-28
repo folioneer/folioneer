@@ -305,15 +305,6 @@ Remove an entry once it has been resolved.
 - User value: Screen-reader and keyboard users meet a real link or button to open each row; the E2E suite clicks that control directly.
 - Done when: each clickable row holds one link or button (with an `id` and an accessible name) that opens it, the row stays clickable for the mouse, and no E2E spec clicks `td:first-child`.
 
-## 2026-09-27 — TD-042 — A quick change of key can show the previous key's data as loaded
-
-- Found by: reviewer-frontend (the F29 change to the view hooks)
-- Where: `src/features/account_details/account_details_view/useAccountDetails.ts`, `account_details/price_history/usePriceHistory.ts`, `accounts/useAccountSummaries.ts`, `transactions/account_journal/useAccountJournal.ts`, and `fetchRates` in `currency/currency_rates_view/useCurrencyRatesView.ts`
-- Severity: 🔵
-- Observation: These hooks have no request-sequence guard, unlike the two performance hooks. When the key changes twice quickly (another account, another asset), an earlier fetch that answers last overwrites the newer data, and its `finally` clears the loading flag while the current fetch is still pending — the previous key's rows show as loaded for a moment. Predates F29; the change only moved where the flag is raised.
-- User value: Switching accounts or assets quickly never shows the one left behind.
-- Done when: each listed hook drops a response that a newer fetch has superseded, as the performance hooks do, with a test per hook.
-
 ## 2026-09-27 — TD-043 — The reviewer agents run without a turn cap and load the whole CLAUDE.md
 
 - Found by: the main agent, comparing the agent files with the Claude Code sub-agent documentation

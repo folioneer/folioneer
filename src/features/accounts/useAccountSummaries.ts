@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AccountSummary, PortfolioTotal } from "@/bindings";
 import { logger } from "@/lib/logger";
 import { useAppStore } from "@/lib/store";
@@ -27,10 +27,15 @@ export function useAccountSummaries(): UseAccountSummariesResult {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<I18nMessage | null>(null);
 
+  // F29 — only the answer to the latest request is shown; an earlier one arriving late is dropped.
+  const latestRequest = useRef(0);
+
   const fetchSummaries = useCallback(async () => {
+    const request = ++latestRequest.current;
     setError(null);
     try {
       const result = await accountGateway.getAccountSummaries();
+      if (request !== latestRequest.current) return;
       if (result.status === "ok") {
         setSummaries(result.data.summaries);
         setPortfolioTotal(result.data.total);
@@ -39,10 +44,11 @@ export function useAccountSummaries(): UseAccountSummariesResult {
         setError(accountMutationErrorToI18n(result.error));
       }
     } catch (err) {
+      if (request !== latestRequest.current) return;
       logger.error("[useAccountSummaries] fetch threw", { error: err });
       setError(UNKNOWN_ERROR);
     } finally {
-      setIsLoading(false);
+      if (request === latestRequest.current) setIsLoading(false);
     }
   }, []);
 

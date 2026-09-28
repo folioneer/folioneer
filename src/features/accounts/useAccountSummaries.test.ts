@@ -313,4 +313,28 @@ describe("useAccountSummaries — bulk-fetch coalescing (MKT-181)", () => {
 
     expect(result.current.isLoading).toBe(true);
   });
+
+  // F29 — when two loads overlap, the earlier one answering last never replaces the newer.
+  it("drops an earlier load that answers last (F29)", async () => {
+    let refetch: (type: string) => void = () => {};
+    mockSubscribeToEvents.mockImplementation((cb: (type: string) => void) => {
+      refetch = cb;
+      return Promise.resolve(() => {});
+    });
+    let answerFirst: (value: unknown) => void = () => {};
+    const newer = [makeSummary({ id: "acc-new", name: "Newer" })];
+    mockGetAccountSummaries
+      .mockImplementationOnce(() => new Promise((resolve) => (answerFirst = resolve)))
+      .mockResolvedValueOnce({ status: "ok", data: { summaries: newer, total: null } });
+    const { result } = renderHook(() => useAccountSummaries());
+
+    await act(async () => {
+      refetch("AccountUpdated");
+    });
+    await act(async () => {
+      answerFirst({ status: "ok", data: { summaries: [makeSummary()], total: null } });
+    });
+
+    expect(result.current.summaries.map((summary) => summary.id)).toEqual(["acc-new"]);
+  });
 });

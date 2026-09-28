@@ -221,4 +221,24 @@ describe("usePriceHistory", () => {
 
     expect(result.current.isLoading).toBe(true);
   });
+
+  // F29 — switching assets quickly never shows the one left behind.
+  it("drops an earlier asset's prices that arrive last (F29)", async () => {
+    let answerFirst: (value: unknown) => void = () => {};
+    mockGetAssetPrices
+      .mockImplementationOnce(() => new Promise((resolve) => (answerFirst = resolve)))
+      .mockResolvedValueOnce({ status: "ok", data: [makePrice({ asset_id: "asset-2" })] });
+    const { result, rerender } = renderHook(({ assetId }) => usePriceHistory({ assetId }), {
+      initialProps: { assetId: "asset-1" },
+    });
+
+    rerender({ assetId: "asset-2" });
+    await act(async () => {});
+    await act(async () => {
+      answerFirst({ status: "ok", data: [makePrice({ asset_id: "asset-1" })] });
+    });
+
+    expect(result.current.prices.map((price) => price.asset_id)).toEqual(["asset-2"]);
+    expect(result.current.isLoading).toBe(false);
+  });
 });
