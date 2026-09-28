@@ -771,6 +771,8 @@ fn applied_write_error(context: &'static str, e: anyhow::Error) -> AssetError {
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait AssetServiceContract: Send + Sync {
+    /// Every asset a purchase or a sale can be recorded on: all but the Cash Assets (TRX-064).
+    async fn get_non_cash_assets(&self) -> StdResult<Vec<Asset>, AssetError>;
     /// Retrieves a single asset by ID.
     async fn get_asset_by_id(&self, asset_id: &str) -> StdResult<Option<Asset>, AssetError>;
     /// Idempotently seeds the system Cash Asset for `currency` (CSH-010, CSH-011, CSH-017).
@@ -799,6 +801,10 @@ pub trait AssetServiceContract: Send + Sync {
 
 #[async_trait]
 impl AssetServiceContract for AssetService {
+    async fn get_non_cash_assets(&self) -> StdResult<Vec<Asset>, AssetError> {
+        AssetService::get_non_cash_assets(self).await
+    }
+
     async fn get_asset_by_id(&self, asset_id: &str) -> StdResult<Option<Asset>, AssetError> {
         AssetService::get_asset_by_id(self, asset_id).await
     }

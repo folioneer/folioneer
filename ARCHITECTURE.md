@@ -27,9 +27,10 @@ shared/              gold shared code: domain/record_change.rs (change-log vocab
                      infrastructure/ (app_directories, change_recorder, container, e2e_run, http, scheduler/)
 lib.rs               the crate root: modules, the headless entry, tracing — the application core
 app.rs               the Tauri shell (feature `app`, B46): wires services, use cases and dispatchers
+command_line/        the command line (CLI): an interface beside the shell, calling the same use cases without a window
                      into the window
 extensions.rs        the one file a build differs by: external data sources and update channel (ADR-020)
-main.rs              entry point; `--scheduled-fetch` runs the daily download without a window
+main.rs              entry point; `--scheduled-fetch` runs the daily download, `holding …` a command (CLI), both without a window
 ```
 
 `sync/` owns device identity, the encrypted shared folder and the conflict-resolution engine (`domain/resolution.rs`, ADR-019); `use_cases/portfolio_sync/` applies resolved changes through the other contexts' services.
@@ -46,7 +47,7 @@ lib/                 cross-feature plumbing (legacy bucket; new code goes to inf
 i18n/                react-i18next config and locales (fr default, en fallback)
 ```
 
-Data flow: component → hook → gateway → Tauri command (`api.rs`) → use case or service → repository → SQLite. Every write publishes an event (`core/event_bus/event.rs`); the store listener in `src/lib/store.ts` re-fetches the affected slice.
+Data flow: component → hook → gateway → Tauri command (`api.rs`) → use case or service → repository → SQLite. Every write from the window publishes an event (`core/event_bus/event.rs`) — the headless starts (scheduled download, command line) publish none; the store listener in `src/lib/store.ts` re-fetches the affected slice.
 
 ## Elsewhere
 

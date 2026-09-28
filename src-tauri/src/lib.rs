@@ -21,6 +21,8 @@ use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 /// The Tauri shell: window, commands, updater (feature `app`).
 #[cfg(feature = "app")]
 mod app;
+/// The command line: an interface beside the window, calling the same use cases (CLI).
+mod command_line;
 /// DDD Bounded Contexts
 pub mod context;
 /// Shared core utilities
@@ -59,6 +61,33 @@ pub fn run_scheduled_fetch_headless() -> i32 {
     }))
 }
 
+/// Headless entry for the command line (CLI spec, #044): reads the arguments after the
+/// program name, runs the command without a window, prints its result and returns the exit
+/// code (CLI-022). Its log lines go to the log file only, never to the terminal.
+pub fn run_command_line(args: &[String]) -> i32 {
+    // Logging is best-effort and never printed: the terminal shows only the command's result.
+    if let Some(log_dir) = shared::infrastructure::app_directories::resolve_log_dir() {
+        let _ = fs::create_dir_all(&log_dir)
+            .map_err(anyhow::Error::from)
+            .and_then(|()| initialize_tracing_to(&log_dir, false));
+    }
+    execute_command_line(args)
+}
+
+/// Runs a command on a runtime of its own, prints its result and returns its exit code.
+fn execute_command_line(args: &[String]) -> i32 {
+    exit_code_on_new_runtime(async {
+        let printed = command_line::headless::run(args).await;
+        if let Some(text) = &printed.stdout {
+            println!("{text}");
+        }
+        if let Some(text) = &printed.stderr {
+            eprintln!("{text}");
+        }
+        printed.exit_code
+    })
+}
+
 /// Runs a headless entry to completion on a runtime of its own and returns its exit
 /// code; 1 when no runtime can be started.
 fn exit_code_on_new_runtime(entry: impl std::future::Future<Output = i32>) -> i32 {
@@ -73,6 +102,11 @@ fn exit_code_on_new_runtime(entry: impl std::future::Future<Output = i32>) -> i3
 
 /// Initialize tracing with dual output: append to `app.log` and write to stderr.
 pub(crate) fn initialize_tracing(log_dir: &std::path::Path) -> anyhow::Result<()> {
+    initialize_tracing_to(log_dir, true)
+}
+
+/// Initialize tracing: append to `app.log`, and to stderr when `echo_to_stderr`.
+fn initialize_tracing_to(log_dir: &std::path::Path, echo_to_stderr: bool) -> anyhow::Result<()> {
     let log_file = log_dir.join("app.log");
 
     let file = fs::OpenOptions::new()
@@ -83,7 +117,7 @@ pub(crate) fn initialize_tracing(log_dir: &std::path::Path) -> anyhow::Result<()
 
     tracing_subscriber::registry()
         .with(fmt::layer().with_ansi(false).with_writer(file))
-        .with(fmt::layer().with_writer(std::io::stderr))
+        .with(echo_to_stderr.then(|| fmt::layer().with_writer(std::io::stderr)))
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
         .try_init()
         .with_context(|| "Failed to install the tracing subscriber")?;
@@ -99,6 +133,18 @@ mod tests {
     // The core sets up its own logging (#047): the log file is created in the given folder,
     // and a folder that does not exist is an error, not a panic.
     // The headless entry returns the exit code its run produces (#047, SPF-020).
+    // CLI-022 — the command-line entry returns the exit code of what it ran.
+    #[test]
+    fn the_command_line_entry_returns_the_exit_code() {
+        let args = |line: &str| {
+            line.split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(execute_command_line(&args("holding --help")), 0);
+        assert_eq!(execute_command_line(&args("holding move")), 2);
+    }
+
     #[test]
     fn a_headless_run_returns_its_exit_code() {
         assert_eq!(exit_code_on_new_runtime(async { 0 }), 0);

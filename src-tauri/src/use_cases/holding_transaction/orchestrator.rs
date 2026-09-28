@@ -1,14 +1,14 @@
 use super::error::{
     DividendError, DividendTask, FreeSharesError, FreeSharesTask, InterestError, InterestTask,
-    ManagementFeeError, ManagementFeeTask, OpenHoldingError, OpenHoldingTask, SplitError,
-    SplitTask, TransactionDraftError, TransactionDraftTask,
+    ManagementFeeError, ManagementFeeTask, NameLookupError, OpenHoldingError, OpenHoldingTask,
+    SplitError, SplitTask, TransactionDraftError, TransactionDraftTask,
 };
 use super::shared::ensure_cash_asset;
 use crate::context::account::{
     Account, AccountError, AccountServiceContract, EnteredAmount, ManagementFeeRemoval,
     Transaction, TransactionType,
 };
-use crate::context::asset::{AssetClass, AssetServiceContract};
+use crate::context::asset::{Asset, AssetClass, AssetServiceContract};
 use crate::core::logger::BACKEND;
 use std::sync::Arc;
 
@@ -50,6 +50,62 @@ pub struct TransactionDraftPreview {
     pub unit_price: i64,
     /// Total in account currency.
     pub total_amount: i64,
+}
+
+/// The account and asset a user named by what they typed (CLI-011).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NamedTarget {
+    /// The account's id.
+    pub account_id: String,
+    /// The account's name as stored.
+    pub account_name: String,
+    /// The account's currency.
+    pub currency: String,
+    /// The asset's id.
+    pub asset_id: String,
+    /// The asset's reference.
+    pub asset_reference: String,
+}
+
+/// Case ignored for every letter, not only ASCII ("épargne" finds "Épargne").
+fn same_words(stored: &str, typed: &str) -> bool {
+    stored.to_lowercase() == typed.to_lowercase()
+}
+
+/// CLI-011 — the one account with this name.
+fn match_account<'a>(accounts: &'a [Account], typed: &str) -> Result<&'a Account, NameLookupError> {
+    let mut matches = accounts
+        .iter()
+        .filter(|account| same_words(&account.name, typed));
+    let account = matches
+        .next()
+        .ok_or_else(|| NameLookupError::AccountNotFound {
+            typed: typed.to_string(),
+        })?;
+    if matches.next().is_some() {
+        return Err(NameLookupError::AccountAmbiguous {
+            typed: typed.to_string(),
+        });
+    }
+    Ok(account)
+}
+
+/// CLI-011 — the one asset with this name or reference, among assets that are not cash.
+fn match_asset<'a>(assets: &'a [Asset], typed: &str) -> Result<&'a Asset, NameLookupError> {
+    let mut matches = assets.iter().filter(|asset| {
+        !asset.is_cash() && (same_words(&asset.name, typed) || same_words(&asset.reference, typed))
+    });
+    let asset = matches
+        .next()
+        .ok_or_else(|| NameLookupError::AssetNotFound {
+            typed: typed.to_string(),
+        })?;
+    if matches.next().is_some() {
+        return Err(NameLookupError::AssetAmbiguous {
+            typed: typed.to_string(),
+        });
+    }
+    Ok(asset)
 }
 
 /// Single orchestrator for every operation that mutates a `Holding` through a `Transaction`:
@@ -116,6 +172,37 @@ impl HoldingTransactionUseCase {
         Ok(TransactionDraftPreview {
             unit_price,
             total_amount,
+        })
+    }
+
+    /// CLI-011 — the one account with this name and the one asset with this name or
+    /// reference, case ignored for every letter; a Cash Asset is never matched (CSH-018,
+    /// TRX-064). Nothing is written.
+    pub async fn find_by_name(
+        &self,
+        account: &str,
+        asset: &str,
+    ) -> Result<NamedTarget, NameLookupError> {
+        let accounts = self.account_service.get_all().await.map_err(|error| {
+            tracing::error!(target: BACKEND, err = ?error, "find_by_name: account lookup failed");
+            NameLookupError::DatabaseError
+        })?;
+        let assets = self
+            .asset_service
+            .get_non_cash_assets()
+            .await
+            .map_err(|error| {
+                tracing::error!(target: BACKEND, err = ?error, "find_by_name: asset lookup failed");
+                NameLookupError::DatabaseError
+            })?;
+        let account = match_account(&accounts, account)?;
+        let asset = match_asset(&assets, asset)?;
+        Ok(NamedTarget {
+            account_id: account.id.clone(),
+            account_name: account.name.clone(),
+            currency: account.currency.clone(),
+            asset_id: asset.id.clone(),
+            asset_reference: asset.reference.clone(),
         })
     }
 
@@ -2702,6 +2789,51 @@ mod draft_tests {
         assert_eq!(
             code(use_case(None).validate_draft(d).await),
             "QuantityNotPositive"
+        );
+    }
+}
+
+#[cfg(test)]
+mod name_lookup_tests {
+    use super::*;
+    use crate::context::account::UpdateFrequency;
+
+    fn account(id: &str, name: &str) -> Account {
+        Account::restore(
+            id.to_string(),
+            name.to_string(),
+            String::new(),
+            "EUR".to_string(),
+            UpdateFrequency::ManualMonth,
+            false,
+        )
+    }
+
+    // CLI-011 — accounts match by name, case ignored for every letter; two accounts sharing a
+    // name after a merge are ambiguous rather than a silent pick.
+    #[test]
+    fn cli_011_accounts_match_by_name_and_refuse_a_shared_one() {
+        let accounts = vec![
+            account("a1", "Épargne"),
+            account("a2", "PEA"),
+            account("a3", "PEA"),
+        ];
+
+        assert_eq!(
+            match_account(&accounts, "épargne").map(|found| found.id.as_str()),
+            Ok("a1")
+        );
+        assert_eq!(
+            match_account(&accounts, "pea").map(|found| found.id.clone()),
+            Err(NameLookupError::AccountAmbiguous {
+                typed: "pea".to_string()
+            })
+        );
+        assert_eq!(
+            match_account(&accounts, "CTO").map(|found| found.id.clone()),
+            Err(NameLookupError::AccountNotFound {
+                typed: "CTO".to_string()
+            })
         );
     }
 }

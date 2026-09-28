@@ -18,6 +18,7 @@ use crate::context::currency::{
     CurrencyService, RateHistoryProvider, RateProvider, SqliteCurrencyPairRepository,
     SqliteCurrencyRateRepository,
 };
+use crate::context::sync::SqliteChangeRecorder;
 use crate::core::SideEffectEventBus;
 use crate::shared::infrastructure::change_recorder::ChangeRecorder;
 
@@ -119,6 +120,14 @@ impl AppContainer {
             asset_service: Arc::new(asset_service),
             currency_service: Arc::new(currency_service),
         }
+    }
+
+    /// The services of a headless entry that writes (CLI-031): no event bus, no currency
+    /// provider, every write recorded for multi-device sync (SYN-020).
+    pub fn for_headless_writes(pool: Pool<Sqlite>) -> Self {
+        let change_recorder: Arc<dyn ChangeRecorder> =
+            Arc::new(SqliteChangeRecorder::new(pool.clone()));
+        Self::build(pool, None, None, None, change_recorder)
     }
 }
 

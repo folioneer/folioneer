@@ -38,6 +38,39 @@ pub enum DividendError {
     UseCase(#[from] DividendTask),
 }
 
+/// Why an account or an asset named by what a user typed was not found (CLI-011).
+#[derive(Debug, thiserror::Error, serde::Serialize, Clone, PartialEq, Eq)]
+#[serde(tag = "code")]
+pub enum NameLookupError {
+    /// No account has this name.
+    #[error("no account named {typed}")]
+    AccountNotFound {
+        /// What the user typed.
+        typed: String,
+    },
+    /// More than one account has this name (possible after a merge, CFR-035).
+    #[error("more than one account named {typed}")]
+    AccountAmbiguous {
+        /// What the user typed.
+        typed: String,
+    },
+    /// No asset but a Cash Asset has this name or reference.
+    #[error("no asset matches {typed}")]
+    AssetNotFound {
+        /// What the user typed.
+        typed: String,
+    },
+    /// More than one asset has this name or reference.
+    #[error("more than one asset matches {typed}")]
+    AssetAmbiguous {
+        /// What the user typed.
+        typed: String,
+    },
+    /// The accounts or assets could not be read.
+    #[error("database error")]
+    DatabaseError,
+}
+
 #[cfg(test)]
 mod dividend_error_wire_tests {
     use super::*;

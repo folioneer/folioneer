@@ -13,3 +13,5 @@ pub mod e2e_run;
 pub mod http;
 /// Daily fetch scheduler abstraction + platform adapters (SPF-012, SPF-017).
 pub mod scheduler;
+/// The lock the application window holds on its data folder while it runs (CLI-030).
+pub mod window_lock;

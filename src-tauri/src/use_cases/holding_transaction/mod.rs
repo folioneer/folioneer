@@ -19,9 +19,9 @@ mod shared;
 pub use api::*;
 pub use error::{
     DividendError, DividendTask, FreeSharesError, FreeSharesTask, InterestError, InterestTask,
-    ManagementFeeError, ManagementFeeTask, OpenHoldingError, OpenHoldingTask, SplitError,
-    SplitTask, TransactionDraftError, TransactionDraftTask,
+    ManagementFeeError, ManagementFeeTask, NameLookupError, OpenHoldingError, OpenHoldingTask,
+    SplitError, SplitTask, TransactionDraftError, TransactionDraftTask,
 };
 pub use orchestrator::{
-    DraftKind, HoldingTransactionUseCase, TransactionDraft, TransactionDraftPreview,
+    DraftKind, HoldingTransactionUseCase, NamedTarget, TransactionDraft, TransactionDraftPreview,
 };

@@ -162,7 +162,7 @@ On Windows the release program is built without a console (`windows_subsystem = 
 
 **User value:** Record a holding, a buy or a sell from a terminal or a script, without opening the application.
 **Done when:** On Linux and Windows (PowerShell), without a window: a command adds an opening balance of an existing asset to an existing account, and commands record a buy and a sell, each validated by the same Rust rules as the window; each prints minimal English text by default and JSON with `--json`, and exits with a code a script can test (0 done, non-zero refused, with the reason); a writing command refuses while the application window is open; the Windows program's output reaches PowerShell and its exit code is returned; the full path to call it from PowerShell is documented, and calling it from WSL is documented if it works.
-**Design:** none
+**Design:** validated (chat, 2026-09-28) — `folioneer holding open|buy|sell` with `--account <name>`, `--asset <name or reference>`, `--quantity`, `--total-cost` (open), `--price` or `--total` (buy/sell), optional `--fees` (0), `--rate` (1), `--date` (today), `--note`, `--json`. Text: `Recorded: …` / `Refused: …`, naming only what was typed — never listing existing accounts or assets (owner). Exit codes: 0 recorded, 1 refused (a rule, not found, ambiguous, window open), 2 wrong usage. JSON: `{"status":"recorded","transaction":…}` / `{"status":"refused","code":…,"message":…}`; codes `AccountNotFound`, `AssetNotFound`, `AssetAmbiguous`, plus the recording codes. The window holds a lock file while open; a command finding it held refuses. Windows: a small console program `folioneer-cli.exe` installed beside the main one. Security: a command runs as the user with the application's own access — no network, no listener, no new privilege; reviewer-security reviews each pull request.
 **Open questions:**
 
 - [x] Which commands come first? — Owner, 2026-09-27: adding an existing asset to an existing account (an opening balance, not a buy or a sell); then a buy or a sell of an existing asset in an existing account.
@@ -185,6 +185,7 @@ Security, following the rule that tools never become an attack surface: local st
 - [ ] Writes through MCP at all, or read-only for good? (Recommended: writes allowed, each one confirmed by the agent client's own tool-approval prompt.)
 - [ ] Which clients to prove it with? (Recommended: Claude Code first; Claude Desktop documented.)
 - [ ] One program with an MCP flag, or a separate small executable? (Recommended: the same program, `--mcp`, like `--scheduled-fetch` — one install, one data folder.)
+- [ ] What may an agent reach through MCP, and how is a write it was not asked for prevented? (Raised by the owner, 2026-09-28: security to be thought through. #044's command line reaches no further than the application; an MCP server lets another program drive the core.)
 
 ## #039 — (service) — A hosted price feed the application can subscribe to (deferred)
 

@@ -16,6 +16,7 @@ use crate::core::{create_specta_builder, Database, SideEffectEventBus, BACKEND};
 use crate::shared::infrastructure::change_recorder::ChangeRecorder;
 use crate::shared::infrastructure::container::AppContainer;
 use crate::shared::infrastructure::scheduler::platform_scheduler;
+use crate::shared::infrastructure::window_lock::WindowLock;
 use crate::use_cases::account_creation::AccountCreationUseCase;
 use crate::use_cases::account_deletion::AccountDeletionUseCase;
 use crate::use_cases::account_details::AccountDetailsUseCase;
@@ -95,6 +96,36 @@ pub fn run() {
             crate::initialize_tracing(&dirs.log_dir)?;
             tracing::info!(target: BACKEND, "Initializing application backend");
             tracing::trace!(target: BACKEND, data_dir = ?dirs.local_data_dir, log_dir = ?dirs.log_dir, "Application directories");
+
+            // CLI-030 — the window owns the portfolio while it runs: a command-line write
+            // finding the lock held refuses. Held until the process ends.
+            match WindowLock::acquire(&dirs.local_data_dir) {
+                Ok(Some(lock)) => {
+                    app_handle.manage(HeldWindowLock(lock));
+                }
+                Ok(None) => {
+                    // A command writing right now holds it for a moment: take it once free.
+                    let data_dir = dirs.local_data_dir.clone();
+                    let handle = app_handle.clone();
+                    std::thread::spawn(move || loop {
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                        match WindowLock::acquire(&data_dir) {
+                            Ok(Some(lock)) => {
+                                handle.manage(HeldWindowLock(lock));
+                                break;
+                            }
+                            Ok(None) => continue,
+                            Err(error) => {
+                                tracing::warn!(target: BACKEND, err = %error, "window lock unavailable");
+                                break;
+                            }
+                        }
+                    });
+                }
+                Err(error) => {
+                    tracing::warn!(target: BACKEND, err = %error, "window lock unavailable");
+                }
+            }
 
             // Manage update state before DB init so it is available even on migration failure (R10, R18)
             app_handle.manage(Arc::new(UpdateState::new()) as ManagedUpdateState);
@@ -443,6 +474,10 @@ struct AppDirectories {
     /// Path to the app-scoped log directory (log file location).
     log_dir: PathBuf,
 }
+
+/// The data folder lock this window holds for as long as it runs (CLI-030).
+// Held only for its release when the window's process ends; never read.
+struct HeldWindowLock(#[allow(dead_code)] WindowLock);
 
 fn create_app_dirs(app: &tauri::AppHandle) -> anyhow::Result<AppDirectories> {
     use shared::infrastructure::{app_directories, e2e_run};

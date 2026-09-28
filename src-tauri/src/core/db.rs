@@ -17,6 +17,11 @@ pub struct Database {
 }
 
 impl Database {
+    /// Whether a portfolio has been created in `app_data_dir` (CLI-032).
+    pub fn exists_in(app_data_dir: &std::path::Path) -> bool {
+        app_data_dir.join(DATABASE_FILENAME).is_file()
+    }
+
     /// Initializes the database at the specified path and runs pending migrations.
     pub async fn new(app_data_dir: PathBuf) -> anyhow::Result<Self> {
         let is_db_reset = reset_requested(

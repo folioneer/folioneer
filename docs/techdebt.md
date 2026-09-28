@@ -412,3 +412,12 @@ Remove an entry once it has been resolved.
 - Observation: the Buy dialog kept the typed date and unit price but lost the quantity, so Save stayed disabled and the test timed out. The helper sets the value and dispatches `input`/`change` once, then returns without reading the field back, so a value the page dropped (the dialog still mounting, a controlled field re-synced) goes unnoticed until a later wait fails far from the cause.
 - User value: None directly — fewer red E2E runs to re-run, each worth 13–15 minutes of CI.
 - Done when: `setReactInputValue` waits until the field shows the value it set (re-dispatching once if not) and fails with the field's id when it never does; a unit check of the helper or a spec that clears a field mid-mount proves the retry.
+
+## 2026-09-28 — TD-056 — The core records a purchase or a sale of a Cash Asset
+
+- Found by: spec-reviewer on #044 (the command line's first draft could buy `EUR`)
+- Where: `use_cases/holding_transaction/orchestrator.rs` — `buy_holding`, `sell_holding`
+- Severity: 🟡
+- Observation: only the interface keeps Cash Assets out of a purchase or a sale (CSH-018, TRX-064); the core records one if asked. The command line excludes them in its lookup (CLI-011), so no path reaches it today, but the core owes the decision (B47).
+- User value: None directly — a later interface (#051) cannot record a purchase of cash by mistake.
+- Done when: `buy_holding` and `sell_holding` reject a Cash Asset with a typed error, tested in Rust, and the command line's own exclusion can rely on it.
