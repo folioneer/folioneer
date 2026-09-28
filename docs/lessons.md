@@ -154,3 +154,13 @@ Append-only; supersede in place if the underlying ecosystem changes.
 **Root cause** — Vitest treats a function returned by `beforeEach` as a cleanup to run after the test. `beforeEach(() => mock.mockReset())` returns the mock itself, so the mock is called once more after the test; a mock set to reject then throws an unhandled rejection.
 
 **Mitigation** — Give `beforeEach` a block body (`() => { mock.mockReset(); }`) whenever the call returns anything.
+
+## L-019 — In WebKitGTK, React does not always take a synthetic input event
+
+**First observed**: 2026-09-28 (TD-055, `buy_sell` TRX-010 and TRX-020 in CI)
+
+**Symptom** — An E2E test types a quantity with the native-setter helper, the field is empty a moment later, and Save never enables; the same test passes on a re-run.
+
+**Root cause** — The helper sets the DOM value and dispatches `input` / `change`; when React does not take that event, the form never receives the value, and the next re-render — here a draft-check answer — writes the field's own empty value back. The form itself keeps every value it receives: 800 runs of the real dialog in a real browser, with late answers and a throttled CPU, lost none, and a component test types while checks are in flight. What remains is the WebKitGTK driver, which already fails React's `onChange` with plain `setValue()`.
+
+**Mitigation** — An E2E input helper reads the field back after the page settles and types again when the value did not hold, logging the field, whether it is still in the page and what has focus. A `[setReactInputValue]` line in the E2E log is the event to look at; one that holds after the retry confirms the harness, one that keeps failing is a form bug.
