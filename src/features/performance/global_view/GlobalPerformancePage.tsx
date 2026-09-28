@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
 import { Button } from "@/ui/components/button/Button";
 import { AccountPerformanceTable } from "../account_view/AccountPerformanceTable";
+import { LifetimeUnavailableNote } from "../shared/LifetimeUnavailableNote";
 import { AccountValueChart } from "../value_chart/AccountValueChart";
 import { useGlobalPerformance } from "./useGlobalPerformance";
 
@@ -232,6 +233,8 @@ export function GlobalPerformancePage() {
 
               {/* Portfolio value over time — fed by the same active-view series as the table. */}
               <AccountValueChart points={view.chartPoints} idPrefix="global-performance" />
+
+              <LifetimeUnavailableNote note={view.lifetimeNote} idPrefix="global-performance" />
 
               <AccountPerformanceTable
                 rows={view.rows}

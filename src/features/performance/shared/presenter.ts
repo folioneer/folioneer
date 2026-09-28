@@ -1,11 +1,13 @@
 import type {
   AccountDetailsResponse,
   AccountError,
+  LifetimeUnavailable,
   PerformanceMetric,
   PerformancePeriod,
 } from "@/bindings";
 import { isCashAsset } from "@/lib/cashAsset";
 import { microToFormatted } from "@/lib/microUnits";
+import { formatIsoDateNumeric } from "@/ui/format/date";
 import type { I18nMessage } from "@/ui/format/i18n";
 
 const DASH = "—";
@@ -131,6 +133,8 @@ export interface MetricCellViewModel {
   gainFormatted: string;
   pctFormatted: string;
   colorClass: string;
+  /** PRF-088 — the percentage is absent because the Dietz denominator is not positive. */
+  pctSuppressed: boolean;
 }
 
 function toMetricCell(metric: PerformanceMetric | null): MetricCellViewModel {
@@ -138,7 +142,34 @@ function toMetricCell(metric: PerformanceMetric | null): MetricCellViewModel {
     gainFormatted: formatMetricGain(metric),
     pctFormatted: formatMetricPct(metric),
     colorClass: gainColorClass(metric),
+    pctSuppressed: metric !== null && metric.pct === null,
   };
+}
+
+/**
+ * PRF-088 — the note explaining why the lifetime metrics are absent (PRF-087): the
+ * zero-cost opening balance to correct, named by asset (and account, in the global view),
+ * or the absence of invested capital. `null` when nothing is suppressed.
+ */
+export function presentLifetimeUnavailable(
+  cause: LifetimeUnavailable | null,
+  names: { asset: (assetId: string) => string; account: ((accountId: string) => string) | null },
+  locale: string,
+): I18nMessage | null {
+  if (cause === null) return null;
+  if (cause.reason === "NoInvestedCapital") {
+    return { key: "account_performance.lifetime_unavailable_no_invested_capital" };
+  }
+  const vars = {
+    asset: names.asset(cause.asset_id),
+    date: formatIsoDateNumeric(cause.date, locale),
+  };
+  return names.account === null
+    ? { key: "account_performance.lifetime_unavailable_zero_cost", vars }
+    : {
+        key: "account_performance.lifetime_unavailable_zero_cost_in_account",
+        vars: { ...vars, account: names.account(cause.account_id) },
+      };
 }
 
 export interface PeriodRowViewModel {

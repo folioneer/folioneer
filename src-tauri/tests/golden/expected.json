@@ -260,6 +260,7 @@
   "global_performance": {
     "account_name": "",
     "currency": "EUR",
+    "lifetime_unavailable": null,
     "month_view_available": false,
     "monthly": [],
     "yearly": [
@@ -311,6 +312,7 @@
   "performance_growth_usd": {
     "account_name": "Growth USD",
     "currency": "USD",
+    "lifetime_unavailable": null,
     "month_view_available": false,
     "monthly": [],
     "yearly": [
@@ -362,6 +364,7 @@
   "performance_main_eur": {
     "account_name": "Main EUR",
     "currency": "EUR",
+    "lifetime_unavailable": null,
     "month_view_available": true,
     "monthly": [
       {

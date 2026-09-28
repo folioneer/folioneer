@@ -150,6 +150,10 @@ The performance read optionally narrows to one asset's position within the accou
 
 **PRF-086 — Opening-balance windowed neutrality (backend)**: An `OpeningBalance` transfers an existing position into the account; the gains it accrued before entering belong to no tracked period. **Windowed** metrics and the period bridge therefore value its flow at the position's market value as of the entry date (carry-forward price PRF-022, FX rate FXR-042), falling back to the typed cost when no usable price or rate exists as of that date — the entry period is then pnl-neutral and performance counts from entry onward. **Lifetime** metrics (since-inception PRF-035, the per-line since-start return) keep the typed cost, so the pre-account gain stays in lifetime performance. Consequence, by design: the sum of period pnls does not reconcile with the since-inception gain when they differ — the difference is exactly the pre-account gain of transferred positions, attributable to no tracked period. Do not "fix" the reconciliation.
 
+**PRF-087 — Why the lifetime metrics are absent (backend)**: When a row's since-inception percentage is absent because the lifetime Simple Dietz denominator is not positive (PRF-032, PRF-035), the response names a cause. An opening balance in scope recorded with a total cost of 0 takes precedence: the earliest one is named — its account, asset and date — since it brings a position with no net invested amount, whether or not it alone made the denominator non-positive. Without one, the cause is that the net invested amount, weighted by time over the account's life, is not positive. When every since-inception percentage is present, no cause is reported.
+
+**PRF-088 — The absence explained on screen (frontend)**: A since-inception percentage absent for that reason, and the annualized yield of its row, show "—" with an info mark instead of a bare "—"; a persistent note above the table names the cause from PRF-087 — the asset (and, in the global view, the account) and the date of the opening balance to correct, telling the user to enter its value on that date — or the absence of net invested capital. The note follows the response, whatever rows the current view shows, and stays while the cause does; it is not a transient message.
+
 ---
 
 ## Workflow
@@ -200,7 +204,7 @@ A full-page table at `/accounts/:id/performance`.
 - **Loading**: table skeleton (PRF-050).
 - **Empty**: "No performance data yet" + Add Transaction affordance (PRF-051).
 - **Error**: generic message + Retry (PRF-052).
-- **Absent metric**: "—" in the affected gain/% cell (PRF-042, PRF-036).
+- **Absent metric**: "—" in the affected gain/% cell (PRF-042, PRF-036); a lifetime percentage absent for a non-positive denominator shows "—" with an info mark, under a persistent note naming the cause (PRF-088).
 
 ### User Flow
 

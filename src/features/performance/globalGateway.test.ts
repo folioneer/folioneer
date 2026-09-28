@@ -37,6 +37,7 @@ const makeResponse = (
   account_name: "",
   currency: "EUR",
   month_view_available: true,
+  lifetime_unavailable: null,
   yearly: [makeYearRow()],
   monthly: [],
   ...overrides,

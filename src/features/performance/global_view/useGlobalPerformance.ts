@@ -18,6 +18,7 @@ import {
   type PeriodRowViewModel,
   presentAccountPerformanceError,
   presentAssetScopeOptions,
+  presentLifetimeUnavailable,
   presentPeriodRow,
   presentValueChartSeries,
   resolveViewMode,
@@ -44,6 +45,8 @@ interface UseGlobalPerformanceResult {
   setSelectedYear: (year: number) => void;
   /** Rows for the active view: yearly rows in year view, the selected year's months in month view. */
   rows: PeriodRowViewModel[];
+  /** PRF-088 — why the lifetime metrics are absent, or null when they are all present. */
+  lifetimeNote: I18nMessage | null;
   /** Value-over-time series for the line chart, chronological (oldest→newest). */
   chartPoints: ValueChartPoint[];
   /** Reporting currency of the response — EUR for cross-account scopes (GPF-011). */
@@ -73,7 +76,7 @@ export function useGlobalPerformance(): UseGlobalPerformanceResult {
   const [scope, setScope] = useState<PerformanceScope>({ accountId: null, assetId: null });
   const [holdingOptions, setHoldingOptions] = useState<AssetScopeOption[]>([]);
   const showSnackbar = useSnackbar();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // Monotonic request token: only the latest fetchPerformance invocation may
   // commit its response, so an older in-flight read never clobbers a newer one.
   const requestSeqRef = useRef(0);
@@ -219,6 +222,21 @@ export function useGlobalPerformance(): UseGlobalPerformanceResult {
     [activePeriods],
   );
 
+  // PRF-088 — why the lifetime metrics are absent, naming the account as well.
+  const lifetimeNote = useMemo(
+    () =>
+      presentLifetimeUnavailable(
+        data?.lifetime_unavailable ?? null,
+        {
+          asset: (assetId) => catalogAssets.find((asset) => asset.id === assetId)?.name ?? assetId,
+          account: (accountId) =>
+            accounts.find((account) => account.id === accountId)?.name ?? accountId,
+        },
+        i18n.language,
+      ),
+    [data, catalogAssets, accounts, i18n.language],
+  );
+
   const accountOptions = useMemo(() => presentAccountScopeOptions(accounts), [accounts]);
 
   const assetOptions = useMemo(
@@ -258,6 +276,7 @@ export function useGlobalPerformance(): UseGlobalPerformanceResult {
     selectedYear,
     setSelectedYear,
     rows,
+    lifetimeNote,
     chartPoints,
     currency: data?.currency ?? null,
     accountOptions,

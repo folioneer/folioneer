@@ -81,6 +81,7 @@ const makeResponse = (
   account_name: "My Portfolio",
   currency: "EUR",
   month_view_available: true,
+  lifetime_unavailable: null,
   yearly: [makeYearRow()],
   monthly: [makeMonthRow(5), makeMonthRow(4), makeMonthRow(3), makeMonthRow(2), makeMonthRow(1)],
   ...overrides,
@@ -411,6 +412,7 @@ describe("AccountPerformancePage", () => {
       status: "ok",
       data: makeResponse({
         month_view_available: false,
+        lifetime_unavailable: null,
         monthly: [],
         yearly: [makeYearRow({ year: 2025 }), makeYearRow({ year: 2024 })],
       }),
@@ -432,6 +434,7 @@ describe("AccountPerformancePage", () => {
       status: "ok",
       data: makeResponse({
         month_view_available: false,
+        lifetime_unavailable: null,
         monthly: [],
         yearly: [makeYearRow({ year: 2025 })],
       }),

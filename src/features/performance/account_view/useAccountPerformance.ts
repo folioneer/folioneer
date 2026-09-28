@@ -13,6 +13,7 @@ import {
   type PeriodRowViewModel,
   presentAccountPerformanceError,
   presentAssetScopeOptions,
+  presentLifetimeUnavailable,
   presentPeriodRow,
   presentValueChartSeries,
   resolveViewMode,
@@ -34,6 +35,8 @@ interface UseAccountPerformanceResult {
   setSelectedYear: (year: number) => void;
   /** Rows for the active view: yearly rows in year view, the selected year's months in month view. */
   rows: PeriodRowViewModel[];
+  /** PRF-088 — why the lifetime metrics are absent, or null when they are all present. */
+  lifetimeNote: I18nMessage | null;
   /** Account-value-over-time series for the line chart, chronological (oldest→newest). */
   chartPoints: ValueChartPoint[];
   /** Active non-cash holdings selectable as an asset scope (PRF-080, PRF-082). */
@@ -60,7 +63,7 @@ export function useAccountPerformance(accountId: string): UseAccountPerformanceR
   const [assetScope, setAssetScope] = useState<AssetScope>({ accountId, assetId: null });
   const [assetOptions, setAssetOptions] = useState<AssetScopeOption[]>([]);
   const showSnackbar = useSnackbar();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // Monotonic request token: only the latest fetchPerformance invocation may
   // commit its response, so an older in-flight read never clobbers a newer one.
   const requestSeqRef = useRef(0);
@@ -212,6 +215,21 @@ export function useAccountPerformance(accountId: string): UseAccountPerformanceR
     [activePeriods],
   );
 
+  // PRF-088 — why the lifetime metrics are absent, named in the user's words.
+  const catalogAssets = useAppStore((state) => state.assets);
+  const lifetimeNote = useMemo(
+    () =>
+      presentLifetimeUnavailable(
+        data?.lifetime_unavailable ?? null,
+        {
+          asset: (assetId) => catalogAssets.find((asset) => asset.id === assetId)?.name ?? assetId,
+          account: null,
+        },
+        i18n.language,
+      ),
+    [data, catalogAssets, i18n.language],
+  );
+
   const selectedAssetName = useMemo(() => {
     if (selectedAssetId === null) return null;
     return assetOptions.find((option) => option.assetId === selectedAssetId)?.assetName ?? null;
@@ -235,6 +253,7 @@ export function useAccountPerformance(accountId: string): UseAccountPerformanceR
     selectedYear,
     setSelectedYear,
     rows,
+    lifetimeNote,
     chartPoints,
     assetOptions,
     selectedAssetId,

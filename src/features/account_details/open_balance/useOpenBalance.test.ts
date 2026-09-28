@@ -392,4 +392,19 @@ describe("useOpenBalance", () => {
 
     expect(result.current.isSubmitting).toBe(false);
   });
+
+  // TRX-065 — a total cost of exactly 0 warns; empty or positive does not.
+  it("warns on a total cost of 0 only", async () => {
+    const { result } = renderHook(() => useOpenBalance(BASE_PROPS));
+    expect(result.current.zeroCostWarning).toBe(false);
+
+    await act(async () => result.current.handleChange("totalCost", "0"));
+    expect(result.current.zeroCostWarning).toBe(true);
+
+    await act(async () => result.current.handleChange("totalCost", "0.00"));
+    expect(result.current.zeroCostWarning).toBe(true);
+
+    await act(async () => result.current.handleChange("totalCost", "12.5"));
+    expect(result.current.zeroCostWarning).toBe(false);
+  });
 });

@@ -403,3 +403,21 @@ Remove an entry once it has been resolved.
 - Observation: only the interface keeps Cash Assets out of a purchase or a sale (CSH-018, TRX-064); the core records one if asked. The command line excludes them in its lookup (CLI-011), so no path reaches it today, but the core owes the decision (B47).
 - User value: None directly — a later interface (#051) cannot record a purchase of cash by mistake.
 - Done when: `buy_holding` and `sell_holding` reject a Cash Asset with a typed error, tested in Rust, and the command line's own exclusion can rely on it.
+
+## 2026-09-28 — TD-057 — The performance contract lags the response
+
+- Found by: spec-reviewer on #012
+- Where: `docs/contracts/account-contract.md` — `PerformancePeriod`, `PerformanceMetric`; no row for `get_global_performance`
+- Severity: 🔵
+- Observation: the contract's `PerformancePeriod` lacks `annualized_yield` and the bridge fields (`previous_value`, `cash_flow`, `asset_flow`, `dividends`, `pnl`), `PerformanceMetric.pct` says "denominator is 0" where PRF-032 says not positive, and `get_global_performance` has no command row in any contract.
+- User value: None directly — the contract describes what the interface receives.
+- Done when: the contract's performance types match `src-tauri/src/use_cases/shared/performance.rs` and `get_global_performance` has its row, checked by contract-reviewer.
+
+## 2026-09-28 — TD-058 — The opening-balance form decides its zero-cost warning itself
+
+- Found by: reviewer-arch on #012 (owner chose to track it, 2026-09-28)
+- Where: `src/features/account_details/open_balance/useOpenBalance.ts` — `zeroCostWarning`
+- Severity: 🔵
+- Observation: the warning of TRX-065 shows when the typed total cost is 0, a comparison made in the frontend; the core owes that decision (F32, B47). The architecture check does not see a bare comparison, so the frozen count of `account_details` (TD-046) does not include it.
+- User value: None directly — the warning reads the same from any interface.
+- Done when: an opening-balance draft check in the core (like TRX-062 for purchases and sales) returns the warning with its other checks, and the form shows what it returns.

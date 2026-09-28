@@ -63,6 +63,25 @@ pub struct PerformancePeriod {
     pub annualized_yield: Option<PerformanceMetric>,
 }
 
+/// PRF-087 — why the lifetime metrics (since-inception %, annualized yield) cannot be
+/// computed: the Simple Dietz denominator over the lifetime span is not positive (PRF-032).
+#[derive(Debug, Serialize, Clone, Type, PartialEq, Eq)]
+#[serde(tag = "reason")]
+pub enum LifetimeUnavailable {
+    /// An opening balance was recorded with a total cost of 0, so it declares no starting
+    /// capital; the earliest one in scope is named.
+    ZeroCostOpeningBalance {
+        /// Account the opening balance belongs to.
+        account_id: String,
+        /// Asset of the opening balance.
+        asset_id: String,
+        /// Its date (`YYYY-MM-DD`).
+        date: String,
+    },
+    /// More was taken out than was ever put in: no invested capital to measure against.
+    NoInvestedCapital,
+}
+
 /// Top-level response for `get_account_performance` — recomputed on read
 /// (ADR-013). Also returned by `get_global_performance`, whose cross-account
 /// aggregation reports in the reference currency with an empty `account_name`
@@ -80,6 +99,9 @@ pub struct AccountPerformanceResponse {
     /// One row per month over the full span, most-recent first.
     /// Empty when month_view_available is false (PRF-013, PRF-015).
     pub monthly: Vec<PerformancePeriod>,
+    /// Why the lifetime metrics cannot be computed, when a row's since-inception
+    /// percentage is absent (PRF-087); None otherwise.
+    pub lifetime_unavailable: Option<LifetimeUnavailable>,
 }
 
 /// Computes per-period performance for a single account (PRF-016, PRF-020–035,
@@ -133,6 +155,7 @@ pub(crate) async fn account_performance_series(
                 month_view_available,
                 yearly: Vec::new(),
                 monthly: Vec::new(),
+                lifetime_unavailable: None,
             })
         }
     };
@@ -175,12 +198,49 @@ pub(crate) async fn account_performance_series(
         Vec::new()
     };
 
+    let lifetime_unavailable = lifetime_unavailable(yearly.iter().chain(&monthly), &transactions);
     Ok(AccountPerformanceResponse {
         account_name: account.name,
         currency: account.currency,
         month_view_available,
         yearly,
         monthly,
+        lifetime_unavailable,
+    })
+}
+
+/// PRF-087 — why the lifetime metrics are absent, when a row's since-inception percentage
+/// is: the earliest zero-cost opening balance in scope, or no invested capital at all.
+pub(crate) fn lifetime_unavailable<'a>(
+    rows: impl IntoIterator<Item = &'a PerformancePeriod>,
+    transactions: &[Transaction],
+) -> Option<LifetimeUnavailable> {
+    let suppressed = rows.into_iter().any(|row| {
+        row.since_inception
+            .as_ref()
+            .is_some_and(|metric| metric.pct.is_none())
+    });
+    if !suppressed {
+        return None;
+    }
+    let zero_cost = transactions
+        .iter()
+        .filter(|transaction| {
+            transaction.transaction_type == TransactionType::OpeningBalance
+                && transaction.total_amount == 0
+        })
+        .min_by(|a, b| {
+            a.date
+                .cmp(&b.date)
+                .then_with(|| a.created_at.cmp(&b.created_at))
+        });
+    Some(match zero_cost {
+        Some(transaction) => LifetimeUnavailable::ZeroCostOpeningBalance {
+            account_id: transaction.account_id.clone(),
+            asset_id: transaction.asset_id.clone(),
+            date: transaction.date.clone(),
+        },
+        None => LifetimeUnavailable::NoInvestedCapital,
     })
 }
 
@@ -839,4 +899,85 @@ pub(crate) fn annualized_yield_metric(
         gain: since_inception.gain,
         pct: Some((cagr * PERCENT_SCALE as f64).round() as i64),
     })
+}
+
+#[cfg(test)]
+mod lifetime_unavailable_tests {
+    use super::*;
+
+    fn row(since_pct: Option<i64>) -> PerformancePeriod {
+        PerformancePeriod {
+            year: 2026,
+            month: None,
+            end_value: 0,
+            previous_value: 0,
+            cash_flow: 0,
+            asset_flow: 0,
+            dividends: 0,
+            pnl: 0,
+            period_over_period: None,
+            year_to_date: None,
+            since_inception: Some(PerformanceMetric {
+                gain: 0,
+                pct: since_pct,
+            }),
+            annualized_yield: None,
+        }
+    }
+
+    fn opening(id: &str, asset: &str, date: &str, total: i64) -> Transaction {
+        Transaction::restore(
+            id.to_string(),
+            "acc-1".to_string(),
+            asset.to_string(),
+            TransactionType::OpeningBalance,
+            date.to_string(),
+            1_000_000,
+            0,
+            1_000_000,
+            0,
+            total,
+            None,
+            None,
+            format!("{date}T00:00:00Z"),
+        )
+    }
+
+    // PRF-087 — nothing to explain while every since-inception percentage is present.
+    #[test]
+    fn prf_087_no_cause_when_nothing_is_suppressed() {
+        let transactions = [opening("o1", "aapl", "2024-01-05", 0)];
+        assert_eq!(
+            lifetime_unavailable([&row(Some(1)), &row(Some(2))], &transactions),
+            None
+        );
+    }
+
+    // PRF-087 — the earliest zero-cost opening balance in scope is named.
+    #[test]
+    fn prf_087_names_the_earliest_zero_cost_opening_balance() {
+        let transactions = [
+            opening("o2", "msft", "2024-03-01", 0),
+            opening("o0", "cw8", "2023-06-01", 500_000_000),
+            opening("o1", "aapl", "2024-01-05", 0),
+        ];
+        assert_eq!(
+            lifetime_unavailable([&row(Some(1)), &row(None)], &transactions),
+            Some(LifetimeUnavailable::ZeroCostOpeningBalance {
+                account_id: "acc-1".to_string(),
+                asset_id: "aapl".to_string(),
+                date: "2024-01-05".to_string(),
+            })
+        );
+    }
+
+    // PRF-087 — without a zero-cost opening balance, the cause is no invested capital.
+    #[test]
+    fn prf_087_otherwise_no_invested_capital() {
+        let transactions = [opening("o0", "cw8", "2023-06-01", 500_000_000)];
+        assert_eq!(
+            lifetime_unavailable([&row(None)], &transactions),
+            Some(LifetimeUnavailable::NoInvestedCapital)
+        );
+    }
 }

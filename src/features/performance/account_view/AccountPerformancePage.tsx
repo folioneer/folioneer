@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
 import { Button } from "@/ui/components/button/Button";
+import { LifetimeUnavailableNote } from "../shared/LifetimeUnavailableNote";
 import { AccountValueChart } from "../value_chart/AccountValueChart";
 import { AccountPerformanceTable } from "./AccountPerformanceTable";
 import { useAccountPerformance } from "./useAccountPerformance";
@@ -192,6 +193,8 @@ export function AccountPerformancePage() {
 
               {/* Account value over time — fed by the same active-view series as the table. */}
               <AccountValueChart points={view.chartPoints} />
+
+              <LifetimeUnavailableNote note={view.lifetimeNote} idPrefix="account-performance" />
 
               <AccountPerformanceTable
                 rows={view.rows}

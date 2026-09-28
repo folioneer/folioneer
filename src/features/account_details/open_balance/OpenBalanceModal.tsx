@@ -1,3 +1,4 @@
+import { TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/lib/store";
 import { Button } from "@/ui/components/button/Button";
@@ -32,9 +33,15 @@ export function OpenBalanceModal({
   const { t } = useTranslation();
   const assets = useAppStore((state) => state.assets);
 
-  const { formData, error, isSubmitting, isFormValid, handleChange, handleSubmit } = useOpenBalance(
-    { accountId, assetId, onSubmitSuccess },
-  );
+  const {
+    formData,
+    error,
+    isSubmitting,
+    isFormValid,
+    zeroCostWarning,
+    handleChange,
+    handleSubmit,
+  } = useOpenBalance({ accountId, assetId, onSubmitSuccess });
 
   return (
     <FormModal
@@ -109,6 +116,12 @@ export function OpenBalanceModal({
           placeholder={t("open_balance.form_total_cost_placeholder")}
           required
         />
+        {zeroCostWarning && (
+          <p id="ob-zero-cost-warning" className="flex items-start gap-2 text-sm text-m3-warning">
+            <TriangleAlert size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <span>{t("open_balance.zero_cost_warning")}</span>
+          </p>
+        )}
 
         {/* Inline error */}
         {error && (

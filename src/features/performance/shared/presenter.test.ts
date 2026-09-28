@@ -14,6 +14,7 @@ import {
   pnlColorClass,
   presentAccountPerformanceError,
   presentAssetScopeOptions,
+  presentLifetimeUnavailable,
   presentPeriodRow,
   presentValueChartSeries,
   resolveViewMode,
@@ -420,5 +421,65 @@ describe("presentAssetScopeOptions", () => {
     );
 
     expect(options).toEqual([]);
+  });
+});
+
+describe("presentLifetimeUnavailable", () => {
+  const names = { asset: (id: string) => (id === "aapl" ? "Apple Inc." : id), account: null };
+
+  // PRF-088 — nothing is suppressed: no note.
+  it("gives no note when the lifetime metrics are present", () => {
+    expect(presentLifetimeUnavailable(null, names, "en")).toBeNull();
+  });
+
+  // PRF-088 — a zero-cost opening balance is named by asset and date.
+  it("names the zero-cost opening balance to correct", () => {
+    expect(
+      presentLifetimeUnavailable(
+        {
+          reason: "ZeroCostOpeningBalance",
+          account_id: "acc-1",
+          asset_id: "aapl",
+          date: "2024-01-05",
+        },
+        names,
+        "en",
+      ),
+    ).toEqual({
+      key: "account_performance.lifetime_unavailable_zero_cost",
+      vars: { asset: "Apple Inc.", date: "1/5/2024" },
+    });
+  });
+
+  // PRF-088 — the global view names the account too.
+  it("names the account in the global view", () => {
+    const note = presentLifetimeUnavailable(
+      {
+        reason: "ZeroCostOpeningBalance",
+        account_id: "acc-1",
+        asset_id: "aapl",
+        date: "2024-01-05",
+      },
+      { ...names, account: (id: string) => (id === "acc-1" ? "PEA" : id) },
+      "en",
+    );
+    expect(note?.key).toBe("account_performance.lifetime_unavailable_zero_cost_in_account");
+    expect(note?.vars).toEqual(expect.objectContaining({ account: "PEA", asset: "Apple Inc." }));
+  });
+
+  // PRF-088 — otherwise the cause is no invested capital.
+  it("explains the absence of invested capital", () => {
+    expect(presentLifetimeUnavailable({ reason: "NoInvestedCapital" }, names, "en")).toEqual({
+      key: "account_performance.lifetime_unavailable_no_invested_capital",
+    });
+  });
+
+  // PRF-088 — a suppressed since-inception percentage is flagged; a present one is not.
+  it("flags a suppressed since-inception percentage", () => {
+    const suppressed = presentPeriodRow(
+      makeYearRow({ since_inception: makeMetric({ pct: null }) }),
+    );
+    expect(suppressed.sinceInception.pctSuppressed).toBe(true);
+    expect(presentPeriodRow(makeYearRow()).sinceInception.pctSuppressed).toBe(false);
   });
 });

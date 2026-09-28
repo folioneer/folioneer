@@ -1,3 +1,4 @@
+import { Info } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { PeriodRowViewModel } from "../shared/presenter";
 
@@ -7,6 +8,15 @@ interface AccountPerformanceTableProps {
   showAnnualized: boolean;
   /** Base of every id/data-testid, so two pages rendering this table never emit colliding ids. */
   idPrefix?: string;
+}
+
+/** PRF-088 — a lifetime percentage the Dietz guard suppressed: "—" with an info mark. */
+function SuppressedPct({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-m3-on-surface-variant" title={label}>
+      —<Info size={14} aria-hidden="true" />
+    </span>
+  );
 }
 
 export function AccountPerformanceTable({
@@ -170,14 +180,22 @@ export function AccountPerformanceTable({
                 data-testid={`${idPrefix}-since-pct-${row.rowKey}`}
                 className={`m3-td text-right ${row.sinceInception.colorClass}`}
               >
-                {row.sinceInception.pctFormatted}
+                {row.sinceInception.pctSuppressed ? (
+                  <SuppressedPct label={t("account_performance.lifetime_unavailable_mark")} />
+                ) : (
+                  row.sinceInception.pctFormatted
+                )}
               </td>
               {showAnnualized && (
                 <td
                   data-testid={`${idPrefix}-annualized-${row.rowKey}`}
                   className={`m3-td text-right ${row.annualizedYield?.colorClass ?? ""}`}
                 >
-                  {row.annualizedYield?.pctFormatted ?? "—"}
+                  {row.sinceInception.pctSuppressed ? (
+                    <SuppressedPct label={t("account_performance.lifetime_unavailable_mark")} />
+                  ) : (
+                    (row.annualizedYield?.pctFormatted ?? "—")
+                  )}
                 </td>
               )}
             </tr>

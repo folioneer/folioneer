@@ -59,6 +59,7 @@ const makeResponse = (
   account_name: "My Portfolio",
   currency: "EUR",
   month_view_available: false,
+  lifetime_unavailable: null,
   yearly: [makeYearRow()],
   monthly: [],
   ...overrides,

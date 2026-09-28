@@ -547,7 +547,11 @@
       "october": "October",
       "november": "November",
       "december": "December"
-    }
+    },
+    "lifetime_unavailable_zero_cost": "Lifetime performance can’t be computed: the opening balance of {{asset}} on {{date}} was recorded with a total cost of 0, so no starting capital is known. Edit that opening balance and enter its value on that date.",
+    "lifetime_unavailable_zero_cost_in_account": "Lifetime performance can’t be computed: the opening balance of {{asset}} in {{account}} on {{date}} was recorded with a total cost of 0, so no starting capital is known. Edit that opening balance and enter its value on that date.",
+    "lifetime_unavailable_no_invested_capital": "Lifetime performance can’t be computed: more money was taken out than was ever put in, so there is no invested capital to measure it against.",
+    "lifetime_unavailable_mark": "Can’t be computed — see the note above the table"
   },
   "global_performance": {
     "title": "Global performance",
@@ -752,7 +756,8 @@
     "form_quantity_placeholder": "0.000000",
     "form_total_cost_placeholder": "0.000",
     "action_submit": "Add position",
-    "success_created": "Position added."
+    "success_created": "Position added.",
+    "zero_cost_warning": "A total cost of 0 declares no invested amount for this position: it may prevent this account’s lifetime performance from being computed, or overstate it. If you know the position’s value on this date, enter it instead."
   },
   "price_history": {
     "title": "Price History",

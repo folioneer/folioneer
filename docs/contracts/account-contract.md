@@ -419,6 +419,13 @@ struct AccountPerformanceResponse {
     month_view_available: bool,         // true only for Automatic/ManualDay/ManualWeek (PRF-013)
     yearly: Vec<PerformancePeriod>,     // one per year, most-recent first (PRF-041); month is None
     monthly: Vec<PerformancePeriod>,    // one per month over the full span, most-recent first; empty when month_view_available is false (PRF-013, PRF-015)
+    lifetime_unavailable: Option<LifetimeUnavailable>, // why a since-inception percentage is absent; None when all are present (PRF-087)
+}
+
+// PRF-087 — serde tag "reason"
+enum LifetimeUnavailable {
+    ZeroCostOpeningBalance { account_id: String, asset_id: String, date: String }, // earliest zero-cost opening balance in scope; date YYYY-MM-DD
+    NoInvestedCapital,
 }
 ```
 
@@ -576,3 +583,4 @@ struct AccountJournal {
 - 2026-07-05 — Input-column refresh: `get_account_details` gains `as_of_date: Option<String>` (as-of read-only view) and `get_account_performance` gains `asset_id: Option<String>` (position-scoped series, PRF-080) — both shipped earlier, now reflected in the tables above. No new command.
 - 2026-09-14 — Amended by `account` spec (ACC-027/028): `get_account_summaries` returns `AccountSummaries` — the rows plus a `PortfolioTotal` in the reference currency, flagged incomplete when an account with no usable rate held a non-zero figure; the accounts list re-fetches on `CurrencyRateUpdated` and `CurrencyPairUpdated` (ACC-033). No new command or error.
 - 2026-09-28 — TXL-060: `get_account_journal(account_id, JournalFilter) -> AccountJournal` — the account's transactions oldest first with `cash_out` / `cash_in` / `cash_balance` from the cash balance rules (interest on the cash line included, INT-023); the filter picks rows (and `newest_first` their order), the balance runs over all.
+- 2026-09-28 — PRF-087: `AccountPerformanceResponse` (returned by `get_account_performance` and `get_global_performance`) gains `lifetime_unavailable: Option<LifetimeUnavailable>` — the earliest zero-cost opening balance in scope, or no invested capital.

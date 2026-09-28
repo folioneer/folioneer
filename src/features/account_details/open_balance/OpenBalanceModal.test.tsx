@@ -47,6 +47,7 @@ const makeHookReturn = (overrides: Record<string, unknown> = {}) => ({
   error: null,
   isSubmitting: false,
   isFormValid: false,
+  zeroCostWarning: false,
   handleChange: vi.fn(),
   handleSubmit: vi.fn(),
   ...overrides,
@@ -240,5 +241,15 @@ describe("OpenBalanceModal", () => {
     await userEvent.click(cancelButton);
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  // TRX-065 — the zero-cost warning shows under the total cost, and saving stays possible.
+  it("shows the zero-cost warning when the hook raises it", () => {
+    mockUseOpenBalance.mockReturnValue(
+      makeHookReturn({ zeroCostWarning: true, isFormValid: true }),
+    );
+    render(<OpenBalanceModal {...BASE_PROPS} />);
+    expect(document.getElementById("ob-zero-cost-warning")).not.toBeNull();
+    expect(document.querySelector('button[type="submit"][form="ob-form"]')).not.toBeDisabled();
   });
 });

@@ -58,6 +58,7 @@ const makeResponse = (
   account_name: "",
   currency: "EUR",
   month_view_available: false,
+  lifetime_unavailable: null,
   yearly: [makeYearRow()],
   monthly: [],
   ...overrides,
@@ -373,6 +374,7 @@ describe("useGlobalPerformance", () => {
       status: "ok",
       data: makeResponse({
         month_view_available: true,
+        lifetime_unavailable: null,
         monthly: [makeYearRow({ year: 2025, month: 5 }), makeYearRow({ year: 2024, month: 12 })],
       }),
     });
@@ -391,6 +393,7 @@ describe("useGlobalPerformance", () => {
       status: "ok",
       data: makeResponse({
         month_view_available: true,
+        lifetime_unavailable: null,
         monthly: [makeYearRow({ year: 2025, month: 5 })],
       }),
     });
@@ -407,6 +410,7 @@ describe("useGlobalPerformance", () => {
       status: "ok",
       data: makeResponse({
         month_view_available: true,
+        lifetime_unavailable: null,
         monthly: [makeYearRow({ year: 2025, month: 5 })],
       }),
     });

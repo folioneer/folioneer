@@ -6,8 +6,8 @@ use crate::context::currency::CurrencyService;
 use crate::core::logger::BACKEND;
 use crate::use_cases::shared::global_value::REFERENCE_CURRENCY;
 use crate::use_cases::shared::performance::{
-    account_performance_series, annualized_yield_metric, residual_pnl, zero_cost_credit_value,
-    AccountPerformanceResponse, PerformancePeriod, PeriodBridge,
+    account_performance_series, annualized_yield_metric, lifetime_unavailable, residual_pnl,
+    zero_cost_credit_value, AccountPerformanceResponse, PerformancePeriod, PeriodBridge,
 };
 use crate::use_cases::shared::valuation::{
     end_value_as_of, external_cash_flows, external_cash_flows_windowed, holding_close_date_as_of,
@@ -188,12 +188,20 @@ impl GlobalPerformanceUseCase {
             Vec::new()
         };
 
+        // PRF-087 — the cause, across every included account's transactions in scope.
+        let all_transactions: Vec<Transaction> = converted_accounts
+            .iter()
+            .flat_map(|account| account.transactions.iter().cloned())
+            .collect();
+        let lifetime_unavailable =
+            lifetime_unavailable(yearly.iter().chain(&monthly), &all_transactions);
         Ok(AccountPerformanceResponse {
             account_name: String::new(),
             currency: REFERENCE_CURRENCY.to_string(),
             month_view_available,
             yearly,
             monthly,
+            lifetime_unavailable,
         })
     }
 
@@ -326,6 +334,7 @@ fn empty_response() -> AccountPerformanceResponse {
         month_view_available: false,
         yearly: Vec::new(),
         monthly: Vec::new(),
+        lifetime_unavailable: None,
     }
 }
 

@@ -45,6 +45,12 @@ export function useOpenBalance({ accountId, assetId, onSubmitSuccess }: UseOpenB
     return !!formData.assetId && !!formData.date && formData.date <= today && qty > 0 && cost >= 0;
   }, [formData.assetId, formData.date, formData.quantity, formData.totalCost]);
 
+  // TRX-065 — a total cost of 0 declares no starting capital: warn, never block (TRX-045).
+  const zeroCostWarning = useMemo(
+    () => formData.totalCost.trim() !== "" && parseFloat(formData.totalCost) === 0,
+    [formData.totalCost],
+  );
+
   const handleChange = useCallback((field: keyof OpenBalanceFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   }, []);
@@ -83,6 +89,7 @@ export function useOpenBalance({ accountId, assetId, onSubmitSuccess }: UseOpenB
     error,
     isSubmitting,
     isFormValid,
+    zeroCostWarning,
     handleChange,
     handleSubmit,
   };

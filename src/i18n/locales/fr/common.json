@@ -547,7 +547,11 @@
       "october": "Octobre",
       "november": "Novembre",
       "december": "Décembre"
-    }
+    },
+    "lifetime_unavailable_zero_cost": "La performance depuis l’origine ne peut pas être calculée : le solde d’ouverture de {{asset}} du {{date}} a été saisi avec un coût total de 0, aucun capital de départ n’est donc connu. Modifiez ce solde d’ouverture et saisissez sa valeur à cette date.",
+    "lifetime_unavailable_zero_cost_in_account": "La performance depuis l’origine ne peut pas être calculée : le solde d’ouverture de {{asset}} dans {{account}} du {{date}} a été saisi avec un coût total de 0, aucun capital de départ n’est donc connu. Modifiez ce solde d’ouverture et saisissez sa valeur à cette date.",
+    "lifetime_unavailable_no_invested_capital": "La performance depuis l’origine ne peut pas être calculée : plus d’argent a été retiré qu’il n’en a jamais été versé, il n’y a donc aucun capital investi pour la mesurer.",
+    "lifetime_unavailable_mark": "Non calculable — voir la note au-dessus du tableau"
   },
   "global_performance": {
     "title": "Performance globale",
@@ -752,7 +756,8 @@
     "form_quantity_placeholder": "0,000000",
     "form_total_cost_placeholder": "0,000",
     "action_submit": "Ajouter",
-    "success_created": "Position ajoutée."
+    "success_created": "Position ajoutée.",
+    "zero_cost_warning": "Un coût total de 0 ne déclare aucun montant investi pour cette position : la performance depuis l’origine du compte pourrait ne pas être calculable, ou être surestimée. Si vous connaissez la valeur de la position à cette date, saisissez-la plutôt."
   },
   "price_history": {
     "title": "Historique des prix",

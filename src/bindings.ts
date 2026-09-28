@@ -1379,7 +1379,12 @@ yearly: PerformancePeriod[];
  * One row per month over the full span, most-recent first.
  * Empty when month_view_available is false (PRF-013, PRF-015).
  */
-monthly: PerformancePeriod[] }
+monthly: PerformancePeriod[]; 
+/**
+ * Why the lifetime metrics cannot be computed, when a row's since-inception
+ * percentage is absent (PRF-087); None otherwise.
+ */
+lifetime_unavailable: LifetimeUnavailable | null }
 /**
  * Response of `get_account_summaries` (ACC-021, ACC-027): the rows and their
  * portfolio total, read together so the list and its total never disagree.
@@ -3074,6 +3079,20 @@ cash_in: number | null;
  * whatever the filter (micro-units).
  */
 cash_balance: number }
+/**
+ * PRF-087 — why the lifetime metrics (since-inception %, annualized yield) cannot be
+ * computed: the Simple Dietz denominator over the lifetime span is not positive (PRF-032).
+ */
+export type LifetimeUnavailable = 
+/**
+ * An opening balance was recorded with a total cost of 0, so it declares no starting
+ * capital; the earliest one in scope is named.
+ */
+{ reason: "ZeroCostOpeningBalance"; account_id: string; asset_id: string; date: string } | 
+/**
+ * More was taken out than was ever put in: no invested capital to measure against.
+ */
+{ reason: "NoInvestedCapital" }
 /**
  * Explicit lookup path selector passed by the frontend (WEB-014).
  * 
