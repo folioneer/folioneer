@@ -28,6 +28,9 @@ import type {
   Result,
   SplitError,
   Transaction,
+  TransactionDraft,
+  TransactionDraftError,
+  TransactionDraftPreview,
   UpdateFeeScheduleDTO,
   UpsertHoldingNoteDTO,
   WithdrawalDTO,
@@ -160,6 +163,14 @@ export const accountDetailsGateway = {
     dto: CorrectTransactionFields,
   ): Promise<Result<Transaction, AccountError>> {
     return commands.correctTransaction({ ...dto, account_id: accountId, transaction_id: id });
+  },
+
+  // TRX-062 — checks a purchase or sale draft without writing: its first problem, or the
+  // unit price and total recording would store.
+  async validateTransactionDraft(
+    draft: TransactionDraft,
+  ): Promise<Result<TransactionDraftPreview, TransactionDraftError>> {
+    return commands.validateTransactionDraft(draft);
   },
 
   // TDI-010 — holding quantity + VWAP average cost as of a date (trade-dialog insights).

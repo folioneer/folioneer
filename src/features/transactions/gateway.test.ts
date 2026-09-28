@@ -8,6 +8,7 @@ import type {
   Event,
   SellHoldingDTO,
   Transaction,
+  TransactionDraft,
 } from "@/bindings";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -53,6 +54,33 @@ const buyDto: BuyHoldingDTO = {
 
 describe("transactionGateway", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  // ── validateTransactionDraft (TRX-062) ──────────────────────────────────────
+
+  it("validateTransactionDraft sends the draft and returns the check's answer", async () => {
+    const draft: TransactionDraft = {
+      kind: "Sell",
+      account_id: "acc-1",
+      asset_id: "ast-1",
+      date: "2026-01-02",
+      quantity: 2_000_000,
+      entered: { mode: "Total", total: 95_000_000, exchange_rate: 1_000_000, fees: 5_000_000 },
+      correcting: null,
+    };
+    mockInvoke.mockResolvedValue({ unit_price: 50_000_000, total_amount: 95_000_000 });
+    const result = await transactionGateway.validateTransactionDraft(draft);
+    expect(result).toEqual({
+      status: "ok",
+      data: { unit_price: 50_000_000, total_amount: 95_000_000 },
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("validate_transaction_draft", { draft });
+
+    mockInvoke.mockRejectedValue({ code: "Oversell", available: 1, requested: 2 });
+    expect(await transactionGateway.validateTransactionDraft(draft)).toEqual({
+      status: "error",
+      error: { code: "Oversell", available: 1, requested: 2 },
+    });
+  });
 
   // ── buyHolding ──────────────────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@
  * Spec rules covered:
  *   TRX-010 — buy holding → holding appears in account details
  *   TRX-020 — sell holding → quantity decremented in holding row
- *   TRX-030 — sell more than held → frontend Oversell error shown
+ *   TRX-030 — sell more than held → the draft check keeps submit disabled
  *
  * Seed strategy:
  *   - TRX-010: account + asset seeded via IPC; buy exercised through the UI.
@@ -132,15 +132,13 @@ describe("buy_sell", () => {
   });
 
   // -------------------------------------------------------------------------
-  // TRX-030 — oversell → submit disabled by frontend guard (validateSellForm)
+  // TRX-030 / TRX-063 — oversell → submit disabled by the draft check
   //
-  // ADR: validateSellForm returns an error when qty > holdingQuantityMicro, which
-  // sets isFormValid=false and disables the submit button. The backend Oversell
-  // error is therefore unreachable from the UI — TRX-030 is verified at the
-  // frontend guard level (submit disabled), not the backend error level.
-  // Backend Oversell is covered by the Rust integration tests.
+  // The sell form sends what the user entered to the backend draft check (TRX-062),
+  // which reports an oversell for a new sale; the submit stays disabled, so the
+  // recording's own Oversell rejection is covered by the Rust tests.
   // -------------------------------------------------------------------------
-  it("TRX-030: selling more than held keeps submit disabled (frontend oversell guard)", async () => {
+  it("TRX-030: selling more than held keeps submit disabled (draft check)", async () => {
     const ACCOUNT_NAME = "E2E Oversell TRX-030";
     const ASSET_NAME = "E2E Asset TRX030";
     const catId = await seedCategory("E2E Cat TRX030");
@@ -159,17 +157,20 @@ describe("buy_sell", () => {
     await form.waitForExist({ timeout: 8000 });
 
     await setReactInputValue("sell-trx-date", DATES.oversell);
-    await setReactInputValue("sell-trx-quantity", "999"); // well above the 2 held
     await setReactInputValue("sell-trx-unit-price", "100");
-
-    // validateSellForm blocks submission when qty > holdingQuantity — submit stays disabled.
     const submitBtn = await $('button[type="submit"][form="sell-transaction-form"]');
     await submitBtn.waitForExist({ timeout: 5000 });
-    const isEnabled = await submitBtn.isEnabled();
+
+    // Precondition: a quantity within the holding checks clean — the check answers.
+    await setReactInputValue("sell-trx-quantity", "1");
+    await submitBtn.waitForEnabled({ timeout: 10000 });
+
+    await setReactInputValue("sell-trx-quantity", "999"); // well above the 2 held
+    await submitBtn.waitForEnabled({ timeout: 10000, reverse: true });
     assert.strictEqual(
-      isEnabled,
+      await submitBtn.isEnabled(),
       false,
-      "Submit must be disabled when quantity exceeds holding (TRX-030 frontend guard)",
+      "Submit must be disabled when quantity exceeds holding (TRX-030, TRX-063)",
     );
     assert.ok(await form.isExisting(), "Sell form must remain open (TRX-030)");
   });

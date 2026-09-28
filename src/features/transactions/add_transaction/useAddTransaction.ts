@@ -3,18 +3,13 @@ import { useTranslation } from "react-i18next";
 import { getAutoRecordPrice } from "@/lib/autoRecordPriceStorage";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import {
-  computeTotalMicro,
-  decimalToMicro,
-  microToDecimal,
-  microToFormatted,
-} from "@/lib/microUnits";
+import { microToDecimal, microToFormatted } from "@/lib/microUnits";
 import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { transactionGateway } from "../gateway";
 import type { TransactionFormData } from "../shared/types";
-import { validateTransactionForm } from "../shared/validateTransaction";
+import { toTransactionDraft, useTransactionDraftCheck } from "../shared/useTransactionDraftCheck";
 import { useTransactions } from "../useTransactions";
 
 interface UseAddTransactionProps {
@@ -56,21 +51,9 @@ export function useAddTransaction({
   // MKT-052/053 — snapshot of the global auto-record toggle at hook mount
   const [recordPrice, setRecordPrice] = useState<boolean>(() => getAutoRecordPrice());
 
-  // Derive micro-unit values from form strings — single conversion at the input boundary (ADR-001).
-  const microValues = useMemo(() => {
-    const qtyMicro = decimalToMicro(formData.quantity);
-    const priceMicro = decimalToMicro(formData.unitPrice);
-    const rateMicro = decimalToMicro(formData.exchangeRate);
-    const feesMicro = decimalToMicro(formData.fees);
-    const totalMicro = computeTotalMicro(qtyMicro, priceMicro, rateMicro, feesMicro);
-    return { qtyMicro, priceMicro, rateMicro, feesMicro, totalMicro };
-  }, [formData.quantity, formData.unitPrice, formData.exchangeRate, formData.fees]);
-
-  // Derived form validity
-  const isFormValid = useMemo(
-    () => validateTransactionForm(formData, microValues.qtyMicro, microValues.totalMicro) === null,
-    [formData, microValues.qtyMicro, microValues.totalMicro],
-  );
+  // TRX-063 — the draft check decides whether the purchase can be saved and what it totals.
+  const draft = useMemo(() => toTransactionDraft("Purchase", formData, "price", ""), [formData]);
+  const check = useTransactionDraftCheck(draft);
 
   // TRX-029 — derived flag: is the currently selected asset archived?
   const isSelectedAssetArchived = formData.assetId
@@ -82,13 +65,8 @@ export function useAddTransaction({
   }, []);
 
   const doSubmit = useCallback(async () => {
-    const validationError = validateTransactionForm(
-      formData,
-      microValues.qtyMicro,
-      microValues.totalMicro,
-    );
-    if (validationError) {
-      setError(validationError);
+    if (!check.isClean) {
+      setError(check.problemMessage);
       return;
     }
 
@@ -100,10 +78,10 @@ export function useAddTransaction({
         account_id: formData.accountId,
         asset_id: formData.assetId,
         date: formData.date,
-        quantity: microValues.qtyMicro,
-        unit_price: microValues.priceMicro,
-        exchange_rate: microValues.rateMicro,
-        fees: microValues.feesMicro,
+        quantity: draft.quantity,
+        unit_price: check.preview?.unit_price ?? 0,
+        exchange_rate: draft.entered.exchange_rate,
+        fees: draft.entered.fees,
         total_amount: null,
         note: formData.note || null,
       });
@@ -114,13 +92,10 @@ export function useAddTransaction({
       }
 
       // MKT-055/061 — record price separately when auto-record is on and price is non-zero (best-effort)
-      if (recordPrice && microValues.priceMicro > 0) {
+      const unitPrice = check.preview?.unit_price ?? 0;
+      if (recordPrice && unitPrice > 0) {
         transactionGateway
-          .recordAssetPrice(
-            formData.assetId,
-            formData.date,
-            parseFloat(microToDecimal(microValues.priceMicro)),
-          )
+          .recordAssetPrice(formData.assetId, formData.date, parseFloat(microToDecimal(unitPrice)))
           .catch((e) => logger.warn("Failed to record asset price after buy", { error: e }));
       }
 
@@ -136,7 +111,8 @@ export function useAddTransaction({
     }
   }, [
     formData,
-    microValues,
+    draft,
+    check,
     recordPrice,
     buyHolding,
     t,
@@ -170,10 +146,10 @@ export function useAddTransaction({
   return {
     formData,
     /** Total amount in micro-units formatted for display (read-only, derived). */
-    totalAmountDisplay: microToFormatted(microValues.totalMicro),
+    totalAmountDisplay: microToFormatted(check.preview?.total_amount ?? 0),
     error,
     isSubmitting,
-    isFormValid,
+    isFormValid: check.isClean,
     showArchivedConfirm,
     recordPrice,
     setRecordPrice,

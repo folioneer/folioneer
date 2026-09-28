@@ -1,4 +1,9 @@
-import type { AccountError, OpenHoldingError, Transaction } from "@/bindings";
+import type {
+  AccountError,
+  OpenHoldingError,
+  Transaction,
+  TransactionDraftError,
+} from "@/bindings";
 import { microToFormatted, microToFormattedFactor } from "@/lib/microUnits";
 import type { I18nMessage } from "@/ui/format/i18n";
 
@@ -54,6 +59,23 @@ export function transactionMutationErrorToI18n(err: AccountError | OpenHoldingEr
       return { key: `error.${err.code}` };
     default:
       return { key: "error.Unknown" };
+  }
+}
+
+/**
+ * F27 — Maps the first problem of a transaction draft (TRX-062) to an i18n key: a field
+ * not filled yet, or the recording rejection the draft would meet.
+ */
+export function transactionDraftErrorToI18n(err: TransactionDraftError): I18nMessage {
+  switch (err.code) {
+    case "AccountMissing":
+      return { key: "transaction.error_validation_account" };
+    case "AssetMissing":
+      return { key: "transaction.error_validation_asset" };
+    case "DateMissing":
+      return { key: "transaction.error_validation_date" };
+    default:
+      return transactionMutationErrorToI18n(err);
   }
 }
 

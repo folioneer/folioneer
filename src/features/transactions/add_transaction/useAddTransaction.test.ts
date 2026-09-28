@@ -1,12 +1,13 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Account, Asset } from "@/bindings";
+import type { Account, Asset, TransactionDraft } from "@/bindings";
 import { useAppStore } from "@/lib/store";
 import { useAddTransaction } from "./useAddTransaction";
 
-const { mockBuyHolding, mockRecordAssetPrice } = vi.hoisted(() => ({
+const { mockBuyHolding, mockRecordAssetPrice, mockValidateDraft } = vi.hoisted(() => ({
   mockBuyHolding: vi.fn(),
   mockRecordAssetPrice: vi.fn(),
+  mockValidateDraft: vi.fn(),
 }));
 
 vi.mock("../useTransactions", () => ({
@@ -22,6 +23,7 @@ vi.mock("../useTransactions", () => ({
 vi.mock("../gateway", () => ({
   transactionGateway: {
     recordAssetPrice: mockRecordAssetPrice,
+    validateTransactionDraft: mockValidateDraft,
   },
 }));
 
@@ -32,6 +34,16 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
+// The draft check (TRX-062) is the backend's: this stand-in reports a missing account, asset
+// or date, echoes a typed unit price, and otherwise returns fixed figures.
+const fakeDraftCheck = async (draft: TransactionDraft) => {
+  if (!draft.account_id) return { status: "error", error: { code: "AccountMissing" } };
+  if (!draft.asset_id) return { status: "error", error: { code: "AssetMissing" } };
+  if (!draft.date) return { status: "error", error: { code: "DateMissing" } };
+  const unit_price = draft.entered.mode === "UnitPrice" ? draft.entered.unit_price : 7_000_000;
+  return { status: "ok", data: { unit_price, total_amount: 42_000_000 } };
+};
+
 const fakeSubmit = { preventDefault: vi.fn() } as unknown as React.FormEvent;
 
 describe("useAddTransaction", () => {
@@ -39,6 +51,7 @@ describe("useAddTransaction", () => {
     localStorage.clear();
     mockBuyHolding.mockReset();
     mockRecordAssetPrice.mockReset();
+    mockValidateDraft.mockReset().mockImplementation(fakeDraftCheck);
     useAppStore.setState({
       assets: [
         { id: "asset-1", name: "Apple", is_archived: false, currency: "USD" },
@@ -60,8 +73,12 @@ describe("useAddTransaction", () => {
     expect(result.current.formData.accountId).toBe("account-1");
   });
 
-  // TRX-026 — totalAmountDisplay is derived from micro values when quantity changes
-  it("recalculates totalAmountDisplay when quantity changes", async () => {
+  // TRX-063 — the form sends what the user entered and shows the total the check returns
+  it("shows the total the draft check returns for what was entered", async () => {
+    mockValidateDraft.mockResolvedValue({
+      status: "ok",
+      data: { unit_price: 100_000_000, total_amount: 200_000_000 },
+    });
     const { result } = renderHook(() => useAddTransaction());
 
     await act(async () => {
@@ -71,8 +88,16 @@ describe("useAddTransaction", () => {
       result.current.handleChange("quantity", "2");
     });
 
-    // 2 * 100 * 1 + 0 = 200.000
+    expect(mockValidateDraft).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        kind: "Purchase",
+        quantity: 2_000_000,
+        entered: { mode: "UnitPrice", unit_price: 100_000_000, exchange_rate: 1_000_000, fees: 0 },
+        correcting: null,
+      }),
+    );
     expect(result.current.totalAmountDisplay).toBe("200,000");
+    expect(result.current.isFormValid).toBe(true);
   });
 
   // TRX-029 — archived asset triggers confirmation dialog on submit
@@ -111,8 +136,8 @@ describe("useAddTransaction", () => {
     expect(mockBuyHolding).not.toHaveBeenCalled();
   });
 
-  // TRX-020 — validation: empty accountId blocks submit
-  it("sets error and does not submit when accountId is empty", async () => {
+  // TRX-063 — the check's first problem blocks the submit and becomes the error
+  it("sets the check's first problem and does not submit when accountId is empty", async () => {
     const onSubmitSuccess = vi.fn();
     const { result } = renderHook(() => useAddTransaction({ onSubmitSuccess }));
 
@@ -127,7 +152,8 @@ describe("useAddTransaction", () => {
       await result.current.handleSubmit(fakeSubmit);
     });
 
-    expect(result.current.error).not.toBeNull();
+    expect(result.current.isFormValid).toBe(false);
+    expect(result.current.error).toEqual({ key: "transaction.error_validation_account" });
     expect(mockBuyHolding).not.toHaveBeenCalled();
     expect(onSubmitSuccess).not.toHaveBeenCalled();
   });
@@ -338,7 +364,7 @@ describe("useAddTransaction", () => {
       result.current.handleChange("quantity", "1");
       result.current.handleChange("unitPrice", "0");
       result.current.handleChange("exchangeRate", "1");
-      result.current.handleChange("fees", "5"); // fees > 0 so totalMicro > 0, passes validation
+      result.current.handleChange("fees", "5");
     });
 
     await act(async () => {

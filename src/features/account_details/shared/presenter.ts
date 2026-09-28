@@ -14,6 +14,7 @@ import type {
   PriceHistoryBackfillError,
   PriceHistoryBackfillOutcome,
   SplitError,
+  TransactionDraftError,
 } from "@/bindings";
 import { isCashAsset } from "@/lib/cashAsset";
 import {
@@ -145,6 +146,31 @@ export function freeSharesErrorToI18n(err: FreeSharesError | AccountError): I18n
     return { key: "error.Unknown" };
   }
   return { key: `error.${err.code}` };
+}
+
+/**
+ * F27 — Maps the first problem of a purchase or sale draft (TRX-062) to an i18n key: a
+ * field not filled yet, an oversell with both quantities, or the recording rejection.
+ */
+export function transactionDraftErrorToI18n(err: TransactionDraftError): I18nMessage {
+  switch (err.code) {
+    case "AccountMissing":
+      return { key: "transaction.error_validation_account" };
+    case "AssetMissing":
+      return { key: "transaction.error_validation_asset" };
+    case "DateMissing":
+      return { key: "transaction.error_validation_date" };
+    case "Oversell":
+      return {
+        key: "error.Oversell",
+        vars: {
+          available: microToFormatted(err.available, 6),
+          requested: microToFormatted(err.requested, 6),
+        },
+      };
+    default:
+      return { key: `error.${err.code}` };
+  }
 }
 
 /**

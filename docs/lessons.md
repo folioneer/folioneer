@@ -144,3 +144,13 @@ Append-only; supersede in place if the underlying ecosystem changes.
 **Root cause** — A rule file's `@path` imports are expanded when the session starts, whatever its `paths:` scope; only the rule's own text waits for a matching read. A canary phrase in a scoped rule without imports loaded only after a matching read.
 
 **Mitigation** — Put no imports in a scoped rule: write a short instruction that names the document to read. Prove a scope with a control — the same question after reading a non-matching file — and log the files the session read (`claude -p … --output-format stream-json`), since a model may read more than asked.
+
+## L-018 — A `beforeEach` arrow that returns a function runs it as the test's teardown
+
+**First observed**: 2026-09-28 (#047 part 3, `useTransactionDraftCheck.test.ts`)
+
+**Symptom** — A test fails with the error of a rejecting mock ("ipc down") after its own assertions passed, and the same test with a block-bodied `beforeEach` passes.
+
+**Root cause** — Vitest treats a function returned by `beforeEach` as a cleanup to run after the test. `beforeEach(() => mock.mockReset())` returns the mock itself, so the mock is called once more after the test; a mock set to reject then throws an unhandled rejection.
+
+**Mitigation** — Give `beforeEach` a block body (`() => { mock.mockReset(); }`) whenever the call returns anything.

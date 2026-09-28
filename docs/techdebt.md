@@ -74,7 +74,7 @@ Remove an entry once it has been resolved.
 - Where: src/ (top-level structure + features/account_details cross-imports)
 - Severity: 🟡
 - Observation: Three FE layout/coupling deltas from the gold layout (F26/F27/F28 in `docs/frontend-rules.md`). The current shape works but encodes implicit conventions that diverge from it. Migration is bit-by-bit per `docs/workflow.md` § 10 — apply gold to new code; defer existing-code reshape unless it fits the 50-LOC + locality + mechanical gates.
-  1. **`features/account_details/{buy,sell}_transaction/` cross-imports from `features/transactions/`.** Today the imports are `RecordPriceCheckbox` (component), `TransactionFormData` (type), `validateTransactionForm` / `validateSellForm` (pure functions), and `useTransactions` (hook with state). Under F26, the first three (primitives) become fine; the fourth (behavior coupling via a hook) remains a code smell. Either `account_details` owns its own thin wrapper around the gateway calls it needs, or the two features consolidate. Worth deciding _with_ the consolidation question (delta 2) rather than fixing the hook coupling alone.
+  1. **`features/account_details/{buy,sell}_transaction/` cross-imports from `features/transactions/`.** Today the imports are `RecordPriceCheckbox` (component), `TransactionFormData` (type), and `useTransactions` (hook with state). Under F26, the first two (primitives) become fine; the third (behavior coupling via a hook) remains a code smell. Either `account_details` owns its own thin wrapper around the gateway calls it needs, or the two features consolidate. The transaction draft check (TRX-062) already takes the first road: `shared/useTransactionDraftCheck.ts` exists in both features, the same draft builder and error mapping on the generic `ui/hooks/useLatestCheck`, chosen by the owner on 2026-09-28 over a hook import; the consolidation removes the copy. Worth deciding _with_ the consolidation question (delta 2) rather than fixing the hook coupling alone.
 
   2. **`account_details` sub-feature bloat (8 sub-features).** Half of them — `buy_transaction`, `sell_transaction`, `deposit_transaction`, `withdrawal_transaction` — are conceptually transaction-recording flows and overlap with the `transactions/` feature. Two reasonable shapes: (a) consolidate the four into `transactions/` and let `account_details` stay focused on the holdings view, or (b) formalize the split — `account_details` owns "modals invoked from the holding row," `transactions/` owns "the transaction list page and its CRUD." Pick (b) as the lighter move; (a) is a bigger refactor.
 
@@ -377,10 +377,10 @@ Remove an entry once it has been resolved.
 - User value: None directly — `performance` behaves the same in the window, the command line and any later interface.
 - Done when: every frozen site of `performance` moves into a core query, a draft check or a query parameter, with its rule tested in Rust; its `decision_sites` entries leave the allowlist (`just arch-check --write-allowlist`).
 
-## 2026-09-28 — TD-051 — Feature `transactions` still makes 7 business decision(s) in the interface
+## 2026-09-28 — TD-051 — Feature `transactions` still makes 6 business decision(s) in the interface
 
 - Found by: architecture rule A12 (#047), first freeze
-- Where: `transactions/account_journal/useAccountJournal.ts` (3), `transactions/add_transaction/AddTransactionModal.tsx` (1), `transactions/edit_transaction_modal/EditTransactionModal.tsx` (1), `transactions/shared/validateTransaction.ts` (1), `transactions/transaction_list/useTransactionList.ts` (1)
+- Where: `transactions/account_journal/useAccountJournal.ts` (3), `transactions/add_transaction/AddTransactionModal.tsx` (1), `transactions/edit_transaction_modal/EditTransactionModal.tsx` (1), `transactions/transaction_list/useTransactionList.ts` (1)
 - Severity: 🟡
 - Observation: validation, grouping, ordering or filtering by business meaning still runs in the frontend of `transactions` (F32). Each site is frozen in `arch-allowlist.json`; a new one fails the check.
 - User value: None directly — `transactions` behaves the same in the window, the command line and any later interface.
@@ -403,3 +403,12 @@ Remove an entry once it has been resolved.
 - Observation: validation, grouping, ordering or filtering by business meaning still runs in the frontend of `whats_new` (F32). Each site is frozen in `arch-allowlist.json`; a new one fails the check.
 - User value: None directly — `whats_new` behaves the same in the window, the command line and any later interface.
 - Done when: every frozen site of `whats_new` moves into a core query, a draft check or a query parameter, with its rule tested in Rust; its `decision_sites` entries leave the allowlist (`just arch-check --write-allowlist`).
+
+## 2026-09-28 — TD-054 — A dividend correction still previews its total in the interface
+
+- Found by: #047 part 3 — the draft check covers a purchase and a sale only (TRX-062)
+- Where: `transactions/edit_transaction_modal/useEditTransactionModal.ts` — `computeTotalMicro` for every type but a purchase or a sale, and the save button enabled once date, quantity and amount are filled
+- Severity: 🟡
+- Observation: the correction form shows a dividend's total computed in the frontend with the purchase formula (F32); the backend recomputes it on save (DIV-040). The architecture check does not see a formula call, so nothing stops a new one.
+- User value: None directly — the total shown while editing a dividend comes from the rule that records it.
+- Done when: the dividend correction takes its displayed total from a backend check, `computeTotalMicro` has no caller left in `src/` and is deleted.

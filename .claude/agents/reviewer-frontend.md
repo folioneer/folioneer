@@ -169,6 +169,7 @@ Out of scope: page-level / shell-level singletons (one instance per route).
 
 - Inline data formatting in JSX (currency, dates, units) — should live in `shared/presenter.ts` (🟡)
 - Business logic in render bodies (calculations, validations, domain decisions) (🔴)
+- A removed frontend validation is not a regression when the backend enforces the rule (F32): the core owes every decision, and a value it rejects is shown from its error on save or from its draft check. Never ask to re-add a numeric or business check to the interface; flag only a lost message or a lost save guard the spec still names.
 - Presenter not pure — imports React, calls hooks, or has side effects (🔴, also F27)
 
 ### Hook colocation

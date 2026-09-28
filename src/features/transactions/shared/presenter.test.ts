@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   toTransactionRow,
+  transactionDraftErrorToI18n,
   transactionLoadErrorToI18n,
   transactionMutationErrorToI18n,
 } from "./presenter";
@@ -237,6 +238,34 @@ describe("transactionMutationErrorToI18n", () => {
   ] as const)("unreachable account-only code %s falls back to error.Unknown", (code) => {
     const err = { code } as Parameters<typeof transactionMutationErrorToI18n>[0];
     expect(transactionMutationErrorToI18n(err)).toEqual({ key: "error.Unknown" });
+  });
+});
+
+describe("transactionDraftErrorToI18n", () => {
+  // TRX-062 — a field not filled yet keeps the form's own message
+  it("maps a missing account, asset or date to the form's messages", () => {
+    expect(transactionDraftErrorToI18n({ code: "AccountMissing" })).toEqual({
+      key: "transaction.error_validation_account",
+    });
+    expect(transactionDraftErrorToI18n({ code: "AssetMissing" })).toEqual({
+      key: "transaction.error_validation_asset",
+    });
+    expect(transactionDraftErrorToI18n({ code: "DateMissing" })).toEqual({
+      key: "transaction.error_validation_date",
+    });
+  });
+
+  // TRX-062 — a recording rejection keeps the message recording shows
+  it("maps a recording rejection like the recording command", () => {
+    expect(
+      transactionDraftErrorToI18n({ code: "Oversell", available: 1_000_000, requested: 2_000_000 }),
+    ).toEqual(
+      transactionMutationErrorToI18n({
+        code: "Oversell",
+        available: 1_000_000,
+        requested: 2_000_000,
+      }),
+    );
   });
 });
 

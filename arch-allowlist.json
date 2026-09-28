@@ -18,10 +18,6 @@
     },
     {
       "from": "src/features/account_details/buy_transaction/useBuyTransaction.ts",
-      "to": "@/features/transactions/shared/validateTransaction"
-    },
-    {
-      "from": "src/features/account_details/buy_transaction/useBuyTransaction.ts",
       "to": "@/features/transactions/useTransactions"
     },
     {
@@ -51,10 +47,6 @@
     {
       "from": "src/features/account_details/sell_transaction/useSellTransaction.ts",
       "to": "@/features/transactions/shared/types"
-    },
-    {
-      "from": "src/features/account_details/sell_transaction/useSellTransaction.ts",
-      "to": "@/features/transactions/shared/validateTransaction"
     },
     {
       "from": "src/features/account_details/sell_transaction/useSellTransaction.ts",
@@ -135,7 +127,6 @@
     "src/features/transactions/account_journal/useAccountJournal.ts": 3,
     "src/features/transactions/add_transaction/AddTransactionModal.tsx": 1,
     "src/features/transactions/edit_transaction_modal/EditTransactionModal.tsx": 1,
-    "src/features/transactions/shared/validateTransaction.ts": 1,
     "src/features/transactions/transaction_list/useTransactionList.ts": 1,
     "src/features/unpriced_prices/useUnpricedPrices.ts": 2,
     "src/features/whats_new/parseChangelog.ts": 3

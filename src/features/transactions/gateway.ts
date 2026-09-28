@@ -5,6 +5,9 @@ import type {
   Event,
   SellHoldingDTO,
   Transaction,
+  TransactionDraft,
+  TransactionDraftError,
+  TransactionDraftPreview,
 } from "../../bindings";
 import { commands, events, type Result } from "../../bindings";
 import type { CorrectTransactionFields } from "./shared/types";
@@ -32,6 +35,12 @@ export const transactionGateway = {
 
   async cancelTransaction(id: string, accountId: string): Promise<Result<null, AccountError>> {
     return await commands.cancelTransaction({ account_id: accountId, transaction_id: id });
+  },
+
+  async validateTransactionDraft(
+    draft: TransactionDraft,
+  ): Promise<Result<TransactionDraftPreview, TransactionDraftError>> {
+    return await commands.validateTransactionDraft(draft);
   },
 
   async getTransactions(

@@ -1,12 +1,13 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Account, Asset, Transaction } from "@/bindings";
+import type { Account, Asset, Transaction, TransactionDraft } from "@/bindings";
 import { useAppStore } from "@/lib/store";
 import { useEditTransactionModal } from "./useEditTransactionModal";
 
-const { mockCorrectTransaction, mockRecordAssetPrice } = vi.hoisted(() => ({
+const { mockCorrectTransaction, mockRecordAssetPrice, mockValidateDraft } = vi.hoisted(() => ({
   mockCorrectTransaction: vi.fn(),
   mockRecordAssetPrice: vi.fn(),
+  mockValidateDraft: vi.fn(),
 }));
 
 vi.mock("../useTransactions", () => ({
@@ -22,6 +23,7 @@ vi.mock("../useTransactions", () => ({
 vi.mock("../gateway", () => ({
   transactionGateway: {
     recordAssetPrice: mockRecordAssetPrice,
+    validateTransactionDraft: mockValidateDraft,
   },
 }));
 
@@ -33,6 +35,23 @@ vi.mock("react-i18next", () => ({
 }));
 
 const MICRO = 1_000_000;
+
+// The draft check (TRX-062) is the backend's: this stand-in reports a missing account, asset
+// or date, echoes a typed unit price, and otherwise returns fixed figures.
+const fakeDraftCheck = async (draft: TransactionDraft) => {
+  if (!draft.account_id) return { status: "error", error: { code: "AccountMissing" } };
+  if (!draft.asset_id) return { status: "error", error: { code: "AssetMissing" } };
+  if (!draft.date) return { status: "error", error: { code: "DateMissing" } };
+  const unit_price = draft.entered.mode === "UnitPrice" ? draft.entered.unit_price : 7_000_000;
+  return { status: "ok", data: { unit_price, total_amount: 42_000_000 } };
+};
+
+// The check's answer by entry mode: a typed total, or the unit price.
+const answersByMode =
+  (byPrice: [number, number], byTotal: [number, number]) => async (draft: TransactionDraft) => {
+    const [unit_price, total_amount] = draft.entered.mode === "Total" ? byTotal : byPrice;
+    return { status: "ok", data: { unit_price, total_amount } };
+  };
 
 // 2 units @ 50.0 each, rate=1.0, fees=0 → total=100_000_000
 const baseTransaction: Transaction = {
@@ -76,6 +95,7 @@ describe("useEditTransactionModal", () => {
     localStorage.clear();
     mockCorrectTransaction.mockReset();
     mockRecordAssetPrice.mockReset();
+    mockValidateDraft.mockReset().mockImplementation(fakeDraftCheck);
     useAppStore.setState({
       assets: [
         { id: "asset-1", name: "Apple", is_archived: false, currency: "USD" },
@@ -85,15 +105,19 @@ describe("useEditTransactionModal", () => {
     });
   });
 
-  // Pre-fill: micro-unit values are converted to decimal strings; totalAmount is derived
-  it("pre-fills formData from transaction (micro → decimal)", () => {
+  // Pre-fill: micro-unit values are converted to decimal strings; the total comes from the check
+  it("pre-fills formData from transaction (micro → decimal)", async () => {
+    mockValidateDraft.mockImplementation(answersByMode([50 * MICRO, 100 * MICRO], [0, 0]));
     const { result } = renderHook(() => useEditTransactionModal({ transaction: baseTransaction }));
     expect(result.current.formData.quantity).toBe("2.000");
     expect(result.current.formData.unitPrice).toBe("50.000");
     expect(result.current.formData.exchangeRate).toBe("1.000");
     expect(result.current.formData.note).toBe("initial note");
-    // totalAmount is derived from micro values, not stored in formData
-    expect(result.current.totalAmountDisplay).toBe("100,000");
+    await waitFor(() => expect(result.current.totalAmountDisplay).toBe("100,000"));
+    // TRX-063 — a correction names the transaction it replaces
+    expect(mockValidateDraft).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: "Purchase", correcting: "tx-existing" }),
+    );
   });
 
   // Submit calls correctTransaction with correct args: (id, accountId, dto)
@@ -109,6 +133,7 @@ describe("useEditTransactionModal", () => {
         onSubmitSuccess,
       }),
     );
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
 
     const fakeSubmit = {
       preventDefault: vi.fn(),
@@ -143,6 +168,7 @@ describe("useEditTransactionModal", () => {
         onSubmitSuccess,
       }),
     );
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
 
     const fakeSubmit = {
       preventDefault: vi.fn(),
@@ -295,7 +321,15 @@ describe("useEditTransactionModal", () => {
 
     const fakeSubmit = { preventDefault: vi.fn() } as unknown as React.FormEvent;
 
-    it("offers total-entry for Purchase and Sell but not OpeningBalance", () => {
+    // TRX-051 — an opening balance's total is its typed total cost, not quantity × cost
+    it("shows an opening balance's total cost as typed", () => {
+      const { result } = renderHook(() =>
+        useEditTransactionModal({ transaction: openingBalanceTransaction }),
+      );
+      expect(result.current.totalAmountDisplay).toBe("100,000");
+    });
+
+    it("offers total-entry for Purchase and Sell but not OpeningBalance", async () => {
       const purchase = renderHook(() => useEditTransactionModal({ transaction: baseTransaction }));
       const sell = renderHook(() => useEditTransactionModal({ transaction: sellTransaction }));
       const ob = renderHook(() =>
@@ -304,6 +338,15 @@ describe("useEditTransactionModal", () => {
       expect(purchase.result.current.isTotalEntryEligible).toBe(true);
       expect(sell.result.current.isTotalEntryEligible).toBe(true);
       expect(ob.result.current.isTotalEntryEligible).toBe(false);
+      await waitFor(() => expect(sell.result.current.isFormValid).toBe(true));
+      expect(mockValidateDraft).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "Sell", correcting: "tx-sell" }),
+      );
+      // TRX-063 — an opening balance is checked on save, not by the draft check
+      expect(mockValidateDraft).not.toHaveBeenCalledWith(
+        expect.objectContaining({ correcting: "tx-ob" }),
+      );
+      expect(ob.result.current.isFormValid).toBe(true);
     });
 
     it("price mode (default) submits total_amount: null", async () => {
@@ -311,6 +354,7 @@ describe("useEditTransactionModal", () => {
       const { result } = renderHook(() =>
         useEditTransactionModal({ transaction: baseTransaction }),
       );
+      await waitFor(() => expect(result.current.isFormValid).toBe(true));
       await act(async () => {
         await result.current.handleSubmit(fakeSubmit);
       });
@@ -323,6 +367,9 @@ describe("useEditTransactionModal", () => {
 
     // TRX-061 — the typed purchase total is stored verbatim; unit price is derived.
     it("purchase total mode ships the typed total and a derived unit price", async () => {
+      mockValidateDraft.mockImplementation(
+        answersByMode([50 * MICRO, 100 * MICRO], [55 * MICRO, 110 * MICRO]),
+      );
       mockCorrectTransaction.mockResolvedValue({ data: { id: "tx-existing" }, error: null });
       const { result } = renderHook(() =>
         useEditTransactionModal({ transaction: baseTransaction }),
@@ -337,7 +384,6 @@ describe("useEditTransactionModal", () => {
       await act(async () => {
         await result.current.handleSubmit(fakeSubmit);
       });
-      // 110 total over 2 units, no fees → 55/unit.
       expect(mockCorrectTransaction).toHaveBeenCalledWith(
         "tx-existing",
         "account-1",
@@ -347,6 +393,9 @@ describe("useEditTransactionModal", () => {
 
     // SEL-051 — the sell total is net proceeds; fees are added back to derive the unit price.
     it("sell total mode derives unit price from net proceeds plus fees", async () => {
+      mockValidateDraft.mockImplementation(
+        answersByMode([50 * MICRO, 90 * MICRO], [50 * MICRO, 90 * MICRO]),
+      );
       mockCorrectTransaction.mockResolvedValue({ data: { id: "tx-sell" }, error: null });
       const { result } = renderHook(() =>
         useEditTransactionModal({ transaction: sellTransaction }),
@@ -363,7 +412,6 @@ describe("useEditTransactionModal", () => {
       await act(async () => {
         await result.current.handleSubmit(fakeSubmit);
       });
-      // (90 net + 10 fees) / 2 units = 50/unit.
       expect(mockCorrectTransaction).toHaveBeenCalledWith(
         "tx-sell",
         "account-1",
@@ -371,8 +419,52 @@ describe("useEditTransactionModal", () => {
       );
     });
 
+    // TRX-061 — switching back to price mode seeds the unit price the check derived
+    it("seeds the unit-price field from the check when switching back to price mode", async () => {
+      mockValidateDraft.mockImplementation(
+        answersByMode([50 * MICRO, 100 * MICRO], [55 * MICRO, 110 * MICRO]),
+      );
+      const { result } = renderHook(() =>
+        useEditTransactionModal({ transaction: baseTransaction }),
+      );
+      await act(async () => {
+        result.current.handleEntryModeChange("total");
+      });
+      await act(async () => {
+        result.current.handleTotalAmountChange("110");
+      });
+      await waitFor(() => expect(result.current.unitPriceDisplay).toBe("55,000"));
+      await act(async () => {
+        result.current.handleEntryModeChange("price");
+      });
+      expect(result.current.formData.unitPrice).toBe("55.000");
+    });
+
+    // TRX-063 — a correction with a problem is not sent; the problem becomes the error
+    it("does not send a correction the check rejects", async () => {
+      mockValidateDraft.mockResolvedValue({
+        status: "error",
+        error: { code: "QuantityNotPositive" },
+      });
+      const { result } = renderHook(() =>
+        useEditTransactionModal({ transaction: baseTransaction }),
+      );
+      await waitFor(() => expect(mockValidateDraft).toHaveBeenCalled());
+      await act(async () => {}); // the check's answer lands
+      await act(async () => {
+        await result.current.handleSubmit(fakeSubmit);
+      });
+      expect(mockCorrectTransaction).not.toHaveBeenCalled();
+      expect(result.current.error).toEqual({ key: "error.QuantityNotPositive" });
+    });
+
     // TRX-060 — a purchase total below its included fees is rejected inline.
     it("flags a purchase total below fees and blocks submit", async () => {
+      mockValidateDraft.mockImplementation(async (draft: TransactionDraft) =>
+        draft.entered.mode === "Total" && draft.entered.total < draft.entered.fees
+          ? { status: "error", error: { code: "TotalAmountBelowFees" } }
+          : fakeDraftCheck(draft),
+      );
       const { result } = renderHook(() =>
         useEditTransactionModal({ transaction: baseTransaction }),
       );

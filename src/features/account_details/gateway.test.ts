@@ -923,3 +923,36 @@ describe("accountDetailsGateway — getAccountDetails", () => {
     expect(result).toEqual({ status: "error", error: err });
   });
 });
+
+describe("accountDetailsGateway — validateTransactionDraft (TRX-062)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("sends the draft and returns the check's answer", async () => {
+    const draft = {
+      kind: "Purchase" as const,
+      account_id: "acc-1",
+      asset_id: "ast-1",
+      date: "2026-01-02",
+      quantity: 1_000_000,
+      entered: {
+        mode: "UnitPrice" as const,
+        unit_price: 10_000_000,
+        exchange_rate: 1_000_000,
+        fees: 0,
+      },
+      correcting: null,
+    };
+    mockInvoke.mockResolvedValue({ unit_price: 10_000_000, total_amount: 10_000_000 });
+    expect(await accountDetailsGateway.validateTransactionDraft(draft)).toEqual({
+      status: "ok",
+      data: { unit_price: 10_000_000, total_amount: 10_000_000 },
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("validate_transaction_draft", { draft });
+
+    mockInvoke.mockRejectedValue({ code: "DateMissing" });
+    expect(await accountDetailsGateway.validateTransactionDraft(draft)).toEqual({
+      status: "error",
+      error: { code: "DateMissing" },
+    });
+  });
+});

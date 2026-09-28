@@ -25,6 +25,7 @@ import {
   toClosedHoldingRow,
   toHoldingRow,
   toPriceableAssets,
+  transactionDraftErrorToI18n,
 } from "./presenter";
 
 const makeHolding = (overrides: Partial<HoldingDetail> = {}): HoldingDetail => ({
@@ -658,6 +659,38 @@ describe("dividendErrorToI18n", () => {
 // correct_transaction): e.g. CascadingOversell, TransactionNotFound. Every flat
 // { code } maps to error.{code}.
 // ---------------------------------------------------------------------------
+
+describe("transactionDraftErrorToI18n", () => {
+  // TRX-062 — a field not filled yet keeps the form's own message
+  it("maps a missing account, asset or date to the form's messages", () => {
+    expect(transactionDraftErrorToI18n({ code: "AccountMissing" })).toEqual({
+      key: "transaction.error_validation_account",
+    });
+    expect(transactionDraftErrorToI18n({ code: "AssetMissing" })).toEqual({
+      key: "transaction.error_validation_asset",
+    });
+    expect(transactionDraftErrorToI18n({ code: "DateMissing" })).toEqual({
+      key: "transaction.error_validation_date",
+    });
+  });
+
+  // SEL-021 — an oversell reports both quantities
+  it("maps an oversell with the available and requested quantities", () => {
+    expect(
+      transactionDraftErrorToI18n({ code: "Oversell", available: 1_000_000, requested: 2_500_000 }),
+    ).toEqual({
+      key: "error.Oversell",
+      vars: { available: expect.stringContaining("1"), requested: expect.stringContaining("2") },
+    });
+  });
+
+  // TRX-062 — any other rejection keeps the recording's flat key
+  it("maps a recording rejection to its flat error key", () => {
+    expect(transactionDraftErrorToI18n({ code: "TotalAmountBelowFees" })).toEqual({
+      key: "error.TotalAmountBelowFees",
+    });
+  });
+});
 
 describe("freeSharesErrorToI18n", () => {
   it.each([

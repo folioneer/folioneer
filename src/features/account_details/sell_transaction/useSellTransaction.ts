@@ -4,28 +4,21 @@ import type {
   TransactionEntryMode,
   TransactionFormData,
 } from "@/features/transactions/shared/types";
-import { validateSellForm } from "@/features/transactions/shared/validateTransaction";
 import { useTransactions } from "@/features/transactions/useTransactions";
 import { getAutoRecordPrice } from "@/lib/autoRecordPriceStorage";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import {
-  computeCostBasisMicro,
-  computeSellTotalMicro,
-  decimalToMicro,
-  deriveUnitPriceMicro,
-  microToDecimal,
-  microToFormatted,
-} from "@/lib/microUnits";
+import { computeCostBasisMicro, microToDecimal, microToFormatted } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
 import { useHoldingSnapshotAsOf } from "../shared/useHoldingSnapshotAsOf";
+import { toTransactionDraft, useTransactionDraftCheck } from "../shared/useTransactionDraftCheck";
 
 interface UseSellTransactionProps {
   accountId: string;
   assetId: string;
-  /** Holding quantity in micro-units — used for oversell guard (SEL-022). */
+  /** Holding quantity in micro-units — shown as the maximum sellable quantity (SEL-022). */
   holdingQuantityMicro: number;
   onSubmitSuccess?: () => void;
 }
@@ -58,38 +51,14 @@ export function useSellTransaction({
   const [entryMode, setEntryMode] = useState<TransactionEntryMode>("price");
   const [totalAmountInput, setTotalAmountInput] = useState("");
 
-  const microValues = useMemo(() => {
-    const qtyMicro = decimalToMicro(formData.quantity);
-    const rateMicro = decimalToMicro(formData.exchangeRate);
-    const feesMicro = decimalToMicro(formData.fees);
-    if (entryMode === "total") {
-      // SEL-050 — the typed net proceeds are ground truth; the unit price is derived
-      const totalMicro = decimalToMicro(totalAmountInput);
-      const priceMicro = deriveUnitPriceMicro(totalMicro, feesMicro, qtyMicro, rateMicro, true);
-      return { qtyMicro, priceMicro, rateMicro, feesMicro, totalMicro };
-    }
-    const priceMicro = decimalToMicro(formData.unitPrice);
-    const totalMicro = computeSellTotalMicro(qtyMicro, priceMicro, rateMicro, feesMicro);
-    return { qtyMicro, priceMicro, rateMicro, feesMicro, totalMicro };
-  }, [
-    formData.quantity,
-    formData.unitPrice,
-    formData.exchangeRate,
-    formData.fees,
-    entryMode,
-    totalAmountInput,
-  ]);
-
-  const isFormValid = useMemo(
-    () =>
-      validateSellForm(
-        formData,
-        microValues.qtyMicro,
-        microValues.totalMicro,
-        holdingQuantityMicro,
-      ) === null,
-    [formData, microValues.qtyMicro, microValues.totalMicro, holdingQuantityMicro],
+  // TRX-063 — the draft check decides whether the sale can be saved (oversell included,
+  // SEL-021), and returns the unit price and net proceeds it would record (SEL-023, SEL-050).
+  const draft = useMemo(
+    () => toTransactionDraft("Sell", formData, entryMode, totalAmountInput),
+    [formData, entryMode, totalAmountInput],
   );
+  const check = useTransactionDraftCheck(draft);
+  const preview = check.preview;
 
   // TDI-020 — average cost as of the entered sell date (or today). Hidden when
   // nothing is held as of that date (TDI-021).
@@ -104,11 +73,11 @@ export function useSellTransaction({
   // are entered and the holding is held as of the date.
   const potentialPnl = useMemo(() => {
     if (!snapshot || snapshot.quantity <= 0) return null;
-    if (microValues.qtyMicro <= 0 || microValues.priceMicro <= 0) return null;
-    const costBasis = computeCostBasisMicro(snapshot.average_price, microValues.qtyMicro);
-    const pnlMicro = microValues.totalMicro - costBasis;
+    if (!preview || preview.unit_price <= 0) return null;
+    const costBasis = computeCostBasisMicro(snapshot.average_price, draft.quantity);
+    const pnlMicro = preview.total_amount - costBasis;
     return { formatted: microToFormatted(pnlMicro), raw: pnlMicro };
-  }, [snapshot, microValues.qtyMicro, microValues.priceMicro, microValues.totalMicro]);
+  }, [snapshot, preview, draft.quantity]);
 
   const handleChange = useCallback((field: keyof TransactionFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -122,29 +91,23 @@ export function useSellTransaction({
     (mode: TransactionEntryMode) => {
       if (mode === entryMode) return;
       if (mode === "total") {
-        if (microValues.qtyMicro > 0 && microValues.priceMicro > 0) {
-          setTotalAmountInput(microToDecimal(microValues.totalMicro));
+        if (preview && preview.unit_price > 0) {
+          setTotalAmountInput(microToDecimal(preview.total_amount));
         }
-      } else if (microValues.priceMicro > 0) {
-        setFormData((prev) => ({ ...prev, unitPrice: microToDecimal(microValues.priceMicro) }));
+      } else if (preview && preview.unit_price > 0) {
+        setFormData((prev) => ({ ...prev, unitPrice: microToDecimal(preview.unit_price) }));
       }
       setEntryMode(mode);
     },
-    [entryMode, microValues],
+    [entryMode, preview],
   );
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
 
-      const validationError = validateSellForm(
-        formData,
-        microValues.qtyMicro,
-        microValues.totalMicro,
-        holdingQuantityMicro,
-      );
-      if (validationError) {
-        setError(validationError);
+      if (!preview) {
+        setError(check.problemMessage);
         return;
       }
 
@@ -156,13 +119,12 @@ export function useSellTransaction({
           account_id: formData.accountId,
           asset_id: formData.assetId,
           date: formData.date,
-          quantity: microValues.qtyMicro,
-          unit_price: microValues.priceMicro,
-          exchange_rate: microValues.rateMicro,
-          fees: microValues.feesMicro,
-          // SEL-050 — total mode ships the typed net proceeds; the backend
-          // re-derives the authoritative unit price from them
-          total_amount: entryMode === "total" ? microValues.totalMicro : null,
+          quantity: draft.quantity,
+          unit_price: preview.unit_price,
+          exchange_rate: draft.entered.exchange_rate,
+          fees: draft.entered.fees,
+          // SEL-050 — total mode ships the typed net proceeds; the backend derives the unit price
+          total_amount: draft.entered.mode === "Total" ? draft.entered.total : null,
           note: formData.note || null,
         });
 
@@ -172,12 +134,12 @@ export function useSellTransaction({
         }
 
         // MKT-055/061 — record price separately when auto-record is on and price is non-zero (best-effort)
-        if (recordPrice && microValues.priceMicro > 0) {
+        if (recordPrice && preview.unit_price > 0) {
           accountDetailsGateway
             .recordAssetPrice(
               formData.assetId,
               formData.date,
-              parseFloat(microToDecimal(microValues.priceMicro)),
+              parseFloat(microToDecimal(preview.unit_price)),
             )
             .catch((e) =>
               logger.warn("Failed to record asset price after sell", {
@@ -195,9 +157,9 @@ export function useSellTransaction({
     },
     [
       formData,
-      microValues,
-      entryMode,
-      holdingQuantityMicro,
+      draft,
+      preview,
+      check.problemMessage,
       recordPrice,
       sellHolding,
       t,
@@ -209,7 +171,7 @@ export function useSellTransaction({
   return {
     formData,
     /** Sell total proceeds in micro-units formatted for display (SEL-023, read-only). */
-    totalAmountDisplay: microToFormatted(microValues.totalMicro),
+    totalAmountDisplay: microToFormatted(preview?.total_amount ?? 0),
     /** Maximum sellable quantity formatted for display (SEL-022). */
     maxQuantityDisplay: microToFormatted(holdingQuantityMicro, 6),
     /** SEL-050 — how the money side is entered; resets with the modal (not persisted). */
@@ -218,15 +180,15 @@ export function useSellTransaction({
     /** SEL-050 — the typed all-in net proceeds (decimal string), only meaningful in total mode. */
     totalAmountInput,
     handleTotalAmountChange: setTotalAmountInput,
-    /** SEL-050 — formatted derived unit price shown in total mode; "—" when quantity is 0. */
-    unitPriceDisplay: microValues.qtyMicro > 0 ? microToFormatted(microValues.priceMicro) : "—",
+    /** SEL-050 — formatted derived unit price shown in total mode; "—" until the draft checks clean. */
+    unitPriceDisplay: preview ? microToFormatted(preview.unit_price) : "—",
     /** TDI-020 — formatted account-currency average cost as of the date, or null when not held. */
     averageCostAsOfDate,
     /** TDI-030 — potential realized P&L of the typed sell (`{ formatted, raw }`), or null. */
     potentialPnl,
     error,
     isSubmitting,
-    isFormValid,
+    isFormValid: check.isClean,
     recordPrice,
     setRecordPrice,
     handleChange,

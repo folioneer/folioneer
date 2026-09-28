@@ -3,10 +3,8 @@ import { useTranslation } from "react-i18next";
 import type { Transaction } from "@/bindings";
 import { logger } from "@/lib/logger";
 import {
-  computeSellTotalMicro,
   computeTotalMicro,
   decimalToMicro,
-  deriveUnitPriceMicro,
   microToDecimal,
   microToFormatted,
 } from "@/lib/microUnits";
@@ -15,7 +13,7 @@ import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { transactionGateway } from "../gateway";
 import type { TransactionEntryMode, TransactionFormData } from "../shared/types";
-import { validateTransactionForm } from "../shared/validateTransaction";
+import { toTransactionDraft, useTransactionDraftCheck } from "../shared/useTransactionDraftCheck";
 import { useTransactions } from "../useTransactions";
 
 interface UseEditTransactionModalProps {
@@ -68,80 +66,60 @@ export function useEditTransactionModal({
 
   const isTotalMode = isTotalEntryEligible && entryMode === "total";
 
-  // Derive micro-unit values from form strings — single conversion at the input boundary (ADR-001).
-  // TRX-051: for OpeningBalance, priceMicro holds total cost; totalMicro = priceMicro directly.
-  // Use sell formula when editing a Sell transaction (SEL-023).
-  const microValues = useMemo(() => {
-    const qtyMicro = decimalToMicro(formData.quantity);
-    const priceMicro = decimalToMicro(formData.unitPrice);
-    if (isOpeningBalance) {
-      return {
-        qtyMicro,
-        priceMicro,
-        rateMicro: 1_000_000,
-        feesMicro: 0,
-        totalMicro: priceMicro,
-      };
-    }
-    const rateMicro = decimalToMicro(formData.exchangeRate);
-    const feesMicro = decimalToMicro(formData.fees);
-    if (isTotalMode) {
-      // TRX-061 / SEL-051 — the typed total is ground truth; the unit price is
-      // derived from it (priceMicro mirrors the backend re-derivation).
-      const totalMicro = decimalToMicro(totalAmountInput);
-      const derivedPriceMicro = deriveUnitPriceMicro(
-        totalMicro,
-        feesMicro,
-        qtyMicro,
-        rateMicro,
-        isSell,
-      );
-      return { qtyMicro, priceMicro: derivedPriceMicro, rateMicro, feesMicro, totalMicro };
-    }
-    const totalMicro = isSell
-      ? computeSellTotalMicro(qtyMicro, priceMicro, rateMicro, feesMicro)
-      : computeTotalMicro(qtyMicro, priceMicro, rateMicro, feesMicro);
-    return { qtyMicro, priceMicro, rateMicro, feesMicro, totalMicro };
-  }, [
-    formData.quantity,
-    formData.unitPrice,
-    formData.exchangeRate,
-    formData.fees,
-    isOpeningBalance,
-    isSell,
-    isTotalMode,
-    totalAmountInput,
-  ]);
-
-  // TRX-060/061 — a typed purchase total must cover the fees it includes; a sell
-  // total is net proceeds, so the fees-floor check does not apply to sells.
-  const totalEntryFeesMicro = isTotalMode && !isSell ? microValues.feesMicro : null;
-
-  // Derived form validity
-  const isFormValid = useMemo(
+  // TRX-063 — a purchase or sale correction follows the draft check, which returns the unit
+  // price and total it would record; a corrected sale is not checked for oversell (SEL-030).
+  const draft = useMemo(
     () =>
-      validateTransactionForm(
-        formData,
-        microValues.qtyMicro,
-        microValues.totalMicro,
-        totalEntryFeesMicro,
-      ) === null,
-    [formData, microValues.qtyMicro, microValues.totalMicro, totalEntryFeesMicro],
+      isTotalEntryEligible
+        ? toTransactionDraft(
+            isSell ? "Sell" : "Purchase",
+            formData,
+            isTotalMode ? "total" : "price",
+            totalAmountInput,
+            transaction.id,
+          )
+        : null,
+    [isTotalEntryEligible, formData, isSell, isTotalMode, totalAmountInput, transaction.id],
   );
+  const check = useTransactionDraftCheck(draft);
+  const preview = check.preview;
 
-  // TRX-060 — inline rejection on the total field for a purchase: a typed all-in
-  // total cannot be lower than the fees it includes. Submit stays disabled via
-  // isFormValid. Sells have no fees floor (the total is already net).
+  // TRX-063 — every other type (an opening balance, a dividend) is checked on save: what the
+  // user typed is sent as entered and recording's rejection is shown.
+  const entered = useMemo(
+    () => ({
+      qtyMicro: decimalToMicro(formData.quantity),
+      priceMicro: decimalToMicro(formData.unitPrice),
+      rateMicro: isOpeningBalance ? 1_000_000 : decimalToMicro(formData.exchangeRate),
+      feesMicro: isOpeningBalance ? 0 : decimalToMicro(formData.fees),
+    }),
+    [formData, isOpeningBalance],
+  );
+  // reviewer-frontend FP: no numeric check here — recording rejects a non-positive figure on
+  // save (TRX-063, F32), and an opening balance may cost zero (TRX-045) — see PR #53
+  const isFormValid = isTotalEntryEligible
+    ? check.isClean
+    : Boolean(formData.date && formData.quantity && formData.unitPrice);
+  // TD-054 — a dividend correction still previews its total in the interface.
+  // TRX-051 — an opening balance's amount field holds its total cost, shown as typed.
+  const totalMicro = isTotalEntryEligible
+    ? (preview?.total_amount ?? 0)
+    : isOpeningBalance
+      ? entered.priceMicro
+      : computeTotalMicro(
+          entered.qtyMicro,
+          entered.priceMicro,
+          entered.rateMicro,
+          entered.feesMicro,
+        );
+
+  // TRX-060 — a typed purchase total below the fees it includes is shown on the Total field.
   const totalBelowFeesError = useMemo<I18nMessage | null>(
     () =>
-      isTotalMode &&
-      !isSell &&
-      microValues.totalMicro > 0 &&
-      microValues.feesMicro > 0 &&
-      microValues.totalMicro < microValues.feesMicro
+      isTotalEntryEligible && check.problem?.code === "TotalAmountBelowFees"
         ? { key: "transaction.error_validation_total_below_fees" }
         : null,
-    [isTotalMode, isSell, microValues.totalMicro, microValues.feesMicro],
+    [isTotalEntryEligible, check.problem],
   );
 
   // TRX-029 — derived flag: is the currently selected asset archived?
@@ -164,26 +142,20 @@ export function useEditTransactionModal({
     (mode: TransactionEntryMode) => {
       if (mode === entryMode) return;
       if (mode === "total") {
-        if (microValues.qtyMicro > 0 && microValues.priceMicro > 0) {
-          setTotalAmountInput(microToDecimal(microValues.totalMicro));
+        if (preview && preview.unit_price > 0) {
+          setTotalAmountInput(microToDecimal(preview.total_amount));
         }
-      } else if (microValues.priceMicro > 0) {
-        setFormData((prev) => ({ ...prev, unitPrice: microToDecimal(microValues.priceMicro) }));
+      } else if (preview && preview.unit_price > 0) {
+        setFormData((prev) => ({ ...prev, unitPrice: microToDecimal(preview.unit_price) }));
       }
       setEntryMode(mode);
     },
-    [entryMode, microValues],
+    [entryMode, preview],
   );
 
   const doSubmit = useCallback(async () => {
-    const validationError = validateTransactionForm(
-      formData,
-      microValues.qtyMicro,
-      microValues.totalMicro,
-      totalEntryFeesMicro,
-    );
-    if (validationError) {
-      setError(validationError);
+    if (isTotalEntryEligible && !preview) {
+      setError(check.problemMessage);
       return;
     }
 
@@ -193,16 +165,16 @@ export function useEditTransactionModal({
     try {
       const result = await correctTransaction(transaction.id, transaction.account_id, {
         date: formData.date,
-        quantity: microValues.qtyMicro,
-        unit_price: isOpeningBalance ? 0 : microValues.priceMicro,
-        exchange_rate: microValues.rateMicro,
-        fees: microValues.feesMicro,
+        quantity: entered.qtyMicro,
+        unit_price: isOpeningBalance ? 0 : (preview?.unit_price ?? entered.priceMicro),
+        exchange_rate: entered.rateMicro,
+        fees: entered.feesMicro,
         // TRX-051 / TRX-061 / SEL-051 — an opening balance's total cost, or a total
         // typed in total mode, is sent as is; the backend derives the unit price.
         total_amount: isOpeningBalance
-          ? microValues.priceMicro
-          : isTotalMode
-            ? microValues.totalMicro
+          ? entered.priceMicro
+          : draft && draft.entered.mode === "Total"
+            ? draft.entered.total
             : null,
         note: isOpeningBalance ? null : formData.note || null,
       });
@@ -213,12 +185,13 @@ export function useEditTransactionModal({
       }
 
       // MKT-055/061 — record price separately when opt-in is on and price is non-zero (best-effort)
-      if (recordPrice && microValues.priceMicro > 0) {
+      const recordedPrice = preview?.unit_price ?? entered.priceMicro;
+      if (recordPrice && recordedPrice > 0) {
         transactionGateway
           .recordAssetPrice(
             transaction.asset_id,
             formData.date,
-            parseFloat(microToDecimal(microValues.priceMicro)),
+            parseFloat(microToDecimal(recordedPrice)),
           )
           .catch((e) =>
             logger.warn("Failed to record asset price after correction", {
@@ -234,9 +207,11 @@ export function useEditTransactionModal({
     }
   }, [
     formData,
-    microValues,
-    totalEntryFeesMicro,
-    isTotalMode,
+    draft,
+    entered,
+    preview,
+    isTotalEntryEligible,
+    check.problemMessage,
     recordPrice,
     isOpeningBalance,
     correctTransaction,
@@ -273,7 +248,7 @@ export function useEditTransactionModal({
   return {
     formData,
     /** Total amount formatted for display. For OpeningBalance, equals total cost (TRX-051). */
-    totalAmountDisplay: microToFormatted(microValues.totalMicro),
+    totalAmountDisplay: microToFormatted(totalMicro),
     error,
     isSubmitting,
     isFormValid,
@@ -289,7 +264,7 @@ export function useEditTransactionModal({
     handleTotalAmountChange,
     totalBelowFeesError,
     /** Derived unit price shown read-only while in total-entry mode. */
-    unitPriceDisplay: microValues.qtyMicro > 0 ? microToFormatted(microValues.priceMicro) : "—",
+    unitPriceDisplay: preview ? microToFormatted(preview.unit_price) : "—",
     handleChange,
     handleSubmit,
     handleConfirmArchived,

@@ -4,23 +4,17 @@ import type {
   TransactionEntryMode,
   TransactionFormData,
 } from "@/features/transactions/shared/types";
-import { validateTransactionForm } from "@/features/transactions/shared/validateTransaction";
 import { useTransactions } from "@/features/transactions/useTransactions";
 import { getAutoRecordPrice } from "@/lib/autoRecordPriceStorage";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import {
-  computeTotalMicro,
-  decimalToMicro,
-  deriveUnitPriceMicro,
-  microToDecimal,
-  microToFormatted,
-} from "@/lib/microUnits";
+import { microToDecimal, microToFormatted } from "@/lib/microUnits";
 import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
 import { useHoldingSnapshotAsOf } from "../shared/useHoldingSnapshotAsOf";
+import { toTransactionDraft, useTransactionDraftCheck } from "../shared/useTransactionDraftCheck";
 
 interface UseBuyTransactionProps {
   accountId: string;
@@ -53,52 +47,22 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
   const [entryMode, setEntryMode] = useState<TransactionEntryMode>("price");
   const [totalAmountInput, setTotalAmountInput] = useState("");
 
-  const microValues = useMemo(() => {
-    const qtyMicro = decimalToMicro(formData.quantity);
-    const rateMicro = decimalToMicro(formData.exchangeRate);
-    const feesMicro = decimalToMicro(formData.fees);
-    if (entryMode === "total") {
-      // TRX-060 — the typed total is ground truth; the unit price is derived
-      const totalMicro = decimalToMicro(totalAmountInput);
-      const priceMicro = deriveUnitPriceMicro(totalMicro, feesMicro, qtyMicro, rateMicro, false);
-      return { qtyMicro, priceMicro, rateMicro, feesMicro, totalMicro };
-    }
-    const priceMicro = decimalToMicro(formData.unitPrice);
-    const totalMicro = computeTotalMicro(qtyMicro, priceMicro, rateMicro, feesMicro);
-    return { qtyMicro, priceMicro, rateMicro, feesMicro, totalMicro };
-  }, [
-    formData.quantity,
-    formData.unitPrice,
-    formData.exchangeRate,
-    formData.fees,
-    entryMode,
-    totalAmountInput,
-  ]);
-
-  const totalEntryFeesMicro = entryMode === "total" ? microValues.feesMicro : null;
-
-  const isFormValid = useMemo(
-    () =>
-      validateTransactionForm(
-        formData,
-        microValues.qtyMicro,
-        microValues.totalMicro,
-        totalEntryFeesMicro,
-      ) === null,
-    [formData, microValues.qtyMicro, microValues.totalMicro, totalEntryFeesMicro],
+  // TRX-063 — the draft check decides whether the purchase can be saved, and returns the
+  // unit price and total it would record (TRX-026, TRX-060).
+  const draft = useMemo(
+    () => toTransactionDraft("Purchase", formData, entryMode, totalAmountInput),
+    [formData, entryMode, totalAmountInput],
   );
+  const check = useTransactionDraftCheck(draft);
+  const preview = check.preview;
 
-  // TRX-060 — inline rejection on the total field: a typed all-in total cannot
-  // be lower than the fees it includes. Submit stays disabled via isFormValid.
+  // TRX-060 — a typed all-in total below the fees it includes is shown on the Total field.
   const totalBelowFeesError = useMemo<I18nMessage | null>(
     () =>
-      entryMode === "total" &&
-      microValues.totalMicro > 0 &&
-      microValues.feesMicro > 0 &&
-      microValues.totalMicro < microValues.feesMicro
+      check.problem?.code === "TotalAmountBelowFees"
         ? { key: "transaction.error_validation_total_below_fees" }
         : null,
-    [entryMode, microValues.totalMicro, microValues.feesMicro],
+    [check.problem],
   );
 
   // TDI-020 — average cost as of the entered trade date (or today). Hidden when
@@ -127,26 +91,20 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
     (mode: TransactionEntryMode) => {
       if (mode === entryMode) return;
       if (mode === "total") {
-        if (microValues.qtyMicro > 0 && microValues.priceMicro > 0) {
-          setTotalAmountInput(microToDecimal(microValues.totalMicro));
+        if (preview && preview.unit_price > 0) {
+          setTotalAmountInput(microToDecimal(preview.total_amount));
         }
-      } else if (microValues.priceMicro > 0) {
-        setFormData((prev) => ({ ...prev, unitPrice: microToDecimal(microValues.priceMicro) }));
+      } else if (preview && preview.unit_price > 0) {
+        setFormData((prev) => ({ ...prev, unitPrice: microToDecimal(preview.unit_price) }));
       }
       setEntryMode(mode);
     },
-    [entryMode, microValues],
+    [entryMode, preview],
   );
 
   const doSubmit = useCallback(async () => {
-    const validationError = validateTransactionForm(
-      formData,
-      microValues.qtyMicro,
-      microValues.totalMicro,
-      totalEntryFeesMicro,
-    );
-    if (validationError) {
-      setError(validationError);
+    if (!preview) {
+      setError(check.problemMessage);
       return;
     }
 
@@ -158,13 +116,12 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
         account_id: formData.accountId,
         asset_id: formData.assetId,
         date: formData.date,
-        quantity: microValues.qtyMicro,
-        unit_price: microValues.priceMicro,
-        exchange_rate: microValues.rateMicro,
-        fees: microValues.feesMicro,
-        // TRX-060 — total mode ships the typed total; the backend re-derives
-        // the authoritative unit price from it (priceMicro mirrors that formula)
-        total_amount: entryMode === "total" ? microValues.totalMicro : null,
+        quantity: draft.quantity,
+        unit_price: preview.unit_price,
+        exchange_rate: draft.entered.exchange_rate,
+        fees: draft.entered.fees,
+        // TRX-060 — total mode ships the typed total; the backend derives the unit price
+        total_amount: draft.entered.mode === "Total" ? draft.entered.total : null,
         note: formData.note || null,
       });
 
@@ -174,12 +131,12 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
       }
 
       // MKT-055/061 — record price separately when auto-record is on and price is non-zero (best-effort)
-      if (recordPrice && microValues.priceMicro > 0) {
+      if (recordPrice && preview.unit_price > 0) {
         accountDetailsGateway
           .recordAssetPrice(
             formData.assetId,
             formData.date,
-            parseFloat(microToDecimal(microValues.priceMicro)),
+            parseFloat(microToDecimal(preview.unit_price)),
           )
           .catch((e) => logger.warn("Failed to record asset price after buy", { error: e }));
       }
@@ -192,9 +149,9 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
     }
   }, [
     formData,
-    microValues,
-    entryMode,
-    totalEntryFeesMicro,
+    draft,
+    preview,
+    check.problemMessage,
     recordPrice,
     buyHolding,
     t,
@@ -225,7 +182,7 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
 
   return {
     formData,
-    totalAmountDisplay: microToFormatted(microValues.totalMicro),
+    totalAmountDisplay: microToFormatted(preview?.total_amount ?? 0),
     /** TRX-060 — how the money side is entered; resets with the modal (not persisted). */
     entryMode,
     setEntryMode: handleEntryModeChange,
@@ -234,13 +191,13 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
     handleTotalAmountChange: setTotalAmountInput,
     /** TRX-060 — inline error for the Total field when the typed total is below the fees. */
     totalBelowFeesError,
-    /** TRX-060 — formatted derived unit price shown in total mode; "—" when quantity is 0. */
-    unitPriceDisplay: microValues.qtyMicro > 0 ? microToFormatted(microValues.priceMicro) : "—",
+    /** TRX-060 — formatted derived unit price shown in total mode; "—" until the draft checks clean. */
+    unitPriceDisplay: preview ? microToFormatted(preview.unit_price) : "—",
     /** TDI-020 — formatted account-currency average cost as of the date, or null when not held. */
     averageCostAsOfDate,
     error,
     isSubmitting,
-    isFormValid,
+    isFormValid: check.isClean,
     showArchivedConfirm,
     recordPrice,
     setRecordPrice,

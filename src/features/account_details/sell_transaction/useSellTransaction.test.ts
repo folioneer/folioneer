@@ -1,12 +1,16 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { TransactionDraft } from "@/bindings";
 import { useSellTransaction } from "./useSellTransaction";
 
-const { mockSellHolding, mockRecordAssetPrice, mockGetSnapshot } = vi.hoisted(() => ({
-  mockSellHolding: vi.fn(),
-  mockRecordAssetPrice: vi.fn(),
-  mockGetSnapshot: vi.fn(),
-}));
+const { mockSellHolding, mockRecordAssetPrice, mockGetSnapshot, mockValidateDraft } = vi.hoisted(
+  () => ({
+    mockSellHolding: vi.fn(),
+    mockValidateDraft: vi.fn(),
+    mockRecordAssetPrice: vi.fn(),
+    mockGetSnapshot: vi.fn(),
+  }),
+);
 
 vi.mock("@/features/transactions/useTransactions", () => ({
   useTransactions: () => ({
@@ -22,6 +26,7 @@ vi.mock("../gateway", () => ({
   accountDetailsGateway: {
     recordAssetPrice: mockRecordAssetPrice,
     getHoldingSnapshotAsOf: mockGetSnapshot,
+    validateTransactionDraft: mockValidateDraft,
   },
 }));
 
@@ -31,6 +36,25 @@ vi.mock("react-i18next", () => ({
     i18n: { language: "en" },
   }),
 }));
+
+// The draft check (TRX-062) is the backend's: this stand-in reports a missing account, asset
+// or date, echoes a typed unit price, and otherwise returns fixed figures.
+const fakeDraftCheck = async (draft: TransactionDraft) => {
+  if (!draft.account_id) return { status: "error", error: { code: "AccountMissing" } };
+  if (!draft.asset_id) return { status: "error", error: { code: "AssetMissing" } };
+  if (!draft.date) return { status: "error", error: { code: "DateMissing" } };
+  const unit_price = draft.entered.mode === "UnitPrice" ? draft.entered.unit_price : 7_000_000;
+  return { status: "ok", data: { unit_price, total_amount: 42_000_000 } };
+};
+
+const answers = (unit_price: number, total_amount: number) => ({
+  status: "ok",
+  data: { unit_price, total_amount },
+});
+const oversell = {
+  status: "error",
+  error: { code: "Oversell", available: 1_000_000, requested: 2_000_000 },
+};
 
 const fakeSubmit = { preventDefault: vi.fn() } as unknown as React.FormEvent;
 
@@ -46,11 +70,13 @@ describe("useSellTransaction", () => {
     mockSellHolding.mockReset();
     mockRecordAssetPrice.mockReset();
     mockGetSnapshot.mockReset();
+    mockValidateDraft.mockReset().mockImplementation(fakeDraftCheck);
     mockGetSnapshot.mockResolvedValue({ status: "ok", data: { quantity: 0, average_price: 0 } });
   });
 
   // TDI-030 — potential P&L = proceeds − VWAP cost basis of the sold quantity.
   it("computes potentialPnl from the as-of snapshot and the typed sell", async () => {
+    mockValidateDraft.mockResolvedValue(answers(150_000_000, 150_000_000));
     mockGetSnapshot.mockResolvedValue({
       status: "ok",
       data: { quantity: 2_000_000, average_price: 100_000_000 },
@@ -61,7 +87,7 @@ describe("useSellTransaction", () => {
       result.current.handleChange("quantity", "1");
       result.current.handleChange("unitPrice", "150");
     });
-    // proceeds 150 − cost basis (100 × 1) = 50 → 50_000_000 micro
+    // proceeds 150 (from the check) − cost basis (100 × 1) = 50
     expect(result.current.potentialPnl?.raw).toBe(50_000_000);
   });
 
@@ -79,6 +105,7 @@ describe("useSellTransaction", () => {
   // TDI-030 — cross-currency: average_price (account CCY) and proceeds (account CCY,
   // rate-converted) are the same currency, so the P&L is correct even when rate ≠ 1.
   it("computes potentialPnl correctly for a cross-currency sell", async () => {
+    mockValidateDraft.mockResolvedValue(answers(60_000_000, 120_000_000));
     mockGetSnapshot.mockResolvedValue({
       status: "ok",
       data: { quantity: 2_000_000, average_price: 100_000_000 },
@@ -94,8 +121,9 @@ describe("useSellTransaction", () => {
     expect(result.current.potentialPnl?.raw).toBe(20_000_000);
   });
 
-  // SEL-023 — sell total = floor(floor(qty × price / MICRO) × rate / MICRO) − fees
-  it("computes sell total with fees subtracted (SEL-023)", async () => {
+  // SEL-023 / TRX-063 — the form shows the net proceeds the draft check returns
+  it("shows the net proceeds the draft check returns (SEL-023)", async () => {
+    mockValidateDraft.mockResolvedValue(answers(50_000_000, 95_000_000));
     const { result } = renderHook(() => useSellTransaction(BASE_PROPS));
 
     await act(async () => {
@@ -105,12 +133,15 @@ describe("useSellTransaction", () => {
       result.current.handleChange("fees", "5");
     });
 
-    // 2 × 50 × 1 − 5 = 95
+    expect(mockValidateDraft).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: "Sell", quantity: 2_000_000, correcting: null }),
+    );
     expect(result.current.totalAmountDisplay).toBe("95,000");
   });
 
   // SEL-022 — oversell guard: quantity > holdingQuantityMicro → form invalid
   it("marks form invalid when quantity exceeds holding (SEL-022)", async () => {
+    mockValidateDraft.mockResolvedValue(oversell);
     const { result } = renderHook(() =>
       useSellTransaction({ ...BASE_PROPS, holdingQuantityMicro: 1_000_000 }),
     );
@@ -128,6 +159,7 @@ describe("useSellTransaction", () => {
 
   // SEL-022 — oversell sets the error key on submit attempt
   it("sets oversell error key on submit when quantity exceeds holding (SEL-022)", async () => {
+    mockValidateDraft.mockResolvedValue(oversell);
     const onSubmitSuccess = vi.fn();
     const { result } = renderHook(() =>
       useSellTransaction({
@@ -150,8 +182,8 @@ describe("useSellTransaction", () => {
     });
 
     expect(result.current.error).toEqual({
-      key: "transaction.error_validation_oversell",
-      vars: expect.objectContaining({ max: expect.any(String) }),
+      key: "error.Oversell",
+      vars: expect.objectContaining({ available: expect.any(String) }),
     });
     expect(mockSellHolding).not.toHaveBeenCalled();
     expect(onSubmitSuccess).not.toHaveBeenCalled();
@@ -205,9 +237,9 @@ describe("useSellTransaction", () => {
     );
   });
 
-  // SEL-050 — total mode sends the typed net proceeds and the derived unit price
-  // (fees added back: (140 + 10) / 1 = 150 in asset currency)
+  // SEL-050 — total mode sends the typed net proceeds and the unit price the check derived
   it("sends the typed total_amount and the derived unit_price in total mode", async () => {
+    mockValidateDraft.mockResolvedValue(answers(150_000_000, 140_000_000));
     mockSellHolding.mockResolvedValue({ data: { id: "tx-t" }, error: null });
     const { result } = renderHook(() => useSellTransaction(BASE_PROPS));
 
@@ -233,8 +265,12 @@ describe("useSellTransaction", () => {
     );
   });
 
-  // SEL-050 — the derived price display falls back to "—" while quantity is 0
-  it("shows an em dash for the derived unit price while quantity is 0", async () => {
+  // SEL-050 — the derived price display falls back to "—" while the draft has a problem
+  it("shows an em dash for the derived unit price while the draft has a problem", async () => {
+    mockValidateDraft.mockResolvedValue({
+      status: "error",
+      error: { code: "QuantityNotPositive" },
+    });
     const { result } = renderHook(() => useSellTransaction(BASE_PROPS));
 
     await act(async () => {
@@ -247,6 +283,7 @@ describe("useSellTransaction", () => {
 
   // SEL-050 — switching price → total seeds the total input from the computed proceeds
   it("seeds the total input from the computed proceeds when switching to total mode", async () => {
+    mockValidateDraft.mockResolvedValue(answers(50_000_000, 95_000_000));
     const { result } = renderHook(() => useSellTransaction(BASE_PROPS));
 
     await act(async () => {
@@ -259,13 +296,13 @@ describe("useSellTransaction", () => {
       result.current.setEntryMode("total");
     });
 
-    // 2 × 50 − 5 fees = 95
     expect(result.current.entryMode).toBe("total");
     expect(result.current.totalAmountInput).toBe("95.000");
   });
 
   // SEL-050 — switching total → price seeds the unit-price field from the derived price
   it("seeds the unit-price field from the derived price when switching back to price mode", async () => {
+    mockValidateDraft.mockResolvedValue(answers(75_000_000, 140_000_000));
     const { result } = renderHook(() => useSellTransaction(BASE_PROPS));
 
     await act(async () => {
@@ -281,13 +318,13 @@ describe("useSellTransaction", () => {
       result.current.setEntryMode("price");
     });
 
-    // (140 + 10) / 2 = 75
     expect(result.current.entryMode).toBe("price");
     expect(result.current.formData.unitPrice).toBe("75.000");
   });
 
   // SEL-022 — the oversell guard still applies in total mode
   it("keeps the oversell guard in total mode", async () => {
+    mockValidateDraft.mockResolvedValue(oversell);
     const { result } = renderHook(() =>
       useSellTransaction({ ...BASE_PROPS, holdingQuantityMicro: 1_000_000 }),
     );
