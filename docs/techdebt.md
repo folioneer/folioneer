@@ -412,3 +412,12 @@ Remove an entry once it has been resolved.
 - Observation: the correction form shows a dividend's total computed in the frontend with the purchase formula (F32); the backend recomputes it on save (DIV-040). The architecture check does not see a formula call, so nothing stops a new one.
 - User value: None directly — the total shown while editing a dividend comes from the rule that records it.
 - Done when: the dividend correction takes its displayed total from a backend check, `computeTotalMicro` has no caller left in `src/` and is deleted.
+
+## 2026-09-28 — TD-055 — The E2E input helper never checks that a typed value was kept
+
+- Found by: E2E flake on PR #53 (`buy_sell` TRX-010 failed once, passed on re-run; failure screenshot in the run's `e2e-failure-screenshots` artifact, run 36404088620)
+- Where: `e2e/helpers/react.ts` — `setReactInputValue`
+- Severity: 🟡
+- Observation: the Buy dialog kept the typed date and unit price but lost the quantity, so Save stayed disabled and the test timed out. The helper sets the value and dispatches `input`/`change` once, then returns without reading the field back, so a value the page dropped (the dialog still mounting, a controlled field re-synced) goes unnoticed until a later wait fails far from the cause.
+- User value: None directly — fewer red E2E runs to re-run, each worth 13–15 minutes of CI.
+- Done when: `setReactInputValue` waits until the field shows the value it set (re-dispatching once if not) and fails with the field's id when it never does; a unit check of the helper or a spec that clears a field mid-mount proves the retry.
