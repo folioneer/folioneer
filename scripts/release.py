@@ -9,7 +9,7 @@ Process:
   1. Run all quality checks via check.py (tests, lint, SQLx, build)
   2. Analyze git history since last tag
   3. Determine version bump using semver
-  4. Update version in package.json, Cargo.toml, and tauri.conf.json
+  4. Update version in package.json, package-lock.json, Cargo.toml, and tauri.conf.json
   5. Create/update CHANGELOG.md
   6. Format files via just format
   7. Create commit and git tag
@@ -79,6 +79,17 @@ class _Resolution(Enum):
     EARLY_FAIL = (
         "early_fail"  # exit 1 (tests failed, no commits in non-preview, user cancelled)
     )
+
+
+def set_lockfile_version(lockfile: Path, version: str) -> None:
+    """The npm lockfile states the version it locks: its own `version` and its root
+    package's (TD-035). Written back the way npm writes it, so nothing else moves."""
+    data = json.loads(lockfile.read_text(encoding="utf-8"))
+    data["version"] = version
+    root = data.get("packages", {}).get("")
+    if root is not None:
+        root["version"] = version
+    lockfile.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 class ReleaseManager:
@@ -242,7 +253,7 @@ class ReleaseManager:
             f.write("\n")
 
     def update_version_files(self) -> None:
-        """Update version in package.json, Cargo.toml, and tauri.conf.json.
+        """Update version in package.json, package-lock.json, Cargo.toml, and tauri.conf.json.
 
         Raises:
             RuntimeError: if the Cargo.toml [package].version regex matches != 1 site
@@ -254,12 +265,15 @@ class ReleaseManager:
 
         if self.mode is Mode.DRY_RUN:
             print("  → package.json")
+            print("  → package-lock.json")
             print("  → src-tauri/Cargo.toml")
             print("  → src-tauri/tauri.conf.json")
             return
 
         self._update_json_file(self.repo_root / "package.json", "version")
         print("  ✓ package.json")
+        set_lockfile_version(self.repo_root / "package-lock.json", self.new_version)
+        print("  ✓ package-lock.json")
 
         cargo_toml = self.repo_root / "src-tauri" / "Cargo.toml"
         content = cargo_toml.read_text(encoding="utf-8")
@@ -318,7 +332,7 @@ class ReleaseManager:
                 print(f"{RED}{detail}{NC}", file=sys.stderr)
             print(
                 f"{BLUE}   Version files already edited; inspect Cargo.toml syntax or "
-                f"`git checkout -- package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json` to revert.{NC}",
+                f"`git checkout -- package.json package-lock.json src-tauri/Cargo.toml src-tauri/tauri.conf.json` to revert.{NC}",
                 file=sys.stderr,
             )
             raise SystemExit(1) from e
@@ -427,6 +441,7 @@ class ReleaseManager:
                     "git",
                     "add",
                     "package.json",
+                    "package-lock.json",
                     "src-tauri/Cargo.toml",
                     "src-tauri/Cargo.lock",
                     "src-tauri/tauri.conf.json",

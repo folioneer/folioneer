@@ -250,15 +250,6 @@ Remove an entry once it has been resolved.
 - User value: None — one look for every two-way entry toggle.
 - Done when: a generic two-option toggle lives in `src/ui/components/` and both forms use it.
 
-## 2026-09-20 — TD-035 — A release leaves the lockfile's own version behind
-
-- Found by: reviewer-infra
-- Where: scripts/release.py (`update_version_files`), package-lock.json (the two top-level `version` fields)
-- Severity: 🔵
-- Observation: A release writes the new version into `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json` and `Cargo.lock`, but not into `package-lock.json`, whose own `version` fields keep the value of the last `npm install`. Nothing reads them, so nothing breaks; the file simply states a version the project is not at.
-- User value: None.
-- Done when: A release leaves `package-lock.json` stating the released version, and a test of the release script proves it.
-
 ## 2026-09-20 — TD-036 — The vocabulary has no entry for the update feature's terms
 
 - Found by: spec-reviewer (UPD-028 review on #037)
