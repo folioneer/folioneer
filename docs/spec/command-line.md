@@ -2,7 +2,7 @@
 
 ## Context
 
-The installed program records holdings from a terminal or a script without opening a window (#044): an opening balance of an existing asset in an existing account, then a purchase or a sale. It starts the way the scheduled price download does (SPF-020), calls the same core as the window, and is checked by the same rules. All its text is English.
+The installed program records holdings from a terminal or a script without opening a window (#044): an opening balance of an existing asset in an existing account, then a purchase or a sale. It starts the way the scheduled price download does (SPF-020), calls the same core as the window, and is checked by the same rules. All its text is English. The Windows program is built without a console, so PowerShell would neither show its output nor wait for its exit code; on Windows the commands therefore run in a small console program installed beside the main one (CLI-040). The README (§ Command line) documents calling it from a Linux terminal, from PowerShell and from WSL.
 
 ## Entity Definition
 
@@ -48,8 +48,12 @@ No new entity and no Tauri command, so no contract: a command records a `Transac
 
 **CLI-033 — No network, nothing listening (backend)**: A command makes no network request and listens on nothing: it reads its arguments, writes the portfolio, prints, and exits.
 
+### Starting it (040–049)
+
+**CLI-040 — A console program on Windows (backend)**: The Windows installer puts a console program, `folioneer-cli.exe`, beside the main program; it is installed, updated and removed with it. It runs the commands (`folioneer-cli holding …`), and every rule CLI-010 to CLI-033 applies to it unchanged, except that any first argument other than `holding` — or none — is a usage error (CLI-022): it never opens a window or starts a download. On Linux the main program itself runs the commands. Only the owner's check on an installed release proves the console behaviour on Windows (see Open Questions).
+
 ---
 
 ## Open Questions
 
-None.
+- [ ] CLI-040 on Windows — checked by the owner once the first release with it is installed (todo #044).

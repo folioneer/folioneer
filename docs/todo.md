@@ -169,6 +169,7 @@ On Windows the release program is built without a console (`windows_subsystem = 
 - [x] What happens when the application is open while a command writes? — The command refuses (owner, 2026-09-27).
 - [x] Plain text only, or JSON as well? — Text by default, `--json` for scripts (owner, 2026-09-27).
 - [x] How is it started on Windows? — The full path from PowerShell, documented; from WSL too if it works (owner, 2026-09-27).
+- [ ] Does it work on Windows? Checked by the owner once the first release with it is installed (README § Command line): `folioneer-cli.exe` is at the README path; from PowerShell a recorded command prints `Recorded:` and `$LASTEXITCODE` is 0, a refused one (an unknown account) prints `Refused:` and gives 1, a wrong one (`holding move`) gives 2; from WSL a recorded command then shows in the window's journal. The entry closes on a yes.
 
 ## #051 — (fullstack) — An MCP server over the headless core
 

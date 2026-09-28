@@ -27,6 +27,12 @@ name = "folioneer"
 path = "src/main.rs"
 required-features = ["app"]
 
+# The command line as a console program (CLI-040): installed beside the main program on
+# Windows, where the main one has no console. Needs no Tauri.
+[[bin]]
+name = "folioneer-cli"
+path = "cli/main.rs"
+
 # `app` is the Tauri shell: the window, the Tauri commands (`api.rs` adapters), the
 # command registry and the updater. Without it the crate is the application core —
 # contexts, use cases, persistence and the headless entry — with no Tauri dependency.

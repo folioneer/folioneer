@@ -24,11 +24,12 @@ use_cases/shared/    stateless helpers shared by use cases (Global Value, price 
 core/                legacy shared bucket: db.rs, event_bus/ (Event enum), logger.rs,
                      specta_builder.rs (the command registry), cash.rs
 shared/              gold shared code: domain/record_change.rs (change-log vocabulary),
-                     infrastructure/ (app_directories, change_recorder, container, e2e_run, http, scheduler/)
+                     infrastructure/ (app_directories, change_recorder, container, e2e_run, http, scheduler/, window_lock)
 lib.rs               the crate root: modules, the headless entry, tracing — the application core
 app.rs               the Tauri shell (feature `app`, B46): wires services, use cases and dispatchers
-command_line/        the command line (CLI): an interface beside the shell, calling the same use cases without a window
                      into the window
+command_line/        the command line (CLI): an interface beside the shell, calling the same use cases without a window
+../cli/main.rs       `folioneer-cli`, the command line as a console program (installed beside the main one on Windows)
 extensions.rs        the one file a build differs by: external data sources and update channel (ADR-020)
 main.rs              entry point; `--scheduled-fetch` runs the daily download, `holding …` a command (CLI), both without a window
 ```

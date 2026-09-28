@@ -7,3 +7,6 @@
 /gen/schemas
 
 .env
+
+# The console program the Windows installer bundles (CLI-040), built by the release workflow.
+/binaries/

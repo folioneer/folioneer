@@ -116,6 +116,28 @@ npm run test               # Frontend tests only
 cd src-tauri && cargo test # Backend tests only
 ```
 
+## Command line
+
+The installed program records an opening balance, a purchase or a sale without opening a window. Close the window first: a command refuses while it is open.
+
+```
+folioneer holding open --account "PEA" --asset CW8 --quantity 10 --total-cost 4950 [--date 2026-09-28] [--json]
+folioneer holding buy  --account "PEA" --asset CW8 --quantity 2 --price 495.10 [--fees 1.99] [--rate 1] [--date …] [--note "…"] [--json]
+folioneer holding buy  --account "PEA" --asset CW8 --quantity 2 --total 992.19 [--fees 1.99] …
+folioneer holding sell …same options as buy…
+folioneer holding --help
+```
+
+`--account` is the account's name; `--asset` is the asset's name or reference; case does not matter. Amounts are decimals with a dot. A command prints one `Recorded:` or `Refused:` line — or one JSON object with `--json` — and exits with 0 when it recorded, 1 when it was refused, 2 when the command itself is wrong.
+
+- **Linux** — the program itself: `folioneer holding …` once the `.deb` is installed, or the AppImage's path with the same arguments (`~/Applications/Folioneer.AppImage holding …`).
+- **Windows (PowerShell)** — the console program installed beside the main one:
+  `& "$env:LOCALAPPDATA\Folioneer\folioneer-cli.exe" holding buy --account "PEA" --asset CW8 --quantity 2 --price 495.10`
+  then `$LASTEXITCODE` holds the exit code.
+- **WSL** — the same Windows program by its path, working on the Windows portfolio:
+  `/mnt/c/Users/<you>/AppData/Local/Folioneer/folioneer-cli.exe holding …`
+  (the Linux program run inside WSL keeps a separate portfolio of its own, and refuses while none exists).
+
 ## Documentation
 
 - [Architecture](ARCHITECTURE.md) — system design, bounded contexts, data flow

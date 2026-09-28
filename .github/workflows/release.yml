@@ -71,6 +71,21 @@ jobs:
             || { echo "::error::productName missing in src-tauri/tauri.conf.json"; exit 1; }
           echo "PRODUCT_NAME=$name" >> "$GITHUB_ENV"
 
+      - name: Build the command-line program
+        # CLI-040 — the console program the installer puts beside the main one
+        # (tauri.windows.conf.json externalBin); Tauri expects the target triple in its name.
+        shell: bash
+        env:
+          SQLX_OFFLINE: true
+          CARGO_INCREMENTAL: 0
+          RUSTFLAGS: "-C debuginfo=0"
+          AWS_LC_SYS_PREBUILT_NASM: "1"
+        run: |
+          cargo build --release --no-default-features --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --bin folioneer-cli
+          mkdir -p src-tauri/binaries
+          cp src-tauri/target/x86_64-pc-windows-msvc/release/folioneer-cli.exe \
+            src-tauri/binaries/folioneer-cli-x86_64-pc-windows-msvc.exe
+
       - name: Build and release
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5  # action-v0.6.2
         env:
