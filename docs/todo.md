@@ -261,6 +261,15 @@ Decided by the owner on 2026-09-27: a todo entry becomes `TODO-NNN` (today `#NNN
 
 - [ ] Rewrite existing references, or only new ones? (Recommended: rewrite every live file in one pull request, so one format exists at a time; the changelog and git history keep the old form.)
 
+## #052 — (tooling) — `/whats-next` proposes the queue the owner sets
+
+`/whats-next` predates the Next queue: it recommends "do now / do next" as if the agent chose the work, never reads an entry's readiness (Done when, open questions, design) nor § Next, so it can recommend an entry that is blocked on the owner's questions or already queued. Two of its sources are empty (inline code TODOs, spec open questions — 0 each on 2026-09-28) while it misses what "in flight" means now: open pull requests and their CI. Tech-debt entries come out one per line even when they are one theme (TD-046–TD-053).
+
+**User value:** At the start of a session the owner sees what is queued, what is ready to queue and what waits on his answers — and accepts or edits a proposed queue.
+**Done when:** the output has three lists — queued (§ Next, in order), ready but not queued, blocked (each with the open questions or design approval it waits on) — and a proposed queue order for the owner to accept or edit, with no "do now" verdicts; open pull requests appear with their CI state; tech-debt entries are grouped by theme; the empty sources are removed from `scripts/whats-next.py` and the skill; the script's readiness parsing has tests.
+**Design:** none
+**Open questions:** none
+
 ## #014 — (e2e) — Drive a second device in the E2E suite
 
 The multi-device sync E2E covers the single-device critical path only (plan § Halt Artifact H1): `wdio.conf.ts` launches one binary with one `VAULT_COMPASS_E2E_DATA_DIR` and `maxInstances: 1`, so joining a folder another device created (SYN-014/036) is proven by the two-database integration test `src-tauri/tests/sync_two_devices.rs`, not through the UI. A real two-device E2E needs an `e2e/helpers/second_device.ts` that launches a second binary against its own data directory plus a wdio multi-remote configuration — a separate, pre-requisite task before any join scenario is written.
