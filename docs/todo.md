@@ -192,6 +192,22 @@ On Windows the release program is built without a console (`windows_subsystem = 
 - [x] Plain text only, or JSON as well? — Text by default, `--json` for scripts (owner, 2026-09-27).
 - [x] How is it started on Windows? — The full path from PowerShell, documented; from WSL too if it works (owner, 2026-09-27).
 
+## #051 — (fullstack) — An MCP server over the headless core
+
+Requested by the owner on 2026-09-28. The Model Context Protocol lets an agent (Claude Desktop, Claude Code, others) call an application's tools. The same installed program would offer one: started without a window, it speaks MCP over standard input and output, and its tools are the application API #047 builds and the command line (#044) calls — so an agent can read the portfolio or record a holding in plain words. It adds no logic of its own: every tool is a query or command the core already has, validated by the same Rust rules.
+
+Security, following the rule that tools never become an attack surface: local standard input/output only (no network listener), the owner's data folder only, and a write refused while the application window is open (as #044 does).
+
+**User value:** Ask an agent "what is my portfolio worth?" or "record 10 shares of X in my PEA at 52 €" and have it done through the application's own rules.
+**Done when:** To be written once the open questions are answered — at least: the program started with an MCP flag serves the chosen tools over stdio; each tool is an existing core query or command with its validation; a write is refused while the window is open; an agent client (Claude Code) lists and calls the tools in a recorded session; nothing listens on the network.
+**Design:** none
+**Open questions:**
+
+- [ ] Which tools first? (Recommended: read-only — portfolio summary, accounts, holdings of an account — then the #044 writes: opening balance, buy, sell.)
+- [ ] Writes through MCP at all, or read-only for good? (Recommended: writes allowed, each one confirmed by the agent client's own tool-approval prompt.)
+- [ ] Which clients to prove it with? (Recommended: Claude Code first; Claude Desktop documented.)
+- [ ] One program with an MCP flag, or a separate small executable? (Recommended: the same program, `--mcp`, like `--scheduled-fetch` — one install, one data folder.)
+
 ## #039 — (service) — A hosted price feed the application can subscribe to (deferred)
 
 What is sold is what a server of the owner's provides: first a price feed under a licence that allows it, later bank feeds, perhaps advice. The application stays free and open, so nothing sold can live in it — a switch in an AGPL client is one fork away from being flipped. The client is ordinary public code: one more price provider behind the seam of #036 and #037, which calls the owner's service with the subscriber's token. The inventory found no licensed replacement — finding and pricing one is this entry's first task. Deferred until then, and until the application is worth showing (#030).
