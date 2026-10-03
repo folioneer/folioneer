@@ -7,7 +7,7 @@ during work that don't warrant immediate action. Format produced by the
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-060) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-061) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -421,3 +421,12 @@ Remove an entry once it has been resolved.
 - Observation: every workflow takes the latest stable Rust, and the lints run with `-D warnings`, so a Rust release can fail code nobody changed: 1.99.0 added a lint that `async-trait` 0.1.89 tripped 206 times. The local toolchain moves only when someone updates it, so the hooks and CI can disagree.
 - User value: None directly — a pull request fails only for what it changes.
 - Done when: the Rust version is written in the repository (`rust-toolchain.toml`), CI and the local hooks use it, and raising it is a pull request of its own.
+
+## 2026-10-03 — TD-060 — The account-performance capture changes with the month
+
+- Found by: main agent — the first pull request of October failed the visual comparison without touching the interface
+- Where: `e2e/` (the `account-performance` capture), the visual comparison in `.github/workflows/e2e.yml`
+- Severity: 🟡
+- Observation: the screen charts the current year and lists its months up to today, so its capture differs from `main`'s as soon as the month changes (0.78 % of pixels against a 0.3 % threshold). Until a run on `main` renews the reference, every pull request that touches no interface file fails; the run had to be started by hand.
+- User value: None directly — the first pull request of a month merges like any other.
+- Done when: the capture does not depend on the day it is taken (data and "today" fixed for the run, or the dated parts masked), shown by a comparison that passes across a month change.
