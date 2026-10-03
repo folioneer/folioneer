@@ -145,23 +145,6 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
 
-## #044 — (fullstack) — Record holdings from the command line, without a window
-
-The same installed program answers commands in a terminal without opening a window. First, adding an existing asset to an existing account as an opening balance (quantity and total cost, no cash movement); second, a buy or a sell of an existing asset in an existing account. Linux and Windows first; macOS when a macOS build exists (none does today). It calls the application API #047 builds, and starts the way the scheduled fetch already does.
-
-On Windows the release program is built without a console (`windows_subsystem = "windows"` in `main.rs`), so as it stands PowerShell shows none of its output and does not wait for its exit code: the command line needs a console of its own — attaching to the parent's, or a second small executable. From WSL, a Windows program can be started by its `/mnt/c/…` path and works on the Windows data; the Linux build run inside WSL would open a separate, empty portfolio.
-
-**User value:** Record a holding, a buy or a sell from a terminal or a script, without opening the application.
-**Done when:** On Linux and Windows (PowerShell), without a window: a command adds an opening balance of an existing asset to an existing account, and commands record a buy and a sell, each validated by the same Rust rules as the window; each prints minimal English text by default and JSON with `--json`, and exits with a code a script can test (0 done, non-zero refused, with the reason); a writing command refuses while the application window is open; the Windows program's output reaches PowerShell and its exit code is returned; the full path to call it from PowerShell is documented, and calling it from WSL is documented if it works.
-**Design:** validated (chat, 2026-09-28) — `folioneer holding open|buy|sell` with `--account <name>`, `--asset <name or reference>`, `--quantity`, `--total-cost` (open), `--price` or `--total` (buy/sell), optional `--fees` (0), `--rate` (1), `--date` (today), `--note`, `--json`. Text: `Recorded: …` / `Refused: …`, naming only what was typed — never listing existing accounts or assets (owner). Exit codes: 0 recorded, 1 refused (a rule, not found, ambiguous, window open), 2 wrong usage. JSON: `{"status":"recorded","transaction":…}` / `{"status":"refused","code":…,"message":…}`; codes `AccountNotFound`, `AssetNotFound`, `AssetAmbiguous`, plus the recording codes. The window holds a lock file while open; a command finding it held refuses. Windows: a small console program `folioneer-cli.exe` installed beside the main one. Security: a command runs as the user with the application's own access — no network, no listener, no new privilege; reviewer-security reviews each pull request.
-**Open questions:**
-
-- [x] Which commands come first? — Owner, 2026-09-27: adding an existing asset to an existing account (an opening balance, not a buy or a sell); then a buy or a sell of an existing asset in an existing account.
-- [x] What happens when the application is open while a command writes? — The command refuses (owner, 2026-09-27).
-- [x] Plain text only, or JSON as well? — Text by default, `--json` for scripts (owner, 2026-09-27).
-- [x] How is it started on Windows? — The full path from PowerShell, documented; from WSL too if it works (owner, 2026-09-27).
-- [ ] Does it work on Windows? Checked by the owner once the first release with it is installed (README § Command line): `folioneer-cli.exe` is at the README path; from PowerShell a recorded command prints `Recorded:` and `$LASTEXITCODE` is 0, a refused one (an unknown account) prints `Refused:` and gives 1, a wrong one (`holding move`) gives 2; from WSL a recorded command then shows in the window's journal. The entry closes on a yes.
-
 ## #051 — (fullstack) — An MCP server over the headless core
 
 Requested by the owner on 2026-09-28. The Model Context Protocol lets an agent (Claude Desktop, Claude Code, others) call an application's tools. The same installed program would offer one: started without a window, it speaks MCP over standard input and output, and its tools are the application API #047 builds and the command line (#044) calls — so an agent can read the portfolio or record a holding in plain words. It adds no logic of its own: every tool is a query or command the core already has, validated by the same Rust rules.

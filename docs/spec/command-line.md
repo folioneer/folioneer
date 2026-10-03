@@ -50,10 +50,10 @@ No new entity and no Tauri command, so no contract: a command records a `Transac
 
 ### Starting it (040–049)
 
-**CLI-040 — A console program on Windows (backend)**: The Windows installer puts a console program, `folioneer-cli.exe`, beside the main program; it is installed, updated and removed with it. It runs the commands (`folioneer-cli holding …`), and every rule CLI-010 to CLI-033 applies to it unchanged, except that any first argument other than `holding` — or none — is a usage error (CLI-022): it never opens a window or starts a download. On Linux the main program itself runs the commands. Only the owner's check on an installed release proves the console behaviour on Windows (see Open Questions).
+**CLI-040 — A console program on Windows (backend)**: The Windows installer puts a console program, `folioneer-cli.exe`, beside the main program; it is installed, updated and removed with it. It runs the commands (`folioneer-cli holding …`), and every rule CLI-010 to CLI-033 applies to it unchanged, except that any first argument other than `holding` — or none — is a usage error (CLI-022): it never opens a window or starts a download. On Linux the main program itself runs the commands. The console behaviour on Windows is proven by the owner's check on an installed release (v0.4.0, 2026-10-03).
 
 ---
 
 ## Open Questions
 
-- [ ] CLI-040 on Windows — checked by the owner once the first release with it is installed (todo #044).
+None — all questions have been resolved.
