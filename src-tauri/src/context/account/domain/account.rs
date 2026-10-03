@@ -571,33 +571,41 @@ impl Account {
             None => return Err(AccountError::TransactionNotFound.into()),
         };
 
-        // Full recalculation for the (account, asset) pair — SEL-032 cascading check inside
-        let pair_txs: Vec<&Transaction> = self
-            .transactions
-            .iter()
-            .filter(|t| t.asset_id == asset_id)
-            .collect();
-        let (holding, pnl_map) = match self.recalculate_holding(&asset_id, &pair_txs) {
-            Ok(result) => result,
-            Err(e) => {
-                if let Some(slot) = self.transactions.iter_mut().find(|t| t.id == tx_id) {
-                    *slot = original_tx;
+        // Full recalculation for the (account, asset) pair — SEL-032 cascading check inside.
+        // CSH-013 — the Cash Holding is not recalculated here: `replay_cash_holding` (below)
+        // is its sole manager, over every transaction that moves cash.
+        let recalculated = if crate::core::cash::is_cash_asset(&asset_id) {
+            None
+        } else {
+            let pair_txs: Vec<&Transaction> = self
+                .transactions
+                .iter()
+                .filter(|t| t.asset_id == asset_id)
+                .collect();
+            match self.recalculate_holding(&asset_id, &pair_txs) {
+                Ok(result) => Some(result),
+                Err(e) => {
+                    if let Some(slot) = self.transactions.iter_mut().find(|t| t.id == tx_id) {
+                        *slot = original_tx;
+                    }
+                    return Err(e);
                 }
-                return Err(e);
             }
         };
 
         // Attach updated realized_pnl to all sells in the pair (excluding the corrected tx itself,
         // which is handled unconditionally below to cover the Purchase case too)
-        for tx in self
-            .transactions
-            .iter_mut()
-            .filter(|t| t.asset_id == asset_id && t.id != tx_id)
-        {
-            if tx.transaction_type == TransactionType::Sell {
-                tx.realized_pnl = pnl_map.get(&tx.id).copied();
-                self.pending_changes
-                    .push(AccountChange::TransactionUpdated(tx.clone()));
+        if let Some((_, pnl_map)) = &recalculated {
+            for tx in self
+                .transactions
+                .iter_mut()
+                .filter(|t| t.asset_id == asset_id && t.id != tx_id)
+            {
+                if tx.transaction_type == TransactionType::Sell {
+                    tx.realized_pnl = pnl_map.get(&tx.id).copied();
+                    self.pending_changes
+                        .push(AccountChange::TransactionUpdated(tx.clone()));
+                }
             }
         }
         // The corrected transaction itself — always record so the repository gets the latest state
@@ -617,9 +625,11 @@ impl Account {
         self.pending_changes
             .push(AccountChange::TransactionUpdated(corrected.clone()));
 
-        self.pending_changes
-            .push(AccountChange::HoldingUpserted(holding.clone()));
-        self.upsert_holding_in_memory(holding);
+        if let Some((holding, _)) = recalculated {
+            self.pending_changes
+                .push(AccountChange::HoldingUpserted(holding.clone()));
+            self.upsert_holding_in_memory(holding);
+        }
 
         // CSH-042 / CSH-051 — chronological replay over Deposit / Withdrawal / Purchase / Sell.
         // OpeningBalance corrections do not touch cash (CSH-060), so the replay is harmless on them.
@@ -1347,14 +1357,9 @@ impl Account {
                     vwap_numerator -= vwap_before as i128 * qty;
                     total_quantity -= qty;
                 }
-                // CSH-022: a Deposit credits cash quantity by total_amount; vwap stays at 1.0.
-                // unit_price and exchange_rate are both 1_000_000, so the vwap_numerator
-                // contribution equals total_amount * MICRO, matching Purchase math.
-                TransactionType::Deposit => {
-                    let qty = t.quantity as i128;
-                    total_quantity += qty;
-                    vwap_numerator += t.total_amount as i128 * MICRO;
-                }
+                // The Cash Holding is replayed by `replay_cash_holding` alone (CSH-013): a
+                // Deposit or a Withdrawal never belongs to the pair replayed here.
+                TransactionType::Deposit | TransactionType::Withdrawal => {}
                 // DIV-024 — a Dividend has no effect on the paying asset's holding
                 // quantity, average cost, or cost basis. The Dividend type ONLY appears
                 // in `replay_cash_holding` (where it credits cash). It is NOT part of
@@ -1402,28 +1407,6 @@ impl Account {
                         return Err(AccountError::SplitCollapsesPosition.into());
                     }
                     total_quantity = rescaled;
-                }
-                // CSH-032: a Withdrawal debits cash quantity by total_amount; never realises P&L
-                // and never tracks last_sold_date. CSH-080's eligibility guard runs in
-                // `replay_cash_holding` (insufficient-cash check), not here — `recalculate_holding`
-                // is shared with Sell oversell which is a CascadingOversell, a different error.
-                TransactionType::Withdrawal => {
-                    if enforced && t.quantity as i128 > total_quantity {
-                        return Err(AccountError::InsufficientCash {
-                            current_balance_micros: total_quantity as i64,
-                            currency: self.currency.clone(),
-                        }
-                        .into());
-                    }
-                    let qty = t.quantity as i128;
-                    total_quantity -= qty;
-                    // For a Withdrawal we shrink the running vwap_numerator proportionally so the
-                    // average_price stays at 1.0 (cash is its own unit).
-                    if total_quantity > 0 {
-                        vwap_numerator = total_quantity * MICRO;
-                    } else {
-                        vwap_numerator = 0;
-                    }
                 }
             }
         }
@@ -2318,6 +2301,97 @@ mod tests {
             );
         }
         assert_eq!(acc.transactions.len(), before);
+    }
+
+    /// An account whose withdrawal (2500) exceeds its deposit (1000): a sale brought the
+    /// rest in. Cash stands at 500. Returns the account, the deposit and the withdrawal.
+    fn account_withdrawing_sale_proceeds() -> (Account, Transaction, Transaction) {
+        let mut acc = base_account();
+        let deposit = acc
+            .record_deposit("2024-01-01".to_string(), micro(1000), None)
+            .unwrap();
+        acc.buy_holding(
+            "asset-1".to_string(),
+            "2024-01-02".to_string(),
+            micro(10),
+            micro(100),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .unwrap();
+        acc.sell_holding(
+            "asset-1".to_string(),
+            "2024-01-03".to_string(),
+            micro(10),
+            micro(300),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .unwrap();
+        let withdrawal = acc
+            .record_withdrawal("2024-01-04".to_string(), micro(2500), None)
+            .unwrap();
+        (acc, deposit, withdrawal)
+    }
+
+    // CSH-023 — a corrected deposit is judged on every transaction that moves cash: the
+    // withdrawal exceeds the deposits, a sale paid for it, and the correction is accepted
+    #[test]
+    fn correcting_a_deposit_counts_the_cash_a_sale_brought_in() {
+        let (mut acc, deposit, _) = account_withdrawing_sale_proceeds();
+
+        acc.correct_transaction(
+            &deposit.id,
+            "2024-01-01".to_string(),
+            micro(1200),
+            micro(1),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .expect("the balance never goes below zero");
+
+        assert_eq!(acc.holding_quantity(&acc.cash_asset_id()), micro(700));
+    }
+
+    // CSH-033 — a corrected withdrawal is judged the same way, and still refused when the
+    // whole balance cannot pay for it (CSH-080)
+    #[test]
+    fn correcting_a_withdrawal_counts_the_cash_a_sale_brought_in() {
+        let (mut acc, _, withdrawal) = account_withdrawing_sale_proceeds();
+        let mut correct = |amount: i64| {
+            acc.correct_transaction(
+                &withdrawal.id,
+                "2024-01-04".to_string(),
+                amount,
+                micro(1),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .map(|tx| tx.total_amount)
+        };
+
+        assert_eq!(
+            correct(micro(3000)).expect("3000 is in the account"),
+            micro(3000)
+        );
+        let refused = correct(micro(3001)).unwrap_err();
+        assert!(
+            matches!(
+                refused.downcast_ref::<AccountError>(),
+                Some(AccountError::InsufficientCash { current_balance_micros, .. })
+                    if *current_balance_micros == micro(3000)
+            ),
+            "expected InsufficientCash at 3000, got: {refused}"
+        );
+        assert_eq!(acc.holding_quantity(&acc.cash_asset_id()), 0);
     }
 
     // SEL-012 — sell_holding on a zero-qty position is rejected
