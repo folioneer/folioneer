@@ -40,9 +40,9 @@ jobs:
           node-version: 22
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
+        # The version and its components: rust-toolchain.toml.
+        shell: bash
+        run: rustup toolchain install
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2.9.1
@@ -138,9 +138,9 @@ jobs:
           node-version: 22
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-unknown-linux-gnu
+        # The version and its components: rust-toolchain.toml.
+        shell: bash
+        run: rustup toolchain install
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2.9.1

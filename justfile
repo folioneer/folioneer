@@ -33,7 +33,7 @@ test-rust:
 coverage-fe:
     npm run test:coverage
 
-# Run backend tests with coverage (output: coverage/backend/lcov.info); requires: cargo install cargo-llvm-cov + rustup component add llvm-tools-preview
+# Run backend tests with coverage (output: coverage/backend/lcov.info); requires: cargo install cargo-llvm-cov
 coverage-be:
     mkdir -p coverage/backend && cd src-tauri && cargo llvm-cov --lib --tests --lcov --output-path ../coverage/backend/lcov.info --ignore-filename-regex '(^|/)build\.rs$|dev/generate_bindings\.rs$|/src-tauri/tests/'
     python3 scripts/coverage-strip-tests.py coverage/backend/lcov.info

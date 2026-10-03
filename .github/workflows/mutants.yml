@@ -42,7 +42,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdbus-1-dev
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        # The version and its components: rust-toolchain.toml.
+        shell: bash
+        run: rustup toolchain install
       - name: Cache Rust
         # Same prefix as the Quality backend job so the warm build is reused;
         # the shards never save (nothing new to keep, twelve writers otherwise).

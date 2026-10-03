@@ -92,7 +92,9 @@ jobs:
 
       - name: Setup Rust
         if: steps.scope.outputs.run == 'true'
-        uses: dtolnay/rust-toolchain@stable
+        # The version and its components: rust-toolchain.toml.
+        shell: bash
+        run: rustup toolchain install
 
       - name: Cache Rust
         if: steps.scope.outputs.run == 'true'

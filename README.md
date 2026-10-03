@@ -25,8 +25,9 @@ sudo apt update && sudo apt install -y pkgconf libwebkit2gtk-4.1-dev libgtk-3-de
 **2. Rust toolchain (user-local)**
 
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --component clippy rustfmt
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
 . "$HOME/.cargo/env"
+rustup toolchain install   # in the repository: installs the version rust-toolchain.toml names
 ```
 
 **3. `just` task runner + `sqlx-cli`**

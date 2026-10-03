@@ -1,0 +1,6 @@
+# The Rust version every build uses — CI, the release and the local hooks. Raising it is
+# a pull request of its own, so a new Rust release cannot fail code nobody changed.
+[toolchain]
+channel = "1.99.0"
+profile = "minimal"
+components = ["rustfmt", "clippy", "llvm-tools-preview"]

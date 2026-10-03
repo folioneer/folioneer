@@ -144,7 +144,7 @@ Get today's date (`date +%Y-%m-%d`) for the report heading.
 ### Rust toolchain
 Installed: {output of rustc --version}
 Stable:    {version from web — cite source URL}
-Status: ✅ up to date / 🟡 behind (update with: rustup update stable)
+Status: ✅ up to date / 🟡 behind (raise `channel` in `rust-toolchain.toml`, in a pull request of its own)
 
 ### Summary
 🔴 {N} CVE(s) — must fix before release

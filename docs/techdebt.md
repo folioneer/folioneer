@@ -413,15 +413,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — the warning reads the same from any interface.
 - Done when: an opening-balance draft check in the core (like TRX-062 for purchases and sales) returns the warning with its other checks; the form shows what it returns, and the command line prints it.
 
-## 2026-10-03 — TD-059 — CI installs whatever Rust is newest
-
-- Found by: main agent — Rust 1.99.0 (2026-09-28) turned the backend check red on every pull request, a docs-only one included
-- Where: `.github/workflows/*.yml` (`dtolnay/rust-toolchain@stable`); no `rust-toolchain.toml`
-- Severity: 🟡
-- Observation: every workflow takes the latest stable Rust, and the lints run with `-D warnings`, so a Rust release can fail code nobody changed: 1.99.0 added a lint that `async-trait` 0.1.89 tripped 206 times. The local toolchain moves only when someone updates it, so the hooks and CI can disagree.
-- User value: None directly — a pull request fails only for what it changes.
-- Done when: the Rust version is written in the repository (`rust-toolchain.toml`), CI and the local hooks use it, and raising it is a pull request of its own.
-
 ## 2026-10-03 — TD-060 — The account-performance capture changes with the month
 
 - Found by: main agent — the first pull request of October failed the visual comparison without touching the interface

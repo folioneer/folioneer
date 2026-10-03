@@ -102,6 +102,16 @@ jobs:
             echo "::error::src-tauri/src/bin/ must be empty — Tauri's NSIS bundler walks it and fails on phantom .exe candidates. Move dev tools to src-tauri/dev/."
             exit 1
           fi
+      - name: Assert the Rust version comes from rust-toolchain.toml
+        # A workflow that installs "the latest stable" fails code nobody changed
+        # the day Rust releases. Every workflow installs what the file names.
+        shell: bash
+        run: |
+          # The bracketed letters keep this line from matching itself.
+          if grep -rnE 'rust-toolchai[n]@|setup-rus[t]|rustup (updat[e]|defaul[t]|overrid[e])|rustup (toolchain )?instal[l] [a-z0-9]|RUSTUP_TOOLCHAI[N]|cargo [+]' .github/workflows/; then
+            echo "::error::a workflow chooses its own Rust version — use 'rustup toolchain install', which reads rust-toolchain.toml."
+            exit 1
+          fi
 
   architecture:
     name: Architecture — mechanical rules
@@ -243,11 +253,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdbus-1-dev
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          # llvm-tools-preview: the profiler runtime and llvm-profdata/llvm-cov
-          # that cargo llvm-cov drives.
-          components: rustfmt, clippy, llvm-tools-preview
+        # The version and its components: rust-toolchain.toml.
+        shell: bash
+        run: rustup toolchain install
       - name: Cache Rust
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2.9.1
         with:
