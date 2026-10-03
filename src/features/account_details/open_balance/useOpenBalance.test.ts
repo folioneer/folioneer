@@ -1,19 +1,33 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { OpeningBalanceDraft } from "@/bindings";
 import { logger } from "@/lib/logger";
 import { useOpenBalance } from "./useOpenBalance";
 
 // ── Gateway mock ──────────────────────────────────────────────────────────────
 // vi.hoisted ensures the spy references exist before vi.mock is hoisted.
-const { mockOpenHolding } = vi.hoisted(() => ({
+const { mockOpenHolding, mockValidateDraft } = vi.hoisted(() => ({
   mockOpenHolding: vi.fn(),
+  mockValidateDraft: vi.fn(),
 }));
 
 vi.mock("../gateway", () => ({
   accountDetailsGateway: {
     openHolding: (...args: unknown[]) => mockOpenHolding(...args),
+    validateOpeningBalanceDraft: (...args: unknown[]) => mockValidateDraft(...args),
   },
 }));
+
+// The core's opening balance draft check (TRX-066), standing in for the backend: the
+// first problem, or whether a zero cost calls for the warning (TRX-065).
+const coreCheck = async (draft: OpeningBalanceDraft) => {
+  const problem = (code: string) => ({ status: "error" as const, error: { code } });
+  if (!draft.date) return problem("DateMissing");
+  if (draft.total_cost === null) return problem("TotalCostMissing");
+  if (draft.quantity <= 0) return problem("QuantityNotPositive");
+  if (draft.total_cost < 0) return problem("InvalidTotalCost");
+  return { status: "ok" as const, data: { zero_cost: draft.total_cost === 0 } };
+};
 
 vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
@@ -62,6 +76,8 @@ describe("useOpenBalance", () => {
   beforeEach(() => {
     mockOpenHolding.mockReset();
     mockShowSnackbar.mockReset();
+    mockValidateDraft.mockReset();
+    mockValidateDraft.mockImplementation(coreCheck);
   });
 
   // ── Initial state ─────────────────────────────────────────────────────────
@@ -86,6 +102,52 @@ describe("useOpenBalance", () => {
   it("isFormValid is false on initial render", () => {
     const { result } = renderHook(() => useOpenBalance(BASE_PROPS));
     expect(result.current.isFormValid).toBe(false);
+  });
+
+  // TRX-066 — the draft goes to the core in micro-units; a total cost not typed yet is
+  // sent as none, never as 0, so an untouched form raises no zero-cost warning.
+  it("sends the draft to the core, an empty total cost as none", async () => {
+    const { result } = renderHook(() => useOpenBalance(BASE_PROPS));
+    await act(async () => {
+      result.current.handleChange("date", "2024-01-15");
+      result.current.handleChange("quantity", "5");
+    });
+
+    expect(mockValidateDraft).toHaveBeenLastCalledWith({
+      account_id: "account-1",
+      asset_id: "asset-1",
+      date: "2024-01-15",
+      quantity: 5_000_000,
+      total_cost: null,
+    });
+    expect(result.current.isFormValid).toBe(false);
+    expect(result.current.zeroCostWarning).toBe(false);
+  });
+
+  // TRX-066 — saving follows the core's answer, whatever the form holds.
+  it("keeps saving disabled while the core reports a problem or cannot be asked", async () => {
+    mockValidateDraft.mockResolvedValue({ status: "error", error: { code: "DateInFuture" } });
+    const { result } = renderHook(() => useOpenBalance(BASE_PROPS));
+    await act(async () => {
+      result.current.handleChange("quantity", "5");
+      result.current.handleChange("totalCost", "500");
+    });
+    expect(result.current.isFormValid).toBe(false);
+
+    mockValidateDraft.mockRejectedValue(new Error("ipc down"));
+    await act(async () => {
+      result.current.handleChange("totalCost", "600");
+    });
+    expect(result.current.isFormValid).toBe(false);
+    expect(logger.error).toHaveBeenCalled();
+    expect(result.current.error).toEqual({ key: "error.Unknown" });
+
+    mockValidateDraft.mockImplementation(coreCheck);
+    await act(async () => {
+      result.current.handleChange("totalCost", "700");
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.isFormValid).toBe(true);
   });
 
   // ── handleChange ─────────────────────────────────────────────────────────
@@ -393,12 +455,16 @@ describe("useOpenBalance", () => {
     expect(result.current.isSubmitting).toBe(false);
   });
 
-  // TRX-065 — a total cost of exactly 0 warns; empty or positive does not.
-  it("warns on a total cost of 0 only", async () => {
+  // TRX-065 — the core says when to warn: a total cost of exactly 0 on a draft that can be
+  // recorded; empty or positive does not, nor does a draft with a problem.
+  it("warns when the core flags a zero cost", async () => {
     const { result } = renderHook(() => useOpenBalance(BASE_PROPS));
     expect(result.current.zeroCostWarning).toBe(false);
 
     await act(async () => result.current.handleChange("totalCost", "0"));
+    expect(result.current.zeroCostWarning).toBe(false);
+
+    await act(async () => result.current.handleChange("quantity", "5"));
     expect(result.current.zeroCostWarning).toBe(true);
 
     await act(async () => result.current.handleChange("totalCost", "0.00"));

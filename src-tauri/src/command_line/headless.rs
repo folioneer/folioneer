@@ -465,6 +465,44 @@ mod tests {
         );
     }
 
+    // TRX-065 / CLI-020 — an opening balance of zero cost is recorded and said so, as the
+    // window's form warns; one with a cost is recorded without a word more.
+    #[tokio::test]
+    async fn trx_065_a_zero_cost_opening_balance_is_recorded_with_a_warning() {
+        let dir = portfolio("zero-cost").await;
+
+        let free = run_line(
+            &dir,
+            "holding open --account PEA --asset CW8 --quantity 3 --total-cost 0 --date 2026-02-01",
+        )
+        .await;
+        assert_eq!(free.exit_code, RECORDED);
+        assert_eq!(
+            free.stdout.as_deref(),
+            Some("Recorded: opened 3 CW8 in PEA on 2026-02-01 — 0.00 EUR")
+        );
+        assert!(free.stderr.as_deref().is_some_and(
+            |text| text.starts_with("Warning: a total cost of 0 declares no invested amount;")
+        ));
+
+        let json = run_line(
+            &dir,
+            "holding open --account PEA --asset C50 --quantity 3 --total-cost 0 --json",
+        )
+        .await;
+        let value: serde_json::Value =
+            serde_json::from_str(json.stdout.as_deref().expect("json")).expect("valid json");
+        assert_eq!(value["warning"], "ZeroCostOpeningBalance");
+
+        let paid = run_line(
+            &dir,
+            "holding open --account PEA --asset C50 --quantity 1 --total-cost 50",
+        )
+        .await;
+        assert_eq!(paid.exit_code, RECORDED);
+        assert!(paid.stderr.is_none());
+    }
+
     // CLI-026 — an asset is added with what the command left out decided by the core (its
     // class's risk level, the system category), can then be named by a command, and is
     // refused while the window is open.

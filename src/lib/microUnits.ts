@@ -21,11 +21,13 @@ const MICRO = 1_000_000;
 export function decimalToMicro(value: string): number {
   const trimmed = value.trim().replace(",", ".");
   if (!trimmed || Number.isNaN(Number(trimmed))) return 0;
-  const [intStr, fracStr = ""] = trimmed.split(".");
+  const negative = trimmed.startsWith("-");
+  const [intStr, fracStr = ""] = trimmed.replace(/^[+-]/, "").split(".");
   const intPart = Number.parseInt(intStr || "0", 10);
   const fracPadded = fracStr.padEnd(6, "0").slice(0, 6);
   const fracPart = Number.parseInt(fracPadded, 10);
-  return intPart * MICRO + fracPart;
+  const micros = intPart * MICRO + fracPart;
+  return negative ? -micros : micros;
 }
 
 /**

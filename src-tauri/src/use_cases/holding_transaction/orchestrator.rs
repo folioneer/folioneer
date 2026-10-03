@@ -43,6 +43,30 @@ pub struct TransactionDraft {
     pub correcting: Option<String>,
 }
 
+/// An opening balance as the user is still entering it (TRX-066). Empty strings are fields
+/// not filled yet, and so is a total cost of `None`: a typed 0 is a figure (TRX-045).
+#[derive(Debug, Clone, serde::Deserialize, specta::Type)]
+#[serde(deny_unknown_fields)]
+pub struct OpeningBalanceDraft {
+    /// The account, empty until chosen.
+    pub account_id: String,
+    /// The asset, empty until chosen.
+    pub asset_id: String,
+    /// ISO date, empty until entered.
+    pub date: String,
+    /// Quantity, in micros.
+    pub quantity: i64,
+    /// Total cost in account currency, in micros; `None` until entered.
+    pub total_cost: Option<i64>,
+}
+
+/// What the user should know about an opening balance that can be recorded (TRX-066).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub struct OpeningBalanceDraftPreview {
+    /// TRX-065 — the total cost is 0: the form and the command line warn, never block.
+    pub zero_cost: bool,
+}
+
 /// What recording a draft would store (TRX-062): the form shows the total.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
 pub struct TransactionDraftPreview {
@@ -174,6 +198,36 @@ impl HoldingTransactionUseCase {
         Ok(TransactionDraftPreview {
             unit_price,
             total_amount,
+        })
+    }
+
+    /// Checks an opening balance draft without writing anything (TRX-066): the first
+    /// problem, or what the user should know about a draft that can be recorded.
+    pub fn validate_opening_balance_draft(
+        &self,
+        draft: &OpeningBalanceDraft,
+    ) -> Result<OpeningBalanceDraftPreview, TransactionDraftError> {
+        let missing = |value: &str| value.trim().is_empty();
+        if missing(&draft.account_id) {
+            return Err(TransactionDraftTask::AccountMissing.into());
+        }
+        if missing(&draft.asset_id) {
+            return Err(TransactionDraftTask::AssetMissing.into());
+        }
+        if missing(&draft.date) {
+            return Err(TransactionDraftTask::DateMissing.into());
+        }
+        let Some(total_cost) = draft.total_cost else {
+            return Err(TransactionDraftTask::TotalCostMissing.into());
+        };
+        let notice = Account::preview_opening_balance(
+            &draft.asset_id,
+            &draft.date,
+            draft.quantity,
+            total_cost,
+        )?;
+        Ok(OpeningBalanceDraftPreview {
+            zero_cost: notice.zero_cost,
         })
     }
 
@@ -2746,6 +2800,85 @@ mod draft_tests {
         );
         d.asset_id = "asset-1".into();
         assert_eq!(code(use_case(None).validate_draft(d).await), "DateMissing");
+    }
+
+    fn opening_balance(total_cost: Option<i64>) -> OpeningBalanceDraft {
+        OpeningBalanceDraft {
+            account_id: "acc-1".into(),
+            asset_id: "asset-1".into(),
+            date: "2024-06-01".into(),
+            quantity: 1_000_000,
+            total_cost,
+        }
+    }
+
+    fn opening_code(result: Result<OpeningBalanceDraftPreview, TransactionDraftError>) -> String {
+        match result {
+            Ok(preview) if preview.zero_cost => "zero-cost".into(),
+            Ok(_) => "ok".into(),
+            Err(error) => serde_json::to_value(&error)
+                .ok()
+                .and_then(|value| value["code"].as_str().map(str::to_string))
+                .unwrap_or_default(),
+        }
+    }
+
+    // TRX-066 / TRX-065 — an opening balance draft that can be recorded is clean; a typed
+    // total cost of 0 is clean and flagged; a total cost not typed yet is not a 0.
+    #[tokio::test]
+    async fn trx_066_an_opening_balance_draft_flags_a_zero_cost() {
+        let uc = use_case(None);
+        let check =
+            |draft: OpeningBalanceDraft| opening_code(uc.validate_opening_balance_draft(&draft));
+
+        assert_eq!(check(opening_balance(Some(5_000_000))), "ok");
+        assert_eq!(check(opening_balance(Some(0))), "zero-cost");
+        assert_eq!(check(opening_balance(None)), "TotalCostMissing");
+    }
+
+    // TRX-066 — fields not filled come first, in form order; then the rejections recording
+    // would make, in its order (CSH-061, TRX-044, TRX-045, TRX-046).
+    #[tokio::test]
+    async fn trx_066_an_opening_balance_draft_reports_its_first_problem() {
+        let uc = use_case(None);
+        let check = |edit: &dyn Fn(&mut OpeningBalanceDraft)| {
+            let mut draft = opening_balance(Some(5_000_000));
+            edit(&mut draft);
+            opening_code(uc.validate_opening_balance_draft(&draft))
+        };
+
+        assert_eq!(check(&|d| d.account_id.clear()), "AccountMissing");
+        assert_eq!(check(&|d| d.asset_id = " ".into()), "AssetMissing");
+        assert_eq!(check(&|d| d.date.clear()), "DateMissing");
+        assert_eq!(
+            check(&|d| d.asset_id = crate::core::cash::system_cash_asset_id("EUR")),
+            "OpeningBalanceOnCashAsset"
+        );
+        assert_eq!(check(&|d| d.quantity = 0), "QuantityNotPositive");
+        assert_eq!(check(&|d| d.total_cost = Some(-1)), "InvalidTotalCost");
+        assert_eq!(check(&|d| d.date = "2999-01-01".into()), "DateInFuture");
+        assert_eq!(
+            check(&|d| {
+                d.quantity = 0;
+                d.total_cost = Some(-1);
+                d.date = "2999-01-01".into();
+            }),
+            "QuantityNotPositive"
+        );
+        assert_eq!(
+            check(&|d| {
+                d.asset_id = crate::core::cash::system_cash_asset_id("EUR");
+                d.quantity = 0;
+            }),
+            "OpeningBalanceOnCashAsset"
+        );
+        assert_eq!(
+            check(&|d| {
+                d.total_cost = Some(-1);
+                d.date = "2999-01-01".into();
+            }),
+            "InvalidTotalCost"
+        );
     }
 
     // CSH-062 — a draft on the cash line is refused as recording it would be, a purchase

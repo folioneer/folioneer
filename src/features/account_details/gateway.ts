@@ -21,6 +21,8 @@ import type {
   ManagementFeeRemoval,
   OpenHoldingDTO,
   OpenHoldingError,
+  OpeningBalanceDraft,
+  OpeningBalanceDraftPreview,
   PriceHistoryBackfillError,
   PriceHistoryBackfillOutcome,
   RecordInterestDTO,
@@ -171,6 +173,14 @@ export const accountDetailsGateway = {
     draft: TransactionDraft,
   ): Promise<Result<TransactionDraftPreview, TransactionDraftError>> {
     return commands.validateTransactionDraft(draft);
+  },
+
+  // TRX-066 — checks an opening balance draft without writing: its first problem, or
+  // whether its zero cost calls for a warning (TRX-065).
+  async validateOpeningBalanceDraft(
+    draft: OpeningBalanceDraft,
+  ): Promise<Result<OpeningBalanceDraftPreview, TransactionDraftError>> {
+    return commands.validateOpeningBalanceDraft(draft);
   },
 
   // TDI-010 — holding quantity + VWAP average cost as of a date (trade-dialog insights).

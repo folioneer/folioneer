@@ -672,6 +672,9 @@ describe("transactionDraftErrorToI18n", () => {
     expect(transactionDraftErrorToI18n({ code: "DateMissing" })).toEqual({
       key: "transaction.error_validation_date",
     });
+    expect(transactionDraftErrorToI18n({ code: "TotalCostMissing" })).toEqual({
+      key: "transaction.error_validation_total_cost",
+    });
   });
 
   // SEL-021 — an oversell reports both quantities

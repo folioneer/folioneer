@@ -395,15 +395,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — the contract describes what the interface receives.
 - Done when: the contract's performance types match `src-tauri/src/use_cases/shared/performance.rs` and `get_global_performance` has its row, checked by contract-reviewer.
 
-## 2026-09-28 — TD-058 — The opening-balance form decides its zero-cost warning itself
-
-- Found by: reviewer-arch on #012 (owner chose to track it, 2026-09-28)
-- Where: `src/features/account_details/open_balance/useOpenBalance.ts` — `zeroCostWarning`
-- Severity: 🔵
-- Observation: the warning of TRX-065 shows when the typed total cost is 0, a comparison made in the frontend; the core owes that decision (F32, B47). The command line's `holding open --total-cost 0` therefore records without the warning. The architecture check does not see a bare comparison, so the frozen count of `account_details` (TD-046) does not include it.
-- User value: None directly — the warning reads the same from any interface.
-- Done when: an opening-balance draft check in the core (like TRX-062 for purchases and sales) returns the warning with its other checks; the form shows what it returns, and the command line prints it.
-
 ## 2026-10-03 — TD-060 — The account-performance capture changes with the month
 
 - Found by: main agent — the first pull request of October failed the visual comparison without touching the interface

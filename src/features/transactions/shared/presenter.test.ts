@@ -254,6 +254,9 @@ describe("transactionDraftErrorToI18n", () => {
     expect(transactionDraftErrorToI18n({ code: "DateMissing" })).toEqual({
       key: "transaction.error_validation_date",
     });
+    expect(transactionDraftErrorToI18n({ code: "TotalCostMissing" })).toEqual({
+      key: "transaction.error_validation_total_cost",
+    });
   });
 
   // TRX-062 — a recording rejection keeps the message recording shows

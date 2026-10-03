@@ -455,6 +455,9 @@ pub enum TransactionDraftTask {
     /// No date entered.
     #[error("No date entered")]
     DateMissing,
+    /// No total cost entered, for an opening balance (TRX-066).
+    #[error("No total cost entered")]
+    TotalCostMissing,
 }
 
 /// Failure surface of `validate_transaction_draft`: a field not filled yet, or the
@@ -483,6 +486,7 @@ mod transaction_draft_error_wire_tests {
             TransactionDraftTask::AccountMissing.into(),
             TransactionDraftTask::AssetMissing.into(),
             TransactionDraftTask::DateMissing.into(),
+            TransactionDraftTask::TotalCostMissing.into(),
             AccountError::QuantityNotPositive.into(),
             AccountError::Oversell {
                 available: 1,

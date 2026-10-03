@@ -385,6 +385,7 @@
     "error_validation_account": "Please select an account.",
     "error_validation_asset": "Please select an asset.",
     "error_validation_date": "Please enter a valid date.",
+    "error_validation_total_cost": "Please enter the total cost.",
     "error_validation_total_below_fees": "Total amount cannot be lower than the fees.",
     "error_validation_split_ratio": "Enter a valid ratio — two positive whole numbers that change the quantity.",
     "error_invariant_mismatch": "Total amount does not match the formula (quantity × price × rate) + fees.",

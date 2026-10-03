@@ -160,6 +160,8 @@ export function transactionDraftErrorToI18n(err: TransactionDraftError): I18nMes
       return { key: "transaction.error_validation_asset" };
     case "DateMissing":
       return { key: "transaction.error_validation_date" };
+    case "TotalCostMissing":
+      return { key: "transaction.error_validation_total_cost" };
     case "Oversell":
       return {
         key: "error.Oversell",

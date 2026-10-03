@@ -43,6 +43,14 @@ pub enum UpdateFrequency {
     ManualYear,
 }
 
+/// What the user should know about an opening balance that can be recorded (TRX-066).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OpeningBalanceNotice {
+    /// TRX-065 — its total cost is 0: it declares no net invested amount, so the account's
+    /// lifetime performance may not be computed (PRF-087) or may be overstated.
+    pub zero_cost: bool,
+}
+
 /// A single change produced by an aggregate operation, applied atomically by the repository.
 #[derive(Debug, Clone)]
 pub enum AccountChange {
@@ -729,18 +737,7 @@ impl Account {
         quantity: i64,
         total_cost: i64,
     ) -> Result<&Transaction> {
-        // CSH-061 — the cash line is never seeded via an opening balance; a
-        // cash-line OpeningBalance would count as a typed-cost flow in the
-        // performance bridge while contributing nothing to end value.
-        if crate::core::cash::is_cash_asset(&asset_id) {
-            return Err(AccountError::OpeningBalanceOnCashAsset.into());
-        }
-        if quantity <= 0 {
-            return Err(AccountError::QuantityNotPositive.into());
-        }
-        // TRX-045 — a zero-cost position is valid (e.g. a mined / gifted /
-        // airdropped asset seeded as a starting position); only a negative
-        // total cost is rejected.
+        Self::preview_opening_balance(&asset_id, &date, quantity, total_cost)?;
         let (unit_price, total_cost) =
             Self::derive_opening_balance_from_total(total_cost, quantity)?;
         let tx = Transaction::new(
@@ -1640,6 +1637,33 @@ impl Account {
         value as i64
     }
 
+    /// TRX-066 — an opening balance checked as recording it would be, nothing written
+    /// (CSH-061, TRX-044, TRX-045, TRX-046). Returns what the user should know about it.
+    pub fn preview_opening_balance(
+        asset_id: &str,
+        date: &str,
+        quantity: i64,
+        total_cost: i64,
+    ) -> StdResult<OpeningBalanceNotice, AccountError> {
+        // CSH-061 — the cash line is never seeded via an opening balance; a
+        // cash-line OpeningBalance would count as a typed-cost flow in the
+        // performance bridge while contributing nothing to end value.
+        if crate::core::cash::is_cash_asset(asset_id) {
+            return Err(AccountError::OpeningBalanceOnCashAsset);
+        }
+        if quantity <= 0 {
+            return Err(AccountError::QuantityNotPositive);
+        }
+        // TRX-045 — a zero-cost position is valid (e.g. a mined / gifted /
+        // airdropped asset seeded as a starting position); only a negative
+        // total cost is rejected.
+        Self::derive_opening_balance_from_total(total_cost, quantity)?;
+        Transaction::validate_date(date)?;
+        Ok(OpeningBalanceNotice {
+            zero_cost: total_cost == 0,
+        })
+    }
+
     /// CSH-062 — a purchase or a sale is never recorded on a Cash Asset: cash moves by a
     /// Deposit or a Withdrawal. Recording and the draft check both ask here.
     pub fn ensure_tradable(asset_id: &str) -> StdResult<(), AccountError> {
@@ -1805,12 +1829,15 @@ impl Account {
     /// `floor(total_cost × MICRO / quantity)`; a negative total cost (TRX-045) and a
     /// non-positive quantity (TRX-044) are rejected.
     /// Returns `(unit_price, total_cost)`.
-    fn derive_opening_balance_from_total(total_cost: i64, quantity: i64) -> Result<(i64, i64)> {
+    fn derive_opening_balance_from_total(
+        total_cost: i64,
+        quantity: i64,
+    ) -> StdResult<(i64, i64), AccountError> {
         if quantity <= 0 {
-            return Err(AccountError::QuantityNotPositive.into());
+            return Err(AccountError::QuantityNotPositive);
         }
         if total_cost < 0 {
-            return Err(AccountError::InvalidTotalCost.into());
+            return Err(AccountError::InvalidTotalCost);
         }
         const MICRO: i128 = 1_000_000;
         Ok((

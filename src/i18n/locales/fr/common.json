@@ -385,6 +385,7 @@
     "error_validation_account": "Veuillez sélectionner un compte.",
     "error_validation_asset": "Veuillez sélectionner un actif.",
     "error_validation_date": "Veuillez saisir une date valide.",
+    "error_validation_total_cost": "Veuillez saisir le coût total.",
     "error_validation_total_below_fees": "Le montant total ne peut pas être inférieur aux frais.",
     "error_validation_split_ratio": "Saisissez un ratio valide — deux nombres entiers positifs qui modifient la quantité.",
     "error_invariant_mismatch": "Le montant total ne correspond pas à la formule (quantité × prix × taux) + frais.",

@@ -618,6 +618,18 @@ async validateTransactionDraft(draft: TransactionDraft) : Promise<Result<Transac
 }
 },
 /**
+ * Checks an opening balance draft without writing anything (TRX-066): whether its total
+ * cost of 0 calls for a warning (TRX-065), or the first problem as a code.
+ */
+async validateOpeningBalanceDraft(draft: OpeningBalanceDraft) : Promise<Result<OpeningBalanceDraftPreview, TransactionDraftError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("validate_opening_balance_draft", { draft }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Corrects an existing transaction and recalculates the affected holding
  * (TRX-031, TRX-061, SEL-051).
  */
@@ -3280,6 +3292,39 @@ export type OpenHoldingTask =
  */
 { code: "OpeningBalanceOnCashAsset" }
 /**
+ * An opening balance as the user is still entering it (TRX-066). Empty strings are fields
+ * not filled yet, and so is a total cost of `None`: a typed 0 is a figure (TRX-045).
+ */
+export type OpeningBalanceDraft = { 
+/**
+ * The account, empty until chosen.
+ */
+account_id: string; 
+/**
+ * The asset, empty until chosen.
+ */
+asset_id: string; 
+/**
+ * ISO date, empty until entered.
+ */
+date: string; 
+/**
+ * Quantity, in micros.
+ */
+quantity: number; 
+/**
+ * Total cost in account currency, in micros; `None` until entered.
+ */
+total_cost: number | null }
+/**
+ * What the user should know about an opening balance that can be recorded (TRX-066).
+ */
+export type OpeningBalanceDraftPreview = { 
+/**
+ * TRX-065 — the total cost is 0: the form and the command line warn, never block.
+ */
+zero_cost: boolean }
+/**
  * Net-of-flows performance figures for one period (PRF-031, PRF-032).
  */
 export type PerformanceMetric = { 
@@ -4286,7 +4331,11 @@ export type TransactionDraftTask =
 /**
  * No date entered.
  */
-{ code: "DateMissing" }
+{ code: "DateMissing" } | 
+/**
+ * No total cost entered, for an opening balance (TRX-066).
+ */
+{ code: "TotalCostMissing" }
 /**
  * Type of financial transaction.
  */

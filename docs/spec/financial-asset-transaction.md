@@ -102,7 +102,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-041 — Buy-from-holding-row modal (frontend)**: When a purchase is initiated from a holding row (TRX-010 entry point 3), the form opens as a `BuyTransactionModal`. Account and asset are pre-filled from the holding row context and are read-only (TRX-011). Default values follow TRX-023 (date=today, exchange_rate=1.0, fees=0). The exchange rate field is visible only when the asset currency differs from the account currency (consistent with SEL-036). On success the modal closes and a success snackbar is shown; the holdings view refreshes via the existing `TransactionUpdated` event (TRX-038).
 
-### Opening Balance (042–059)
+### Opening Balance (042–059, 065–066)
 
 **TRX-042 — Opening balance transaction type (backend)**: A `TransactionType::OpeningBalance` variant allows users to seed an existing position — recording the quantity held and total cost paid before they began tracking in Folioneer — without re-entering the full purchase history. An `OpeningBalance` transaction is stored and processed alongside regular `Purchase` and `Sell` transactions in chronological recalculation.
 
@@ -140,7 +140,9 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-058 — Opening balance success feedback (frontend)**: On success, the modal closes and a success snackbar is shown. The Account Details holdings view refreshes via the existing `TransactionUpdated` event (TRX-038).
 
-**TRX-065 — A zero-cost opening balance warns (frontend)**: When the total cost of a new opening balance is 0, the form shows an inline warning under it: a total cost of 0 declares no net invested amount for the position, which may prevent the account's lifetime performance from being computed (PRF-087) or overstate it; the warning advises entering the position's value on that date instead. It never blocks saving: a zero-cost position stays valid (TRX-045). It covers creating an opening balance (TRX-055), not editing one (TRX-051).
+**TRX-065 — A zero-cost opening balance warns (frontend + backend)**: When the total cost of a new opening balance is 0, the user is warned: a total cost of 0 declares no net invested amount for the position, which may prevent the account's lifetime performance from being computed (PRF-087) or overstate it; the warning advises entering the position's value on that date instead. The core decides it (TRX-066), on a draft that can be recorded: the form shows it inline under the total cost, and the command line prints it after recording (CLI-020). It never blocks saving: a zero-cost position stays valid (TRX-045). It covers creating an opening balance (TRX-055), not editing one (TRX-051).
+
+**TRX-066 — Opening balance draft check (frontend + backend)**: A new opening balance as the user is still entering it — account, asset, date, quantity and total cost — is checked without writing anything; a correction of one is checked on save (TRX-051, TRX-063). The check reports the first problem, in this order: no account, no asset, no date, no total cost (one not typed yet is not a 0); then, among the rejections recording would make and in recording's order — a Cash Asset (CSH-061), a quantity not strictly positive (TRX-044), a negative total cost (TRX-045), a date recording rejects (unreadable, in the future, before 1900 — TRX-046, TRX-056). A draft without a problem answers whether its total cost is 0 (TRX-065). Whether the account and the asset exist and whether the asset is archived is checked on saving (TRX-050, TRX-056). The form sends its draft each time it changes and follows the check as TRX-063 says for a purchase or a sale: saving is enabled only once the latest draft checks without a problem, and stays disabled while a check runs or when the check itself fails. Recording runs the same four checks, so the draft check and recording cannot disagree on them.
 
 ### Total-Entry Mode (060–069)
 

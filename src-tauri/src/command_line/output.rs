@@ -52,6 +52,7 @@ pub fn render(outcome: &Outcome, json: bool) -> Printed {
                 account_name,
                 currency,
                 asset_reference,
+                zero_cost,
             },
             false,
         ) => Printed {
@@ -65,11 +66,29 @@ pub fn render(outcome: &Outcome, json: bool) -> Printed {
                 money(transaction.total_amount),
                 currency
             )),
-            stderr: None,
+            // TRX-065 — recorded all the same: the warning never blocks.
+            stderr: zero_cost.then(|| {
+                "Warning: a total cost of 0 declares no invested amount; the account's lifetime \
+                 performance may not be computed, or be overstated. Enter the position's value \
+                 on that date instead."
+                    .to_string()
+            }),
             exit_code: RECORDED,
         },
-        (Outcome::Recorded { transaction, .. }, true) => Printed {
-            stdout: Some(json!({ "status": "recorded", "transaction": transaction }).to_string()),
+        (
+            Outcome::Recorded {
+                transaction,
+                zero_cost,
+                ..
+            },
+            true,
+        ) => Printed {
+            stdout: Some(if *zero_cost {
+                json!({ "status": "recorded", "transaction": transaction, "warning": "ZeroCostOpeningBalance" })
+            } else {
+                json!({ "status": "recorded", "transaction": transaction })
+            }
+            .to_string()),
             stderr: None,
             exit_code: RECORDED,
         },
@@ -254,6 +273,7 @@ mod tests {
             account_name: "PEA".to_string(),
             currency: "EUR".to_string(),
             asset_reference: "CW8".to_string(),
+            zero_cost: false,
         }
     }
 

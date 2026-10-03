@@ -1,11 +1,13 @@
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { OpeningBalanceDraft } from "@/bindings";
 import { transactionMutationErrorToI18n } from "@/features/transactions/shared/presenter";
 import { logger } from "@/lib/logger";
 import { decimalToMicro } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
+import { useLatestCheck } from "@/ui/hooks/useLatestCheck";
 import { accountDetailsGateway } from "../gateway";
 
 interface UseOpenBalanceProps {
@@ -36,19 +38,35 @@ export function useOpenBalance({ accountId, assetId, onSubmitSuccess }: UseOpenB
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isFormValid = useMemo(() => {
-    const qty = parseFloat(formData.quantity);
-    const cost = parseFloat(formData.totalCost);
-    const today = new Date().toISOString().slice(0, 10);
-    // TRX-046: date must not be in the future. TRX-045: total cost may be 0 (a
-    // zero-cost position — mined / gifted / airdropped); empty (NaN) stays invalid.
-    return !!formData.assetId && !!formData.date && formData.date <= today && qty > 0 && cost >= 0;
-  }, [formData.assetId, formData.date, formData.quantity, formData.totalCost]);
-
-  // TRX-065 — a total cost of 0 declares no starting capital: warn, never block (TRX-045).
-  const zeroCostWarning = useMemo(
-    () => formData.totalCost.trim() !== "" && parseFloat(formData.totalCost) === 0,
-    [formData.totalCost],
+  // TRX-066 — the core checks the draft each time it changes: saving is enabled once the
+  // latest draft checks clean, and the core says whether a zero cost calls for the warning
+  // (TRX-065). A total cost not typed yet is sent as none, never as 0.
+  const draft = useMemo<OpeningBalanceDraft>(
+    () => ({
+      account_id: formData.accountId,
+      asset_id: formData.assetId,
+      date: formData.date,
+      quantity: decimalToMicro(formData.quantity),
+      total_cost: formData.totalCost.trim() === "" ? null : decimalToMicro(formData.totalCost),
+    }),
+    [formData],
+  );
+  const logCheckFailure = useCallback(
+    (cause: unknown) =>
+      logger.error("[useOpenBalance] opening balance draft check failed", { error: cause }),
+    [],
+  );
+  const check = useLatestCheck(
+    draft,
+    accountDetailsGateway.validateOpeningBalanceDraft,
+    logCheckFailure,
+  );
+  const isFormValid = check.data !== null;
+  const zeroCostWarning = check.data?.zero_cost ?? false;
+  // The check itself could not run: saving stays disabled, and the form says so.
+  const checkFailure = useMemo<I18nMessage | null>(
+    () => (check.failed ? { key: "error.Unknown" } : null),
+    [check.failed],
   );
 
   const handleChange = useCallback((field: keyof OpenBalanceFormData, value: string) => {
@@ -65,8 +83,8 @@ export function useOpenBalance({ accountId, assetId, onSubmitSuccess }: UseOpenB
           account_id: formData.accountId,
           asset_id: formData.assetId,
           date: formData.date,
-          quantity: decimalToMicro(formData.quantity),
-          total_cost: decimalToMicro(formData.totalCost),
+          quantity: draft.quantity,
+          total_cost: draft.total_cost ?? 0,
         });
         if (result.status === "ok") {
           showSnackbar(t("open_balance.success_created"), "success");
@@ -81,12 +99,12 @@ export function useOpenBalance({ accountId, assetId, onSubmitSuccess }: UseOpenB
         setIsSubmitting(false);
       }
     },
-    [formData, onSubmitSuccess, showSnackbar, t],
+    [formData, draft, onSubmitSuccess, showSnackbar, t],
   );
 
   return {
     formData,
-    error,
+    error: error ?? checkFailure,
     isSubmitting,
     isFormValid,
     zeroCostWarning,

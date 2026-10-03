@@ -3,7 +3,8 @@
 
 use super::error::{DividendError, OpenHoldingError};
 use super::{
-    HoldingTransactionUseCase, TransactionDraft, TransactionDraftError, TransactionDraftPreview,
+    HoldingTransactionUseCase, OpeningBalanceDraft, OpeningBalanceDraftPreview, TransactionDraft,
+    TransactionDraftError, TransactionDraftPreview,
 };
 use crate::context::account::{AccountError, ManagementFeeRemoval, Transaction};
 use serde::{Deserialize, Serialize};
@@ -492,4 +493,15 @@ pub async fn validate_transaction_draft(
     draft: TransactionDraft,
 ) -> Result<TransactionDraftPreview, TransactionDraftError> {
     uc.validate_draft(draft).await
+}
+
+/// Checks an opening balance draft without writing anything (TRX-066): whether its total
+/// cost of 0 calls for a warning (TRX-065), or the first problem as a code.
+#[tauri::command]
+#[specta::specta]
+pub async fn validate_opening_balance_draft(
+    uc: State<'_, HoldingTransactionUseCase>,
+    draft: OpeningBalanceDraft,
+) -> Result<OpeningBalanceDraftPreview, TransactionDraftError> {
+    uc.validate_opening_balance_draft(&draft)
 }

@@ -10,6 +10,7 @@ use crate::context::asset::{Asset, AssetClass, AssetError, AssetServiceContract,
 use crate::core::BACKEND;
 use crate::use_cases::holding_transaction::{
     HoldingTransactionUseCase, NameLookupError, OpenHoldingError, OpenHoldingTask,
+    OpeningBalanceDraft,
 };
 
 use super::args::{Listed, Recording, Trade, TradeAmount};
@@ -26,12 +27,14 @@ pub struct Refusal {
 /// What a command did.
 #[derive(Debug, Clone)]
 pub enum Outcome {
-    /// It recorded this transaction, in this account and currency, on this asset.
+    /// It recorded this transaction, in this account and currency, on this asset; an
+    /// opening balance of zero cost is said so (TRX-065).
     Recorded {
         transaction: Box<Transaction>,
         account_name: String,
         currency: String,
         asset_reference: String,
+        zero_cost: bool,
     },
     /// It added this asset; another asset has the same reference when `reference_shared`
     /// (CLI-026).
@@ -176,6 +179,20 @@ impl CommandRunner {
             Err(error) => return Outcome::Refused(refusal_from_lookup(&error)),
         };
         let date = target.date.clone().unwrap_or_else(|| today.to_string());
+        // TRX-065 — the core says whether an opening balance calls for the warning.
+        let zero_cost = match &command {
+            Recording::Open { target, total_cost } => self
+                .holding
+                .validate_opening_balance_draft(&OpeningBalanceDraft {
+                    account_id: found.account_id.clone(),
+                    asset_id: found.asset_id.clone(),
+                    date: date.clone(),
+                    quantity: target.quantity,
+                    total_cost: Some(*total_cost),
+                })
+                .is_ok_and(|preview| preview.zero_cost),
+            Recording::Buy(_) | Recording::Sell(_) => false,
+        };
         let result = match command {
             Recording::Open { target, total_cost } => self
                 .holding
@@ -229,6 +246,7 @@ impl CommandRunner {
                 account_name: found.account_name,
                 currency: found.currency,
                 asset_reference: found.asset_reference,
+                zero_cost,
             },
             Err(refusal) => Outcome::Refused(refusal),
         }
