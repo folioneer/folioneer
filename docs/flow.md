@@ -15,7 +15,7 @@ The rules for an entry, set by the owner on 2026-10-03:
    questions come in one block for the batch, with what to look at and what a yes means.
 
 Each entry carries a permanent `FLOW-NNN` reference (never renumbered, never reused; next
-free: FLOW-014) so the owner can queue it in `docs/todo.md` § Next like any other. An
+free: FLOW-018) so the owner can queue it in `docs/todo.md` § Next like any other. An
 entry is removed once it is settled.
 
 ---
@@ -165,6 +165,84 @@ request. The time went to waiting on CI and to rounds that tested nothing new.
   usable to its end.
 
 ---
+
+## Used and not used — the 0.5.0 batch
+
+Counted from the session's transcript, 2026-09-29 → 2026-10-03: what the agent invoked
+itself. Hooks and CI ran their own share on every commit and push; that is not counted.
+
+| What                  | Used (times)                                                                                                                                          | Not used                                                                                                                                                                                                                         |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Skills, invoked       | none                                                                                                                                                  | all nine — `/next-todo`, `/design-proposal`, `/visual-proof`, `/review-triage`, `/techdebt`, `/whats-next`, `/adr-writer`, `/dep-audit`, `/prune`                                                                                |
+| Agents, local         | reviewer-backend 9, reviewer-frontend 6, reviewer-infra 4, reviewer-arch 4, spec-reviewer 3, reviewer-security 3, reviewer-e2e 2, contract-reviewer 1 | spec-checker, adr-reviewer, reviewer-sql                                                                                                                                                                                         |
+| Recipes               | `merge` 47, `arch-check` 12, `generate-types` 9, `test-scripts` 9, `worktree` 4, `release` 3, `licence-check` 2, `test-rust` 1                        | `harness`, `check`, `check-full`, `format`, `test`, `test-unit`, `coverage-fe`, `coverage-be`, `coverage-gate`, `dev`, `dev-seed`, `install`, `stat`, `db-migrate`, `prepare-sqlx`, `next-todo`, `test-e2e`, `test-e2e-headless` |
+| Native commands       | `cargo test` 71, `cargo fmt` 53, `npx vitest run` 45, `npx prettier` 44, `npx biome` 42, `npx tsc` 40, `cargo clippy` 35                              | —                                                                                                                                                                                                                                |
+| Scripts, run directly | `whats-next.py` 8, `visual-proof-capture.mjs` 1                                                                                                       | `build.sh` has no caller anywhere                                                                                                                                                                                                |
+
+Reading: the reviewers were used as the workflow says. The skills and the recipes were
+not — the work was done by hand, in the skills' spirit, with native commands.
+
+## FLOW-014 — "Always use `just`" was not followed: 330 native commands, no `just harness`
+
+- Kind: quality + speed
+- Observed: CLAUDE.md rule 2 says a recipe is used whenever one exists. In the batch the
+  agent ran `cargo` and `npx` directly 330 times and `just harness` never — not once
+  before a first push, where `docs/workflow.md` § 3 asks for `just harness --coverage`.
+  The reason each time: a recipe runs everything, on a machine that a full run
+  overloads (FLOW-010), when one test filter or one folder was wanted. The hooks and CI
+  caught what the harness would have, except once: the unhandled errors that failed CI
+  on #91 are what a local harness run shows.
+- Proposal: recipes that take a scope, so the rule can be followed — `just test-rust
+<filter>`, `just test-fe <path>`, `just lint` for the changed files, each capped at
+  two build jobs — and `just harness` once before the first push of a code pull request,
+  as written. The rule stays; the tools make it affordable.
+- Costs: half a day on the `justfile` and `scripts/check.py`. Protects: the rule that
+  CI, the hooks and the agent run the same commands, and a CI round per local miss.
+
+## FLOW-015 — No skill was invoked; their steps were followed from memory
+
+- Kind: quality
+- Observed: the nine skills were invoked zero times in the batch. Entries were run, two
+  designs proposed, visual proofs captured, findings graded and debt filed by hand.
+  Where the hand-made path left the skill's, it cost: capture scripts rewritten three
+  times instead of `scripts/visual-proof-capture.mjs` (used once); triage done without
+  `/review-triage`, so a declined finding was sometimes recorded only in the pull
+  request body; no `/dep-audit` before the release — the local tools ran, the web check
+  of versions did not; `/prune` never ran.
+- Proposal: in a chat batch the agent invokes `/next-todo #NNN` for each entry rather
+  than re-deriving its steps, and `/dep-audit` is the first step of the release
+  hand-over. `/review-triage` and `/techdebt` are short enough to fold into
+  `/next-todo`'s steps 6 and 9, and be deleted as separate skills. `/prune` runs once
+  after each release.
+- Costs: an edit of `/next-todo`; two skills fewer. Protects: the steps that only the
+  skill remembers.
+- Needs the owner: yes — it removes two skills.
+
+## FLOW-016 — Specs and contracts changed more often than their reviewers ran
+
+- Kind: quality
+- Observed: ten of the batch's thirty commits changed a spec and five a contract;
+  `spec-reviewer` ran three times and `contract-reviewer` once, and `spec-checker`
+  never, though CLAUDE.md asks for it before closing an entry that carries spec rules.
+  CI's reviewer lanes cover code, not these documents.
+- Proposal: the documents get lanes in CI like the code — `review.yml` launches
+  `spec-reviewer` when `docs/spec/` changes and `contract-reviewer` when
+  `docs/contracts/` does — and `spec-checker` runs at the release (FLOW-007).
+- Costs: two lanes in `review.yml`, about two minutes on the pull requests that touch
+  those files. Protects: the two documents the reviewers themselves read as the truth.
+
+## FLOW-017 — Things nothing calls
+
+- Kind: speed
+- Observed: `scripts/build.sh` has no caller in the justfile, the hooks, the workflows
+  or the skills. `just db-migrate` is named nowhere outside the justfile, `just stat`
+  only in CLAUDE.md. `just test-e2e` and `just test-e2e-headless` cannot run on this
+  machine (lesson L-011) and CI uses `npm run test:e2e:ci`. `reviewer-sql` and
+  `adr-reviewer` did not run because no migration and no ADR changed: they stay.
+- Proposal: `/prune` decides each — delete `scripts/build.sh` and the two recipes with
+  no caller; keep the E2E recipes only if L-011 is to be fixed.
+- Costs: one `/prune` run. Protects: the rule that a recipe exists because something
+  calls it.
 
 ## Moved here from the todo and the tech debt
 
