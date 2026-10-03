@@ -675,6 +675,7 @@ mod tests {
             data_format_version: 1,
             app_version: Some("0.42.0".into()),
             last_applied_at: Some("2026-08-22T09:59:00Z".into()),
+            published_changes: 12,
         }];
         let mut run_status = SyncStatus::for_device(&active_device(), None, vec![]);
         run_status.roster = roster.clone();

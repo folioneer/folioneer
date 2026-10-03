@@ -88,6 +88,7 @@ pub(super) async fn read_other_devices(
             last_applied_at: cursor
                 .as_ref()
                 .and_then(|cursor| cursor.last_applied_at.clone()),
+            published_changes: manifest.latest_sequence,
         });
         if manifest.data_format_version > DATA_FORMAT_VERSION {
             intake.failures.push(SyncFailure::UpdateRequired {

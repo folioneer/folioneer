@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
 import { selectHasExternalProvider, useAppStore } from "@/lib/store";
 import { ScheduledFetchSection } from "./scheduled_fetch/ScheduledFetchSection";
-import { SyncSection } from "./sync/SyncSection";
+import { SyncSummary } from "./sync/SyncSummary";
 import { type LanguageChoice, useSettings } from "./useSettings";
 
 const LANGUAGE_OPTIONS: { value: LanguageChoice; labelKey: string }[] = [
@@ -85,7 +85,7 @@ export function SettingsPage() {
           </>
         )}
 
-        <SyncSection />
+        <SyncSummary />
 
         <section className="flex flex-col gap-2">
           <label className="flex items-start gap-3 cursor-pointer group">

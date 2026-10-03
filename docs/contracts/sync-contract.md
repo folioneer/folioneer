@@ -96,6 +96,7 @@ struct RosterEntry {
     data_format_version: u32,
     app_version: Option<String>,            // what its manifest states; None when it does not say (SYN-037) — information only
     last_applied_at: Option<String>,        // when its changes were last applied here; None if never
+    published_changes: i64,                 // how many changes it has published (its manifest's latest sequence); 0 when none yet
 }
 
 // One persisted, undismissed notice (SYN-066, CFR-060).
@@ -193,6 +194,7 @@ Record identity per kind follows CFR-012: accounts, categories, assets, transact
 
 ## Changelog
 
+- 2026-10-03 — #010 (SYN-063): `RosterEntry.published_changes` added — the manifest's latest sequence. No command, error or event changes.
 - 2026-09-27 — #045 (SYN-063): `last_sync_completed_at` is the end of the last run without a failure, stored on the device; a failed run leaves it unchanged. No shape change.
 - 2026-09-19 — SYN-037/063 amended: `SyncStatus.app_version` and `RosterEntry.app_version` added. No command, error or event changes; the manifest's new field is ignored by older builds, so the data format version stays 1 (SYN-038 pins the written form).
 - 2026-09-19 — SYN-064 amended (reverses the 2026-09-12 entry): applying a change raises no event of its own; one `SyncCompleted` per run that applied changes or whose failures or paused state changed, raised after the apply commits, and one per join; every view that shows synced data reloads on it

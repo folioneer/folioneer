@@ -124,6 +124,29 @@ describe("useEnableSyncModal — folder step (SYN-011/019)", () => {
     expect(result.current.isJoin).toBe(true);
     expect(result.current.canProceedToStep2).toBe(false);
     expect(result.current.folderError).toEqual({ key: "sync.errors.InstallationHoldsUserData" });
+    expect(result.current.joinRefused).toBe(true);
+  });
+
+  // #010 — the remedy is shown only for a folder that holds a portfolio this installation
+  // cannot join: not for an empty folder, and not for a fresh installation.
+  it.each([
+    [false, true],
+    [true, false],
+  ])("does not refuse the join when holds_portfolio=%s and holds user data=%s", async (holdsPortfolio, holdsData) => {
+    vi.mocked(gateway.inspectSyncFolder).mockResolvedValue({
+      status: "ok",
+      data: makeFolderState({
+        holds_portfolio: holdsPortfolio,
+        installation_holds_user_data: holdsData,
+      }),
+    });
+    const { result } = renderHook(() => useEnableSyncModal({ variant: "enable" }));
+
+    await act(async () => {
+      await result.current.setFolder("/home/user/sync");
+    });
+
+    expect(result.current.joinRefused).toBe(false);
   });
 
   it("blocks step 2 with the update message when format_readable is false (SYN-019/035)", async () => {

@@ -22,6 +22,7 @@ const makeState = (overrides: Record<string, unknown> = {}) => ({
   setFolder: vi.fn(),
   handleBrowse: vi.fn(),
   folderError: null,
+  joinRefused: false,
   canProceedToStep2: false,
   goToStep2: vi.fn(),
   passphrase: "",
@@ -115,12 +116,19 @@ describe("EnableSyncModal — step 2 passphrase (SYN-011/012/014/015/019)", () =
       makeState({
         isJoin: true,
         folderError: { key: "sync.errors.InstallationHoldsUserData" },
+        joinRefused: true,
         canProceedToStep2: false,
       }),
     );
     render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="enable" />);
 
-    expect(screen.getByText("sync.errors.InstallationHoldsUserData")).toBeInTheDocument();
+    // #010 — the refusal names the remedy: why, the three steps, and where the data lives.
+    const refusal = document.getElementById("sync-enable-join-refused");
+    expect(refusal).toHaveAttribute("role", "alert");
+    for (const key of ["title", "why", "step_keep", "step_rename", "step_join", "where"]) {
+      expect(refusal).toHaveTextContent(`sync.join_refused.${key}`);
+    }
+    expect(screen.queryByText("sync.errors.InstallationHoldsUserData")).not.toBeInTheDocument();
     expect(screen.getByTestId("sync-enable-next")).toBeDisabled();
   });
 

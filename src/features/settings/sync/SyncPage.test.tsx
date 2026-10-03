@@ -1,12 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SyncSection } from "./SyncSection";
+import { SyncPage } from "./SyncPage";
 
 // Controlled orchestration hook (mocked per task direction, mirrors
 // ScheduledFetchSection.test.tsx's hook-mocking pattern).
-const { mockUseSyncSection } = vi.hoisted(() => ({ mockUseSyncSection: vi.fn() }));
+const { mockUseSyncPage } = vi.hoisted(() => ({ mockUseSyncPage: vi.fn() }));
 
-vi.mock("./useSyncSection", () => ({ useSyncSection: () => mockUseSyncSection() }));
+vi.mock("./useSyncPage", () => ({ useSyncPage: () => mockUseSyncPage() }));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -32,6 +32,7 @@ const makeState = (overrides: Record<string, unknown> = {}) => ({
   failures: [],
   isSyncing: false,
   actionError: null,
+  clearActionError: vi.fn(),
   handleSyncNow: vi.fn(),
   handlePause: vi.fn(),
   handleResume: vi.fn(),
@@ -51,21 +52,21 @@ const makeState = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-describe("SyncSection — disabled state (SYN-010/017)", () => {
+describe("SyncPage — disabled state (SYN-010/017)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseSyncSection.mockReturnValue(makeState());
+    mockUseSyncPage.mockReturnValue(makeState());
   });
 
   it("shows the honest-positioning copy and the enable action when disabled (SYN-017)", () => {
-    render(<SyncSection />);
+    render(<SyncPage />);
 
     expect(screen.getByText("sync.local_copy_note")).toBeInTheDocument();
     expect(screen.getByTestId("sync-enable")).toBeInTheDocument();
   });
 
   it("does not show enabled-only actions while disabled", () => {
-    render(<SyncSection />);
+    render(<SyncPage />);
 
     expect(screen.queryByTestId("sync-now")).toBeNull();
     expect(screen.queryByTestId("sync-leave")).toBeNull();
@@ -73,8 +74,8 @@ describe("SyncSection — disabled state (SYN-010/017)", () => {
 
   it("opens the enable modal when the enable action is clicked", () => {
     const openEnableModal = vi.fn();
-    mockUseSyncSection.mockReturnValue(makeState({ openEnableModal }));
-    render(<SyncSection />);
+    mockUseSyncPage.mockReturnValue(makeState({ openEnableModal }));
+    render(<SyncPage />);
 
     fireEvent.click(screen.getByTestId("sync-enable"));
 
@@ -82,7 +83,7 @@ describe("SyncSection — disabled state (SYN-010/017)", () => {
   });
 });
 
-describe("SyncSection — enabled state (SYN-061/063/070/072/073/074/082/084)", () => {
+describe("SyncPage — enabled state (SYN-061/063/070/072/073/074/082/084)", () => {
   const enabledState = makeState({
     enabled: true,
     deviceName: "Desktop",
@@ -95,6 +96,7 @@ describe("SyncSection — enabled state (SYN-061/063/070/072/073/074/082/084)", 
         dataFormatVersion: 3,
         appVersion: "0.42.0",
         lastAppliedAt: null,
+        publishedChanges: 7,
       },
       {
         deviceId: "device-3",
@@ -102,37 +104,84 @@ describe("SyncSection — enabled state (SYN-061/063/070/072/073/074/082/084)", 
         dataFormatVersion: 3,
         appVersion: null,
         lastAppliedAt: null,
+        publishedChanges: 0,
       },
     ],
   });
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseSyncSection.mockReturnValue(enabledState);
+    mockUseSyncPage.mockReturnValue(enabledState);
   });
 
   it("shows device name, last sync time and roster rows", () => {
-    render(<SyncSection />);
+    render(<SyncPage />);
 
-    expect(screen.getByText("Desktop")).toBeInTheDocument();
+    expect(document.getElementById("sync-status-device-name")).toHaveTextContent("Desktop");
     expect(screen.getByText("Laptop")).toBeInTheDocument();
   });
 
+  // #010 — the page leads with one word for its health, read from the status.
+  it("leads with the health of sync: up to date, needing attention, or paused", () => {
+    const word = () => document.getElementById("sync-status-state")?.textContent;
+    const { unmount } = render(<SyncPage />);
+    expect(word()).toBe("sync.health.up_to_date");
+    unmount();
+
+    mockUseSyncPage.mockReturnValue({ ...enabledState, heldBackCount: 2 });
+    const attention = render(<SyncPage />);
+    expect(word()).toBe("sync.health.needs_attention");
+    attention.unmount();
+
+    mockUseSyncPage.mockReturnValue({ ...enabledState, paused: true, heldBackCount: 2 });
+    render(<SyncPage />);
+    expect(word()).toBe("sync.health.paused");
+  });
+
+  // #010 — each other computer says how many changes it has published, or that it has
+  // published nothing yet.
+  it("says what each other computer has published", () => {
+    render(<SyncPage />);
+
+    expect(document.getElementById("sync-roster-device-2-published")).toHaveTextContent(
+      'sync.published_changes:{"count":7}',
+    );
+    expect(document.getElementById("sync-roster-device-3-published")).toHaveTextContent(
+      "sync.published_nothing",
+    );
+  });
+
+  // #010 — actions are grouped by consequence: routine ones with the status, the name and
+  // the folder under this computer, the two that cannot be undone apart.
+  it("groups the actions by consequence", () => {
+    render(<SyncPage />);
+    const inside = (group: string, action: string) =>
+      document.getElementById(group)?.querySelector(`#${action}`) !== null;
+
+    expect(inside("sync-status", "sync-now")).toBe(true);
+    expect(inside("sync-status", "sync-pause")).toBe(true);
+    expect(inside("sync-this-computer", "sync-rename")).toBe(true);
+    expect(inside("sync-this-computer", "sync-change-folder")).toBe(true);
+    expect(inside("sync-danger-zone", "sync-leave")).toBe(true);
+    expect(inside("sync-danger-zone", "sync-start-over")).toBe(true);
+    expect(inside("sync-status", "sync-start-over")).toBe(false);
+  });
+
   it("SYN-063: the device name element holds the name alone, not the version beside it", () => {
-    const { container } = render(<SyncSection />);
+    const { container } = render(<SyncPage />);
 
     expect(container.querySelector("#sync-status-device-name")?.textContent).toBe("Desktop");
   });
 
   it("SYN-063: shows the app version of this computer and of each other computer", () => {
-    const { container } = render(<SyncSection />);
+    const { container } = render(<SyncPage />);
 
     expect(container.querySelector("#sync-status-app-version")).toHaveTextContent("0.43.0");
     expect(container.querySelector("#sync-roster-device-2-version")).toHaveTextContent("0.42.0");
   });
 
   it("SYN-063: says so when another computer does not publish its version", () => {
-    const { container } = render(<SyncSection />);
+    const { container } = render(<SyncPage />);
 
     expect(container.querySelector("#sync-roster-device-3-version")).toHaveTextContent(
       "sync.app_version_unknown",
@@ -140,43 +189,43 @@ describe("SyncSection — enabled state (SYN-061/063/070/072/073/074/082/084)", 
   });
 
   it("shows the held-back count when non-zero", () => {
-    mockUseSyncSection.mockReturnValue(
+    mockUseSyncPage.mockReturnValue(
       makeState({ enabled: true, heldBackCount: 3, oldestHeldBackSince: "2026-08-18T10:00:00Z" }),
     );
-    render(<SyncSection />);
+    render(<SyncPage />);
 
     expect(screen.getByTestId("sync-held-back")).toBeInTheDocument();
   });
 
   it("shows a failure line for each failure (SYN-034/035/069/084)", () => {
-    mockUseSyncSection.mockReturnValue(
+    mockUseSyncPage.mockReturnValue(
       makeState({
         enabled: true,
         failures: [{ UnreadableFiles: { count: 2 } }, "PortfolioReset"],
       }),
     );
-    render(<SyncSection />);
+    render(<SyncPage />);
 
     expect(screen.getAllByTestId(/^sync-failure-/)).toHaveLength(2);
   });
 
   it("renders exactly the pause action (not resume) when not paused", () => {
-    render(<SyncSection />);
+    render(<SyncPage />);
     expect(screen.getByTestId("sync-pause")).toBeInTheDocument();
     expect(screen.queryByTestId("sync-resume")).toBeNull();
   });
 
   it("renders exactly the resume action (not pause) when paused", () => {
-    mockUseSyncSection.mockReturnValue(makeState({ enabled: true, paused: true }));
-    render(<SyncSection />);
+    mockUseSyncPage.mockReturnValue(makeState({ enabled: true, paused: true }));
+    render(<SyncPage />);
     expect(screen.getByTestId("sync-resume")).toBeInTheDocument();
     expect(screen.queryByTestId("sync-pause")).toBeNull();
   });
 
   it("calls handleSyncNow when Sync now is clicked", () => {
     const handleSyncNow = vi.fn();
-    mockUseSyncSection.mockReturnValue(makeState({ enabled: true, handleSyncNow }));
-    render(<SyncSection />);
+    mockUseSyncPage.mockReturnValue(makeState({ enabled: true, handleSyncNow }));
+    render(<SyncPage />);
 
     fireEvent.click(screen.getByTestId("sync-now"));
 
@@ -185,8 +234,8 @@ describe("SyncSection — enabled state (SYN-061/063/070/072/073/074/082/084)", 
 
   it("calls handlePause when Pause is clicked", () => {
     const handlePause = vi.fn();
-    mockUseSyncSection.mockReturnValue(makeState({ enabled: true, handlePause }));
-    render(<SyncSection />);
+    mockUseSyncPage.mockReturnValue(makeState({ enabled: true, handlePause }));
+    render(<SyncPage />);
 
     fireEvent.click(screen.getByTestId("sync-pause"));
 
@@ -195,8 +244,8 @@ describe("SyncSection — enabled state (SYN-061/063/070/072/073/074/082/084)", 
 
   it("calls handleResume when Resume is clicked", () => {
     const handleResume = vi.fn();
-    mockUseSyncSection.mockReturnValue(makeState({ enabled: true, paused: true, handleResume }));
-    render(<SyncSection />);
+    mockUseSyncPage.mockReturnValue(makeState({ enabled: true, paused: true, handleResume }));
+    render(<SyncPage />);
 
     fireEvent.click(screen.getByTestId("sync-resume"));
 
@@ -204,18 +253,18 @@ describe("SyncSection — enabled state (SYN-061/063/070/072/073/074/082/084)", 
   });
 
   it("renders the presented error inline when actionError is set (F27)", () => {
-    mockUseSyncSection.mockReturnValue(
+    mockUseSyncPage.mockReturnValue(
       makeState({ enabled: true, actionError: { key: "sync.errors.SyncPaused" } }),
     );
-    render(<SyncSection />);
+    render(<SyncPage />);
 
     expect(screen.getByText("sync.errors.SyncPaused")).toBeInTheDocument();
   });
 
   it("requestLeave opens a confirmation before calling leaveSync (SYN-071/082)", () => {
     const requestLeave = vi.fn();
-    mockUseSyncSection.mockReturnValue(makeState({ enabled: true, requestLeave }));
-    render(<SyncSection />);
+    mockUseSyncPage.mockReturnValue(makeState({ enabled: true, requestLeave }));
+    render(<SyncPage />);
 
     fireEvent.click(screen.getByTestId("sync-leave"));
 
@@ -224,10 +273,10 @@ describe("SyncSection — enabled state (SYN-061/063/070/072/073/074/082/084)", 
 
   it("shows the confirmation dialog and calls confirmLeave only when confirmed", () => {
     const confirmLeave = vi.fn();
-    mockUseSyncSection.mockReturnValue(
+    mockUseSyncPage.mockReturnValue(
       makeState({ enabled: true, confirmingLeave: true, confirmLeave }),
     );
-    render(<SyncSection />);
+    render(<SyncPage />);
 
     expect(screen.getByTestId("sync-leave-confirm")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("sync-leave-confirm"));
@@ -237,58 +286,104 @@ describe("SyncSection — enabled state (SYN-061/063/070/072/073/074/082/084)", 
 
   it("renames through the prompt and closes it once the backend accepted the name (SYN-072)", async () => {
     const handleRename = vi.fn().mockResolvedValue(true);
-    mockUseSyncSection.mockReturnValue(
+    mockUseSyncPage.mockReturnValue(
       makeState({ enabled: true, deviceName: "Desktop", handleRename }),
     );
-    render(<SyncSection />);
+    render(<SyncPage />);
 
     fireEvent.click(screen.getByTestId("sync-rename"));
     fireEvent.change(screen.getByLabelText("sync.rename_prompt_label"), {
       target: { value: "Laptop" },
     });
-    fireEvent.click(screen.getByTestId("sync-prompt-submit"));
+    fireEvent.click(screen.getByTestId("sync-rename-submit"));
 
     expect(handleRename).toHaveBeenCalledWith("Laptop");
-    await waitFor(() => expect(screen.queryByTestId("sync-prompt-submit")).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId("sync-rename-submit")).toBeNull());
   });
 
   it("keeps the prompt open when the backend rejects the new folder (SYN-074, F27)", async () => {
     const handleChangeFolder = vi.fn().mockResolvedValue(false);
-    mockUseSyncSection.mockReturnValue(
+    mockUseSyncPage.mockReturnValue(
       makeState({ enabled: true, folder: "/home/user/sync", handleChangeFolder }),
     );
-    render(<SyncSection />);
+    render(<SyncPage />);
 
     fireEvent.click(screen.getByTestId("sync-change-folder"));
-    fireEvent.click(screen.getByTestId("sync-prompt-submit"));
+    fireEvent.click(screen.getByTestId("sync-folder-submit"));
 
     expect(handleChangeFolder).toHaveBeenCalledWith("/home/user/sync");
     await waitFor(() => expect(handleChangeFolder).toHaveBeenCalledTimes(1));
-    expect(screen.getByTestId("sync-prompt-submit")).toBeInTheDocument();
+    expect(screen.getByTestId("sync-folder-submit")).toBeInTheDocument();
   });
 
-  it("offers Browse in the change-folder prompt (SYN-074, F25)", () => {
-    mockUseSyncSection.mockReturnValue(makeState({ enabled: true, folder: "/home/user/sync" }));
-    render(<SyncSection />);
-
-    fireEvent.click(screen.getByTestId("sync-change-folder"));
-
-    expect(screen.getByTestId("sync-prompt-browse")).toBeInTheDocument();
-  });
-
-  it("offers no Browse in the rename prompt — it takes a name, not a path (SYN-072)", () => {
-    mockUseSyncSection.mockReturnValue(makeState({ enabled: true, deviceName: "Desktop" }));
-    render(<SyncSection />);
+  // F27 — a dialog shows the rejection of what it submitted, under its field and nowhere
+  // else; another action's rejection is forgotten when a dialog opens or closes.
+  it("shows a rejected name in the rename dialog only, and forgets errors around it", () => {
+    const clearActionError = vi.fn();
+    mockUseSyncPage.mockReturnValue(
+      makeState({
+        enabled: true,
+        deviceName: "Desktop",
+        actionError: { key: "sync.errors.DeviceNameBlank" },
+        clearActionError,
+      }),
+    );
+    render(<SyncPage />);
+    expect(document.getElementById("sync-action-error")).not.toBeNull();
 
     fireEvent.click(screen.getByTestId("sync-rename"));
 
-    expect(screen.queryByTestId("sync-prompt-browse")).toBeNull();
+    expect(clearActionError).toHaveBeenCalledTimes(1);
+    expect(document.getElementById("sync-action-error")).toBeNull();
+    expect(document.getElementById("sync-rename-value-error")).toHaveTextContent(
+      "sync.errors.DeviceNameBlank",
+    );
+
+    fireEvent.click(document.getElementById("sync-rename-cancel") as HTMLElement);
+
+    expect(clearActionError).toHaveBeenCalledTimes(2);
+    expect(document.getElementById("sync-rename-dialog")).toBeNull();
+  });
+
+  it("shows a rejected folder under the folder field (SYN-074, F27)", () => {
+    mockUseSyncPage.mockReturnValue(
+      makeState({
+        enabled: true,
+        folder: "/home/user/sync",
+        actionError: { key: "sync.folder_problem.Missing" },
+      }),
+    );
+    render(<SyncPage />);
+
+    fireEvent.click(screen.getByTestId("sync-change-folder"));
+
+    expect(document.getElementById("sync-folder-value-error")).toHaveTextContent(
+      "sync.folder_problem.Missing",
+    );
+  });
+
+  it("offers Browse in the change-folder prompt (SYN-074, F25)", () => {
+    mockUseSyncPage.mockReturnValue(makeState({ enabled: true, folder: "/home/user/sync" }));
+    render(<SyncPage />);
+
+    fireEvent.click(screen.getByTestId("sync-change-folder"));
+
+    expect(screen.getByTestId("sync-folder-browse")).toBeInTheDocument();
+  });
+
+  it("offers no Browse in the rename prompt — it takes a name, not a path (SYN-072)", () => {
+    mockUseSyncPage.mockReturnValue(makeState({ enabled: true, deviceName: "Desktop" }));
+    render(<SyncPage />);
+
+    fireEvent.click(screen.getByTestId("sync-rename"));
+
+    expect(screen.queryByTestId("sync-folder-browse")).toBeNull();
   });
 
   it("puts the picked folder in the field and submits it (SYN-074)", async () => {
     const handleBrowseFolder = vi.fn().mockResolvedValue("/media/phil/KEY/Folioneer");
     const handleChangeFolder = vi.fn().mockResolvedValue(true);
-    mockUseSyncSection.mockReturnValue(
+    mockUseSyncPage.mockReturnValue(
       makeState({
         enabled: true,
         folder: "/home/user/sync",
@@ -296,16 +391,16 @@ describe("SyncSection — enabled state (SYN-061/063/070/072/073/074/082/084)", 
         handleChangeFolder,
       }),
     );
-    render(<SyncSection />);
+    render(<SyncPage />);
 
     fireEvent.click(screen.getByTestId("sync-change-folder"));
-    fireEvent.click(screen.getByTestId("sync-prompt-browse"));
+    fireEvent.click(screen.getByTestId("sync-folder-browse"));
 
     await waitFor(() =>
       expect(screen.getByDisplayValue("/media/phil/KEY/Folioneer")).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByTestId("sync-prompt-submit"));
+    fireEvent.click(screen.getByTestId("sync-folder-submit"));
 
     await waitFor(() =>
       expect(handleChangeFolder).toHaveBeenCalledWith("/media/phil/KEY/Folioneer"),
@@ -314,13 +409,13 @@ describe("SyncSection — enabled state (SYN-061/063/070/072/073/074/082/084)", 
 
   it("leaves the typed folder untouched when the picker is cancelled (SYN-074)", async () => {
     const handleBrowseFolder = vi.fn().mockResolvedValue(null);
-    mockUseSyncSection.mockReturnValue(
+    mockUseSyncPage.mockReturnValue(
       makeState({ enabled: true, folder: "/home/user/sync", handleBrowseFolder }),
     );
-    render(<SyncSection />);
+    render(<SyncPage />);
 
     fireEvent.click(screen.getByTestId("sync-change-folder"));
-    fireEvent.click(screen.getByTestId("sync-prompt-browse"));
+    fireEvent.click(screen.getByTestId("sync-folder-browse"));
 
     await waitFor(() => expect(handleBrowseFolder).toHaveBeenCalled());
     expect(screen.getByDisplayValue("/home/user/sync")).toBeInTheDocument();
@@ -328,8 +423,8 @@ describe("SyncSection — enabled state (SYN-061/063/070/072/073/074/082/084)", 
 
   it("opens the start-over flow (its own confirmation lives in the enable modal, SYN-071)", () => {
     const openStartOverModal = vi.fn();
-    mockUseSyncSection.mockReturnValue(makeState({ enabled: true, openStartOverModal }));
-    render(<SyncSection />);
+    mockUseSyncPage.mockReturnValue(makeState({ enabled: true, openStartOverModal }));
+    render(<SyncPage />);
 
     fireEvent.click(screen.getByTestId("sync-start-over"));
 

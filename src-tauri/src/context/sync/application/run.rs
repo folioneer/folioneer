@@ -979,6 +979,63 @@ mod tests {
         );
     }
 
+    // SYN-063 — each other device's roster entry carries how far its manifest says it has
+    // published: the manifest's latest sequence, and 0 for a device that has joined and
+    // published nothing.
+    #[tokio::test]
+    async fn the_roster_states_how_many_changes_each_device_has_published() {
+        let key = kept_key_for_tests();
+        let manifest_of = |device_id: &str, latest_sequence: i64| {
+            encode_manifest(
+                &key,
+                &Manifest {
+                    device_id: device_id.into(),
+                    device_name: device_id.into(),
+                    data_format_version: DATA_FORMAT_VERSION,
+                    app_version: None,
+                    latest_sequence,
+                },
+            )
+            .expect("manifest encodes")
+        };
+        let (laptop, office) = (manifest_of("laptop", 7), manifest_of("office", 0));
+        let mut folder_store = MockFolderStore::new();
+        folder_store
+            .expect_list_device_ids()
+            .returning(|| Ok(vec!["laptop".into(), "office".into()]));
+        folder_store
+            .expect_read_manifest_bytes()
+            .returning(move |device_id| {
+                Ok(Some(if device_id == "laptop" {
+                    laptop.clone()
+                } else {
+                    office.clone()
+                }))
+            });
+        let mut state_repo = MockSyncStateRepository::new();
+        state_repo.expect_get_cursor().returning(|device_id| {
+            Ok(
+                (device_id == "laptop").then(|| crate::context::sync::SyncCursor {
+                    device_id: "laptop".into(),
+                    applied_through: 7,
+                    last_applied_at: Some("2026-08-22T09:59:00Z".into()),
+                }),
+            )
+        });
+
+        let intake =
+            super::super::intake::read_other_devices(&folder_store, &state_repo, &device(), &key)
+                .await
+                .expect("intake");
+
+        let published: Vec<(&str, i64)> = intake
+            .roster
+            .iter()
+            .map(|entry| (entry.device_id.as_str(), entry.published_changes))
+            .collect();
+        assert_eq!(published, vec![("laptop", 7), ("office", 0)]);
+    }
+
     /// A laptop area holding one segment `1..=1` with `change`, sealed under the kept key,
     /// and the manifest announcing it — served by the mock folder store.
     fn folder_with_laptop_segment(change: SegmentChange) -> MockFolderStore {
@@ -1088,9 +1145,11 @@ mod tests {
                 data_format_version: DATA_FORMAT_VERSION,
                 app_version: Some("0.42.0".into()),
                 last_applied_at: cursor.last_applied_at,
+                published_changes: 1,
             }],
             "SYN-063: the roster names every other device the run read, with the version \
-             its manifest states and when its changes were last applied here"
+             its manifest states, when its changes were last applied here and how many \
+             changes it has published"
         );
     }
 

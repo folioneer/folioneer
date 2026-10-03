@@ -103,7 +103,7 @@ export function EnableSyncModal({ isOpen, onClose, onSuccess, variant }: EnableS
                     value={state.folder}
                     onChange={(event) => void state.setFolder(event.target.value)}
                     error={
-                      state.folderError
+                      state.folderError && !state.joinRefused
                         ? t(state.folderError.key, state.folderError.vars)
                         : undefined
                     }
@@ -120,6 +120,24 @@ export function EnableSyncModal({ isOpen, onClose, onSuccess, variant }: EnableS
                   {t("sync.browse")}
                 </Button>
               </div>
+              {state.joinRefused && (
+                <div
+                  id="sync-enable-join-refused"
+                  role="alert"
+                  className="flex flex-col gap-2 rounded-2xl border border-m3-error p-3 text-sm"
+                >
+                  <span className="text-m3-error">{t("sync.join_refused.title")}</span>
+                  <span className="text-m3-on-surface">{t("sync.join_refused.why")}</span>
+                  <ol className="list-decimal pl-5 text-m3-on-surface">
+                    <li>{t("sync.join_refused.step_keep")}</li>
+                    <li>{t("sync.join_refused.step_rename")}</li>
+                    <li>{t("sync.join_refused.step_join")}</li>
+                  </ol>
+                  <code className="whitespace-pre-line break-all text-xs text-m3-on-surface-variant">
+                    {t("sync.join_refused.where")}
+                  </code>
+                </div>
+              )}
               <p className="text-xs text-m3-on-surface-variant">
                 {t("sync.enable_modal.folder_hint")}
               </p>

@@ -365,7 +365,7 @@ describe("store — unpricedAssets dismiss / clear action (MKT-177)", () => {
 // SyncCompleted — SYN-064/D10: a bare marker event; the frontend treats it as
 // a global refresh (accounts, assets, categories — the store's cached slices)
 // rather than reading a payload, since the run's outcome is re-read via
-// get_sync_status separately (SyncSection/SyncIndicator own that read).
+// get_sync_status separately (SyncPage/SyncIndicator own that read).
 // ---------------------------------------------------------------------------
 
 describe("store — SyncCompleted global refresh (SYN-064)", () => {

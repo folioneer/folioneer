@@ -20,7 +20,7 @@ import {
 } from "../gateway";
 import { type RosterEntryViewModel, rosterToViewModel, syncErrorToI18n } from "../shared/presenter";
 
-export interface UseSyncSectionResult {
+export interface UseSyncPageResult {
   isLoading: boolean;
   loadError: I18nMessage | null;
   enabled: boolean;
@@ -36,10 +36,12 @@ export interface UseSyncSectionResult {
   notices: ConflictNotice[];
   inconsistentHoldings: InconsistentHolding[];
   failures: SyncFailure[];
-  /** True while a run started from this section is in flight (SYN-061). */
+  /** True while a run started from this page is in flight (SYN-061). */
   isSyncing: boolean;
   /** Set when the last action was rejected; cleared by the next action (F27). */
   actionError: I18nMessage | null;
+  /** Forgets the last rejection: a dialog opens and closes without another action's error. */
+  clearActionError: () => void;
   handleSyncNow: () => Promise<void>;
   handlePause: () => Promise<void>;
   handleResume: () => Promise<void>;
@@ -79,11 +81,11 @@ const DISABLED_STATUS: SyncStatus = {
 };
 
 /**
- * SYN-061/063/070–074/082 — Settings section state: loads the sync status on
+ * SYN-061/063/070–074/082 — the sync page's state: loads the sync status on
  * mount and exposes every device-side action. Each action's result carries the
  * fresh status (or the run report's status), which replaces the displayed one.
  */
-export function useSyncSection(): UseSyncSectionResult {
+export function useSyncPage(): UseSyncPageResult {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<I18nMessage | null>(null);
   const [status, setStatus] = useState<SyncStatus>(DISABLED_STATUS);
@@ -182,6 +184,7 @@ export function useSyncSection(): UseSyncSectionResult {
     failures: status.failures,
     isSyncing,
     actionError,
+    clearActionError: () => setActionError(null),
     handleSyncNow,
     handlePause,
     handleResume,

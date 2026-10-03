@@ -16,7 +16,7 @@ vi.mock("../gateway", () => ({
 
 // 2. Import mocked modules for typed access
 import * as gateway from "../gateway";
-import { useSyncSection } from "./useSyncSection";
+import { useSyncPage } from "./useSyncPage";
 
 function makeSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus {
   return {
@@ -34,6 +34,7 @@ function makeSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus {
         data_format_version: 3,
         app_version: "0.42.0",
         last_applied_at: null,
+        published_changes: 3,
       },
     ],
     held_back_count: 0,
@@ -59,7 +60,7 @@ function makeSyncReport(overrides: Partial<SyncReport> = {}): SyncReport {
   };
 }
 
-describe("useSyncSection — load status on mount (SYN-063)", () => {
+describe("useSyncPage — load status on mount (SYN-063)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -67,7 +68,7 @@ describe("useSyncSection — load status on mount (SYN-063)", () => {
   it("is loading before the status call resolves", () => {
     vi.mocked(gateway.getSyncStatus).mockReturnValue(new Promise(() => {}));
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
 
     expect(result.current.isLoading).toBe(true);
   });
@@ -85,7 +86,7 @@ describe("useSyncSection — load status on mount (SYN-063)", () => {
       }),
     });
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.enabled).toBe(false);
@@ -94,7 +95,7 @@ describe("useSyncSection — load status on mount (SYN-063)", () => {
   it("loads the enabled status with device name, folder and roster", async () => {
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.enabled).toBe(true);
@@ -111,14 +112,14 @@ describe("useSyncSection — load status on mount (SYN-063)", () => {
       error: { code: "DatabaseError" },
     });
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.loadError).toEqual({ key: "sync.errors.DatabaseError" });
   });
 });
 
-describe("useSyncSection — Sync now (SYN-061)", () => {
+describe("useSyncPage — Sync now (SYN-061)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
@@ -127,7 +128,7 @@ describe("useSyncSection — Sync now (SYN-061)", () => {
   it("calls syncNow and re-renders status from report.status on success", async () => {
     vi.mocked(gateway.syncNow).mockResolvedValue({ status: "ok", data: makeSyncReport() });
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
@@ -146,7 +147,7 @@ describe("useSyncSection — Sync now (SYN-061)", () => {
       }),
     );
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     act(() => {
@@ -164,7 +165,7 @@ describe("useSyncSection — Sync now (SYN-061)", () => {
       error: { code: "SyncPaused" },
     });
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
@@ -175,7 +176,7 @@ describe("useSyncSection — Sync now (SYN-061)", () => {
   });
 });
 
-describe("useSyncSection — pause / resume (SYN-070/073)", () => {
+describe("useSyncPage — pause / resume (SYN-070/073)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
@@ -187,7 +188,7 @@ describe("useSyncSection — pause / resume (SYN-070/073)", () => {
       data: makeSyncStatus({ paused: true }),
     });
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
@@ -208,7 +209,7 @@ describe("useSyncSection — pause / resume (SYN-070/073)", () => {
       data: makeSyncReport({ status: makeSyncStatus({ paused: false }) }),
     });
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.paused).toBe(true);
 
@@ -221,7 +222,7 @@ describe("useSyncSection — pause / resume (SYN-070/073)", () => {
   });
 });
 
-describe("useSyncSection — rename device / change folder (SYN-072/074)", () => {
+describe("useSyncPage — rename device / change folder (SYN-072/074)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
@@ -233,7 +234,7 @@ describe("useSyncSection — rename device / change folder (SYN-072/074)", () =>
       data: makeSyncStatus({ device_name: "Laptop" }),
     });
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
@@ -250,7 +251,7 @@ describe("useSyncSection — rename device / change folder (SYN-072/074)", () =>
       data: makeSyncStatus({ folder: "/home/user/new-sync" }),
     });
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
@@ -262,14 +263,14 @@ describe("useSyncSection — rename device / change folder (SYN-072/074)", () =>
   });
 });
 
-describe("useSyncSection — leave sync confirmation (SYN-071/082)", () => {
+describe("useSyncPage — leave sync confirmation (SYN-071/082)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
   });
 
   it("does not call leaveSync until confirmed", async () => {
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     act(() => result.current.requestLeave());
@@ -281,7 +282,7 @@ describe("useSyncSection — leave sync confirmation (SYN-071/082)", () => {
   it("calls leaveSync only after confirmLeave", async () => {
     vi.mocked(gateway.leaveSync).mockResolvedValue({ status: "ok", data: null });
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     act(() => result.current.requestLeave());
@@ -294,7 +295,7 @@ describe("useSyncSection — leave sync confirmation (SYN-071/082)", () => {
   });
 
   it("cancelLeave dismisses the confirmation without calling leaveSync", async () => {
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     act(() => result.current.requestLeave());
@@ -306,7 +307,7 @@ describe("useSyncSection — leave sync confirmation (SYN-071/082)", () => {
   it("handleBrowseFolder returns the picked path (SYN-074)", async () => {
     vi.mocked(gateway.pickSyncFolder).mockResolvedValue("/media/phil/KEY/Folioneer");
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     let picked: string | null = null;
@@ -321,7 +322,7 @@ describe("useSyncSection — leave sync confirmation (SYN-071/082)", () => {
   it("handleBrowseFolder passes a cancelled picker through as null (SYN-074)", async () => {
     vi.mocked(gateway.pickSyncFolder).mockResolvedValue(null);
 
-    const { result } = renderHook(() => useSyncSection());
+    const { result } = renderHook(() => useSyncPage());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     let picked: string | null = "unchanged";

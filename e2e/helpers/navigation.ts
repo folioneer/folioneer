@@ -1,4 +1,4 @@
-import { $ } from "@wdio/globals";
+import { $, browser } from "@wdio/globals";
 
 /** Navigates to the Assets page and waits for the Add Asset FAB to confirm the route is active. */
 export async function navigateToAssets(): Promise<void> {
@@ -51,6 +51,23 @@ export async function navigateToSettings(): Promise<void> {
   await settingsNav.click();
   const toggle = await $("#scheduled-fetch-toggle");
   await toggle.waitForExist({ timeout: 10000 });
+}
+
+/**
+ * Opens the sync page the way a user does: Settings, then its "Open sync" link (#010).
+ * Waits for the page's own content — "Enable sync" while disabled, the status otherwise.
+ */
+export async function navigateToSync(): Promise<void> {
+  await navigateToSettings();
+  const openSync = await $("#settings-open-sync");
+  await openSync.waitForExist({ timeout: 10000 });
+  await openSync.click();
+  await browser.waitUntil(
+    async () =>
+      (await (await $("#sync-enable")).isExisting()) ||
+      (await (await $("#sync-status")).isExisting()),
+    { timeout: 10000, timeoutMsg: "the sync page did not show Enable sync nor its status" },
+  );
 }
 
 /**

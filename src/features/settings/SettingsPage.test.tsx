@@ -25,6 +25,11 @@ vi.mock("./scheduled_fetch/ScheduledFetchSection", () => ({
   ScheduledFetchSection: () => <div data-testid="scheduled-fetch-section-mounted" />,
 }));
 
+// The sync line reads the sync status on its own (SyncSummary.test.tsx): stubbed here too.
+vi.mock("./sync/SyncSummary", () => ({
+  SyncSummary: () => <div data-testid="sync-summary-mounted" />,
+}));
+
 const { SettingsPage } = await import("./SettingsPage");
 const { useAppStore } = await import("@/lib/store");
 
@@ -39,6 +44,8 @@ describe("SettingsPage — scheduled fetch section (SPF-010)", () => {
     render(<SettingsPage />);
 
     expect(screen.getByTestId("scheduled-fetch-section-mounted")).toBeInTheDocument();
+    // #010 — the settings keep a line about sync, with the way to its page.
+    expect(screen.getByTestId("sync-summary-mounted")).toBeInTheDocument();
   });
 });
 

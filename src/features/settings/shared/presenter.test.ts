@@ -301,6 +301,7 @@ describe("rosterToViewModel", () => {
         data_format_version: 3,
         app_version: "0.43.0",
         last_applied_at: null,
+        published_changes: 3,
       },
       {
         device_id: "device-3",
@@ -308,6 +309,7 @@ describe("rosterToViewModel", () => {
         data_format_version: 3,
         app_version: null,
         last_applied_at: "2026-08-19T08:00:00Z",
+        published_changes: 3,
       },
     ];
 
@@ -318,6 +320,7 @@ describe("rosterToViewModel", () => {
         dataFormatVersion: 3,
         appVersion: "0.43.0",
         lastAppliedAt: null,
+        publishedChanges: 3,
       },
       {
         deviceId: "device-3",
@@ -325,7 +328,34 @@ describe("rosterToViewModel", () => {
         dataFormatVersion: 3,
         appVersion: null,
         lastAppliedAt: "2026-08-19T08:00:00Z",
+        publishedChanges: 3,
       },
     ]);
+  });
+});
+
+// #010 — the word the sync page leads with.
+describe("syncHealth", () => {
+  const calm = {
+    paused: false,
+    failures: [],
+    notices: [],
+    inconsistentHoldings: [],
+    heldBackCount: 0,
+  };
+
+  it("is up to date when the status carries nothing to look at", () => {
+    expect(presenter.syncHealth(calm)).toBe("up_to_date");
+  });
+
+  it("needs attention for a failure, a notice, an inconsistent holding or a held-back change", () => {
+    expect(presenter.syncHealth({ ...calm, failures: [{}] })).toBe("needs_attention");
+    expect(presenter.syncHealth({ ...calm, notices: [{}] })).toBe("needs_attention");
+    expect(presenter.syncHealth({ ...calm, inconsistentHoldings: [{}] })).toBe("needs_attention");
+    expect(presenter.syncHealth({ ...calm, heldBackCount: 1 })).toBe("needs_attention");
+  });
+
+  it("is paused whatever else the status carries", () => {
+    expect(presenter.syncHealth({ ...calm, paused: true, failures: [{}] })).toBe("paused");
   });
 });

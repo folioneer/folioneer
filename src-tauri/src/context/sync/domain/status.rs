@@ -23,6 +23,10 @@ pub struct RosterEntry {
     pub app_version: Option<String>,
     /// When its changes were last applied here; `None` if never.
     pub last_applied_at: Option<String>,
+    /// How many changes it has published: the last sequence its manifest states, which is
+    /// a count because a device's sequences start at 1 and leave no gap (SYN-025, SYN-036);
+    /// 0 when it has joined and published nothing yet.
+    pub published_changes: i64,
 }
 
 /// A holding whose merged ledger breaks an invariant (CFR-042). Derived on read, never stored.

@@ -148,6 +148,8 @@ export interface RosterEntryViewModel {
   appVersion: string | null;
   /** ISO timestamp of the last time this device's changes were applied here, or null (SYN-063). */
   lastAppliedAt: string | null;
+  /** How many changes it has published; 0 when it joined and published nothing yet. */
+  publishedChanges: number;
 }
 
 /** SYN-037/063 — the other devices of the shared folder. */
@@ -158,5 +160,25 @@ export function rosterToViewModel(roster: RosterEntry[]): RosterEntryViewModel[]
     dataFormatVersion: entry.data_format_version,
     appVersion: entry.app_version,
     lastAppliedAt: entry.last_applied_at,
+    publishedChanges: entry.published_changes,
   }));
+}
+
+export type SyncHealth = "up_to_date" | "needs_attention" | "paused";
+
+/**
+ * SYN-063 — the one word the sync page leads with: paused, or needing attention when the
+ * status carries a failure, a held-back change, a notice or an inconsistent holding.
+ */
+export function syncHealth(status: {
+  paused: boolean;
+  failures: readonly unknown[];
+  notices: readonly unknown[];
+  inconsistentHoldings: readonly unknown[];
+  heldBackCount: number;
+}): SyncHealth {
+  if (status.paused) return "paused";
+  const waiting =
+    status.failures.length + status.notices.length + status.inconsistentHoldings.length;
+  return waiting > 0 || status.heldBackCount > 0 ? "needs_attention" : "up_to_date";
 }

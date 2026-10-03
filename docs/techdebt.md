@@ -7,7 +7,7 @@ during work that don't warrant immediate action. Format produced by the
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-069) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-070) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -448,3 +448,12 @@ Remove an entry once it has been resolved.
 - Observation: DIV-040 makes the date, the net amount, the exchange rate and the note editable. The dialog also shows a required unit price and a fees field, labels the amount "Quantity", and offers "use this price as the market price": ticked, it records the dividend's stored unit price — 1 — as the asset's price for that day. The exchange rate field is hidden when the asset and the account share a currency, so a problem on it would show on no field; a total that rounds down to nothing is reported on the unit price, which a dividend's total does not depend on.
 - User value: Editing a dividend shows the fields a dividend has, and cannot record a wrong price for the asset.
 - Done when: for a dividend the dialog shows the date, the amount (labelled as such), the exchange rate when currencies differ and the note; no unit price, no fees, no market-price checkbox; a design is validated by the owner before the dialog changes.
+
+## 2026-10-03 — TD-069 — The interface decides whether sync needs attention, in two places
+
+- Found by: the main agent, building the sync page (#010)
+- Where: `syncHealth` in `src/features/settings/shared/presenter.ts` (the sync page's leading word) and `needsAttention` in `src/features/shell/sync_indicator/useSyncIndicator.ts` (the shell indicator)
+- Severity: 🔵
+- Observation: both read the sync status and decide from its failures, notices, inconsistent holdings — and, for the page only, held-back changes — whether sync needs attention. The two rules already differ by one case. The status is assembled in several places of the core (the sync service, the run, the portfolio sync use case), so a health field stored on it would go stale; the core has no single point where a status leaves for the interface.
+- User value: The indicator in the header and the sync page never disagree about whether something needs a look.
+- Done when: the core says the health of sync with the status, from one rule; the page and the indicator show it; neither decides.

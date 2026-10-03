@@ -29,7 +29,7 @@
  *   precondition-guard error variant (`AlreadyEnabled`, `SyncPaused`, `NotPaused`, …) —
  *   see `PortfolioSyncOrchestrator`'s and `SyncService`'s inline `#[cfg(test)]` modules
  *   and the Tier-3 two-device integration test. This E2E scenario locks in the one thing
- *   only a real running app can prove: the Settings section's enable → status → sync now
+ *   only a real running app can prove: the sync page's enable → status → sync now
  *   → pause → resume → rename → leave chain genuinely reaches `enable_sync` /
  *   `sync_now` / `pause_sync` / `resume_sync` / `rename_sync_device` / `leave_sync` /
  *   `get_sync_status` on the real Rust backend, and that the backend actually writes the
@@ -48,13 +48,13 @@
  *     left to its own component tests (`EnableSyncModal.test.tsx`).
  *   - `change_sync_folder` (SYN-074) and conflict notices (SYN-066) — no scenario in the
  *     single-device chain naturally produces a second folder or a conflict; both are
- *     fully covered by BE Tier 1/2 and the FE `useSyncSection.test.ts` /
+ *     fully covered by BE Tier 1/2 and the FE `useSyncPage.test.ts` /
  *     `NoticeList.test.tsx` mocked-gateway tests.
  *   - SYN-017 (honest-positioning copy) and the no-recovery/metadata-exposure notes
- *     (SYN-053/054) — the paragraphs carrying this copy in `SyncSection.tsx` and
+ *     (SYN-053/054) — the paragraphs carrying this copy in `SyncPage.tsx` and
  *     `EnableSyncModal.tsx` have no stable `id` (they are plain `<p>{t(...)}</p>` nodes).
  *     E1-E4 forbid a text/aria-label selector, so this rule has no locale-invariant E2E
- *     surface; it is exercised by `SyncSection.test.tsx` / `EnableSyncModal.test.tsx`,
+ *     surface; it is exercised by `SyncPage.test.tsx` / `EnableSyncModal.test.tsx`,
  *     which can assert translated text directly. Not a missing-helper gap — adding an
  *     `id` to those paragraphs is a frontend source change, out of this writer's scope.
  *   - `SyncFailure` rendering (SYN-034/035/069/084), inconsistent holdings (SYN-040),
@@ -62,7 +62,7 @@
  *     enabled device with an always-available folder and no other device publishing
  *     concurrently; these require the join/two-device setup this file cannot drive.
  *   - The shell `SyncIndicator` (`#sync-indicator`) — it reads the same `SyncStatus`
- *     already exercised through `SyncSection`; asserting it too would duplicate
+ *     already exercised through `SyncPage`; asserting it too would duplicate
  *     coverage without proving anything new about the IPC round trip.
  *
  * Seed strategy:
@@ -90,7 +90,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $, browser } from "@wdio/globals";
 import { dismissLeftoverModal } from "../helpers/modal";
-import { navigateToSettings } from "../helpers/navigation";
+import { navigateToSync } from "../helpers/navigation";
 import { setReactInputValue } from "../helpers/react";
 import { captureScreen } from "../helpers/screenshot";
 import { seedAccount } from "../helpers/seed";
@@ -136,7 +136,7 @@ describe("sync", () => {
   //   leave (folder area survives, singleton left disabled for later files).
   // -------------------------------------------------------------------------
   it("SYN-010/011/012/018/061/063/070/072/073/082: enable as the first device round-trips through the real backend", async () => {
-    await navigateToSettings();
+    await navigateToSync();
 
     // -----------------------------------------------------------------
     // Step 1 — Fresh-install state (SYN-010): "Enable sync" offered, no
@@ -230,7 +230,7 @@ describe("sync", () => {
     await modal.waitForExist({ timeout: 20000, reverse: true });
     const statusBlock = await $("#sync-status");
     await statusBlock.waitForExist({ timeout: 10000 });
-    await captureScreen("sync-settings");
+    await captureScreen("sync-page");
 
     // -----------------------------------------------------------------
     // Step 5 — The one thing only a real run can prove: the backend wrote
@@ -343,9 +343,9 @@ describe("sync", () => {
     // -----------------------------------------------------------------
     const renameBtn = await $("#sync-rename");
     await renameBtn.click();
-    const promptDialog = await $("#sync-prompt-dialog");
+    const promptDialog = await $("#sync-rename-dialog");
     await promptDialog.waitForExist({ timeout: 8000 });
-    const promptValue = await $("#sync-prompt-value");
+    const promptValue = await $("#sync-rename-value");
     await promptValue.waitForExist({ timeout: 5000 });
     assert.strictEqual(
       await promptValue.getValue(),
@@ -353,8 +353,8 @@ describe("sync", () => {
       "SYN-072 — the rename prompt must pre-fill the device's current name",
     );
 
-    await setReactInputValue("sync-prompt-value", RENAMED_DEVICE_NAME);
-    const promptSubmit = await $("#sync-prompt-submit");
+    await setReactInputValue("sync-rename-value", RENAMED_DEVICE_NAME);
+    const promptSubmit = await $("#sync-rename-submit");
     await promptSubmit.waitForEnabled({ timeout: 5000 });
     await promptSubmit.click();
     await promptDialog.waitForExist({ timeout: 8000, reverse: true });

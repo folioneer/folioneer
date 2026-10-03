@@ -20,6 +20,8 @@ export interface UseEnableSyncModalResult {
   handleBrowse: () => Promise<void>;
   /** Why the folder cannot be used, from `inspect_sync_folder` (SYN-014/019/035). */
   folderError: I18nMessage | null;
+  /** SYN-014 — the folder holds a portfolio this installation cannot join: it holds data. */
+  joinRefused: boolean;
   canProceedToStep2: boolean;
   goToStep2: () => void;
   passphrase: string;
@@ -157,6 +159,7 @@ export function useEnableSyncModal({
     setFolder,
     handleBrowse,
     folderError,
+    joinRefused: folderState?.holds_portfolio === true && folderState.installation_holds_user_data,
     canProceedToStep2,
     goToStep2: () => setStep(2),
     passphrase,
