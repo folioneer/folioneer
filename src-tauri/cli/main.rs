@@ -4,5 +4,5 @@
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    std::process::exit(folioneer_lib::run_command_line(&arguments));
+    std::process::exit(folioneer_lib::run_command_line("folioneer-cli", &arguments));
 }

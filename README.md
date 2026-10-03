@@ -126,10 +126,11 @@ folioneer holding open --account "PEA" --asset CW8 --quantity 10 --total-cost 49
 folioneer holding buy  --account "PEA" --asset CW8 --quantity 2 --price 495.10 [--fees 1.99] [--rate 1] [--date …] [--note "…"] [--json]
 folioneer holding buy  --account "PEA" --asset CW8 --quantity 2 --total 992.19 [--fees 1.99] …
 folioneer holding sell …same options as buy…
-folioneer holding --help
+folioneer --help              # the commands, with examples
+folioneer holding buy --help  # one command's options and defaults
 ```
 
-`--account` is the account's name; `--asset` is the asset's name or reference; case does not matter. Amounts are decimals with a dot. A command prints one `Recorded:` or `Refused:` line — or one JSON object with `--json` — and exits with 0 when it recorded, 1 when it was refused, 2 when the command itself is wrong.
+`--account` is the account's name; `--asset` is the asset's name or reference; case does not matter. Amounts are decimals with a dot. A command prints one `Recorded:` or `Refused:` line — or one JSON object with `--json` — and exits with 0 when it recorded, 1 when it was refused, 2 when the command itself is wrong — it then prints the mistake, the closest command or option when one was mistyped, and the help to run.
 
 - **Linux** — the program itself: `folioneer holding …` once the `.deb` is installed, or the AppImage's path with the same arguments (`~/Applications/Folioneer.AppImage holding …`).
 - **Windows (PowerShell)** — the console program installed beside the main one:

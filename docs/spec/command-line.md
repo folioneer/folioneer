@@ -14,7 +14,7 @@ No new entity and no Tauri command, so no contract: a command records a `Transac
 
 ### Commands (010–019)
 
-**CLI-010 — Commands (backend)**: `folioneer holding open` records an opening balance, `folioneer holding buy` a purchase, `folioneer holding sell` a sale. Only a first argument of `holding` starts a command; the program's other starts (no argument, `--scheduled-fetch`) are unchanged, and any other first argument opens the window as before.
+**CLI-010 — Commands (backend)**: `folioneer holding open` records an opening balance, `folioneer holding buy` a purchase, `folioneer holding sell` a sale. Only a first argument of `holding`, or of `--help` or `-h` (CLI-016), starts the command line; the program's other starts (no argument, `--scheduled-fetch`) are unchanged, and any other first argument opens the window as before.
 
 **CLI-013 — Options (backend)**: Every command takes `--account` and `--asset` (CLI-011), `--quantity`, and optionally `--date` and `--json` (CLI-021). An opening balance takes `--total-cost`, in the account's currency (TRX-047). A purchase or a sale takes either `--price` — the unit price in the asset's currency (TRX-021) — or `--total` — the broker's all-in amount in the account's currency (TRX-060, SEL-050), never both; and optionally `--fees` in the account's currency, `--rate` — the exchange rate from the asset's currency to the account's (TRX-021) — and `--note`.
 
@@ -22,7 +22,7 @@ No new entity and no Tauri command, so no contract: a command records a `Transac
 
 **CLI-015 — Numbers and dates (backend)**: Quantities and amounts are decimals with a dot and at most six decimals; a date is `YYYY-MM-DD`. Anything else is a usage error (CLI-022). A leading minus is read as written, so the recording rules refuse a negative figure with their own reason (CLI-012).
 
-**CLI-016 — Help (backend)**: `--help` or `-h` anywhere after `holding` (`folioneer holding --help`, `folioneer holding buy -h`) prints how to use the commands on standard output and exits 0.
+**CLI-016 — Help (backend)**: `--help` or `-h` anywhere on a command line — one that starts as CLI-010 says, or any line given to the Windows console program (CLI-040) — prints a page of help on standard output and exits 0; nothing is recorded, whatever else the line holds. With a known command (`folioneer holding buy --help`) it is that command's page (CLI-023); with no known command (`folioneer --help`, `folioneer holding --help`, `folioneer holding buuy --help`) it is the overview: one line saying what the program does, its usage, the commands with one line each, an example of each command, how numbers and dates are written, the help to run for a command's options, that the window must be closed, and the exit codes. Every page names the program as the user types it: `folioneer`, or `folioneer-cli` on Windows (CLI-040).
 
 **CLI-011 — Account and asset by what the user typed (backend)**: `--account` names an account by its name; `--asset` names an asset by its name or its reference; case is ignored for every letter. A Cash Asset is never matched: cash is moved by deposits and withdrawals (CSH-018, TRX-064), and the core would reject the purchase or the sale (CSH-062). A name that matches no account is refused with `AccountNotFound`, one that two accounts share (possible after a merge, CFR-035) with `AccountAmbiguous`; a name that matches no asset with `AssetNotFound`, one that matches more than one with `AssetAmbiguous`. A refusal names only what was typed: it never lists the existing accounts or assets.
 
@@ -36,7 +36,13 @@ No new entity and no Tauri command, so no contract: a command records a `Transac
 
 **CLI-021 — JSON output (backend)**: With `--json`, a command that ran prints one JSON object on standard output: `{"status":"recorded","transaction":{…}}` with the recorded transaction — its figures in micro-units, as the TRX Entity Definition stores them (TRX-024) — or `{"status":"refused","code":…,"message":…}` with the code of the refusal: the code of the rejection recording makes, or `AccountNotFound`, `AccountAmbiguous`, `AssetNotFound`, `AssetAmbiguous`, `NoPortfolio`, `WindowOpen`, `DatabaseError`. A usage error is never JSON (CLI-022).
 
-**CLI-022 — Exit codes (backend)**: A command exits with 0 when it recorded, 1 when it was refused (a rule, something not found or ambiguous, no portfolio, the window open, the data unreachable), and 2 when the command line itself is wrong (unknown command or option, a missing, repeated or unreadable value), printing the reason and how to use the commands on standard error.
+**CLI-022 — Exit codes (backend)**: A command exits with 0 when it recorded or printed help (CLI-016), 1 when it was refused (a rule, something not found or ambiguous, no portfolio, the window open, the data unreachable), and 2 on a usage error — the command line itself is wrong: unknown command or option, a missing, repeated or unreadable value — printing the error and the help to run on standard error (CLI-024).
+
+**CLI-023 — A command's page (backend)**: A command's page shows that command only: one line saying what it does; its usage, continued on aligned lines; its required options, then the optional ones, one per line with its name, its value and what it is, the columns aligned — `--price` and `--total` both among the required ones, the second marked as taking the place of the first (CLI-013); the default of every option that has one (CLI-014); `--json` and `-h, --help`; one example; the exit codes.
+
+**CLI-024 — After a usage error (backend)**: A usage error (CLI-022) prints two lines on standard error and nothing else: `error: ` followed by what is wrong, then `Try '<program> <command> --help'.` naming the page of the command that was typed — or `Try '<program> --help'.` when no known command was. The help itself is not printed.
+
+**CLI-025 — The closest name (backend)**: An unknown command or option one or two characters away from a known one is answered with it: `unknown command "holding buuy". Did you mean "holding buy"?`. The distance is the number of characters to add, remove or replace, dashes and the space included. A command is compared with the commands; an option with the options its command takes, `--json` and `--help`. When several are as close, the first in the page's order is suggested; anything further away, and a name of one or two characters, is reported without a suggestion. On Linux a mistyped `holding` never reaches this rule: it is no command, and opens the window (CLI-010).
 
 ### Running beside the window (030–039)
 
@@ -50,7 +56,7 @@ No new entity and no Tauri command, so no contract: a command records a `Transac
 
 ### Starting it (040–049)
 
-**CLI-040 — A console program on Windows (backend)**: The Windows installer puts a console program, `folioneer-cli.exe`, beside the main program; it is installed, updated and removed with it. It runs the commands (`folioneer-cli holding …`), and every rule CLI-010 to CLI-033 applies to it unchanged, except that any first argument other than `holding` — or none — is a usage error (CLI-022): it never opens a window or starts a download. On Linux the main program itself runs the commands. The console behaviour on Windows is proven by the owner's check on an installed release (v0.4.0, 2026-10-03).
+**CLI-040 — A console program on Windows (backend)**: The Windows installer puts a console program, `folioneer-cli.exe`, beside the main program; it is installed, updated and removed with it. It runs the commands (`folioneer-cli holding …`), and every rule CLI-010 to CLI-033 applies to it unchanged, except that any line that does not start with `holding` and does not ask for help (CLI-016) — or an empty one — is a usage error (CLI-022): it never opens a window or starts a download. On Linux the main program itself runs the commands. The console behaviour on Windows is proven by the owner's check on an installed release (v0.4.0, 2026-10-03).
 
 ---
 

@@ -64,20 +64,27 @@ pub fn run_scheduled_fetch_headless() -> i32 {
 /// Headless entry for the command line (CLI spec, #044): reads the arguments after the
 /// program name, runs the command without a window, prints its result and returns the exit
 /// code (CLI-022). Its log lines go to the log file only, never to the terminal.
-pub fn run_command_line(args: &[String]) -> i32 {
+pub fn run_command_line(program: &str, args: &[String]) -> i32 {
     // Logging is best-effort and never printed: the terminal shows only the command's result.
     if let Some(log_dir) = shared::infrastructure::app_directories::resolve_log_dir() {
         let _ = fs::create_dir_all(&log_dir)
             .map_err(anyhow::Error::from)
             .and_then(|()| initialize_tracing_to(&log_dir, false));
     }
-    execute_command_line(args)
+    execute_command_line(program, args)
+}
+
+/// CLI-010 — whether the arguments start a command: `holding`, or a request for the
+/// command line's help. Anything else is the program's other starts.
+pub fn starts_command_line(args: &[String]) -> bool {
+    args.first()
+        .is_some_and(|first| matches!(first.as_str(), "holding" | "--help" | "-h"))
 }
 
 /// Runs a command on a runtime of its own, prints its result and returns its exit code.
-fn execute_command_line(args: &[String]) -> i32 {
+fn execute_command_line(program: &str, args: &[String]) -> i32 {
     exit_code_on_new_runtime(async {
-        let printed = command_line::headless::run(args).await;
+        let printed = command_line::headless::run(program, args).await;
         if let Some(text) = &printed.stdout {
             println!("{text}");
         }
@@ -141,8 +148,27 @@ mod tests {
                 .map(str::to_string)
                 .collect::<Vec<_>>()
         };
-        assert_eq!(execute_command_line(&args("holding --help")), 0);
-        assert_eq!(execute_command_line(&args("holding move")), 2);
+        assert_eq!(
+            execute_command_line("folioneer", &args("holding --help")),
+            0
+        );
+        assert_eq!(execute_command_line("folioneer", &args("holding move")), 2);
+    }
+
+    // CLI-010 — `holding` and a request for help start the command line; nothing else does.
+    #[test]
+    fn cli_010_a_command_or_a_request_for_help_starts_the_command_line() {
+        let starts = |line: &str| {
+            let args: Vec<String> = line.split_whitespace().map(str::to_string).collect();
+            starts_command_line(&args)
+        };
+        assert!(starts("holding buy --account PEA"));
+        assert!(starts("--help"));
+        assert!(starts("-h"));
+        assert!(!starts(""));
+        assert!(!starts("--scheduled-fetch"));
+        assert!(!starts("--scheduled-fetch --help"));
+        assert!(!starts("portfolio.db"));
     }
 
     #[test]

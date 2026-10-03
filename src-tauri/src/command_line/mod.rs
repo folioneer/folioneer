@@ -4,5 +4,6 @@
 
 mod args;
 pub mod headless;
+mod help;
 mod orchestrator;
 mod output;

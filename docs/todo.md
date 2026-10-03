@@ -147,15 +147,6 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
 
-## #053 — (backend) — The command line's help is easy to read
-
-Requested by the owner on 2026-10-03, after the first use on Windows. The help is one block of three long lines, printed whole for `--help` and after every mistake, so the one thing that was wrong is lost above it. The conventions a terminal user expects (Command Line Interface Guidelines, clig.dev): help for the program lists its commands with one line each and a few examples; help for one command shows its usage, one option per line with its default, and an example; a mistake prints the error and where to find help, not the help itself; a mistyped command suggests the closest one.
-
-**User value:** A user finds the command and its options at a glance, and after a mistake reads what was wrong.
-**Done when:** `folioneer --help` (and `folioneer-cli --help`) prints a one-line description, the commands with one line each and two or three examples; `--help` after a command prints that command only — usage, one option per line, aligned, with its default, then an example; a usage error prints the error and a hint naming the `--help` to run, not the whole help; a mistyped command or option suggests the closest one; exit codes are unchanged (0, 1, 2); the texts are tested in Rust and the README's examples match them.
-**Design:** none
-**Open questions:** none
-
 ## #054 — (backend) — List accounts and assets from the command line
 
 Requested by the owner on 2026-10-03. A command names its account and its asset by what the user typed, and a refusal never lists what exists (#044); the user therefore needs a way to ask. `folioneer account list` and `folioneer asset list` print what the window's lists show. They only read, so they answer while the window is open.

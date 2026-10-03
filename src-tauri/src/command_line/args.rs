@@ -1,15 +1,7 @@
 //! Reading a command line (CLI-010): the command, its options and their values, in
 //! micro-units (TRX-024). Anything wrong is a usage error (CLI-022).
 
-/// How to use the commands, printed by `--help` and after a usage error.
-pub const USAGE: &str = "\
-Usage:
-  folioneer holding open --account <name> --asset <name or reference> --quantity <q> --total-cost <amount> [--date YYYY-MM-DD] [--json]
-  folioneer holding buy  --account <name> --asset <name or reference> --quantity <q> (--price <amount> | --total <amount>) [--fees <amount>] [--rate <rate>] [--date YYYY-MM-DD] [--note <text>] [--json]
-  folioneer holding sell (same options as buy)
-
-Amounts and quantities are decimals with a dot. --date defaults to today, --fees to 0, --rate to 1.
-Exit codes: 0 recorded, 1 refused, 2 wrong usage.";
+use super::help::{closest, commands, HelpTopic};
 
 const MICRO: i64 = 1_000_000;
 
@@ -66,35 +58,66 @@ pub enum Command {
 pub enum Invocation {
     /// Run a command, printing text or JSON.
     Run { command: Command, json: bool },
-    /// Print how to use the commands.
-    Help,
+    /// Print a page of help.
+    Help(HelpTopic),
 }
 
-/// A command line that cannot be run, with the reason.
+/// A command line that cannot be run: the reason, and the page of help to point at.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UsageError(pub String);
+pub struct UsageError {
+    /// What is wrong, with the closest name when one was mistyped (CLI-025).
+    pub message: String,
+    /// The page that says how to type it (CLI-024).
+    pub topic: HelpTopic,
+}
+
+/// Why a command line cannot be run.
+struct Reason(String);
 
 /// CLI-010 — reads the arguments after the program name.
 pub fn parse(args: &[String]) -> Result<Invocation, UsageError> {
-    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        return Ok(Invocation::Help);
+    let words: Vec<&str> = args
+        .iter()
+        .map(String::as_str)
+        .filter(|arg| !is_help(arg))
+        .collect();
+    let topic = HelpTopic::of(words.first().copied(), words.get(1).copied());
+    if args.iter().any(|arg| is_help(arg)) {
+        return Ok(Invocation::Help(topic));
     }
+    read(args).map_err(|Reason(message)| UsageError { message, topic })
+}
+
+fn is_help(argument: &str) -> bool {
+    argument == "--help" || argument == "-h"
+}
+
+/// `unknown <what> "<typed>"`, with the closest of `candidates` when it is a typing mistake
+/// (CLI-025). What was typed is echoed with its control characters escaped.
+fn unknown(what: &str, typed: &str, candidates: &[&str]) -> Reason {
+    let echoed = typed.escape_debug();
+    Reason(match closest(typed, candidates) {
+        Some(meant) => format!("unknown {what} \"{echoed}\". Did you mean \"{meant}\"?"),
+        None => format!("unknown {what} \"{echoed}\""),
+    })
+}
+
+fn read(args: &[String]) -> Result<Invocation, Reason> {
     let (group, verb, rest) = match args {
         [group, verb, rest @ ..] => (group.as_str(), verb.as_str(), rest),
-        _ => return Err(UsageError("a command is missing".to_string())),
+        [group] if group != "holding" => return Err(unknown("command", group, &commands())),
+        _ => return Err(Reason("a command is missing".to_string())),
     };
-    if group != "holding" {
-        return Err(UsageError(format!("unknown command \"{group}\"")));
-    }
-    let allowed: &[&str] = match verb {
-        "open" => &[
+    let command = format!("{group} {verb}");
+    let allowed: &[&str] = match command.as_str() {
+        "holding open" => &[
             "--account",
             "--asset",
             "--quantity",
             "--total-cost",
             "--date",
         ],
-        "buy" | "sell" => &[
+        "holding buy" | "holding sell" => &[
             "--account",
             "--asset",
             "--quantity",
@@ -105,7 +128,7 @@ pub fn parse(args: &[String]) -> Result<Invocation, UsageError> {
             "--date",
             "--note",
         ],
-        other => return Err(UsageError(format!("unknown command \"holding {other}\""))),
+        _ => return Err(unknown("command", &command, &commands())),
     };
     let mut options = Options::default();
     let mut json = false;
@@ -117,13 +140,18 @@ pub fn parse(args: &[String]) -> Result<Invocation, UsageError> {
             continue;
         }
         if !allowed.contains(&name) {
-            return Err(UsageError(format!("unknown option \"{name}\"")));
+            let known: Vec<&str> = allowed
+                .iter()
+                .copied()
+                .chain(["--json", "--help"])
+                .collect();
+            return Err(unknown("option", name, &known));
         }
         let Some(value) = rest.get(index + 1) else {
-            return Err(UsageError(format!("{name} needs a value")));
+            return Err(Reason(format!("{name} needs a value")));
         };
         if options.values.iter().any(|(seen, _)| seen == name) {
-            return Err(UsageError(format!("{name} is given twice")));
+            return Err(Reason(format!("{name} is given twice")));
         }
         options.values.push((name.to_string(), value.clone()));
         index += 2;
@@ -143,7 +171,7 @@ pub fn parse(args: &[String]) -> Result<Invocation, UsageError> {
             let amount = match (options.get("--price"), options.get("--total")) {
                 (Some(_), None) => TradeAmount::Price(options.amount("--price")?),
                 (None, Some(_)) => TradeAmount::Total(options.amount("--total")?),
-                _ => return Err(UsageError("give either --price or --total".to_string())),
+                _ => return Err(Reason("give either --price or --total".to_string())),
             };
             let trade = Trade {
                 target,
@@ -175,33 +203,33 @@ impl Options {
             .map(|(_, value)| value.as_str())
     }
 
-    fn text(&self, name: &str) -> Result<String, UsageError> {
+    fn text(&self, name: &str) -> Result<String, Reason> {
         match self.get(name).map(str::trim) {
             Some(value) if !value.is_empty() => Ok(value.to_string()),
-            _ => Err(UsageError(format!("{name} is missing"))),
+            _ => Err(Reason(format!("{name} is missing"))),
         }
     }
 
-    fn amount(&self, name: &str) -> Result<i64, UsageError> {
+    fn amount(&self, name: &str) -> Result<i64, Reason> {
         let value = self
             .get(name)
-            .ok_or_else(|| UsageError(format!("{name} is missing")))?;
+            .ok_or_else(|| Reason(format!("{name} is missing")))?;
         decimal_to_micro(value)
-            .ok_or_else(|| UsageError(format!("{name} is not a decimal number: \"{value}\"")))
+            .ok_or_else(|| Reason(format!("{name} is not a decimal number: \"{value}\"")))
     }
 
-    fn amount_or(&self, name: &str, default: i64) -> Result<i64, UsageError> {
+    fn amount_or(&self, name: &str, default: i64) -> Result<i64, Reason> {
         match self.get(name) {
             Some(_) => self.amount(name),
             None => Ok(default),
         }
     }
 
-    fn date(&self) -> Result<Option<String>, UsageError> {
+    fn date(&self) -> Result<Option<String>, Reason> {
         match self.get("--date") {
             None => Ok(None),
             Some(value) if is_iso_date(value) => Ok(Some(value.to_string())),
-            Some(value) => Err(UsageError(format!(
+            Some(value) => Err(Reason(format!(
                 "--date is not a date as YYYY-MM-DD: \"{value}\""
             ))),
         }
@@ -249,7 +277,7 @@ mod tests {
     fn run(line: &str) -> Command {
         match parse(&args(line)).expect("valid") {
             Invocation::Run { command, .. } => command,
-            Invocation::Help => panic!("help"),
+            Invocation::Help(_) => panic!("help"),
         }
     }
 
@@ -298,19 +326,75 @@ mod tests {
         ));
     }
 
-    // CLI-010 — `--help` anywhere asks for help.
+    // CLI-016 — `--help` or `-h` anywhere asks for help: the page of the command it comes
+    // with, the overview when it comes with none.
     #[test]
-    fn cli_010_help_is_help() {
-        assert_eq!(parse(&args("holding buy --help")), Ok(Invocation::Help));
-        assert_eq!(parse(&args("--help")), Ok(Invocation::Help));
+    fn cli_016_help_is_the_page_of_its_command() {
+        let page = |line: &str| parse(&args(line));
+        assert_eq!(
+            page("holding buy --help"),
+            Ok(Invocation::Help(HelpTopic::Buy))
+        );
+        assert_eq!(
+            page("holding -h sell --account A"),
+            Ok(Invocation::Help(HelpTopic::Sell))
+        );
+        assert_eq!(
+            page("holding open -h"),
+            Ok(Invocation::Help(HelpTopic::Open))
+        );
+        assert_eq!(
+            page("holding --help"),
+            Ok(Invocation::Help(HelpTopic::Overview))
+        );
+        assert_eq!(page("--help"), Ok(Invocation::Help(HelpTopic::Overview)));
+        assert_eq!(page("-h"), Ok(Invocation::Help(HelpTopic::Overview)));
+    }
+
+    // CLI-024 — a usage error points at the page of the command it was typed for.
+    #[test]
+    fn cli_024_a_usage_error_names_the_page_to_read() {
+        let topic = |line: &str| parse(&args(line)).expect_err("usage error").topic;
+        assert_eq!(topic("holding buy --account A"), HelpTopic::Buy);
+        assert_eq!(topic("holding open --price 1"), HelpTopic::Open);
+        assert_eq!(topic("holding move"), HelpTopic::Overview);
+        assert_eq!(topic(""), HelpTopic::Overview);
+    }
+
+    // CLI-025 — a mistyped command or option is answered with the closest one.
+    #[test]
+    fn cli_025_a_mistyped_name_is_answered_with_the_closest() {
+        let reason = |line: &str| parse(&args(line)).expect_err("usage error").message;
+        assert_eq!(
+            reason("holding buuy"),
+            "unknown command \"holding buuy\". Did you mean \"holding buy\"?"
+        );
+        assert_eq!(
+            reason("holdin sell --account A"),
+            "unknown command \"holdin sell\". Did you mean \"holding sell\"?"
+        );
+        assert_eq!(
+            reason("holding buy --acount A"),
+            "unknown option \"--acount\". Did you mean \"--account\"?"
+        );
+        assert_eq!(
+            reason("holding buy --account A --jsn"),
+            "unknown option \"--jsn\". Did you mean \"--json\"?"
+        );
+        assert_eq!(reason("holding buy --ASML"), "unknown option \"--ASML\"");
+        // Several as close: the first in the page's order.
+        assert_eq!(
+            reason("holding buy --nate x"),
+            "unknown option \"--nate\". Did you mean \"--rate\"?"
+        );
     }
 
     // CLI-022 — a wrong command line is a usage error naming what is wrong.
     #[test]
     fn cli_022_a_wrong_command_line_is_a_usage_error() {
-        let reason = |line: &str| parse(&args(line)).expect_err("usage error").0;
+        let reason = |line: &str| parse(&args(line)).expect_err("usage error").message;
         assert_eq!(reason(""), "a command is missing");
-        assert_eq!(reason("account list"), "unknown command \"account\"");
+        assert_eq!(reason("account list"), "unknown command \"account list\"");
         assert_eq!(reason("holding move"), "unknown command \"holding move\"");
         assert_eq!(
             reason("holding open --account A --asset B --quantity 1 --price 2"),

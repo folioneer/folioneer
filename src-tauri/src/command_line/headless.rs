@@ -8,26 +8,33 @@ use crate::shared::infrastructure::app_directories;
 use crate::shared::infrastructure::container::AppContainer;
 use crate::shared::infrastructure::window_lock::WindowLock;
 
-use super::args::{parse, Invocation, USAGE};
+use super::args::{parse, Invocation};
+use super::help::help;
 use super::orchestrator::{CommandRunner, Refusal};
 use super::output::{refused, render, Printed, RECORDED, WRONG_USAGE};
 
 /// Reads the arguments after the program name, runs the command against the data folder,
-/// and returns what to print with the exit code.
-pub async fn run(args: &[String]) -> Printed {
+/// and returns what to print with the exit code. `program` is the name the user typed it
+/// under, for the help it prints (CLI-016).
+pub async fn run(program: &str, args: &[String]) -> Printed {
     let (command, json) = match parse(args) {
         Ok(Invocation::Run { command, json }) => (command, json),
-        Ok(Invocation::Help) => {
+        Ok(Invocation::Help(topic)) => {
             return Printed {
-                stdout: Some(USAGE.to_string()),
+                stdout: Some(help(program, topic)),
                 stderr: None,
                 exit_code: RECORDED,
             }
         }
+        // CLI-024 — the mistake and where to read how, never the whole help.
         Err(error) => {
             return Printed {
                 stdout: None,
-                stderr: Some(format!("{}\n\n{USAGE}", error.0)),
+                stderr: Some(format!(
+                    "error: {}\nTry '{}'.",
+                    error.message,
+                    error.topic.invocation(program)
+                )),
                 exit_code: WRONG_USAGE,
             }
         }
@@ -118,7 +125,7 @@ mod tests {
         let args: Vec<String> = line.split_whitespace().map(str::to_string).collect();
         match parse(&args).expect("valid command") {
             Invocation::Run { command, json } => (command, json),
-            Invocation::Help => panic!("help"),
+            Invocation::Help(_) => panic!("help"),
         }
     }
 
@@ -326,21 +333,35 @@ mod tests {
         );
     }
 
-    // CLI-022 — help prints the usage and exits 0; a wrong command line exits 2 with the
-    // reason and the usage.
+    // CLI-016 / CLI-024 / CLI-022 — help prints its page on standard output and exits 0; a
+    // wrong command line exits 2 with the mistake and the help to run, not the help itself.
     #[tokio::test]
-    async fn cli_022_help_and_wrong_usage() {
-        let help = run(&["holding".to_string(), "--help".to_string()]).await;
+    async fn cli_024_help_and_wrong_usage() {
+        let line =
+            |text: &str| -> Vec<String> { text.split_whitespace().map(str::to_string).collect() };
+
+        let help = run("folioneer", &line("holding buy --help")).await;
         assert_eq!(help.exit_code, RECORDED);
+        assert!(help.stderr.is_none());
         assert!(help
             .stdout
             .as_deref()
-            .is_some_and(|text| text.starts_with("Usage:")));
+            .is_some_and(|text| text.contains("Usage: folioneer holding buy ")));
 
-        let wrong = run(&["holding".to_string(), "move".to_string()]).await;
+        let wrong = run("folioneer-cli", &line("holding buy --account PEA --ASML")).await;
         assert_eq!(wrong.exit_code, WRONG_USAGE);
-        let text = wrong.stderr.expect("reason");
-        assert!(text.starts_with("unknown command \"holding move\""));
-        assert!(text.contains("Usage:"));
+        assert!(wrong.stdout.is_none());
+        assert_eq!(
+            wrong.stderr.as_deref(),
+            Some("error: unknown option \"--ASML\"\nTry 'folioneer-cli holding buy --help'.")
+        );
+
+        let mistyped = run("folioneer", &line("holding buuy")).await;
+        assert_eq!(
+            mistyped.stderr.as_deref(),
+            Some(
+                "error: unknown command \"holding buuy\". Did you mean \"holding buy\"?\nTry 'folioneer --help'."
+            )
+        );
     }
 }
