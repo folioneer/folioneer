@@ -2,7 +2,7 @@
 
 <!-- Add new backlog items here. Format: ## #NNN — (domain) — Short title -->
 <!-- #NNN is a permanent reference: never renumbered, never reused. A new entry takes the -->
-<!-- next free number wherever it is placed. Next free: #058. -->
+<!-- next free number wherever it is placed. Next free: #059. -->
 <!-- Every entry ends with four lines: **User value:**, **Done when:**, **Design:** and -->
 <!-- **Open questions:**. Design is `none` until the agent proposes one (it does so before -->
 <!-- touching anything the user sees), then `proposed (screenshots/design/NNN-*.png)`, then -->
@@ -172,6 +172,18 @@ Decided by the owner on 2026-10-03: "always show what is wrong". The core checks
 **Done when:** every form that records or corrects a transaction shows the first problem the core reports — on the field it concerns when there is one, above the actions otherwise — in both languages, and never disables Save without a visible reason; a field not filled yet is not reported as an error before the user has typed in it; an E2E test reads the message of at least one form.
 **Design:** none
 **Open questions:** none
+
+## #058 — (fullstack) — Numbers are typed and shown the same way everywhere, by language
+
+Asked by the owner on 2026-10-03, for 0.6.0. A number's decimal separator is not handled consistently: the forms accept a comma or a dot in either language; a form pre-filled from a recorded figure (a correction) writes a dot even in French; the display language is set once at start-up and falls back to French. The thousands separator is out of scope. The command line reads and prints the dot only — all its text is English (#044).
+
+**User value:** A number reads and is typed the same way on every screen: with a comma in French, with a dot in English.
+**Done when:** every place a number is typed or shown is listed (forms, pre-filled forms, tables, charts, exports, the command line); in the window each shows and accepts the decimal separator of the display language — a comma in French, a dot in English — and a form pre-filled from a recorded figure uses it too; one conversion reads a typed number and one writes it, both tested in the two languages; what the command line does is decided and stated.
+**Design:** none
+**Open questions:**
+
+- [ ] In French, is a dot still accepted when typed (a numeric keypad types one), or refused?
+- [ ] Does the command line stay on the dot whatever the system language (recommended: yes — a script behaves the same everywhere)?
 
 ## #051 — (fullstack) — An MCP server over the headless core
 

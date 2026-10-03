@@ -157,7 +157,7 @@ A purchase or a sale of an asset. Cash is never traded: it moves by a Deposit or
 
 > Status: confirmed
 
-A transaction as the user is still entering it — a purchase or a sale with its account, asset, date, quantity and either a unit price or a total. The application checks it before it can be recorded and shows its first problem, or the unit price and total recording would store.
+A transaction as the user is still entering it — a purchase or a sale with its account, asset, date, quantity and either a unit price or a total, or an opening balance with its account, asset, date, quantity and total cost. The application checks it before it can be recorded and shows its first problem, or what recording would store and what the user should know about it.
 
 ## Cash Domain Concepts (introduced by CSH spec)
 
