@@ -59,7 +59,7 @@ Carry-over risk: `e2e/sync/sync.test.ts` selects on `sync-*` stable ids througho
 
 **User value:** Sync health is readable at a glance, destructive actions sit apart from routine ones, and a refused join states how to fix it.
 **Done when:** Sync lives at `/sync` with a link from settings, actions are grouped by consequence, rename and change-folder have separate dialogs, `InstallationHoldsUserData` names the remedy, and `e2e/sync/sync.test.ts` passes on the new ids.
-**Design:** none
+**Design:** proposed (screenshots/design/010-\*.png)
 **Open questions:** none
 
 ## #011 — (fullstack) — Monitored assets, price bars, and indicator primitives
