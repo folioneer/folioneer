@@ -164,3 +164,13 @@ Append-only; supersede in place if the underlying ecosystem changes.
 **Root cause** — The helper sets the DOM value and dispatches `input` / `change`; when React does not take that event, the form never receives the value, and the next re-render — here a draft-check answer — writes the field's own empty value back. The form itself keeps every value it receives: 800 runs of the real dialog in a real browser, with late answers and a throttled CPU, lost none, and a component test types while checks are in flight. What remains is the WebKitGTK driver, which already fails React's `onChange` with plain `setValue()`.
 
 **Mitigation** — An E2E input helper reads the field back after the page settles and types again when the value did not hold, logging the field, whether it is still in the page and what has focus. A `[setReactInputValue]` line in the E2E log is the event to look at; one that holds after the retry confirms the harness, one that keeps failing is a form bug.
+
+## L-020 — A GTK application started without a session bus waits 30 seconds for one
+
+**First observed**: 2026-09-27, cause found 2026-10-03 (TD-044, the E2E job)
+
+**Symptom** — Under `xvfb-run` in CI, each start of the application sits 30 seconds between its first log line (`AT-SPI: Error retrieving accessibility bus address`) and the webview's first one. With a fresh application per spec file, 23 files of about 80 seconds of tests took 12 to 15 minutes.
+
+**Root cause** — A CI runner has no D-Bus session bus. GTK and WebKitGTK call services on it at start-up; with no bus the call ends on its 30-second timeout instead of failing at once. Silencing the accessibility bridge (`NO_AT_BRIDGE=1`) removes the warning, not the wait.
+
+**Mitigation** — Start the run inside its own session bus: `dbus-run-session -- xvfb-run …`. The E2E step went from 12 min 26 s to 2 min 32 s on the same 23 files. A wait of exactly 30 seconds, repeated, is a timeout: look for who is being waited on before looking at the code that waits.

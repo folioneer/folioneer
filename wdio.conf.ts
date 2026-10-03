@@ -9,7 +9,7 @@
 //
 // Run:
 //   npm run test:e2e          # local (headed window)
-//   npm run test:e2e:xvfb     # Linux with virtual framebuffer (no display)
+//   npm run test:e2e:ci       # Linux with virtual framebuffer (no display), in its own D-Bus session
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import os from "node:os";

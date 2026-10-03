@@ -124,6 +124,8 @@ jobs:
       - name: Run E2E (headless via Xvfb)
         if: steps.scope.outputs.run == 'true'
         # `test:e2e:ci` is the project's xvfb wrapper around `test:e2e` (see package.json).
+        # It runs inside its own D-Bus session: without one, every start of the app waits
+        # 30 seconds (docs/lessons.md L-020).
         shell: bash
         run: npm run test:e2e:ci
 
