@@ -2,7 +2,7 @@
 
 <!-- Add new backlog items here. Format: ## #NNN — (domain) — Short title -->
 <!-- #NNN is a permanent reference: never renumbered, never reused. A new entry takes the -->
-<!-- next free number wherever it is placed. Next free: #056. -->
+<!-- next free number wherever it is placed. Next free: #058. -->
 <!-- Every entry ends with four lines: **User value:**, **Done when:**, **Design:** and -->
 <!-- **Open questions:**. Design is `none` until the agent proposes one (it does so before -->
 <!-- touching anything the user sees), then `proposed (screenshots/design/NNN-*.png)`, then -->
@@ -24,10 +24,12 @@
 5. #053
 6. #054
 7. #055
-8. TD-058
-9. TD-044
-10. #052
-11. #010
+8. TD-065
+9. TD-058
+10. #057
+11. TD-044
+12. #052
+13. #010
 
 ## #009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
@@ -146,6 +148,30 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Are management fees part of this report, or a separate one? (Recommended: part of it — income without the cost of holding tells half the story, and the data is already there.)
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
+
+## #056 — (fullstack) — What an asset is, and what identifies it
+
+Raised by the owner on 2026-10-03, while adding assets from the command line. The model has one notion, the asset, with three identifiers that do different jobs and no rule tying them: the ISIN names an instrument wherever it trades; the reference is a ticker on a market, or any code the user picks for an asset no market lists; the exchange says which market. A reference may be shared by several assets on purpose (AST-009: one ticker, several markets and currencies), and so may an ISIN — nothing checks it — so the same instrument held on two markets is two unrelated assets, and nothing tells that legitimate case from an asset created twice by mistake. The definition must fit both a listed instrument (a stock, an ETF) and a custom asset the user owns (real estate, a fund inside a contract) that has neither ISIN nor market.
+
+**User value:** A user knows what to type to create an asset and what makes two assets the same or different; an asset created twice by mistake is caught, and one instrument held on two markets is understood as such.
+**Done when:** the asset spec defines an asset and each identifier for a listed instrument and for a custom asset; the vocabulary carries the terms; a true duplicate is refused or warned about as the owner decides, by the same rule in the window and on the command line; what a command's `--asset` accepts follows from the definition.
+**Design:** none
+**Open questions:**
+
+- [ ] Is an asset a listing — a reference on an exchange, in a currency — of an instrument identified by its ISIN? Or one instrument whatever the market?
+- [ ] What makes two assets "the same": the same ISIN, exchange and currency? And is creating a second one refused, or warned about as a shared reference is today (AST-009)?
+- [ ] For a custom asset (no ISIN, no market): is the reference a free label, and must it be unique among custom assets?
+- [ ] Are positions in one instrument across markets shown together anywhere (allocation, performance), or always per asset?
+- [ ] On the command line, is an asset named by its name, its reference, its ISIN — and what when the reference is shared?
+
+## #057 — (frontend) — A form always says what is wrong
+
+Decided by the owner on 2026-10-03: "always show what is wrong". The core checks a transaction draft while the user types and returns its first problem (TRX-062, TRX-063). Some forms show it (a total below its fees, on the Total field); others only disable Save, and the user has to guess why. The vocabulary already says a draft "shows its first problem" — the forms are to catch up with it. Forms the core does not check while typing (TD-054, TD-058) show the rejection on save; the same message, in the same place, is wanted for them.
+
+**User value:** When Save is disabled or a save is refused, the user reads why, next to what to fix.
+**Done when:** every form that records or corrects a transaction shows the first problem the core reports — on the field it concerns when there is one, above the actions otherwise — in both languages, and never disables Save without a visible reason; a field not filled yet is not reported as an error before the user has typed in it; an E2E test reads the message of at least one form.
+**Design:** none
+**Open questions:** none
 
 ## #051 — (fullstack) — An MCP server over the headless core
 
