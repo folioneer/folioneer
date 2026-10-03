@@ -55,7 +55,7 @@ Append-only; supersede in place if the underlying ecosystem changes.
 
 **Symptom** — An E2E spec green in repeated local headless runs fails on CI, on an assertion right after an action whose behavior depends on an OS service — here the keychain: with no Secret Service on the runner, the save fell back to a lower storage tier whose UI flow is legitimately different, and the spec had asserted the dev-host variant only.
 
-**Mitigation** — (1) When a code path branches on host-service availability, assert only what is identical across all environment-legal variants (or accept any of them explicitly). (2) Before trusting local runs for such a path, reproduce the CI host: `DBUS_SESSION_BUS_ADDRESS=disabled: just test-e2e-headless` makes anything Secret-Service-dependent see "unavailable", exactly like CI. Generalizes to any host-coupled dependency — locale, display server, network: find the env knob that recreates the CI condition and run the suite under it. Fixed in `2091460`.
+**Mitigation** — (1) When a code path branches on host-service availability, assert only what is identical across all environment-legal variants (or accept any of them explicitly). (2) Before trusting local runs for such a path, reproduce the CI host: `npm run test:e2e:ci` runs the suite in a session bus of its own (L-020), where nothing answers for the Secret Service, so anything that depends on it sees "unavailable", exactly like CI. Generalizes to any host-coupled dependency — locale, display server, network: find the env knob that recreates the CI condition and run the suite under it. Fixed in `2091460`.
 
 ## L-008 — An external API's "access denied" can be origin-gated, not credential-gated
 

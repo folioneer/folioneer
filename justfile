@@ -38,15 +38,7 @@ coverage-be:
     mkdir -p coverage/backend && cd src-tauri && cargo llvm-cov --lib --tests --lcov --output-path ../coverage/backend/lcov.info --ignore-filename-regex '(^|/)build\.rs$|dev/generate_bindings\.rs$|/src-tauri/tests/'
     python3 scripts/coverage-strip-tests.py coverage/backend/lcov.info
 
-# Run E2E tests against the built binary (opens a window)
-test-e2e:
-    npm run test:e2e
-
-# Run E2E tests headlessly via Xvfb (Linux / CI, no display required)
-test-e2e-headless:
-    npm run test:e2e:ci
-
-# Run unit tests only (excludes E2E and coverage; see test-e2e and coverage-fe/coverage-be)
+# Run unit tests only (excludes E2E, which runs in CI, and coverage; see coverage-fe/coverage-be)
 test-unit: test test-rust
 
 # Check the coverage reports against the floors in coverage-gates.json (run coverage-fe / coverage-be first); pass --frontend or --backend for one layer

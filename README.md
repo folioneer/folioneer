@@ -82,7 +82,7 @@ E2E tests drive the real Tauri app via WebDriver and need two extra binaries tha
 sudo apt install -y webkit2gtk-driver xvfb
 ```
 
-`webkit2gtk-driver` provides the `WebKitWebDriver` binary that `tauri-driver` proxies to. `xvfb` is only required for headless runs (`just test-e2e-headless`); skip it if you only need `just test-e2e` against your real display.
+`webkit2gtk-driver` provides the `WebKitWebDriver` binary that `tauri-driver` proxies to. `xvfb` is only required for headless runs (`npm run test:e2e:ci`); skip it if you only need `npm run test:e2e` against your real display.
 
 **2. tauri-driver (user-local, must match the project's Tauri version)**
 
@@ -95,8 +95,8 @@ The version must match what `.github/workflows/e2e.yml` installs. Run a fresh `c
 **3. Run the suite**
 
 ```bash
-just test-e2e            # uses your current $DISPLAY
-just test-e2e-headless   # uses xvfb-run, useful over SSH or in tmux
+npm run test:e2e      # uses your current $DISPLAY
+npm run test:e2e:ci   # uses xvfb-run in its own D-Bus session, as CI does
 ```
 
 Specs live in `e2e/` and follow `docs/e2e-rules.md`. Each spec seeds its own state via IPC (`e2e/helpers/seed.ts`) and tears down via the wdio harness — no shared global fixtures.
@@ -104,7 +104,7 @@ Specs live in `e2e/` and follow `docs/e2e-rules.md`. Each spec seeds its own sta
 ### Build
 
 ```bash
-./scripts/build.sh
+npm run tauri -- build
 ```
 
 Output: `src-tauri/target/release/bundle/`
