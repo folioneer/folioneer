@@ -349,11 +349,16 @@ impl AccountService {
         date: &str,
     ) -> StdResult<HoldingSnapshot, AccountError> {
         NaiveDate::parse_from_str(date, "%Y-%m-%d").map_err(|_| AccountError::InvalidDate)?;
-        let transactions = self
-            .transaction_repo
-            .get_by_account_asset(account_id, asset_id)
-            .await
-            .map_err(|e| {
+        // The cash line is moved by every asset's purchases, sales and dividends: its
+        // balance needs the whole account, a holding only its own pair.
+        let transactions = if crate::core::cash::is_cash_asset(asset_id) {
+            self.transaction_repo.get_all_for_account(account_id).await
+        } else {
+            self.transaction_repo
+                .get_by_account_asset(account_id, asset_id)
+                .await
+        }
+        .map_err(|e| {
                 tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "holding_snapshot_as_of: repository failure");
                 AccountError::DatabaseError
             })?;
@@ -3067,6 +3072,53 @@ mod tests {
             .expect("a valid date with no transactions yields an empty snapshot");
         assert_eq!(snap.quantity, 0);
         assert_eq!(snap.average_price, 0);
+    }
+
+    // The cash line's snapshot is read over the whole account: the purchase of
+    // another asset, paid from the cash, counts.
+    #[tokio::test]
+    async fn holding_snapshot_as_of_reads_the_cash_line_over_the_whole_account() {
+        let cash = crate::core::cash::system_cash_asset_id("EUR");
+        let deposit = Transaction::new_deposit(
+            "acc-1".to_string(),
+            cash.clone(),
+            "2024-06-01".to_string(),
+            100_000_000,
+            None,
+        )
+        .expect("deposit");
+        let purchase = Transaction::new(
+            "acc-1".to_string(),
+            "asset-1".to_string(),
+            crate::context::account::TransactionType::Purchase,
+            "2024-06-05".to_string(),
+            4_000_000,
+            10_000_000,
+            1_000_000,
+            0,
+            40_000_000,
+            None,
+            None,
+        )
+        .expect("purchase");
+        let mut mock_tr = MockTransactionRepository::new();
+        mock_tr
+            .expect_get_all_for_account()
+            .once()
+            .returning(move |_| Ok(vec![deposit.clone(), purchase.clone()]));
+        let svc = AccountService::new(
+            Box::new(MockAccountRepository::new()),
+            Box::new(MockHoldingRepository::new()),
+            Box::new(mock_tr),
+        );
+
+        let snap = svc
+            .holding_snapshot_as_of("acc-1", &cash, "2024-07-01")
+            .await
+            .expect("snapshot");
+
+        assert_eq!(snap.quantity, 60_000_000);
+        assert_eq!(snap.average_price, 1_000_000);
     }
 
     // A repository failure on the transaction fetch surfaces as DatabaseError.

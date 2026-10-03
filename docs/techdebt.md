@@ -434,11 +434,11 @@ Remove an entry once it has been resolved.
 ## 2026-10-03 — TD-065 — Some figures are computed in two places
 
 - Found by: the owner, after TD-062 (a corrected deposit was refused because a second cash computation counted deposits and withdrawals only)
-- Where: `Account::reconstruct_holding_as_of` (repeats `replay_holding`, and still carries deposit and withdrawal branches for a cash line whose balance purchases, sales and dividends also move) beside `Account::cash_balance_as_of`; its callers in `use_cases/account_details/orchestrator.rs` and `use_cases/shared/valuation.rs`; `computeTotalMicro` in `src/lib/microUnits.ts` beside the core's totals (TD-054); `DEFAULT_RISK_BY_CLASS` and `SYSTEM_CATEGORY_ID` in `src/features/assets/shared/constants.ts` beside `AssetClass::default_risk` and the core's system category, which `asset add` uses (CLI-026)
+- Where: `computeTotalMicro` in `src/lib/microUnits.ts` beside the core's totals (TD-054); `DEFAULT_RISK_BY_CLASS` and `SYSTEM_CATEGORY_ID` in `src/features/assets/shared/constants.ts` beside `AssetClass::default_risk` and the core's system category; the figures not yet listed (performance flows, valuation, price movement)
 - Severity: 🟡
-- Observation: where one figure has two computations, only one is exercised by the tests of the day, and the other drifts. Not audited: whether any caller asks the as-of reconstruction for the cash line, and which other figures (realized profit, average cost, performance flows) have a second computation.
+- Observation: where one figure has two computations, only one is exercised by the tests of the day, and the other drifts. In the account, this is settled: one rule says what moves cash (`cash_effect`), the cash line as of a date is read by it alone, and a test holds the as-of reconstruction of a holding equal to the replay on the same ledger. What remains is in the interface, and in the figures no one has listed.
 - User value: None directly — a figure reads the same wherever it is shown.
-- Done when: every figure the application shows is listed with where it is computed; one with two computations either loses one, or has a test proving both agree on the same ledger; a cash line never goes through the non-cash reconstruction.
+- Done when: every figure the application shows is listed with where it is computed; the interface computes none the core computes (TD-054, the default risk table); any other figure with two computations loses one, or has a test proving both agree on the same ledger.
 
 ## 2026-10-03 — TD-066 — An asset's name, reference and category have no length or character rule
 

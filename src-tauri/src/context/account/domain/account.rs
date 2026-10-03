@@ -1164,49 +1164,28 @@ impl Account {
     /// running balance would go strictly negative (CSH-080); `Invariants::Tolerated` lets
     /// it (CFR-042).
     fn replayed_cash_balance(&self, invariants: Invariants) -> Result<i64, AccountError> {
-        let mut cash_txs: Vec<&Transaction> = self
-            .transactions
-            .iter()
-            .filter(|t| {
-                matches!(
-                    t.transaction_type,
-                    TransactionType::Deposit
-                        | TransactionType::Withdrawal
-                        | TransactionType::Purchase
-                        | TransactionType::Sell
-                        | TransactionType::Dividend
-                        | TransactionType::Interest
-                )
-            })
-            .collect();
-        cash_txs.sort_by(|a, b| {
+        // Every transaction, in date order: `cash_effect` alone says which ones move cash.
+        let mut by_date: Vec<&Transaction> = self.transactions.iter().collect();
+        by_date.sort_by(|a, b| {
             a.date
                 .cmp(&b.date)
                 .then_with(|| a.created_at.cmp(&b.created_at))
         });
 
         let mut running: i64 = 0;
-        for t in &cash_txs {
-            match t.transaction_type {
-                TransactionType::Deposit | TransactionType::Sell | TransactionType::Dividend => {
-                    running = running.saturating_add(t.total_amount);
-                }
-                TransactionType::Withdrawal | TransactionType::Purchase => {
-                    if invariants == Invariants::Enforced && running < t.total_amount {
+        for transaction in by_date {
+            match Self::cash_effect(transaction) {
+                CashEffect::In(amount) => running = running.saturating_add(amount),
+                CashEffect::Out(amount) => {
+                    if invariants == Invariants::Enforced && running < amount {
                         return Err(AccountError::InsufficientCash {
                             current_balance_micros: running,
                             currency: self.currency.clone(),
                         });
                     }
-                    running = running.saturating_sub(t.total_amount);
+                    running = running.saturating_sub(amount);
                 }
-                // INT-023 — interest on the cash line credits the balance by `quantity`
-                // (its total_amount is 0 per the zero-cost packing); interest on a
-                // non-cash asset never touches cash.
-                TransactionType::Interest if crate::core::cash::is_cash_asset(&t.asset_id) => {
-                    running = running.saturating_add(t.quantity);
-                }
-                _ => {}
+                CashEffect::None => {}
             }
         }
         Ok(running)
@@ -1503,6 +1482,15 @@ impl Account {
         asset_id: &str,
         as_of: &str,
     ) -> HoldingSnapshot {
+        // The cash line has one computation, over every transaction of the account that
+        // moves cash; its unit is its own, so its average price is 1. Like every as-of
+        // read it reports 0 for a balance a merged ledger left negative (CFR-042).
+        if crate::core::cash::is_cash_asset(asset_id) {
+            return HoldingSnapshot {
+                quantity: Self::cash_balance_as_of(transactions, as_of),
+                average_price: 1_000_000,
+            };
+        }
         let reconstruction = Self::reconstruct_holding_as_of(transactions, asset_id, as_of);
         HoldingSnapshot {
             quantity: reconstruction.quantity,
@@ -1510,7 +1498,7 @@ impl Account {
         }
     }
 
-    /// Full point-in-time reconstruction of a holding as of `as_of`: quantity,
+    /// Full point-in-time reconstruction of a non-cash holding as of `as_of`: quantity,
     /// VWAP average cost, cumulative realized P&L, and the most recent sell date —
     /// replayed from the asset's transactions dated on or before that date. A
     /// read-only valuation over already-validated history, so it omits the
@@ -1542,9 +1530,7 @@ impl Account {
         let mut last_sold_date: Option<String> = None;
         for t in &txs {
             match t.transaction_type {
-                TransactionType::Purchase
-                | TransactionType::OpeningBalance
-                | TransactionType::Deposit => {
+                TransactionType::Purchase | TransactionType::OpeningBalance => {
                     total_quantity += t.quantity as i128;
                     vwap_numerator += t.total_amount as i128 * MICRO;
                 }
@@ -1564,10 +1550,9 @@ impl Account {
                     vwap_numerator -= vwap_before as i128 * qty;
                     total_quantity -= qty;
                 }
-                TransactionType::Withdrawal => {
-                    total_quantity -= t.quantity as i128;
-                    vwap_numerator = total_quantity.max(0) * MICRO;
-                }
+                // The cash line is read by `cash_balance_as_of` alone: a Deposit or a
+                // Withdrawal never belongs to the pair replayed here.
+                TransactionType::Deposit | TransactionType::Withdrawal => {}
                 // FSD-022/023 — free shares add quantity at zero cost (dilutes VWAP).
                 TransactionType::FreeShares => {
                     total_quantity += t.quantity as i128;
@@ -3236,30 +3221,55 @@ mod tests {
         assert_eq!(snap.average_price, micro(50)); // INT-024 — VWAP dilutes to 200/4
     }
 
+    // The cash line as of a date is read by the one cash computation: a purchase
+    // paid from it counts, and a transaction after the date does not.
     #[test]
-    fn holding_snapshot_as_of_handles_cash_deposit_and_withdrawal() {
-        // Cash unit price stays 1.0: deposit 100, withdraw 30 → 70 held at avg 1.0.
+    fn holding_snapshot_as_of_reads_the_cash_line_through_the_cash_balance() {
+        let cash = crate::core::cash::system_cash_asset_id("EUR");
         let txs = vec![
             snap_tx(
                 "dep-1",
-                "cash-1",
+                &cash,
                 TransactionType::Deposit,
                 "2024-06-01",
                 100,
                 100,
             ),
             snap_tx(
+                "buy-1",
+                "asset-1",
+                TransactionType::Purchase,
+                "2024-06-05",
+                4,
+                40,
+            ),
+            snap_tx(
                 "wd-1",
-                "cash-1",
+                &cash,
                 TransactionType::Withdrawal,
                 "2024-06-10",
                 30,
                 30,
             ),
+            snap_tx(
+                "dep-2",
+                &cash,
+                TransactionType::Deposit,
+                "2024-08-01",
+                500,
+                500,
+            ),
         ];
-        let snap = Account::holding_snapshot_as_of(&txs, "cash-1", "2024-07-01");
-        assert_eq!(snap.quantity, micro(70));
-        assert_eq!(snap.average_price, micro(1)); // CSH — cash VWAP stays at 1.0
+
+        let snap = Account::holding_snapshot_as_of(&txs, &cash, "2024-07-01");
+
+        assert_eq!(snap.quantity, micro(30));
+        assert_eq!(snap.average_price, micro(1));
+        assert_eq!(
+            Account::reconstruct_holding_as_of(&txs, &cash, "2024-07-01").quantity,
+            0,
+            "the non-cash reconstruction holds no cash arithmetic"
+        );
     }
 
     // SEL-024 / SEL-030 — correcting a sell to a date that precedes its buy is rejected:
@@ -6073,6 +6083,90 @@ mod two_asset_and_synced_ledger_tests {
         let a = holding(&acc, A).unwrap();
         assert_eq!(a.total_realized_pnl, micro(100 - 60));
         assert_eq!(a.last_sold_date.as_deref(), Some("2024-01-03"));
+    }
+
+    // A holding read as of the far future is the holding the account keeps: the
+    // as-of reconstruction and the replay agree on quantity, average cost, realized profit
+    // and last sale date, and the as-of cash balance is the cash holding.
+    #[test]
+    fn the_as_of_read_and_the_replay_agree_on_the_same_ledger() {
+        let mut acc = funded_account();
+        two_assets(&mut acc);
+        sell(&mut acc, B, "2024-02-01", 5, 150);
+        acc.record_withdrawal("2024-02-02".to_string(), micro(1_000), None)
+            .unwrap();
+        let interest = Transaction::interest(
+            "acc-1".to_string(),
+            A.to_string(),
+            "2024-03-01".to_string(),
+            micro(2),
+            None,
+        )
+        .unwrap();
+        acc.apply_interest(interest).unwrap();
+        let cash_interest = Transaction::interest(
+            "acc-1".to_string(),
+            acc.cash_asset_id(),
+            "2024-03-02".to_string(),
+            micro(7),
+            None,
+        )
+        .unwrap();
+        acc.apply_interest(cash_interest).unwrap();
+        let dividend = Transaction::new_dividend(
+            "acc-1".to_string(),
+            A.to_string(),
+            "2024-03-03".to_string(),
+            micro(12),
+            micro(1),
+            None,
+        )
+        .unwrap();
+        acc.apply_dividend(dividend).unwrap();
+        acc.correct_transaction(
+            &acc.transactions
+                .iter()
+                .find(|t| t.asset_id == A && t.transaction_type == TransactionType::Sell)
+                .map(|t| t.id.clone())
+                .unwrap(),
+            "2024-01-03".to_string(),
+            micro(6),
+            micro(155),
+            micro(1),
+            micro(2),
+            None,
+            None,
+        )
+        .unwrap();
+
+        for asset in [A, B] {
+            let kept = holding(&acc, asset).unwrap();
+            let read = Account::reconstruct_holding_as_of(&acc.transactions, asset, "9999-12-31");
+            assert_eq!(
+                (
+                    read.quantity,
+                    read.average_price,
+                    read.total_realized_pnl,
+                    read.last_sold_date.as_deref(),
+                ),
+                (
+                    kept.quantity,
+                    kept.average_price,
+                    kept.total_realized_pnl,
+                    kept.last_sold_date.as_deref(),
+                ),
+                "{asset}"
+            );
+        }
+        let cash = acc.cash_asset_id();
+        assert_eq!(
+            Account::cash_balance_as_of(&acc.transactions, "9999-12-31"),
+            acc.holding_quantity(&cash)
+        );
+        assert_eq!(
+            Account::holding_snapshot_as_of(&acc.transactions, &cash, "9999-12-31").quantity,
+            acc.holding_quantity(&cash)
+        );
     }
 
     // INT-023 — interest on an asset credits that asset, never the cash
