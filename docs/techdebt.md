@@ -7,7 +7,7 @@ during work that don't warrant immediate action. Format produced by the
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-067) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-069) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -377,15 +377,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — `whats_new` behaves the same in the window, the command line and any later interface.
 - Done when: every frozen site of `whats_new` moves into a core query, a draft check or a query parameter, with its rule tested in Rust; its `decision_sites` entries leave the allowlist (`just arch-check --write-allowlist`).
 
-## 2026-09-28 — TD-054 — A dividend correction still previews its total in the interface
-
-- Found by: #047 part 3 — the draft check covers a purchase and a sale only (TRX-062)
-- Where: `transactions/edit_transaction_modal/useEditTransactionModal.ts` — `computeTotalMicro` for every type but a purchase or a sale, and the save button enabled once date, quantity and amount are filled
-- Severity: 🟡
-- Observation: the correction form shows a dividend's total computed in the frontend with the purchase formula (F32); the backend recomputes it on save (DIV-040). The architecture check does not see a formula call, so nothing stops a new one.
-- User value: None directly — the total shown while editing a dividend comes from the rule that records it.
-- Done when: the dividend correction takes its displayed total from a backend check, `computeTotalMicro` has no caller left in `src/` and is deleted.
-
 ## 2026-09-28 — TD-057 — The performance contract lags the response
 
 - Found by: spec-reviewer on #012
@@ -425,11 +416,11 @@ Remove an entry once it has been resolved.
 ## 2026-10-03 — TD-065 — Some figures are computed in two places
 
 - Found by: the owner, after TD-062 (a corrected deposit was refused because a second cash computation counted deposits and withdrawals only)
-- Where: `computeTotalMicro` in `src/lib/microUnits.ts` beside the core's totals (TD-054); `SYSTEM_CATEGORY_ID`, `SYSTEM_CASH_CATEGORY_ID` and `isSystemCategory` in `src/features/categories/shared/presenter.ts`, and `RISK_LEVELS` in `src/features/assets/shared/constants.ts`, beside the core's own; the figures not yet listed (performance flows, valuation, price movement)
+- Where: `SYSTEM_CATEGORY_ID`, `SYSTEM_CASH_CATEGORY_ID` and `isSystemCategory` in `src/features/categories/shared/presenter.ts`, and `RISK_LEVELS` in `src/features/assets/shared/constants.ts`, beside the core's own; the figures not yet listed (performance flows, valuation, price movement)
 - Severity: 🟡
-- Observation: where one figure has two computations, only one is exercised by the tests of the day, and the other drifts. In the account, this is settled: one rule says what moves cash (`cash_effect`), the cash line as of a date is read by it alone, and a test holds the as-of reconstruction of a holding equal to the replay on the same ledger. The asset form reads its classes, default risk levels and default category from the core's generated constant. What remains is the dividend total the correction form computes (TD-054), and the figures no one has listed.
+- Observation: where one figure has two computations, only one is exercised by the tests of the day, and the other drifts. In the account, this is settled: one rule says what moves cash (`cash_effect`), the cash line as of a date is read by it alone, and a test holds the as-of reconstruction of a holding equal to the replay on the same ledger. The asset form reads its classes, default risk levels and default category from the core's generated constant, and a corrected dividend shows the core's total: the interface holds no formula for a total any more. What remains is a few identifiers and scales copied in the interface, and the figures no one has listed.
 - User value: None directly — a figure reads the same wherever it is shown.
-- Done when: every figure the application shows is listed with where it is computed; the interface computes none the core computes (TD-054); any other figure with two computations loses one, or has a test proving both agree on the same ledger.
+- Done when: every figure the application shows is listed with where it is computed; the interface copies no value the core defines; any other figure with two computations loses one, or has a test proving both agree on the same ledger.
 
 ## 2026-10-03 — TD-066 — An asset's name, reference and category have no length or character rule
 
@@ -439,3 +430,21 @@ Remove an entry once it has been resolved.
 - Observation: the asset rules check that a name and a reference are not empty, and nothing else: no maximum length, and a control character is accepted from the window's form or from another device's synced change. The command line escapes what it prints.
 - User value: None directly — a name pasted with a stray control character or of unreasonable length is refused where it is typed.
 - Done when: `Asset::validate` refuses a control character and a name or reference above a stated length, with a typed error the form shows and the command line reports.
+
+## 2026-10-03 — TD-067 — The correction form of an opening balance still decides in the interface
+
+- Found by: reviewer-frontend on TD-054
+- Where: `src/features/transactions/edit_transaction_modal/useEditTransactionModal.ts` — the branch of an opening balance: saving enabled on `Boolean(date && quantity && unitPrice)`, the total shown as typed
+- Severity: 🔵
+- Observation: a purchase, a sale and a dividend being corrected follow the core's draft check; a new opening balance does too (TRX-066). The correction of an opening balance is the last transaction form that decides in the interface when it can be saved; recording rejects what is wrong on save.
+- User value: None directly — the form says what is wrong before saving, like the others (TRX-067).
+- Done when: the opening balance draft check covers a correction, the form follows it, and the hook holds no condition of its own.
+
+## 2026-10-03 — TD-068 — The edit dialog of a dividend shows fields a dividend does not have
+
+- Found by: reviewer-frontend on TD-054
+- Where: `src/features/transactions/edit_transaction_modal/EditTransactionModal.tsx`
+- Severity: 🟡
+- Observation: DIV-040 makes the date, the net amount, the exchange rate and the note editable. The dialog also shows a required unit price and a fees field, labels the amount "Quantity", and offers "use this price as the market price": ticked, it records the dividend's stored unit price — 1 — as the asset's price for that day. The exchange rate field is hidden when the asset and the account share a currency, so a problem on it would show on no field; a total that rounds down to nothing is reported on the unit price, which a dividend's total does not depend on.
+- User value: Editing a dividend shows the fields a dividend has, and cannot record a wrong price for the asset.
+- Done when: for a dividend the dialog shows the date, the amount (labelled as such), the exchange rate when currencies differ and the note; no unit price, no fees, no market-price checkbox; a design is validated by the owner before the dialog changes.

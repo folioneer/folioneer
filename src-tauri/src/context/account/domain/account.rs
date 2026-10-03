@@ -540,10 +540,9 @@ impl Account {
                 }
                 // DIV-040: dividend total_amount = floor(quantity × exchange_rate / MICRO).
                 // quantity holds amount_micros in asset currency on a Dividend correction.
-                (TransactionType::Dividend, _) => (
-                    unit_price,
-                    ((quantity as i128 * exchange_rate as i128) / 1_000_000) as i64,
-                ),
+                (TransactionType::Dividend, _) => {
+                    (unit_price, Self::dividend_total(quantity, exchange_rate))
+                }
                 // Never reached — FreeShares / ManagementFee / Interest / Split
                 // take the dedicated branches above.
                 (
@@ -1662,6 +1661,35 @@ impl Account {
         Ok(OpeningBalanceNotice {
             zero_cost: total_cost == 0,
         })
+    }
+
+    /// DIV-040 — a dividend's total in account currency: its amount at the exchange rate,
+    /// rounded down.
+    fn dividend_total(amount: i64, exchange_rate: i64) -> i64 {
+        ((amount as i128 * exchange_rate as i128) / 1_000_000) as i64
+    }
+
+    /// TRX-062 / DIV-040 — the total a corrected dividend would record, validated as
+    /// recording it would be; nothing is written. `amount` is the dividend's amount in the
+    /// asset's currency, which a correction carries as its quantity.
+    pub fn preview_dividend_correction(
+        date: &str,
+        amount: i64,
+        unit_price: i64,
+        exchange_rate: i64,
+        fees: i64,
+    ) -> StdResult<i64, AccountError> {
+        let total = Self::dividend_total(amount, exchange_rate);
+        Transaction::validate(
+            &TransactionType::Dividend,
+            date,
+            amount,
+            unit_price,
+            exchange_rate,
+            fees,
+            total,
+        )?;
+        Ok(total)
     }
 
     /// CSH-062 — a purchase or a sale is never recorded on a Cash Asset: cash moves by a

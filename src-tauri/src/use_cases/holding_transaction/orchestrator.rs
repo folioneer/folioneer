@@ -12,13 +12,16 @@ use crate::context::asset::{Asset, AssetClass, AssetServiceContract};
 use crate::core::logger::BACKEND;
 use std::sync::Arc;
 
-/// Whether a transaction draft is a purchase or a sale (TRX-062).
+/// What a transaction draft is (TRX-062): a purchase, a sale, or a dividend being corrected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, specta::Type)]
 pub enum DraftKind {
     /// A purchase.
     Purchase,
     /// A sale of a held position.
     Sell,
+    /// A recorded dividend being corrected (DIV-040): the quantity carries its amount, and
+    /// what was entered is a unit price with its rate — a dividend has no typed total.
+    Dividend,
 }
 
 /// A transaction draft: a purchase or sale as the user is still entering it (TRX-062).
@@ -172,12 +175,38 @@ impl HoldingTransactionUseCase {
         if missing(&draft.date) {
             return Err(TransactionDraftTask::DateMissing.into());
         }
-        // CSH-062 — recording would refuse the cash line; so does the draft.
-        Account::ensure_tradable(&draft.asset_id)?;
         let transaction_type = match draft.kind {
             DraftKind::Purchase => TransactionType::Purchase,
             DraftKind::Sell => TransactionType::Sell,
+            // DIV-040 — a corrected dividend totals its amount at the exchange rate.
+            DraftKind::Dividend => {
+                let (unit_price, exchange_rate, fees) = match draft.entered {
+                    EnteredAmount::UnitPrice {
+                        unit_price,
+                        exchange_rate,
+                        fees,
+                    } => (unit_price, exchange_rate, fees),
+                    EnteredAmount::Total {
+                        exchange_rate,
+                        fees,
+                        ..
+                    } => (0, exchange_rate, fees),
+                };
+                let total_amount = Account::preview_dividend_correction(
+                    &draft.date,
+                    draft.quantity,
+                    unit_price,
+                    exchange_rate,
+                    fees,
+                )?;
+                return Ok(TransactionDraftPreview {
+                    unit_price,
+                    total_amount,
+                });
+            }
         };
+        // CSH-062 — recording would refuse the cash line; so does the draft.
+        Account::ensure_tradable(&draft.asset_id)?;
         let (unit_price, total_amount) =
             Account::preview_trade(transaction_type, &draft.date, draft.quantity, draft.entered)?;
         if draft.kind == DraftKind::Sell && draft.correcting.is_none() {
@@ -2879,6 +2908,103 @@ mod draft_tests {
             }),
             "InvalidTotalCost"
         );
+    }
+
+    // TRX-062 / DIV-040 — a corrected dividend totals its amount at the exchange rate,
+    // rounded down, whatever its unit price and fees.
+    #[tokio::test]
+    async fn div_040_a_dividend_correction_draft_totals_amount_times_rate() {
+        let dividend = |quantity: i64, unit_price: i64, exchange_rate: i64, fees: i64| {
+            let mut d = draft(DraftKind::Dividend);
+            d.quantity = quantity;
+            d.entered = EnteredAmount::UnitPrice {
+                unit_price,
+                exchange_rate,
+                fees,
+            };
+            d
+        };
+        let total = |d: TransactionDraft| async move {
+            use_case(None)
+                .validate_draft(d)
+                .await
+                .map(|preview| preview.total_amount)
+        };
+
+        assert_eq!(
+            total(dividend(12_500_000, 3_000_000, 1_100_000, 0))
+                .await
+                .ok(),
+            Some(13_750_000)
+        );
+        // A dividend has no typed total: one sent is ignored, the amount and the rate decide.
+        let mut by_total = dividend(12_500_000, 0, 0, 0);
+        by_total.entered = EnteredAmount::Total {
+            total: 99_000_000,
+            exchange_rate: 1_100_000,
+            fees: 0,
+        };
+        assert_eq!(total(by_total).await.ok(), Some(13_750_000));
+        // 3.333333 × 1.1 = 3.6666663: the seventh decimal is dropped.
+        assert_eq!(
+            total(dividend(3_333_333, 1_000_000, 1_100_000, 0))
+                .await
+                .ok(),
+            Some(3_666_666)
+        );
+    }
+
+    // TRX-062 / DIV-040 — a corrected dividend is refused as recording it would be, the
+    // first problem in recording's order: date, amount, unit price, fees, rate, total.
+    #[tokio::test]
+    async fn div_040_a_dividend_correction_draft_reports_what_recording_would() {
+        let check = |edit: &dyn Fn(&mut TransactionDraft)| {
+            let mut d = draft(DraftKind::Dividend);
+            d.quantity = 12_500_000;
+            d.entered = EnteredAmount::UnitPrice {
+                unit_price: 1_000_000,
+                exchange_rate: 1_000_000,
+                fees: 0,
+            };
+            edit(&mut d);
+            d
+        };
+        let entered = |unit_price: i64, exchange_rate: i64, fees: i64| EnteredAmount::UnitPrice {
+            unit_price,
+            exchange_rate,
+            fees,
+        };
+        for (d, expected) in [
+            (check(&|d| d.date = "2999-01-01".into()), "DateInFuture"),
+            (check(&|d| d.quantity = 0), "QuantityNotPositive"),
+            (
+                check(&|d| d.entered = entered(-1, 1_000_000, 0)),
+                "UnitPriceNegative",
+            ),
+            (
+                check(&|d| d.entered = entered(1_000_000, 1_000_000, -1)),
+                "FeesNegative",
+            ),
+            (
+                check(&|d| d.entered = entered(1_000_000, 0, 0)),
+                "ExchangeRateNotPositive",
+            ),
+            // Fees are judged before the rate.
+            (
+                check(&|d| d.entered = entered(1_000_000, 0, -1)),
+                "FeesNegative",
+            ),
+            // One micro-unit at a rate of one micro-unit rounds down to nothing.
+            (
+                check(&|d| {
+                    d.quantity = 1;
+                    d.entered = entered(1_000_000, 1, 0);
+                }),
+                "TotalAmountNotPositive",
+            ),
+        ] {
+            assert_eq!(code(use_case(None).validate_draft(d).await), expected);
+        }
     }
 
     // CSH-062 — a draft on the cash line is refused as recording it would be, a purchase

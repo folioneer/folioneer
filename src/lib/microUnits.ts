@@ -6,7 +6,6 @@
  *   - User input:  decimal string → number (micro-units) via decimalToMicro
  *   - Display:     number (micro-units) → formatted decimal string via microToDecimal
  *
- * All internal calculations are performed on micro-unit integers (computeTotalMicro).
  */
 
 const MICRO = 1_000_000;
@@ -90,22 +89,6 @@ export function microToFormattedQuantity(micros: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 6,
   }).format(micros / MICRO);
-}
-
-/**
- * Computes total amount from micro-unit values (TRX-026 formula).
- * Formula: floor(floor(qty × price / MICRO) × rate / MICRO) + fees
- *
- * All arguments and the return value are in micro-units.
- * Mirrors the backend integer arithmetic exactly — no decimal conversion involved.
- */
-export function computeTotalMicro(
-  qtyMicro: number,
-  priceMicro: number,
-  rateMicro: number,
-  feesMicro: number,
-): number {
-  return Math.floor((Math.floor((qtyMicro * priceMicro) / MICRO) * rateMicro) / MICRO) + feesMicro;
 }
 
 /**

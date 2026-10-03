@@ -2381,7 +2381,7 @@ export type DividendTask =
  */
 { code: "DividendOnCashAsset" }
 /**
- * Whether a transaction draft is a purchase or a sale (TRX-062).
+ * What a transaction draft is (TRX-062): a purchase, a sale, or a dividend being corrected.
  */
 export type DraftKind = 
 /**
@@ -2391,7 +2391,11 @@ export type DraftKind =
 /**
  * A sale of a held position.
  */
-"Sell"
+"Sell" | 
+/**
+ * A recorded dividend being corrected (DIV-040): the quantity carries its amount.
+ */
+"Dividend"
 /**
  * What the user entered for a purchase or sale (TRX-062): a unit price, or a typed
  * total (TRX-060 / SEL-050), each with its exchange rate and fees, in micros.

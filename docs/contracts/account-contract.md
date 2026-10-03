@@ -495,7 +495,7 @@ struct UpdateFeeScheduleDTO {
 
 ```rust
 // Transaction draft (TRX-062) — checked without writing
-enum DraftKind { Purchase, Sell }
+enum DraftKind { Purchase, Sell, Dividend }  // Dividend: a recorded dividend being corrected (DIV-040)
 
 struct TransactionDraft {         // serde: deny_unknown_fields
     kind: DraftKind,
@@ -569,6 +569,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-10-03 — DIV-040: `DraftKind` gains `Dividend`; `validate_transaction_draft` returns a corrected dividend's total (amount × exchange rate, rounded down).
 - 2026-10-03 — TRX-066: `validate_opening_balance_draft(OpeningBalanceDraft) -> OpeningBalanceDraftPreview { zero_cost }` checks an opening balance draft without writing; `TransactionDraftTask` gains `TotalCostMissing`.
 - 2026-10-03 — CSH-062: `buy_holding`, `sell_holding` and `validate_transaction_draft` return `TradeOnCashAsset` for a Cash Asset.
 - 2026-09-28 — TRX-062: `validate_transaction_draft(TransactionDraft) -> TransactionDraftPreview { unit_price, total_amount }` checks a transaction draft without writing. `TransactionDraft { kind: Purchase | Sell, account_id, asset_id, date, quantity, entered: EnteredAmount, correcting: Option<transaction_id> }`; `EnteredAmount = UnitPrice { unit_price, exchange_rate, fees } | Total { total, exchange_rate, fees }` (tag `mode`). Only three new codes (`TransactionDraftTask`); every figure rejection (from `InvalidDate` on) reuses the recording command's `AccountError` code.
