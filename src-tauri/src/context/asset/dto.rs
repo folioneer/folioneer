@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::domain::{AssetClass, Exchange};
+use super::domain::{Asset, AssetClass, Exchange};
 
 /// Parameters for creating a new asset.
 #[derive(Debug, Serialize, Deserialize, Type)]
@@ -52,4 +52,36 @@ pub struct UpdateAssetDTO {
     pub exchange: Option<Exchange>,
     /// New Interest-credit eligibility (AST-024).
     pub interest_bearing: bool,
+}
+
+/// An asset described the way a person names things (CLI-026): its category by name, its
+/// exchange by code, and whatever is left out decided here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NamedAsset {
+    /// Display name.
+    pub name: String,
+    /// Ticker or reference.
+    pub reference: String,
+    /// Classification.
+    pub class: AssetClass,
+    /// ISO currency code.
+    pub currency: String,
+    /// ISIN, when it has one.
+    pub isin: Option<String>,
+    /// MIC code of its exchange, when it has one.
+    pub exchange_code: Option<String>,
+    /// Risk level; the class's default when left out.
+    pub risk_level: Option<u8>,
+    /// Category name; the system category when left out.
+    pub category_name: Option<String>,
+}
+
+/// An asset added by name, and what the user should know about it (CLI-026).
+#[derive(Debug, Clone)]
+pub struct AddedAsset {
+    /// The asset as created.
+    pub asset: Asset,
+    /// Another asset, archived or not, has the same reference (AST-009): allowed — the
+    /// same ticker trades on several markets — and worth saying.
+    pub reference_shared: bool,
 }

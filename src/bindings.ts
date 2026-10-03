@@ -1702,6 +1702,11 @@ export type AssetError =
  */
 { code: "CategoryNotFound"; id: string } | 
 /**
+ * No category has the name typed (CLI-026). Born at the service layer when
+ * `category_repo.find_by_name` returns `None`.
+ */
+{ code: "CategoryNameNotFound"; name: string } | 
+/**
  * A category with the same name (case-insensitive) already exists. Born at
  * the service layer from a `find_by_name` uniqueness pre-check.
  */

@@ -54,6 +54,21 @@ pub enum AssetClass {
 }
 
 impl AssetClass {
+    /// The classes a user may create an asset in (CSH-015): every class but Cash, whose
+    /// assets the application seeds itself.
+    pub const fn user_addable() -> &'static [AssetClass] {
+        &[
+            AssetClass::Stocks,
+            AssetClass::ETF,
+            AssetClass::ETP,
+            AssetClass::Bonds,
+            AssetClass::MutualFunds,
+            AssetClass::RealEstate,
+            AssetClass::DigitalAsset,
+            AssetClass::Derivatives,
+        ]
+    }
+
     /// Returns the default risk level for this asset class (R3).
     pub fn default_risk(&self) -> u8 {
         match self {

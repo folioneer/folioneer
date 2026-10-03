@@ -4,7 +4,7 @@ use super::domain::{
 };
 use super::error::AssetError;
 use crate::{
-    context::asset::{CreateAssetDTO, UpdateAssetDTO},
+    context::asset::{AddedAsset, CreateAssetDTO, NamedAsset, UpdateAssetDTO},
     core::{Event, SideEffectEventBus, BACKEND},
     shared::domain::{Rank, RecordKind, SyncedRecord},
 };
@@ -170,6 +170,10 @@ impl AssetService {
 
     /// Creates a new asset and publishes an AssetUpdated event.
     pub async fn create_asset(&self, dto: CreateAssetDTO) -> StdResult<Asset, AssetError> {
+        // CSH-015 — a Cash Asset is seeded by the application, never created by a user.
+        if !AssetClass::user_addable().contains(&dto.class) {
+            return Err(AssetError::CashAssetNotEditable);
+        }
         let category = find_category_for_asset_crud(&*self.category_repo, &dto.category_id).await?;
 
         let asset = Asset::new(
@@ -188,13 +192,72 @@ impl AssetService {
             tracing::error!(target: BACKEND, err = ?e, "create_asset: repository failure");
             AssetError::DatabaseError
         })?;
-        tracing::info!(target: BACKEND, asset_id = %asset.id, name = %asset.name, "Asset created");
+        tracing::info!(target: BACKEND, asset_id = %asset.id, name = ?asset.name, "Asset created");
 
         if let Some(bus) = &self.event_bus {
             bus.publish(Event::AssetUpdated);
         }
 
         Ok(asset)
+    }
+
+    /// CLI-026 — adds an asset described by name, through the rules of the window's form
+    /// and no other. A reference another asset has, archived or not, is allowed and
+    /// reported, as the form warns (AST-009). The risk level left out is the class's
+    /// default, the category left out the system one; a category is found by its name, an
+    /// exchange by its code (AST-001).
+    pub async fn add_named_asset(&self, named: NamedAsset) -> StdResult<AddedAsset, AssetError> {
+        let reference = named.reference.trim().to_lowercase();
+        let reference_shared = self
+            .get_all_assets_with_archived()
+            .await?
+            .iter()
+            .any(|asset| asset.reference.trim().to_lowercase() == reference);
+        let category_id = match &named.category_name {
+            None => SYSTEM_CATEGORY_ID.to_string(),
+            Some(category_name) => self
+                .category_repo
+                .find_by_name(category_name.trim())
+                .await
+                .map_err(|e| {
+                    tracing::error!(target: BACKEND, err = ?e, "add_named_asset: category lookup failure");
+                    AssetError::DatabaseError
+                })?
+                .ok_or_else(|| AssetError::CategoryNameNotFound {
+                    name: category_name.trim().to_string(),
+                })?
+                .id,
+        };
+        let exchange = match named.exchange_code {
+            None => None,
+            Some(code) => {
+                let code = code.trim().to_uppercase();
+                Some(
+                    super::domain::exchange::lookup(&code).ok_or(AssetError::InvalidExchange {
+                        exchange_code: code,
+                    })?,
+                )
+            }
+        };
+        let asset = self
+            .create_asset(CreateAssetDTO {
+                name: named.name,
+                reference: named.reference,
+                isin: named.isin,
+                risk_level: named
+                    .risk_level
+                    .unwrap_or_else(|| named.class.default_risk()),
+                class: named.class,
+                currency: named.currency,
+                category_id,
+                exchange,
+                interest_bearing: false,
+            })
+            .await?;
+        Ok(AddedAsset {
+            asset,
+            reference_shared,
+        })
     }
 
     /// Updates an existing asset. Rejects if the asset is the system Cash Asset
@@ -790,6 +853,8 @@ pub trait AssetServiceContract: Send + Sync {
         &self,
         include_archived: bool,
     ) -> StdResult<Vec<Asset>, AssetError>;
+    /// Adds an asset described by name, its defaults decided here (CLI-026).
+    async fn add_named_asset(&self, named: NamedAsset) -> StdResult<AddedAsset, AssetError>;
     /// Retrieves a single asset by ID.
     async fn get_asset_by_id(&self, asset_id: &str) -> StdResult<Option<Asset>, AssetError>;
     /// Idempotently seeds the system Cash Asset for `currency` (CSH-010, CSH-011, CSH-017).
@@ -827,6 +892,10 @@ impl AssetServiceContract for AssetService {
         include_archived: bool,
     ) -> StdResult<Vec<Asset>, AssetError> {
         AssetService::get_non_cash_assets_by_name(self, include_archived).await
+    }
+
+    async fn add_named_asset(&self, named: NamedAsset) -> StdResult<AddedAsset, AssetError> {
+        AssetService::add_named_asset(self, named).await
     }
 
     async fn get_asset_by_id(&self, asset_id: &str) -> StdResult<Option<Asset>, AssetError> {
@@ -1102,7 +1171,7 @@ mod tests {
             name: name.to_string(),
             reference: "REF-001".to_string(),
             isin: None,
-            class: AssetClass::Cash,
+            class: AssetClass::Stocks,
             currency: "USD".to_string(),
             risk_level: 1,
             category_id: SYSTEM_CATEGORY_ID.to_string(),
@@ -1138,6 +1207,162 @@ mod tests {
             .collect();
 
         assert_eq!(ids, vec!["aapl", "old"]);
+    }
+
+    // CSH-015 — a Cash Asset is the application's to seed: creating one is refused, and
+    // nothing is written.
+    #[tokio::test]
+    async fn csh_015_creating_an_asset_in_the_cash_class_is_refused() {
+        let svc = make_svc(
+            MockAssetRepository::new(),
+            MockAssetCategoryRepository::new(),
+            MockAssetPriceRepository::new(),
+        );
+
+        let err = svc
+            .create_asset(CreateAssetDTO {
+                class: AssetClass::Cash,
+                ..base_dto("Euro")
+            })
+            .await
+            .unwrap_err();
+
+        assert!(
+            matches!(err, AssetError::CashAssetNotEditable),
+            "got: {err}"
+        );
+        assert!(!AssetClass::user_addable().contains(&AssetClass::Cash));
+    }
+
+    fn named(name: &str, reference: &str) -> NamedAsset {
+        NamedAsset {
+            name: name.to_string(),
+            reference: reference.to_string(),
+            class: AssetClass::ETF,
+            currency: "EUR".to_string(),
+            isin: None,
+            exchange_code: None,
+            risk_level: None,
+            category_name: None,
+        }
+    }
+
+    // CLI-026 — what is left out is decided here: the class's risk level, the system
+    // category, no interest.
+    #[tokio::test]
+    async fn cli_026_a_named_asset_takes_the_class_risk_and_the_system_category() {
+        let mut ar = MockAssetRepository::new();
+        ar.expect_get_all_including_archived()
+            .returning(|| Ok(vec![make_asset("aapl", false)]));
+        ar.expect_create()
+            .withf(|a| {
+                a.name == "World"
+                    && a.risk_level == AssetClass::ETF.default_risk()
+                    && a.category.id == SYSTEM_CATEGORY_ID
+                    && !a.interest_bearing
+                    && a.exchange.is_none()
+            })
+            .times(1)
+            .return_once(Ok);
+        let mut cr = MockAssetCategoryRepository::new();
+        cr.expect_get_by_id()
+            .withf(|id| id == SYSTEM_CATEGORY_ID)
+            .times(1)
+            .return_once(|_| Ok(Some(make_category())));
+        let svc = make_svc(ar, cr, MockAssetPriceRepository::new());
+
+        let added = svc
+            .add_named_asset(named("World", "cw8"))
+            .await
+            .expect("added");
+
+        assert_eq!(added.asset.reference, "CW8");
+        assert!(!added.reference_shared);
+    }
+
+    // AST-009 / CLI-026 — a reference another asset has is allowed — one ticker, several
+    // markets — and reported; a new reference is not.
+    #[tokio::test]
+    async fn cli_026_a_shared_reference_is_added_and_reported() {
+        for (reference, shared) in [(" ref ", true), ("NEW", false)] {
+            let mut ar = MockAssetRepository::new();
+            ar.expect_get_all_including_archived()
+                .returning(|| Ok(vec![make_asset("old", true)]));
+            ar.expect_create().times(1).return_once(Ok);
+            let mut cr = MockAssetCategoryRepository::new();
+            cr.expect_get_by_id()
+                .return_once(|_| Ok(Some(make_category())));
+            let svc = make_svc(ar, cr, MockAssetPriceRepository::new());
+
+            let added = svc
+                .add_named_asset(named("Other listing", reference))
+                .await
+                .expect("added");
+
+            assert_eq!(added.reference_shared, shared, "{reference}");
+        }
+    }
+
+    // CLI-026 — a category is found by its name and an exchange by its code, case ignored;
+    // one that does not exist is refused.
+    #[tokio::test]
+    async fn cli_026_a_category_and_an_exchange_are_found_by_what_was_typed() {
+        let svc_with = |category: Option<AssetCategory>| {
+            let mut ar = MockAssetRepository::new();
+            ar.expect_get_all_including_archived()
+                .returning(|| Ok(vec![]));
+            ar.expect_create().returning(Ok);
+            let mut cr = MockAssetCategoryRepository::new();
+            let found = category.clone();
+            cr.expect_find_by_name()
+                .withf(|name| name == "Tech")
+                .returning(move |_| Ok(found.clone()));
+            cr.expect_get_by_id()
+                .returning(move |_| Ok(category.clone()));
+            make_svc(ar, cr, MockAssetPriceRepository::new())
+        };
+        let tech = AssetCategory::from_storage("cat-tech".to_string(), "Tech".to_string());
+
+        let asset = svc_with(Some(tech))
+            .add_named_asset(NamedAsset {
+                category_name: Some(" Tech ".to_string()),
+                exchange_code: Some("xpar".to_string()),
+                risk_level: Some(2),
+                ..named("World", "CW8")
+            })
+            .await
+            .expect("added")
+            .asset;
+        assert_eq!(asset.category.id, "cat-tech");
+        assert_eq!(
+            asset.exchange.map(|exchange| exchange.code),
+            Some("XPAR".to_string())
+        );
+        assert_eq!(asset.risk_level, 2);
+
+        let unknown_category = svc_with(None)
+            .add_named_asset(NamedAsset {
+                category_name: Some("Tech".to_string()),
+                ..named("World", "CW8")
+            })
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            unknown_category,
+            AssetError::CategoryNameNotFound { name } if name == "Tech"
+        ));
+
+        let unknown_exchange = svc_with(None)
+            .add_named_asset(NamedAsset {
+                exchange_code: Some("nope".to_string()),
+                ..named("World", "CW8")
+            })
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            unknown_exchange,
+            AssetError::InvalidExchange { exchange_code } if exchange_code == "NOPE"
+        ));
     }
 
     // R1 — empty name is rejected

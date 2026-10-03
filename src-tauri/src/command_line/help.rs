@@ -16,15 +16,18 @@ pub enum HelpTopic {
     AccountList,
     /// `asset list`.
     AssetList,
+    /// `asset add`.
+    AssetAdd,
 }
 
 /// Every command, as typed after the program name, with its page — in the overview's order.
-const PAGES: [(&str, HelpTopic); 5] = [
+const PAGES: [(&str, HelpTopic); 6] = [
     ("holding open", HelpTopic::Open),
     ("holding buy", HelpTopic::Buy),
     ("holding sell", HelpTopic::Sell),
     ("account list", HelpTopic::AccountList),
     ("asset list", HelpTopic::AssetList),
+    ("asset add", HelpTopic::AssetAdd),
 ];
 
 const RECORDING_EXIT_CODES: &str = "Exit codes: 0 recorded, 1 refused, 2 wrong usage.";
@@ -127,6 +130,38 @@ pub fn help(program: &str, topic: HelpTopic) -> String {
             &[],
             "",
         ),
+        HelpTopic::AssetAdd => page(
+            program,
+            "asset add",
+            "Add an asset, so that a holding of it can be recorded.",
+            &[
+                "--name <name> --reference <ref> --class <class>",
+                "--currency <code> [options]",
+            ],
+            &[
+                ("--name <name>", "Asset name"),
+                ("--reference <ref>", "Ticker or reference"),
+                (
+                    "--class <class>",
+                    "Stocks, ETF, ETP, Bonds, MutualFunds, RealEstate, DigitalAsset or Derivatives",
+                ),
+                (
+                    "--currency <code>",
+                    "Currency it is quoted in (EUR, USD, ...)",
+                ),
+            ],
+            &[
+                ("--isin <isin>", "ISIN", None),
+                (
+                    "--exchange <code>",
+                    "Exchange, by its MIC code (XPAR, XNAS, ...)",
+                    None,
+                ),
+                ("--risk <1-5>", "Risk level", Some("its class's")),
+                ("--category <name>", "Category", Some("none")),
+            ],
+            "--name \"ASML Holding\" --reference ASML --class Stocks --currency EUR",
+        ),
         HelpTopic::AssetList => page(
             program,
             "asset list",
@@ -159,6 +194,7 @@ Commands:
   holding sell   Record a sale
   account list   List the accounts
   asset list     List the assets
+  asset add      Add an asset
 
 Examples:
   {program} holding buy  --account PEA --asset ASML --quantity 1 --price 1236.50
@@ -365,6 +401,26 @@ Exit codes: 0 listed, 1 refused, 2 wrong usage."
         let accounts = help("folioneer", HelpTopic::AccountList);
         assert!(accounts.contains("\nExample:\n  folioneer account list\n"));
         assert!(!accounts.contains("--archived"));
+    }
+
+    // CLI-023 / CLI-026 — the page of `asset add` names its classes and what the core
+    // decides when an option is left out.
+    #[test]
+    fn cli_026_the_page_of_asset_add_names_its_classes_and_defaults() {
+        let page = help("folioneer", HelpTopic::AssetAdd);
+        assert!(page.contains(
+            "Usage: folioneer asset add --name <name> --reference <ref> --class <class>\n"
+        ));
+        assert!(page.contains(
+            "Stocks, ETF, ETP, Bonds, MutualFunds, RealEstate, DigitalAsset or Derivatives"
+        ));
+        assert!(page.contains("--risk <1-5>        Risk level"));
+        assert!(page.contains("[default: its class's]"));
+        assert!(page.contains("[default: none]"));
+        assert!(page.ends_with("Exit codes: 0 recorded, 1 refused, 2 wrong usage."));
+        assert!(
+            help("folioneer", HelpTopic::Overview).contains("\n  asset add      Add an asset\n")
+        );
     }
 
     // CLI-024 — the hint names the page of the command that was mistyped.

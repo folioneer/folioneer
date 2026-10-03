@@ -8,7 +8,7 @@ use crate::shared::infrastructure::app_directories;
 use crate::shared::infrastructure::container::AppContainer;
 use crate::shared::infrastructure::window_lock::WindowLock;
 
-use super::args::{parse, Command, Invocation, Listed};
+use super::args::{parse, Command, Invocation, Listed, Writing};
 use super::help::help;
 use super::orchestrator::{CommandRunner, Refusal};
 use super::output::{refused, render, Printed, RECORDED, WRONG_USAGE};
@@ -57,9 +57,9 @@ pub(crate) async fn run_in(data_dir: &Path, command: Command, json: bool) -> Pri
             json,
         );
     }
-    let command = match command {
+    let writing = match command {
         Command::List(listed) => return list_in(data_dir, listed, json).await,
-        Command::Record(recording) => recording,
+        Command::Write(writing) => writing,
     };
     // CLI-030 — held until the command has written, so a window cannot start meanwhile and
     // two commands never write at once.
@@ -94,7 +94,11 @@ pub(crate) async fn run_in(data_dir: &Path, command: Command, json: bool) -> Pri
         .date_naive()
         .format("%Y-%m-%d")
         .to_string();
-    render(&runner.run(command, &today).await, json)
+    let outcome = match writing {
+        Writing::Record(recording) => runner.run(recording, &today).await,
+        Writing::AddAsset(named) => runner.add_asset(named).await,
+    };
+    render(&outcome, json)
 }
 
 /// CLI-018 / CLI-019 — a list only reads: it takes no lock and opens the portfolio for
@@ -458,6 +462,209 @@ mod tests {
         assert_eq!(
             std::fs::read(&portfolio_file).expect("portfolio file"),
             before
+        );
+    }
+
+    // CLI-026 — an asset is added with what the command left out decided by the core (its
+    // class's risk level, the system category), can then be named by a command, and is
+    // refused while the window is open.
+    #[tokio::test]
+    async fn cli_026_adds_an_asset_with_the_core_defaults() {
+        let dir = portfolio("asset-add").await;
+        let line = "asset add --name ASML --reference asml --class stocks --currency EUR";
+        {
+            let _window = WindowLock::acquire(&dir)
+                .expect("acquire")
+                .expect("free lock");
+            let refused = run_line(&dir, line).await;
+            assert_eq!(
+                refused.stderr.as_deref(),
+                Some("Refused: close Folioneer first — it is open and owns the portfolio")
+            );
+        }
+
+        let added = run_line(&dir, line).await;
+        assert_eq!(added.exit_code, RECORDED);
+        assert_eq!(
+            added.stdout.as_deref(),
+            Some("Recorded: added ASML (ASML) — Stocks, EUR")
+        );
+
+        let database = Database::new(dir.clone()).await.expect("database");
+        let container = AppContainer::for_headless_writes(database.pool);
+        let assets = container
+            .asset_service
+            .get_non_cash_assets()
+            .await
+            .expect("assets");
+        let asml = assets
+            .iter()
+            .find(|asset| asset.reference == "ASML")
+            .expect("ASML");
+        assert_eq!(asml.risk_level, AssetClass::Stocks.default_risk());
+        assert_eq!(asml.category.id, "default-uncategorized");
+        assert!(!asml.is_archived);
+
+        let opened = run_line(
+            &dir,
+            "holding open --account PEA --asset ASML --quantity 1 --total-cost 600",
+        )
+        .await;
+        assert_eq!(opened.exit_code, RECORDED);
+    }
+
+    // CLI-026 — every optional figure is taken as typed: the category by its name, the
+    // exchange by its code, both with case ignored; the result as JSON.
+    #[tokio::test]
+    async fn cli_026_takes_the_optional_figures_as_typed() {
+        let dir = portfolio("asset-add-options").await;
+        {
+            let database = Database::new(dir.clone()).await.expect("database");
+            let container = AppContainer::for_headless_writes(database.pool);
+            container
+                .asset_service
+                .create_category("Tech")
+                .await
+                .expect("category");
+        }
+
+        let added = run_line(
+            &dir,
+            "asset add --name Apple --reference AAPL --class Stocks --currency USD --isin US0378331005 --exchange xnas --risk 5 --category tech --json",
+        )
+        .await;
+
+        assert_eq!(added.exit_code, RECORDED);
+        let value: serde_json::Value =
+            serde_json::from_str(added.stdout.as_deref().expect("json")).expect("valid json");
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "status": "recorded",
+                "asset": {
+                    "name": "Apple",
+                    "reference": "AAPL",
+                    "class": "Stocks",
+                    "currency": "USD",
+                    "isin": "US0378331005",
+                    "archived": false
+                }
+            })
+        );
+        let database = Database::new(dir.clone()).await.expect("database");
+        let container = AppContainer::for_headless_writes(database.pool);
+        let assets = container
+            .asset_service
+            .get_non_cash_assets()
+            .await
+            .expect("assets");
+        let apple = assets
+            .iter()
+            .find(|asset| asset.reference == "AAPL")
+            .expect("AAPL");
+        assert_eq!(apple.risk_level, 5);
+        assert_eq!(apple.category.name, "Tech");
+        assert_eq!(
+            apple
+                .exchange
+                .as_ref()
+                .map(|exchange| exchange.code.as_str()),
+            Some("XNAS")
+        );
+    }
+
+    // AST-009 / CLI-026 — a reference another asset has is added and said: one ticker,
+    // several markets. A command then names that asset by its name.
+    #[tokio::test]
+    async fn cli_026_a_shared_reference_is_recorded_with_a_warning() {
+        let dir = portfolio("asset-add-shared").await;
+
+        let added = run_line(
+            &dir,
+            "asset add --name World_USD --reference cw8 --class ETF --currency USD",
+        )
+        .await;
+        assert_eq!(added.exit_code, RECORDED);
+        assert_eq!(
+            added.stdout.as_deref(),
+            Some("Recorded: added World_USD (CW8) — ETF, USD")
+        );
+        assert_eq!(
+            added.stderr.as_deref(),
+            Some("Warning: another asset has the reference CW8; name this one by its name in --asset.")
+        );
+
+        let json = run_line(
+            &dir,
+            "asset add --name World_GBP --reference CW8 --class ETF --currency GBP --json",
+        )
+        .await;
+        let value: serde_json::Value =
+            serde_json::from_str(json.stdout.as_deref().expect("json")).expect("valid json");
+        assert_eq!(value["warning"], "ReferenceShared");
+
+        let by_reference = run_line(
+            &dir,
+            "holding open --account PEA --asset CW8 --quantity 1 --total-cost 1 --json",
+        )
+        .await;
+        let refusal: serde_json::Value =
+            serde_json::from_str(by_reference.stdout.as_deref().expect("json")).expect("json");
+        assert_eq!(refusal["code"], "AssetAmbiguous");
+        let by_name = run_line(
+            &dir,
+            "holding open --account PEA --asset World_USD --quantity 1 --total-cost 1",
+        )
+        .await;
+        assert_eq!(by_name.exit_code, RECORDED);
+    }
+
+    // CLI-026 / CLI-012 — an asset whose category does
+    // not exist, or that the window's rules reject, is refused with its code and not added.
+    #[tokio::test]
+    async fn cli_026_refuses_what_the_core_refuses() {
+        let dir = portfolio("asset-add-refused").await;
+        let code = |printed: Printed| -> String {
+            assert_eq!(printed.exit_code, REFUSED);
+            let value: serde_json::Value =
+                serde_json::from_str(printed.stdout.as_deref().expect("json")).expect("json");
+            value["code"].as_str().expect("code").to_string()
+        };
+        let add = |options: &str| format!("asset add {options} --json");
+
+        for (options, expected) in [
+            (
+                "--name New --reference NEW --class ETF --currency EUR --category Nope",
+                "CategoryNotFound",
+            ),
+            (
+                "--name New --reference NEW --class ETF --currency EURO",
+                "InvalidCurrency",
+            ),
+            (
+                "--name New --reference NEW --class ETF --currency EUR --isin 123",
+                "InvalidIsinFormat",
+            ),
+            (
+                "--name New --reference NEW --class ETF --currency EUR --exchange XXXX",
+                "InvalidExchange",
+            ),
+            (
+                "--name New --reference NEW --class ETF --currency EUR --risk 9",
+                "InvalidRiskLevel",
+            ),
+        ] {
+            assert_eq!(
+                code(run_line(&dir, &add(options)).await),
+                expected,
+                "{options}"
+            );
+        }
+
+        let listed = run_line(&dir, "asset list").await;
+        assert_eq!(
+            listed.stdout.as_deref(),
+            Some("NAME                REFERENCE\nAmundi Euro Stoxx   C50\nAmundi MSCI World   CW8")
         );
     }
 

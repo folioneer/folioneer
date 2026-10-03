@@ -147,18 +147,6 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
 
-## #055 — (backend) — Add an asset from the command line
-
-Requested by the owner on 2026-10-03. Recording a holding needs the asset to exist; today only the window creates one. `folioneer asset add` creates it through the same rules as the window's form. The form's defaults — the risk level of each class, the system category — are decided in the interface today (`DEFAULT_RISK_BY_CLASS`, part of TD-048); the core must own them for a second interface to share them.
-
-**User value:** A user adds a new asset and records its first holding from a terminal or a script.
-**Done when:** `folioneer asset add --name … --reference … --class … --currency …` creates the asset, checked by the same Rust rules as the window (a duplicate reference, an invalid ISIN or currency is refused with the reason); `--isin`, `--exchange`, `--risk` and `--category` are optional — the risk defaults to its class's and the category to the system one, both decided in the core and read by the window's form from it; it prints `Recorded: …` or `Refused: …`, JSON with `--json`, exits 0 / 1 / 2, and refuses while the window is open; it makes no network call; spec rules in `docs/spec/command-line.md`, tested in Rust; the README documents it.
-**Design:** none
-**Open questions:**
-
-- [x] Which options are required? — Name, reference, class and currency; risk and category default to what the form preselects; ISIN, exchange, risk and category are optional (owner, 2026-10-03).
-- [x] Does it look the asset up on the web by ISIN? — No: the command line makes no network call (owner, 2026-10-03).
-
 ## #051 — (fullstack) — An MCP server over the headless core
 
 Requested by the owner on 2026-09-28. The Model Context Protocol lets an agent (Claude Desktop, Claude Code, others) call an application's tools. The same installed program would offer one: started without a window, it speaks MCP over standard input and output, and its tools are the application API #047 builds and the command line (#044) calls — so an agent can read the portfolio or record a holding in plain words. It adds no logic of its own: every tool is a query or command the core already has, validated by the same Rust rules.

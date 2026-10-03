@@ -73,6 +73,45 @@ pub fn render(outcome: &Outcome, json: bool) -> Printed {
             stderr: None,
             exit_code: RECORDED,
         },
+        (
+            Outcome::AssetAdded {
+                asset,
+                reference_shared,
+            },
+            true,
+        ) => Printed {
+            stdout: Some(if *reference_shared {
+                json!({ "status": "recorded", "asset": asset, "warning": "ReferenceShared" })
+            } else {
+                json!({ "status": "recorded", "asset": asset })
+            }
+            .to_string()),
+            stderr: None,
+            exit_code: RECORDED,
+        },
+        (
+            Outcome::AssetAdded {
+                asset,
+                reference_shared,
+            },
+            false,
+        ) => Printed {
+            stdout: Some(format!(
+                "Recorded: added {} ({}) — {}, {}",
+                printable(&asset.name),
+                printable(&asset.reference),
+                asset.class,
+                asset.currency
+            )),
+            // AST-009 — allowed, and worth saying: `--asset` by this reference is now ambiguous.
+            stderr: reference_shared.then(|| {
+                format!(
+                    "Warning: another asset has the reference {}; name this one by its name in --asset.",
+                    printable(&asset.reference)
+                )
+            }),
+            exit_code: RECORDED,
+        },
         (Outcome::Listed(listing), json) => Printed {
             stdout: Some(if json {
                 listed_as_json(listing)

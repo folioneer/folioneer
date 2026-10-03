@@ -3,7 +3,7 @@
 mod api;
 /// Inputs the asset service accepts from any adapter.
 mod dto;
-pub use dto::{CreateAssetDTO, UpdateAssetDTO};
+pub use dto::{AddedAsset, CreateAssetDTO, NamedAsset, UpdateAssetDTO};
 /// Core business entities and repository traits.
 mod domain;
 /// Flat BC error enum (error-model.md).
