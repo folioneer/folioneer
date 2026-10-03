@@ -2,8 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { AssetCategory, AssetClass, Exchange } from "@/bindings";
 import { SelectField } from "@/ui/components/field/SelectField";
 import { TextField } from "@/ui/components/field/TextField";
-import { RISK_LEVELS } from "./constants";
-import { ADDABLE_ASSET_CLASSES } from "./creationDefaults";
+import { ADDABLE_ASSET_CLASSES, RISK_LEVELS } from "./creationDefaults";
 import { ExchangePicker } from "./ExchangePicker";
 
 interface AssetFormData {

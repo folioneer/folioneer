@@ -1,12 +1,9 @@
-import type { AssetError } from "@/bindings";
+import { type AssetError, SYSTEM_CATEGORY_IDS } from "@/bindings";
 import type { I18nMessage } from "@/ui/format/i18n";
 
-export const SYSTEM_CATEGORY_ID = "default-uncategorized";
-/** Cash category seeded by ensure_cash_asset (CSH-017) — hidden from category lists. */
-export const SYSTEM_CASH_CATEGORY_ID = "system-cash-category";
-
+/** Whether the application owns this category (CSH-017): the core lists them. */
 export function isSystemCategory(id: string): boolean {
-  return id === SYSTEM_CATEGORY_ID || id === SYSTEM_CASH_CATEGORY_ID;
+  return (SYSTEM_CATEGORY_IDS as readonly string[]).includes(id);
 }
 
 /**

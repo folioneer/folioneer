@@ -10,6 +10,8 @@ export const ADDABLE_ASSET_CLASSES: AssetClass[] = ASSET_CREATION_DEFAULTS.class
 );
 
 export const DEFAULT_ASSET_CLASS: AssetClass = ASSET_CREATION_DEFAULTS.class;
+/** The risk levels offered, lowest risk first. */
+export const RISK_LEVELS: readonly number[] = ASSET_CREATION_DEFAULTS.risk_levels;
 
 export const DEFAULT_CATEGORY_ID: string = ASSET_CREATION_DEFAULTS.category_id;
 

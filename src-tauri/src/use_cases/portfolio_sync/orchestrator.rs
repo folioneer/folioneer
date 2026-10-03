@@ -7,14 +7,14 @@
 use std::sync::Arc;
 
 use crate::context::account::AccountService;
-use crate::context::asset::{AssetService, SYSTEM_CATEGORY_ID};
+use crate::context::asset::{AssetService, SYSTEM_CATEGORY_IDS};
 use crate::context::currency::CurrencyService;
 use crate::context::sync::{
     ensure_device_name, ensure_passphrase_length, header_data_format_version, FirstPublish,
     FolderStore, InconsistentHolding, JoinError, SyncError, SyncFailure, SyncFolderState,
     SyncReport, SyncRun, SyncService, SyncStateRepository, SyncStatus, DATA_FORMAT_VERSION,
 };
-use crate::core::cash::{is_cash_asset, SYSTEM_CASH_CATEGORY_ID};
+use crate::core::cash::is_cash_asset;
 use crate::core::BACKEND;
 use crate::use_cases::shared::inconsistency::holding_inconsistency;
 
@@ -139,9 +139,10 @@ impl PortfolioSyncOrchestrator {
             return Ok(true);
         }
         let categories = self.asset_service.get_all_categories().await?;
-        if categories.iter().any(|category| {
-            category.id != SYSTEM_CATEGORY_ID && category.id != SYSTEM_CASH_CATEGORY_ID
-        }) {
+        if categories
+            .iter()
+            .any(|category| !SYSTEM_CATEGORY_IDS.contains(&category.id.as_str()))
+        {
             return Ok(true);
         }
         Ok(!self
@@ -318,6 +319,7 @@ mod tests {
         SqliteAccountRepository, SqliteHoldingRepository, SqliteTransactionRepository,
         UpdateFrequency,
     };
+    use crate::context::asset::SYSTEM_CATEGORY_ID;
     use crate::context::asset::{
         SqliteAssetCategoryRepository, SqliteAssetPriceRepository, SqliteAssetRepository,
     };

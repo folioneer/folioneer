@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ASSET_CREATION_DEFAULTS } from "@/bindings";
-import { RISK_LEVELS } from "./constants";
 import {
   ADDABLE_ASSET_CLASSES,
   DEFAULT_ASSET_CLASS,
   DEFAULT_CATEGORY_ID,
   defaultRiskOf,
+  RISK_LEVELS,
 } from "./creationDefaults";
 
 describe("creationDefaults", () => {

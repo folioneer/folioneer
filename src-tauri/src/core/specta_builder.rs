@@ -18,6 +18,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             "ASSET_CREATION_DEFAULTS",
             asset::AssetCreationDefaults::current(),
         )
+        .constant("SYSTEM_CATEGORY_IDS", asset::SYSTEM_CATEGORY_IDS)
         .typ::<asset::Asset>()
         .typ::<asset::AssetCategory>()
         .typ::<asset::AssetClass>()

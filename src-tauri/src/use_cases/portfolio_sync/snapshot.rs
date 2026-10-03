@@ -6,10 +6,10 @@
 use std::sync::Arc;
 
 use crate::context::account::{AccountService, FeeSchedule};
-use crate::context::asset::{AssetService, SYSTEM_CATEGORY_ID};
+use crate::context::asset::{AssetService, SYSTEM_CATEGORY_IDS};
 use crate::context::currency::{CurrencyPair, CurrencyService};
 use crate::context::sync::{PortfolioRecord, PortfolioSnapshot, SyncError};
-use crate::core::cash::{is_cash_asset, SYSTEM_CASH_CATEGORY_ID};
+use crate::core::cash::is_cash_asset;
 use crate::shared::domain::{RecordIdentity, RecordKind};
 
 /// Reads the whole portfolio through the owning bounded contexts' services.
@@ -72,9 +72,10 @@ impl PortfolioSnapshot for ServicePortfolioSnapshot {
             .get_all_categories()
             .await
             .map_err(|error| SyncError::database("snapshot: categories", error))?;
-        for category in categories.iter().filter(|category| {
-            category.id != SYSTEM_CATEGORY_ID && category.id != SYSTEM_CASH_CATEGORY_ID
-        }) {
+        for category in categories
+            .iter()
+            .filter(|category| !SYSTEM_CATEGORY_IDS.contains(&category.id.as_str()))
+        {
             records.push(record(RecordKind::Category, &[&category.id], category)?);
         }
 
@@ -200,6 +201,7 @@ mod tests {
         SqliteHoldingNoteRepository, SqliteHoldingRepository, SqliteTransactionRepository,
         UpdateFrequency,
     };
+    use crate::context::asset::SYSTEM_CATEGORY_ID;
     use crate::context::asset::{
         AssetClass, CreateAssetDTO, SqliteAssetCategoryRepository, SqliteAssetPriceRepository,
         SqliteAssetRepository,

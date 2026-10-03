@@ -1,19 +1,12 @@
 import { describe, expect, it } from "vitest";
-import {
-  categoryMutationErrorToI18n,
-  isSystemCategory,
-  SYSTEM_CASH_CATEGORY_ID,
-  SYSTEM_CATEGORY_ID,
-} from "./presenter";
+import { SYSTEM_CATEGORY_IDS } from "@/bindings";
+import { categoryMutationErrorToI18n, isSystemCategory } from "./presenter";
 
 describe("isSystemCategory (CSH-017)", () => {
-  it("returns true for the default uncategorized id", () => {
-    expect(isSystemCategory(SYSTEM_CATEGORY_ID)).toBe(true);
-  });
-
-  // CSH-017 — system Cash Category is also flagged as system, hidden from category lists.
-  it("returns true for the system Cash Category id", () => {
-    expect(isSystemCategory(SYSTEM_CASH_CATEGORY_ID)).toBe(true);
+  // CSH-017 — the default category and the Cash Category, as the core lists them.
+  it("returns true for every category the core lists as its own", () => {
+    expect(SYSTEM_CATEGORY_IDS).toHaveLength(2);
+    for (const id of SYSTEM_CATEGORY_IDS) expect(isSystemCategory(id)).toBe(true);
   });
 
   it("returns false for a regular category id", () => {

@@ -407,11 +407,20 @@ Remove an entry once it has been resolved.
 ## 2026-10-03 — TD-065 — Some figures are computed in two places
 
 - Found by: the owner, after TD-062 (a corrected deposit was refused because a second cash computation counted deposits and withdrawals only)
-- Where: `SYSTEM_CATEGORY_ID`, `SYSTEM_CASH_CATEGORY_ID` and `isSystemCategory` in `src/features/categories/shared/presenter.ts`, and `RISK_LEVELS` in `src/features/assets/shared/constants.ts`, beside the core's own; the figures not yet listed (performance flows, valuation, price movement)
+- Where: listed below, figure by figure
 - Severity: 🟡
-- Observation: where one figure has two computations, only one is exercised by the tests of the day, and the other drifts. In the account, this is settled: one rule says what moves cash (`cash_effect`), the cash line as of a date is read by it alone, and a test holds the as-of reconstruction of a holding equal to the replay on the same ledger. The asset form reads its classes, default risk levels and default category from the core's generated constant, and a corrected dividend shows the core's total: the interface holds no formula for a total any more. What remains is a few identifiers and scales copied in the interface, and the figures no one has listed.
+- Observation: where one figure has two computations, only one is exercised by the tests of the day, and the other drifts. The figures the application shows, and where each is computed:
+  - **Cash balance** — one rule, `Account::cash_effect`; the cash line as of a date reads it alone. Settled.
+  - **A transaction's total and unit price** — the account aggregate; the forms show what the draft check returns and hold no formula. Settled.
+  - **What a new asset starts from, the risk scale, the system categories** — the core's generated constants. Settled.
+  - **An account's value and unrealized gain** — twice: `use_cases/shared/global_value.rs` (account list, price movement) and `use_cases/account_details/orchestrator.rs` (account page). A test on the golden portfolio holds the list and the page equal. Proven, not merged.
+  - **An account's value as of a date** — three times: the account page as of a date (`account_details`), the end value of a performance period (`end_value_as_of`, `holding_end_value_as_of` in `use_cases/shared/valuation.rs`), and the value before a price refresh (`price_movement`). No test compares them on the same date.
+  - **The weighted flow of a period (Simple Dietz)** — the same loop twice in `use_cases/shared/valuation.rs`, for an account and for a holding.
+  - **An amount converted at a rate** — the same line in `account_summary`, `global_performance`, `price_movement`, `global_value` and `valuation`.
+  - **The gain a sale would realize** — in the interface (`useSellTransaction.ts`, `computeCostBasisMicro`), beside `Account::compute_realized_pnl`.
+  - **A split's preview** (new quantity, new average price, price after the split) — in the interface (`useSplitTransaction.ts`), in floating point, beside the core's integer rule (SPL-020).
 - User value: None directly — a figure reads the same wherever it is shown.
-- Done when: every figure the application shows is listed with where it is computed; the interface copies no value the core defines; any other figure with two computations loses one, or has a test proving both agree on the same ledger.
+- Done when: the value as of a date has one computation, or a test holding the three equal on the golden portfolio; the weighted flow and the conversion are each written once; the sale's gain and the split's preview come from the core, and the interface's formulas are deleted.
 
 ## 2026-10-03 — TD-066 — An asset's name, reference and category have no length or character rule
 

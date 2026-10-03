@@ -23,8 +23,8 @@ use std::sync::Arc;
 
 use folioneer_lib::context::account::{
     AccountService, FeeFrequency, SqliteAccountRepository, SqliteFeeCatchUpRepository,
-    SqliteFeeScheduleRepository, SqliteHoldingRepository, SqliteTransactionRepository,
-    UpdateFrequency,
+    SqliteFeeScheduleRepository, SqliteHoldingNoteRepository, SqliteHoldingRepository,
+    SqliteTransactionRepository, UpdateFrequency,
 };
 use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, PriceProvider, Quote, SqliteAssetCategoryRepository,
@@ -127,7 +127,8 @@ async fn build_portfolio() -> Portfolio {
         )
         .with_event_bus(Arc::clone(&bus))
         .with_fee_schedule_repo(Box::new(SqliteFeeScheduleRepository::new(pool.clone())))
-        .with_fee_catch_up_repo(Box::new(SqliteFeeCatchUpRepository::new(pool.clone()))),
+        .with_fee_catch_up_repo(Box::new(SqliteFeeCatchUpRepository::new(pool.clone())))
+        .with_holding_note_repo(Box::new(SqliteHoldingNoteRepository::new(pool.clone()))),
     );
     let asset_service = Arc::new(AssetService::new(
         Box::new(SqliteAssetRepository::new(pool.clone())),
@@ -580,4 +581,40 @@ async fn golden_portfolio_figures_are_unchanged() {
             .collect::<Vec<_>>()
             .join("\n  ")
     );
+}
+
+// TD-065 — an account's value and unrealized gain are computed once for the account list
+// and once for the account's own page: on the same ledger, read the same day, both views
+// carry the same figures.
+#[tokio::test]
+async fn the_account_list_and_the_account_page_agree_on_value_and_unrealized_gain() {
+    let p = build_portfolio().await;
+    let details = AccountDetailsUseCase::new(
+        p.account_service.clone(),
+        p.asset_service.clone(),
+        p.currency_service.clone(),
+    );
+    let summaries = AccountSummaryUseCase::new(
+        p.account_service.clone(),
+        p.asset_service.clone(),
+        p.currency_service.clone(),
+    );
+    let list = summaries
+        .get_account_summaries()
+        .await
+        .expect("summaries")
+        .summaries;
+
+    assert!(list.iter().any(|row| row.id == p.main_eur));
+    assert!(list.iter().any(|row| row.id == p.growth_usd));
+    for row in &list {
+        let page = details
+            .get_account_details(&row.id, None)
+            .await
+            .expect("details");
+        assert_eq!(row.total_global_value, page.total_global_value);
+        assert_eq!(row.total_unrealized_pnl, page.total_unrealized_pnl);
+    }
+    assert!(list.iter().all(|row| row.total_global_value != 0));
+    assert!(list.iter().any(|row| row.total_unrealized_pnl.is_some()));
 }

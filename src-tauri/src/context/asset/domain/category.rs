@@ -1,4 +1,5 @@
 use crate::context::asset::error::AssetError;
+use crate::core::cash::SYSTEM_CASH_CATEGORY_ID;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -8,6 +9,10 @@ use uuid::Uuid;
 
 /// The fixed ID of the system default category used as a fallback.
 pub const SYSTEM_CATEGORY_ID: &str = "default-uncategorized";
+
+/// The categories the application owns and a user cannot rename or delete: the default
+/// one and the Cash Category (CSH-017).
+pub const SYSTEM_CATEGORY_IDS: [&str; 2] = [SYSTEM_CATEGORY_ID, SYSTEM_CASH_CATEGORY_ID];
 
 /// A user-defined grouping for assets.
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
@@ -63,12 +68,12 @@ impl AssetCategory {
         })
     }
 
-    /// Returns true if this is the seeded system default category.
+    /// Whether the application owns this category: the default one or the Cash Category.
     fn is_system(&self) -> bool {
-        self.id == SYSTEM_CATEGORY_ID
+        SYSTEM_CATEGORY_IDS.contains(&self.id.as_str())
     }
 
-    /// Aggregate-level invariant: the system category is read-only — its
+    /// Aggregate-level invariant: a system category is read-only — its
     /// label cannot be changed by the user.
     pub fn ensure_renameable(&self) -> Result<(), AssetError> {
         if self.is_system() {
@@ -77,7 +82,7 @@ impl AssetCategory {
         Ok(())
     }
 
-    /// Aggregate-level invariant: the system category is protected — it
+    /// Aggregate-level invariant: a system category is protected — it
     /// cannot be deleted.
     pub fn ensure_deletable(&self) -> Result<(), AssetError> {
         if self.is_system() {
@@ -127,6 +132,23 @@ mod aggregate_tests {
         let updated = user_category().update_from("Stocks".into()).unwrap();
         assert_eq!(updated.id, "cat-bonds");
         assert_eq!(updated.name, "Stocks");
+    }
+
+    // CSH-017 — the Cash Category is the application's, like the default one: a user can
+    // neither rename nor delete it.
+    #[test]
+    fn the_cash_category_is_neither_renameable_nor_deletable() {
+        let cash = AssetCategory::from_storage(SYSTEM_CASH_CATEGORY_ID.into(), "Cash".into());
+        assert!(matches!(
+            cash.ensure_renameable(),
+            Err(AssetError::SystemReadonly)
+        ));
+        assert!(matches!(
+            cash.ensure_deletable(),
+            Err(AssetError::SystemProtected)
+        ));
+        let own = AssetCategory::from_storage("mine".into(), "Mine".into());
+        assert!(own.ensure_renameable().is_ok() && own.ensure_deletable().is_ok());
     }
 
     // R2 — system category is not deletable.

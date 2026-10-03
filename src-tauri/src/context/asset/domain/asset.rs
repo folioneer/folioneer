@@ -94,6 +94,9 @@ pub struct AssetClassDefault {
     pub default_risk: u8,
 }
 
+/// The risk scale of an asset: the levels a user may pick, lowest risk first.
+pub const RISK_LEVELS: std::ops::RangeInclusive<u8> = 1..=5;
+
 /// What a new asset starts from, in every interface: the classes a user may pick
 /// (CSH-015), each with its default risk level (R3), and the category preselected.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
@@ -102,6 +105,8 @@ pub struct AssetCreationDefaults {
     pub classes: Vec<AssetClassDefault>,
     /// The class preselected.
     pub class: AssetClass,
+    /// The risk levels a user may pick, lowest risk first.
+    pub risk_levels: Vec<u8>,
     /// The risk level preselected: the preselected class's.
     pub risk_level: u8,
     /// The category a new asset is in until the user picks one.
@@ -120,6 +125,7 @@ impl AssetCreationDefaults {
                 })
                 .collect(),
             class: AssetClass::Stocks,
+            risk_levels: RISK_LEVELS.collect(),
             risk_level: AssetClass::Stocks.default_risk(),
             category_id: super::category::SYSTEM_CATEGORY_ID.to_string(),
         }
@@ -248,7 +254,7 @@ impl Asset {
         if reference.trim().is_empty() {
             return Err(AssetError::ReferenceEmpty);
         }
-        if !(1..=5).contains(&risk_level) {
+        if !RISK_LEVELS.contains(&risk_level) {
             return Err(AssetError::InvalidRiskLevel {
                 received: risk_level,
             });
@@ -430,6 +436,32 @@ fn normalize_optional_isin(isin: Option<String>) -> StdResult<Option<String>, As
 #[cfg(test)]
 mod aggregate_tests {
     use super::*;
+
+    // The risk levels offered are exactly those an asset accepts, and every class's default
+    // is one of them.
+    #[test]
+    fn creation_defaults_offer_the_risk_levels_an_asset_accepts() {
+        let defaults = AssetCreationDefaults::current();
+        let accepts = |risk_level: u8| Asset::validate("Name", risk_level, "EUR", "REF", None);
+
+        assert_eq!(defaults.risk_levels, vec![1, 2, 3, 4, 5]);
+        assert!(defaults
+            .risk_levels
+            .iter()
+            .all(|level| accepts(*level).is_ok()));
+        assert!(matches!(
+            accepts(0),
+            Err(AssetError::InvalidRiskLevel { received: 0 })
+        ));
+        assert!(matches!(
+            accepts(6),
+            Err(AssetError::InvalidRiskLevel { received: 6 })
+        ));
+        assert!(defaults
+            .classes
+            .iter()
+            .all(|entry| defaults.risk_levels.contains(&entry.default_risk)));
+    }
 
     // CSH-015 / R3 — what a new asset starts from: every class but Cash, each with its
     // default risk level, the preselected class among them, and the system category.
