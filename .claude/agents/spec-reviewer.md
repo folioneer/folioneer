@@ -170,10 +170,12 @@ Group findings by category, then by severity:
 
 If a section has no issues, write `✅ None.`
 
+The closing count is written exactly as shown, with its `🔴`: the review check in CI reads the number of criticals from it, and a report without it fails the check.
+
 End with:
 
 ```
-Review complete: N critical, N warning(s), N suggestion(s).
+Review complete: 🔴 N critical, 🟡 N warning(s), 🔵 N suggestion(s).
 Ready for the contract: yes — 0 critical findings (incl. contractability). / no — blocked by N critical finding(s).
 ```
 

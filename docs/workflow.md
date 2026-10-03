@@ -178,8 +178,10 @@ lanes: `reviewer-backend` and `reviewer-arch` for
 `.rs`, `reviewer-frontend` and `reviewer-arch` for `.ts`/`.tsx`, `reviewer-sql` for
 migrations, `reviewer-infra` for scripts, hooks, config and workflows,
 `reviewer-security` for commands, capabilities and secret handling, `reviewer-e2e` for
-`e2e/**`, `spec-reviewer` / `contract-reviewer` / `adr-reviewer` when those documents
-change, `spec-checker` before closing an entry that carries spec rules.
+`e2e/**`, `spec-reviewer` and `contract-reviewer` when `docs/spec/` or `docs/contracts/`
+change (the checks `reviewer-spec` and `reviewer-contract` in CI), `adr-reviewer` when an
+ADR changes and `spec-checker` before closing an entry that carries spec rules — these
+two locally only.
 
 Every finding, local or from a lane's CI comment, is graded and the outcome recorded
 in the PR body:

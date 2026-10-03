@@ -157,11 +157,13 @@ Output the review to the conversation using `## Output format` below.
 ### H — Contract invariants
 🔴 `process_overnight_reconciliation`: source spec rule PAY-100 describes a scheduled job ("runs nightly at 02:00 UTC") with no frontend caller — internal-only logic must not appear as a command.
 
-Review complete: 4 critical, 2 warning(s).
+Review complete: 🔴 4 critical, 🟡 2 warning(s).
 Ready to merge: no — blocked by 4 critical finding(s).
 ```
 
 If a section has no issues, write `✅ None.`
+
+The closing count is written exactly as shown, with its `🔴`: the review check in CI reads the number of criticals from it, and a report without it fails the check.
 
 Use the `[DECISION]` tag when the correct resolution requires a domain design choice that cannot
 be made without domain expert input:
@@ -176,7 +178,7 @@ be made without domain expert input:
 If all checks pass:
 
 ```
-Review complete: 0 critical, N warning(s).
+Review complete: 🔴 0 critical, 🟡 N warning(s).
 Ready to merge: yes — 0 critical findings.
 ```
 

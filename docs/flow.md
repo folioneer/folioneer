@@ -218,19 +218,6 @@ not — the work was done by hand, in the skills' spirit, with native commands.
   skill remembers.
 - Needs the owner: yes — it removes two skills.
 
-## FLOW-016 — Specs and contracts changed more often than their reviewers ran
-
-- Kind: quality
-- Observed: ten of the batch's thirty commits changed a spec and five a contract;
-  `spec-reviewer` ran three times and `contract-reviewer` once, and `spec-checker`
-  never, though CLAUDE.md asks for it before closing an entry that carries spec rules.
-  CI's reviewer lanes cover code, not these documents.
-- Proposal: the documents get lanes in CI like the code — `review.yml` launches
-  `spec-reviewer` when `docs/spec/` changes and `contract-reviewer` when
-  `docs/contracts/` does — and `spec-checker` runs at the release (FLOW-007).
-- Costs: two lanes in `review.yml`, about two minutes on the pull requests that touch
-  those files. Protects: the two documents the reviewers themselves read as the truth.
-
 ## Moved here from the todo and the tech debt
 
 Entries that are about how work moves, not about the application. Each keeps the

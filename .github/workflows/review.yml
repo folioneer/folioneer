@@ -61,11 +61,16 @@ jobs:
           infra=$(has '^(scripts/[^/]*\.(sh|bat|py|mjs)$|\.githooks/|\.github/workflows/.*\.ya?ml$|justfile$|package\.json$|src-tauri/Cargo\.toml$|src-tauri/tauri\.conf\.json$|src-tauri/capabilities/.*\.json$|coverage-gates\.json$|arch-allowlist\.json$|required-checks\.json$)')
           security=$(has '^(src-tauri/src/.*/api\.rs$|src-tauri/capabilities/|src-tauri/src/core/specta_builder\.rs$|src-tauri/src/context/sync/)')
           e2e=$(has '^e2e/.*\.test\.ts$')
+          # The two documents the code reviewers read as the truth get a reviewer
+          # of their own when they change (docs/flow.md FLOW-016).
+          spec=$(has '^docs/spec/.*\.md$')
+          contract=$(has '^docs/contracts/.*\.md$')
           arch=false
           if [[ "$backend" == true || "$frontend" == true ]]; then arch=true; fi
           lanes=$(jq -cn --argjson b "$backend" --argjson f "$frontend" --argjson s "$sql" --argjson i "$infra" \
             --argjson sec "$security" --argjson e "$e2e" --argjson a "$arch" \
-            '{backend:$b, frontend:$f, sql:$s, infra:$i, security:$sec, e2e:$e, arch:$a}')
+            --argjson sp "$spec" --argjson c "$contract" \
+            '{backend:$b, frontend:$f, sql:$s, infra:$i, security:$sec, e2e:$e, arch:$a, spec:$sp, contract:$c}')
           echo "lanes=$lanes" >> "$GITHUB_OUTPUT"
           echo "$lanes"
 
@@ -86,7 +91,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        reviewer: [backend, arch, frontend, sql, infra, security, e2e]
+        reviewer: [backend, arch, frontend, sql, infra, security, e2e, spec, contract]
     steps:
       - name: Skip lanes the diff does not touch
         id: gate
@@ -96,6 +101,16 @@ jobs:
           REVIEWER: ${{ matrix.reviewer }}
         run: |
           set -euo pipefail
+          # The agent file behind the lane, and what it is pointed at: the code
+          # reviewers read the diff, the two document reviewers the changed documents.
+          case "$REVIEWER" in
+            spec) echo "agent=spec-reviewer" >> "$GITHUB_OUTPUT"
+                  echo "target=on each file under docs/spec/ that the pull request changed, one after the other" >> "$GITHUB_OUTPUT" ;;
+            contract) echo "agent=contract-reviewer" >> "$GITHUB_OUTPUT"
+                  echo "target=on each file under docs/contracts/ that the pull request changed, one after the other, against its spec" >> "$GITHUB_OUTPUT" ;;
+            *) echo "agent=reviewer-$REVIEWER" >> "$GITHUB_OUTPUT"
+               echo "target=in its default diff-scoped mode" >> "$GITHUB_OUTPUT" ;;
+          esac
           if [[ "$(jq -r --arg r "$REVIEWER" '.[$r]' <<<"$LANES")" == "true" ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
@@ -150,15 +165,18 @@ jobs:
           # action mints one through OIDC, which needs the Claude GitHub App.
           github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
-            You are the `reviewer-${{ matrix.reviewer }}` agent of this repository.
-            Read `.claude/agents/reviewer-${{ matrix.reviewer }}.md` and follow it
-            exactly, in its default diff-scoped mode, against the current branch
+            You are the `${{ steps.gate.outputs.agent }}` agent of this repository.
+            Read `.claude/agents/${{ steps.gate.outputs.agent }}.md` and follow it
+            exactly, ${{ steps.gate.outputs.target }}, against the current branch
             (the pull request's merge commit; `bash scripts/branch.sh files` and
             `bash scripts/branch.sh diff <path> [<path> ...]` give the changed set and
             the whole diff in one call).
             Include `docs/ubiquitous-language.md` in your term checks. Save the
-            full report where the agent file says (`bash scripts/review-path.sh
-            reviewer-${{ matrix.reviewer }}`). Do not post comments or reviews
+            full report with the Write tool at the path printed by `bash
+            scripts/review-path.sh reviewer-${{ matrix.reviewer }}`, whatever the
+            agent file says about where its output goes, and begin it with one
+            line counting the findings: `🔴 N critical, 🟡 N warning(s), 🔵 N
+            suggestion(s)`. Do not post comments or reviews
             on GitHub yourself; the workflow does that from the saved file.
             Be concise: one line per finding (location, claim, fix); no
             restating of the diff, no narrative, no unrequested alternatives.
