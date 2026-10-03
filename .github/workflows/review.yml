@@ -40,6 +40,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Map changed files to reviewer lanes
         id: detect
         shell: bash
@@ -117,6 +118,8 @@ jobs:
         if: steps.gate.outputs.run == 'true'
         with:
           fetch-depth: 0
+          # The session gets a broad shell over the pull request's content.
+          persist-credentials: false
 
       - name: Give the branch helper a local main and trusted helper scripts
         # scripts/branch.sh resolves the diff base as merge-base(HEAD, main).

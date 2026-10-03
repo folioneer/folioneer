@@ -11,6 +11,39 @@ SPEC = importlib.util.spec_from_file_location("merge", Path(__file__).resolve().
 merge = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(merge)
 
+# A git hook exports GIT_DIR (and GIT_INDEX_FILE, GIT_WORK_TREE…). Inherited, they would
+# make every `git` below — the helpers here and merge.py's own calls — act on the real
+# repository instead of the throwaway one. They are removed while this module runs.
+_SAVED_GIT_ENV: dict[str, str] = {}
+
+
+def clear_git_environment(environ, saved):
+    """Moves every GIT_* variable out of `environ` into `saved`."""
+    for key in [k for k in environ if k.startswith("GIT_")]:
+        saved[key] = environ.pop(key)
+
+
+def setUpModule():
+    clear_git_environment(os.environ, _SAVED_GIT_ENV)
+
+
+def tearDownModule():
+    os.environ.update(_SAVED_GIT_ENV)
+
+
+class NoRealRepository(unittest.TestCase):
+    def test_no_git_variable_reaches_the_tests(self):
+        self.assertEqual([k for k in os.environ if k.startswith("GIT_")], [])
+
+    def test_git_variables_are_set_aside_and_kept_for_restoring(self):
+        environ = {"GIT_DIR": "/real/.git", "GIT_INDEX_FILE": "index", "PATH": "/bin"}
+        saved = {}
+
+        clear_git_environment(environ, saved)
+
+        self.assertEqual(environ, {"PATH": "/bin"})
+        self.assertEqual(saved, {"GIT_DIR": "/real/.git", "GIT_INDEX_FILE": "index"})
+
 
 class FoldingFixups(unittest.TestCase):
     """A repository with `main` and a checked-out `work` branch, in a temporary folder."""

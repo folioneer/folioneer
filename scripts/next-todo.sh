@@ -20,16 +20,16 @@ BUDGET="${NEXT_TODO_BUDGET:-3h}"
 
 log() { printf '%s %s\n' "$(date -u +%H:%M:%S)" "$*" | tee -a "$LOG"; }
 
+for tool in claude git gh just flock timeout; do
+    command -v "$tool" >/dev/null 2>&1 || { log "$tool not found"; exit 1; }
+done
+
 # One run at a time: a second timer tick while a run is open must not start over.
 exec 9>"$LOG_DIR/.lock"
 if ! flock -n 9; then
     log "another run holds the lock — skipped"
     exit 0
 fi
-
-for tool in claude git gh just flock timeout; do
-    command -v "$tool" >/dev/null 2>&1 || { log "$tool not found"; exit 1; }
-done
 
 if [[ -n "$(git status --short)" ]]; then
     log "working tree is not clean — refusing to run"

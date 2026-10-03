@@ -115,11 +115,16 @@ Skip silently any file or directory below that does not exist in the project (v4
 
 - 🔴 `GITHUB_TOKEN` with `contents: write` must not be combined with `pull_request` trigger from forks (injection risk)
 - 🔴 Secrets must never be echoed, logged, or passed to untrusted actions
-- 🔴 Third-party actions must be pinned to a commit SHA, not a mutable tag like `@v1` or `@latest` — **exception**: internal/trusted actions explicitly approved by the team (e.g. `tauri-apps/tauri-action@v0`, `Swatinem/rust-cache@v2`, `dtolnay/rust-toolchain@stable`, `actions/checkout@v4`, `actions/setup-node@v4`, `actions/setup-python@v5`) are allowed with version tags
+- 🔴 Third-party actions must be pinned to a commit SHA, not a mutable tag like `@v1` or `@latest` — **exception**: internal/trusted actions explicitly approved by the team (e.g. `tauri-apps/tauri-action@v0`, `Swatinem/rust-cache@v2`, `actions/checkout@v4`, `actions/setup-node@v4`, `actions/setup-python@v5`) are allowed with version tags
 - A pin is judged against upstream, never against a sibling file: before flagging a SHA or its version label, resolve the tag with `git ls-remote --tags https://github.com/<owner>/<action> | grep <tag>` and compare the peeled commit (`^{}` line when the tag is annotated). Report only a mismatch you observed; two files pinning different commits under one label means one of them is mislabelled — name which, from the lookup (FP on PR #118: a verified pin was flagged for differing from older, mislabelled ones).
 - 🔴 `actions: write` permission is required when using `gh cache delete`
 - 🟡 `permissions` block should follow least-privilege: only grant what the job actually needs
 - 🟡 `workflow_dispatch` inputs of type `choice` should have a `default` value
+
+**Workflows that run an agent on pull-request content** (`review.yml`) — treat the diff as hostile:
+
+- 🔴 A checkout without `persist-credentials: false`.
+- 🔴 A helper script the session executes that comes from the pull request and not from the base branch.
 
 ### Reliability
 

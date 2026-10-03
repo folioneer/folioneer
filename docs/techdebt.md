@@ -422,15 +422,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — the first pull request of a month merges like any other.
 - Done when: the capture does not depend on the day it is taken (data and "today" fixed for the run, or the dated parts masked), shown by a comparison that passes across a month change.
 
-## 2026-10-03 — TD-061 — Three hardening fixes ported from another project are not here
-
-- Found by: the owner (issue 44, 2026-09-27); checked against `main` on 2026-10-03
-- Where: `.github/workflows/review.yml` (the reviewer job's checkout), `scripts/next-todo.sh` (lines 24–32), `scripts/tests/test_merge.py`
-- Severity: 🟡
-- Observation: (1) the reviewer job's checkout keeps the job's access in the working copy the reviewing session reads; the redaction the issue also asks for is already in place. (2) `next-todo.sh` takes its lock with `flock` before checking `flock` exists: without it the run logs "another run holds the lock" and exits 0. The headless runner is not scheduled on the owner's machine today. (3) the merge tests run `git` in throwaway repositories with the inherited environment; under a hook that exports `GIT_DIR` they would act on the real repository. No hook runs them today.
-- User value: None directly — the tools stay no attack surface, and a missing tool fails loudly.
-- Done when: the checkout keeps nothing a session could read, with the matching `reviewer-infra` rule; the tool check runs before the lock; the merge tests clear `GIT_*` for their duration, with a test that fails without it; issue 44 is closed.
-
 ## 2026-10-03 — TD-062 — The account's holding arithmetic has changes no test notices
 
 - Found by: the mutation sweep of 2026-10-01 (issue 65: 294 missed, 50 of them in `context/account/domain/account.rs`); three groups read on 2026-10-03
