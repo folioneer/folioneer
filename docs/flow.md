@@ -177,7 +177,7 @@ itself. Hooks and CI ran their own share on every commit and push; that is not c
 | Agents, local         | reviewer-backend 9, reviewer-frontend 6, reviewer-infra 4, reviewer-arch 4, spec-reviewer 3, reviewer-security 3, reviewer-e2e 2, contract-reviewer 1 | spec-checker, adr-reviewer, reviewer-sql                                                                                                                                                                                         |
 | Recipes               | `merge` 47, `arch-check` 12, `generate-types` 9, `test-scripts` 9, `worktree` 4, `release` 3, `licence-check` 2, `test-rust` 1                        | `harness`, `check`, `check-full`, `format`, `test`, `test-unit`, `coverage-fe`, `coverage-be`, `coverage-gate`, `dev`, `dev-seed`, `install`, `stat`, `db-migrate`, `prepare-sqlx`, `next-todo`, `test-e2e`, `test-e2e-headless` |
 | Native commands       | `cargo test` 71, `cargo fmt` 53, `npx vitest run` 45, `npx prettier` 44, `npx biome` 42, `npx tsc` 40, `cargo clippy` 35                              | —                                                                                                                                                                                                                                |
-| Scripts, run directly | `whats-next.py` 8, `visual-proof-capture.mjs` 1                                                                                                       | `build.sh` has no caller anywhere                                                                                                                                                                                                |
+| Scripts, run directly | `whats-next.py` 8, `visual-proof-capture.mjs` 1                                                                                                       | every other script is called by a recipe, a hook, CI, a skill or the README                                                                                                                                                      |
 
 Reading: the reviewers were used as the workflow says. The skills and the recipes were
 not — the work was done by hand, in the skills' spirit, with native commands.
@@ -230,19 +230,6 @@ not — the work was done by hand, in the skills' spirit, with native commands.
   `docs/contracts/` does — and `spec-checker` runs at the release (FLOW-007).
 - Costs: two lanes in `review.yml`, about two minutes on the pull requests that touch
   those files. Protects: the two documents the reviewers themselves read as the truth.
-
-## FLOW-017 — Things nothing calls
-
-- Kind: speed
-- Observed: `scripts/build.sh` has no caller in the justfile, the hooks, the workflows
-  or the skills. `just db-migrate` is named nowhere outside the justfile, `just stat`
-  only in CLAUDE.md. `just test-e2e` and `just test-e2e-headless` cannot run on this
-  machine (lesson L-011) and CI uses `npm run test:e2e:ci`. `reviewer-sql` and
-  `adr-reviewer` did not run because no migration and no ADR changed: they stay.
-- Proposal: `/prune` decides each — delete `scripts/build.sh` and the two recipes with
-  no caller; keep the E2E recipes only if L-011 is to be fixed.
-- Costs: one `/prune` run. Protects: the rule that a recipe exists because something
-  calls it.
 
 ## Moved here from the todo and the tech debt
 

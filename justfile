@@ -69,10 +69,6 @@ arch-check *ARGS:
 harness *ARGS:
     bash scripts/harness.sh {{ARGS}}
 
-# Run pending database migrations. Override `URL=...` to target a different DB.
-db-migrate URL="sqlite:.local/dev_check.sqlite":
-    cd src-tauri && DATABASE_URL={{URL}} sqlx migrate run
-
 # ---- shared recipes ----------------------------------------------------
 # Run fast quality check (lint/format only, no tests)
 check:
@@ -107,8 +103,10 @@ next-todo:
 
 # SQLX_OFFLINE=false forces online mode so `prepare` hits the dev DB even
 # though .cargo/config.toml sets SQLX_OFFLINE=true globally.
-# Regenerate the SQLx offline query cache (run after schema or query changes)
+# Regenerate the SQLx offline query cache (run after schema or query changes): brings the
+# check database up to the latest migration, then prepares against it
 prepare-sqlx:
+    @if [ -d src-tauri ]; then cd src-tauri && DATABASE_URL="sqlite:.local/dev_check.sqlite" sqlx migrate run; fi
     @if [ -d src-tauri ]; then cd src-tauri && SQLX_OFFLINE=false DATABASE_URL="sqlite:.local/dev_check.sqlite" cargo sqlx prepare -- --tests; else echo "ℹ skipping prepare-sqlx (no src-tauri/)"; fi
 
 # The markdown fixer runs prettier with the same args as check.py's

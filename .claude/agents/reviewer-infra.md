@@ -326,7 +326,7 @@ Always perform these checks across files together:
 
 - 🔴 The `check` recipe must invoke the quality check script (e.g. `python3 scripts/check.py`) with flags consistent with what CI runs — drift between `just check` and the CI workflow means "green locally" ≠ "green in CI"
 - 🟡 If `scripts/release.py` is the canonical release tool, the `release` recipe should delegate to it — no release logic should live directly in the justfile
-- 🟡 Database-related recipes (`db-migrate`, `prepare-sqlx`) should document required prerequisites (correct `DATABASE_URL`) in their doc comment
+- 🟡 Database-related recipes (`prepare-sqlx`) should document required prerequisites (correct `DATABASE_URL`) in their doc comment
 - 🟡 A recipe needs a caller — CI, a git hook, a skill, an agent or a script — or a line in `CLAUDE.md` § Commands as a tool people run; a new recipe with neither is dead code, and a change that removes a recipe's last caller removes the recipe; never propose a recipe for a script that CI and the harness already call directly — the one-recipe-per-script convention does not apply here
 
 ### Safety
