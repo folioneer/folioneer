@@ -7,7 +7,7 @@ during work that don't warrant immediate action. Format produced by the
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-066) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-067) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -434,8 +434,17 @@ Remove an entry once it has been resolved.
 ## 2026-10-03 — TD-065 — Some figures are computed in two places
 
 - Found by: the owner, after TD-062 (a corrected deposit was refused because a second cash computation counted deposits and withdrawals only)
-- Where: `Account::reconstruct_holding_as_of` (repeats `replay_holding`, and still carries deposit and withdrawal branches for a cash line whose balance purchases, sales and dividends also move) beside `Account::cash_balance_as_of`; its callers in `use_cases/account_details/orchestrator.rs` and `use_cases/shared/valuation.rs`; `computeTotalMicro` in `src/lib/microUnits.ts` beside the core's totals (TD-054)
+- Where: `Account::reconstruct_holding_as_of` (repeats `replay_holding`, and still carries deposit and withdrawal branches for a cash line whose balance purchases, sales and dividends also move) beside `Account::cash_balance_as_of`; its callers in `use_cases/account_details/orchestrator.rs` and `use_cases/shared/valuation.rs`; `computeTotalMicro` in `src/lib/microUnits.ts` beside the core's totals (TD-054); `DEFAULT_RISK_BY_CLASS` and `SYSTEM_CATEGORY_ID` in `src/features/assets/shared/constants.ts` beside `AssetClass::default_risk` and the core's system category, which `asset add` uses (CLI-026)
 - Severity: 🟡
 - Observation: where one figure has two computations, only one is exercised by the tests of the day, and the other drifts. Not audited: whether any caller asks the as-of reconstruction for the cash line, and which other figures (realized profit, average cost, performance flows) have a second computation.
 - User value: None directly — a figure reads the same wherever it is shown.
 - Done when: every figure the application shows is listed with where it is computed; one with two computations either loses one, or has a test proving both agree on the same ledger; a cash line never goes through the non-cash reconstruction.
+
+## 2026-10-03 — TD-066 — An asset's name, reference and category have no length or character rule
+
+- Found by: reviewer-security on #055
+- Where: `Asset::validate` in `src-tauri/src/context/asset/domain/asset.rs`; `AssetService::add_named_asset` (the command line's path, with the same rules)
+- Severity: 🔵
+- Observation: the asset rules check that a name and a reference are not empty, and nothing else: no maximum length, and a control character is accepted from the window's form or from another device's synced change. The command line escapes what it prints.
+- User value: None directly — a name pasted with a stray control character or of unreasonable length is refused where it is typed.
+- Done when: `Asset::validate` refuses a control character and a name or reference above a stated length, with a typed error the form shows and the command line reports.

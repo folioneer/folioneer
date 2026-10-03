@@ -6,7 +6,9 @@ use std::sync::Arc;
 use serde::Serialize;
 
 use crate::context::account::{AccountError, AccountServiceContract, Transaction, TransactionType};
-use crate::context::asset::{AssetClass, AssetServiceContract};
+use crate::context::asset::{
+    AddNamedAssetError, Asset, AssetClass, AssetServiceContract, NamedAsset,
+};
 use crate::core::BACKEND;
 use crate::use_cases::holding_transaction::{
     HoldingTransactionUseCase, NameLookupError, OpenHoldingError, OpenHoldingTask,
@@ -32,6 +34,12 @@ pub enum Outcome {
         account_name: String,
         currency: String,
         asset_reference: String,
+    },
+    /// It added this asset; another asset has the same reference when `reference_shared`
+    /// (CLI-026).
+    AssetAdded {
+        asset: AssetRow,
+        reference_shared: bool,
     },
     /// It listed these accounts or assets, sorted by name.
     Listed(Listing),
@@ -98,6 +106,31 @@ impl CommandRunner {
         }
     }
 
+    /// CLI-026 — adds an asset through the core, which decides what the command left out.
+    pub async fn add_asset(&self, named: NamedAsset) -> Outcome {
+        let category = named.category_name.clone();
+        match self.asset_service.add_named_asset(named).await {
+            Ok(added) => Outcome::AssetAdded {
+                asset: row_of(added.asset),
+                reference_shared: added.reference_shared,
+            },
+            Err(AddNamedAssetError::CategoryNameNotFound) => Outcome::Refused(Refusal {
+                code: "CategoryNotFound".to_string(),
+                message: format!(
+                    "no category named \"{}\"",
+                    category.unwrap_or_default().escape_debug()
+                ),
+            }),
+            Err(AddNamedAssetError::Asset(error)) => {
+                let code = code_of(&error);
+                Outcome::Refused(Refusal {
+                    message: format!("refused by the rules ({code})"),
+                    code,
+                })
+            }
+        }
+    }
+
     /// CLI-018 / CLI-019 — what a list command asks for, in the core's order.
     pub async fn list(&self, listed: Listed) -> Outcome {
         match listed {
@@ -122,19 +155,9 @@ impl CommandRunner {
                     .get_non_cash_assets_by_name(archived)
                     .await
                 {
-                    Ok(assets) => Outcome::Listed(Listing::Assets(
-                        assets
-                            .into_iter()
-                            .map(|asset| AssetRow {
-                                name: asset.name,
-                                reference: asset.reference,
-                                class: asset.class,
-                                currency: asset.currency,
-                                isin: asset.isin,
-                                archived: asset.is_archived,
-                            })
-                            .collect(),
-                    )),
+                    Ok(assets) => {
+                        Outcome::Listed(Listing::Assets(assets.into_iter().map(row_of).collect()))
+                    }
                     Err(error) => {
                         tracing::error!(target: BACKEND, err = ?error, "command line: asset list failed");
                         Outcome::Refused(unreadable())
@@ -215,6 +238,18 @@ impl CommandRunner {
             },
             Err(refusal) => Outcome::Refused(refusal),
         }
+    }
+}
+
+/// An asset as a list or an addition reports it.
+fn row_of(asset: Asset) -> AssetRow {
+    AssetRow {
+        name: asset.name,
+        reference: asset.reference,
+        class: asset.class,
+        currency: asset.currency,
+        isin: asset.isin,
+        archived: asset.is_archived,
     }
 }
 

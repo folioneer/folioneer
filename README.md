@@ -128,6 +128,7 @@ folioneer holding buy  --account "PEA" --asset CW8 --quantity 2 --total 992.19 [
 folioneer holding sell …same options as buy…
 folioneer account list        # the accounts: what --account takes
 folioneer asset list          # the assets: what --asset takes (--archived for the archived ones)
+folioneer asset add --name "ASML Holding" --reference ASML --class Stocks --currency EUR
 folioneer --help              # the commands, with examples
 folioneer holding buy --help  # one command's options and defaults
 ```
