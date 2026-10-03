@@ -1350,9 +1350,8 @@ impl Account {
                     let pnl = Self::compute_realized_pnl(t.total_amount, vwap_before, t.quantity);
                     pnl_map.insert(t.id.clone(), pnl);
                     total_realized_pnl += pnl;
-                    if last_sold_date.as_deref() < Some(t.date.as_str()) {
-                        last_sold_date = Some(t.date.clone());
-                    }
+                    // The replay runs in date order: the sale at hand is the latest so far.
+                    last_sold_date = Some(t.date.clone());
                     let qty = t.quantity as i128;
                     vwap_numerator -= vwap_before as i128 * qty;
                     total_quantity -= qty;
@@ -1559,20 +1558,15 @@ impl Account {
                     // SEL-024 — realized P&L for the sell, accumulated as of the date.
                     let pnl = Self::compute_realized_pnl(t.total_amount, vwap_before, t.quantity);
                     total_realized_pnl = total_realized_pnl.saturating_add(pnl);
-                    if last_sold_date.as_deref() < Some(t.date.as_str()) {
-                        last_sold_date = Some(t.date.clone());
-                    }
+                    // The replay runs in date order: the sale at hand is the latest so far.
+                    last_sold_date = Some(t.date.clone());
                     let qty = t.quantity as i128;
                     vwap_numerator -= vwap_before as i128 * qty;
                     total_quantity -= qty;
                 }
                 TransactionType::Withdrawal => {
                     total_quantity -= t.quantity as i128;
-                    vwap_numerator = if total_quantity > 0 {
-                        total_quantity * MICRO
-                    } else {
-                        0
-                    };
+                    vwap_numerator = total_quantity.max(0) * MICRO;
                 }
                 // FSD-022/023 — free shares add quantity at zero cost (dilutes VWAP).
                 TransactionType::FreeShares => {
@@ -1757,9 +1751,10 @@ impl Account {
 
     /// Derives the unit price implied by a user-entered all-in total (TRX-060, SEL-050).
     /// Formula: round((securities_amount × MICRO × MICRO) / (quantity × exchange_rate)),
-    /// rounding half away from zero. `securities_amount` is the account-currency
-    /// micro-amount attributable to the securities themselves: `total − fees` for a
-    /// purchase, `total + fees` for a sell.
+    /// rounding half up. `securities_amount` is the account-currency micro-amount
+    /// attributable to the securities themselves — `total − fees` for a purchase,
+    /// `total + fees` for a sell — and is never negative in a transaction that is
+    /// recorded: a total below its fees and negative fees are rejected (TRX-060, SEL-020).
     fn derive_unit_price_from_total(
         securities_amount: i128,
         quantity: i64,
@@ -1774,12 +1769,7 @@ impl Account {
         const MICRO: i128 = 1_000_000;
         let numerator = securities_amount * MICRO * MICRO;
         let denominator = quantity as i128 * exchange_rate as i128;
-        let half = denominator / 2;
-        let rounded = if numerator >= 0 {
-            (numerator + half) / denominator
-        } else {
-            (numerator - half) / denominator
-        };
+        let rounded = (numerator + denominator / 2) / denominator;
         i64::try_from(rounded).map_err(|_| AccountError::UnitPriceOutOfRange)
     }
 
@@ -2566,9 +2556,9 @@ mod tests {
         assert_eq!(tx.realized_pnl, Some(micro(40)));
     }
 
-    // TRX-060 / SEL-050 — an exact .5 fraction rounds half away from zero
+    // TRX-060 / SEL-050 — an exact .5 fraction rounds up
     #[test]
-    fn derive_unit_price_from_total_rounds_half_away_from_zero() {
+    fn derive_unit_price_from_total_rounds_half_up() {
         let derived = Account::derive_unit_price_from_total(3, micro(2), micro(1)).unwrap();
         assert_eq!(derived, 2);
     }
@@ -5788,6 +5778,479 @@ mod tests {
             changes_before,
             "rolled-back pending_change must not be kept"
         );
+    }
+}
+
+/// An account holding two assets, a synced ledger, and the day an as-of read stops on:
+/// what the tests of one asset in one account do not see.
+#[cfg(test)]
+mod two_asset_and_synced_ledger_tests {
+    use super::*;
+
+    const A: &str = "asset-a";
+    const B: &str = "asset-b";
+
+    fn micro(v: i64) -> i64 {
+        v * 1_000_000
+    }
+
+    fn account() -> Account {
+        Account::restore_with_positions(
+            "acc-1".to_string(),
+            "Test".to_string(),
+            String::new(),
+            "EUR".to_string(),
+            UpdateFrequency::ManualMonth,
+            false,
+            vec![],
+            vec![],
+        )
+    }
+
+    fn funded_account() -> Account {
+        let mut acc = account();
+        acc.record_deposit("2020-01-01".to_string(), micro(1_000_000), None)
+            .unwrap();
+        acc
+    }
+
+    fn buy(acc: &mut Account, asset: &str, date: &str, quantity: i64, price: i64) -> String {
+        acc.buy_holding(
+            asset.to_string(),
+            date.to_string(),
+            micro(quantity),
+            micro(price),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .unwrap()
+        .id
+        .clone()
+    }
+
+    fn sell(acc: &mut Account, asset: &str, date: &str, quantity: i64, price: i64) -> String {
+        acc.sell_holding(
+            asset.to_string(),
+            date.to_string(),
+            micro(quantity),
+            micro(price),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .unwrap()
+        .id
+        .clone()
+    }
+
+    /// A transaction as another device recorded it.
+    fn synced(
+        asset: &str,
+        kind: TransactionType,
+        date: &str,
+        quantity: i64,
+        price: i64,
+    ) -> Transaction {
+        Transaction::new(
+            "acc-1".to_string(),
+            asset.to_string(),
+            kind,
+            date.to_string(),
+            micro(quantity),
+            micro(price),
+            micro(1),
+            0,
+            micro(quantity * price),
+            None,
+            None,
+        )
+        .unwrap()
+    }
+
+    fn holding<'a>(acc: &'a Account, asset: &str) -> Option<&'a Holding> {
+        acc.holdings.iter().find(|h| h.asset_id == asset)
+    }
+
+    fn realized_pnl(acc: &Account, tx_id: &str) -> Option<i64> {
+        acc.transactions
+            .iter()
+            .find(|t| t.id == tx_id)
+            .and_then(|t| t.realized_pnl)
+    }
+
+    /// The transactions the pending changes report as updated, in order.
+    fn updated(acc: &Account) -> Vec<String> {
+        acc.pending_changes
+            .iter()
+            .filter_map(|change| match change {
+                AccountChange::TransactionUpdated(tx) => Some(tx.id.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// A: 10 bought at 100, 10 at 140, 5 sold at 150 (average 120, profit 150).
+    /// B: 10 bought at 200, 5 sold at 300 (profit 500). Returns the ids
+    /// (first purchase of A, second purchase of A, sale of A, sale of B).
+    fn two_assets(acc: &mut Account) -> (String, String, String, String) {
+        let first = buy(acc, A, "2024-01-01", 10, 100);
+        let second = buy(acc, A, "2024-01-02", 10, 140);
+        let sale_a = sell(acc, A, "2024-01-03", 5, 150);
+        buy(acc, B, "2024-01-01", 10, 200);
+        let sale_b = sell(acc, B, "2024-01-03", 5, 300);
+        acc.pending_changes.clear();
+        (first, second, sale_a, sale_b)
+    }
+
+    // TRX-031 / SEL-032 — correcting a purchase recalculates its own asset: its holding and
+    // the profit of its sales; the other asset's holding and sales are left as they are
+    #[test]
+    fn correcting_a_purchase_recalculates_its_own_asset_only() {
+        let mut acc = funded_account();
+        let (first, _, sale_a, sale_b) = two_assets(&mut acc);
+
+        acc.correct_transaction(
+            &first,
+            "2024-01-01".to_string(),
+            micro(10),
+            micro(60),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .unwrap();
+
+        let a = holding(&acc, A).unwrap();
+        assert_eq!((a.quantity, a.average_price), (micro(15), micro(100)));
+        assert_eq!(realized_pnl(&acc, &sale_a), Some(micro(250)));
+        let b = holding(&acc, B).unwrap();
+        assert_eq!((b.quantity, b.average_price), (micro(5), micro(200)));
+        assert_eq!(realized_pnl(&acc, &sale_b), Some(micro(500)));
+        assert_eq!(updated(&acc), vec![sale_a, first]);
+    }
+
+    // CSH-042 — a correction the cash cannot pay for is refused, and every transaction
+    // stands as it was
+    #[test]
+    fn a_correction_the_cash_refuses_restores_every_transaction() {
+        let mut acc = funded_account();
+        let (first, ..) = two_assets(&mut acc);
+        let figures = |acc: &Account| -> Vec<(String, i64, i64)> {
+            acc.transactions
+                .iter()
+                .map(|t| (t.id.clone(), t.unit_price, t.total_amount))
+                .collect()
+        };
+        let before = figures(&acc);
+
+        let refused = acc
+            .correct_transaction(
+                &first,
+                "2024-01-01".to_string(),
+                micro(10),
+                micro(1_000_000),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                refused.downcast_ref::<AccountError>(),
+                Some(AccountError::InsufficientCash { .. })
+            ),
+            "expected InsufficientCash, got: {refused}"
+        );
+        assert_eq!(figures(&acc), before);
+    }
+
+    // SEL-032 — a correction that leaves a later sale without enough behind it is refused,
+    // and every transaction stands as it was
+    #[test]
+    fn a_correction_a_later_sale_refuses_restores_every_transaction() {
+        let mut acc = funded_account();
+        let purchase = buy(&mut acc, A, "2024-01-01", 10, 100);
+        sell(&mut acc, A, "2024-01-03", 8, 150);
+        let figures = |acc: &Account| -> Vec<(String, i64, i64)> {
+            acc.transactions
+                .iter()
+                .map(|t| (t.id.clone(), t.quantity, t.total_amount))
+                .collect()
+        };
+        let before = figures(&acc);
+
+        let refused = acc
+            .correct_transaction(
+                &purchase,
+                "2024-01-01".to_string(),
+                micro(5),
+                micro(100),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                refused.downcast_ref::<AccountError>(),
+                Some(AccountError::CascadingOversell)
+            ),
+            "expected CascadingOversell, got: {refused}"
+        );
+        assert_eq!(figures(&acc), before);
+    }
+
+    // TRX-034 — cancelling the only transaction of an asset removes that holding and no other
+    #[test]
+    fn cancelling_the_last_transaction_of_an_asset_keeps_the_other_holdings() {
+        let mut acc = funded_account();
+        let only = buy(&mut acc, A, "2024-01-01", 10, 100);
+        buy(&mut acc, B, "2024-01-01", 10, 200);
+
+        acc.cancel_transaction(&only).unwrap();
+
+        assert!(holding(&acc, A).is_none());
+        assert_eq!(holding(&acc, B).map(|h| h.quantity), Some(micro(10)));
+        assert!(holding(&acc, &acc.cash_asset_id()).is_some());
+    }
+
+    // SEL-033 — cancelling a purchase recalculates the profit of its asset's sales only
+    #[test]
+    fn cancelling_a_purchase_updates_the_sales_of_its_asset_only() {
+        let mut acc = funded_account();
+        let (_, second, sale_a, sale_b) = two_assets(&mut acc);
+
+        acc.cancel_transaction(&second).unwrap();
+
+        assert_eq!(realized_pnl(&acc, &sale_a), Some(micro(250)));
+        assert_eq!(realized_pnl(&acc, &sale_b), Some(micro(500)));
+        assert_eq!(updated(&acc), vec![sale_a]);
+    }
+
+    // CSH-012 — an account holding an asset and no cash yet is seeded once
+    #[test]
+    fn seeding_cash_looks_for_the_cash_holding_among_the_others() {
+        let mut acc = account();
+        acc.holdings.push(
+            Holding::new(
+                "acc-1".to_string(),
+                A.to_string(),
+                micro(1),
+                micro(1),
+                0,
+                None,
+            )
+            .unwrap(),
+        );
+        let cash = acc.cash_asset_id();
+        let cash_holdings =
+            |acc: &Account| acc.holdings.iter().filter(|h| h.asset_id == cash).count();
+
+        acc.seed_cash_holding();
+        assert_eq!(cash_holdings(&acc), 1);
+        acc.seed_cash_holding();
+        assert_eq!(cash_holdings(&acc), 1);
+        assert_eq!(acc.pending_changes.len(), 1);
+    }
+
+    // SEL-024 / SEL-026 — a holding sums the profit of its sales, losses included, and
+    // remembers the day of the last one
+    #[test]
+    fn a_holding_sums_its_sales_and_keeps_the_last_sale_date() {
+        let mut acc = funded_account();
+        buy(&mut acc, A, "2024-01-01", 10, 100);
+        sell(&mut acc, A, "2024-01-02", 2, 150);
+        sell(&mut acc, A, "2024-01-03", 3, 80);
+
+        let a = holding(&acc, A).unwrap();
+        assert_eq!(a.total_realized_pnl, micro(100 - 60));
+        assert_eq!(a.last_sold_date.as_deref(), Some("2024-01-03"));
+    }
+
+    // INT-023 — interest on an asset credits that asset, never the cash
+    #[test]
+    fn interest_on_an_asset_leaves_the_cash_as_it_was() {
+        let mut acc = funded_account();
+        buy(&mut acc, A, "2024-01-01", 10, 100);
+        let cash = acc.cash_asset_id();
+        let before = acc.holding_quantity(&cash);
+
+        let interest = Transaction::interest(
+            "acc-1".to_string(),
+            A.to_string(),
+            "2024-06-15".to_string(),
+            micro(5),
+            None,
+        )
+        .unwrap();
+        acc.apply_interest(interest).unwrap();
+
+        assert_eq!(acc.holding_quantity(&cash), before);
+        assert_eq!(acc.holding_quantity(A), micro(15));
+    }
+
+    // CFR-017 — a synced transaction moved to another asset leaves the first asset's
+    // holding without it
+    #[test]
+    fn a_synced_transaction_moved_to_another_asset_frees_the_first() {
+        let mut acc = account();
+        let purchase = synced(A, TransactionType::Purchase, "2024-01-01", 10, 100);
+        acc.apply_synced_transaction(purchase.clone());
+        assert_eq!(acc.holding_quantity(A), micro(10));
+
+        let mut moved = purchase;
+        moved.asset_id = B.to_string();
+        acc.apply_synced_transaction(moved);
+
+        assert!(holding(&acc, A).is_none());
+        assert_eq!(acc.holding_quantity(B), micro(10));
+    }
+
+    // CFR-017/030 — removing a synced transaction removes that one, replays its holding and
+    // the cash, and reports the removal
+    #[test]
+    fn removing_a_synced_transaction_replays_its_holding_and_the_cash() {
+        let mut acc = account();
+        let first = synced(A, TransactionType::Purchase, "2024-01-01", 10, 100);
+        let second = synced(A, TransactionType::Purchase, "2024-01-02", 5, 100);
+        acc.apply_synced_transaction(first.clone());
+        acc.apply_synced_transaction(second.clone());
+        let cash = acc.cash_asset_id();
+        assert_eq!(acc.holding_quantity(&cash), -micro(1500));
+        acc.pending_changes.clear();
+
+        acc.remove_synced_transaction(&first.id);
+
+        let left: Vec<&str> = acc.transactions.iter().map(|t| t.id.as_str()).collect();
+        assert_eq!(left, vec![second.id.as_str()]);
+        assert_eq!(acc.holding_quantity(A), micro(5));
+        assert_eq!(acc.holding_quantity(&cash), -micro(500));
+        assert!(acc
+            .pending_changes
+            .iter()
+            .any(|c| matches!(c, AccountChange::TransactionDeleted(id) if *id == first.id)));
+    }
+
+    // TRX-034 / CFR-017 — removing the last synced transaction of an asset removes that
+    // holding and no other
+    #[test]
+    fn removing_the_last_synced_transaction_of_an_asset_keeps_the_other_holdings() {
+        let mut acc = account();
+        let only = synced(A, TransactionType::Purchase, "2024-01-01", 10, 100);
+        acc.apply_synced_transaction(only.clone());
+        acc.apply_synced_transaction(synced(B, TransactionType::Purchase, "2024-01-01", 10, 200));
+        acc.pending_changes.clear();
+
+        acc.remove_synced_transaction(&only.id);
+
+        assert!(holding(&acc, A).is_none());
+        assert_eq!(acc.holding_quantity(B), micro(10));
+        assert!(acc.pending_changes.iter().any(|c| matches!(
+            c,
+            AccountChange::HoldingDeleted { asset_id, .. } if asset_id == A
+        )));
+    }
+
+    // CFR-042 / SEL-032 — a synced change updates the profit of its asset's sales, reports
+    // only the sales whose profit moved, and leaves the other asset's sales alone
+    #[test]
+    fn a_synced_change_updates_the_sales_of_its_asset_whose_profit_moved() {
+        let mut acc = account();
+        let purchase = synced(A, TransactionType::Purchase, "2024-01-01", 10, 100);
+        let sale_a = synced(A, TransactionType::Sell, "2024-01-03", 5, 150);
+        let sale_b = synced(B, TransactionType::Sell, "2024-01-03", 5, 300);
+        acc.apply_synced_transaction(purchase.clone());
+        acc.apply_synced_transaction(sale_a.clone());
+        acc.apply_synced_transaction(synced(B, TransactionType::Purchase, "2024-01-01", 10, 200));
+        acc.apply_synced_transaction(sale_b.clone());
+        assert_eq!(realized_pnl(&acc, &sale_a.id), Some(micro(250)));
+        acc.pending_changes.clear();
+
+        let mut dearer = purchase.clone();
+        dearer.unit_price = micro(120);
+        dearer.total_amount = micro(1200);
+        acc.apply_synced_transaction(dearer);
+
+        assert_eq!(realized_pnl(&acc, &sale_a.id), Some(micro(150)));
+        assert_eq!(realized_pnl(&acc, &sale_b.id), Some(micro(500)));
+        assert_eq!(updated(&acc), vec![purchase.id.clone(), sale_a.id.clone()]);
+
+        acc.pending_changes.clear();
+        let later = synced(A, TransactionType::Purchase, "2024-01-04", 1, 100);
+        acc.apply_synced_transaction(later);
+        assert_eq!(updated(&acc), Vec::<String>::new());
+    }
+
+    // CFR-017 — a synced deposit reaches the cash holding
+    #[test]
+    fn a_synced_deposit_reaches_the_cash() {
+        let mut acc = account();
+        let cash = acc.cash_asset_id();
+        let deposit = Transaction::new_deposit(
+            "acc-1".to_string(),
+            cash.clone(),
+            "2024-01-01".to_string(),
+            micro(700),
+            None,
+        )
+        .unwrap();
+
+        acc.apply_synced_transaction(deposit);
+
+        assert_eq!(acc.holding_quantity(&cash), micro(700));
+    }
+
+    // CFR-042 — an as-of read of a ledger whose sale has nothing behind it holds nothing;
+    // the average cost of nothing is zero, so the whole proceeds are profit
+    #[test]
+    fn an_as_of_read_of_a_sale_with_nothing_behind_it_does_not_divide_by_zero() {
+        let sale = synced(A, TransactionType::Sell, "2024-01-03", 5, 150);
+
+        let read = Account::reconstruct_holding_as_of(&[sale], A, "2024-12-31");
+
+        assert_eq!(read.quantity, 0);
+        assert_eq!(read.total_realized_pnl, micro(750));
+    }
+
+    // PRF — the cash balance as of a day counts that day's transactions
+    #[test]
+    fn the_cash_balance_as_of_a_day_counts_that_day() {
+        let deposit = |date: &str, amount: i64| {
+            Transaction::new_deposit(
+                "acc-1".to_string(),
+                crate::core::cash::system_cash_asset_id("EUR"),
+                date.to_string(),
+                micro(amount),
+                None,
+            )
+            .unwrap()
+        };
+        let ledger = [deposit("2024-01-01", 100), deposit("2024-01-02", 50)];
+
+        assert_eq!(
+            Account::cash_balance_as_of(&ledger, "2024-01-01"),
+            micro(100)
+        );
+        assert_eq!(
+            Account::cash_balance_as_of(&ledger, "2024-01-02"),
+            micro(150)
+        );
+    }
+
+    // TRX-060 — a typed total equal to its fees is not below them: the unit price is zero
+    #[test]
+    fn a_typed_total_equal_to_its_fees_is_accepted() {
+        let derived = Account::derive_purchase_from_total(micro(3), micro(1), micro(1), micro(3))
+            .expect("a total that covers its fees");
+        assert_eq!(derived, (0, micro(3)));
     }
 }
 

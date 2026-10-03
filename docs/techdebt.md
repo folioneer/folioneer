@@ -7,7 +7,7 @@ during work that don't warrant immediate action. Format produced by the
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-064) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-066) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -413,15 +413,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — the first pull request of a month merges like any other.
 - Done when: the capture does not depend on the day it is taken (data and "today" fixed for the run, or the dated parts masked), shown by a comparison that passes across a month change.
 
-## 2026-10-03 — TD-062 — The account's holding arithmetic has changes no test notices
-
-- Found by: the mutation sweep of 2026-10-01 (issue 65: 294 missed, 50 of them in `context/account/domain/account.rs`); three groups read on 2026-10-03
-- Where: `src-tauri/src/context/account/domain/account.rs` — `replay_holding` (17), `replay_holding_tolerantly` (8), `correct_transaction` (6), `cancel_transaction` (4), `derive_unit_price_from_total` (4)
-- Severity: 🟡
-- Observation: the 50 are of three kinds. Real gaps: the realized profit total of a holding can change sign with every test passing. Probably dead code: `replay_holding` carries deposit and withdrawal branches while cash is replayed by `replay_cash_holding` — to prove, then delete rather than test. Noise: a `<` against a `<=` on the last sold date changes nothing. The other 244 (sync resolution first, 24) are not sorted.
-- User value: None directly — a wrong position or profit figure would be caught by a test before a release.
-- Done when: each of the 50 is sorted — a test added, the dead branch deleted, or the equivalent mutant excluded in `.cargo/mutants.toml` with its reason; a sweep of `account.rs` reports no missed mutant; what remains of issue 65 is filed by file.
-
 ## 2026-10-03 — TD-063 — The spec lets a correction change the asset; the code does not
 
 - Found by: spec-reviewer and contract-reviewer on TD-056
@@ -430,3 +421,21 @@ Remove an entry once it has been resolved.
 - Observation: TRX-032 says changing a transaction's asset or account is permitted and recalculates both holdings. A correction carries neither: it keeps the asset and the account of its transaction. CSH-062 states what the code does.
 - User value: None directly — the spec says what a correction can change.
 - Done when: TRX-032 lists the fields a correction changes, and no rule mentions moving a transaction to another asset or account.
+
+## 2026-10-03 — TD-064 — 244 changes in the logic code that no test notices, outside the account
+
+- Found by: the mutation sweep of 2026-10-01 (issue 65); the 50 of `account.rs` were sorted on 2026-10-03
+- Where: `context/sync/domain/resolution.rs` (24), `use_cases/account_details/orchestrator.rs` (13), `context/sync/application/` (`run.rs` 8, `intake.rs` 7, `join.rs` 5, `first_publish.rs` 4), `use_cases/asset_price_fetch/` (`dispatcher.rs` 6, `movement_capture.rs` 4), `context/account/service.rs` (5), and the files with fewer — the full list is in the sweep's artifacts
+- Severity: 🟡
+- Observation: sorting `account.rs` found one real bug (a corrected deposit refused), tests that only ever used one asset per account, a synced removal no test checked, unreachable code and three comparisons that changed nothing. The other files are not sorted, and the local machine cannot run the sweep (five minutes a mutant under load): CI's sweep is the proof.
+- User value: None directly — a wrong merge of two devices' changes, or a wrong figure in an account's history, would be caught by a test.
+- Done when: a sweep started on `main` reports no missed mutant in `account.rs`; each remaining missed mutant is sorted, file by file, into a test added, dead code deleted, or code simplified so the change no longer exists; issue 65 is closed.
+
+## 2026-10-03 — TD-065 — Some figures are computed in two places
+
+- Found by: the owner, after TD-062 (a corrected deposit was refused because a second cash computation counted deposits and withdrawals only)
+- Where: `Account::reconstruct_holding_as_of` (repeats `replay_holding`, and still carries deposit and withdrawal branches for a cash line whose balance purchases, sales and dividends also move) beside `Account::cash_balance_as_of`; its callers in `use_cases/account_details/orchestrator.rs` and `use_cases/shared/valuation.rs`; `computeTotalMicro` in `src/lib/microUnits.ts` beside the core's totals (TD-054)
+- Severity: 🟡
+- Observation: where one figure has two computations, only one is exercised by the tests of the day, and the other drifts. Not audited: whether any caller asks the as-of reconstruction for the cash line, and which other figures (realized profit, average cost, performance flows) have a second computation.
+- User value: None directly — a figure reads the same wherever it is shown.
+- Done when: every figure the application shows is listed with where it is computed; one with two computations either loses one, or has a test proving both agree on the same ledger; a cash line never goes through the non-cash reconstruction.
