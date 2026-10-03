@@ -147,6 +147,12 @@ A canonical reference to a trading venue, independent of any market-data provide
 
 A way of recording a Purchase or Sell from the all-in broker total (fees included, account currency) instead of the unit price. The typed total is stored verbatim as the transaction's `total_amount` and the unit price is derived from it (TRX-060, SEL-050).
 
+### Trade
+
+> Status: confirmed
+
+A purchase or a sale of an asset. Cash is never traded: it moves by a Deposit or a Withdrawal.
+
 ### Transaction draft
 
 > Status: confirmed
