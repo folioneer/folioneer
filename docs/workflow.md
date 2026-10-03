@@ -11,6 +11,7 @@ on 2026-09-12; this document is the rule set, the git history records how it was
 | Human   | Validating a **design** before anything the user sees changes.                                   |
 | Human   | Cutting a **release**. Several merged branches may wait for one.                                 |
 | Agent   | `docs/techdebt.md`: every observation, smell and proposal. The human queues from it.             |
+| Agent   | `docs/flow.md`: what the workflow itself owes. The human queues from it.                         |
 | Agent   | The task, end to end: tests, code, review, merge. **No pull request is validated by a human.**   |
 | Agent   | Coding the right way: logic in Rust, dumb frontend, gold layouts, typed errors, stable ids.      |
 | Harness | Proving it, mechanically, on every pull request. Nothing merges that the harness has not passed. |
@@ -30,7 +31,7 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
   `none` (no proposal needed yet) or `validated`.
 - The agent writes to this file in four places only: it flips `Design` to
   `proposed (…)`, it adds open questions, and in the closure commit of the pull request
-  that merges an entry it removes the entry and its reference in Next. It never creates
+  that merges an entry it removes the entry, and its reference in Next. It never creates
   or reorders entries.
 
 ### `docs/techdebt.md` — agent-owned
@@ -40,6 +41,15 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
   proposals for new work, surviving mutants, coverage holes, frozen architecture debt.
 - Entries are observations, not commitments. The human promotes one by queuing its
   reference in Next.
+
+### `docs/flow.md` — agent-owned
+
+- What the workflow itself owes: observations about the harness, the checks, the waits
+  and the human's part, each with its figure, what is proposed (or the verdict to keep
+  things as they are), what it costs and what it protects. Reference `FLOW-NNN`.
+- It also holds the todo and tech-debt entries that are about how work moves; each keeps
+  the reference it was filed under.
+- The human promotes one by queuing its reference in Next, like any other.
 
 ## 3. The loop — one run, one entry
 
@@ -75,8 +85,9 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
    each Done when clause with the test that proves it, findings that changed
    something, techdebt filed, screenshots. The commit title is the changelog line.
 9. **Merge**: `just merge`, which refuses until every check on the pull request is green.
-10. **Closure** in the same PR: the entry removed from `docs/todo.md`, and its reference
-    from Next (a `TD-NNN` reference too); techdebt
+10. **Closure** in the same PR: the entry removed from the file it lives in
+    (`docs/todo.md`, `docs/techdebt.md` or `docs/flow.md`), and its reference from Next;
+    techdebt
     updated; `ARCHITECTURE.md` if a module appeared; the spec if a rule changed.
 11. **Next** entry, or stop (§ 8).
 

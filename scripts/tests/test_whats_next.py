@@ -204,6 +204,80 @@ class DebtThemes(unittest.TestCase):
         self.assertEqual(debt["TD-009"]["waits_on"], ["no Done when"])
 
 
+FLOW = """# Flow
+
+## FLOW-001 — A proposal the agent can run
+
+- Kind: quality
+- Proposal: gate on the exit code.
+
+## FLOW-002 — A verdict
+
+- Kind: speed
+- Verdict: **keep.**
+
+## FLOW-003 — A proposal that is the owner's to decide
+
+- Kind: human review
+- Proposal: two blocks.
+- Needs the owner: yes — it changes who is asked.
+
+## 2026-09-12 — TD-015 — A debt entry that is about the flow
+
+- Severity: 🔵
+- Done when: the specs select by id.
+
+## #049 — (tooling) — A todo entry that is about the flow
+
+**User value:** None.
+**Done when:** references are renamed.
+**Design:** none
+**Open questions:** none
+"""
+
+
+class FlowEntries(unittest.TestCase):
+    # The flow file's own entries: a proposal is work, a verdict is a record, and one
+    # that needs the owner waits on that decision.
+    def test_a_proposal_is_work_and_a_verdict_is_not(self):
+        flow = {entry["ref"]: entry for entry in whats_next.parse_flow(FLOW)}
+        self.assertEqual(sorted(flow), ["FLOW-001", "FLOW-003"])
+        self.assertEqual(flow["FLOW-001"]["waits_on"], [])
+        self.assertEqual(flow["FLOW-003"]["waits_on"], ["the owner's decision"])
+
+    # A proposal beside a verdict is still work; the owner's yes may be written in bold.
+    def test_a_proposal_beside_a_verdict_is_work(self):
+        text = (
+            "## FLOW-009 — Both\n\n- Verdict: keep, with one change.\n"
+            "- Proposal: the change.\n- Needs the owner: **Yes** — it is theirs.\n\n"
+            "## FLOW-010 — No decision needed\n\n- Proposal: x.\n- Needs the owner: no\n"
+        )
+        flow = {
+            entry["ref"]: entry["waits_on"] for entry in whats_next.parse_flow(text)
+        }
+        self.assertEqual(flow, {"FLOW-009": ["the owner's decision"], "FLOW-010": []})
+
+    # A queued reference to a verdict — nothing to run — reads as closed, to remove.
+    def test_a_queued_verdict_reads_as_closed(self):
+        lists = whats_next.classify(["FLOW-002"], whats_next.parse_flow(FLOW))
+        self.assertEqual(lists["queued"], [{"ref": "FLOW-002", "state": "closed"}])
+
+    # An entry moved to the flow file keeps its reference and its readiness rule.
+    def test_entries_moved_to_the_flow_file_keep_their_reference(self):
+        self.assertEqual(refs(whats_next.parse_debt(FLOW)), ["TD-015"])
+        self.assertEqual(refs(whats_next.parse_entries(FLOW)), ["#049"])
+
+    # A flow reference can be queued like any other.
+    def test_a_flow_reference_can_be_queued(self):
+        queue = whats_next.parse_queue("## Next\n\n1. FLOW-001\n2. TD-015\n")
+        self.assertEqual(queue, ["FLOW-001", "TD-015"])
+        entries = whats_next.parse_flow(FLOW) + whats_next.parse_debt(FLOW)
+        states = [
+            entry["state"] for entry in whats_next.classify(queue, entries)["queued"]
+        ]
+        self.assertEqual(states, ["ready", "ready"])
+
+
 class CiState(unittest.TestCase):
     # #052 — a pull request's checks read as one word; one failure outweighs the rest.
     def test_checks_reduce_to_one_word(self):

@@ -129,34 +129,6 @@ Remove an entry once it has been resolved.
 - User value: None — documentation and a debug-log nuisance.
 - Done when: every `Event` variant has a row in the table and in its owning contract's Events table, and the allowlist names every event the global store deliberately ignores.
 
-## 2026-09-12 — TD-015 — Three E2E specs select by text or duplicate a shared helper
-
-- Found by: reviewer-e2e (`.review/reviewer-e2e-2026-09-12-01.md`, pre-existing section)
-- Where: e2e/accounts/accounts.test.ts:23 (local `navigateToAccounts` next to the shared one in e2e/helpers/navigation.ts), e2e/asset_web_lookup/asset_web_lookup.test.ts:47 (`button[aria-label="Fill manually"]`), e2e/assets/assets.test.ts:79 and :102 (XPath on `normalize-space(text())`)
-- Severity: 🔵
-- Observation: Two specs locate elements by their English label or cell text rather than a stable id (E4), which ties them to the forced `en_US` locale and to copy that the i18n files own; one spec carries its own copy of a navigation helper the shared module already provides, so a change to the accounts route has two places to drift.
-- User value: None — suite robustness.
-- Done when: the three sites select by `id` (adding the ids on the frontend elements in the same commit) and the local helper is replaced by the shared import.
-
-## 2026-09-12 — TD-016 — A controlled-input value can be lost once in the E2E buy flow
-
-- Found by: manual (first pull-request E2E run, attempt 1)
-- Where: e2e/account_details/buy_sell.test.ts (TRX-010), e2e/helpers/react.ts (`setReactInputValue`), src/ui/components/field/CalcField.tsx
-- Severity: 🟡
-- Observation: TRX-010 failed with `submit still not enabled after 5000ms`; the failure screenshot shows the date and the unit price filled and the quantity field empty, so the value set by `setReactInputValue("buy-trx-quantity", "10")` between the two others did not stick. The same spec passed six times on `main` the same day and the field's own state sync guards against prop clobbering, so no deterministic path is known. With E2E as a required check, a once-in-N loss of a set value is a merge blocked for a reason unrelated to the change.
-- User value: None — suite reliability.
-- Done when: the loss is reproduced (or its trigger understood) and either the helper waits for the field to report the value back before returning, or the field's handling is changed so a dispatched `input` event can never be dropped; TRX-010 no longer needs a re-run to pass.
-
-## 2026-09-12 — TD-017 — Backend logic coverage sits at 89 % against the 90 % target
-
-- Found by: manual (`python3 scripts/coverage-gate.py --backend`; figures refreshed 2026-09-19)
-- Where: src-tauri/src/use_cases/update_checker/service.rs (0 %), src-tauri/src/use_cases/scheduled_fetch/headless.rs (5 %), src-tauri/src/use_cases/portfolio_sync/applier.rs (60 %), src-tauri/src/use_cases/asset_web_lookup/orchestrator.rs (62 %), src-tauri/src/context/sync/application/join.rs (74 %), src-tauri/src/use_cases/holding_transaction/orchestrator.rs (77 %), src-tauri/src/context/asset/service.rs (86 %), src-tauri/src/context/account/service.rs (87 %)
-- Severity: 🟡
-- Observation: 89.06 % of the 11,680 lines in domain, application, service and use-case code are covered; the gate's floor is 85.5 % and its target 90 %, about 110 more covered lines. Two files carry almost no test at all because they talk to the network or run the app headless; the other six are orchestration paths with untested branches. The floor in `coverage-gates.json` is a ratchet — raise it in the same change that lifts coverage, never lower it.
-- User value: None — a harness that catches logic regressions in these paths.
-- Mutation survivors: the 2026-09-14 sweep (issue #137) found 301 logic changes no test notices — `context/account/domain/account.rs` 52, `use_cases/shared/valuation.rs` 33, `context/sync/domain/resolution.rs` 24, `use_cases/global_performance/orchestrator.rs` 21; each names an assertion that is missing or too weak.
-- Done when: the backend floor in `coverage-gates.json` reads 90.0 and the gate passes on `main`.
-
 ## 2026-09-13 — TD-018 — 118 interactive components in feature code carry no id
 
 - Found by: manual (`python3 scripts/arch-check.py`, rule A6, first run)
@@ -165,36 +137,6 @@ Remove an entry once it has been resolved.
 - Observation: E1–E4 ask every interactive element for a stable id, and the E2E suite selects by id, yet 118 (119 at the first run) of the 317 `Button` / `IconButton` / `TextField` / `DateField` / `CalcField` / `FAB` tags rendered by feature code have none. The architecture check freezes today's count per file and refuses any growth; the count can only go down. The 18 sibling-feature imports the same check freezes belong to the FE gold layout migration entry above; the 8 `Math.` uses are display rounding and the documented split preview (SPL-061) and need no action.
 - User value: None — every control becomes addressable by tests and assistive tech.
 - Done when: `missing_ids` in arch-allowlist.json is empty.
-
-## 2026-09-13 — TD-019 — The assets spec's before-each hook can hit a stale element
-
-- Found by: manual (an E2E run, attempt 1, on a pull request that touched no app code)
-- Seen again: a `main` push run, attempt 1 (2026-09-15, after a change that touched no E2E or assets code) — same `before each` hook, same stale node handle on an `element` call; attempt 2 green.
-- Seen again: PR #18, a records-only pull request, attempt 1 (2026-09-27); attempt 2 green.
-- Where: e2e/assets/assets.test.ts (`beforeEach`), e2e/helpers/modal.ts (`dismissLeftoverModal`), e2e/helpers/navigation.ts (`navigateToAssets`)
-- Severity: 🟡
-- Observation: The hook failed with `stale element reference` while creating a node handle for an `element` call — an element located by one step had been replaced by a re-render before the next step used it. It is the second distinct once-only E2E failure in two days (TD-016 is the first); both sit in setup or navigation code shared by many specs, so each has many chances to fire per run. With E2E as a required check, every such failure costs a re-run before a green PR can merge.
-- User value: None — suite reliability.
-- Cause not found yet (2026-09-27): the F29 fix for TD-039 does not reach this hook — the assets spec's navigation and modal helpers depend on none of the hooks it changed. Next step: capture which element the `element` call was locating when it went stale (the failure screenshot and the hook's last command), then fix the component that replaces it.
-- Done when: the hook re-locates elements after each navigation step instead of reusing handles across renders, or the shared helpers wait for the route to settle before returning; a month of pull-request runs shows no before-each failure.
-
-## 2026-09-13 — TD-021 — The rust-cache pin is labelled with the wrong tag in three workflows
-
-- Found by: reviewer-infra (phase 12 review, `.review/reviewer-infra-2026-09-13-10.md`)
-- Where: `.github/workflows/quality.yml`, `e2e.yml`, `release.yml` (twice) — `Swatinem/rust-cache@e18b4977…` labelled v2.9.1, while that tag peels to `c1937114…`; `security-audit.yml` pins `taiki-e/install-action@f48d2f8b…` with no version label at all
-- Severity: 🔵
-- Observation: the commits are real upstream commits, so nothing is compromised, but a reader trusting the comment audits the wrong release notes. `mutants.yml` carries the correct pins, and the `install-action` labels were corrected to v2.79.6 since; the rust-cache label is what remains. Tag verified with `git ls-remote --tags` on 2026-09-13, file state on 2026-09-19.
-- User value: None — whoever audits a pinned action reads the release notes of the version actually running.
-- Done when: every pinned action in `.github/workflows/` carries the label of the tag its commit belongs to, or the pin moves to the commit of the labelled tag.
-
-## 2026-09-14 — TD-023 — E2E specs still locate controls by label, role or form attribute
-
-- Found by: manual (selector count while fixing dangling references in the E2E headers)
-- Where: `e2e/asset_web_lookup/asset_web_lookup.test.ts` (`button[aria-label="Add asset"]`, `"Back"`, `"Fill manually"`), `e2e/account_details/manual_price_fill.test.ts` and `e2e/account_details/auto_fetch.test.ts` (`[role="dialog"]`, `[role="status"]`, `body`), `e2e/open_balance/open_balance.test.ts` and `e2e/account_details/buy_sell.test.ts` (`button[type="submit"][form="…"]`)
-- Severity: 🔵
-- Observation: `docs/e2e-rules.md` asks every selector to be a stable `id`; these specs still find controls by an accessible label (which changes with the locale and the wording), by role, or by the form a submit button belongs to, because the elements carry no id of their own.
-- User value: None — E2E specs that survive a wording or locale change.
-- Done when: every selector in those five specs is an `id`, the controls they target carry one, and `reviewer-e2e` passes on them.
 
 ## 2026-09-14 — TD-025 — "Reference currency" names two different things in the vocabulary
 
@@ -259,15 +201,6 @@ Remove an entry once it has been resolved.
 - User value: None.
 - Done when: The vocabulary carries an Update section whose terms the owner has confirmed, and the spec, ADR, contract and code use them.
 
-## 2026-09-21 — TD-037 — The settings capture still carries a random folder path
-
-- Found by: the main agent (PR #8, a Markdown-only pull request, visual gate red)
-- Where: `e2e/sync/sync.test.ts:114` (`mkdtempSync(join(tmpdir(), "folioneer-sync-"))`), captured in `sync-settings-{light,dark}`
-- Severity: 🔵
-- Observation: the sync section renders the shared folder, whose `mkdtemp` suffix differs every run, so those pixels (columns 611–651, 0.106 % of the screen) always differ between two runs of the same commit. Below the workflow's 0.3 % threshold on its own, so nothing fails today; it was a third of the budget when the fading scrollbar took the rest and pushed the total to 0.327 %. It leaves the gate that much closer to a false regression on any screen that shares it.
-- User value: None — the merge gate's headroom.
-- Done when: `sync-settings` is byte-identical across two runs of the same commit; the E2E sync folder carries a fixed name (the suite runs one instance, `maxInstances: 1`) or the value is not rendered into the capture.
-
 ## 2026-09-23 — TD-038 — A build without an External provider refuses fetch commands with the runtime's own error
 
 - Found by: reviewer-security (#036)
@@ -277,16 +210,6 @@ Remove an entry once it has been resolved.
 - User value: None today.
 - Done when: a call to any of those commands in a build without an External provider answers a typed code the frontend presenter can map, through one shared guard rather than five hand-written checks — worth doing when a second optional capability (a bank feed, the advice module) makes the pattern repeat.
 
-## 2026-09-27 — TD-039 — The currency rates spec's rate edit can hit a stale element
-
-- Found by: the main agent (PR #18, a records-only pull request, E2E attempt 1 after a rebase; attempt 2 green)
-- Where: e2e/currency/currency_rates.test.ts (`FXR-052: editing a rate via the UI updates the rate row`)
-- Severity: 🟡
-- Observation: The test failed with `stale element reference` while creating a node handle for an `element` call — the same failure as TD-019, in a different spec. The Currency Rates view re-fetches its pairs and rates on `CurrencyRateUpdated`, so the row a step located can be re-rendered before the next step uses it. The same pull request hit TD-019 on its first run: two once-only failures on a change the suite cannot execute (see #041).
-- User value: None — suite reliability.
-- Cause fixed (2026-09-27): views no longer unmount their rows on an event-driven re-fetch (F29), and the currency rates drill-ins locate a row's cell with one selector instead of chaining from a row handle. The entry closes after a month of pull-request runs without this failure.
-- Done when: the test re-locates the row after the edit is saved, or waits for the view's re-fetch to settle; a month of pull-request runs shows no failure of it.
-
 ## 2026-09-27 — TD-041 — Clickable table rows have no interactive element of their own
 
 - Found by: the main agent (TD-039 review — nine E2E steps click `td:first-child` to open a row)
@@ -295,15 +218,6 @@ Remove an entry once it has been resolved.
 - Observation: The rows are opened by an `onClick` on the `<tr>`, made focusable with `tabIndex` and a key handler. WebDriver cannot click a `<tr>` (its centre hit-tests to a cell), so specs click the first cell and rely on the event bubbling — a click on the wrong cell, or a cell that stops propagation, breaks them. Assistive technology meets a row announced as a row, not as a control that opens something.
 - User value: Screen-reader and keyboard users meet a real link or button to open each row; the E2E suite clicks that control directly.
 - Done when: each clickable row holds one link or button (with an `id` and an accessible name) that opens it, the row stays clickable for the mouse, and no E2E spec clicks `td:first-child`.
-
-## 2026-09-27 — TD-043 — The reviewer agents run without a turn cap and load the whole CLAUDE.md
-
-- Found by: the main agent, comparing the agent files with the Claude Code sub-agent documentation
-- Where: `.claude/agents/reviewer-*.md` (frontmatter), `.github/workflows/review.yml`
-- Severity: 🔵
-- Observation: The sub-agent format now offers `maxTurns` (stop a runaway review), `effort` (per agent) and `omitClaudeMd` (skip the project `CLAUDE.md` when the prompt is self-contained). None is set: every CI review loads `CLAUDE.md` seven times per pull request, and nothing bounds a review that loops.
-- User value: None directly — cheaper, bounded reviews on every pull request.
-- Done when: one reviewer runs with `omitClaudeMd: true` and a `maxTurns` cap on a sample diff and reports the same findings as without; if it does, the settings extend to every reviewer, with the review time and cost before and after recorded.
 
 ## 2026-09-28 — TD-046 — Feature `account_details` still makes 10 business decision(s) in the interface
 
@@ -377,15 +291,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — the contract describes what the interface receives.
 - Done when: the contract's performance types match `src-tauri/src/use_cases/shared/performance.rs` and `get_global_performance` has its row, checked by contract-reviewer.
 
-## 2026-10-03 — TD-060 — The account-performance capture changes with the month
-
-- Found by: main agent — the first pull request of October failed the visual comparison without touching the interface
-- Where: `e2e/` (the `account-performance` capture), the visual comparison in `.github/workflows/e2e.yml`
-- Severity: 🟡
-- Observation: the screen charts the current year and lists its months up to today, so its capture differs from `main`'s as soon as the month changes (0.78 % of pixels against a 0.3 % threshold). Until a run on `main` renews the reference, every pull request that touches no interface file fails; the run had to be started by hand.
-- User value: None directly — the first pull request of a month merges like any other.
-- Done when: the capture does not depend on the day it is taken (data and "today" fixed for the run, or the dated parts masked), shown by a comparison that passes across a month change.
-
 ## 2026-10-03 — TD-063 — The spec lets a correction change the asset; the code does not
 
 - Found by: spec-reviewer and contract-reviewer on TD-056
@@ -394,15 +299,6 @@ Remove an entry once it has been resolved.
 - Observation: TRX-032 says changing a transaction's asset or account is permitted and recalculates both holdings. A correction carries neither: it keeps the asset and the account of its transaction. CSH-062 states what the code does.
 - User value: None directly — the spec says what a correction can change.
 - Done when: TRX-032 lists the fields a correction changes, and no rule mentions moving a transaction to another asset or account.
-
-## 2026-10-03 — TD-064 — 244 changes in the logic code that no test notices, outside the account
-
-- Found by: the mutation sweep of 2026-10-01 (issue 65); the 50 of `account.rs` were sorted on 2026-10-03
-- Where: `context/sync/domain/resolution.rs` (24), `use_cases/account_details/orchestrator.rs` (13), `context/sync/application/` (`run.rs` 8, `intake.rs` 7, `join.rs` 5, `first_publish.rs` 4), `use_cases/asset_price_fetch/` (`dispatcher.rs` 6, `movement_capture.rs` 4), `context/account/service.rs` (5), and the files with fewer — the full list is in the sweep's artifacts
-- Severity: 🟡
-- Observation: sorting `account.rs` found one real bug (a corrected deposit refused), tests that only ever used one asset per account, a synced removal no test checked, unreachable code and three comparisons that changed nothing. The other files are not sorted, and the local machine cannot run the sweep (five minutes a mutant under load): CI's sweep is the proof.
-- User value: None directly — a wrong merge of two devices' changes, or a wrong figure in an account's history, would be caught by a test.
-- Done when: a sweep started on `main` reports no missed mutant in `account.rs`; each remaining missed mutant is sorted, file by file, into a test added, dead code deleted, or code simplified so the change no longer exists; issue 65 is closed.
 
 ## 2026-10-03 — TD-065 — Some figures are computed in two places
 

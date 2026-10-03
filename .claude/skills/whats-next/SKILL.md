@@ -41,6 +41,9 @@ One JSON document:
 - `blocked` — todo entries not queued, each with `waits_on`: the unticked open
   questions, a design to validate, or a missing Done when.
 - `techdebt_not_queued` — tech-debt entries not queued, grouped by theme (`refs`).
+- `flow_not_queued` — the entries of `docs/flow.md` not queued: its own proposals
+  (`FLOW-NNN`; `waits_on` the owner's decision for some) and the todo and tech-debt
+  entries that are about the flow.
 - `pull_requests` — open pull requests with `ci`: `green`, `running`, `failing`, `none`.
 - `in_flight` — uncommitted files, unmerged local branches, recent commits.
 - `roadmap`, `gh_issues` — the roadmap's headings and the open GitHub issues.
@@ -91,6 +94,9 @@ Print the output below, then save it to the path given by
 
 ### Tech debt, not queued
 - {theme, in plain words} — {refs} — {severity}
+
+### Flow, not queued
+- {ref} — {title} — {ready | waits on the owner's decision}
 
 ### GitHub issues
 - gh#{n} — {title}

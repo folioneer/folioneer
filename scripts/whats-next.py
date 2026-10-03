@@ -3,7 +3,7 @@
 
 Emits one JSON document on stdout: the owner's queue (`docs/todo.md` § Next) with the
 state of each reference, the entries ready to queue, the entries blocked with what
-each waits on, the tech debt grouped by theme, the open pull requests with their CI
+each waits on, the tech debt grouped by theme, the flow entries, the open pull requests with their CI
 state, the local git state, the roadmap and the open GitHub issues.
 
 Usage:
@@ -73,7 +73,8 @@ ENTRY_HEADING = re.compile(r"^##\s+#(?P<number>\d+)\s+—\s+(?P<title>.+?)\s*$")
 DEBT_HEADING = re.compile(
     r"^##\s+(?P<date>\d{4}-\d{2}-\d{2})\s+—\s+(?P<ref>TD-\d+)\s+—\s+(?P<title>.+?)\s*$"
 )
-QUEUE_LINE = re.compile(r"^\s*\d+\.\s+(?P<ref>#\d+|TD-\d+)\b")
+FLOW_HEADING = re.compile(r"^##\s+(?P<ref>FLOW-\d+)\s+—\s+(?P<title>.+?)\s*$")
+QUEUE_LINE = re.compile(r"^\s*\d+\.\s+(?P<ref>#\d+|TD-\d+|FLOW-\d+)\b")
 
 
 def _sections(text: str) -> list[tuple[str, list[str]]]:
@@ -211,6 +212,33 @@ def parse_debt(debt_text: str) -> list[dict]:
     return entries
 
 
+def parse_flow(flow_text: str) -> list[dict]:
+    """Every `## FLOW-NNN — …` entry of the flow file that proposes a change. An entry
+    with a verdict and no proposal is a record, not work: it is left out, and a queued
+    reference to it reads as closed. An entry carrying both is work. One whose
+    `Needs the owner:` line starts with yes waits on that decision."""
+    entries: list[dict] = []
+    for heading, body in _sections(flow_text):
+        match = FLOW_HEADING.match(heading)
+        if not match or _debt_field(body, "Proposal") is None:
+            continue
+        needs_owner = (
+            (_debt_field(body, "Needs the owner") or "")
+            .strip("* ")
+            .lower()
+            .startswith("yes")
+        )
+        entries.append(
+            {
+                "ref": match.group("ref"),
+                "title": match.group("title"),
+                "kind": _debt_field(body, "Kind"),
+                "waits_on": ["the owner's decision"] if needs_owner else [],
+            }
+        )
+    return entries
+
+
 def group_debt(entries: list[dict]) -> list[dict]:
     """Tech-debt entries grouped by theme, in the order themes first appear."""
     themes: dict[str, list[dict]] = {}
@@ -313,18 +341,24 @@ def collect_pull_requests() -> list[dict]:
 
 
 def collect_work() -> dict:
-    """The queue, the todo entries and the tech debt, classified."""
+    """The queue, the todo entries, the tech debt and the flow entries, classified.
+
+    `docs/flow.md` holds its own `FLOW-NNN` entries and the todo and tech-debt entries
+    that are about the flow; the latter keep their reference and are read as what they
+    are."""
     todo_text = _read(ROOT / "docs" / "todo.md") or ""
+    flow_text = _read(ROOT / "docs" / "flow.md") or ""
     debt = parse_debt(_read(ROOT / "docs" / "techdebt.md") or "")
-    lists = classify(parse_queue(todo_text), parse_entries(todo_text) + debt)
+    flow = parse_flow(flow_text) + parse_entries(flow_text) + parse_debt(flow_text)
+    lists = classify(parse_queue(todo_text), parse_entries(todo_text) + debt + flow)
     queued = {entry["ref"] for entry in lists["queued"]}
+    in_todo = {entry["ref"] for entry in parse_entries(todo_text)}
     for name in ("ready", "blocked"):
-        lists[name] = [
-            entry for entry in lists[name] if not entry["ref"].startswith("TD-")
-        ]
+        lists[name] = [entry for entry in lists[name] if entry["ref"] in in_todo]
     lists["techdebt_not_queued"] = group_debt(
         [entry for entry in debt if entry["ref"] not in queued]
     )
+    lists["flow_not_queued"] = [entry for entry in flow if entry["ref"] not in queued]
     return lists
 
 

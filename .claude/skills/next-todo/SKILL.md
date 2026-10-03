@@ -16,7 +16,9 @@ rules are `docs/workflow.md`; this file is the checklist.
 - With an argument (`/next-todo #NNN` or `/next-todo TD-NNN`): that entry, and the
   human is in the chat — **chat mode**. Without one: read `docs/todo.md` § Next and
   take references in order — **headless mode**, nobody to ask. Load the entry
-  (`## #NNN` in `docs/todo.md`, or `## … — TD-NNN — …` in `docs/techdebt.md`).
+  (`## #NNN` in `docs/todo.md`, `## … — TD-NNN — …` in `docs/techdebt.md`, or
+  `## FLOW-NNN — …` in `docs/flow.md`, which also holds the `#NNN` and `TD-NNN` entries
+  that are about the flow).
 - **Ready** = has a `**Done when:**`, `**Open questions:** none` (or every box ticked
   with its answer written after it), and `**Design:**` is `none` or `validated`.
   Headless: skip entries that are not ready; if none is ready, print which questions
@@ -107,7 +109,7 @@ repos/{owner}/{repo}/issues/<n>/comments`), grade every finding with
 ## Step 9 — Closure
 
 On the same branch before the merge, or as a follow-up docs PR if forgotten: the
-entry is removed from `docs/todo.md`, and its reference from § Next; techdebt entries the work resolved are removed; `ARCHITECTURE.md` if a
+entry is removed from the file it lives in (`docs/todo.md`, `docs/techdebt.md` or `docs/flow.md`), and its reference from § Next; techdebt entries the work resolved are removed; `ARCHITECTURE.md` if a
 module appeared; design proposal images deleted. Then the closing brief (CLAUDE.md §
 Opening and closing a piece of work): what changed for the user, what the project
 accumulated; the PR number and where anything still owed was filed.

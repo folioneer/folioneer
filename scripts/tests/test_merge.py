@@ -7,7 +7,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SPEC = importlib.util.spec_from_file_location("merge", Path(__file__).resolve().parents[1] / "merge.py")
+SPEC = importlib.util.spec_from_file_location(
+    "merge", Path(__file__).resolve().parents[1] / "merge.py"
+)
 merge = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(merge)
 
@@ -62,7 +64,9 @@ class FoldingFixups(unittest.TestCase):
         self.run_git("checkout", "--quiet", "-b", "work")
 
     def run_git(self, *args):
-        return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout.strip()
+        return subprocess.run(
+            ["git", *args], capture_output=True, text=True, check=True
+        ).stdout.strip()
 
     def commit(self, title, files):
         for name, content in files.items():
@@ -78,15 +82,23 @@ class FoldingFixups(unittest.TestCase):
 
     def test_a_fixup_is_folded_into_the_commit_it_names_and_the_tree_is_unchanged(self):
         self.commit("feat: show the total", {"total.txt": "total\n"})
-        tested = self.commit("fixup! feat: show the total", {"total.txt": "total, fixed\n"})
+        tested = self.commit(
+            "fixup! feat: show the total", {"total.txt": "total, fixed\n"}
+        )
 
         result = merge.rebase_folding_fixups("main")
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.titles(), ["feat: show the total"])
-        self.assertEqual(Path("total.txt").read_text(encoding="utf-8"), "total, fixed\n")
+        self.assertEqual(
+            Path("total.txt").read_text(encoding="utf-8"), "total, fixed\n"
+        )
         self.assertEqual(merge._fold_commits("main", "work"), [])
-        self.assertTrue(merge._rebase_left_the_checks_standing(tested, self.run_git("rev-parse", "HEAD")))
+        self.assertTrue(
+            merge._rebase_left_the_checks_standing(
+                tested, self.run_git("rev-parse", "HEAD")
+            )
+        )
 
     def test_a_fixup_is_folded_when_the_target_moved_too(self):
         self.commit("feat: show the total", {"total.txt": "total\n"})
@@ -117,7 +129,9 @@ class FoldingFixups(unittest.TestCase):
 
     def test_a_branch_whose_fixups_were_folded_is_not_refused(self):
         self.commit("feat: show the total", {"total.txt": "total\n"})
-        before = self.commit("fixup! feat: show the total", {"total.txt": "total, fixed\n"})
+        before = self.commit(
+            "fixup! feat: show the total", {"total.txt": "total, fixed\n"}
+        )
         merge.rebase_folding_fixups("main")
 
         merge.refuse_unfolded_fixups("main", "work", before)
@@ -142,7 +156,14 @@ class FoldingFixups(unittest.TestCase):
 
     def test_the_checks_stand_for_record_files_and_fall_for_anything_else(self):
         tested = self.commit("feat: show the total", {"total.txt": "total\n"})
-        records = self.commit("docs: close the entry", {"docs/todo.md": "closed\n", "docs/plan/a-plan.md": "x\n"})
+        records = self.commit(
+            "docs: close the entry",
+            {
+                "docs/todo.md": "closed\n",
+                "docs/flow.md": "closed\n",
+                "docs/plan/a-plan.md": "x\n",
+            },
+        )
         code = self.commit("fix: the total", {"total.txt": "other\n"})
 
         self.assertTrue(merge._rebase_left_the_checks_standing(tested, tested))
