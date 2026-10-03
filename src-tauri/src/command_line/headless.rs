@@ -8,7 +8,7 @@ use crate::shared::infrastructure::app_directories;
 use crate::shared::infrastructure::container::AppContainer;
 use crate::shared::infrastructure::window_lock::WindowLock;
 
-use super::args::{parse, Command, Invocation, Listed};
+use super::args::{parse, Command, Invocation, Listed, Writing};
 use super::help::help;
 use super::orchestrator::{CommandRunner, Refusal};
 use super::output::{refused, render, Printed, RECORDED, WRONG_USAGE};
@@ -57,9 +57,9 @@ pub(crate) async fn run_in(data_dir: &Path, command: Command, json: bool) -> Pri
             json,
         );
     }
-    let command = match command {
+    let writing = match command {
         Command::List(listed) => return list_in(data_dir, listed, json).await,
-        writing => writing,
+        Command::Write(writing) => writing,
     };
     // CLI-030 — held until the command has written, so a window cannot start meanwhile and
     // two commands never write at once.
@@ -94,10 +94,9 @@ pub(crate) async fn run_in(data_dir: &Path, command: Command, json: bool) -> Pri
         .date_naive()
         .format("%Y-%m-%d")
         .to_string();
-    let outcome = match command {
-        Command::Record(recording) => runner.run(recording, &today).await,
-        Command::AddAsset(named) => runner.add_asset(named).await,
-        Command::List(listed) => runner.list(listed).await,
+    let outcome = match writing {
+        Writing::Record(recording) => runner.run(recording, &today).await,
+        Writing::AddAsset(named) => runner.add_asset(named).await,
     };
     render(&outcome, json)
 }

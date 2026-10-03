@@ -6,9 +6,7 @@ use std::sync::Arc;
 use serde::Serialize;
 
 use crate::context::account::{AccountError, AccountServiceContract, Transaction, TransactionType};
-use crate::context::asset::{
-    AddNamedAssetError, Asset, AssetClass, AssetServiceContract, NamedAsset,
-};
+use crate::context::asset::{Asset, AssetClass, AssetError, AssetServiceContract, NamedAsset};
 use crate::core::BACKEND;
 use crate::use_cases::holding_transaction::{
     HoldingTransactionUseCase, NameLookupError, OpenHoldingError, OpenHoldingTask,
@@ -108,20 +106,16 @@ impl CommandRunner {
 
     /// CLI-026 — adds an asset through the core, which decides what the command left out.
     pub async fn add_asset(&self, named: NamedAsset) -> Outcome {
-        let category = named.category_name.clone();
         match self.asset_service.add_named_asset(named).await {
             Ok(added) => Outcome::AssetAdded {
                 asset: row_of(added.asset),
                 reference_shared: added.reference_shared,
             },
-            Err(AddNamedAssetError::CategoryNameNotFound) => Outcome::Refused(Refusal {
+            Err(AssetError::CategoryNameNotFound { name }) => Outcome::Refused(Refusal {
                 code: "CategoryNotFound".to_string(),
-                message: format!(
-                    "no category named \"{}\"",
-                    category.unwrap_or_default().escape_debug()
-                ),
+                message: format!("no category named \"{}\"", name.escape_debug()),
             }),
-            Err(AddNamedAssetError::Asset(error)) => {
+            Err(error) => {
                 let code = code_of(&error);
                 Outcome::Refused(Refusal {
                     message: format!("refused by the rules ({code})"),

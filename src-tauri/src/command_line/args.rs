@@ -64,15 +64,22 @@ pub enum Listed {
     Assets { archived: bool },
 }
 
+/// A command that writes: refused while the window is open (CLI-030).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Writing {
+    /// Record a transaction.
+    Record(Recording),
+    /// Add an asset (CLI-026).
+    AddAsset(NamedAsset),
+}
+
 /// A command the user asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
-    /// Record a transaction; refused while the window is open (CLI-030).
-    Record(Recording),
+    /// Record a transaction or add an asset.
+    Write(Writing),
     /// List accounts or assets; reads only.
     List(Listed),
-    /// Add an asset (CLI-026); refused while the window is open.
-    AddAsset(NamedAsset),
 }
 
 /// What the command line asks for.
@@ -209,7 +216,7 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
     }
     if command == "asset add" {
         return Ok(Invocation::Run {
-            command: Command::AddAsset(NamedAsset {
+            command: Command::Write(Writing::AddAsset(NamedAsset {
                 name: options.text("--name")?,
                 reference: options.text("--reference")?,
                 class: options.class()?,
@@ -218,7 +225,7 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
                 exchange_code: options.get("--exchange").map(str::to_string),
                 risk_level: options.risk()?,
                 category_name: options.get("--category").map(str::to_string),
-            }),
+            })),
             json,
         });
     }
@@ -254,7 +261,7 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
         }
     };
     Ok(Invocation::Run {
-        command: Command::Record(command),
+        command: Command::Write(Writing::Record(command)),
         json,
     })
 }
@@ -401,7 +408,7 @@ mod tests {
     fn run(line: &str) -> Recording {
         match parse(&args(line)).expect("valid") {
             Invocation::Run {
-                command: Command::Record(recording),
+                command: Command::Write(Writing::Record(recording)),
                 ..
             } => recording,
             other => panic!("not a recording: {other:?}"),
@@ -492,7 +499,7 @@ mod tests {
         assert_eq!(
             read("asset add --name ASML --reference asml --class stocks --currency EUR --json"),
             Ok(Invocation::Run {
-                command: Command::AddAsset(NamedAsset {
+                command: Command::Write(Writing::AddAsset(NamedAsset {
                     name: "ASML".to_string(),
                     reference: "asml".to_string(),
                     class: AssetClass::Stocks,
@@ -501,12 +508,12 @@ mod tests {
                     exchange_code: None,
                     risk_level: None,
                     category_name: None,
-                }),
+                })),
                 json: true,
             })
         );
         let Ok(Invocation::Run {
-            command: Command::AddAsset(full),
+            command: Command::Write(Writing::AddAsset(full)),
             ..
         }) = read(
             "asset add --name A --reference B --class ETF --currency USD --isin US0378331005 --exchange xnas --risk 3 --category Tech",

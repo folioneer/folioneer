@@ -4,7 +4,7 @@ use super::domain::{
 };
 use super::error::AssetError;
 use crate::{
-    context::asset::{CreateAssetDTO, UpdateAssetDTO},
+    context::asset::{AddedAsset, CreateAssetDTO, NamedAsset, UpdateAssetDTO},
     core::{Event, SideEffectEventBus, BACKEND},
     shared::domain::{Rank, RecordKind, SyncedRecord},
 };
@@ -14,50 +14,6 @@ use sqlx::SqliteConnection;
 use std::collections::HashSet;
 use std::result::Result as StdResult;
 use std::sync::Arc;
-
-/// An asset described the way a person names things (CLI-026): its category by name, its
-/// exchange by code, and whatever is left out decided here.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamedAsset {
-    /// Display name.
-    pub name: String,
-    /// Ticker or reference.
-    pub reference: String,
-    /// Classification.
-    pub class: AssetClass,
-    /// ISO currency code.
-    pub currency: String,
-    /// ISIN, when it has one.
-    pub isin: Option<String>,
-    /// MIC code of its exchange, when it has one.
-    pub exchange_code: Option<String>,
-    /// Risk level; the class's default when left out.
-    pub risk_level: Option<u8>,
-    /// Category name; the system category when left out.
-    pub category_name: Option<String>,
-}
-
-/// An asset added by name, and what the user should know about it (CLI-026).
-#[derive(Debug, Clone)]
-pub struct AddedAsset {
-    /// The asset as created.
-    pub asset: Asset,
-    /// Another asset, archived or not, has the same reference (AST-009): allowed — the
-    /// same ticker trades on several markets — and worth saying.
-    pub reference_shared: bool,
-}
-
-/// Why an asset described by name was not added (CLI-026): a category named that does
-/// not exist, or the rejection creating any asset makes.
-#[derive(Debug, thiserror::Error)]
-pub enum AddNamedAssetError {
-    /// No category has this name.
-    #[error("No category has this name")]
-    CategoryNameNotFound,
-    /// The rejection `create_asset` makes.
-    #[error(transparent)]
-    Asset(#[from] AssetError),
-}
 
 /// Orchestrates business logic for assets, categories, and market prices.
 pub struct AssetService {
@@ -250,10 +206,7 @@ impl AssetService {
     /// reported, as the form warns (AST-009). The risk level left out is the class's
     /// default, the category left out the system one; a category is found by its name, an
     /// exchange by its code (AST-001).
-    pub async fn add_named_asset(
-        &self,
-        named: NamedAsset,
-    ) -> StdResult<AddedAsset, AddNamedAssetError> {
+    pub async fn add_named_asset(&self, named: NamedAsset) -> StdResult<AddedAsset, AssetError> {
         let reference = named.reference.trim().to_lowercase();
         let reference_shared = self
             .get_all_assets_with_archived()
@@ -270,7 +223,9 @@ impl AssetService {
                     tracing::error!(target: BACKEND, err = ?e, "add_named_asset: category lookup failure");
                     AssetError::DatabaseError
                 })?
-                .ok_or(AddNamedAssetError::CategoryNameNotFound)?
+                .ok_or_else(|| AssetError::CategoryNameNotFound {
+                    name: category_name.trim().to_string(),
+                })?
                 .id,
         };
         let exchange = match named.exchange_code {
@@ -899,8 +854,7 @@ pub trait AssetServiceContract: Send + Sync {
         include_archived: bool,
     ) -> StdResult<Vec<Asset>, AssetError>;
     /// Adds an asset described by name, its defaults decided here (CLI-026).
-    async fn add_named_asset(&self, named: NamedAsset)
-        -> StdResult<AddedAsset, AddNamedAssetError>;
+    async fn add_named_asset(&self, named: NamedAsset) -> StdResult<AddedAsset, AssetError>;
     /// Retrieves a single asset by ID.
     async fn get_asset_by_id(&self, asset_id: &str) -> StdResult<Option<Asset>, AssetError>;
     /// Idempotently seeds the system Cash Asset for `currency` (CSH-010, CSH-011, CSH-017).
@@ -940,10 +894,7 @@ impl AssetServiceContract for AssetService {
         AssetService::get_non_cash_assets_by_name(self, include_archived).await
     }
 
-    async fn add_named_asset(
-        &self,
-        named: NamedAsset,
-    ) -> StdResult<AddedAsset, AddNamedAssetError> {
+    async fn add_named_asset(&self, named: NamedAsset) -> StdResult<AddedAsset, AssetError> {
         AssetService::add_named_asset(self, named).await
     }
 
@@ -1398,7 +1349,7 @@ mod tests {
             .unwrap_err();
         assert!(matches!(
             unknown_category,
-            AddNamedAssetError::CategoryNameNotFound
+            AssetError::CategoryNameNotFound { name } if name == "Tech"
         ));
 
         let unknown_exchange = svc_with(None)
@@ -1410,7 +1361,7 @@ mod tests {
             .unwrap_err();
         assert!(matches!(
             unknown_exchange,
-            AddNamedAssetError::Asset(AssetError::InvalidExchange { exchange_code }) if exchange_code == "NOPE"
+            AssetError::InvalidExchange { exchange_code } if exchange_code == "NOPE"
         ));
     }
 

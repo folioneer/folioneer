@@ -92,6 +92,13 @@ pub enum AssetError {
         /// The ID the caller asked for.
         id: String,
     },
+    /// No category has the name typed (CLI-026). Born at the service layer when
+    /// `category_repo.find_by_name` returns `None`.
+    #[error("No category named: {name}")]
+    CategoryNameNotFound {
+        /// The name the caller typed.
+        name: String,
+    },
     /// A category with the same name (case-insensitive) already exists. Born at
     /// the service layer from a `find_by_name` uniqueness pre-check.
     #[error("A category with this name already exists")]
@@ -199,6 +206,13 @@ mod tests {
         assert_eq!(
             to_value(AssetError::CategoryNotFound { id: "cat-1".into() }).unwrap(),
             json!({ "code": "CategoryNotFound", "id": "cat-1" })
+        );
+        assert_eq!(
+            to_value(AssetError::CategoryNameNotFound {
+                name: "Tech".into()
+            })
+            .unwrap(),
+            json!({ "code": "CategoryNameNotFound", "name": "Tech" })
         );
         assert_eq!(
             to_value(AssetError::DuplicateName).unwrap(),
