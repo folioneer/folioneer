@@ -83,17 +83,6 @@ request. The time went to waiting on CI and to rounds that tested nothing new.
   by hand on a branch with no pull request. A suspicion about CI costs one such run to
   test; say so in `docs/workflow.md`.
 
-## FLOW-005 — The queue goes stale while a batch runs
-
-- Kind: quality (of the record)
-- Observed: the agent may not edit § Next, so after twelve merges the queue still listed
-  twelve closed references; the owner asked for the cleaning by hand.
-- Proposal: closing an entry removes its reference from § Next in the same commit —
-  the one edit of the queue the agent is allowed. Order and additions stay the owner's.
-- Costs: one sentence in `docs/workflow.md` and the `/next-todo` skill. Protects: a
-  queue that says what is left.
-- Needs the owner: yes — it changes who may touch the queue.
-
 ## FLOW-006 — An entry whose Done-when is an audit cannot close
 
 - Kind: speed
@@ -127,25 +116,6 @@ request. The time went to waiting on CI and to rounds that tested nothing new.
   the one that cannot be skipped. One change: the architecture lane is launched locally
   with the backend or frontend lane every time, as CLAUDE.md already says — the skip
   cost a round.
-
-## FLOW-009 — The owner was asked in pieces
-
-- Kind: human review
-- Observed: the batch needed the owner on at least six occasions — the order and three questions at
-  the start, a vocabulary term, the list format, two forms questions, two designs
-  (#057, #010) — each asked when its entry came up, some hours apart.
-- Proposal: one block at the start of a batch and one at its end.
-  - **Opening block** — the open questions of every queued entry, and the mock-ups of
-    every queued entry that changes what the user sees, produced first, in one pull
-    request. For each: what to look at, what a yes means, what is assumed if nothing is
-    said.
-  - **Closing block**, in the release brief — the vocabulary terms added or widened, the
-    reviewer findings declined and why, the debt filed, and the screenshots of what
-    shipped. Nothing here blocks the release; it is what the owner reads to disagree.
-- Costs: the mock-ups are drawn before the code they depend on is read, so some will be
-  redrawn (#010's published column changed once the model was read). Protects: the
-  owner's attention — two sittings instead of six.
-- Needs the owner: yes.
 
 ## FLOW-010 — The local machine cannot carry a mutation sweep
 

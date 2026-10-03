@@ -15,7 +15,8 @@
 ## Next
 
 <!-- The human's queue: references (#NNN or TD-NNN) in the order to work them. The agent -->
-<!-- takes the first ready one, never edits this list, and stops when it is empty. -->
+<!-- takes the first ready one, removes a reference when it closes the entry (order and -->
+<!-- additions are the human's), and stops when the queue is empty. -->
 
 1. TD-065
 

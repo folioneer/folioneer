@@ -107,7 +107,7 @@ repos/{owner}/{repo}/issues/<n>/comments`), grade every finding with
 ## Step 9 — Closure
 
 On the same branch before the merge, or as a follow-up docs PR if forgotten: the
-entry is removed from `docs/todo.md`; techdebt entries the work resolved are removed; `ARCHITECTURE.md` if a
+entry is removed from `docs/todo.md`, and its reference from § Next; techdebt entries the work resolved are removed; `ARCHITECTURE.md` if a
 module appeared; design proposal images deleted. Then the closing brief (CLAUDE.md §
 Opening and closing a piece of work): what changed for the user, what the project
 accumulated; the PR number and where anything still owed was filed.
@@ -116,6 +116,6 @@ accumulated; the PR number and where anything still owed was filed.
 
 1. Never ask the human. Questions are lines in the entry.
 2. Never lower a floor, never raise an allowlist, never bypass a hook, never
-   force-push, never touch the live database, never cut a release, never edit Next.
+   force-push, never touch the live database, never cut a release, never add to or reorder Next.
 3. One entry per invocation. Stop after Step 9.
 4. Three hours wall-clock per entry; over that, open question and stop.

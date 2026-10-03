@@ -22,14 +22,16 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
 ### `docs/todo.md` — human-owned
 
 - `## Next` at the top holds the queue: `#NNN` and `TD-NNN` references in the order to
-  work them. The agent takes the first **ready** one and never edits the list.
+  work them. The agent takes the first **ready** one. Order and additions are the
+  human's; the agent only removes a reference, when it closes the entry.
 - Every entry ends with `**User value:**`, `**Done when:**`, `**Design:**` and
   `**Open questions:**`.
 - **Ready** means: queued, has a Done when, `Open questions: none`, and `Design` is
   `none` (no proposal needed yet) or `validated`.
-- The agent writes to this file in three places only: it flips `Design` to
-  `proposed (…)`, it adds open questions, and it removes an entry in the closure commit
-  of the pull request that merges it. It never creates or reorders entries.
+- The agent writes to this file in four places only: it flips `Design` to
+  `proposed (…)`, it adds open questions, and in the closure commit of the pull request
+  that merges an entry it removes the entry and its reference in Next. It never creates
+  or reorders entries.
 
 ### `docs/techdebt.md` — agent-owned
 
@@ -73,9 +75,25 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
    each Done when clause with the test that proves it, findings that changed
    something, techdebt filed, screenshots. The commit title is the changelog line.
 9. **Merge**: `just merge`, which refuses until every check on the pull request is green.
-10. **Closure** in the same PR: the entry removed from `docs/todo.md`; techdebt
+10. **Closure** in the same PR: the entry removed from `docs/todo.md`, and its reference
+    from Next (a `TD-NNN` reference too); techdebt
     updated; `ARCHITECTURE.md` if a module appeared; the spec if a rule changed.
 11. **Next** entry, or stop (§ 8).
+
+**A batch in chat** — when the human says go to several queued entries, the human is
+asked twice, not once per entry:
+
+- **Opening block**, before the first entry starts: the open questions of every queued
+  entry, and the mock-ups (§ 4) of every queued entry that changes what the user sees,
+  in one docs pull request. For each: what to look at, what a yes means, and what is
+  assumed if nothing is said. A mock-up drawn this early may be redrawn once the code is
+  read; the change is said in the entry's pull request.
+- **Closing block**, in the release brief: the vocabulary terms added or widened, the
+  reviewer findings declined and why, the debt filed, and the screenshots of what
+  shipped. It blocks nothing; it is what the human reads to disagree.
+
+A question that only appears mid-batch is written on its entry, the entry is skipped,
+and the question joins the closing block — unless nothing else in the queue can run.
 
 **Release** — the human runs `just release -y` when they choose. It re-runs the full
 harness on `main`, computes the version from the merged titles, writes the changelog,
