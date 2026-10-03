@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-10-03
+
+### Added
+
+- sync has its own page, with its health and grouped actions
+- a transaction form says why it cannot be saved
+- add an asset from the command line
+- list accounts and assets from the command line
+- the command line's help is easy to read
+
+### Fixed
+
+- a deposit or withdrawal can be corrected after cash was withdrawn
+- the core refuses a purchase or a sale of cash
+
 ## [0.4.0] - 2026-09-29
 
 ### Added
