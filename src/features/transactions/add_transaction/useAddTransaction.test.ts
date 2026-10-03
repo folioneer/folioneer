@@ -100,6 +100,24 @@ describe("useAddTransaction", () => {
     expect(result.current.isFormValid).toBe(true);
   });
 
+  // TRX-067 — an account not chosen yet is a hint; chosen then cleared, it is the account
+  // field's error — saving is never disabled without a visible reason.
+  it("says to select the account, and shows it on the field once it was chosen and cleared", async () => {
+    const { result } = renderHook(() => useAddTransaction({}));
+    await act(async () => {});
+    expect(result.current.problemHint).toEqual({ key: "transaction.hint_select_account" });
+    expect(result.current.fieldErrors).toEqual({});
+
+    await act(async () => result.current.handleChange("accountId", "account-1"));
+    await act(async () => result.current.handleChange("accountId", ""));
+
+    expect(result.current.problemHint).toBeNull();
+    expect(result.current.fieldErrors.account).toEqual({
+      key: "transaction.error_validation_account",
+    });
+    expect(result.current.isFormValid).toBe(false);
+  });
+
   // TRX-029 — archived asset triggers confirmation dialog on submit
   it("sets showArchivedConfirm when submitting with an archived asset", async () => {
     const { result } = renderHook(() => useAddTransaction({ prefillAccountId: "account-1" }));

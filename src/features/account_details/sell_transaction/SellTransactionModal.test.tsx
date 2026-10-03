@@ -33,6 +33,8 @@ const makeHookReturn = (overrides: Record<string, unknown> = {}) => ({
   setEntryMode: vi.fn(),
   totalAmountInput: "",
   handleTotalAmountChange: vi.fn(),
+  fieldErrors: {},
+  problemHint: null,
   unitPriceDisplay: "—",
   averageCostAsOfDate: null,
   potentialPnl: null,

@@ -477,9 +477,8 @@ describe("useEditTransactionModal", () => {
       await act(async () => {
         result.current.handleTotalAmountChange("10");
       });
-      expect(result.current.totalBelowFeesError).toEqual({
-        key: "transaction.error_validation_total_below_fees",
-      });
+      expect(result.current.fieldErrors.total).toBeDefined();
+      expect(result.current.problemHint).toBeNull();
       expect(result.current.isFormValid).toBe(false);
     });
   });

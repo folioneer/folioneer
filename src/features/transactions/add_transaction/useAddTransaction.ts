@@ -9,6 +9,7 @@ import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { transactionGateway } from "../gateway";
 import type { TransactionFormData } from "../shared/types";
+import { type DraftField, useDraftProblemDisplay } from "../shared/useDraftProblemDisplay";
 import { toTransactionDraft, useTransactionDraftCheck } from "../shared/useTransactionDraftCheck";
 import { useTransactions } from "../useTransactions";
 
@@ -55,14 +56,32 @@ export function useAddTransaction({
   const draft = useMemo(() => toTransactionDraft("Purchase", formData, "price", ""), [formData]);
   const check = useTransactionDraftCheck(draft);
 
+  // TRX-067 — the first problem is shown on its field once typed in, as a hint before.
+  const problemDisplay = useDraftProblemDisplay(check.problem, check.problemMessage);
+  const touch = problemDisplay.touch;
+
   // TRX-029 — derived flag: is the currently selected asset archived?
   const isSelectedAssetArchived = formData.assetId
     ? (assets.find((a) => a.id === formData.assetId)?.is_archived ?? false)
     : false;
 
-  const handleChange = useCallback((field: keyof TransactionFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  }, []);
+  const handleChange = useCallback(
+    (field: keyof TransactionFormData, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+      const typed: Partial<Record<keyof TransactionFormData, DraftField>> = {
+        accountId: "account",
+        assetId: "asset",
+        date: "date",
+        quantity: "quantity",
+        unitPrice: "unitPrice",
+        exchangeRate: "exchangeRate",
+        fees: "fees",
+      };
+      const draftField = typed[field];
+      if (draftField) touch(draftField);
+    },
+    [touch],
+  );
 
   const doSubmit = useCallback(async () => {
     if (!check.isClean) {
@@ -147,7 +166,11 @@ export function useAddTransaction({
     formData,
     /** Total amount in micro-units formatted for display (read-only, derived). */
     totalAmountDisplay: microToFormatted(check.preview?.total_amount ?? 0),
-    error,
+    error: error ?? problemDisplay.alert,
+    /** TRX-067 — the first problem as an error on the field it concerns, once typed in. */
+    fieldErrors: problemDisplay.fieldErrors,
+    /** TRX-067 — what to enter, for a field not typed in yet. */
+    problemHint: problemDisplay.hint,
     isSubmitting,
     isFormValid: check.isClean,
     showArchivedConfirm,

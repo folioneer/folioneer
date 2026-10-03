@@ -41,7 +41,11 @@ export function SelectField({
           <ChevronDown size={20} />
         </div>
       </div>
-      {error && <span className="text-xs text-m3-error px-1">{error}</span>}
+      {error && (
+        <span id={`${id}-error`} className="text-xs text-m3-error px-1">
+          {error}
+        </span>
+      )}
     </div>
   );
 }

@@ -12,6 +12,17 @@ export type I18nMessage = {
 };
 
 /**
+ * The text of a message in the current language, or `undefined` when there is none —
+ * what a field's `error` prop and a hint take. `translate` is react-i18next's `t`.
+ */
+export function messageText(
+  translate: (key: string, vars?: Record<string, string | number>) => string,
+  message: I18nMessage | null | undefined,
+): string | undefined {
+  return message ? translate(message.key, message.vars) : undefined;
+}
+
+/**
  * Variant of `I18nMessage` returned by presenters whose output drives a global
  * snackbar instead of component-rendered error state. Carries the i18n key + vars
  * plus a severity dimension the snackbar needs.

@@ -7,6 +7,8 @@ import { ComboboxField } from "@/ui/components/field/ComboboxField";
 import { DateField } from "@/ui/components/field/DateField";
 import { TextField } from "@/ui/components/field/TextField";
 import { FormModal } from "@/ui/components/modal/FormModal";
+import { FormProblem } from "@/ui/components/modal/FormProblem";
+import { messageText } from "@/ui/format/i18n";
 import { useOpenBalance } from "./useOpenBalance";
 
 interface OpenBalanceModalProps {
@@ -39,10 +41,11 @@ export function OpenBalanceModal({
     isSubmitting,
     isFormValid,
     zeroCostWarning,
+    fieldErrors,
+    problemHint,
     handleChange,
     handleSubmit,
   } = useOpenBalance({ accountId, assetId, onSubmitSuccess });
-
   return (
     <FormModal
       id="open-balance-modal"
@@ -95,6 +98,7 @@ export function OpenBalanceModal({
           onChange={(e) => handleChange("date", e.target.value)}
           max={new Date().toISOString().slice(0, 10)}
           required
+          error={messageText(t, fieldErrors.date)}
         />
 
         {/* Quantity */}
@@ -105,6 +109,7 @@ export function OpenBalanceModal({
           onValueChange={(v) => handleChange("quantity", v)}
           placeholder={t("open_balance.form_quantity_placeholder")}
           required
+          error={messageText(t, fieldErrors.quantity)}
         />
 
         {/* Total Cost (TRX-043: no fees, no exchange_rate, no unit_price) */}
@@ -115,6 +120,7 @@ export function OpenBalanceModal({
           onValueChange={(v) => handleChange("totalCost", v)}
           placeholder={t("open_balance.form_total_cost_placeholder")}
           required
+          error={messageText(t, fieldErrors.totalCost)}
         />
         {zeroCostWarning && (
           <p id="ob-zero-cost-warning" className="flex items-start gap-2 text-sm text-m3-warning">
@@ -123,14 +129,13 @@ export function OpenBalanceModal({
           </p>
         )}
 
-        {/* Inline error */}
-        {error && (
-          <p role="alert" className="text-sm text-m3-error">
-            {t(error.key, error.vars)}
-          </p>
-        )}
-
         <div className="flex items-center justify-end gap-2 pt-2">
+          {/* TRX-067 — why saving is not possible: beside the actions */}
+          <FormProblem
+            idPrefix="ob"
+            error={messageText(t, error)}
+            hint={messageText(t, problemHint)}
+          />
           <Button variant="secondary" type="button" onClick={onClose} disabled={isSubmitting}>
             {t("action.cancel")}
           </Button>

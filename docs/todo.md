@@ -164,15 +164,6 @@ Raised by the owner on 2026-10-03, while adding assets from the command line. Th
 - [ ] Are positions in one instrument across markets shown together anywhere (allocation, performance), or always per asset?
 - [ ] On the command line, is an asset named by its name, its reference, its ISIN — and what when the reference is shared?
 
-## #057 — (frontend) — A form always says what is wrong
-
-Decided by the owner on 2026-10-03: "always show what is wrong". The core checks a transaction draft while the user types and returns its first problem (TRX-062, TRX-063). Some forms show it (a total below its fees, on the Total field); others only disable Save, and the user has to guess why. The vocabulary already says a draft "shows its first problem" — the forms are to catch up with it. Forms the core does not check while typing (TD-054, TD-058) show the rejection on save; the same message, in the same place, is wanted for them.
-
-**User value:** When Save is disabled or a save is refused, the user reads why, next to what to fix.
-**Done when:** every form that records or corrects a transaction shows the first problem the core reports — on the field it concerns when there is one, above the actions otherwise — in both languages, and never disables Save without a visible reason; a field not filled yet is not reported as an error before the user has typed in it; an E2E test reads the message of at least one form.
-**Design:** none
-**Open questions:** none
-
 ## #058 — (fullstack) — Numbers are typed and shown the same way everywhere, by language
 
 Asked by the owner on 2026-10-03, for 0.6.0. A number's decimal separator is not handled consistently: the forms accept a comma or a dot in either language; a form pre-filled from a recorded figure (a correction) writes a dot even in French; the display language is set once at start-up and falls back to French. The thousands separator is out of scope. The command line reads and prints the dot only — all its text is English (#044).

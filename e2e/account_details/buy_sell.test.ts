@@ -6,6 +6,7 @@
  *   TRX-010 — buy holding → holding appears in account details
  *   TRX-020 — sell holding → quantity decremented in holding row
  *   TRX-030 — sell more than held → the draft check keeps submit disabled
+ *   TRX-067 — the form says why: the oversell on the quantity field, with both quantities
  *
  * Seed strategy:
  *   - TRX-010: account + asset seeded via IPC; buy exercised through the UI.
@@ -173,5 +174,14 @@ describe("buy_sell", () => {
       "Submit must be disabled when quantity exceeds holding (TRX-030, TRX-063)",
     );
     assert.ok(await form.isExisting(), "Sell form must remain open (TRX-030)");
+
+    // TRX-067 — the reason is on the field that was typed in, naming both quantities.
+    const quantityError = await $("#sell-trx-quantity-error");
+    await quantityError.waitForExist({ timeout: 5000 });
+    const message = await quantityError.getText();
+    assert.ok(
+      message.includes("999") && /(^|\D)2[.,]0+(\D|$)/.test(message),
+      `The oversell message must name both quantities (TRX-067), got: "${message}"`,
+    );
   });
 });

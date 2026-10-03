@@ -138,7 +138,11 @@ export function ComboboxField<T extends object>({
         </div>
       </Combobox>
 
-      {error && <p className="text-xs text-m3-error mt-1 ml-1">{error}</p>}
+      {error && (
+        <p id={`${id}-error`} className="text-xs text-m3-error mt-1 ml-1">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

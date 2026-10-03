@@ -333,16 +333,15 @@ describe("useBuyTransaction", () => {
       result.current.handleTotalAmountChange("5");
     });
 
-    expect(result.current.totalBelowFeesError).toEqual({
-      key: "transaction.error_validation_total_below_fees",
-    });
+    expect(result.current.fieldErrors.total).toBeDefined();
+    expect(result.current.problemHint).toBeNull();
     expect(result.current.isFormValid).toBe(false);
 
     // Raising the total above the fees clears the inline error
     await act(async () => {
       result.current.handleTotalAmountChange("15");
     });
-    expect(result.current.totalBelowFeesError).toBeNull();
+    expect(result.current.fieldErrors.total).toBeUndefined();
   });
 
   // MKT-054 — does not call recordAssetPrice when recordPrice is false
