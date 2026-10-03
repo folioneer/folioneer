@@ -143,7 +143,7 @@ pub fn help(program: &str, topic: HelpTopic) -> String {
                 ("--reference <ref>", "Ticker or reference"),
                 (
                     "--class <class>",
-                    "Stocks, ETF, ETP, Bonds, MutualFunds, RealEstate, DigitalAsset or Derivatives",
+                    "RealEstate, Stocks, Bonds, ETF, ETP, MutualFunds, DigitalAsset or Derivatives",
                 ),
                 (
                     "--currency <code>",
@@ -412,7 +412,7 @@ Exit codes: 0 listed, 1 refused, 2 wrong usage."
             "Usage: folioneer asset add --name <name> --reference <ref> --class <class>\n"
         ));
         assert!(page.contains(
-            "Stocks, ETF, ETP, Bonds, MutualFunds, RealEstate, DigitalAsset or Derivatives"
+            "RealEstate, Stocks, Bonds, ETF, ETP, MutualFunds, DigitalAsset or Derivatives"
         ));
         assert!(page.contains("--risk <1-5>        Risk level"));
         assert!(page.contains("[default: its class's]"));

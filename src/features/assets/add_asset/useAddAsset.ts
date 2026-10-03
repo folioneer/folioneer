@@ -2,7 +2,11 @@ import { useMemo, useState } from "react";
 import type { AssetClass, AssetLookupResult, Exchange } from "@/bindings";
 import { useAppStore } from "@/lib/store";
 import type { I18nMessage } from "@/ui/format/i18n";
-import { DEFAULT_RISK_BY_CLASS, SYSTEM_CATEGORY_ID } from "../shared/constants";
+import {
+  DEFAULT_ASSET_CLASS,
+  DEFAULT_CATEGORY_ID,
+  defaultRiskOf,
+} from "../shared/creationDefaults";
 import { hasDuplicateReference } from "../shared/validateAsset";
 import { useAssets } from "../useAssets";
 
@@ -15,8 +19,8 @@ export function useAddAsset({ onSubmitSuccess, prefill }: UseAddAssetProps = {})
   const { addAsset, assets } = useAssets();
   const categories = useAppStore((s) => s.categories);
 
-  // CSH-015 — default class is `Stocks` (the dropdown's first user-selectable
-  // entry). `Cash` is reserved for the system Cash Asset and never available here.
+  // CSH-015 — the class, risk level and category a new asset starts from are the core's
+  // (`creationDefaults`); `Cash` is the application's alone and never offered.
   const [formData, setFormData] = useState<{
     name: string;
     reference: string;
@@ -31,12 +35,10 @@ export function useAddAsset({ onSubmitSuccess, prefill }: UseAddAssetProps = {})
     name: prefill?.name ?? "",
     reference: prefill?.reference ?? "",
     isin: prefill?.isin ?? "",
-    class: (prefill?.asset_class ?? "Stocks") as AssetClass,
+    class: (prefill?.asset_class ?? DEFAULT_ASSET_CLASS) as AssetClass,
     currency: prefill?.currency ?? "EUR",
-    risk_level: prefill?.asset_class
-      ? DEFAULT_RISK_BY_CLASS[prefill.asset_class as AssetClass]
-      : DEFAULT_RISK_BY_CLASS.Stocks,
-    category_id: SYSTEM_CATEGORY_ID,
+    risk_level: defaultRiskOf((prefill?.asset_class ?? DEFAULT_ASSET_CLASS) as AssetClass),
+    category_id: DEFAULT_CATEGORY_ID,
     exchange: prefill?.exchange ?? null,
     interest_bearing: false,
   });
@@ -67,7 +69,7 @@ export function useAddAsset({ onSubmitSuccess, prefill }: UseAddAssetProps = {})
     setFormData((prev) => ({
       ...prev,
       class: assetClass,
-      risk_level: DEFAULT_RISK_BY_CLASS[assetClass],
+      risk_level: defaultRiskOf(assetClass),
     }));
   };
 
@@ -88,7 +90,7 @@ export function useAddAsset({ onSubmitSuccess, prefill }: UseAddAssetProps = {})
       class: formData.class,
       currency: formData.currency,
       risk_level: formData.risk_level,
-      category_id: formData.category_id || SYSTEM_CATEGORY_ID,
+      category_id: formData.category_id || DEFAULT_CATEGORY_ID,
       exchange: formData.exchange,
       interest_bearing: formData.interest_bearing,
     });
@@ -108,10 +110,10 @@ export function useAddAsset({ onSubmitSuccess, prefill }: UseAddAssetProps = {})
       name: "",
       reference: "",
       isin: "",
-      class: "Stocks",
+      class: DEFAULT_ASSET_CLASS,
       currency: "EUR",
-      risk_level: DEFAULT_RISK_BY_CLASS.Stocks,
-      category_id: SYSTEM_CATEGORY_ID,
+      risk_level: defaultRiskOf(DEFAULT_ASSET_CLASS),
+      category_id: DEFAULT_CATEGORY_ID,
       exchange: null,
       interest_bearing: false,
     });

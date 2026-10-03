@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Asset, AssetLookupResult, Exchange } from "@/bindings";
-import { DEFAULT_RISK_BY_CLASS, SYSTEM_CATEGORY_ID } from "../shared/constants";
+import { DEFAULT_CATEGORY_ID, defaultRiskOf } from "../shared/creationDefaults";
 import { useAddAsset } from "./useAddAsset";
 
 const mockAddAsset = vi.fn();
@@ -35,10 +35,10 @@ describe("useAddAsset", () => {
     mockAddAsset.mockReset();
   });
 
-  // R2 — category pre-selected on SYSTEM_CATEGORY_ID
-  it("pre-selects SYSTEM_CATEGORY_ID as default category", () => {
+  // R2 — category pre-selected on DEFAULT_CATEGORY_ID
+  it("pre-selects DEFAULT_CATEGORY_ID as default category", () => {
     const { result } = renderHook(() => useAddAsset());
-    expect(result.current.formData.category_id).toBe(SYSTEM_CATEGORY_ID);
+    expect(result.current.formData.category_id).toBe(DEFAULT_CATEGORY_ID);
   });
 
   // R10 — risk_level auto-filled when class changes
@@ -163,7 +163,7 @@ describe("useAddAsset", () => {
     const { result } = renderHook(() => useAddAsset({ prefill }));
 
     expect(result.current.formData.class).toBe("ETF");
-    expect(result.current.formData.risk_level).toBe(DEFAULT_RISK_BY_CLASS.ETF);
+    expect(result.current.formData.risk_level).toBe(defaultRiskOf("ETF"));
   });
 
   // WEB-042 — when asset_class is absent in prefill, risk_level stays at form default
@@ -181,7 +181,7 @@ describe("useAddAsset", () => {
 
     // risk_level should remain the Stocks default (initial form default — CSH-015 made
     // Cash unavailable as a user-pickable class).
-    expect(result.current.formData.risk_level).toBe(DEFAULT_RISK_BY_CLASS.Stocks);
+    expect(result.current.formData.risk_level).toBe(defaultRiskOf("Stocks"));
   });
 
   // WEB-043 — all prefilled fields remain editable
@@ -226,8 +226,8 @@ describe("useAddAsset", () => {
     expect(result.current.formData.class).toBe("ETF");
   });
 
-  // WEB-044 — category_id always defaults to SYSTEM_CATEGORY_ID even when prefill is provided
-  it("always defaults category_id to SYSTEM_CATEGORY_ID regardless of prefill", () => {
+  // WEB-044 — category_id always defaults to DEFAULT_CATEGORY_ID even when prefill is provided
+  it("always defaults category_id to DEFAULT_CATEGORY_ID regardless of prefill", () => {
     const prefill: AssetLookupResult = {
       name: "Apple Inc.",
       reference: "AAPL",
@@ -237,7 +237,7 @@ describe("useAddAsset", () => {
       exchange: null,
     };
     const { result } = renderHook(() => useAddAsset({ prefill }));
-    expect(result.current.formData.category_id).toBe(SYSTEM_CATEGORY_ID);
+    expect(result.current.formData.category_id).toBe(DEFAULT_CATEGORY_ID);
   });
 
   // Regression — no prefill defaults to Stocks / EUR / risk 4 (CSH-015 — Cash
@@ -249,8 +249,8 @@ describe("useAddAsset", () => {
     expect(result.current.formData.reference).toBe("");
     expect(result.current.formData.currency).toBe("EUR");
     expect(result.current.formData.class).toBe("Stocks");
-    expect(result.current.formData.risk_level).toBe(DEFAULT_RISK_BY_CLASS.Stocks);
-    expect(result.current.formData.category_id).toBe(SYSTEM_CATEGORY_ID);
+    expect(result.current.formData.risk_level).toBe(defaultRiskOf("Stocks"));
+    expect(result.current.formData.category_id).toBe(DEFAULT_CATEGORY_ID);
   });
 
   // AST-021 — exchange defaults to null when no prefill

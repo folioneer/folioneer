@@ -58,12 +58,12 @@ impl AssetClass {
     /// assets the application seeds itself.
     pub const fn user_addable() -> &'static [AssetClass] {
         &[
+            AssetClass::RealEstate,
             AssetClass::Stocks,
+            AssetClass::Bonds,
             AssetClass::ETF,
             AssetClass::ETP,
-            AssetClass::Bonds,
             AssetClass::MutualFunds,
-            AssetClass::RealEstate,
             AssetClass::DigitalAsset,
             AssetClass::Derivatives,
         ]
@@ -81,6 +81,47 @@ impl AssetClass {
             AssetClass::Stocks => 4,
             AssetClass::DigitalAsset => 5,
             AssetClass::Derivatives => 5,
+        }
+    }
+}
+
+/// A class a user may create an asset in, with the risk level a new asset of it starts at.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct AssetClassDefault {
+    /// The class.
+    pub class: AssetClass,
+    /// The risk level preselected for it (R3).
+    pub default_risk: u8,
+}
+
+/// What a new asset starts from, in every interface: the classes a user may pick
+/// (CSH-015), each with its default risk level (R3), and the category preselected.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct AssetCreationDefaults {
+    /// The classes a user may create an asset in, in the order they are offered.
+    pub classes: Vec<AssetClassDefault>,
+    /// The class preselected.
+    pub class: AssetClass,
+    /// The risk level preselected: the preselected class's.
+    pub risk_level: u8,
+    /// The category a new asset is in until the user picks one.
+    pub category_id: String,
+}
+
+impl AssetCreationDefaults {
+    /// The defaults of this application.
+    pub fn current() -> Self {
+        Self {
+            classes: AssetClass::user_addable()
+                .iter()
+                .map(|class| AssetClassDefault {
+                    class: class.clone(),
+                    default_risk: class.default_risk(),
+                })
+                .collect(),
+            class: AssetClass::Stocks,
+            risk_level: AssetClass::Stocks.default_risk(),
+            category_id: super::category::SYSTEM_CATEGORY_ID.to_string(),
         }
     }
 }
@@ -389,6 +430,30 @@ fn normalize_optional_isin(isin: Option<String>) -> StdResult<Option<String>, As
 #[cfg(test)]
 mod aggregate_tests {
     use super::*;
+
+    // CSH-015 / R3 — what a new asset starts from: every class but Cash, each with its
+    // default risk level, the preselected class among them, and the system category.
+    #[test]
+    fn creation_defaults_offer_every_class_but_cash_with_its_risk() {
+        let defaults = AssetCreationDefaults::current();
+
+        assert!(defaults
+            .classes
+            .iter()
+            .all(|entry| entry.class != AssetClass::Cash));
+        assert_eq!(defaults.classes.len(), 8);
+        assert!(defaults
+            .classes
+            .iter()
+            .all(|entry| entry.default_risk == entry.class.default_risk()));
+        assert!(defaults.classes.iter().any(
+            |entry| entry.class == defaults.class && entry.default_risk == defaults.risk_level
+        ));
+        assert_eq!(
+            defaults.category_id,
+            crate::context::asset::SYSTEM_CATEGORY_ID
+        );
+    }
 
     fn equity(id: &str, archived: bool) -> Asset {
         Asset::restore(

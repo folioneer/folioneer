@@ -425,11 +425,11 @@ Remove an entry once it has been resolved.
 ## 2026-10-03 — TD-065 — Some figures are computed in two places
 
 - Found by: the owner, after TD-062 (a corrected deposit was refused because a second cash computation counted deposits and withdrawals only)
-- Where: `computeTotalMicro` in `src/lib/microUnits.ts` beside the core's totals (TD-054); `DEFAULT_RISK_BY_CLASS` and `SYSTEM_CATEGORY_ID` in `src/features/assets/shared/constants.ts` beside `AssetClass::default_risk` and the core's system category; the figures not yet listed (performance flows, valuation, price movement)
+- Where: `computeTotalMicro` in `src/lib/microUnits.ts` beside the core's totals (TD-054); `SYSTEM_CATEGORY_ID`, `SYSTEM_CASH_CATEGORY_ID` and `isSystemCategory` in `src/features/categories/shared/presenter.ts`, and `RISK_LEVELS` in `src/features/assets/shared/constants.ts`, beside the core's own; the figures not yet listed (performance flows, valuation, price movement)
 - Severity: 🟡
-- Observation: where one figure has two computations, only one is exercised by the tests of the day, and the other drifts. In the account, this is settled: one rule says what moves cash (`cash_effect`), the cash line as of a date is read by it alone, and a test holds the as-of reconstruction of a holding equal to the replay on the same ledger. What remains is in the interface, and in the figures no one has listed.
+- Observation: where one figure has two computations, only one is exercised by the tests of the day, and the other drifts. In the account, this is settled: one rule says what moves cash (`cash_effect`), the cash line as of a date is read by it alone, and a test holds the as-of reconstruction of a holding equal to the replay on the same ledger. The asset form reads its classes, default risk levels and default category from the core's generated constant. What remains is the dividend total the correction form computes (TD-054), and the figures no one has listed.
 - User value: None directly — a figure reads the same wherever it is shown.
-- Done when: every figure the application shows is listed with where it is computed; the interface computes none the core computes (TD-054, the default risk table); any other figure with two computations loses one, or has a test proving both agree on the same ledger.
+- Done when: every figure the application shows is listed with where it is computed; the interface computes none the core computes (TD-054); any other figure with two computations loses one, or has a test proving both agree on the same ledger.
 
 ## 2026-10-03 — TD-066 — An asset's name, reference and category have no length or character rule
 

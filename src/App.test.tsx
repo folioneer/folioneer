@@ -8,7 +8,10 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 
 // Mock Tauri bindings
-vi.mock("./bindings", () => ({
+// The generated constants are kept (the asset form reads the core's creation defaults from
+// them); only the commands are replaced.
+vi.mock("./bindings", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./bindings")>()),
   commands: {
     getAssets: vi.fn(() => Promise.resolve({ status: "ok", data: [] })),
     getAssetsWithArchived: vi.fn(() => Promise.resolve({ status: "ok", data: [] })),

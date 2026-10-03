@@ -14,6 +14,10 @@ use crate::{
 pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         // ----- asset BC -----
+        .constant(
+            "ASSET_CREATION_DEFAULTS",
+            asset::AssetCreationDefaults::current(),
+        )
         .typ::<asset::Asset>()
         .typ::<asset::AssetCategory>()
         .typ::<asset::AssetClass>()

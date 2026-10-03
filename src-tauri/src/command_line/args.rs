@@ -532,7 +532,7 @@ mod tests {
         );
         assert_eq!(
             reason("asset add --name A --reference B --class Cash --currency USD"),
-            "--class is not one of Stocks, ETF, ETP, Bonds, MutualFunds, RealEstate, DigitalAsset, Derivatives: \"Cash\""
+            "--class is not one of RealEstate, Stocks, Bonds, ETF, ETP, MutualFunds, DigitalAsset, Derivatives: \"Cash\""
         );
         assert_eq!(
             reason("asset add --name A --reference B --class ETF --currency USD --risk high"),
