@@ -272,6 +272,7 @@ impl Account {
         total_amount: Option<i64>,
         note: Option<String>,
     ) -> Result<&Transaction> {
+        Self::ensure_tradable(&asset_id)?;
         let (unit_price, total_amount) = match total_amount {
             // TRX-060 — the typed total is ground truth; the unit price is derived.
             Some(total) => Self::derive_purchase_from_total(total, quantity, exchange_rate, fees)?,
@@ -340,6 +341,7 @@ impl Account {
         total_amount: Option<i64>,
         note: Option<String>,
     ) -> Result<&Transaction> {
+        Self::ensure_tradable(&asset_id)?;
         // SEL-012 — closed position guard
         let current_qty = self.holding_quantity(&asset_id);
         if current_qty == 0 {
@@ -1676,6 +1678,15 @@ impl Account {
         value as i64
     }
 
+    /// CSH-062 — a purchase or a sale is never recorded on a Cash Asset: cash moves by a
+    /// Deposit or a Withdrawal. Recording and the draft check both ask here.
+    pub fn ensure_tradable(asset_id: &str) -> StdResult<(), AccountError> {
+        if crate::core::cash::is_cash_asset(asset_id) {
+            return Err(AccountError::TradeOnCashAsset);
+        }
+        Ok(())
+    }
+
     /// TRX-062 — the unit price and total a purchase or sale would record from what the
     /// user entered, validated as recording it would be (TRX-020, TRX-026, TRX-060,
     /// SEL-023, SEL-050). Returns `(unit_price, total_amount)`; nothing is written.
@@ -2262,6 +2273,51 @@ mod tests {
             .unwrap();
         assert_eq!(h.quantity, micro(4));
         assert_eq!(h.average_price, micro(150));
+    }
+
+    // CSH-062 — a purchase or a sale of the account's cash line is rejected, and
+    // nothing is recorded
+    #[test]
+    fn buy_and_sell_holding_reject_the_cash_line() {
+        let mut acc = cash_seeded_account();
+        let cash = crate::core::cash::system_cash_asset_id(&acc.currency);
+        let before = acc.transactions.len();
+
+        let bought = acc
+            .buy_holding(
+                cash.clone(),
+                "2024-01-01".to_string(),
+                micro(1),
+                micro(1),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .unwrap_err();
+        let sold = acc
+            .sell_holding(
+                cash,
+                "2024-01-01".to_string(),
+                micro(1),
+                micro(1),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .unwrap_err();
+
+        for err in [bought, sold] {
+            assert!(
+                matches!(
+                    err.downcast_ref::<AccountError>(),
+                    Some(AccountError::TradeOnCashAsset)
+                ),
+                "expected TradeOnCashAsset, got: {err}"
+            );
+        }
+        assert_eq!(acc.transactions.len(), before);
     }
 
     // SEL-012 — sell_holding on a zero-qty position is rejected

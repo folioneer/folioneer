@@ -1151,6 +1151,11 @@ export type AccountError =
  */
 { code: "OpeningBalanceOnCashAsset" } | 
 /**
+ * A purchase or a sale cannot target the account's cash line (CSH-062); cash
+ * moves by a Deposit or a Withdrawal.
+ */
+{ code: "TradeOnCashAsset" } | 
+/**
  * Attempt to sell an asset with no open position (quantity = 0).
  */
 { code: "ClosedPosition" } | 

@@ -386,15 +386,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — the total shown while editing a dividend comes from the rule that records it.
 - Done when: the dividend correction takes its displayed total from a backend check, `computeTotalMicro` has no caller left in `src/` and is deleted.
 
-## 2026-09-28 — TD-056 — The core records a purchase or a sale of a Cash Asset
-
-- Found by: spec-reviewer on #044 (the command line's first draft could buy `EUR`)
-- Where: `use_cases/holding_transaction/orchestrator.rs` — `buy_holding`, `sell_holding`
-- Severity: 🟡
-- Observation: only the interface keeps Cash Assets out of a purchase or a sale (CSH-018, TRX-064); the core records one if asked. The command line excludes them in its lookup (CLI-011), so no path reaches it today, but the core owes the decision (B47).
-- User value: None directly — a later interface (#051) cannot record a purchase of cash by mistake.
-- Done when: `buy_holding` and `sell_holding` reject a Cash Asset with a typed error, tested in Rust, and the command line's own exclusion can rely on it.
-
 ## 2026-09-28 — TD-057 — The performance contract lags the response
 
 - Found by: spec-reviewer on #012

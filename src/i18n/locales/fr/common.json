@@ -916,6 +916,7 @@
     "InvalidTotalCost": "Le coût total ne doit pas être négatif.",
     "AmountNotPositive": "Le montant doit être supérieur à 0.",
     "OpeningBalanceOnCashAsset": "Impossible d'ouvrir un solde sur l'actif Cash système.",
+    "TradeOnCashAsset": "Les liquidités ne s'achètent ni ne se vendent : enregistrez un dépôt ou un retrait.",
     "NoteTextEmpty": "Le texte de la note ne peut pas être vide.",
     "NoteTextTooLong": "Le texte de la note dépasse 500 caractères.",
     "ThresholdNotPositive": "Le seuil d'alarme doit être un prix positif.",

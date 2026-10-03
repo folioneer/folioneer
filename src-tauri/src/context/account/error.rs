@@ -36,6 +36,10 @@ pub enum AccountError {
     /// initial cash is recorded via a Deposit instead.
     #[error("Opening balance cannot target the cash line")]
     OpeningBalanceOnCashAsset,
+    /// A purchase or a sale cannot target the account's cash line (CSH-062); cash
+    /// moves by a Deposit or a Withdrawal.
+    #[error("A purchase or a sale cannot target the cash line")]
+    TradeOnCashAsset,
 
     // --- Account aggregate operations (buy/sell/correct/cancel/cash) ---
     /// Attempt to sell an asset with no open position (quantity = 0).
@@ -244,6 +248,10 @@ mod tests {
         assert_eq!(
             to_value(AccountError::OpeningBalanceOnCashAsset).unwrap(),
             json!({ "code": "OpeningBalanceOnCashAsset" })
+        );
+        assert_eq!(
+            to_value(AccountError::TradeOnCashAsset).unwrap(),
+            json!({ "code": "TradeOnCashAsset" })
         );
         assert_eq!(
             to_value(AccountError::ClosedPosition).unwrap(),

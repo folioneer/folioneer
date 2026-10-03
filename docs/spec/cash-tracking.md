@@ -83,7 +83,7 @@ Two **new** commands are added; existing commands (`buy_holding`, `sell_holding`
 
 Edit and delete of Deposit/Withdrawal reuse the existing `correct_transaction(id, accountId, dto: CorrectTransactionDTO) -> Transaction` and `cancel_transaction(id, accountId)` commands. Their existing error enums are extended (see CSH-024 and CSH-051) with `InsufficientCash { current_balance_micros, currency }`.
 
-`buy_holding`'s error enum gains `InsufficientCash { current_balance_micros, currency }` (CSH-041). `sell_holding` does **not** gain this variant — Sell only credits cash, never debits it (CSH-080). `open_holding`'s error enum gains `OpeningBalanceOnCashAsset` (CSH-061; cross-amends TRX-056).
+`buy_holding`'s error enum gains `InsufficientCash { current_balance_micros, currency }` (CSH-041). `sell_holding` does **not** gain this variant — Sell only credits cash, never debits it (CSH-080). `open_holding`'s error enum gains `OpeningBalanceOnCashAsset` (CSH-061; cross-amends TRX-056). `buy_holding`, `sell_holding` and `validate_transaction_draft` return `TradeOnCashAsset` for a Cash Asset (CSH-062).
 
 The asset-mutation commands (`update_asset`, `archive_asset`, `unarchive_asset`, `delete_asset`) gain a new variant `CashAssetNotEditable` (CSH-016).
 
@@ -159,11 +159,13 @@ The asset-mutation commands (`update_asset`, `archive_asset`, `unarchive_asset`,
 
 **CSH-051 — Sell delete and edit replay (backend)**: Edits and deletes of Sell transactions (SEL-031, SEL-033) trigger the same chronological replay across both the sold-asset holding and the Cash Holding. A delete that would leave any later Purchase in violation of CSH-080 is rejected with `InsufficientCash`, mirroring CSH-024.
 
-### Opening Balance Cohabitation with Cash (060–069)
+### Transactions the Cash Asset refuses (060–069)
 
 **CSH-060 — OpeningBalance for non-cash asset does not touch cash (backend)**: An `OpeningBalance` transaction whose `asset_id` is **not** a Cash Asset seeds only the asset's holding (per TRX-040). It does **not** create or modify the Cash Holding. The semantic is: "I already held this position when I started tracking — its prior cost is not visible to the app."
 
 **CSH-061 — OpeningBalance for the Cash Asset is rejected (backend)**: The `open_holding` command rejects any `OpeningBalanceDTO` whose resolved asset has `class = AssetClass::Cash`, returning the error variant `OpeningBalanceOnCashAsset` (added to `OpenHoldingCommandError` — cross-amends TRX-056). The user records initial cash via the `record_deposit` command instead. Reason: keeping a single explicit entry point (Deposit) for "cash arriving in the account" simplifies the transaction list and avoids a redundant lifecycle.
+
+**CSH-062 — A purchase or a sale of the Cash Asset is rejected (backend)**: Recording a purchase or a sale whose asset is a Cash Asset is rejected with `TradeOnCashAsset`, before any other check of the figures (TRX-020, SEL-020), and nothing is recorded; the transaction draft check (TRX-062) reports the same problem. A correction keeps the asset of its transaction, so it cannot move a purchase or a sale onto a Cash Asset. Cash moves by a Deposit or a Withdrawal. The rejection holds for every interface: the forms and the command line also keep Cash Assets out of what they offer or match (CSH-018, TRX-064, CLI-011).
 
 ### Insufficient Cash Guard (080–089)
 

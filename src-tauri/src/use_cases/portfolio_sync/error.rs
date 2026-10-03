@@ -242,6 +242,7 @@ mod tests {
                 "ThresholdNotPositive",
                 "TotalAmountBelowFees",
                 "TotalAmountNotPositive",
+                "TradeOnCashAsset",
                 "TransactionNotFound",
                 "UnitPriceNegative",
                 "UnitPriceOutOfRange",

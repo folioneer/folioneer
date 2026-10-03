@@ -148,6 +148,8 @@ impl HoldingTransactionUseCase {
         if missing(&draft.date) {
             return Err(TransactionDraftTask::DateMissing.into());
         }
+        // CSH-062 — recording would refuse the cash line; so does the draft.
+        Account::ensure_tradable(&draft.asset_id)?;
         let transaction_type = match draft.kind {
             DraftKind::Purchase => TransactionType::Purchase,
             DraftKind::Sell => TransactionType::Sell,
@@ -2744,6 +2746,20 @@ mod draft_tests {
         );
         d.asset_id = "asset-1".into();
         assert_eq!(code(use_case(None).validate_draft(d).await), "DateMissing");
+    }
+
+    // CSH-062 — a draft on the cash line is refused as recording it would be, a purchase
+    // and a sale alike.
+    #[tokio::test]
+    async fn csh_062_a_draft_on_the_cash_line_is_refused() {
+        for kind in [DraftKind::Purchase, DraftKind::Sell] {
+            let mut d = draft(kind);
+            d.asset_id = crate::core::cash::system_cash_asset_id("EUR");
+            assert_eq!(
+                code(use_case(Some(1_000_000)).validate_draft(d).await),
+                "TradeOnCashAsset"
+            );
+        }
     }
 
     // TRX-062 / SEL-022 — a sale above the quantity held is refused with both figures.

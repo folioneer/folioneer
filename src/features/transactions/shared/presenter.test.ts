@@ -219,6 +219,7 @@ describe("transactionMutationErrorToI18n", () => {
     "AssetNotFound",
     "ArchivedAsset",
     "OpeningBalanceOnCashAsset",
+    "TradeOnCashAsset",
     "InvalidTotalCost",
   ] as const)("%s unit variant maps to its flat error key", (code) => {
     // `AccountNotFound` carries `account_id` payload; we strip it because the

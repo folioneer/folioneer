@@ -256,6 +256,7 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
         | AccountError::ThresholdNotPositive
         | AccountError::ThresholdIncomplete
         | AccountError::NoteOnCashAsset
+        | AccountError::TradeOnCashAsset
         | AccountError::NoteOnUnheldAsset
         | AccountError::NameAlreadyExists => format!("refused by the rules ({})", code_of(error)),
     };

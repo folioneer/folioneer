@@ -916,6 +916,7 @@
     "InvalidTotalCost": "Total cost must not be negative.",
     "AmountNotPositive": "Amount must be greater than 0.",
     "OpeningBalanceOnCashAsset": "Cannot open a balance on the system Cash Asset.",
+    "TradeOnCashAsset": "Cash cannot be bought or sold: record a deposit or a withdrawal.",
     "NoteTextEmpty": "The note text cannot be empty.",
     "NoteTextTooLong": "The note text exceeds 500 characters.",
     "ThresholdNotPositive": "The alarm threshold must be a positive price.",
