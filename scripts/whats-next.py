@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """Deterministic data collection for the /whats-next skill.
 
-Emits a single JSON document on stdout describing every potential work source
-in the project (the todo file, inline TODOs, open spec questions, in-flight
-git state, roadmap, tech debt, GitHub issues). Sections whose source is missing
-are emitted as empty — the consumer skips them silently.
+Emits one JSON document on stdout: the owner's queue (`docs/todo.md` § Next) with the
+state of each reference, the entries ready to queue, the entries blocked with what
+each waits on, the tech debt grouped by theme, the open pull requests with their CI
+state, the local git state, the roadmap and the open GitHub issues.
 
 Usage:
     python3 scripts/whats-next.py            # JSON to stdout
     python3 scripts/whats-next.py --pretty   # indented JSON for inspection
 
-The skill consumes this output, verifies each candidate against current repo
-state, scores it (Value/Effort/Recommend), and picks the suggested next action.
-This script has no judgment — only collection.
+The skill turns this into three lists and a proposed queue order for the owner to
+accept or edit. This script has no judgment — only collection and the readiness rule
+of `docs/workflow.md`.
 """
 
 from __future__ import annotations
@@ -43,8 +43,6 @@ def _project_root() -> Path:
 
 
 ROOT = _project_root()
-SOURCE_DIRS = ["src", "src-tauri/src"]
-SOURCE_EXTS = (".ts", ".tsx", ".rs")
 
 
 def _read(path: Path) -> str | None:
@@ -71,123 +69,263 @@ def _git(*args: str) -> str:
         return ""
 
 
-def collect_todo_file() -> dict | None:
-    """Return TODO file content split into sections, or None if absent.
+ENTRY_HEADING = re.compile(r"^##\s+#(?P<number>\d+)\s+—\s+(?P<title>.+?)\s*$")
+DEBT_HEADING = re.compile(
+    r"^##\s+(?P<date>\d{4}-\d{2}-\d{2})\s+—\s+(?P<ref>TD-\d+)\s+—\s+(?P<title>.+?)\s*$"
+)
+QUEUE_LINE = re.compile(r"^\s*\d+\.\s+(?P<ref>#\d+|TD-\d+)\b")
 
-    Two bullet styles are captured per section:
-      - Checkbox bullets at any indent (`- [ ] foo`, `- [x] foo`) — surfaced
-        with `done: true|false` from the checkbox state.
-      - Plain top-level bullets (`- foo`, no checkbox) — surfaced with
-        `done: false`. The TODO candidates pool typically uses this style;
-        only top-level entries count (nested `  - sub-item` lines are
-        treated as continuation of the parent, not separate candidates).
-    """
-    for name in ("docs/todo.md",):
-        path = ROOT / name
-        text = _read(path)
-        if text is None:
-            continue
-        sections: list[dict] = []
-        current_heading: str | None = None
-        current_items: list[dict] = []
-        for line in text.splitlines():
-            heading = re.match(r"^##\s+(.+?)\s*$", line)
-            if heading:
-                if current_heading is not None:
-                    sections.append(
-                        {"heading": current_heading, "items": current_items}
-                    )
-                current_heading = heading.group(1)
-                current_items = []
-                continue
-            checkbox = re.match(r"^\s*-\s+\[(?P<state>[ xX])\]\s+(?P<text>.+)$", line)
-            if checkbox and current_heading is not None:
-                current_items.append(
-                    {
-                        "done": checkbox.group("state").lower() == "x",
-                        "text": checkbox.group("text").strip(),
-                    }
-                )
-                continue
-            # Lookahead excludes ONLY checkbox bullets (`- [ ]` / `- [x]`),
-            # not link bullets (`- [text](url)`) — link-bullet TODOs are valid.
-            plain = re.match(r"^-\s+(?!\[[ xX]\])(?P<text>.+)$", line)
-            if plain and current_heading is not None:
-                current_items.append(
-                    {"done": False, "text": plain.group("text").strip()}
-                )
-        if current_heading is not None:
-            sections.append({"heading": current_heading, "items": current_items})
-        return {"path": str(path.relative_to(ROOT)), "sections": sections}
+
+def _sections(text: str) -> list[tuple[str, list[str]]]:
+    """Split a Markdown file into (`## ` heading line, body lines)."""
+    sections: list[tuple[str, list[str]]] = []
+    for line in text.splitlines():
+        if line.startswith("## "):
+            sections.append((line, []))
+        elif sections:
+            sections[-1][1].append(line)
+    return sections
+
+
+def parse_queue(todo_text: str) -> list[str]:
+    """The references of `## Next`, in the owner's order."""
+    for heading, body in _sections(todo_text):
+        if heading.strip() == "## Next":
+            return [m.group("ref") for m in map(QUEUE_LINE.match, body) if m]
+    return []
+
+
+def _field(body: list[str], name: str) -> str | None:
+    """The text after `**name:**` on its line, or None when the line is absent."""
+    prefix = f"**{name}:**"
+    for line in body:
+        if line.startswith(prefix):
+            return line[len(prefix) :].strip()
     return None
 
 
-def collect_inline_todos() -> list[dict]:
-    """Scan source dirs for TODO/FIXME comments."""
-    hits: list[dict] = []
-    pattern = re.compile(r"\b(TODO|FIXME)\b[: ]?\s*(.*)")
-    for d in SOURCE_DIRS:
-        base = ROOT / d
-        if not base.is_dir():
+def _question_items(body: list[str]) -> list[tuple[bool, str]]:
+    """The list items under `**Open questions:**`, each with whether it is ticked.
+    An item with no checkbox counts as unticked."""
+    items: list[tuple[bool, str]] = []
+    listing = False
+    for line in body:
+        if line.startswith("**Open questions:**"):
+            listing = True
             continue
-        for path in base.rglob("*"):
-            if not path.is_file() or path.suffix not in SOURCE_EXTS:
-                continue
-            try:
-                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-            except OSError:
-                continue
-            for n, line in enumerate(lines, start=1):
-                m = pattern.search(line)
-                if m:
-                    hits.append(
-                        {
-                            "file": str(path.relative_to(ROOT)),
-                            "line": n,
-                            "marker": m.group(1),
-                            "text": m.group(2).strip(),
-                        }
-                    )
-    return hits
-
-
-def _extract_open_questions(text: str) -> list[str]:
-    """Return unchecked items under any '## Open Questions' heading."""
-    items: list[str] = []
-    in_section = False
-    for line in text.splitlines():
-        if re.match(r"^##\s+Open\s+Questions\b", line, re.IGNORECASE):
-            in_section = True
+        if not listing:
             continue
-        if in_section and line.startswith("## "):
-            in_section = False
-            continue
-        if in_section:
-            m = re.match(r"^\s*-\s+\[\s\]\s+(.+)$", line)
-            if m:
-                items.append(m.group(1).strip())
+        if line.startswith("**") or line.startswith("## "):
+            break
+        item = re.match(
+            r"^\s*(?:[-*]|\d+\.)\s+(?:\[(?P<box>[ xX])\]\s+)?(?P<text>.+)$", line
+        )
+        if item:
+            items.append(
+                ((item.group("box") or " ") != " ", item.group("text").strip())
+            )
     return items
 
 
-def collect_spec_open_questions() -> list[dict]:
-    """docs/spec/*.md — Open Questions sections."""
-    out: list[dict] = []
-    spec_dir = ROOT / "docs" / "spec"
-    if not spec_dir.is_dir():
-        return out
-    for path in sorted(spec_dir.glob("*.md")):
-        text = _read(path)
-        if text is None:
+def readiness(body: list[str]) -> list[str]:
+    """What an entry waits on before the agent may run it; empty when it is ready.
+
+    Ready (docs/workflow.md): a Done when; open questions that are `none` or a list
+    with every box ticked; a design that is `none` or `validated`. Anything else —
+    a missing line, other words — waits: the rule fails closed.
+    """
+    waits: list[str] = []
+    if not _field(body, "Done when"):
+        waits.append("no Done when")
+
+    questions = _field(body, "Open questions")
+    items = _question_items(body)
+    if questions is None:
+        waits.append("no Open questions line")
+    elif questions.rstrip(".").lower() == "none":
+        pass
+    elif questions:
+        waits.append(f"question: {questions}")
+    elif not items:
+        waits.append("no Open questions line")
+    waits.extend(f"question: {text}" for ticked, text in items if not ticked)
+
+    design = _field(body, "Design")
+    if design is None:
+        waits.append("no Design line")
+    elif design.rstrip(".").lower() not in ("none", "validated"):
+        waits.append(f"design to validate: {design}")
+    return waits
+
+
+def parse_entries(todo_text: str) -> list[dict]:
+    """Every `## #NNN — …` entry of the todo file, with what it waits on."""
+    entries: list[dict] = []
+    for heading, body in _sections(todo_text):
+        match = ENTRY_HEADING.match(heading)
+        if not match:
             continue
-        questions = _extract_open_questions(text)
-        if questions:
-            out.append(
-                {
-                    "path": str(path.relative_to(ROOT)),
-                    "questions": questions,
-                }
-            )
-    return out
+        entries.append(
+            {
+                "ref": f"#{match.group('number')}",
+                "title": match.group("title"),
+                "user_value": _field(body, "User value"),
+                "waits_on": readiness(body),
+            }
+        )
+    return entries
+
+
+def debt_theme(title: str) -> str:
+    """A title with its code spans and figures blanked: entries that differ only by
+    a name or a count share a theme."""
+    return re.sub(r"\b\d+\b", "N", re.sub(r"`[^`]*`", "`…`", title))
+
+
+def _debt_field(body: list[str], name: str) -> str | None:
+    prefix = f"- {name}:"
+    for line in body:
+        if line.strip().startswith(prefix):
+            return line.strip()[len(prefix) :].strip()
+    return None
+
+
+def parse_debt(debt_text: str) -> list[dict]:
+    """Every `## date — TD-NNN — …` entry of the tech-debt file."""
+    entries: list[dict] = []
+    for heading, body in _sections(debt_text):
+        match = DEBT_HEADING.match(heading)
+        if not match:
+            continue
+        entries.append(
+            {
+                "ref": match.group("ref"),
+                "date": match.group("date"),
+                "title": match.group("title"),
+                "theme": debt_theme(match.group("title")),
+                "severity": _debt_field(body, "Severity"),
+                "user_value": _debt_field(body, "User value"),
+                "waits_on": [] if _debt_field(body, "Done when") else ["no Done when"],
+            }
+        )
+    return entries
+
+
+def group_debt(entries: list[dict]) -> list[dict]:
+    """Tech-debt entries grouped by theme, in the order themes first appear."""
+    themes: dict[str, list[dict]] = {}
+    for entry in entries:
+        themes.setdefault(entry["theme"], []).append(entry)
+    return [
+        {
+            "theme": theme,
+            "refs": [entry["ref"] for entry in members],
+            "entries": members,
+        }
+        for theme, members in themes.items()
+    ]
+
+
+def classify(queue: list[str], entries: list[dict]) -> dict:
+    """The three lists: queued (in the owner's order), ready but not queued, blocked.
+
+    A queued reference with no entry left is reported as `closed`: its work merged
+    and the owner has not yet removed it from the queue.
+    """
+    by_ref = {entry["ref"]: entry for entry in entries}
+    queued = [
+        by_ref[ref] | {"state": "blocked" if by_ref[ref]["waits_on"] else "ready"}
+        if ref in by_ref
+        else {"ref": ref, "state": "closed"}
+        for ref in queue
+    ]
+    in_queue = set(queue)
+    unqueued = [entry for entry in entries if entry["ref"] not in in_queue]
+    return {
+        "queued": queued,
+        "ready": [entry for entry in unqueued if not entry["waits_on"]],
+        "blocked": [entry for entry in unqueued if entry["waits_on"]],
+    }
+
+
+FAILING = (
+    "FAILURE",
+    "TIMED_OUT",
+    "CANCELLED",
+    "ERROR",
+    "ACTION_REQUIRED",
+    "STARTUP_FAILURE",
+    "STALE",
+)
+
+
+def ci_state(checks: list[dict]) -> str:
+    """One word for a pull request's checks: failing, running, green or none."""
+    if not checks:
+        return "none"
+    results = [
+        (check.get("conclusion") or check.get("state") or "").upper()
+        for check in checks
+    ]
+    if any(result in FAILING for result in results):
+        return "failing"
+    if any(result in ("", "PENDING", "EXPECTED") for result in results):
+        return "running"
+    return "green"
+
+
+def _gh_json(*args: str) -> list[dict]:
+    """A `gh … --json` listing, or [] when gh is absent, offline or refused."""
+    if not shutil.which("gh"):
+        return []
+    try:
+        result = subprocess.run(
+            ["gh", *args], check=True, capture_output=True, text=True, timeout=15
+        )
+        data = json.loads(result.stdout)
+        return data if isinstance(data, list) else []
+    except (
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        json.JSONDecodeError,
+    ):
+        return []
+
+
+def collect_pull_requests() -> list[dict]:
+    """Open pull requests with the state of their checks."""
+    return [
+        {
+            "number": pull["number"],
+            "title": pull["title"],
+            "branch": pull["headRefName"],
+            "ci": ci_state(pull.get("statusCheckRollup") or []),
+        }
+        for pull in _gh_json(
+            "pr",
+            "list",
+            "--state",
+            "open",
+            "--json",
+            "number,title,headRefName,statusCheckRollup",
+        )
+    ]
+
+
+def collect_work() -> dict:
+    """The queue, the todo entries and the tech debt, classified."""
+    todo_text = _read(ROOT / "docs" / "todo.md") or ""
+    debt = parse_debt(_read(ROOT / "docs" / "techdebt.md") or "")
+    lists = classify(parse_queue(todo_text), parse_entries(todo_text) + debt)
+    queued = {entry["ref"] for entry in lists["queued"]}
+    for name in ("ready", "blocked"):
+        lists[name] = [
+            entry for entry in lists[name] if not entry["ref"].startswith("TD-")
+        ]
+    lists["techdebt_not_queued"] = group_debt(
+        [entry for entry in debt if entry["ref"] not in queued]
+    )
+    return lists
 
 
 def collect_in_flight() -> dict:
@@ -200,7 +338,7 @@ def collect_in_flight() -> dict:
 
     branch_raw = _git("branch", "--no-merged", "main")
     unmerged = [
-        b.strip().lstrip("* ").strip()
+        b.strip().lstrip("*+ ").strip()
         for b in branch_raw.splitlines()
         if b.strip() and not b.startswith("*")
     ]
@@ -245,80 +383,18 @@ def collect_roadmap() -> dict | None:
     return None
 
 
-def collect_techdebt() -> dict | None:
-    """docs/techdebt.md — entries written by the /techdebt skill."""
-    path = ROOT / "docs" / "techdebt.md"
-    text = _read(path)
-    if text is None:
-        return None
-    entries: list[dict] = []
-    blocks = re.split(r"^(?=##\s+\d{4}-\d{2}-\d{2}\b)", text, flags=re.MULTILINE)
-    for block in blocks:
-        m = re.match(
-            r"^##\s+(?P<date>\d{4}-\d{2}-\d{2})\s+—\s+(?P<title>.+?)\s*$",
-            block,
-            re.MULTILINE,
-        )
-        if not m:
-            continue
-        entry = {"date": m.group("date"), "title": m.group("title")}
-        for field in ("Found by", "Where", "Context", "Severity", "Observation"):
-            fm = re.search(
-                rf"^\s*-\s+{re.escape(field)}:\s*(.+?)\s*$", block, re.MULTILINE
-            )
-            if fm:
-                entry[field.lower().replace(" ", "_")] = fm.group(1)
-        entry["where_exists"] = _where_path_exists(entry.get("where", ""))
-        entries.append(entry)
-    return {"path": str(path.relative_to(ROOT)), "entries": entries}
-
-
 def collect_gh_issues() -> list[dict]:
-    """Open GitHub issues via `gh issue list`.
-
-    Returns [] when gh is not on PATH, the repo has no GitHub remote, or the
-    call fails for any reason — the script must stay portable to non-GitHub
-    downstream projects, so this collector skips silently rather than failing.
-    """
-    if not shutil.which("gh"):
-        return []
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "issue",
-                "list",
-                "--state",
-                "open",
-                "--json",
-                "number,title,url,updatedAt",
-                "--limit",
-                "20",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        data = json.loads(result.stdout)
-        return data if isinstance(data, list) else []
-    except (
-        subprocess.CalledProcessError,
-        subprocess.TimeoutExpired,
-        json.JSONDecodeError,
-    ):
-        return []
-
-
-def _where_path_exists(where: str) -> bool | None:
-    """If `where` looks like a path, check if it exists. Return None if non-path."""
-    if not where:
-        return None
-    candidate = where.split(":", 1)[0].strip()
-    if not candidate or " " in candidate:
-        return None
-    p = ROOT / candidate
-    return p.exists()
+    """Open GitHub issues."""
+    return _gh_json(
+        "issue",
+        "list",
+        "--state",
+        "open",
+        "--json",
+        "number,title,url,updatedAt",
+        "--limit",
+        "20",
+    )
 
 
 def main() -> int:
@@ -329,13 +405,11 @@ def main() -> int:
     args = parser.parse_args()
 
     out = {
-        "version": 2,
-        "todo_file": collect_todo_file(),
-        "inline_todos": collect_inline_todos(),
-        "spec_open_questions": collect_spec_open_questions(),
+        "version": 3,
+        **collect_work(),
+        "pull_requests": collect_pull_requests(),
         "in_flight": collect_in_flight(),
         "roadmap": collect_roadmap(),
-        "techdebt": collect_techdebt(),
         "gh_issues": collect_gh_issues(),
     }
     indent = 2 if args.pretty else None

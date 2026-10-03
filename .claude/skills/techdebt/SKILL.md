@@ -103,4 +103,4 @@ Do not write to any file. Do not ask the user where to put it — that's the mai
 
 This skill complements the `[DECISION]` reviewer tag (`docs/workflow.md` § 7: a `[DECISION]` critical becomes an open question on the entry). Reviewers flag; the main agent decides; this skill normalizes the persisted record.
 
-`whats-next` reads `docs/techdebt.md` (when present) and surfaces entries as work candidates alongside TODOs, plans, and specs — with the source labelled `docs/techdebt.md (DATE)` so the user can tell observations from explicit todos. The "observation, not fix" framing applies to _how entries are written_ (capture the smell, not the prescription); once captured, an entry is fair game for triage and scoring like any other backlog item.
+`whats-next` reads `docs/techdebt.md` and lists the entries not queued, grouped by theme, for the owner to queue like any todo. The "observation, not fix" framing applies to _how entries are written_ (capture the smell, not the prescription); once captured, an entry is fair game for triage and scoring like any other backlog item.
