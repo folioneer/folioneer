@@ -7,7 +7,7 @@ during work that don't warrant immediate action. Format produced by the
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-061) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-064) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -409,9 +409,9 @@ Remove an entry once it has been resolved.
 - Found by: reviewer-arch on #012 (owner chose to track it, 2026-09-28)
 - Where: `src/features/account_details/open_balance/useOpenBalance.ts` — `zeroCostWarning`
 - Severity: 🔵
-- Observation: the warning of TRX-065 shows when the typed total cost is 0, a comparison made in the frontend; the core owes that decision (F32, B47). The architecture check does not see a bare comparison, so the frozen count of `account_details` (TD-046) does not include it.
+- Observation: the warning of TRX-065 shows when the typed total cost is 0, a comparison made in the frontend; the core owes that decision (F32, B47). The command line's `holding open --total-cost 0` therefore records without the warning. The architecture check does not see a bare comparison, so the frozen count of `account_details` (TD-046) does not include it.
 - User value: None directly — the warning reads the same from any interface.
-- Done when: an opening-balance draft check in the core (like TRX-062 for purchases and sales) returns the warning with its other checks, and the form shows what it returns.
+- Done when: an opening-balance draft check in the core (like TRX-062 for purchases and sales) returns the warning with its other checks; the form shows what it returns, and the command line prints it.
 
 ## 2026-10-03 — TD-059 — CI installs whatever Rust is newest
 
@@ -430,3 +430,30 @@ Remove an entry once it has been resolved.
 - Observation: the screen charts the current year and lists its months up to today, so its capture differs from `main`'s as soon as the month changes (0.78 % of pixels against a 0.3 % threshold). Until a run on `main` renews the reference, every pull request that touches no interface file fails; the run had to be started by hand.
 - User value: None directly — the first pull request of a month merges like any other.
 - Done when: the capture does not depend on the day it is taken (data and "today" fixed for the run, or the dated parts masked), shown by a comparison that passes across a month change.
+
+## 2026-10-03 — TD-061 — Three hardening fixes ported from another project are not here
+
+- Found by: the owner (issue 44, 2026-09-27); checked against `main` on 2026-10-03
+- Where: `.github/workflows/review.yml` (the reviewer job's checkout), `scripts/next-todo.sh` (lines 24–32), `scripts/tests/test_merge.py`
+- Severity: 🟡
+- Observation: (1) the reviewer job's checkout keeps the job's access in the working copy the reviewing session reads; the redaction the issue also asks for is already in place. (2) `next-todo.sh` takes its lock with `flock` before checking `flock` exists: without it the run logs "another run holds the lock" and exits 0. The headless runner is not scheduled on the owner's machine today. (3) the merge tests run `git` in throwaway repositories with the inherited environment; under a hook that exports `GIT_DIR` they would act on the real repository. No hook runs them today.
+- User value: None directly — the tools stay no attack surface, and a missing tool fails loudly.
+- Done when: the checkout keeps nothing a session could read, with the matching `reviewer-infra` rule; the tool check runs before the lock; the merge tests clear `GIT_*` for their duration, with a test that fails without it; issue 44 is closed.
+
+## 2026-10-03 — TD-062 — The account's holding arithmetic has changes no test notices
+
+- Found by: the mutation sweep of 2026-10-01 (issue 65: 294 missed, 50 of them in `context/account/domain/account.rs`); three groups read on 2026-10-03
+- Where: `src-tauri/src/context/account/domain/account.rs` — `replay_holding` (17), `replay_holding_tolerantly` (8), `correct_transaction` (6), `cancel_transaction` (4), `derive_unit_price_from_total` (4)
+- Severity: 🟡
+- Observation: the 50 are of three kinds. Real gaps: the realized profit total of a holding can change sign with every test passing. Probably dead code: `replay_holding` carries deposit and withdrawal branches while cash is replayed by `replay_cash_holding` — to prove, then delete rather than test. Noise: a `<` against a `<=` on the last sold date changes nothing. The other 244 (sync resolution first, 24) are not sorted.
+- User value: None directly — a wrong position or profit figure would be caught by a test before a release.
+- Done when: each of the 50 is sorted — a test added, the dead branch deleted, or the equivalent mutant excluded in `.cargo/mutants.toml` with its reason; a sweep of `account.rs` reports no missed mutant; what remains of issue 65 is filed by file.
+
+## 2026-10-03 — TD-063 — The spec lets a correction change the asset; the code does not
+
+- Found by: spec-reviewer and contract-reviewer on TD-056
+- Where: `docs/spec/financial-asset-transaction.md` — TRX-032; `CorrectTransactionDTO` in `src-tauri/src/use_cases/holding_transaction/api.rs`
+- Severity: 🔵
+- Observation: TRX-032 says changing a transaction's asset or account is permitted and recalculates both holdings. A correction carries neither: it keeps the asset and the account of its transaction. CSH-062 states what the code does.
+- User value: None directly — the spec says what a correction can change.
+- Done when: TRX-032 lists the fields a correction changes, and no rule mentions moving a transaction to another asset or account.

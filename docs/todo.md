@@ -2,7 +2,7 @@
 
 <!-- Add new backlog items here. Format: ## #NNN — (domain) — Short title -->
 <!-- #NNN is a permanent reference: never renumbered, never reused. A new entry takes the -->
-<!-- next free number wherever it is placed. Next free: #053. -->
+<!-- next free number wherever it is placed. Next free: #056. -->
 <!-- Every entry ends with four lines: **User value:**, **Done when:**, **Design:** and -->
 <!-- **Open questions:**. Design is `none` until the agent proposes one (it does so before -->
 <!-- touching anything the user sees), then `proposed (screenshots/design/NNN-*.png)`, then -->
@@ -17,15 +17,17 @@
 <!-- The human's queue: references (#NNN or TD-NNN) in the order to work them. The agent -->
 <!-- takes the first ready one, never edits this list, and stops when it is empty. -->
 
-1. #046
-2. #048
-3. TD-033
-4. #050
-5. #047
-6. #044
-7. TD-042
-8. #012
-9. TD-035
+1. TD-059
+2. TD-061
+3. TD-056
+4. TD-062
+5. #053
+6. #054
+7. #055
+8. TD-058
+9. TD-044
+10. #052
+11. #010
 
 ## #009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
@@ -144,6 +146,38 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Are management fees part of this report, or a separate one? (Recommended: part of it — income without the cost of holding tells half the story, and the data is already there.)
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
+
+## #053 — (backend) — The command line's help is easy to read
+
+Requested by the owner on 2026-10-03, after the first use on Windows. The help is one block of three long lines, printed whole for `--help` and after every mistake, so the one thing that was wrong is lost above it. The conventions a terminal user expects (Command Line Interface Guidelines, clig.dev): help for the program lists its commands with one line each and a few examples; help for one command shows its usage, one option per line with its default, and an example; a mistake prints the error and where to find help, not the help itself; a mistyped command suggests the closest one.
+
+**User value:** A user finds the command and its options at a glance, and after a mistake reads what was wrong.
+**Done when:** `folioneer --help` (and `folioneer-cli --help`) prints a one-line description, the commands with one line each and two or three examples; `--help` after a command prints that command only — usage, one option per line, aligned, with its default, then an example; a usage error prints the error and a hint naming the `--help` to run, not the whole help; a mistyped command or option suggests the closest one; exit codes are unchanged (0, 1, 2); the texts are tested in Rust and the README's examples match them.
+**Design:** none
+**Open questions:** none
+
+## #054 — (backend) — List accounts and assets from the command line
+
+Requested by the owner on 2026-10-03. A command names its account and its asset by what the user typed, and a refusal never lists what exists (#044); the user therefore needs a way to ask. `folioneer account list` and `folioneer asset list` print what the window's lists show. They only read, so they answer while the window is open.
+
+**User value:** A user finds the exact account and asset names to type, without opening the application.
+**Done when:** `folioneer account list` prints each account's name and currency, and `folioneer asset list` each asset's name, reference, class and currency — archived assets left out unless `--archived`, Cash Assets never; text columns by default and JSON with `--json`; both answer while the window is open and refuse with `NoPortfolio` where no portfolio exists; a refusal of any other command still lists nothing; spec rules in `docs/spec/command-line.md`, tested in Rust; the README documents them.
+**Design:** none
+**Open questions:**
+
+- [x] Does listing contradict the blind refusals? — No: refusals stay blind, only the explicit `list` commands show names (owner, 2026-10-03).
+
+## #055 — (backend) — Add an asset from the command line
+
+Requested by the owner on 2026-10-03. Recording a holding needs the asset to exist; today only the window creates one. `folioneer asset add` creates it through the same rules as the window's form. The form's defaults — the risk level of each class, the system category — are decided in the interface today (`DEFAULT_RISK_BY_CLASS`, part of TD-048); the core must own them for a second interface to share them.
+
+**User value:** A user adds a new asset and records its first holding from a terminal or a script.
+**Done when:** `folioneer asset add --name … --reference … --class … --currency …` creates the asset, checked by the same Rust rules as the window (a duplicate reference, an invalid ISIN or currency is refused with the reason); `--isin`, `--exchange`, `--risk` and `--category` are optional — the risk defaults to its class's and the category to the system one, both decided in the core and read by the window's form from it; it prints `Recorded: …` or `Refused: …`, JSON with `--json`, exits 0 / 1 / 2, and refuses while the window is open; it makes no network call; spec rules in `docs/spec/command-line.md`, tested in Rust; the README documents it.
+**Design:** none
+**Open questions:**
+
+- [x] Which options are required? — Name, reference, class and currency; risk and category default to what the form preselects; ISIN, exchange, risk and category are optional (owner, 2026-10-03).
+- [x] Does it look the asset up on the web by ISIN? — No: the command line makes no network call (owner, 2026-10-03).
 
 ## #051 — (fullstack) — An MCP server over the headless core
 
