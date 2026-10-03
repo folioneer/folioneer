@@ -175,8 +175,8 @@ jobs:
             full report with the Write tool at the path printed by `bash
             scripts/review-path.sh reviewer-${{ matrix.reviewer }}`, whatever the
             agent file says about where its output goes, and begin it with one
-            line counting the findings: `🔴 N critical, 🟡 N warning(s), 🔵 N
-            suggestion(s)`. Do not post comments or reviews
+            headline: `🔴 N critical, 🟡 N warning(s), 🔵 N suggestion(s)`, or
+            `✅ No issues found.` when there is none. Do not post comments or reviews
             on GitHub yourself; the workflow does that from the saved file.
             Be concise: one line per finding (location, claim, fix); no
             restating of the diff, no narrative, no unrequested alternatives.
@@ -234,8 +234,13 @@ jobs:
               "$MARKER" "$REVIEWER" "$RUN_URL" "${last:-(no final message)}")
             criticals=1
           else
+            # A report is read by its headline: a count of criticals, or the clean
+            # line. One with neither cannot be read as clean, and fails the check
+            # as a missing report does.
             criticals=$( { grep -Eo '🔴 [0-9]+ critical' "$report" || true; } | grep -Eo '[0-9]+' | head -n 1 || true)
-            criticals=${criticals:-0}
+            if [[ -z "$criticals" ]]; then
+              if grep -q '✅ No issues found' "$report"; then criticals=0; else criticals=1; fi
+            fi
             # GitHub caps a comment at 65 536 characters; keep the head of a long report.
             body=$(printf '%s\n%s\n\n[run](%s)\n' "$MARKER" "$(head -c 60000 "$report")" "$RUN_URL")
           fi

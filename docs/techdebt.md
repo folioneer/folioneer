@@ -1,8 +1,8 @@
 # Tech Debt
 
 Observations of code smells, brittle patterns, or pre-existing issues surfaced
-during work that don't warrant immediate action. Format produced by the
-`/techdebt` skill.
+during work that don't warrant immediate action. The entry format is in
+`docs/workflow.md` § 2.
 
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a

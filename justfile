@@ -106,7 +106,7 @@ next-todo:
 # Regenerate the SQLx offline query cache (run after schema or query changes): brings the
 # check database up to the latest migration, then prepares against it
 prepare-sqlx:
-    @if [ -d src-tauri ]; then cd src-tauri && DATABASE_URL="sqlite:.local/dev_check.sqlite" sqlx migrate run; fi
+    @if [ -d src-tauri ]; then cd src-tauri && mkdir -p .local && DATABASE_URL="sqlite:.local/dev_check.sqlite" sqlx database create && DATABASE_URL="sqlite:.local/dev_check.sqlite" sqlx migrate run; fi
     @if [ -d src-tauri ]; then cd src-tauri && SQLX_OFFLINE=false DATABASE_URL="sqlite:.local/dev_check.sqlite" cargo sqlx prepare -- --tests; else echo "ℹ skipping prepare-sqlx (no src-tauri/)"; fi
 
 # The markdown fixer runs prettier with the same args as check.py's

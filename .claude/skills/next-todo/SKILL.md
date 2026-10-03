@@ -76,7 +76,8 @@ fixed in code, never by editing `arch-allowlist.json` upward.
 ## Step 6 — Reviewers
 
 Launch the reviewer agents that match the diff (`docs/workflow.md` § 7) in one
-batch. Grade every finding with `/review-triage`'s axes and apply the policy: (a) fix,
+batch. Grade every finding by the four questions of `docs/workflow.md` § 7, one row
+each, and apply the policy: (a) fix,
 (b) `TD-NNN` entry, (c) one-off inline comment, (c) pattern → edit the reviewer prompt,
 `[DECISION]` → open question on the entry. Re-run the reviewers until no 🔴 remains.
 No question to the human. CI runs the same reviewers on every push (Step 8).
@@ -97,7 +98,7 @@ for `feat`/`fix`), body ≤ 2 lines with the ref.
   run, exit when all are completed) until every run completes.
 - A red `reviewer-<lane>` check: read its sticky comment on the PR (`gh api
 repos/{owner}/{repo}/issues/<n>/comments`), grade every finding with
-  `/review-triage`'s axes and apply the policy — (a) fix, (b) `TD-NNN` entry, (c)
+  the four questions of `docs/workflow.md` § 7 and apply the policy — (a) fix, (b) `TD-NNN` entry, (c)
   one-off inline comment, (c) pattern → edit the reviewer prompt, `[DECISION]` → open
   question on the entry — then record the table in the PR body, push, and watch again.
 - One E2E failure that passes on re-run: file the flake as `TD-NNN` with the failure

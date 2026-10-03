@@ -39,8 +39,11 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
 - Every entry carries a permanent `TD-NNN` reference (`## YYYY-MM-DD — TD-NNN — title`).
 - The agent files here: reviewer findings it did not fix, smells met on the way,
   proposals for new work, surviving mutants, coverage holes, frozen architecture debt.
-- Entries are observations, not commitments. The human promotes one by queuing its
-  reference in Next.
+- Entries are observations, not commitments: an entry says what is odd, not what to do.
+  The human promotes one by queuing its reference in Next.
+- An entry is `Found by`, `Where`, `Severity` (🔴 🟡 🔵, omitted when unknown),
+  `Observation`, `User value` and `Done when`. Nothing in it is invented: a missing fact
+  is left out.
 
 ### `docs/flow.md` — agent-owned
 
@@ -91,8 +94,9 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
     updated; `ARCHITECTURE.md` if a module appeared; the spec if a rule changed.
 11. **Next** entry, or stop (§ 8).
 
-**A batch in chat** — when the human says go to several queued entries, the human is
-asked twice, not once per entry:
+**A batch in chat** — when the human says go to several queued entries, the agent runs
+`/next-todo` for each rather than re-deriving its steps, and the human is asked twice,
+not once per entry:
 
 - **Opening block**, before the first entry starts: the open questions of every queued
   entry, and the mock-ups (§ 4) of every queued entry that changes what the user sees,
@@ -106,7 +110,9 @@ asked twice, not once per entry:
 A question that only appears mid-batch is written on its entry, the entry is skipped,
 and the question joins the closing block — unless nothing else in the queue can run.
 
-**Release** — the human runs `just release -y` when they choose. It re-runs the full
+**Release** — the hand-over starts with `/dep-audit` (a known vulnerability in what
+ships blocks the release) and the human runs `just release -y` when they choose. After
+it, `/prune` runs once. The release re-runs the full
 harness on `main`, computes the version from the merged titles, writes the changelog,
 tags and pushes; CI builds and leaves the draft; the human publishes it. The
 changelog and the git history are the record of what shipped.
@@ -184,7 +190,18 @@ ADR changes and `spec-checker` before closing an entry that carries spec rules �
 two locally only.
 
 Every finding, local or from a lane's CI comment, is graded and the outcome recorded
-in the PR body:
+in the PR body. The grade comes from four questions, in order; the one that settles it
+is the row's reason:
+
+1. **Did this branch introduce it?** Yes → (a), unless question 3 or 4 says otherwise.
+2. **If it was there before: is it in a file the pull request touches, small (about ten
+   lines) and mechanical?** All three → (a). Otherwise → (b).
+3. **Does it need a design judgment, or reach files outside the pull request?** → (b).
+4. **Is it wrong on the facts, outside the entry, speculative, or a taste no rule
+   states?** → (c), whatever the earlier answers. It is a pattern only when it recurs
+   across the batch or would bind later work; in doubt, one-off.
+
+Each finding gets its own row — never a silent fix, never a silent pass.
 
 | Grade        | Action                                                            |
 | ------------ | ----------------------------------------------------------------- |

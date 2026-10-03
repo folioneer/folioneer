@@ -27,7 +27,7 @@ Headless, a question only the human can answer goes into the entry's `**Open que
 2. **Gold for new code, bit by bit for existing** — `docs/workflow.md` § 10. When in doubt, defer.
 3. **Boyscout** — small mechanical fixes inside the files already edited ship in the same PR. Known dead code is removed in the same commit (live-vs-dead table in the PR body). No transition comments: code and docs describe what is, not what was.
 4. **Coverage when a real gap surfaces** — add a focused test; the floors in `coverage-gates.json` only rise.
-5. **Challenge reviewer returns** — every finding graded with `/review-triage` and recorded in the PR body: (a) in scope → fix; (b) bigger → `TD-NNN`; (c) false positive → inline `// <reviewer> FP: <reason> — see PR #NN`, or edit the reviewer prompt when it is a pattern. A `[DECISION]` critical becomes an open question on the entry.
+5. **Challenge reviewer returns** — every finding graded (`docs/workflow.md` § 7) and recorded in the PR body: (a) in scope → fix; (b) bigger → `TD-NNN`; (c) false positive → inline `// <reviewer> FP: <reason> — see PR #NN`, or edit the reviewer prompt when it is a pattern. A `[DECISION]` critical becomes an open question on the entry.
 6. **PR size ≤ 1000 lines** as a target; split when a PR crosses it or tells two stories (`docs/workflow.md` § 11).
 
 ## Opening and closing a piece of work
@@ -50,7 +50,7 @@ Headless, a question only the human can answer goes into the entry's `**Open que
 - **Before implementing**, read the rules for the layers touched (`.claude/rules/` brings the pointer in when a matching file is read; a new file triggers nothing, so this list is the fallback) — backend (`backend-rules`, `error-model`, `backend-patterns`), frontend (`frontend-rules`, `i18n-rules`, `visual-proof-rules`), E2E (`e2e-rules`), any test (`test-rules`), commits (`commit-rules`). When a rule changes, its doc changes in the same PR.
 - **After completing**, update the source docs in the same PR: the spec rules (+ `spec-reviewer`), the contract (+ `contract-reviewer`), an ADR only for a technical choice (`/adr-writer` + `adr-reviewer`), `docs/lessons.md` for an empirical failure worth teaching, `ARCHITECTURE.md` when a top-level folder appears.
 - **Vocabulary**: `docs/ubiquitous-language.md` — use confirmed terms in identifiers, comments and logs; never extend a discrepant one; changes need the owner. Give it to every reviewer you launch.
-- **Skills**: `/next-todo`, `/design-proposal NNN`, `/visual-proof`, `/review-triage`, `/techdebt`, `/adr-writer`, `/dep-audit`, `/prune`, `/whats-next`.
+- **Skills**: `/next-todo`, `/design-proposal NNN`, `/visual-proof`, `/adr-writer`, `/dep-audit`, `/prune`, `/whats-next`.
 - **Agents**: the reviewers matched to the diff (locally until no 🔴, and in CI on every push); `reviewer-security` before every release; `spec-checker` before closing an entry with spec rules; `spec-reviewer` / `contract-reviewer` / `adr-reviewer` when those documents change.
 - **Task tracking**: `TaskCreate` / `TaskUpdate` for any task of more than one file or step.
 - **Plans** (asked in chat): exact paths, functions and components per layer, gold work with its size, the tests for each clause. Once the human says go, the plan is the authority for the batch.

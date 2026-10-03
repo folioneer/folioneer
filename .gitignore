@@ -32,7 +32,7 @@ screenshots/e2e-failures/
 screenshots/e2e/
 tmp/
 coverage/
-# Reviewer reports (local triage artifacts, consumed by /review-triage)
+# Reviewer reports (local artifacts, read when the findings are graded)
 .review/
 
 # Python

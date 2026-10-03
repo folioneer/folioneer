@@ -6,11 +6,11 @@
 # Reviewer agents (kit/agents/reviewer-*.md) call this before responding so
 # their full report is preserved across the sub-agent → main-agent boundary
 # (where only the agent's terminal message would otherwise be visible). The
-# main agent reads the file(s) when executing /review-triage.
+# main agent reads the file(s) when it grades the findings (docs/workflow.md § 7).
 #
 # The `.review/` folder is intentionally separate from `tmp/` (used by
 # scripts/report-path.sh for one-shot skill reports) — reviewer reports live
-# longer because /review-triage may consult them after the fact. Downstream
+# longer because the grading may consult them after the fact. Downstream
 # projects should gitignore `.review/`.
 #
 # Concurrency: the script reads-then-prints without locking, so two parallel

@@ -15,7 +15,7 @@ The rules for an entry, set by the owner on 2026-10-03:
    questions come in one block for the batch, with what to look at and what a yes means.
 
 Each entry carries a permanent `FLOW-NNN` reference (never renumbered, never reused; next
-free: FLOW-018) so the owner can queue it in `docs/todo.md` § Next like any other. An
+free: FLOW-019) so the owner can queue it in `docs/todo.md` § Next like any other. An
 entry is removed once it is settled.
 
 ---
@@ -199,24 +199,23 @@ not — the work was done by hand, in the skills' spirit, with native commands.
 - Costs: half a day on the `justfile` and `scripts/check.py`. Protects: the rule that
   CI, the hooks and the agent run the same commands, and a CI round per local miss.
 
-## FLOW-015 — No skill was invoked; their steps were followed from memory
+## FLOW-018 — The flow is audited once, by hand
 
-- Kind: quality
-- Observed: the nine skills were invoked zero times in the batch. Entries were run, two
-  designs proposed, visual proofs captured, findings graded and debt filed by hand.
-  Where the hand-made path left the skill's, it cost: capture scripts rewritten three
-  times instead of `scripts/visual-proof-capture.mjs` (used once); triage done without
-  `/review-triage`, so a declined finding was sometimes recorded only in the pull
-  request body; no `/dep-audit` before the release — the local tools ran, the web check
-  of versions did not; `/prune` never ran.
-- Proposal: in a chat batch the agent invokes `/next-todo #NNN` for each entry rather
-  than re-deriving its steps, and `/dep-audit` is the first step of the release
-  hand-over. `/review-triage` and `/techdebt` are short enough to fold into
-  `/next-todo`'s steps 6 and 9, and be deleted as separate skills. `/prune` runs once
-  after each release.
-- Costs: an edit of `/next-todo`; two skills fewer. Protects: the steps that only the
-  skill remembers.
-- Needs the owner: yes — it removes two skills.
+- Kind: quality + speed
+- Observed: this file's figures — pull requests and their time to merge, CI rounds and
+  what caused them, run durations, what the agent invoked — were gathered by hand after
+  0.5.0, from `gh` and the session's transcript, in about an hour. Nothing will gather
+  them after 0.6.0 unless someone thinks of it. Raised by the owner on 2026-10-04.
+- Proposal: a `/flow-audit` skill run after each release, on a script
+  (`scripts/flow-audit.py`) that measures the same things between two tags and prints
+  them beside the previous release's. The skill writes the "Measured" and "Used and not
+  used" sections anew, proposes entries only where a figure moved or a rule was not
+  followed, and re-reads the open entries: settled ones leave, "keep" verdicts are
+  re-measured. A skill, not an agent: the judging needs the session's context, the
+  counting does not.
+- Costs: about half a day for the script and its tests; a few minutes per release.
+  Protects: the flow being improved on figures, release after release.
+- Needs the owner: yes — a new skill and a step in the release hand-over.
 
 ## Moved here from the todo and the tech debt
 
