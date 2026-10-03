@@ -37,6 +37,8 @@ vi.mock("./useEditTransactionModal", () => ({
     error: null,
     isSubmitting: false,
     isFormValid: true,
+    fieldErrors: {},
+    problemHint: null,
     showArchivedConfirm: false,
     recordPrice: false,
     setRecordPrice: vi.fn(),

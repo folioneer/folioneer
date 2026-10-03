@@ -10,6 +10,8 @@ import { TextareaField } from "@/ui/components/field/TextareaField";
 import { TextField } from "@/ui/components/field/TextField";
 import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { FormModal } from "@/ui/components/modal/FormModal";
+import { FormProblem } from "@/ui/components/modal/FormProblem";
+import { messageText } from "@/ui/format/i18n";
 import { useBuyTransaction } from "./useBuyTransaction";
 
 interface BuyTransactionModalProps {
@@ -50,7 +52,8 @@ export function BuyTransactionModal({
     setEntryMode,
     totalAmountInput,
     handleTotalAmountChange,
-    totalBelowFeesError,
+    fieldErrors,
+    problemHint,
     unitPriceDisplay,
     averageCostAsOfDate,
     error,
@@ -68,6 +71,12 @@ export function BuyTransactionModal({
   const footer = useMemo(
     () => (
       <div className="flex items-center justify-end gap-2">
+        {/* TRX-067 — why saving is not possible: beside the actions, always in view */}
+        <FormProblem
+          idPrefix="buy-trx"
+          error={messageText(t, error)}
+          hint={messageText(t, problemHint)}
+        />
         <Button
           variant="secondary"
           onClick={onClose}
@@ -86,7 +95,7 @@ export function BuyTransactionModal({
         </Button>
       </div>
     ),
-    [isSubmitting, showArchivedConfirm, isFormValid, t, onClose],
+    [isSubmitting, showArchivedConfirm, isFormValid, error, problemHint, t, onClose],
   );
 
   return (
@@ -126,6 +135,7 @@ export function BuyTransactionModal({
             label={t("transaction.form_date_label")}
             value={formData.date}
             onChange={(e) => handleChange("date", e.target.value)}
+            error={messageText(t, fieldErrors.date)}
             required
           />
 
@@ -136,6 +146,7 @@ export function BuyTransactionModal({
             value={formData.quantity}
             onValueChange={(v) => handleChange("quantity", v)}
             placeholder={t("transaction.form_quantity_placeholder")}
+            error={messageText(t, fieldErrors.quantity)}
             required
           />
 
@@ -151,6 +162,7 @@ export function BuyTransactionModal({
                 value={formData.unitPrice}
                 onValueChange={(v) => handleChange("unitPrice", v)}
                 placeholder={t("transaction.form_unit_price_placeholder")}
+                error={messageText(t, fieldErrors.unitPrice)}
                 required
               />
             ) : (
@@ -179,6 +191,7 @@ export function BuyTransactionModal({
               value={formData.exchangeRate}
               onValueChange={(v) => handleChange("exchangeRate", v)}
               placeholder={t("transaction.form_exchange_rate_placeholder")}
+              error={messageText(t, fieldErrors.exchangeRate)}
             />
           )}
 
@@ -190,6 +203,7 @@ export function BuyTransactionModal({
               value={formData.fees}
               onValueChange={(v) => handleChange("fees", v)}
               placeholder={t("transaction.form_fees_placeholder")}
+              error={messageText(t, fieldErrors.fees)}
             />
             {entryMode === "price" ? (
               <TextField
@@ -207,11 +221,7 @@ export function BuyTransactionModal({
                 value={totalAmountInput}
                 onValueChange={handleTotalAmountChange}
                 placeholder={t("transaction.form_total_amount_placeholder")}
-                error={
-                  totalBelowFeesError
-                    ? t(totalBelowFeesError.key, totalBelowFeesError.vars)
-                    : undefined
-                }
+                error={messageText(t, fieldErrors.total)}
                 required
               />
             )}
@@ -233,13 +243,6 @@ export function BuyTransactionModal({
             onChange={setRecordPrice}
             date={formData.date}
           />
-
-          {/* Inline error */}
-          {error && (
-            <p role="alert" className="text-sm text-m3-error">
-              {t(error.key, error.vars)}
-            </p>
-          )}
         </form>
       </FormModal>
 

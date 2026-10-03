@@ -93,6 +93,8 @@ export function CalcField({
         inputMode="decimal"
         autoComplete="off"
         className={`m3-input w-full ${error ? "border-m3-error" : ""}`}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
         value={display}
         onChange={(e) => handleInput(e.target.value)}
         onBlur={handleBlur}
@@ -104,7 +106,11 @@ export function CalcField({
           = {formatResult(previewResult)}
         </p>
       )}
-      {error && <p className="text-xs text-m3-error mt-1 ml-1">{error}</p>}
+      {error && (
+        <p id={`${id}-error`} className="text-xs text-m3-error mt-1 ml-1">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
+import { type DraftField, useDraftProblemDisplay } from "../shared/useDraftProblemDisplay";
 import { useHoldingSnapshotAsOf } from "../shared/useHoldingSnapshotAsOf";
 import { toTransactionDraft, useTransactionDraftCheck } from "../shared/useTransactionDraftCheck";
 
@@ -56,14 +57,9 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
   const check = useTransactionDraftCheck(draft);
   const preview = check.preview;
 
-  // TRX-060 — a typed all-in total below the fees it includes is shown on the Total field.
-  const totalBelowFeesError = useMemo<I18nMessage | null>(
-    () =>
-      check.problem?.code === "TotalAmountBelowFees"
-        ? { key: "transaction.error_validation_total_below_fees" }
-        : null,
-    [check.problem],
-  );
+  // TRX-067 — the first problem is shown on its field once typed in, as a hint before.
+  const problemDisplay = useDraftProblemDisplay(check.problem, check.problemMessage, entryMode);
+  const touch = problemDisplay.touch;
 
   // TDI-020 — average cost as of the entered trade date (or today). Hidden when
   // nothing is held as of that date (TDI-021).
@@ -79,9 +75,29 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
     [assets, assetId],
   );
 
-  const handleChange = useCallback((field: keyof TransactionFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  }, []);
+  const handleChange = useCallback(
+    (field: keyof TransactionFormData, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+      const typed: Partial<Record<keyof TransactionFormData, DraftField>> = {
+        date: "date",
+        quantity: "quantity",
+        unitPrice: "unitPrice",
+        exchangeRate: "exchangeRate",
+        fees: "fees",
+      };
+      const draftField = typed[field];
+      if (draftField) touch(draftField);
+    },
+    [touch],
+  );
+
+  const handleTotalAmountChange = useCallback(
+    (value: string) => {
+      setTotalAmountInput(value);
+      touch("total");
+    },
+    [touch],
+  );
 
   // TRX-060 — switching modes carries over what the user currently sees: price →
   // total seeds the total input from the computed total (when qty + price are
@@ -188,14 +204,16 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
     setEntryMode: handleEntryModeChange,
     /** TRX-060 — the typed all-in total (decimal string), only meaningful in total mode. */
     totalAmountInput,
-    handleTotalAmountChange: setTotalAmountInput,
-    /** TRX-060 — inline error for the Total field when the typed total is below the fees. */
-    totalBelowFeesError,
+    handleTotalAmountChange,
+    /** TRX-067 — the first problem as an error on the field it concerns, once typed in. */
+    fieldErrors: problemDisplay.fieldErrors,
+    /** TRX-067 — the first problem as a plain hint, for a field not typed in yet. */
+    problemHint: problemDisplay.hint,
     /** TRX-060 — formatted derived unit price shown in total mode; "—" until the draft checks clean. */
     unitPriceDisplay: preview ? microToFormatted(preview.unit_price) : "—",
     /** TDI-020 — formatted account-currency average cost as of the date, or null when not held. */
     averageCostAsOfDate,
-    error,
+    error: error ?? problemDisplay.alert,
     isSubmitting,
     isFormValid: check.isClean,
     showArchivedConfirm,

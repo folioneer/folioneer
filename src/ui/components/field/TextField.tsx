@@ -30,9 +30,15 @@ export function TextField({ id, label, error, className = "", ...props }: TextFi
       <input
         id={id}
         className={`m3-input w-full ${error ? "border-m3-error" : ""} ${className}`}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
         {...props}
       />
-      {error && <p className="text-xs text-m3-error mt-1 ml-1">{error}</p>}
+      {error && (
+        <p id={`${id}-error`} className="text-xs text-m3-error mt-1 ml-1">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

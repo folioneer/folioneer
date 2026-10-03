@@ -12,6 +12,8 @@ import { TextareaField } from "@/ui/components/field/TextareaField";
 import { TextField } from "@/ui/components/field/TextField";
 import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { FormModal } from "@/ui/components/modal/FormModal";
+import { FormProblem } from "@/ui/components/modal/FormProblem";
+import { messageText } from "@/ui/format/i18n";
 import { EntryModeToggle } from "../shared/EntryModeToggle";
 import { RecordPriceCheckbox } from "../shared/RecordPriceCheckbox";
 import { useNonCashAssets } from "../shared/useNonCashAssets";
@@ -58,7 +60,8 @@ export function EditTransactionModal({
     handleEntryModeChange,
     totalAmountInput,
     handleTotalAmountChange,
-    totalBelowFeesError,
+    fieldErrors,
+    problemHint,
     unitPriceDisplay,
     handleChange,
     handleSubmit,
@@ -80,6 +83,12 @@ export function EditTransactionModal({
 
   const footer = (
     <div className="flex items-center justify-end gap-2">
+      {/* TRX-067 — why saving is not possible: beside the actions, always in view */}
+      <FormProblem
+        idPrefix="edit-trx"
+        error={messageText(t, error)}
+        hint={messageText(t, problemHint)}
+      />
       <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
         {t("action.cancel")}
       </Button>
@@ -139,6 +148,7 @@ export function EditTransactionModal({
             onChange={(e) => handleChange("date", e.target.value)}
             max={isOpeningBalance ? new Date().toISOString().slice(0, 10) : undefined}
             required
+            error={messageText(t, fieldErrors.date)}
           />
 
           {/* Quantity + Unit Price (or Total Cost for OpeningBalance — TRX-051) */}
@@ -150,6 +160,7 @@ export function EditTransactionModal({
               onValueChange={(v) => handleChange("quantity", v)}
               placeholder={t("transaction.form_quantity_placeholder")}
               required
+              error={messageText(t, fieldErrors.quantity)}
             />
             {isTotalMode ? (
               // TRX-061 / SEL-051 — derived from the typed total; the backend recomputes it
@@ -172,6 +183,7 @@ export function EditTransactionModal({
                 value={formData.unitPrice}
                 onValueChange={(v) => handleChange("unitPrice", v)}
                 placeholder={t("transaction.form_unit_price_placeholder")}
+                error={messageText(t, fieldErrors.unitPrice)}
                 required
               />
             )}
@@ -194,6 +206,7 @@ export function EditTransactionModal({
               value={formData.exchangeRate}
               onValueChange={(v) => handleChange("exchangeRate", v)}
               placeholder={t("transaction.form_exchange_rate_placeholder")}
+              error={messageText(t, fieldErrors.exchangeRate)}
             />
           )}
 
@@ -206,6 +219,7 @@ export function EditTransactionModal({
                 value={formData.fees}
                 onValueChange={(v) => handleChange("fees", v)}
                 placeholder={t("transaction.form_fees_placeholder")}
+                error={messageText(t, fieldErrors.fees)}
               />
               {isTotalMode ? (
                 // TRX-061 / SEL-051 — the typed all-in total is ground truth
@@ -215,11 +229,7 @@ export function EditTransactionModal({
                   value={totalAmountInput}
                   onValueChange={handleTotalAmountChange}
                   placeholder={t("transaction.form_total_amount_placeholder")}
-                  error={
-                    totalBelowFeesError
-                      ? t(totalBelowFeesError.key, totalBelowFeesError.vars)
-                      : undefined
-                  }
+                  error={messageText(t, fieldErrors.total)}
                   required
                 />
               ) : (
@@ -254,13 +264,6 @@ export function EditTransactionModal({
               onChange={setRecordPrice}
               date={formData.date}
             />
-          )}
-
-          {/* Inline error */}
-          {error && (
-            <p role="alert" className="text-sm text-m3-error">
-              {t(error.key, error.vars)}
-            </p>
           )}
         </form>
       </FormModal>

@@ -11,6 +11,8 @@ import { TextareaField } from "@/ui/components/field/TextareaField";
 import { TextField } from "@/ui/components/field/TextField";
 import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { FormModal } from "@/ui/components/modal/FormModal";
+import { FormProblem } from "@/ui/components/modal/FormProblem";
+import { messageText } from "@/ui/format/i18n";
 import { RecordPriceCheckbox } from "../shared/RecordPriceCheckbox";
 import { useNonCashAssets } from "../shared/useNonCashAssets";
 import { useAddTransaction } from "./useAddTransaction";
@@ -46,6 +48,8 @@ export function AddTransactionModal({
     formData,
     totalAmountDisplay,
     error,
+    fieldErrors,
+    problemHint,
     isSubmitting,
     isFormValid,
     showArchivedConfirm,
@@ -70,6 +74,12 @@ export function AddTransactionModal({
 
   const footer = (
     <div className="flex items-center justify-end gap-2">
+      {/* TRX-067 — why saving is not possible: beside the actions, always in view */}
+      <FormProblem
+        idPrefix="trx"
+        error={messageText(t, error)}
+        hint={messageText(t, problemHint)}
+      />
       <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
         {t("action.cancel")}
       </Button>
@@ -103,6 +113,7 @@ export function AddTransactionModal({
             value={formData.accountId}
             onChange={(e) => handleChange("accountId", e.target.value)}
             options={[{ label: `— ${t("action.select")} —`, value: "" }, ...accountOptions]}
+            error={messageText(t, fieldErrors.account)}
             required
           />
 
@@ -115,6 +126,7 @@ export function AddTransactionModal({
             idKey="id"
             value={formData.assetId}
             onChange={(id) => handleChange("assetId", id)}
+            error={messageText(t, fieldErrors.asset)}
             searchKeys={["name", "reference"]}
             placeholder={t("transaction.form_asset_placeholder")}
             onCreateNew={onCreateNewAsset}
@@ -128,6 +140,7 @@ export function AddTransactionModal({
             value={formData.date}
             onChange={(e) => handleChange("date", e.target.value)}
             required
+            error={messageText(t, fieldErrors.date)}
           />
 
           {/* Quantity + Unit Price side by side */}
@@ -139,6 +152,7 @@ export function AddTransactionModal({
               onValueChange={(v) => handleChange("quantity", v)}
               placeholder={t("transaction.form_quantity_placeholder")}
               required
+              error={messageText(t, fieldErrors.quantity)}
             />
             <CalcField
               id="trx-unit-price"
@@ -147,6 +161,7 @@ export function AddTransactionModal({
               onValueChange={(v) => handleChange("unitPrice", v)}
               placeholder={t("transaction.form_unit_price_placeholder")}
               required
+              error={messageText(t, fieldErrors.unitPrice)}
             />
           </div>
 
@@ -158,6 +173,7 @@ export function AddTransactionModal({
               value={formData.exchangeRate}
               onValueChange={(v) => handleChange("exchangeRate", v)}
               placeholder={t("transaction.form_exchange_rate_placeholder")}
+              error={messageText(t, fieldErrors.exchangeRate)}
             />
           )}
 
@@ -169,6 +185,7 @@ export function AddTransactionModal({
               value={formData.fees}
               onValueChange={(v) => handleChange("fees", v)}
               placeholder={t("transaction.form_fees_placeholder")}
+              error={messageText(t, fieldErrors.fees)}
             />
             <TextField
               id="trx-total"
@@ -196,13 +213,6 @@ export function AddTransactionModal({
             onChange={setRecordPrice}
             date={formData.date}
           />
-
-          {/* Inline error */}
-          {error && (
-            <p role="alert" className="text-sm text-m3-error">
-              {t(error.key, error.vars)}
-            </p>
-          )}
         </form>
       </FormModal>
 

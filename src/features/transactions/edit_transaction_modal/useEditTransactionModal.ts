@@ -13,6 +13,7 @@ import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { transactionGateway } from "../gateway";
 import type { TransactionEntryMode, TransactionFormData } from "../shared/types";
+import { type DraftField, useDraftProblemDisplay } from "../shared/useDraftProblemDisplay";
 import { toTransactionDraft, useTransactionDraftCheck } from "../shared/useTransactionDraftCheck";
 import { useTransactions } from "../useTransactions";
 
@@ -84,6 +85,14 @@ export function useEditTransactionModal({
   const check = useTransactionDraftCheck(draft);
   const preview = check.preview;
 
+  // TRX-067 — the first problem is shown on its field once typed in, as a hint before.
+  const problemDisplay = useDraftProblemDisplay(
+    check.problem,
+    check.problemMessage,
+    isTotalMode ? "total" : "price",
+  );
+  const touch = problemDisplay.touch;
+
   // TRX-063 — every other type (an opening balance, a dividend) is checked on save: what the
   // user typed is sent as entered and recording's rejection is shown.
   const entered = useMemo(
@@ -113,27 +122,34 @@ export function useEditTransactionModal({
           entered.feesMicro,
         );
 
-  // TRX-060 — a typed purchase total below the fees it includes is shown on the Total field.
-  const totalBelowFeesError = useMemo<I18nMessage | null>(
-    () =>
-      isTotalEntryEligible && check.problem?.code === "TotalAmountBelowFees"
-        ? { key: "transaction.error_validation_total_below_fees" }
-        : null,
-    [isTotalEntryEligible, check.problem],
-  );
-
   // TRX-029 — derived flag: is the currently selected asset archived?
   const isSelectedAssetArchived = formData.assetId
     ? (assets.find((a) => a.id === formData.assetId)?.is_archived ?? false)
     : false;
 
-  const handleChange = useCallback((field: keyof TransactionFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  }, []);
+  const handleChange = useCallback(
+    (field: keyof TransactionFormData, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+      const typed: Partial<Record<keyof TransactionFormData, DraftField>> = {
+        date: "date",
+        quantity: "quantity",
+        unitPrice: "unitPrice",
+        exchangeRate: "exchangeRate",
+        fees: "fees",
+      };
+      const draftField = typed[field];
+      if (draftField) touch(draftField);
+    },
+    [touch],
+  );
 
-  const handleTotalAmountChange = useCallback((value: string) => {
-    setTotalAmountInput(value);
-  }, []);
+  const handleTotalAmountChange = useCallback(
+    (value: string) => {
+      setTotalAmountInput(value);
+      touch("total");
+    },
+    [touch],
+  );
 
   // TRX-061 — switching modes carries over what the user currently sees: price →
   // total seeds the total input from the computed total; total → price seeds the
@@ -249,7 +265,7 @@ export function useEditTransactionModal({
     formData,
     /** Total amount formatted for display. For OpeningBalance, equals total cost (TRX-051). */
     totalAmountDisplay: microToFormatted(totalMicro),
-    error,
+    error: error ?? problemDisplay.alert,
     isSubmitting,
     isFormValid,
     showArchivedConfirm,
@@ -262,7 +278,10 @@ export function useEditTransactionModal({
     handleEntryModeChange,
     totalAmountInput,
     handleTotalAmountChange,
-    totalBelowFeesError,
+    /** TRX-067 — the first problem as an error on the field it concerns, once typed in. */
+    fieldErrors: problemDisplay.fieldErrors,
+    /** TRX-067 — what to enter, for a field not typed in yet. */
+    problemHint: problemDisplay.hint,
     /** Derived unit price shown read-only while in total-entry mode. */
     unitPriceDisplay: preview ? microToFormatted(preview.unit_price) : "—",
     handleChange,

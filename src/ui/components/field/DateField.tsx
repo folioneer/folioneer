@@ -106,6 +106,8 @@ export function DateField({
           id={id}
           type="text"
           className={`m3-input w-full pr-8 ${error ? "border-m3-error" : ""} ${className}`}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
           value={displayValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
@@ -191,7 +193,11 @@ export function DateField({
             document.body,
           )}
       </div>
-      {error && <p className="text-xs text-m3-error mt-1 ml-1">{error}</p>}
+      {error && (
+        <p id={`${id}-error`} className="text-xs text-m3-error mt-1 ml-1">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

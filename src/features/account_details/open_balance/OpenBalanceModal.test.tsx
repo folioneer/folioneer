@@ -48,6 +48,8 @@ const makeHookReturn = (overrides: Record<string, unknown> = {}) => ({
   isSubmitting: false,
   isFormValid: false,
   zeroCostWarning: false,
+  fieldErrors: {},
+  problemHint: null,
   handleChange: vi.fn(),
   handleSubmit: vi.fn(),
   ...overrides,
@@ -179,7 +181,7 @@ describe("OpenBalanceModal", () => {
   // ── Error display ─────────────────────────────────────────────────────────
 
   it("renders an alert with the error message when error is set", () => {
-    mockUseOpenBalance.mockReturnValue(makeHookReturn({ error: "error.ArchivedAsset" }));
+    mockUseOpenBalance.mockReturnValue(makeHookReturn({ error: { key: "error.ArchivedAsset" } }));
     render(<OpenBalanceModal {...BASE_PROPS} />);
     expect(screen.getByRole("alert")).toBeInTheDocument();
   });

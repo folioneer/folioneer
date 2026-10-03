@@ -32,7 +32,8 @@ const makeHookReturn = (overrides: Record<string, unknown> = {}) => ({
   setEntryMode: vi.fn(),
   totalAmountInput: "",
   handleTotalAmountChange: vi.fn(),
-  totalBelowFeesError: null,
+  fieldErrors: {},
+  problemHint: null,
   unitPriceDisplay: "—",
   averageCostAsOfDate: null,
   error: null,
@@ -109,7 +110,7 @@ describe("BuyTransactionModal", () => {
       makeHookReturn({
         entryMode: "total",
         totalAmountInput: "5",
-        totalBelowFeesError: { key: "transaction.error_validation_total_below_fees" },
+        fieldErrors: { total: { key: "transaction.error_validation_total_below_fees" } },
       }),
     );
     render(<BuyTransactionModal {...BASE_PROPS} />);
@@ -118,6 +119,28 @@ describe("BuyTransactionModal", () => {
   });
 
   // TRX-060 — clicking a toggle segment switches the mode
+  // TRX-067 — a problem on a field not typed in yet is a plain hint above the actions, not
+  // an alert; one that concerns no field is the alert.
+  it("shows a problem as a hint before the field is typed in, as an alert when it concerns none", () => {
+    mockUseBuyTransaction.mockReturnValue(
+      makeHookReturn({ problemHint: { key: "error.QuantityNotPositive" } }),
+    );
+    const { unmount } = render(<BuyTransactionModal {...BASE_PROPS} />);
+    expect(document.getElementById("buy-trx-hint")?.textContent).toBe("error.QuantityNotPositive");
+    expect(document.getElementById("buy-trx-error")).toBeNull();
+    unmount();
+
+    mockUseBuyTransaction.mockReturnValue(
+      makeHookReturn({
+        problemHint: { key: "error.QuantityNotPositive" },
+        error: { key: "error.Unknown" },
+      }),
+    );
+    render(<BuyTransactionModal {...BASE_PROPS} />);
+    expect(document.getElementById("buy-trx-hint")).toBeNull();
+    expect(document.getElementById("buy-trx-error")?.textContent).toBe("error.Unknown");
+  });
+
   it("calls setEntryMode when a toggle segment is clicked", () => {
     const setEntryMode = vi.fn();
     mockUseBuyTransaction.mockReturnValue(makeHookReturn({ setEntryMode }));

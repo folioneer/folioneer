@@ -9,6 +9,8 @@ import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { useLatestCheck } from "@/ui/hooks/useLatestCheck";
 import { accountDetailsGateway } from "../gateway";
+import { transactionDraftErrorToI18n } from "../shared/presenter";
+import { type DraftField, useDraftProblemDisplay } from "../shared/useDraftProblemDisplay";
 
 interface UseOpenBalanceProps {
   accountId: string;
@@ -63,15 +65,28 @@ export function useOpenBalance({ accountId, assetId, onSubmitSuccess }: UseOpenB
   );
   const isFormValid = check.data !== null;
   const zeroCostWarning = check.data?.zero_cost ?? false;
-  // The check itself could not run: saving stays disabled, and the form says so.
-  const checkFailure = useMemo<I18nMessage | null>(
-    () => (check.failed ? { key: "error.Unknown" } : null),
-    [check.failed],
-  );
+  // TRX-067 — the first problem is shown on its field once typed in, as a hint before; a
+  // check that could not run is said beside the actions.
+  const problemMessage = useMemo<I18nMessage | null>(() => {
+    if (check.failed) return { key: "error.Unknown" };
+    return check.error ? transactionDraftErrorToI18n(check.error) : null;
+  }, [check.failed, check.error]);
+  const problemDisplay = useDraftProblemDisplay(check.error, problemMessage);
+  const touch = problemDisplay.touch;
 
-  const handleChange = useCallback((field: keyof OpenBalanceFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  }, []);
+  const handleChange = useCallback(
+    (field: keyof OpenBalanceFormData, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+      const typed: Partial<Record<keyof OpenBalanceFormData, DraftField>> = {
+        date: "date",
+        quantity: "quantity",
+        totalCost: "totalCost",
+      };
+      const draftField = typed[field];
+      if (draftField) touch(draftField);
+    },
+    [touch],
+  );
 
   const handleSubmit = useCallback(
     async (e: React.SyntheticEvent) => {
@@ -104,7 +119,11 @@ export function useOpenBalance({ accountId, assetId, onSubmitSuccess }: UseOpenB
 
   return {
     formData,
-    error: error ?? checkFailure,
+    error: error ?? problemDisplay.alert,
+    /** TRX-067 — the first problem as an error on the field it concerns, once typed in. */
+    fieldErrors: problemDisplay.fieldErrors,
+    /** TRX-067 — what to enter, for a field not typed in yet. */
+    problemHint: problemDisplay.hint,
     isSubmitting,
     isFormValid,
     zeroCostWarning,

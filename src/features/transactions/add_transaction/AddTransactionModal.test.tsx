@@ -35,6 +35,8 @@ vi.mock("./useAddTransaction", () => ({
     },
     totalAmountDisplay: "",
     error: null,
+    fieldErrors: {},
+    problemHint: null,
     isSubmitting: false,
     isFormValid: false,
     showArchivedConfirm: false,
