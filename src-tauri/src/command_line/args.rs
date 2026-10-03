@@ -42,15 +42,33 @@ pub struct Trade {
     pub note: Option<String>,
 }
 
-/// A command the user asked for.
+/// A command that records a transaction.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Command {
+pub enum Recording {
     /// An opening balance: quantity and total cost.
     Open { target: Target, total_cost: i64 },
     /// A purchase.
     Buy(Trade),
     /// A sale.
     Sell(Trade),
+}
+
+/// A command that lists what the others can name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Listed {
+    /// The accounts (CLI-018).
+    Accounts,
+    /// The assets a command can name (CLI-019), archived ones too when asked.
+    Assets { archived: bool },
+}
+
+/// A command the user asked for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Command {
+    /// Record a transaction; refused while the window is open (CLI-030).
+    Record(Recording),
+    /// List accounts or assets; reads only.
+    List(Listed),
 }
 
 /// What the command line asks for.
@@ -109,6 +127,25 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
         _ => return Err(Reason("a command is missing".to_string())),
     };
     let command = format!("{group} {verb}");
+    match command.as_str() {
+        "account list" => {
+            let (_, json) = flags(rest, &[])?;
+            return Ok(Invocation::Run {
+                command: Command::List(Listed::Accounts),
+                json,
+            });
+        }
+        "asset list" => {
+            let (given, json) = flags(rest, &["--archived"])?;
+            return Ok(Invocation::Run {
+                command: Command::List(Listed::Assets {
+                    archived: given.contains(&"--archived"),
+                }),
+                json,
+            });
+        }
+        _ => {}
+    }
     let allowed: &[&str] = match command.as_str() {
         "holding open" => &[
             "--account",
@@ -163,7 +200,7 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
         quantity: options.amount("--quantity")?,
     };
     let command = match verb {
-        "open" => Command::Open {
+        "open" => Recording::Open {
             target,
             total_cost: options.amount("--total-cost")?,
         },
@@ -181,13 +218,38 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
                 note: options.get("--note").map(str::to_string),
             };
             if verb == "buy" {
-                Command::Buy(trade)
+                Recording::Buy(trade)
             } else {
-                Command::Sell(trade)
+                Recording::Sell(trade)
             }
         }
     };
-    Ok(Invocation::Run { command, json })
+    Ok(Invocation::Run {
+        command: Command::Record(command),
+        json,
+    })
+}
+
+/// Reads the options of a command that takes no value: which of `allowed` were given, and
+/// whether `--json` was.
+fn flags<'a>(rest: &[String], allowed: &[&'a str]) -> Result<(Vec<&'a str>, bool), Reason> {
+    let mut given = Vec::new();
+    let mut json = false;
+    for name in rest.iter().map(String::as_str) {
+        if name == "--json" {
+            json = true;
+        } else if let Some(flag) = allowed.iter().find(|flag| **flag == name) {
+            given.push(*flag);
+        } else {
+            let known: Vec<&str> = allowed
+                .iter()
+                .copied()
+                .chain(["--json", "--help"])
+                .collect();
+            return Err(unknown("option", name, &known));
+        }
+    }
+    Ok((given, json))
 }
 
 #[derive(Default)]
@@ -274,10 +336,13 @@ mod tests {
         line.split_whitespace().map(str::to_string).collect()
     }
 
-    fn run(line: &str) -> Command {
+    fn run(line: &str) -> Recording {
         match parse(&args(line)).expect("valid") {
-            Invocation::Run { command, .. } => command,
-            Invocation::Help(_) => panic!("help"),
+            Invocation::Run {
+                command: Command::Record(recording),
+                ..
+            } => recording,
+            other => panic!("not a recording: {other:?}"),
         }
     }
 
@@ -286,7 +351,7 @@ mod tests {
     fn cli_010_reads_an_opening_balance() {
         assert_eq!(
             run("holding open --account PEA --asset CW8 --quantity 10 --total-cost 4950.5"),
-            Command::Open {
+            Recording::Open {
                 target: Target {
                     account: "PEA".to_string(),
                     asset: "CW8".to_string(),
@@ -301,7 +366,7 @@ mod tests {
     // CLI-010 — a purchase by price takes the defaults; a sale by total keeps its options.
     #[test]
     fn cli_010_reads_a_purchase_and_a_sale() {
-        let Command::Buy(buy) =
+        let Recording::Buy(buy) =
             run("holding buy --account PEA --asset CW8 --quantity 2 --price 495.10")
         else {
             panic!("buy");
@@ -309,7 +374,7 @@ mod tests {
         assert_eq!(buy.amount, TradeAmount::Price(495_100_000));
         assert_eq!((buy.fees, buy.rate, buy.note), (0, MICRO, None));
 
-        let Command::Sell(sell) = run(
+        let Recording::Sell(sell) = run(
             "holding sell --account PEA --asset CW8 --quantity 1 --total 980 --fees 1.99 --rate 1.1 --date 2026-09-28 --note x --json",
         ) else {
             panic!("sell");
@@ -324,6 +389,37 @@ mod tests {
             )),
             Ok(Invocation::Run { json: true, .. })
         ));
+    }
+
+    // CLI-018 / CLI-019 — the list commands take no value: `--json`, and `--archived` for assets.
+    #[test]
+    fn cli_018_reads_the_list_commands() {
+        let read = |line: &str| parse(&args(line)).expect("valid");
+        assert_eq!(
+            read("account list"),
+            Invocation::Run {
+                command: Command::List(Listed::Accounts),
+                json: false
+            }
+        );
+        assert_eq!(
+            read("asset list --json"),
+            Invocation::Run {
+                command: Command::List(Listed::Assets { archived: false }),
+                json: true
+            }
+        );
+        assert_eq!(
+            read("asset list --archived"),
+            Invocation::Run {
+                command: Command::List(Listed::Assets { archived: true }),
+                json: false
+            }
+        );
+        assert_eq!(
+            read("asset list --help"),
+            Invocation::Help(HelpTopic::AssetList)
+        );
     }
 
     // CLI-016 — `--help` or `-h` anywhere asks for help: the page of the command it comes
@@ -394,7 +490,15 @@ mod tests {
     fn cli_022_a_wrong_command_line_is_a_usage_error() {
         let reason = |line: &str| parse(&args(line)).expect_err("usage error").message;
         assert_eq!(reason(""), "a command is missing");
-        assert_eq!(reason("account list"), "unknown command \"account list\"");
+        assert_eq!(reason("account show"), "unknown command \"account show\"");
+        assert_eq!(
+            reason("account list --archived"),
+            "unknown option \"--archived\""
+        );
+        assert_eq!(
+            reason("asset list --archivd"),
+            "unknown option \"--archivd\". Did you mean \"--archived\"?"
+        );
         assert_eq!(reason("holding move"), "unknown command \"holding move\"");
         assert_eq!(
             reason("holding open --account A --asset B --quantity 1 --price 2"),

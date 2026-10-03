@@ -119,13 +119,15 @@ cd src-tauri && cargo test # Backend tests only
 
 ## Command line
 
-The installed program records an opening balance, a purchase or a sale without opening a window. Close the window first: a command refuses while it is open.
+The installed program records an opening balance, a purchase or a sale without opening a window. Close the window first: a command that records refuses while it is open; the lists answer anyway.
 
 ```
 folioneer holding open --account "PEA" --asset CW8 --quantity 10 --total-cost 4950 [--date 2026-09-28] [--json]
 folioneer holding buy  --account "PEA" --asset CW8 --quantity 2 --price 495.10 [--fees 1.99] [--rate 1] [--date …] [--note "…"] [--json]
 folioneer holding buy  --account "PEA" --asset CW8 --quantity 2 --total 992.19 [--fees 1.99] …
 folioneer holding sell …same options as buy…
+folioneer account list        # the accounts: what --account takes
+folioneer asset list          # the assets: what --asset takes (--archived for the archived ones)
 folioneer --help              # the commands, with examples
 folioneer holding buy --help  # one command's options and defaults
 ```

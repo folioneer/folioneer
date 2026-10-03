@@ -147,17 +147,6 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
 
-## #054 — (backend) — List accounts and assets from the command line
-
-Requested by the owner on 2026-10-03. A command names its account and its asset by what the user typed, and a refusal never lists what exists (#044); the user therefore needs a way to ask. `folioneer account list` and `folioneer asset list` print what the window's lists show. They only read, so they answer while the window is open.
-
-**User value:** A user finds the exact account and asset names to type, without opening the application.
-**Done when:** `folioneer account list` prints each account's name and currency, and `folioneer asset list` each asset's name, reference, class and currency — archived assets left out unless `--archived`, Cash Assets never; text columns by default and JSON with `--json`; both answer while the window is open and refuse with `NoPortfolio` where no portfolio exists; a refusal of any other command still lists nothing; spec rules in `docs/spec/command-line.md`, tested in Rust; the README documents them.
-**Design:** none
-**Open questions:**
-
-- [x] Does listing contradict the blind refusals? — No: refusals stay blind, only the explicit `list` commands show names (owner, 2026-10-03).
-
 ## #055 — (backend) — Add an asset from the command line
 
 Requested by the owner on 2026-10-03. Recording a holding needs the asset to exist; today only the window creates one. `folioneer asset add` creates it through the same rules as the window's form. The form's defaults — the risk level of each class, the system category — are decided in the interface today (`DEFAULT_RISK_BY_CLASS`, part of TD-048); the core must own them for a second interface to share them.

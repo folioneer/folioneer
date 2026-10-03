@@ -6,12 +6,13 @@ use std::sync::Arc;
 use serde::Serialize;
 
 use crate::context::account::{AccountError, AccountServiceContract, Transaction, TransactionType};
-use crate::context::asset::AssetServiceContract;
+use crate::context::asset::{AssetClass, AssetServiceContract};
+use crate::core::BACKEND;
 use crate::use_cases::holding_transaction::{
     HoldingTransactionUseCase, NameLookupError, OpenHoldingError, OpenHoldingTask,
 };
 
-use super::args::{Command, Trade, TradeAmount};
+use super::args::{Listed, Recording, Trade, TradeAmount};
 
 /// A refusal: a stable code a script can test and a sentence for a person (CLI-021).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,14 +33,53 @@ pub enum Outcome {
         currency: String,
         asset_reference: String,
     },
+    /// It listed these accounts or assets, sorted by name.
+    Listed(Listing),
     /// It recorded nothing.
     Refused(Refusal),
+}
+
+/// What a list command found.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Listing {
+    /// CLI-018 — the accounts.
+    Accounts(Vec<AccountRow>),
+    /// CLI-019 — the assets a command can name.
+    Assets(Vec<AssetRow>),
+}
+
+/// An account as `--account` names it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AccountRow {
+    /// The account's name.
+    pub name: String,
+    /// The account's currency.
+    pub currency: String,
+}
+
+/// An asset as `--asset` names it, with what the text output leaves out.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AssetRow {
+    /// The asset's name.
+    pub name: String,
+    /// The asset's reference.
+    pub reference: String,
+    /// The asset's class.
+    pub class: AssetClass,
+    /// The asset's currency.
+    pub currency: String,
+    /// The asset's ISIN, when it has one.
+    pub isin: Option<String>,
+    /// Whether the asset is archived.
+    pub archived: bool,
 }
 
 /// CLI-011/012 — asks the holding use case for what a command names, then records through it:
 /// the same use case the window calls. An interface adapter, like the Tauri commands.
 pub struct CommandRunner {
     holding: HoldingTransactionUseCase,
+    account_service: Arc<dyn AccountServiceContract>,
+    asset_service: Arc<dyn AssetServiceContract>,
 }
 
 impl CommandRunner {
@@ -49,15 +89,66 @@ impl CommandRunner {
         asset_service: Arc<dyn AssetServiceContract>,
     ) -> Self {
         Self {
-            holding: HoldingTransactionUseCase::new(account_service, asset_service),
+            holding: HoldingTransactionUseCase::new(
+                Arc::clone(&account_service),
+                Arc::clone(&asset_service),
+            ),
+            account_service,
+            asset_service,
         }
     }
 
-    /// Runs a command; `today` is the date used when the command gives none.
-    pub async fn run(&self, command: Command, today: &str) -> Outcome {
+    /// CLI-018 / CLI-019 — what a list command asks for, in the core's order.
+    pub async fn list(&self, listed: Listed) -> Outcome {
+        match listed {
+            Listed::Accounts => match self.account_service.get_all_by_name().await {
+                Ok(accounts) => Outcome::Listed(Listing::Accounts(
+                    accounts
+                        .into_iter()
+                        .map(|account| AccountRow {
+                            name: account.name,
+                            currency: account.currency,
+                        })
+                        .collect(),
+                )),
+                Err(error) => {
+                    tracing::error!(target: BACKEND, err = ?error, "command line: account list failed");
+                    Outcome::Refused(unreadable())
+                }
+            },
+            Listed::Assets { archived } => {
+                match self
+                    .asset_service
+                    .get_non_cash_assets_by_name(archived)
+                    .await
+                {
+                    Ok(assets) => Outcome::Listed(Listing::Assets(
+                        assets
+                            .into_iter()
+                            .map(|asset| AssetRow {
+                                name: asset.name,
+                                reference: asset.reference,
+                                class: asset.class,
+                                currency: asset.currency,
+                                isin: asset.isin,
+                                archived: asset.is_archived,
+                            })
+                            .collect(),
+                    )),
+                    Err(error) => {
+                        tracing::error!(target: BACKEND, err = ?error, "command line: asset list failed");
+                        Outcome::Refused(unreadable())
+                    }
+                }
+            }
+        }
+    }
+
+    /// Records a command; `today` is the date used when the command gives none.
+    pub async fn run(&self, command: Recording, today: &str) -> Outcome {
         let target = match &command {
-            Command::Open { target, .. } => target,
-            Command::Buy(trade) | Command::Sell(trade) => &trade.target,
+            Recording::Open { target, .. } => target,
+            Recording::Buy(trade) | Recording::Sell(trade) => &trade.target,
         };
         let found = match self
             .holding
@@ -69,7 +160,7 @@ impl CommandRunner {
         };
         let date = target.date.clone().unwrap_or_else(|| today.to_string());
         let result = match command {
-            Command::Open { target, total_cost } => self
+            Recording::Open { target, total_cost } => self
                 .holding
                 .open_holding(
                     &found.account_id,
@@ -80,7 +171,7 @@ impl CommandRunner {
                 )
                 .await
                 .map_err(|error| refusal_from_open(&error)),
-            Command::Buy(trade) => {
+            Recording::Buy(trade) => {
                 let (unit_price, total) = split(&trade);
                 self.holding
                     .buy_holding(
@@ -97,7 +188,7 @@ impl CommandRunner {
                     .await
                     .map_err(|error| refusal_from_account(&error))
             }
-            Command::Sell(trade) => {
+            Recording::Sell(trade) => {
                 let (unit_price, total) = split(&trade);
                 self.holding
                     .sell_holding(
@@ -124,6 +215,14 @@ impl CommandRunner {
             },
             Err(refusal) => Outcome::Refused(refusal),
         }
+    }
+}
+
+/// The portfolio could not be read.
+fn unreadable() -> Refusal {
+    Refusal {
+        code: "DatabaseError".to_string(),
+        message: "the portfolio could not be read".to_string(),
     }
 }
 

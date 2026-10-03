@@ -74,11 +74,15 @@ pub fn run_command_line(program: &str, args: &[String]) -> i32 {
     execute_command_line(program, args)
 }
 
-/// CLI-010 — whether the arguments start a command: `holding`, or a request for the
-/// command line's help. Anything else is the program's other starts.
+/// CLI-010 — whether the arguments start a command: `holding`, `account`, `asset`, or a
+/// request for the command line's help. Anything else is the program's other starts.
 pub fn starts_command_line(args: &[String]) -> bool {
-    args.first()
-        .is_some_and(|first| matches!(first.as_str(), "holding" | "--help" | "-h"))
+    args.first().is_some_and(|first| {
+        matches!(
+            first.as_str(),
+            "holding" | "account" | "asset" | "--help" | "-h"
+        )
+    })
 }
 
 /// Runs a command on a runtime of its own, prints its result and returns its exit code.
@@ -163,6 +167,8 @@ mod tests {
             starts_command_line(&args)
         };
         assert!(starts("holding buy --account PEA"));
+        assert!(starts("account list"));
+        assert!(starts("asset list --json"));
         assert!(starts("--help"));
         assert!(starts("-h"));
         assert!(!starts(""));

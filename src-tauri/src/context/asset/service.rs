@@ -67,6 +67,18 @@ impl AssetService {
             .collect())
     }
 
+    /// CLI-019 — the assets a purchase or a sale can be recorded on (TRX-064), ordered by
+    /// name with case ignored; archived ones only when asked.
+    pub async fn get_non_cash_assets_by_name(
+        &self,
+        include_archived: bool,
+    ) -> StdResult<Vec<Asset>, AssetError> {
+        let mut assets = self.get_non_cash_assets().await?;
+        assets.retain(|asset| include_archived || !asset.is_archived);
+        assets.sort_by_cached_key(|asset| asset.name.to_lowercase());
+        Ok(assets)
+    }
+
     /// Retrieves all assets including archived ones.
     pub async fn get_all_assets_with_archived(&self) -> StdResult<Vec<Asset>, AssetError> {
         self.asset_repo
@@ -773,6 +785,11 @@ fn applied_write_error(context: &'static str, e: anyhow::Error) -> AssetError {
 pub trait AssetServiceContract: Send + Sync {
     /// Every asset a purchase or a sale can be recorded on: all but the Cash Assets (TRX-064).
     async fn get_non_cash_assets(&self) -> StdResult<Vec<Asset>, AssetError>;
+    /// The same assets ordered by name, archived ones only when asked (CLI-019).
+    async fn get_non_cash_assets_by_name(
+        &self,
+        include_archived: bool,
+    ) -> StdResult<Vec<Asset>, AssetError>;
     /// Retrieves a single asset by ID.
     async fn get_asset_by_id(&self, asset_id: &str) -> StdResult<Option<Asset>, AssetError>;
     /// Idempotently seeds the system Cash Asset for `currency` (CSH-010, CSH-011, CSH-017).
@@ -803,6 +820,13 @@ pub trait AssetServiceContract: Send + Sync {
 impl AssetServiceContract for AssetService {
     async fn get_non_cash_assets(&self) -> StdResult<Vec<Asset>, AssetError> {
         AssetService::get_non_cash_assets(self).await
+    }
+
+    async fn get_non_cash_assets_by_name(
+        &self,
+        include_archived: bool,
+    ) -> StdResult<Vec<Asset>, AssetError> {
+        AssetService::get_non_cash_assets_by_name(self, include_archived).await
     }
 
     async fn get_asset_by_id(&self, asset_id: &str) -> StdResult<Option<Asset>, AssetError> {

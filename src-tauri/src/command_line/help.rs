@@ -12,16 +12,24 @@ pub enum HelpTopic {
     Buy,
     /// `holding sell`.
     Sell,
+    /// `account list`.
+    AccountList,
+    /// `asset list`.
+    AssetList,
 }
 
 /// Every command, as typed after the program name, with its page — in the overview's order.
-const PAGES: [(&str, HelpTopic); 3] = [
+const PAGES: [(&str, HelpTopic); 5] = [
     ("holding open", HelpTopic::Open),
     ("holding buy", HelpTopic::Buy),
     ("holding sell", HelpTopic::Sell),
+    ("account list", HelpTopic::AccountList),
+    ("asset list", HelpTopic::AssetList),
 ];
 
-const EXIT_CODES: &str = "Exit codes: 0 recorded, 1 refused, 2 wrong usage.";
+const RECORDING_EXIT_CODES: &str = "Exit codes: 0 recorded, 1 refused, 2 wrong usage.";
+const LISTING_EXIT_CODES: &str = "Exit codes: 0 listed, 1 refused, 2 wrong usage.";
+const EXIT_CODES: &str = "Exit codes: 0 recorded or listed, 1 refused, 2 wrong usage.";
 
 /// The commands, as typed after the program name.
 pub fn commands() -> Vec<&'static str> {
@@ -110,6 +118,24 @@ pub fn help(program: &str, topic: HelpTopic) -> String {
             &TRADE_OPTIONS,
             "--account PEA --asset ASML --quantity 1 --total 1300",
         ),
+        HelpTopic::AccountList => page(
+            program,
+            "account list",
+            "List the accounts: the names --account takes, with their currency.",
+            &["[options]"],
+            &[],
+            &[],
+            "",
+        ),
+        HelpTopic::AssetList => page(
+            program,
+            "asset list",
+            "List the assets: the names and references --asset takes.",
+            &["[options]"],
+            &[],
+            &[("--archived", "Include archived assets", None)],
+            "--archived",
+        ),
     }
 }
 
@@ -131,11 +157,14 @@ Commands:
   holding open   Add an asset you already hold to an account (opening balance)
   holding buy    Record a purchase
   holding sell   Record a sale
+  account list   List the accounts
+  asset list     List the assets
 
 Examples:
   {program} holding buy  --account PEA --asset ASML --quantity 1 --price 1236.50
   {program} holding open --account PEA --asset \"Air Liquide\" --quantity 10 --total-cost 1520
   {program} holding sell --account PEA --asset ASML --quantity 1 --total 1300 --json
+  {program} asset list
 
 Amounts and quantities are decimals with a dot; dates are YYYY-MM-DD.
 Run '{program} <command> --help' for a command's options.
@@ -145,7 +174,8 @@ Close the Folioneer window before recording.
 }
 
 /// One command's page: what it does, its usage on aligned lines, one option per line with
-/// its default, an example and the exit codes.
+/// its default, an example and the exit codes. A command without required options — a
+/// list — has no such section and exits 0 when it listed.
 fn page(
     program: &str,
     command: &str,
@@ -174,10 +204,22 @@ fn page(
         .map(|(_, text, _)| text.len())
         .max()
         .unwrap_or(0);
+    let exit_codes = if required.is_empty() {
+        LISTING_EXIT_CODES
+    } else {
+        RECORDING_EXIT_CODES
+    };
     let required: String = required
         .iter()
         .map(|(name, text)| format!("  {name:<name_width$}   {text}\n"))
         .collect();
+    let required = if required.is_empty() {
+        String::new()
+    } else {
+        format!("Required:\n{required}\n")
+    };
+    let example = format!("{program} {command} {example}");
+    let example = example.trim_end();
     let optional: String = optional
         .iter()
         .map(|(name, text, default)| match default {
@@ -193,14 +235,12 @@ fn page(
 
 {lead}{usage}
 
-Required:
-{required}
-Options:
+{required}Options:
 {optional}
 Example:
-  {program} {command} {example}
+  {example}
 
-{EXIT_CODES}"
+{exit_codes}"
     )
 }
 
@@ -249,6 +289,7 @@ mod tests {
             assert!(text.contains(&format!("\n  {command}  ")), "{command}");
         }
         assert_eq!(text.matches("\n  folioneer-cli holding ").count(), 3);
+        assert!(text.contains("\n  folioneer-cli asset list\n"));
         assert!(text.contains("Run 'folioneer-cli <command> --help' for a command's options."));
         assert!(text.ends_with(EXIT_CODES));
     }
@@ -299,6 +340,31 @@ Exit codes: 0 recorded, 1 refused, 2 wrong usage."
         assert!(sell.starts_with("Record a sale of an asset in an account.\n"));
         assert!(sell.contains("Usage: folioneer holding sell --account"));
         assert!(sell.contains("\n  --fees <amount>"));
+    }
+
+    // CLI-023 — a list's page has no required option and exits 0 when it listed.
+    #[test]
+    fn cli_023_a_list_page_has_only_options() {
+        assert_eq!(
+            help("folioneer", HelpTopic::AssetList),
+            "\
+List the assets: the names and references --asset takes.
+
+Usage: folioneer asset list [options]
+
+Options:
+  --archived   Include archived assets
+  --json       Print the result as JSON
+  -h, --help   Show this help
+
+Example:
+  folioneer asset list --archived
+
+Exit codes: 0 listed, 1 refused, 2 wrong usage."
+        );
+        let accounts = help("folioneer", HelpTopic::AccountList);
+        assert!(accounts.contains("\nExample:\n  folioneer account list\n"));
+        assert!(!accounts.contains("--archived"));
     }
 
     // CLI-024 — the hint names the page of the command that was mistyped.

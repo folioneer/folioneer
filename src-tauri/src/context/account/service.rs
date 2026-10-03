@@ -111,6 +111,13 @@ impl AccountService {
         })
     }
 
+    /// CLI-018 — every account, ordered by name with case ignored.
+    pub async fn get_all_by_name(&self) -> StdResult<Vec<Account>, AccountError> {
+        let mut accounts = self.get_all().await?;
+        accounts.sort_by_cached_key(|account| account.name.to_lowercase());
+        Ok(accounts)
+    }
+
     /// Retrieves an account by ID.
     pub async fn get_by_id(&self, id: &str) -> StdResult<Option<Account>, AccountError> {
         self.account_repo.get_by_id(id).await.map_err(|e| {
@@ -1538,6 +1545,8 @@ impl AccountService {
 pub trait AccountServiceContract: Send + Sync {
     /// Retrieves all non-deleted accounts.
     async fn get_all(&self) -> StdResult<Vec<Account>, AccountError>;
+    /// Every account ordered by name, case ignored (CLI-018).
+    async fn get_all_by_name(&self) -> StdResult<Vec<Account>, AccountError>;
     /// Retrieves an account by ID.
     async fn get_by_id(&self, id: &str) -> StdResult<Option<Account>, AccountError>;
     /// Creates a new account.
@@ -1764,6 +1773,10 @@ pub trait AccountServiceContract: Send + Sync {
 impl AccountServiceContract for AccountService {
     async fn get_all(&self) -> StdResult<Vec<Account>, AccountError> {
         AccountService::get_all(self).await
+    }
+
+    async fn get_all_by_name(&self) -> StdResult<Vec<Account>, AccountError> {
+        AccountService::get_all_by_name(self).await
     }
 
     async fn get_by_id(&self, id: &str) -> StdResult<Option<Account>, AccountError> {

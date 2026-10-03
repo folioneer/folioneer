@@ -20,7 +20,7 @@ use crate::context::currency::{
 };
 use crate::context::sync::SqliteChangeRecorder;
 use crate::core::SideEffectEventBus;
-use crate::shared::infrastructure::change_recorder::ChangeRecorder;
+use crate::shared::infrastructure::change_recorder::{ChangeRecorder, NoopChangeRecorder};
 
 /// Fully wired service layer shared by every process entry point.
 ///
@@ -129,6 +129,12 @@ impl AppContainer {
             Arc::new(SqliteChangeRecorder::new(pool.clone()));
         Self::build(pool, None, None, None, change_recorder)
     }
+
+    /// The services of a headless entry that only reads (CLI-018): no event bus, no
+    /// currency provider, and nothing recorded for sync — there is nothing to record.
+    pub fn for_headless_reads(pool: Pool<Sqlite>) -> Self {
+        Self::build(pool, None, None, None, Arc::new(NoopChangeRecorder))
+    }
 }
 
 #[cfg(test)]
@@ -137,7 +143,6 @@ mod tests {
     use crate::context::currency::domain::rate_provider::{
         MockRateHistoryProvider, MockRateProvider,
     };
-    use crate::shared::infrastructure::change_recorder::NoopChangeRecorder;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn make_pool() -> Pool<Sqlite> {

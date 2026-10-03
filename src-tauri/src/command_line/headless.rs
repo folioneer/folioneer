@@ -8,7 +8,7 @@ use crate::shared::infrastructure::app_directories;
 use crate::shared::infrastructure::container::AppContainer;
 use crate::shared::infrastructure::window_lock::WindowLock;
 
-use super::args::{parse, Invocation};
+use super::args::{parse, Command, Invocation, Listed};
 use super::help::help;
 use super::orchestrator::{CommandRunner, Refusal};
 use super::output::{refused, render, Printed, RECORDED, WRONG_USAGE};
@@ -46,7 +46,7 @@ pub async fn run(program: &str, args: &[String]) -> Printed {
 }
 
 /// Runs a parsed command against the portfolio in `data_dir`.
-pub(crate) async fn run_in(data_dir: &Path, command: super::args::Command, json: bool) -> Printed {
+pub(crate) async fn run_in(data_dir: &Path, command: Command, json: bool) -> Printed {
     // CLI-032 — a command works on an existing portfolio; it never creates one.
     if !Database::exists_in(data_dir) {
         return refused(
@@ -57,6 +57,10 @@ pub(crate) async fn run_in(data_dir: &Path, command: super::args::Command, json:
             json,
         );
     }
+    let command = match command {
+        Command::List(listed) => return list_in(data_dir, listed, json).await,
+        Command::Record(recording) => recording,
+    };
     // CLI-030 — held until the command has written, so a window cannot start meanwhile and
     // two commands never write at once.
     let _lock = match WindowLock::acquire(data_dir) {
@@ -93,6 +97,23 @@ pub(crate) async fn run_in(data_dir: &Path, command: super::args::Command, json:
     render(&runner.run(command, &today).await, json)
 }
 
+/// CLI-018 / CLI-019 — a list only reads: it takes no lock and opens the portfolio for
+/// reading, so it answers while the window is open and never changes the portfolio file.
+async fn list_in(data_dir: &Path, listed: Listed, json: bool) -> Printed {
+    let database = match Database::open_read_only(data_dir).await {
+        Ok(database) => database,
+        Err(error) => {
+            tracing::error!(target: BACKEND, err = %format!("{error:#}"), "command line: read-only open failed");
+            return refused(&unavailable("the portfolio could not be opened"), json);
+        }
+    };
+    let container = AppContainer::for_headless_reads(database.pool.clone());
+    let runner = CommandRunner::new(container.account_service, container.asset_service);
+    let printed = render(&runner.list(listed).await, json);
+    database.pool.close().await;
+    printed
+}
+
 fn unavailable(reason: &str) -> Refusal {
     Refusal {
         code: "DatabaseError".to_string(),
@@ -103,7 +124,7 @@ fn unavailable(reason: &str) -> Refusal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command_line::args::{parse, Command, Invocation};
+    use crate::command_line::args::{parse, Invocation};
     use crate::command_line::output::{REFUSED, WRONG_USAGE};
     use crate::context::account::UpdateFrequency;
     use crate::context::asset::{AssetClass, CreateAssetDTO};
@@ -331,6 +352,128 @@ mod tests {
             refused.stderr.as_deref(),
             Some("Refused: no asset matches \"EUR\" by name or reference")
         );
+    }
+
+    // CLI-018 — the accounts as a table of what `--account` takes: name and currency, with
+    // a header; as JSON with `--json`. A list answers while the window is open (CLI-030).
+    #[tokio::test]
+    async fn cli_018_lists_the_accounts_even_while_the_window_is_open() {
+        let dir = portfolio("list-accounts").await;
+        let _window = WindowLock::acquire(&dir)
+            .expect("acquire")
+            .expect("free lock");
+
+        let listed = run_line(&dir, "account list").await;
+        assert_eq!(listed.exit_code, RECORDED);
+        assert_eq!(
+            listed.stdout.as_deref(),
+            Some("NAME   CURRENCY\nPEA    EUR")
+        );
+
+        let json = run_line(&dir, "account list --json").await;
+        let value: serde_json::Value =
+            serde_json::from_str(json.stdout.as_deref().expect("json")).expect("valid json");
+        assert_eq!(
+            value,
+            serde_json::json!({ "status": "listed", "accounts": [{ "name": "PEA", "currency": "EUR" }] })
+        );
+    }
+
+    // CLI-019 — the assets as a table of what `--asset` takes: name and reference, sorted
+    // by name; never a Cash Asset; an archived asset only with `--archived`; every field as
+    // JSON.
+    #[tokio::test]
+    async fn cli_019_lists_the_assets_a_command_can_name() {
+        let dir = portfolio("list-assets").await;
+        {
+            let database = Database::new(dir.clone()).await.expect("database");
+            let container = AppContainer::for_headless_writes(database.pool);
+            let assets = container
+                .asset_service
+                .get_non_cash_assets()
+                .await
+                .expect("assets");
+            let world = assets
+                .iter()
+                .find(|asset| asset.reference == "CW8")
+                .expect("CW8");
+            container
+                .asset_service
+                .archive_asset(&world.id)
+                .await
+                .expect("archived");
+            asset(&container, "amundi alpha", "ALP").await;
+        }
+
+        let listed = run_line(&dir, "asset list").await;
+        assert_eq!(
+            listed.stdout.as_deref(),
+            Some("NAME                REFERENCE\namundi alpha        ALP\nAmundi Euro Stoxx   C50")
+        );
+
+        let with_archived = run_line(&dir, "asset list --archived").await;
+        assert_eq!(
+            with_archived.stdout.as_deref(),
+            Some("NAME                REFERENCE\namundi alpha        ALP\nAmundi Euro Stoxx   C50\nAmundi MSCI World   CW8")
+        );
+
+        let json = run_line(&dir, "asset list --archived --json").await;
+        let value: serde_json::Value =
+            serde_json::from_str(json.stdout.as_deref().expect("json")).expect("valid json");
+        assert_eq!(value["status"], "listed");
+        assert_eq!(
+            value["assets"][2],
+            serde_json::json!({
+                "name": "Amundi MSCI World",
+                "reference": "CW8",
+                "class": "ETF",
+                "currency": "EUR",
+                "isin": null,
+                "archived": true
+            })
+        );
+        assert_eq!(value["assets"].as_array().map(Vec::len), Some(3));
+    }
+
+    // CLI-018 — a list reads a portfolio the window closed cleanly, and leaves the portfolio
+    // file byte for byte as it found it.
+    #[tokio::test]
+    async fn cli_018_a_list_never_changes_the_portfolio_file() {
+        let dir = portfolio("list-closed").await;
+        Database::new(dir.clone())
+            .await
+            .expect("database")
+            .pool
+            .close()
+            .await;
+        let portfolio_file = dir.join("portfolio");
+        let before = std::fs::read(&portfolio_file).expect("portfolio file");
+
+        let listed = run_line(&dir, "account list").await;
+
+        assert_eq!(
+            listed.stdout.as_deref(),
+            Some("NAME   CURRENCY\nPEA    EUR")
+        );
+        assert_eq!(
+            std::fs::read(&portfolio_file).expect("portfolio file"),
+            before
+        );
+    }
+
+    // CLI-032 — a list refuses where no portfolio exists, and creates none.
+    #[tokio::test]
+    async fn cli_032_a_list_refuses_where_there_is_no_portfolio() {
+        let dir = fresh_dir("list-nothing");
+
+        let refused = run_line(&dir, "asset list").await;
+
+        assert_eq!(refused.exit_code, REFUSED);
+        assert_eq!(
+            refused.stderr.as_deref(),
+            Some("Refused: no portfolio for this user on this computer")
+        );
+        assert!(!Database::exists_in(&dir));
     }
 
     // CLI-016 / CLI-024 / CLI-022 — help prints its page on standard output and exits 0; a

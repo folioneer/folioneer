@@ -22,6 +22,24 @@ impl Database {
         app_data_dir.join(DATABASE_FILENAME).is_file()
     }
 
+    /// Opens the existing database for reading only (CLI-018): it is neither created nor
+    /// migrated and no data is written, so it can be read while the window owns it. SQLite
+    /// may leave its own empty side files beside it.
+    pub async fn open_read_only(app_data_dir: &std::path::Path) -> anyhow::Result<Self> {
+        let db_path = app_data_dir.join(DATABASE_FILENAME);
+        let connect_options = SqliteConnectOptions::new()
+            .filename(&db_path)
+            .read_only(true)
+            .busy_timeout(std::time::Duration::from_secs(5))
+            .disable_statement_logging();
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(connect_options)
+            .await
+            .with_context(|| format!("Failed to open SQLite read-only at {:?}", db_path))?;
+        Ok(Database { pool })
+    }
+
     /// Initializes the database at the specified path and runs pending migrations.
     pub async fn new(app_data_dir: PathBuf) -> anyhow::Result<Self> {
         let is_db_reset = reset_requested(

@@ -2,7 +2,7 @@
 
 use serde_json::json;
 
-use super::orchestrator::{verb, Outcome, Refusal};
+use super::orchestrator::{verb, Listing, Outcome, Refusal};
 
 /// A command recorded.
 pub const RECORDED: i32 = 0;
@@ -73,8 +73,74 @@ pub fn render(outcome: &Outcome, json: bool) -> Printed {
             stderr: None,
             exit_code: RECORDED,
         },
+        (Outcome::Listed(listing), json) => Printed {
+            stdout: Some(if json {
+                listed_as_json(listing)
+            } else {
+                listed_as_table(listing)
+            }),
+            stderr: None,
+            exit_code: RECORDED,
+        },
         (Outcome::Refused(refusal), json) => refused(refusal, json),
     }
+}
+
+/// CLI-021 — a list as one JSON object, every field of each row.
+fn listed_as_json(listing: &Listing) -> String {
+    match listing {
+        Listing::Accounts(rows) => json!({ "status": "listed", "accounts": rows }),
+        Listing::Assets(rows) => json!({ "status": "listed", "assets": rows }),
+    }
+    .to_string()
+}
+
+/// CLI-020 — a list as a table: a header, then what a command needs to name each row.
+fn listed_as_table(listing: &Listing) -> String {
+    match listing {
+        Listing::Accounts(rows) => table(
+            ["NAME", "CURRENCY"],
+            rows.iter()
+                .map(|row| [row.name.as_str(), row.currency.as_str()]),
+        ),
+        Listing::Assets(rows) => table(
+            ["NAME", "REFERENCE"],
+            rows.iter()
+                .map(|row| [row.name.as_str(), row.reference.as_str()]),
+        ),
+    }
+}
+
+/// Two columns, the first padded to its widest cell, three spaces apart. A control
+/// character in a cell is printed escaped, never sent to the terminal.
+fn table<'a>(header: [&'a str; 2], rows: impl Iterator<Item = [&'a str; 2]>) -> String {
+    let lines: Vec<[String; 2]> = std::iter::once(header)
+        .chain(rows)
+        .map(|cells| cells.map(printable))
+        .collect();
+    let width = lines
+        .iter()
+        .map(|[first, _]| first.chars().count())
+        .max()
+        .unwrap_or(0);
+    lines
+        .iter()
+        .map(|[first, second]| format!("{first:<width$}   {second}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// `text` with every control character replaced by its escape (`\u{1b}`, `\r`).
+fn printable(text: &str) -> String {
+    text.chars()
+        .flat_map(|letter| {
+            if letter.is_control() {
+                letter.escape_default().collect::<Vec<char>>()
+            } else {
+                vec![letter]
+            }
+        })
+        .collect()
 }
 
 /// A refusal as text on standard error, or as JSON on standard output.
@@ -101,6 +167,29 @@ pub fn refused(refusal: &Refusal, json: bool) -> Printed {
 mod tests {
     use super::*;
     use crate::context::account::{Transaction, TransactionType};
+
+    // CLI-020 — a list of nothing prints its header alone; a control character in a name is
+    // printed escaped, and the column is as wide as what is printed.
+    #[test]
+    fn cli_020_a_table_escapes_control_characters_and_prints_its_header_alone() {
+        use crate::command_line::orchestrator::AccountRow;
+
+        let none = render(&Outcome::Listed(Listing::Accounts(vec![])), false);
+        assert_eq!(none.stdout.as_deref(), Some("NAME   CURRENCY"));
+
+        let row = |name: &str| AccountRow {
+            name: name.to_string(),
+            currency: "EUR".to_string(),
+        };
+        let listed = render(
+            &Outcome::Listed(Listing::Accounts(vec![row("PE\u{1b}[2JA"), row("CTO")])),
+            false,
+        );
+        assert_eq!(
+            listed.stdout.as_deref(),
+            Some("NAME           CURRENCY\nPE\\u{1b}[2JA   EUR\nCTO            EUR")
+        );
+    }
 
     fn purchase() -> Transaction {
         Transaction::restore(
