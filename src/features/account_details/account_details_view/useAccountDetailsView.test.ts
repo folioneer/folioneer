@@ -770,8 +770,6 @@ describe("useAccountDetailsView — split modal target (SPL-061)", () => {
     expect(result.current.splitTarget).toEqual({
       assetId: "asset-split",
       assetName: "Alphabet Inc",
-      holdingQuantityMicro: 10_000_000,
-      averagePriceMicro: 150_000_000,
       currentPriceMicro: 150_000_000,
     });
   });

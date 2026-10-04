@@ -3,8 +3,8 @@
 
 use super::error::{DividendError, OpenHoldingError};
 use super::{
-    HoldingTransactionUseCase, OpeningBalanceDraft, OpeningBalanceDraftPreview, TransactionDraft,
-    TransactionDraftError, TransactionDraftPreview,
+    HoldingTransactionUseCase, OpeningBalanceDraft, OpeningBalanceDraftPreview, SplitDraft,
+    SplitDraftPreview, TransactionDraft, TransactionDraftError, TransactionDraftPreview,
 };
 use crate::context::account::{AccountError, ManagementFeeRemoval, Transaction};
 use serde::{Deserialize, Serialize};
@@ -493,6 +493,18 @@ pub async fn validate_transaction_draft(
     draft: TransactionDraft,
 ) -> Result<TransactionDraftPreview, TransactionDraftError> {
     uc.validate_draft(draft).await
+}
+
+/// Checks a split draft without writing anything (SPL-062): the factor recording would
+/// store, the position before and after, the price to carry across the split — or the
+/// first problem as a code.
+#[tauri::command]
+#[specta::specta]
+pub async fn validate_split_draft(
+    uc: State<'_, HoldingTransactionUseCase>,
+    draft: SplitDraft,
+) -> Result<SplitDraftPreview, TransactionDraftError> {
+    uc.validate_split_draft(draft).await
 }
 
 /// Checks an opening balance draft without writing anything (TRX-066): whether its total

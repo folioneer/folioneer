@@ -6,7 +6,7 @@ use super::error::{
 use super::shared::ensure_cash_asset;
 use crate::context::account::{
     Account, AccountError, AccountServiceContract, EnteredAmount, ManagementFeeRemoval,
-    Transaction, TransactionType,
+    SplitPositionPreview, Transaction, TransactionType,
 };
 use crate::context::asset::{Asset, AssetClass, AssetServiceContract};
 use crate::core::logger::BACKEND;
@@ -68,6 +68,53 @@ pub struct OpeningBalanceDraft {
 pub struct OpeningBalanceDraftPreview {
     /// TRX-065 — the total cost is 0: the form and the command line warn, never block.
     pub zero_cost: bool,
+}
+
+/// How the size of a split is entered (SPL-061).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, specta::Type)]
+#[serde(tag = "mode", deny_unknown_fields)]
+pub enum SplitSize {
+    /// "new for old" shares, as a split is announced (2 for 1); `None` until typed.
+    Ratio {
+        /// Shares after, for `old` shares before.
+        new: Option<i64>,
+        /// Shares before.
+        old: Option<i64>,
+    },
+    /// The factor itself, in micros, as a correction carries it (SPL-030).
+    Factor {
+        /// Micro-scaled factor (2 for 1 → 2_000_000).
+        factor: i64,
+    },
+}
+
+/// A split as the user is still entering it (SPL-062/063). Empty strings are fields not filled
+/// yet.
+#[derive(Debug, Clone, serde::Deserialize, specta::Type)]
+#[serde(deny_unknown_fields)]
+pub struct SplitDraft {
+    /// The account.
+    pub account_id: String,
+    /// The asset that splits.
+    pub asset_id: String,
+    /// ISO date, empty until entered.
+    pub date: String,
+    /// The size of the split.
+    pub size: SplitSize,
+    /// The split being corrected, if any: its position is not previewed (SPL-063).
+    pub correcting: Option<String>,
+}
+
+/// What recording a split draft would do (SPL-062): the form shows it and computes none.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub struct SplitDraftPreview {
+    /// The micro-scaled factor recording would store (SPL-061).
+    pub factor: i64,
+    /// The position on the split's date, before and after; `None` for a correction.
+    pub position: Option<SplitPositionPreview>,
+    /// The asset's latest price before the split's date, carried across the split:
+    /// `round(price × MICRO / factor)` (SPL-040); `None` when it has none.
+    pub price_after_split: Option<i64>,
 }
 
 /// What recording a draft would store (TRX-062): the form shows the total.
@@ -247,6 +294,81 @@ impl HoldingTransactionUseCase {
             unit_price,
             total_amount,
             realized_pnl,
+        })
+    }
+
+    /// SPL-062 — checks a split draft without writing anything: the factor it would store,
+    /// what it would make of the position, the price to carry across it — or the first
+    /// problem, as recording would report it.
+    pub async fn validate_split_draft(
+        &self,
+        draft: SplitDraft,
+    ) -> Result<SplitDraftPreview, TransactionDraftError> {
+        const MICRO: i128 = 1_000_000;
+        // `round(numerator / denominator)` on positive integers, halves up; `None` when
+        // the result is no amount the application can hold.
+        let rounded = |numerator: i128, denominator: i128| {
+            i64::try_from((2 * numerator + denominator) / (2 * denominator)).ok()
+        };
+        if draft.date.trim().is_empty() {
+            return Err(TransactionDraftTask::DateMissing.into());
+        }
+        // SPL-061 — a ratio's factor is `round(new × MICRO / old)`; a part not typed yet,
+        // or not strictly positive, is no factor.
+        let factor = match draft.size {
+            SplitSize::Ratio {
+                new: Some(new),
+                old: Some(old),
+            } if new > 0 && old > 0 => rounded(new as i128 * MICRO, old as i128)
+                .filter(|factor| *factor > 0)
+                .ok_or(AccountError::SplitFactorNotPositive)?,
+            SplitSize::Ratio { .. } => return Err(AccountError::SplitFactorNotPositive.into()),
+            SplitSize::Factor { factor } => factor,
+        };
+        let position = if draft.correcting.is_some() {
+            // SPL-063 — a correction is checked on its date and factor alone.
+            Transaction::split(
+                draft.account_id.clone(),
+                draft.asset_id.clone(),
+                draft.date.clone(),
+                factor,
+                None,
+            )?;
+            None
+        } else {
+            // SPL-012 — a position closed today cannot be split, whatever it held then.
+            let held = self
+                .account_service
+                .get_holding_by_account_asset(&draft.account_id, &draft.asset_id)
+                .await?;
+            if !held.is_some_and(|holding| holding.quantity > 0) {
+                return Err(AccountError::ClosedPosition.into());
+            }
+            Some(
+                self.account_service
+                    .preview_split(&draft.account_id, &draft.asset_id, &draft.date, factor)
+                    .await?,
+            )
+        };
+        // SPL-040 — the latest price strictly before the split's date, carried across it.
+        // It helps fill a field: without one, or when prices cannot be read, there is none.
+        let prices = self
+            .asset_service
+            .get_asset_prices(&draft.asset_id)
+            .await
+            .unwrap_or_else(|e| {
+                tracing::error!(target: BACKEND, asset_id = %draft.asset_id, err = ?e, "validate_split_draft: price read failed");
+                Vec::new()
+            });
+        let price_after_split = prices
+            .into_iter()
+            .filter(|price| price.date < draft.date)
+            .max_by(|a, b| a.date.cmp(&b.date))
+            .and_then(|latest| rounded(latest.price as i128 * MICRO, factor as i128));
+        Ok(SplitDraftPreview {
+            factor,
+            position,
+            price_after_split,
         })
     }
 
@@ -2842,6 +2964,207 @@ mod draft_tests {
                     })
             });
         HoldingTransactionUseCase::new(Arc::new(account), Arc::new(MockAssetServiceContract::new()))
+    }
+
+    /// A use case whose account holds the asset today and previews a split as `position`
+    /// (read `reads` times), and whose asset has `price` on 2026-01-01, and a later one
+    /// on the draft's own date that must not be used.
+    fn split_use_case(
+        position: Result<SplitPositionPreview, AccountError>,
+        reads: usize,
+        price: Option<i64>,
+    ) -> HoldingTransactionUseCase {
+        split_use_case_holding(Some(4 * M), position, reads, price)
+    }
+
+    /// As `split_use_case`, with what the account holds of the asset today.
+    fn split_use_case_holding(
+        held_today: Option<i64>,
+        position: Result<SplitPositionPreview, AccountError>,
+        reads: usize,
+        price: Option<i64>,
+    ) -> HoldingTransactionUseCase {
+        let mut account = MockAccountServiceContract::new();
+        account
+            .expect_get_holding_by_account_asset()
+            .returning(move |account_id, asset_id| {
+                Ok(held_today.map(|quantity| {
+                    Holding::new(account_id.into(), asset_id.into(), quantity, M, 0, None)
+                        .expect("holding")
+                }))
+            });
+        account
+            .expect_preview_split()
+            .times(reads)
+            .returning(move |_, _, _, _| position.clone());
+        let mut asset = MockAssetServiceContract::new();
+        asset.expect_get_asset_prices().returning(move |asset_id| {
+            let on = |date: &str, price: i64| {
+                crate::context::asset::AssetPrice::new(
+                    asset_id.into(),
+                    date.into(),
+                    price,
+                    crate::context::asset::AssetPriceSource::Manual,
+                )
+                .expect("price")
+            };
+            Ok(price
+                .map(|price| {
+                    vec![
+                        on("2025-12-01", 7 * M),
+                        on("2026-01-01", price),
+                        on("2026-01-02", 9 * M),
+                    ]
+                })
+                .unwrap_or_default())
+        });
+        HoldingTransactionUseCase::new(Arc::new(account), Arc::new(asset))
+    }
+
+    fn split_draft(size: SplitSize) -> SplitDraft {
+        SplitDraft {
+            account_id: "acc-1".into(),
+            asset_id: "asset-1".into(),
+            date: "2026-01-02".into(),
+            size,
+            correcting: None,
+        }
+    }
+
+    const HELD: SplitPositionPreview = SplitPositionPreview {
+        old_quantity: 4 * M,
+        old_average_price: 30 * M,
+        new_quantity: 6 * M,
+        new_average_price: 20 * M,
+    };
+
+    // SPL-062 — a ratio becomes the factor recording stores, the position is the core's
+    // preview, and the latest price is carried across the split — each rounded once.
+    #[tokio::test]
+    async fn spl_062_a_split_draft_previews_factor_position_and_price() {
+        let ratio = |new, old| SplitSize::Ratio {
+            new: Some(new),
+            old: Some(old),
+        };
+        let preview = split_use_case(Ok(HELD), 1, Some(100 * M))
+            .validate_split_draft(split_draft(ratio(3, 2)))
+            .await
+            .expect("valid");
+        assert_eq!(preview.factor, 1_500_000);
+        assert_eq!(preview.position, Some(HELD));
+        // 100 / 1.5 = 66.666666…, rounded at the last micro.
+        assert_eq!(preview.price_after_split, Some(66_666_667));
+
+        // 1 for 3 does not divide: the factor rounds at the micro (SPL-061).
+        let preview = split_use_case(Ok(HELD), 1, None)
+            .validate_split_draft(split_draft(ratio(1, 3)))
+            .await
+            .expect("valid");
+        assert_eq!(preview.factor, 333_333);
+        assert_eq!(preview.price_after_split, None);
+    }
+
+    // SPL-062 — the first problem is reported as recording would: a date not entered, a
+    // ratio not typed yet or not positive, and what the account refuses.
+    #[tokio::test]
+    async fn spl_062_a_split_draft_reports_its_first_problem() {
+        let code_of = |result: Result<SplitDraftPreview, TransactionDraftError>| match result {
+            Ok(_) => "ok".to_string(),
+            Err(error) => serde_json::to_value(&error).expect("serialize")["code"]
+                .as_str()
+                .expect("code")
+                .to_string(),
+        };
+        let unread = || split_use_case(Ok(HELD), 0, None);
+        let mut undated = split_draft(SplitSize::Factor { factor: 2 * M });
+        undated.date = String::new();
+        assert_eq!(
+            code_of(unread().validate_split_draft(undated).await),
+            "DateMissing"
+        );
+        for (new, old) in [
+            (None, Some(1)),
+            (Some(2), None),
+            (Some(0), Some(1)),
+            (Some(1), Some(i64::MAX)),
+            (Some(i64::MAX), Some(1)),
+            (Some(2), Some(-1)),
+        ] {
+            let draft = split_draft(SplitSize::Ratio { new, old });
+            assert_eq!(
+                code_of(unread().validate_split_draft(draft).await),
+                "SplitFactorNotPositive"
+            );
+        }
+        let refused = split_use_case(Err(AccountError::SplitCollapsesPosition), 1, None)
+            .validate_split_draft(split_draft(SplitSize::Factor { factor: 1 }))
+            .await;
+        assert_eq!(code_of(refused), "SplitCollapsesPosition");
+    }
+
+    // SPL-012 — a position closed today is refused before anything is previewed, and a
+    // price read that fails leaves the check clean, without a price.
+    #[tokio::test]
+    async fn spl_062_a_split_draft_needs_a_position_held_today() {
+        for held_today in [None, Some(0)] {
+            let refused = split_use_case_holding(held_today, Ok(HELD), 0, None)
+                .validate_split_draft(split_draft(SplitSize::Factor { factor: 2 * M }))
+                .await;
+            assert!(matches!(
+                refused,
+                Err(TransactionDraftError::Account(AccountError::ClosedPosition))
+            ));
+        }
+
+        let mut account = MockAccountServiceContract::new();
+        account
+            .expect_get_holding_by_account_asset()
+            .returning(|account_id, asset_id| {
+                Ok(Some(
+                    Holding::new(account_id.into(), asset_id.into(), 4 * M, M, 0, None)
+                        .expect("holding"),
+                ))
+            });
+        account
+            .expect_preview_split()
+            .returning(|_, _, _, _| Ok(HELD));
+        let mut asset = MockAssetServiceContract::new();
+        asset
+            .expect_get_asset_prices()
+            .returning(|_| Err(crate::context::asset::AssetError::DatabaseError));
+        let preview = HoldingTransactionUseCase::new(Arc::new(account), Arc::new(asset))
+            .validate_split_draft(split_draft(SplitSize::Factor { factor: 2 * M }))
+            .await
+            .expect("valid");
+        assert_eq!(
+            (preview.position, preview.price_after_split),
+            (Some(HELD), None)
+        );
+    }
+
+    // SPL-063 — a split being corrected is checked on its date and factor alone: no
+    // position is read nor previewed.
+    #[tokio::test]
+    async fn spl_062_a_corrected_split_is_checked_without_its_position() {
+        let mut draft = split_draft(SplitSize::Factor { factor: 2 * M });
+        draft.correcting = Some("tx-1".into());
+        let preview = split_use_case(Ok(HELD), 0, Some(100 * M))
+            .validate_split_draft(draft.clone())
+            .await
+            .expect("valid");
+        assert_eq!((preview.factor, preview.position), (2 * M, None));
+        assert_eq!(preview.price_after_split, Some(50 * M));
+
+        draft.size = SplitSize::Factor { factor: M };
+        let refused = split_use_case(Ok(HELD), 0, None)
+            .validate_split_draft(draft)
+            .await;
+        assert!(matches!(
+            refused,
+            Err(TransactionDraftError::Account(
+                AccountError::SplitFactorIsOne
+            ))
+        ));
     }
 
     // TDI-030 — a new sale previews the gain it would realize: its proceeds minus the

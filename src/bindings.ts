@@ -630,6 +630,19 @@ async validateOpeningBalanceDraft(draft: OpeningBalanceDraft) : Promise<Result<O
 }
 },
 /**
+ * Checks a split draft without writing anything (SPL-062): the factor recording would
+ * store, the position before and after, the price to carry across the split — or the
+ * first problem as a code.
+ */
+async validateSplitDraft(draft: SplitDraft) : Promise<Result<SplitDraftPreview, TransactionDraftError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("validate_split_draft", { draft }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Corrects an existing transaction and recalculates the affected holding
  * (TRX-031, TRX-061, SEL-051).
  */
@@ -3937,6 +3950,48 @@ total_amount: number | null;
  */
 note: string | null }
 /**
+ * A split as the user is still entering it (SPL-062/063). Empty strings are fields not filled
+ * yet.
+ */
+export type SplitDraft = { 
+/**
+ * The account.
+ */
+account_id: string; 
+/**
+ * The asset that splits.
+ */
+asset_id: string; 
+/**
+ * ISO date, empty until entered.
+ */
+date: string; 
+/**
+ * The size of the split.
+ */
+size: SplitSize; 
+/**
+ * The split being corrected, if any: its position is not previewed (SPL-063).
+ */
+correcting: string | null }
+/**
+ * What recording a split draft would do (SPL-062): the form shows it and computes none.
+ */
+export type SplitDraftPreview = { 
+/**
+ * The micro-scaled factor recording would store (SPL-061).
+ */
+factor: number; 
+/**
+ * The position on the split's date, before and after; `None` for a correction.
+ */
+position: SplitPositionPreview | null; 
+/**
+ * The asset's latest price before the split's date, carried across the split:
+ * `round(price × MICRO / factor)` (SPL-040); `None` when it has none.
+ */
+price_after_split: number | null }
+/**
  * Use-case composite for the **record split** failure surface.
  * 
  * - `AccountError` — every account-BC rejection (lookup, infrastructure, the
@@ -3952,6 +4007,39 @@ AccountError |
  * Use-case-layer rejection (cross-BC asset checks).
  */
 SplitTask
+/**
+ * What a split would make of a position (SPL-020): the holding on the split's date,
+ * before and after the rescale. All fields are i64 micro-units (ADR-001).
+ */
+export type SplitPositionPreview = { 
+/**
+ * Units held on the split's date, before it.
+ */
+old_quantity: number; 
+/**
+ * Average cost per unit before the split, account currency.
+ */
+old_average_price: number; 
+/**
+ * Units held once the split is applied.
+ */
+new_quantity: number; 
+/**
+ * Average cost per unit once the split is applied, account currency.
+ */
+new_average_price: number }
+/**
+ * How the size of a split is entered (SPL-061).
+ */
+export type SplitSize = 
+/**
+ * "new for old" shares, as a split is announced (2 for 1); `None` until typed.
+ */
+{ mode: "Ratio"; new: number | null; old: number | null } | 
+/**
+ * The factor itself, in micros, as a correction carries it (SPL-030).
+ */
+{ mode: "Factor"; factor: number }
 /**
  * Application-layer rejections specific to the `record_split` use case —
  * cross-BC asset and holding checks performed by the orchestrator before
@@ -4330,8 +4418,8 @@ total_amount: number;
 /**
  * The gain a new sale would realize (TDI-030), in account currency: its proceeds minus
  * the average cost, as of its date, of the quantity sold. `None` for anything but a
- * new sale, and when it cannot be computed — no unit price, or nothing held at that
- * date (TDI-031).
+ * new sale, and when it cannot be computed — the position at that date does not
+ * hold what is sold, or cannot be read (TDI-031).
  */
 realized_pnl: number | null }
 /**

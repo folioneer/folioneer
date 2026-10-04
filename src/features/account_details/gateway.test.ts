@@ -956,3 +956,30 @@ describe("accountDetailsGateway — validateTransactionDraft (TRX-062)", () => {
     });
   });
 });
+
+describe("accountDetailsGateway — validateSplitDraft (SPL-062)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("sends the draft and returns the check's answer", async () => {
+    const draft = {
+      account_id: "acc-1",
+      asset_id: "ast-1",
+      date: "2026-01-02",
+      size: { mode: "Ratio" as const, new: 2, old: 1 },
+      correcting: null,
+    };
+    const preview = { factor: 2_000_000, position: null, price_after_split: null };
+    mockInvoke.mockResolvedValue(preview);
+    expect(await accountDetailsGateway.validateSplitDraft(draft)).toEqual({
+      status: "ok",
+      data: preview,
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("validate_split_draft", { draft });
+
+    mockInvoke.mockRejectedValue({ code: "SplitFactorIsOne" });
+    expect(await accountDetailsGateway.validateSplitDraft(draft)).toEqual({
+      status: "error",
+      error: { code: "SplitFactorIsOne" },
+    });
+  });
+});

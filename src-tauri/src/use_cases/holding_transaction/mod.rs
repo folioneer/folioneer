@@ -24,5 +24,6 @@ pub use error::{
 };
 pub use orchestrator::{
     DraftKind, HoldingTransactionUseCase, NamedTarget, OpeningBalanceDraft,
-    OpeningBalanceDraftPreview, TransactionDraft, TransactionDraftPreview,
+    OpeningBalanceDraftPreview, SplitDraft, SplitDraftPreview, SplitSize, TransactionDraft,
+    TransactionDraftPreview,
 };

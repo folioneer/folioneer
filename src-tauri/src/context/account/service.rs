@@ -1,8 +1,8 @@
 use super::domain::{
     Account, AccountJournal, AccountRepository, FeeCatchUpPosition, FeeCatchUpRepository,
     FeeSchedule, FeeScheduleRepository, Holding, HoldingNote, HoldingNoteRepository,
-    HoldingRepository, HoldingSnapshot, JournalFilter, ManagementFeeRemoval, ThresholdDirection,
-    Transaction, TransactionRepository, UpdateFrequency,
+    HoldingRepository, HoldingSnapshot, JournalFilter, ManagementFeeRemoval, SplitPositionPreview,
+    ThresholdDirection, Transaction, TransactionRepository, UpdateFrequency,
 };
 use super::error::AccountError;
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
@@ -367,6 +367,22 @@ impl AccountService {
             asset_id,
             date,
         ))
+    }
+
+    /// SPL-062 — what a split of `factor` on `date` would make of the (account, asset)
+    /// position, or the refusal recording it would give. Loads the account as recording
+    /// does; saves nothing.
+    pub async fn preview_split(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        date: &str,
+        factor: i64,
+    ) -> StdResult<SplitPositionPreview, AccountError> {
+        load_account(&*self.account_repo, account_id)
+            .await?
+            .preview_split(asset_id, date, factor)
+            .map_err(to_holding_tx_error)
     }
 
     /// Retrieves every transaction for an account across all assets, ordered
@@ -1576,6 +1592,14 @@ pub trait AccountServiceContract: Send + Sync {
         account_id: &str,
         asset_id: &str,
     ) -> StdResult<Option<Holding>, AccountError>;
+    /// What a split would make of a position, or its refusal (SPL-020/021).
+    async fn preview_split(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        date: &str,
+        factor: i64,
+    ) -> StdResult<SplitPositionPreview, AccountError>;
     /// The holding's quantity and average cost as of a date (TDI-010).
     async fn holding_snapshot_as_of(
         &self,
@@ -1840,6 +1864,16 @@ impl AccountServiceContract for AccountService {
         date: &str,
     ) -> StdResult<HoldingSnapshot, AccountError> {
         AccountService::holding_snapshot_as_of(self, account_id, asset_id, date).await
+    }
+
+    async fn preview_split(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        date: &str,
+        factor: i64,
+    ) -> StdResult<SplitPositionPreview, AccountError> {
+        AccountService::preview_split(self, account_id, asset_id, date, factor).await
     }
 
     async fn get_all_transactions_for_account(

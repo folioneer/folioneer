@@ -4,19 +4,26 @@ import { logger } from "@/lib/logger";
 import { useSplitTransaction } from "./useSplitTransaction";
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────────
-const { mockRecordSplit, mockCorrectTransaction, mockRecordAssetPrice, mockShowSnackbar } =
-  vi.hoisted(() => ({
-    mockRecordSplit: vi.fn(),
-    mockCorrectTransaction: vi.fn(),
-    mockRecordAssetPrice: vi.fn(),
-    mockShowSnackbar: vi.fn(),
-  }));
+const {
+  mockRecordSplit,
+  mockCorrectTransaction,
+  mockRecordAssetPrice,
+  mockShowSnackbar,
+  mockValidateSplitDraft,
+} = vi.hoisted(() => ({
+  mockValidateSplitDraft: vi.fn(),
+  mockRecordSplit: vi.fn(),
+  mockCorrectTransaction: vi.fn(),
+  mockRecordAssetPrice: vi.fn(),
+  mockShowSnackbar: vi.fn(),
+}));
 
 vi.mock("../gateway", () => ({
   accountDetailsGateway: {
     recordSplit: mockRecordSplit,
     correctTransaction: mockCorrectTransaction,
     recordAssetPrice: mockRecordAssetPrice,
+    validateSplitDraft: mockValidateSplitDraft,
   },
 }));
 
@@ -40,12 +47,10 @@ const TODAY = new Date().toISOString().slice(0, 10);
 
 const fakeSubmit = { preventDefault: vi.fn() } as unknown as React.FormEvent;
 
-// 10 shares at an average of 150.00, latest price 150.00.
+// A holding whose latest price is 150.00.
 const target = {
   assetId: "asset-equity-1",
   assetName: "Alphabet Inc",
-  holdingQuantityMicro: 10_000_000,
-  averagePriceMicro: 150_000_000,
   currentPriceMicro: 150_000_000,
 };
 
@@ -57,17 +62,39 @@ const BASE_PROPS = {
   onSubmitSuccess: vi.fn(),
 };
 
-// ── Tests ──────────────────────────────────────────────────────────────────────
-describe("useSplitTransaction — create mode (SPL-061/040)", () => {
-  beforeEach(() => {
-    mockRecordSplit.mockReset();
-    mockCorrectTransaction.mockReset();
-    mockRecordAssetPrice.mockReset();
-    mockShowSnackbar.mockReset();
-    vi.mocked(logger.error).mockClear();
-    vi.mocked(logger.warn).mockClear();
-    BASE_PROPS.onSubmitSuccess.mockClear();
-  });
+// The split draft check (SPL-062) is the core's. This stand-in answers a ratio draft with
+// a fixed factor, position and price, so a test can tell what the form shows from what it
+// would have computed itself.
+const answer = (overrides: Record<string, unknown> = {}) => ({
+  status: "ok",
+  data: {
+    factor: 2_000_000,
+    position: {
+      old_quantity: 10_000_000,
+      old_average_price: 150_000_000,
+      new_quantity: 20_000_000,
+      new_average_price: 75_000_000,
+    },
+    price_after_split: 75_000_000,
+    ...overrides,
+  },
+});
+const problem = (code: string) => ({ status: "error", error: { code } });
+
+const resetMocks = () => {
+  mockRecordSplit.mockReset();
+  mockCorrectTransaction.mockReset();
+  mockRecordAssetPrice.mockReset().mockResolvedValue({ status: "ok", data: null });
+  mockShowSnackbar.mockReset();
+  mockValidateSplitDraft.mockReset().mockResolvedValue(answer());
+  vi.mocked(logger.error).mockClear();
+  vi.mocked(logger.warn).mockClear();
+  BASE_PROPS.onSubmitSuccess.mockClear();
+};
+
+// ── Tests ──────────────────────────────────────────────────────────────────
+describe("useSplitTransaction — create mode (SPL-061/062/040)", () => {
+  beforeEach(resetMocks);
 
   // SPL-061 — initial form: today's date, default 2 : 1 ratio, blank note
   it("initial state has today's date, a 2 : 1 ratio, and a blank note", () => {
@@ -76,247 +103,274 @@ describe("useSplitTransaction — create mode (SPL-061/040)", () => {
     expect(result.current.formData.ratioNew).toBe("2");
     expect(result.current.formData.ratioOld).toBe("1");
     expect(result.current.formData.note).toBe("");
+    expect(result.current.isEditMode).toBe(false);
+  });
+
+  // SPL-062 — the form sends the ratio as typed and shows what the core returns: the
+  // position before and after, and the price to carry across the split.
+  it("sends the ratio as typed and shows the core's preview", async () => {
+    mockValidateSplitDraft.mockResolvedValue(
+      answer({
+        factor: 1_500_000,
+        position: {
+          old_quantity: 7_000_000,
+          old_average_price: 33_476_190,
+          new_quantity: 10_500_000,
+          new_average_price: 22_317_460,
+        },
+        price_after_split: 66_666_667,
+      }),
+    );
+    const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
+    act(() => result.current.handleChange("ratioNew", "3"));
+    act(() => result.current.handleChange("ratioOld", "2"));
+
+    await waitFor(() => expect(result.current.preview).not.toBeNull());
+    expect(mockValidateSplitDraft).toHaveBeenLastCalledWith({
+      account_id: "account-1",
+      asset_id: "asset-equity-1",
+      date: TODAY,
+      size: { mode: "Ratio", new: 3, old: 2 },
+      correcting: null,
+    });
+    // Not the holding the dialog was opened on (10 @ 150): the figures are the core's.
+    expect(result.current.preview?.oldQuantity).toContain("7");
+    expect(result.current.priceInput).toBe("66.667");
     expect(result.current.isFormValid).toBe(true);
   });
 
-  // SPL-061 — preview mirrors the SPL-020 formulas: qty ×2, average halved
-  it("previews the rescaled quantity and average price for the default 2 : 1 ratio", () => {
+  // SPL-061 — a ratio part that is not a whole number is sent as not typed yet.
+  it("sends a ratio part that is not a whole number as missing", async () => {
     const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
-    expect(result.current.preview).toEqual(
-      expect.objectContaining({
-        oldQuantity: "10",
-        // Formatted through the shared micro formatters (default "fr" locale in tests).
-        oldAveragePrice: "150,00",
-        newQuantity: "20",
-        newAveragePrice: "75,00",
-        newQuantityMicro: 20_000_000,
-      }),
+    act(() => result.current.handleChange("ratioNew", "2.5"));
+    await waitFor(() =>
+      expect(mockValidateSplitDraft).toHaveBeenLastCalledWith(
+        expect.objectContaining({ size: { mode: "Ratio", new: null, old: 1 } }),
+      ),
     );
   });
 
-  // SPL-011 — ratio invalid when a part is not a positive integer
-  it("flags the ratio and disables submit when a ratio part is zero", () => {
+  // SPL-011 — the core refuses a factor that is not positive or is 1: the ratio is
+  // flagged and nothing can be saved.
+  it.each([
+    "SplitFactorNotPositive",
+    "SplitFactorIsOne",
+  ])("flags the ratio when the core answers %s", async (code) => {
+    mockValidateSplitDraft.mockResolvedValue(problem(code));
     const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
-    act(() => result.current.handleChange("ratioOld", "0"));
-    expect(result.current.ratioError).toEqual({
-      key: "transaction.error_validation_split_ratio",
-    });
+    await waitFor(() => expect(result.current.ratioError).not.toBeNull());
     expect(result.current.isFormValid).toBe(false);
+    expect(result.current.preview).toBeNull();
+    expect(result.current.error).toBeNull();
   });
 
-  // SPL-011 — a ×1 split is a no-op data-entry error
-  it("flags the ratio and disables submit for a 1 : 1 ratio (factor = 1)", () => {
+  // SPL-021 — a split the core says leaves nothing is stated, with its own message.
+  it("states a split the core says leaves nothing", async () => {
+    mockValidateSplitDraft.mockResolvedValue(problem("SplitCollapsesPosition"));
+    const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
+    await waitFor(() =>
+      expect(result.current.error).toEqual({ key: "error.SplitCollapsesPosition" }),
+    );
+    expect(result.current.isFormValid).toBe(false);
+    expect(result.current.ratioError).toBeNull();
+  });
+
+  // A note is no part of the check: typing one asks the core nothing.
+  it("does not check again when the note changes", async () => {
+    const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
+    const asked = mockValidateSplitDraft.mock.calls.length;
+    act(() => result.current.handleChange("note", "2 for 1"));
+    expect(result.current.isFormValid).toBe(true);
+    expect(mockValidateSplitDraft).toHaveBeenCalledTimes(asked);
+  });
+
+  // TRX-067 — any other problem (a date, a position not held then) is said, not only
+  // shown by a disabled button; so is a check that could not run.
+  it("says why when the core reports another problem or the check fails", async () => {
+    mockValidateSplitDraft.mockResolvedValue(problem("ClosedPosition"));
+    const closed = renderHook(() => useSplitTransaction(BASE_PROPS));
+    await waitFor(() => expect(closed.result.current.error).not.toBeNull());
+    expect(closed.result.current.isFormValid).toBe(false);
+    closed.unmount();
+
+    mockValidateSplitDraft.mockRejectedValue(new Error("ipc down"));
+    const failed = renderHook(() => useSplitTransaction(BASE_PROPS));
+    await waitFor(() => expect(failed.result.current.error).toEqual({ key: "error.Unknown" }));
+    expect(failed.result.current.isFormValid).toBe(false);
+  });
+
+  // SPL-061 — the factor recorded is the one the core returned for the ratio.
+  it("records the factor the core returned", async () => {
+    mockValidateSplitDraft.mockResolvedValue(answer({ factor: 333_333 }));
+    mockRecordSplit.mockResolvedValue({ status: "ok", data: {} });
     const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
     act(() => result.current.handleChange("ratioNew", "1"));
-    expect(result.current.ratioError).toEqual({
-      key: "transaction.error_validation_split_ratio",
-    });
-    expect(result.current.isFormValid).toBe(false);
-  });
+    act(() => result.current.handleChange("ratioOld", "3"));
+    act(() => result.current.handleChange("note", "Reverse split"));
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
 
-  // SPL-021 — a reverse split flooring the quantity to zero disables submit
-  it("disables submit when the preview quantity floors to zero (collapse guard)", () => {
-    const tinyTarget = { ...target, holdingQuantityMicro: 1 };
-    const props = { ...BASE_PROPS, target: tinyTarget };
-    const { result } = renderHook(() => useSplitTransaction(props));
-    act(() => {
-      result.current.handleChange("ratioNew", "1");
-      result.current.handleChange("ratioOld", "2");
-    });
-    expect(result.current.collapsesPosition).toBe(true);
-    expect(result.current.isFormValid).toBe(false);
-  });
-
-  // SPL-061 — factor = round(new × MICRO / old): 3 : 2 → 1_500_000
-  it("submits the micro-scaled factor computed from the ratio pair", async () => {
-    mockRecordSplit.mockResolvedValue({ status: "ok", data: { id: "tx-spl-1" } });
-    const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
-
-    act(() => {
-      result.current.handleChange("ratioNew", "3");
-      result.current.handleChange("ratioOld", "2");
-      result.current.setRecordPrice(false);
-    });
-
-    await act(async () => {
-      await result.current.handleSubmit(fakeSubmit);
-    });
+    await act(async () => result.current.handleSubmit(fakeSubmit));
 
     expect(mockRecordSplit).toHaveBeenCalledWith({
       account_id: "account-1",
       asset_id: "asset-equity-1",
       date: TODAY,
-      factor: 1_500_000,
-      note: null,
+      factor: 333_333,
+      note: "Reverse split",
     });
     expect(mockShowSnackbar).toHaveBeenCalledWith("split.recorded", "success");
-    expect(BASE_PROPS.onSubmitSuccess).toHaveBeenCalled();
+    expect(BASE_PROPS.onSubmitSuccess).toHaveBeenCalledTimes(1);
   });
 
-  // SPL-040 — post-split price prefilled as round(latest price × MICRO / factor)
-  it("prefills the derived post-split price and records it best-effort on success", async () => {
-    mockRecordSplit.mockResolvedValue({ status: "ok", data: { id: "tx-spl-1" } });
+  // SPL-040 — the price field is prefilled with the core's price and recorded, best
+  // effort, after the split.
+  it("prefills the core's post-split price and records it best-effort on success", async () => {
+    mockRecordSplit.mockResolvedValue({ status: "ok", data: {} });
     mockRecordAssetPrice.mockResolvedValue({ status: "ok", data: null });
     const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
-
-    // Latest price 150.00 with the default 2 : 1 factor → 75.00.
+    await waitFor(() => expect(result.current.priceInput).toBe("75.000"));
     expect(result.current.recordPrice).toBe(true);
-    expect(result.current.priceInput).toBe("75.000");
 
-    await act(async () => {
-      await result.current.handleSubmit(fakeSubmit);
-    });
+    await act(async () => result.current.handleSubmit(fakeSubmit));
 
     expect(mockRecordAssetPrice).toHaveBeenCalledWith("asset-equity-1", TODAY, 75);
   });
 
-  // SPL-040 — price recording is best-effort: a failure never fails the submit
   it("keeps the success flow when the post-split price record rejects (best-effort)", async () => {
-    mockRecordSplit.mockResolvedValue({ status: "ok", data: { id: "tx-spl-1" } });
-    mockRecordAssetPrice.mockRejectedValue(new Error("ipc broken"));
+    mockRecordSplit.mockResolvedValue({ status: "ok", data: {} });
+    mockRecordAssetPrice.mockRejectedValue(new Error("price write failed"));
     const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
 
-    await act(async () => {
-      await result.current.handleSubmit(fakeSubmit);
-    });
+    await act(async () => result.current.handleSubmit(fakeSubmit));
 
     expect(mockShowSnackbar).toHaveBeenCalledWith("split.recorded", "success");
-    expect(BASE_PROPS.onSubmitSuccess).toHaveBeenCalled();
     await waitFor(() => expect(logger.warn).toHaveBeenCalled());
   });
 
-  // SPL-040 — without a prior price: checkbox unchecked, field empty, no record
-  it("starts unchecked with an empty price and skips the record when no prior price exists", async () => {
-    mockRecordSplit.mockResolvedValue({ status: "ok", data: { id: "tx-spl-1" } });
-    const props = { ...BASE_PROPS, target: unpricedTarget };
-    const { result } = renderHook(() => useSplitTransaction(props));
-
+  // SPL-040 — without a price there is nothing to prefill nor to record.
+  it("starts unchecked with an empty price and skips the record when the asset has no price", async () => {
+    mockValidateSplitDraft.mockResolvedValue(answer({ price_after_split: null }));
+    mockRecordSplit.mockResolvedValue({ status: "ok", data: {} });
+    const { result } = renderHook(() =>
+      useSplitTransaction({ ...BASE_PROPS, target: unpricedTarget }),
+    );
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
     expect(result.current.recordPrice).toBe(false);
     expect(result.current.priceInput).toBe("");
 
-    await act(async () => {
-      await result.current.handleSubmit(fakeSubmit);
-    });
+    await act(async () => result.current.handleSubmit(fakeSubmit));
 
     expect(mockRecordAssetPrice).not.toHaveBeenCalled();
   });
 
-  // SPL-040 — the user can edit the derived price; the typed value is recorded
-  it("records the user-edited price instead of the derived prefill", async () => {
-    mockRecordSplit.mockResolvedValue({ status: "ok", data: { id: "tx-spl-1" } });
+  it("records the user-edited price instead of the prefill", async () => {
+    mockRecordSplit.mockResolvedValue({ status: "ok", data: {} });
     mockRecordAssetPrice.mockResolvedValue({ status: "ok", data: null });
     const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
+    act(() => result.current.handlePriceChange("80"));
 
-    act(() => result.current.handlePriceChange("74.5"));
+    await act(async () => result.current.handleSubmit(fakeSubmit));
 
-    await act(async () => {
-      await result.current.handleSubmit(fakeSubmit);
-    });
-
-    expect(mockRecordAssetPrice).toHaveBeenCalledWith("asset-equity-1", TODAY, 74.5);
+    expect(mockRecordAssetPrice).toHaveBeenCalledWith("asset-equity-1", TODAY, 80);
   });
 
-  // F27 — backend rejection surfaces as an inline typed error via the presenter
+  // F27 — a refusal on save is shown and the dialog stays open.
   it("surfaces a backend error code as an inline error (F27)", async () => {
-    mockRecordSplit.mockResolvedValue({
-      status: "error",
-      error: { code: "SplitCollapsesPosition" },
-    });
+    mockRecordSplit.mockResolvedValue({ status: "error", error: { code: "ClosedPosition" } });
     const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
 
-    await act(async () => {
-      await result.current.handleSubmit(fakeSubmit);
-    });
+    await act(async () => result.current.handleSubmit(fakeSubmit));
 
-    expect(result.current.error).toEqual({ key: "error.SplitCollapsesPosition" });
-    expect(mockShowSnackbar).not.toHaveBeenCalled();
+    expect(result.current.error).not.toBeNull();
+    expect(BASE_PROPS.onSubmitSuccess).not.toHaveBeenCalled();
     expect(logger.error).toHaveBeenCalled();
   });
 
-  // SPL-011 — an invalid ratio blocks the submit before any gateway call
-  it("does not call the gateway when the ratio is invalid", async () => {
+  // Saving follows the check: while the core reports a problem, nothing is recorded.
+  it("records nothing while the check is not clean", async () => {
+    mockValidateSplitDraft.mockResolvedValue(problem("SplitFactorIsOne"));
     const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
-    act(() => result.current.handleChange("ratioNew", ""));
+    await waitFor(() => expect(result.current.ratioError).not.toBeNull());
 
-    await act(async () => {
-      await result.current.handleSubmit(fakeSubmit);
-    });
+    await act(async () => result.current.handleSubmit(fakeSubmit));
 
     expect(mockRecordSplit).not.toHaveBeenCalled();
-    expect(result.current.error).toEqual({
-      key: "transaction.error_validation_split_ratio",
-    });
   });
 });
 
 describe("useSplitTransaction — edit mode (SPL-030)", () => {
-  const editProps = {
-    ...BASE_PROPS,
-    editMode: {
-      transactionId: "tx-spl-existing",
-      lockedAssetId: "asset-equity-1",
-      lockedAssetName: "Alphabet Inc",
-      initialDate: "2024-06-15",
-      initialFactor: "2.000",
-      initialNote: "20-for-10",
-    },
+  const editMode = {
+    transactionId: "tx-split-1",
+    lockedAssetId: "asset-equity-1",
+    lockedAssetName: "Alphabet Inc",
+    initialDate: "2024-06-15",
+    initialFactor: "2.000",
+    initialNote: "2-for-1",
   };
+  const EDIT_PROPS = { ...BASE_PROPS, editMode };
 
   beforeEach(() => {
-    mockRecordSplit.mockReset();
-    mockCorrectTransaction.mockReset();
-    mockRecordAssetPrice.mockReset();
-    mockShowSnackbar.mockReset();
-    BASE_PROPS.onSubmitSuccess.mockClear();
+    resetMocks();
+    mockValidateSplitDraft.mockResolvedValue(answer({ position: null }));
   });
 
-  // SPL-030 — the form prefills from the transaction (factor as a decimal multiplier)
   it("prefills date, factor, and note from the transaction", () => {
-    const { result } = renderHook(() => useSplitTransaction(editProps));
+    const { result } = renderHook(() => useSplitTransaction(EDIT_PROPS));
     expect(result.current.isEditMode).toBe(true);
     expect(result.current.formData.date).toBe("2024-06-15");
     expect(result.current.formData.factor).toBe("2.000");
-    expect(result.current.formData.note).toBe("20-for-10");
-    // No preview and no price checkbox in edit mode (SPL-030).
-    expect(result.current.preview).toBeNull();
+    expect(result.current.formData.note).toBe("2-for-1");
     expect(result.current.recordPrice).toBe(false);
   });
 
-  // SPL-030 — the correction rides correct_transaction with the factor in `quantity`
-  it("submits via correctTransaction with the factor in the quantity field", async () => {
-    mockCorrectTransaction.mockResolvedValue({ status: "ok", data: {} });
-    const { result } = renderHook(() => useSplitTransaction(editProps));
+  // SPL-030 — a correction sends its factor and what it corrects; no position is shown.
+  it("checks the corrected split by its factor and shows no position", async () => {
+    const { result } = renderHook(() => useSplitTransaction(EDIT_PROPS));
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
 
-    act(() => result.current.handleChange("factor", "3"));
-
-    await act(async () => {
-      await result.current.handleSubmit(fakeSubmit);
+    expect(mockValidateSplitDraft).toHaveBeenLastCalledWith({
+      account_id: "account-1",
+      asset_id: "asset-equity-1",
+      date: "2024-06-15",
+      size: { mode: "Factor", factor: 2_000_000 },
+      correcting: "tx-split-1",
     });
+    expect(result.current.preview).toBeNull();
+  });
 
-    expect(mockCorrectTransaction).toHaveBeenCalledWith("tx-spl-existing", "account-1", {
+  it("submits via correctTransaction with the factor in the quantity field", async () => {
+    mockValidateSplitDraft.mockResolvedValue(answer({ factor: 3_000_000, position: null }));
+    mockCorrectTransaction.mockResolvedValue({ status: "ok", data: {} });
+    const { result } = renderHook(() => useSplitTransaction(EDIT_PROPS));
+    act(() => result.current.handleChange("factor", "3"));
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
+
+    await act(async () => result.current.handleSubmit(fakeSubmit));
+
+    expect(mockCorrectTransaction).toHaveBeenCalledWith("tx-split-1", "account-1", {
       date: "2024-06-15",
       quantity: 3_000_000,
       unit_price: 0,
       exchange_rate: 1_000_000,
       fees: 0,
       total_amount: null,
-      note: "20-for-10",
+      note: "2-for-1",
     });
-    expect(mockRecordSplit).not.toHaveBeenCalled();
-    // No post-split price record on the edit path (SPL-030).
     expect(mockRecordAssetPrice).not.toHaveBeenCalled();
     expect(mockShowSnackbar).toHaveBeenCalledWith("split.updated", "success");
   });
 
-  // SPL-011 — a ×1 factor is rejected in edit mode too
-  it("flags a factor of 1 and blocks the submit", async () => {
-    const { result } = renderHook(() => useSplitTransaction(editProps));
+  it("flags a factor the core refuses and blocks the submit", async () => {
+    mockValidateSplitDraft.mockResolvedValue(problem("SplitFactorIsOne"));
+    const { result } = renderHook(() => useSplitTransaction(EDIT_PROPS));
     act(() => result.current.handleChange("factor", "1"));
-    expect(result.current.isFormValid).toBe(false);
+    await waitFor(() => expect(result.current.ratioError).not.toBeNull());
 
-    await act(async () => {
-      await result.current.handleSubmit(fakeSubmit);
-    });
+    await act(async () => result.current.handleSubmit(fakeSubmit));
 
     expect(mockCorrectTransaction).not.toHaveBeenCalled();
   });

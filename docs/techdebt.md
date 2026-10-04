@@ -300,15 +300,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — the spec says what a correction can change.
 - Done when: TRX-032 lists the fields a correction changes, and no rule mentions moving a transaction to another asset or account.
 
-## 2026-10-04 — TD-071 — A split's preview is computed in the interface, in floating point
-
-- Found by: the audit of TD-065, split by the owner's decision of 2026-10-04
-- Where: `src/features/account_details/split_transaction/useSplitTransaction.ts`, beside the core's integer rule (SPL-020)
-- Severity: 🟡
-- Observation: the split dialog previews the new quantity, the new average price and the price after the split with floating-point arithmetic, and refuses a split that would round the position down to nothing from that preview. The core applies the split with integers. The two can differ by a micro-unit.
-- User value: None directly — what the split dialog previews is what the split records.
-- Done when: the core previews a split (new quantity, new average price, price after the split, or its refusal); the dialog shows that; the interface holds no arithmetic on these figures.
-
 ## 2026-10-04 — TD-072 — An account's value as of a date is computed three times
 
 - Found by: the audit of TD-065, split by the owner's decision of 2026-10-04
@@ -362,3 +353,12 @@ Remove an entry once it has been resolved.
 - Observation: the draft check compares the quantity sold with what is held today. A sale dated before later purchases can sell more than was held on its date: the draft is clean, and recording refuses it (`CascadingOversell`). The draft now returns no potential gain in that case, but reports no problem.
 - User value: The sell dialog says before saving that the quantity was not held at that date.
 - Done when: the draft check of a new sale refuses a quantity above the position as of the sale's date, with the error recording would give, shown on the quantity field.
+
+## 2026-10-04 — TD-075 — A split factor has no upper bound, and the replay's quantity can wrap
+
+- Found by: reviewer-security and reviewer-backend on TD-071
+- Where: `Transaction::split` in `src-tauri/src/context/account/domain/transaction.rs` (accepts any positive factor); the split arms of the replay in `src-tauri/src/context/account/domain/account.rs` (`total_quantity as i64`)
+- Severity: 🔵
+- Observation: the replay multiplies the quantity by the factor in 128 bits and casts the result back to 64 bits without a check. A factor large enough (far beyond any real split) makes the cast wrap: recording and the split check both then show a quantity that is wrong, or refuse a split for the wrong reason.
+- User value: None in practice — no real split comes near the bound; an absurd factor typed by mistake is refused with a clear reason.
+- Done when: a factor whose rescale cannot be stored is refused when the split is recorded and when it is checked, with one error code, shown by a test on each path.

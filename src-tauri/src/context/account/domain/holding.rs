@@ -37,6 +37,20 @@ pub struct HoldingSnapshot {
     pub average_price: i64,
 }
 
+/// What a split would make of a position (SPL-020): the holding on the split's date,
+/// before and after the rescale. All fields are i64 micro-units (ADR-001).
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
+pub struct SplitPositionPreview {
+    /// Units held on the split's date, before it.
+    pub old_quantity: i64,
+    /// Average cost per unit before the split, account currency.
+    pub old_average_price: i64,
+    /// Units held once the split is applied.
+    pub new_quantity: i64,
+    /// Average cost per unit once the split is applied, account currency.
+    pub new_average_price: i64,
+}
+
 /// Full point-in-time reconstruction of a holding as of a date: quantity, VWAP
 /// cost basis, cumulative realized P&L, and the most recent sell date. Backs the
 /// account-details "as of a past date" view, which needs the realized-P&L and

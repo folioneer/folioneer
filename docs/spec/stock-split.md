@@ -34,7 +34,7 @@ SPL reuses the TRX `Transaction` entity with a new `TransactionType::Split` vari
 
 ### Valuation continuity
 
-**SPL-040 — Post-split price record (frontend)**: Recorded market prices are point-in-time observations and are never retro-adjusted. Without a post-split observation, carrying a pre-split price forward across the split date would misvalue the rescaled position by the factor. The split modal therefore offers a **"Record post-split price"** checkbox, checked by default, pre-filled with `round(latest price strictly before the split date ÷ factor)` in the asset currency and editable; on submit it records that price at the split date through the existing price-record flow (best-effort, like MKT-055). The prefill is empty and the checkbox unchecked when no prior price exists.
+**SPL-040 — Post-split price record (frontend)**: Recorded market prices are point-in-time observations and are never retro-adjusted. Without a post-split observation, carrying a pre-split price forward across the split date would misvalue the rescaled position by the factor. The split modal therefore offers a **"Record post-split price"** checkbox, checked by default, pre-filled with the carried price the split check gives (SPL-062), in the asset currency, and editable — once edited, the typed price stays whatever the date or ratio becomes; on submit it records that price at the split date through the existing price-record flow (best-effort, like MKT-055). The prefill is empty and the checkbox unchecked when no prior price exists.
 
 ### Performance
 
@@ -44,7 +44,13 @@ SPL reuses the TRX `Transaction` entity with a new `TransactionType::Split` vari
 
 **SPL-060 — Journal rendering (frontend)**: A split row in the journal/transaction tables shows the factor in the quantity column as "×N" with the micro factor formatted as a trimmed decimal ("×20", "×1.5", "×0.1"); the money columns render "—". Split rows are editable per SPL-030 through the edit affordance and deletable like any transaction.
 
-**SPL-061 — Split affordance (frontend)**: The account-details holding row offers a "Split" action (icon button, non-cash active holdings only, hidden in as-of view) opening the split modal: ratio input as **new : old** positive-integer pair (factor = `round(new × MICRO / old)`, so non-terminating ratios like 1:3 round at the micro), date, the SPL-040 price checkbox, optional note, and a preview of the resulting quantity and average price. Submit is disabled while the ratio is invalid (SPL-011) or the preview quantity would floor to zero (SPL-021).
+**SPL-061 — Split affordance (frontend)**: The account-details holding row offers a "Split" action (icon button, non-cash active holdings only, hidden in as-of view) opening the split modal: ratio input as a **new : old** pair of whole numbers, date, the SPL-040 price checkbox, optional note, and a preview of the resulting quantity and average price. The modal computes none of these: it gives what is typed to the split check (SPL-062) and shows what the check gives back — the preview and the price, or the problem. Submit is disabled while the check is unanswered, has failed, or reports a problem; a problem with the ratio is stated under the ratio, any other problem in the modal's alert. The note is no part of the check.
+
+**SPL-062 — Split check (backend)**: A new split being entered — the account, the asset, the date, and its size as a **new : old** pair — is checked without anything being recorded. A clean check gives the factor recording stores, `round(new × MICRO / old)` (so a ratio like 1 : 3 rounds at the micro); the position on the split's date before and after the rescale (SPL-020), obtained by applying the split to a copy of the account exactly as recording does; and the latest price strictly before the split's date carried across the split, `round(price × MICRO / factor)` with the micro-scaled factor (SPL-040), or none when the asset has no such price or prices cannot be read. A check that reports a problem gives none of these. Problems are reported one at a time, in this order: the date is not entered; a part of the pair is not typed, is not strictly positive, or the pair gives no usable factor — it rounds to 0, or exceeds the largest amount the application stores (a signed 64-bit count of micros); all are reported with SPL-011's one code for a factor that is not usable, factor not positive; the asset is not held today, or does not exist (SPL-012, reported as a closed position); then every refusal recording gives, with recording's code — an invalid date, a factor of 1 (SPL-011), an unknown account, the cash line, nothing held on that date (SPL-012), a rescale that leaves nothing (SPL-021), a later sale or fee left without enough shares (SPL-022).
+
+**SPL-063 — Check of a corrected split (backend)**: A split being corrected (SPL-030) is checked on its date and its factor only: a date not entered or invalid, a factor not strictly positive or equal to 1 (SPL-011). A clean check gives the factor and the carried price of SPL-062 and no position. The position-dependent refusals of SPL-030 are not checked: saving the correction can still be refused.
+
+**SPL-064 — Correction form (frontend)**: The form correcting a split holds the date, the factor as a multiplier and the note. It shows no preview and offers no price record: of the check of SPL-063 it uses the problems only, states them as SPL-061 does, and shows a refusal on save inline.
 
 ---
 
@@ -52,7 +58,7 @@ SPL reuses the TRX `Transaction` entity with a new `TransactionType::Split` vari
 
 - **Entry point**: holding-row icon button ("Split", scissors-style icon) next to the existing Buy/Sell actions; hidden for cash rows, archived assets, and in as-of view.
 - **Modal** (`FormModal`, `split-trx-*` stable ids): date field (default last-operation date), ratio pair `new : old` (two integer inputs side by side, default 2 : 1), read-only preview line "10 shares @ 150.00 → 20 shares @ 75.00", "Record post-split price" checkbox + editable derived price field (SPL-040), note textarea, Cancel/Save footer.
-- **States**: submit disabled on invalid ratio / collapsing preview / while saving; backend rejection shown inline (F27); success closes the modal and refreshes the view (snackbar).
+- **States**: submit disabled while the split check is unanswered, has failed or reports a problem (SPL-061), and while saving; a refusal on save shown inline (F27); success closes the modal and refreshes the view (snackbar).
 
 ## Open Questions
 

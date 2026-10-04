@@ -28,6 +28,8 @@ import type {
   RecordInterestDTO,
   RecordSplitDTO,
   Result,
+  SplitDraft,
+  SplitDraftPreview,
   SplitError,
   Transaction,
   TransactionDraft,
@@ -173,6 +175,14 @@ export const accountDetailsGateway = {
     draft: TransactionDraft,
   ): Promise<Result<TransactionDraftPreview, TransactionDraftError>> {
     return commands.validateTransactionDraft(draft);
+  },
+
+  // SPL-062 — checks a split draft without writing: its first problem, or the factor,
+  // the position before and after and the price to carry across the split.
+  async validateSplitDraft(
+    draft: SplitDraft,
+  ): Promise<Result<SplitDraftPreview, TransactionDraftError>> {
+    return commands.validateSplitDraft(draft);
   },
 
   // TRX-066 — checks an opening balance draft without writing: its first problem, or

@@ -14,7 +14,9 @@ use folioneer_lib::context::asset::{
     SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
 };
 use folioneer_lib::core::SideEffectEventBus;
-use folioneer_lib::use_cases::holding_transaction::{HoldingTransactionUseCase, SplitError};
+use folioneer_lib::use_cases::holding_transaction::{
+    HoldingTransactionUseCase, SplitDraft, SplitError, SplitSize,
+};
 use std::sync::Arc;
 
 fn micro(v: i64) -> i64 {
@@ -304,4 +306,73 @@ async fn record_split_dated_before_position_opens_rejected() {
         matches!(err, SplitError::Account(AccountError::ClosedPosition)),
         "expected Account(ClosedPosition), got: {err:?}"
     );
+}
+
+// -------------------------------------------------------------------------
+// SPL-062 — the split draft check
+// -------------------------------------------------------------------------
+
+/// SPL-062 — through the real stack, the check previews the position recording then
+/// leaves and writes nothing; an unknown account is refused as recording refuses it.
+#[tokio::test]
+async fn spl_062_the_split_draft_check_previews_what_recording_leaves() {
+    let ctx = build_ctx().await;
+    let (account_id, asset_id) = seed_held_position(&ctx).await;
+    let draft = |account_id: &str| SplitDraft {
+        account_id: account_id.to_string(),
+        asset_id: asset_id.clone(),
+        date: "2024-06-15".to_string(),
+        size: SplitSize::Ratio {
+            new: Some(3),
+            old: Some(2),
+        },
+        correcting: None,
+    };
+
+    let preview = ctx
+        .use_case
+        .validate_split_draft(draft(&account_id))
+        .await
+        .expect("a held position can be split");
+    let position = preview.position.expect("a new split previews its position");
+    assert_eq!(preview.factor, 1_500_000);
+    assert_eq!(
+        (position.old_quantity, position.old_average_price),
+        (micro(10), micro(50))
+    );
+
+    let untouched = ctx
+        .account_service
+        .get_holding_by_account_asset(&account_id, &asset_id)
+        .await
+        .unwrap()
+        .expect("holding");
+    assert_eq!(untouched.quantity, micro(10), "the check writes nothing");
+
+    ctx.use_case
+        .record_split(
+            &account_id,
+            asset_id.clone(),
+            "2024-06-15".to_string(),
+            preview.factor,
+            None,
+        )
+        .await
+        .unwrap();
+    let recorded = ctx
+        .account_service
+        .get_holding_by_account_asset(&account_id, &asset_id)
+        .await
+        .unwrap()
+        .expect("holding");
+    assert_eq!(
+        (position.new_quantity, position.new_average_price),
+        (recorded.quantity, recorded.average_price)
+    );
+
+    assert!(ctx
+        .use_case
+        .validate_split_draft(draft("no-such-account"))
+        .await
+        .is_err());
 }

@@ -29,8 +29,6 @@ const TODAY = new Date().toISOString().slice(0, 10);
 const target = {
   assetId: "asset-equity-1",
   assetName: "Alphabet Inc",
-  holdingQuantityMicro: 10_000_000,
-  averagePriceMicro: 150_000_000,
   currentPriceMicro: 150_000_000,
 };
 
@@ -47,9 +45,7 @@ const makeHookReturn = (overrides: Record<string, unknown> = {}) => ({
     oldAveragePrice: "150,00",
     newQuantity: "20",
     newAveragePrice: "75,00",
-    newQuantityMicro: 20_000_000,
   },
-  collapsesPosition: false,
   ratioError: null,
   error: null,
   isSubmitting: false,

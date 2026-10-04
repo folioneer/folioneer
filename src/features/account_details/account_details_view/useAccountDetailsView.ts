@@ -240,9 +240,7 @@ export function useAccountDetailsView(accountId: string) {
     data.retry();
   }, [data]);
 
-  // SPL-061 — split modal, opened per holding from its row action. The holding
-  // detail supplies the quantity/average/latest price the modal's preview and
-  // price prefill consume (SPL-040).
+  // SPL-061 — split modal, opened per holding from its row action.
   const handleSplitOpen = useCallback(
     (assetId: string) => {
       if (isAsOf) return;
@@ -251,8 +249,6 @@ export function useAccountDetailsView(accountId: string) {
       setSplitTarget({
         assetId: holding.asset_id,
         assetName: holding.asset_name,
-        holdingQuantityMicro: holding.quantity,
-        averagePriceMicro: holding.average_price,
         currentPriceMicro: holding.current_price,
       });
     },

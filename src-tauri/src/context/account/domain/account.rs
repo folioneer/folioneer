@@ -1,5 +1,5 @@
 use super::fee_schedule::{FeeCatchUpPosition, FeeSchedule};
-use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot};
+use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot, SplitPositionPreview};
 use super::holding_note::HoldingNote;
 use super::journal::CashEffect;
 use super::transaction::{EnteredAmount, Transaction, TransactionType};
@@ -1879,6 +1879,34 @@ impl Account {
     fn compute_opening_balance_total(quantity: i64, unit_price: i64) -> i64 {
         const MICRO: i128 = 1_000_000;
         (quantity as i128 * unit_price as i128 / MICRO) as i64
+    }
+
+    /// SPL-062 — what a split of `factor` on `date` would make of an asset's position:
+    /// the holding as of that date, then the same once a copy of the account has applied
+    /// the split as recording does. Refused as recording refuses. Changes nothing.
+    pub fn preview_split(
+        &self,
+        asset_id: &str,
+        date: &str,
+        factor: i64,
+    ) -> Result<SplitPositionPreview> {
+        let split = Transaction::split(
+            self.id.clone(),
+            asset_id.to_string(),
+            date.to_string(),
+            factor,
+            None,
+        )?;
+        let before = Self::holding_snapshot_as_of(&self.transactions, asset_id, date);
+        let mut replayed = self.clone();
+        replayed.apply_split(split)?;
+        let after = Self::holding_snapshot_as_of(&replayed.transactions, asset_id, date);
+        Ok(SplitPositionPreview {
+            old_quantity: before.quantity,
+            old_average_price: before.average_price,
+            new_quantity: after.quantity,
+            new_average_price: after.average_price,
+        })
     }
 
     /// TDI-030 — the gain a sale would realize against a position held at `average_price`:
@@ -5155,6 +5183,191 @@ mod tests {
                 .map(|e| matches!(e, AccountError::SplitCollapsesPosition))
                 .unwrap_or(false),
             "expected SplitCollapsesPosition, got: {err}"
+        );
+    }
+
+    // SPL-062 — the preview of a split is what recording it leaves: same quantity, same
+    // average price, on figures that do not divide evenly.
+    #[test]
+    fn spl_062_a_split_preview_equals_the_position_recording_leaves() {
+        let mut acc = cash_seeded_account();
+        acc.buy_holding(
+            "asset-xyz".to_string(),
+            "2024-01-01".to_string(),
+            micro(7),
+            33_333_333,
+            micro(1),
+            micro(1),
+            None,
+            None,
+        )
+        .unwrap();
+        let before = acc
+            .holdings
+            .iter()
+            .find(|h| h.asset_id == "asset-xyz")
+            .map(|h| (h.quantity, h.average_price))
+            .unwrap();
+
+        let pending_before = (acc.pending_changes.len(), acc.transactions.len());
+
+        // 3 for 2.
+        let preview = acc
+            .preview_split("asset-xyz", "2024-06-15", 1_500_000)
+            .expect("a held position can be split");
+        assert_eq!(
+            (acc.pending_changes.len(), acc.transactions.len()),
+            pending_before,
+            "a preview changes nothing"
+        );
+        assert_eq!((preview.old_quantity, preview.old_average_price), before);
+
+        let tx = Transaction::split(
+            acc.id.clone(),
+            "asset-xyz".to_string(),
+            "2024-06-15".to_string(),
+            1_500_000,
+            None,
+        )
+        .unwrap();
+        acc.apply_split(tx).unwrap();
+        let after = acc
+            .holdings
+            .iter()
+            .find(|h| h.asset_id == "asset-xyz")
+            .map(|h| (h.quantity, h.average_price))
+            .unwrap();
+        assert_eq!((preview.new_quantity, preview.new_average_price), after);
+        assert_eq!(preview.new_quantity, 10_500_000);
+    }
+
+    // SPL-062 — a split is previewed on the position of its date: one dated before a later
+    // purchase rescales what was held then.
+    #[test]
+    fn spl_062_a_back_dated_split_preview_uses_the_position_of_its_date() {
+        let mut acc = cash_seeded_account();
+        for (date, quantity) in [("2024-01-01", 4), ("2024-09-01", 6)] {
+            acc.buy_holding(
+                "asset-xyz".to_string(),
+                date.to_string(),
+                micro(quantity),
+                micro(10),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .unwrap();
+        }
+        let preview = acc
+            .preview_split("asset-xyz", "2024-06-15", micro(2))
+            .unwrap();
+        assert_eq!(
+            (preview.old_quantity, preview.new_quantity),
+            (micro(4), micro(8))
+        );
+        assert_eq!(
+            (preview.old_average_price, preview.new_average_price),
+            (micro(10), micro(5))
+        );
+    }
+
+    // SPL-062 — the preview refuses what recording refuses: nothing held on that date
+    // or a cash line (SPL-012), a rescale that leaves nothing (SPL-021), a factor of 1 or
+    // none (SPL-011), a date that cannot be one.
+    #[test]
+    fn spl_062_a_split_preview_refuses_what_recording_refuses() {
+        let mut acc = cash_seeded_account();
+        acc.buy_holding(
+            "asset-xyz".to_string(),
+            "2024-03-01".to_string(),
+            500_000,
+            micro(100),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .unwrap();
+        let refusal = |asset_id: &str, date: &str, factor: i64| {
+            acc.preview_split(asset_id, date, factor)
+                .err()
+                .and_then(|error| error.downcast::<AccountError>().ok())
+        };
+        assert!(matches!(
+            refusal("asset-xyz", "2024-01-15", micro(2)),
+            Some(AccountError::ClosedPosition)
+        ));
+        assert!(matches!(
+            refusal("asset-xyz", "2024-06-15", 1),
+            Some(AccountError::SplitCollapsesPosition)
+        ));
+        assert!(matches!(
+            refusal("asset-xyz", "2024-06-15", micro(1)),
+            Some(AccountError::SplitFactorIsOne)
+        ));
+        assert!(matches!(
+            refusal("asset-xyz", "2024-06-15", 0),
+            Some(AccountError::SplitFactorNotPositive)
+        ));
+        assert!(matches!(
+            refusal("asset-xyz", "not-a-date", micro(2)),
+            Some(AccountError::InvalidDate)
+        ));
+        assert!(matches!(
+            refusal("system-cash-eur", "2024-06-15", micro(2)),
+            Some(AccountError::SplitOnCashAsset)
+        ));
+        assert!(acc
+            .preview_split("asset-xyz", "2024-06-15", micro(2))
+            .is_ok());
+    }
+
+    // SPL-062 — a split dated before a later sale is replayed with it, as recording does:
+    // a reverse split that leaves less than was sold afterwards is refused.
+    #[test]
+    fn spl_062_a_split_preview_replays_what_came_after_its_date() {
+        let mut acc = cash_seeded_account();
+        acc.buy_holding(
+            "asset-xyz".to_string(),
+            "2024-01-01".to_string(),
+            micro(10),
+            micro(10),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .unwrap();
+        acc.sell_holding(
+            "asset-xyz".to_string(),
+            "2024-09-01".to_string(),
+            micro(6),
+            micro(10),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .unwrap();
+        // 1 for 2 on a date before the sale: 5 held, 6 sold afterwards.
+        let refused = acc.preview_split("asset-xyz", "2024-06-15", 500_000);
+        assert!(
+            refused.is_err(),
+            "recording refuses it, so does the preview"
+        );
+        let mut recorded = acc.clone();
+        let split = Transaction::split(
+            acc.id.clone(),
+            "asset-xyz".to_string(),
+            "2024-06-15".to_string(),
+            500_000,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            refused.unwrap_err().to_string(),
+            recorded.apply_split(split).unwrap_err().to_string()
         );
     }
 
