@@ -7,7 +7,7 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-070) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-073) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -300,23 +300,32 @@ Remove an entry once it has been resolved.
 - User value: None directly — the spec says what a correction can change.
 - Done when: TRX-032 lists the fields a correction changes, and no rule mentions moving a transaction to another asset or account.
 
-## 2026-10-03 — TD-065 — Some figures are computed in two places
+## 2026-10-04 — TD-070 — The gain a sale would realize is computed in the interface
 
-- Found by: the owner, after TD-062 (a corrected deposit was refused because a second cash computation counted deposits and withdrawals only)
-- Where: listed below, figure by figure
+- Found by: the audit of TD-065 (figures computed in two places), split by the owner's decision of 2026-10-04
+- Where: `src/features/account_details/sell_transaction/useSellTransaction.ts`, `computeCostBasisMicro` in `src/lib/microUnits.ts`, beside `Account::compute_realized_pnl`
 - Severity: 🟡
-- Observation: where one figure has two computations, only one is exercised by the tests of the day, and the other drifts. The figures the application shows, and where each is computed:
-  - **Cash balance** — one rule, `Account::cash_effect`; the cash line as of a date reads it alone. Settled.
-  - **A transaction's total and unit price** — the account aggregate; the forms show what the draft check returns and hold no formula. Settled.
-  - **What a new asset starts from, the risk scale, the system categories** — the core's generated constants. Settled.
-  - **An account's value and unrealized gain** — twice: `use_cases/shared/global_value.rs` (account list, price movement) and `use_cases/account_details/orchestrator.rs` (account page). A test on the golden portfolio holds the list and the page equal. Proven, not merged.
-  - **An account's value as of a date** — three times: the account page as of a date (`account_details`), the end value of a performance period (`end_value_as_of`, `holding_end_value_as_of` in `use_cases/shared/valuation.rs`), and the value before a price refresh (`price_movement`). No test compares them on the same date.
-  - **The weighted flow of a period (Simple Dietz)** — the same loop twice in `use_cases/shared/valuation.rs`, for an account and for a holding.
-  - **An amount converted at a rate** — the same line in `account_summary`, `global_performance`, `price_movement`, `global_value` and `valuation`.
-  - **The gain a sale would realize** — in the interface (`useSellTransaction.ts`, `computeCostBasisMicro`), beside `Account::compute_realized_pnl`.
-  - **A split's preview** (new quantity, new average price, price after the split) — in the interface (`useSplitTransaction.ts`), in floating point, beside the core's integer rule (SPL-020).
-- User value: None directly — a figure reads the same wherever it is shown.
-- Done when: the value as of a date has one computation, or a test holding the three equal on the golden portfolio; the weighted flow and the conversion are each written once; the sale's gain and the split's preview come from the core, and the interface's formulas are deleted.
+- Observation: the sell dialog shows the gain the sale would realize — proceeds minus the average cost of the quantity sold — from a formula of its own. Recording computes the same figure in the core. Only one of the two is exercised by a given test.
+- User value: None directly — the gain shown before a sale is the gain recorded after it.
+- Done when: the draft check of a sale returns the gain it would realize; the dialog shows it; the interface's formula and `computeCostBasisMicro` are deleted.
+
+## 2026-10-04 — TD-071 — A split's preview is computed in the interface, in floating point
+
+- Found by: the audit of TD-065, split by the owner's decision of 2026-10-04
+- Where: `src/features/account_details/split_transaction/useSplitTransaction.ts`, beside the core's integer rule (SPL-020)
+- Severity: 🟡
+- Observation: the split dialog previews the new quantity, the new average price and the price after the split with floating-point arithmetic, and refuses a split that would round the position down to nothing from that preview. The core applies the split with integers. The two can differ by a micro-unit.
+- User value: None directly — what the split dialog previews is what the split records.
+- Done when: the core previews a split (new quantity, new average price, price after the split, or its refusal); the dialog shows that; the interface holds no arithmetic on these figures.
+
+## 2026-10-04 — TD-072 — An account's value as of a date is computed three times
+
+- Found by: the audit of TD-065, split by the owner's decision of 2026-10-04
+- Where: `use_cases/account_details/orchestrator.rs` (the account page as of a date), `end_value_as_of` and `holding_end_value_as_of` in `use_cases/shared/valuation.rs` (the end value of a performance period), `use_cases/shared/price_movement.rs` (the value before a price refresh); the weighted flow of a period, written twice in `use_cases/shared/valuation.rs`; an amount converted at a rate, the same line in `account_summary`, `global_performance`, `price_movement`, `global_value` and `valuation`
+- Severity: 🟡
+- Observation: no test compares the three valuations on the same date. The value read today is settled: a test on the golden portfolio holds the account list and the account page equal. The mutation sweep of 2026-10-04 finds its largest cluster of unnoticed changes in these files (TD-064).
+- User value: None directly — an account is worth the same on its page, in its performance and in the price movement report.
+- Done when: the value as of a date has one computation, or a test holds the three equal on the golden portfolio; the weighted flow and the conversion are each written once.
 
 ## 2026-10-03 — TD-066 — An asset's name, reference and category have no length or character rule
 
@@ -343,7 +352,7 @@ Remove an entry once it has been resolved.
 - Severity: 🟡
 - Observation: DIV-040 makes the date, the net amount, the exchange rate and the note editable. The dialog also shows a required unit price and a fees field, labels the amount "Quantity", and offers "use this price as the market price": ticked, it records the dividend's stored unit price — 1 — as the asset's price for that day. The exchange rate field is hidden when the asset and the account share a currency, so a problem on it would show on no field; a total that rounds down to nothing is reported on the unit price, which a dividend's total does not depend on.
 - User value: Editing a dividend shows the fields a dividend has, and cannot record a wrong price for the asset.
-- Done when: for a dividend the dialog shows the date, the amount (labelled as such), the exchange rate when currencies differ and the note; no unit price, no fees, no market-price checkbox; a design is validated by the owner before the dialog changes.
+- Done when: for a dividend the dialog shows the date, the amount (labelled as such), the exchange rate when currencies differ and the note; no unit price, no fees, no market-price checkbox (the owner's choice, 2026-10-04); the mock-up `screenshots/design/TD-068-*.png` is validated by the owner before the dialog changes.
 
 ## 2026-10-03 — TD-069 — The interface decides whether sync needs attention, in two places
 

@@ -215,7 +215,7 @@ not — the work was done by hand, in the skills' spirit, with native commands.
   counting does not.
 - Costs: about half a day for the script and its tests; a few minutes per release.
   Protects: the flow being improved on figures, release after release.
-- Needs the owner: yes — a new skill and a step in the release hand-over.
+- Decided: go, built last in the 0.6.0 batch and run first at the 0.6.0 release (owner, 2026-10-04).
 
 ## Moved here from the todo and the tech debt
 
@@ -342,6 +342,6 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 - Found by: the mutation sweep of 2026-10-01 (issue 65); the 50 of `account.rs` were sorted on 2026-10-03, and the sweep of 2026-10-04 on `main` (run 37151658259: 1 890 mutants — 1 307 caught, 218 missed, 354 unviable, 11 timed out) reports none left in `account.rs` nor in `context/account/service.rs`
 - Where: `use_cases/shared/valuation.rs` (24), `context/sync/domain/resolution.rs` (24), `use_cases/global_performance/orchestrator.rs` (21), `use_cases/shared/performance.rs` (14), `use_cases/account_details/orchestrator.rs` (14), `use_cases/scheduled_fetch/orchestrator.rs` (11), `use_cases/holding_transaction/orchestrator.rs` (10), `use_cases/asset_web_lookup/orchestrator.rs` (10), `use_cases/fee_generation/orchestrator.rs` (9), `context/sync/application/` (`run.rs` 8, `intake.rs` 7, `join.rs` 5, `first_publish.rs` 4), and the files with fewer — the full list is in the sweep's artifacts
 - Severity: 🟡
-- Observation: sorting `account.rs` found one real bug (a corrected deposit refused), tests that only ever used one asset per account, a synced removal no test checked, unreachable code and three comparisons that changed nothing; the sweep that followed finds nothing there. The other files are not sorted. The figures that the valuation and the performance compute are where the most changes go unnoticed (59 across three files) — the same code TD-065 lists as computed in more than one place. The local machine cannot run the sweep (five minutes a mutant under load): CI's sweep, four hours, is the proof.
+- Observation: sorting `account.rs` found one real bug (a corrected deposit refused), tests that only ever used one asset per account, a synced removal no test checked, unreachable code and three comparisons that changed nothing; the sweep that followed finds nothing there. The other files are not sorted. The figures that the valuation and the performance compute are where the most changes go unnoticed (59 across three files) — the same code TD-072 lists as computed in more than one place. The local machine cannot run the sweep (five minutes a mutant under load): CI's sweep, four hours, is the proof.
 - User value: None directly — a wrong merge of two devices' changes, or a wrong figure in an account's history or performance, would be caught by a test.
 - Done when: each remaining missed mutant is sorted, file by file, into a test added, dead code deleted, or code simplified so the change no longer exists, the valuation and performance files first; a sweep on `main` confirms it; issue 65 is closed.

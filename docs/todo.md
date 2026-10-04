@@ -18,7 +18,22 @@
 <!-- takes the first ready one, removes a reference when it closes the entry (order and -->
 <!-- additions are the human's), and stops when the queue is empty. -->
 
-1. TD-065
+1. FLOW-014
+2. FLOW-001
+3. FLOW-012
+4. FLOW-002
+5. FLOW-013
+6. TD-060
+7. TD-068
+8. TD-070
+9. TD-071
+10. TD-072
+11. TD-064
+12. TD-067
+13. TD-069
+14. TD-063
+15. #058
+16. FLOW-018
 
 ## #009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
@@ -142,8 +157,8 @@ Asked by the owner on 2026-10-03, for 0.6.0. A number's decimal separator is not
 **Design:** none
 **Open questions:**
 
-- [ ] In French, is a dot still accepted when typed (a numeric keypad types one), or refused?
-- [ ] Does the command line stay on the dot whatever the system language (recommended: yes — a script behaves the same everywhere)?
+- [x] In French, is a dot still accepted when typed (a numeric keypad types one), or refused? — Accepted: a typed dot is read, the field shows a comma. In English only the dot is accepted and shown. (Owner, 2026-10-04.)
+- [x] Does the command line stay on the dot whatever the system language (recommended: yes — a script behaves the same everywhere)? — Yes: always the dot; a comma is refused with a usage message. (Owner, 2026-10-04.)
 
 ## #051 — (fullstack) — An MCP server over the headless core
 
@@ -156,11 +171,11 @@ Security, following the rule that tools never become an attack surface: local st
 **Design:** none
 **Open questions:**
 
-- [ ] Which tools first? (Recommended: read-only — portfolio summary, accounts, holdings of an account — then the #044 writes: opening balance, buy, sell.)
-- [ ] Writes through MCP at all, or read-only for good? (Recommended: writes allowed, each one confirmed by the agent client's own tool-approval prompt.)
-- [ ] Which clients to prove it with? (Recommended: Claude Code first; Claude Desktop documented.)
-- [ ] One program with an MCP flag, or a separate small executable? (Recommended: the same program, `--mcp`, like `--scheduled-fetch` — one install, one data folder.)
-- [ ] What may an agent reach through MCP, and how is a write it was not asked for prevented? (Raised by the owner, 2026-09-28: security to be thought through. #044's command line reaches no further than the application; an MCP server lets another program drive the core.)
+- [x] Which tools first? (Recommended: read-only — portfolio summary, accounts, holdings of an account — then the #044 writes: opening balance, buy, sell.) — As recommended, in two pull requests: the reads, then the writes. (Owner, 2026-10-04.)
+- [x] Writes through MCP at all, or read-only for good? (Recommended: writes allowed, each one confirmed by the agent client's own tool-approval prompt.) — Writes allowed, confirmed by the client's approval prompt. (Owner, 2026-10-04; may change with the security discussion below.)
+- [x] Which clients to prove it with? (Recommended: Claude Code first; Claude Desktop documented.) — Claude Code, with a recorded session; Claude Desktop documented. (Owner, 2026-10-04.)
+- [x] One program with an MCP flag, or a separate small executable? (Recommended: the same program, `--mcp`, like `--scheduled-fetch` — one install, one data folder.) — The same program, `--mcp`. (Owner, 2026-10-04.)
+- [ ] What may an agent reach through MCP, and how is a write it was not asked for prevented? (Raised by the owner, 2026-09-28: security to be thought through. #044's command line reaches no further than the application; an MCP server lets another program drive the core.) To be discussed with the owner before the entry is queued (2026-10-04); a proposal exists: only the listed tools, blind refusals, writes refused while the window is open and logged, the mode started by its flag alone.
 
 ## #039 — (service) — A hosted price feed the application can subscribe to (deferred)
 
