@@ -171,6 +171,32 @@ class FoldingFixups(unittest.TestCase):
         self.assertFalse(merge._rebase_left_the_checks_standing(tested, code))
 
 
+class Worktrees(unittest.TestCase):
+    LISTING = (
+        "worktree /home/me/project\nHEAD 1111\nbranch refs/heads/main\n\n"
+        "worktree /home/me/project-docs\nHEAD 2222\nbranch refs/heads/docs/notes\n\n"
+        "worktree /home/me/project-detached\nHEAD 3333\ndetached\n"
+    )
+
+    # FLOW-013 — from a worktree, the target is held by the main folder: named, so the
+    # refusal can say where to merge from.
+    def test_the_folder_holding_the_target_is_found_from_another_worktree(self):
+        self.assertEqual(
+            merge.worktree_holding("main", self.LISTING, "/home/me/project-docs"),
+            "/home/me/project",
+        )
+
+    # From the folder that holds the target itself, nothing is in the way.
+    def test_the_folder_that_holds_the_target_is_not_in_its_own_way(self):
+        self.assertIsNone(merge.worktree_holding("main", self.LISTING, "/home/me/project"))
+        self.assertIsNone(merge.worktree_holding("release", self.LISTING, "/home/me/project"))
+
+    # A branch whose name ends like the target is not the target.
+    def test_a_branch_named_alike_is_not_the_target(self):
+        listing = "worktree /w\nHEAD 1\nbranch refs/heads/not-main\n"
+        self.assertIsNone(merge.worktree_holding("main", listing, "/elsewhere"))
+
+
 class ReviewerNotes(unittest.TestCase):
     # FLOW-002 — a reviewer that did not run says so in its sticky comment's heading; the
     # refusal repeats it, so a red check is not read as a finding.

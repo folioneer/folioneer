@@ -115,21 +115,6 @@ request. The time went to waiting on CI and to rounds that tested nothing new.
 - Costs: about 20 runner-minutes a week. Protects: a release day spent on a workflow
   bug.
 
-## FLOW-013 — `just merge` cannot run from a worktree
-
-- Kind: speed
-- Observed: docs work done in a worktree while the release ran on `main` (the rule for
-  a release hand-over) could not be merged from there: `scripts/merge.py` checks out
-  `main`, which the main folder holds. The worktree had to be removed and the branch
-  checked out in the main folder.
-- Proposal: `scripts/merge.py` merges without checking out `main` when it runs in a
-  worktree (it pushes the rebased branch to `main` and lets the main folder pull), or
-  says in its refusal what to do.
-- Costs: an hour on `scripts/merge.py` and its tests. Protects: the worktree rule being
-  usable to its end.
-
----
-
 ## Used and not used — the 0.5.0 batch
 
 Counted from the session's transcript, 2026-09-29 → 2026-10-03: what the agent invoked

@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -200,6 +201,18 @@ def rebase_folding_fixups(target: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def worktree_holding(branch: str, listing: str, here: str) -> str | None:
+    """The path of another worktree that has `branch` checked out, from the output of
+    `git worktree list --porcelain`; None when no other worktree holds it."""
+    path = ""
+    for line in listing.splitlines():
+        if line.startswith("worktree "):
+            path = line[len("worktree ") :]
+        elif line == f"branch refs/heads/{branch}" and path != here:
+            return path
+    return None
+
+
 def reviewer_heading(comments: list[str], check_name: str) -> str | None:
     """What a reviewer lane's sticky comment says of itself: the text after the dash of
     its `## reviewer-<lane> — …` heading ("no report", "did not run (usage limit)"), or
@@ -217,21 +230,24 @@ def reviewer_heading(comments: list[str], check_name: str) -> str | None:
     return None
 
 
-def _reviewer_notes(number: int, failing: list[str]) -> dict[str, str]:
-    """For the failing reviewer checks, what each one's sticky comment says of its run."""
-    lanes = [name for name in failing if name.startswith("reviewer-")]
+def _reviewer_notes(number: int, failed: list[str]) -> dict[str, str]:
+    """For the reviewer checks that completed without passing, what each one's sticky
+    comment says of its run. Best effort: the refusal is the product, the note an aid —
+    a slow or failing call gives no note, never another error."""
+    lanes = [name for name in failed if name.startswith("reviewer-")]
     if not lanes:
         return {}
-    result = gh(
-        "api",
-        f"repos/{{owner}}/{{repo}}/issues/{number}/comments",
-        "--paginate",
-        "--jq",
-        ".[] | .body | @json",
-    )
-    if result.returncode != 0:
+    try:
+        result = subprocess.run(
+            [
+                "gh", "api", f"repos/{{owner}}/{{repo}}/issues/{number}/comments", "--paginate",
+                "--jq", ".[] | .body | @json",
+            ],
+            capture_output=True, text=True, check=False, timeout=30,
+        )
+        comments = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
         return {}
-    comments = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
     notes = {name: reviewer_heading(comments, name) for name in lanes}
     return {name: note for name, note in notes.items() if note}
 
@@ -269,7 +285,8 @@ def ensure_checks_green(branch: str, target: str, before: str, after: str) -> No
         if status != "completed" or conclusion not in PASSING
     )
     # A reviewer that did not run is told apart from one that found a critical.
-    notes = _reviewer_notes(number, failing) if failing else {}
+    # Only for a check that has finished: a lane still running has a stale comment.
+    notes = _reviewer_notes(number, [name for name in failing if runs[name][0] == "completed"])
     not_green = [
         f"{name}: {runs[name][0] if runs[name][0] != 'completed' else runs[name][1]}"
         + (f" — {notes[name]}" if name in notes else "")
@@ -327,6 +344,19 @@ def main() -> int:
             "  git rebase --continue   # after resolving conflicts",
             "  git rebase --abort      # to abandon",
             "Then re-run.",
+        )
+
+    # Pre-flight 3b — the target is not checked out in another worktree. The merge
+    # checks the target out here, which git refuses when another folder holds it;
+    # say so before anything is rebased or pushed.
+    here = git("rev-parse", "--show-toplevel").stdout.strip()
+    holder = worktree_holding(target, git("worktree", "list", "--porcelain").stdout, here)
+    if holder:
+        fail(
+            f"`{target}` is checked out in {holder}: the merge cannot run from this worktree.",
+            "Merge from that folder instead, once it is clean and this worktree is pushed:",
+            f"  git worktree remove {shlex.quote(here)}",
+            f"  cd {shlex.quote(holder)} && git checkout {shlex.quote(branch)} && just merge",
         )
 
     # Pre-flight 4 — target branch exists locally.
