@@ -4540,6 +4540,221 @@ mod tests {
         assert_eq!(resp.total_realized_pnl, 0);
     }
 
+    // ACD-050/053, DIV-070 — the as-of view counts what is dated on the day itself: a
+    // deposit less a withdrawal, a position first bought that day, its dividend. A
+    // position sold before the day counts among the holdings as a closed one, and the
+    // day asked for may be today.
+    #[tokio::test]
+    async fn as_of_counts_what_is_dated_on_the_day_itself() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let account = account_svc
+            .create(
+                "Acc".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::Automatic,
+                false,
+            )
+            .await
+            .unwrap();
+        asset_svc.seed_cash_asset("EUR").await.unwrap();
+        account_svc
+            .record_deposit(&account.id, "2024-01-01".to_string(), 1_000_000_000, None)
+            .await
+            .unwrap();
+        let sold = make_stock(&asset_svc, "Sold Co", "EUR").await;
+        for (date, sell) in [("2024-02-01", false), ("2024-03-01", true)] {
+            let trade = if sell {
+                account_svc
+                    .sell_holding(
+                        &account.id,
+                        sold.clone(),
+                        date.to_string(),
+                        1_000_000,
+                        12_000_000,
+                        1_000_000,
+                        0,
+                        None,
+                        None,
+                    )
+                    .await
+            } else {
+                account_svc
+                    .buy_holding(
+                        &account.id,
+                        sold.clone(),
+                        date.to_string(),
+                        1_000_000,
+                        10_000_000,
+                        1_000_000,
+                        0,
+                        None,
+                        None,
+                    )
+                    .await
+            };
+            trade.unwrap();
+        }
+        let day = "2024-06-01";
+        let bought = make_stock(&asset_svc, "Bought Co", "EUR").await;
+        account_svc
+            .buy_holding(
+                &account.id,
+                bought.clone(),
+                day.to_string(),
+                2_000_000,
+                100_000_000,
+                1_000_000,
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        account_svc
+            .record_dividend(
+                &account.id,
+                bought.clone(),
+                day.to_string(),
+                3_000_000,
+                1_000_000,
+                None,
+            )
+            .await
+            .unwrap();
+        account_svc
+            .record_withdrawal(&account.id, day.to_string(), 50_000_000, None)
+            .await
+            .unwrap();
+
+        let uc = AccountDetailsUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let resp = uc
+            .get_account_details(&account.id, Some(day))
+            .await
+            .unwrap();
+
+        assert_eq!(resp.total_net_cash_input, 950_000_000);
+        assert_eq!(resp.total_dividends_received, 3_000_000);
+        let position = resp
+            .holdings
+            .iter()
+            .find(|holding| holding.asset_id == bought)
+            .expect("a position bought on the day is held on the day");
+        assert_eq!(position.quantity, 2_000_000);
+        assert_eq!(resp.closed_holdings.len(), 1);
+        assert_eq!(resp.holdings.len(), 2);
+        assert_eq!(resp.total_holding_count, 3);
+        assert_eq!(
+            resp.total_holding_count,
+            (resp.holdings.len() + resp.closed_holdings.len()) as i64
+        );
+        // Cash once: 1 000 − 10 + 12 − 200 + 3 − 50.
+        let cash: Vec<i64> = resp
+            .holdings
+            .iter()
+            .filter(|holding| is_cash_asset(&holding.asset_id))
+            .map(|holding| holding.quantity)
+            .collect();
+        assert_eq!(cash, vec![755_000_000]);
+
+        let today = Local::now().date_naive().to_string();
+        assert!(uc
+            .get_account_details(&account.id, Some(&today))
+            .await
+            .is_ok());
+    }
+
+    // MKT-035 — a position that cost nothing has a value and no return to state: there
+    // is no cost to divide by.
+    #[tokio::test]
+    async fn as_of_states_no_return_for_a_position_that_cost_nothing() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let account = account_svc
+            .create(
+                "Acc".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::Automatic,
+                false,
+            )
+            .await
+            .unwrap();
+        asset_svc.seed_cash_asset("EUR").await.unwrap();
+        let gift = make_stock(&asset_svc, "Gift Co", "EUR").await;
+        account_svc
+            .open_holding(
+                &account.id,
+                gift.clone(),
+                "2024-01-01".to_string(),
+                1_000_000,
+                0,
+            )
+            .await
+            .unwrap();
+        asset_svc
+            .record_asset_price(&gift, "2024-01-01", 50.0)
+            .await
+            .unwrap();
+
+        let uc = AccountDetailsUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let resp = uc
+            .get_account_details(&account.id, Some("2024-06-01"))
+            .await
+            .unwrap();
+        assert_eq!(resp.holdings.len(), 1);
+        assert_eq!(resp.holdings[0].current_value, Some(50_000_000));
+        assert_eq!(resp.holdings[0].performance_pct, None);
+        assert_eq!(resp.holdings[0].total_return_pct, None);
+    }
+
+    // CSH-090 — an account whose cash is back to nothing on the day shows no cash line.
+    #[tokio::test]
+    async fn as_of_shows_no_cash_line_when_the_balance_is_nothing() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let account = account_svc
+            .create(
+                "Acc".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::Automatic,
+                false,
+            )
+            .await
+            .unwrap();
+        asset_svc.seed_cash_asset("EUR").await.unwrap();
+        account_svc
+            .record_deposit(&account.id, "2024-01-01".to_string(), 100_000_000, None)
+            .await
+            .unwrap();
+        account_svc
+            .record_withdrawal(&account.id, "2024-02-01".to_string(), 100_000_000, None)
+            .await
+            .unwrap();
+
+        let uc = AccountDetailsUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let resp = uc
+            .get_account_details(&account.id, Some("2024-03-01"))
+            .await
+            .unwrap();
+        assert!(resp.holdings.is_empty());
+        assert_eq!(resp.total_global_value, 0);
+    }
+
     // DIV-070/073 — a dividend dated AFTER the as-of date is excluded from both
     // the holding's dividends_received and the account-level total.
     #[tokio::test]
