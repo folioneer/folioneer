@@ -1664,6 +1664,353 @@ mod tests {
         assert!(notice_for(&Outcome::MergeMax).is_none());
     }
 
+    /// A user's update of a transaction on `device_id` at `timestamp`.
+    fn transaction_update(device_id: &str, timestamp: u64, based_on: Option<u64>) -> Change {
+        change(
+            device_id,
+            RecordKind::Transaction,
+            "transaction-1",
+            Operation::Updated,
+            Origin::User,
+            timestamp,
+            based_on,
+            Some("{\"account_id\":\"account-1\"}"),
+        )
+    }
+
+    // CFR-021 — the same change arriving twice ranks equal to the state it left: only a
+    // higher rank prevails (CFR-020), so it is ignored. The same holds for an observation
+    // (CFR-050) and for a local write (CFR-016/020).
+    #[test]
+    fn cfr_021_an_equal_rank_never_prevails() {
+        let delivered = transaction_update("laptop", 2_000, None);
+        let left_by_it = RecordState::Live(delivered.rank());
+        assert!(matches!(
+            resolve(&delivered, Some(&left_by_it)),
+            Outcome::Ignore { .. }
+        ));
+
+        let price = change(
+            "laptop",
+            RecordKind::AssetPrice,
+            "asset-1:2026-08-21",
+            Operation::Created,
+            Origin::Application,
+            2_000,
+            None,
+            Some("{\"price\":58100000}"),
+        );
+        assert_eq!(
+            resolve_observation(&price, Some(&RecordState::Live(price.rank()))),
+            Outcome::Ignore { notice: None }
+        );
+
+        assert!(!local_write_allowed(
+            RecordKind::Transaction,
+            &delivered.rank(),
+            Some(&left_by_it)
+        ));
+        assert!(local_write_allowed(
+            RecordKind::Transaction,
+            &rank("laptop", Origin::User, 2_001),
+            Some(&left_by_it)
+        ));
+    }
+
+    // CFR-060 — what a prevailing change reports about the state it supersedes: an edit
+    // over a concurrent removal overrules the removal; a creation over a live record
+    // reports nothing here (a collision is reported elsewhere, CFR-034).
+    #[test]
+    fn cfr_060_a_prevailing_change_reports_the_removal_it_overrules_not_a_creation() {
+        let removed_on_desktop = RecordState::Tombstone(rank("desktop", Origin::User, 1_000));
+        let later_edit = transaction_update("laptop", 2_000, None);
+        let Outcome::Apply {
+            notice: Some(notice),
+        } = resolve(&later_edit, Some(&removed_on_desktop))
+        else {
+            panic!("a later concurrent edit prevails over a removal and reports it");
+        };
+        assert_eq!(notice.kind, ConflictNoticeKind::OverruledRemoval);
+        assert_eq!(notice.raised_on_device_id, "desktop");
+        assert_eq!(notice.other_device_id, "laptop");
+
+        let live_on_desktop = RecordState::Live(rank("desktop", Origin::User, 1_000));
+        let mut later_creation = transaction_update("laptop", 2_000, None);
+        later_creation.operation = Operation::Created;
+        assert_eq!(
+            resolve(&later_creation, Some(&live_on_desktop)),
+            Outcome::Apply { notice: None }
+        );
+    }
+
+    // CFR-060 — what an overruled change reports: a concurrent user edit that loses is
+    // reported on the device that made it; an application's change that loses is not
+    // (CFR-016), nor is a change made knowing the state that overrules it — an edit of
+    // an account made after its removal was received.
+    #[test]
+    fn cfr_060_an_overruled_change_is_reported_only_when_concurrent_and_the_users() {
+        let live_on_laptop = RecordState::Live(rank("laptop", Origin::User, 2_000));
+        let earlier_edit = transaction_update("desktop", 1_000, None);
+        let Outcome::Ignore {
+            notice: Some(notice),
+        } = resolve(&earlier_edit, Some(&live_on_laptop))
+        else {
+            panic!("an earlier concurrent user edit is overruled and reported");
+        };
+        assert_eq!(notice.kind, ConflictNoticeKind::OverruledEdit);
+        assert_eq!(notice.raised_on_device_id, "desktop");
+        assert_eq!(notice.other_device_id, "laptop");
+
+        let mut by_the_application = transaction_update("desktop", 1_000, None);
+        by_the_application.origin = Origin::Application;
+        assert_eq!(
+            resolve(&by_the_application, Some(&live_on_laptop)),
+            Outcome::Ignore { notice: None }
+        );
+
+        let account_removed = RecordState::Tombstone(rank("laptop", Origin::User, 2_000));
+        let rename_after_the_removal = change(
+            "desktop",
+            RecordKind::Account,
+            "account-1",
+            Operation::Updated,
+            Origin::User,
+            3_000,
+            Some(2_000),
+            Some("{\"name\":\"Main\"}"),
+        );
+        assert_eq!(
+            resolve(&rename_after_the_removal, Some(&account_removed)),
+            Outcome::Ignore { notice: None }
+        );
+
+        // CFR-022 — the same rename made without knowing of the removal is overruled
+        // too, and reported.
+        let mut concurrent_rename = rename_after_the_removal.clone();
+        concurrent_rename.based_on = Some(LogicalTimestamp::new(500));
+        let Outcome::Ignore {
+            notice: Some(notice),
+        } = resolve(&concurrent_rename, Some(&account_removed))
+        else {
+            panic!("a concurrent edit of a removed account is overruled and reported");
+        };
+        assert_eq!(notice.kind, ConflictNoticeKind::OverruledEdit);
+        assert_eq!(notice.raised_on_device_id, "desktop");
+    }
+
+    // CFR-050 — through the full decision, an observation is decided by its date of
+    // writing alone: a later download replaces an earlier manual price, which the rank
+    // of CFR-016 would have kept.
+    #[test]
+    fn cfr_050_the_decision_routes_an_observation_past_the_rank() {
+        let manual = RecordState::Live(rank("desktop", Origin::User, 1_000));
+        let later_download = change(
+            "laptop",
+            RecordKind::AssetPrice,
+            "asset-1:2026-08-21",
+            Operation::Created,
+            Origin::Application,
+            1_300,
+            None,
+            Some("{\"price\":58300000}"),
+        );
+        let decision = decide(&later_download, Some(&manual), Some("{\"price\":58100000}"));
+        assert_eq!(decision.outcome, Outcome::Apply { notice: None });
+        assert!(decision.notices.is_empty());
+
+        let mut earlier_download = later_download.clone();
+        earlier_download.logical_timestamp = LogicalTimestamp::new(900);
+        let decision = decide(
+            &earlier_download,
+            Some(&manual),
+            Some("{\"price\":58100000}"),
+        );
+        assert_eq!(decision.outcome, Outcome::Ignore { notice: None });
+    }
+
+    // CFR-044 — a catch-up position merges by maximum while it lives. The rule says
+    // nothing of a removed one: its removal, and a change arriving over its tombstone,
+    // are decided by rank like any record (CFR-015/020) — so the application's change
+    // never brings back a position the user's removal took away (CFR-016).
+    #[test]
+    fn cfr_044_a_removed_catch_up_position_is_decided_by_rank() {
+        let position = |operation: Operation, timestamp: u64| {
+            change(
+                "laptop",
+                RecordKind::FeeCatchUpPosition,
+                "account-1:asset-1",
+                operation,
+                Origin::Application,
+                timestamp,
+                None,
+                Some("{\"account_id\":\"account-1\"}"),
+            )
+        };
+        let live = RecordState::Live(rank("desktop", Origin::Application, 1_000));
+        let tombstone = RecordState::Tombstone(rank("desktop", Origin::Application, 1_000));
+
+        assert_eq!(
+            decide(&position(Operation::Updated, 2_000), Some(&live), None).outcome,
+            Outcome::MergeMax
+        );
+        assert_eq!(
+            decide(&position(Operation::Removed, 2_000), Some(&live), None).outcome,
+            Outcome::Apply { notice: None }
+        );
+        assert_eq!(
+            decide(&position(Operation::Updated, 2_000), Some(&tombstone), None).outcome,
+            Outcome::Apply { notice: None }
+        );
+        let removed_by_the_user = RecordState::Tombstone(rank("desktop", Origin::User, 1_000));
+        assert_eq!(
+            decide(
+                &position(Operation::Updated, 2_000),
+                Some(&removed_by_the_user),
+                None
+            )
+            .outcome,
+            Outcome::Ignore { notice: None }
+        );
+    }
+
+    // CFR-034 — the decision reports a collision for a creation meeting a live record of
+    // other content, on both devices; an update never collides, based on a state or not.
+    #[test]
+    fn cfr_034_the_decision_reports_a_collision_for_a_creation_only() {
+        let live_on_desktop = RecordState::Live(rank("desktop", Origin::User, 1_000));
+        let mut creation = transaction_update("laptop", 2_000, None);
+        creation.operation = Operation::Created;
+        let held = Some("{\"account_id\":\"account-2\"}");
+
+        let collided = decide(&creation, Some(&live_on_desktop), held);
+        let kinds: Vec<ConflictNoticeKind> =
+            collided.notices.iter().map(|notice| notice.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                ConflictNoticeKind::NaturalKeyCollision,
+                ConflictNoticeKind::NaturalKeyCollision
+            ]
+        );
+
+        for based_on in [None, Some(500)] {
+            let update = transaction_update("laptop", 2_000, based_on);
+            let updated = decide(&update, Some(&live_on_desktop), held);
+            assert!(updated
+                .notices
+                .iter()
+                .all(|notice| notice.kind != ConflictNoticeKind::NaturalKeyCollision));
+        }
+    }
+
+    // CFR-034 — a collision is reported only between two creations by users: one that is
+    // based on a state, or an application's on either side, is not one.
+    #[test]
+    fn cfr_034_each_condition_alone_rules_a_collision_out() {
+        let creation = |device_id: &str, origin: Origin, based_on: Option<u64>, content: &str| {
+            change(
+                device_id,
+                RecordKind::Category,
+                "category-bonds",
+                Operation::Created,
+                origin,
+                1_000,
+                based_on,
+                Some(content),
+            )
+        };
+        let held = creation("desktop", Origin::User, None, "{\"name\":\"Bonds\"}");
+        let other = "{\"name\":\"Obligations\"}";
+
+        assert!(collision_notice(&creation("laptop", Origin::User, None, other), &held).is_some());
+        assert!(
+            collision_notice(&creation("laptop", Origin::User, Some(900), other), &held).is_none()
+        );
+        assert!(
+            collision_notice(&creation("laptop", Origin::Application, None, other), &held)
+                .is_none()
+        );
+        let held_by_the_application =
+            creation("desktop", Origin::Application, None, "{\"name\":\"Bonds\"}");
+        assert!(collision_notice(
+            &creation("laptop", Origin::User, None, other),
+            &held_by_the_application
+        )
+        .is_none());
+    }
+
+    // CFR-031/032/035 — what a change's content says of the records around it: a rate
+    // refers to its currency pair, a record keyed by its holding belongs to the account
+    // its identity starts with, and only an account or a category carries a display name.
+    #[test]
+    fn cfr_031_a_change_names_its_pair_its_account_and_its_display_name() {
+        let rate = change(
+            "desktop",
+            RecordKind::CurrencyRate,
+            "USD:EUR:2026-08-21",
+            Operation::Created,
+            Origin::Application,
+            1_000,
+            None,
+            Some("{\"from_currency\":\"USD\",\"to_currency\":\"EUR\"}"),
+        );
+        assert!(
+            parent_references(&rate).contains(&(RecordKind::CurrencyPair, "USD:EUR".to_string()))
+        );
+
+        let note = change(
+            "desktop",
+            RecordKind::HoldingNote,
+            "account-1:asset-1",
+            Operation::Removed,
+            Origin::User,
+            1_000,
+            None,
+            None,
+        );
+        assert_eq!(account_parent(&note), Some("account-1".to_string()));
+
+        let named = |record_kind: RecordKind| {
+            change(
+                "desktop",
+                record_kind,
+                "record-1",
+                Operation::Created,
+                Origin::User,
+                1_000,
+                None,
+                Some("{\"name\":\"Main\"}"),
+            )
+        };
+        assert_eq!(
+            display_name(&named(RecordKind::Account)),
+            Some("Main".to_string())
+        );
+        assert_eq!(
+            display_name(&named(RecordKind::Category)),
+            Some("Main".to_string())
+        );
+        assert_eq!(display_name(&named(RecordKind::Transaction)), None);
+    }
+
+    // CFR-032 — a removal is never dropped for its account's removal: it has nothing
+    // left to add to it.
+    #[test]
+    fn cfr_032_a_removal_under_a_removed_account_is_not_dropped() {
+        let account_removed = RecordState::Tombstone(rank("laptop", Origin::User, 2_000));
+        let mut removal = transaction_update("desktop", 1_000, None);
+        removal.operation = Operation::Removed;
+        assert_eq!(
+            drop_if_parent_tombstoned(&removal, Some(&account_removed)),
+            None
+        );
+        assert!(drop_if_parent_tombstoned(
+            &transaction_update("desktop", 1_000, None),
+            Some(&account_removed)
+        )
+        .is_some());
+    }
+
     // SYN-035 — a change written in an older data format keeps the local value of every
     // field it does not carry; a field it carries wins; with nothing local it applies as is.
     #[test]
