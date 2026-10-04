@@ -344,3 +344,12 @@ Remove an entry once it has been resolved.
 - Observation: the replay multiplies the quantity by the factor in 128 bits and casts the result back to 64 bits without a check. A factor large enough (far beyond any real split) makes the cast wrap: recording and the split check both then show a quantity that is wrong, or refuse a split for the wrong reason.
 - User value: None in practice — no real split comes near the bound; an absurd factor typed by mistake is refused with a clear reason.
 - Done when: a factor whose rescale cannot be stored is refused when the split is recorded and when it is checked, with one error code, shown by a test on each path.
+
+## 2026-10-04 — TD-079 — The rate edit scenario fails at random and is skipped
+
+- Found by: CI on pull request 124 (run 37225909601), which does not touch currencies
+- Where: `e2e/currency/currency_rates.test.ts` — "FXR-052: editing a rate via the UI updates the rate row", at the lookup of the old rate row just after the edit dialog closes
+- Severity: 🟡
+- Observation: `stale element reference: Stale element found when trying to create the node handle` on `$("#rate-row-…")` once the dialog is gone. The rate list is re-rendered when the rate changes; the scenario asks for a row of the list while it is being replaced. Whether the list re-renders once or twice after an edit, and whether the scenario should wait for the new row before looking for the old one, is not established. The test is skipped (`it.skip`): editing a rate through the interface has no end-to-end coverage until this is fixed.
+- User value: None directly — the scenario protects the rate edit again.
+- Done when: the cause is found (in the scenario or in how the rate list refreshes), fixed, and the scenario is re-enabled and passes twenty runs in a row.

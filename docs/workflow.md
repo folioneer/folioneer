@@ -234,8 +234,10 @@ treated as a new open question on the entry.
 - One entry, one run, a wall-clock budget of three hours. Over budget → open question
   "larger than estimated: split?", move on.
 - The same gate failing three times on one entry → open question, move on.
-- E2E failed once and passed on re-run → the run continues; the flake is filed as
-  `TD-NNN` with the failure screenshot.
+- A test fails for a reason the change cannot explain → it is flaky, and is never
+  accepted by re-running it: that one test is skipped in its own pull request and a
+  `TD-NNN` is filed with the failure text and the run's link, to find out why; the fix
+  that re-enables it closes the entry. The run continues.
 - Never touch the live portfolio database, never force-push, never bypass a hook,
   never edit a released changelog line, never reorder Next, never cut a release.
 

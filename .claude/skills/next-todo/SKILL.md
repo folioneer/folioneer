@@ -101,8 +101,10 @@ repos/{owner}/{repo}/issues/<n>/comments`), grade every finding with
   the four questions of `docs/workflow.md` § 7 and apply the policy — (a) fix, (b) `TD-NNN` entry, (c)
   one-off inline comment, (c) pattern → edit the reviewer prompt, `[DECISION]` → open
   question on the entry — then record the table in the PR body, push, and watch again.
-- One E2E failure that passes on re-run: file the flake as `TD-NNN` with the failure
-  screenshot and continue. Any other red: fix, commit with `git commit --fixup <sha>` (the entry lands as one
+- A test that fails for a reason the change cannot explain is a flaky test, and is never
+  accepted by re-running it: skip that one test in its own pull request, file a `TD-NNN`
+  with the failure text and the run's link to find out why, and continue; the fix that
+  re-enables it closes the entry. Any other red: fix, commit with `git commit --fixup <sha>` (the entry lands as one
   commit — `just merge` folds it), push, watch again. The same gate red
   three times: open question on the entry, leave the PR open, stop.
 - All green: `just merge`.
