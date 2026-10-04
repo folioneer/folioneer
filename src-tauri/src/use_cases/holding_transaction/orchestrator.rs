@@ -297,6 +297,16 @@ impl HoldingTransactionUseCase {
         })
     }
 
+    /// Whether the account holds the asset today: a quantity above zero. A closed position
+    /// keeps its holding at zero, and is not held.
+    async fn holds(&self, account_id: &str, asset_id: &str) -> Result<bool, AccountError> {
+        Ok(self
+            .account_service
+            .get_holding_by_account_asset(account_id, asset_id)
+            .await?
+            .is_some_and(|holding| holding.quantity > 0))
+    }
+
     /// SPL-062 — checks a split draft without writing anything: the factor it would store,
     /// what it would make of the position, the price to carry across it — or the first
     /// problem, as recording would report it.
@@ -337,11 +347,7 @@ impl HoldingTransactionUseCase {
             None
         } else {
             // SPL-012 — a position closed today cannot be split, whatever it held then.
-            let held = self
-                .account_service
-                .get_holding_by_account_asset(&draft.account_id, &draft.asset_id)
-                .await?;
-            if !held.is_some_and(|holding| holding.quantity > 0) {
+            if !self.holds(&draft.account_id, &draft.asset_id).await? {
                 return Err(AccountError::ClosedPosition.into());
             }
             Some(
@@ -665,13 +671,8 @@ impl HoldingTransactionUseCase {
 
         // DIV-011 — asset must be currently held (quantity > 0). A repository
         // failure here is surfaced as `DatabaseError` by the service layer.
-        let held = self
-            .account_service
-            .get_holding_by_account_asset(account_id, &asset_id)
-            .await?;
-        match held {
-            Some(h) if h.quantity > 0 => {}
-            _ => return Err(DividendTask::AssetNotHeld.into()),
+        if !self.holds(account_id, &asset_id).await? {
+            return Err(DividendTask::AssetNotHeld.into());
         }
 
         // CSH-010 — ensure the system Cash Asset for the account's currency exists.
@@ -737,13 +738,8 @@ impl HoldingTransactionUseCase {
         }
 
         // FSD-011 — asset must be currently held (quantity > 0).
-        let held = self
-            .account_service
-            .get_holding_by_account_asset(account_id, &asset_id)
-            .await?;
-        match held {
-            Some(h) if h.quantity > 0 => {}
-            _ => return Err(FreeSharesTask::AssetNotHeld.into()),
+        if !self.holds(account_id, &asset_id).await? {
+            return Err(FreeSharesTask::AssetNotHeld.into());
         }
 
         // Delegate to the account BC; its `AccountError` surfaces on the
@@ -793,13 +789,8 @@ impl HoldingTransactionUseCase {
         }
 
         // SPL-012 — asset must be currently held (quantity > 0).
-        let held = self
-            .account_service
-            .get_holding_by_account_asset(account_id, &asset_id)
-            .await?;
-        match held {
-            Some(h) if h.quantity > 0 => {}
-            _ => return Err(SplitTask::AssetNotHeld.into()),
+        if !self.holds(account_id, &asset_id).await? {
+            return Err(SplitTask::AssetNotHeld.into());
         }
 
         // Delegate to the account BC; its `AccountError` surfaces on the
@@ -908,13 +899,10 @@ impl HoldingTransactionUseCase {
             Some(_) => {}
         }
 
-        let held = self
-            .account_service
-            .get_holding_by_account_asset(account_id, asset_id)
-            .await?;
-        match held {
-            Some(h) if h.quantity > 0 => Ok(()),
-            _ => Err(ManagementFeeTask::AssetNotHeld.into()),
+        if self.holds(account_id, asset_id).await? {
+            Ok(())
+        } else {
+            Err(ManagementFeeTask::AssetNotHeld.into())
         }
     }
 
@@ -968,13 +956,8 @@ impl HoldingTransactionUseCase {
             if !asset.interest_bearing {
                 return Err(InterestTask::InterestNotEligible.into());
             }
-            let held = self
-                .account_service
-                .get_holding_by_account_asset(account_id, &asset_id)
-                .await?;
-            match held {
-                Some(h) if h.quantity > 0 => {}
-                _ => return Err(InterestTask::AssetNotHeld.into()),
+            if !self.holds(account_id, &asset_id).await? {
+                return Err(InterestTask::AssetNotHeld.into());
             }
         }
 
@@ -3100,6 +3083,17 @@ mod draft_tests {
             .validate_stock_split_draft(split_draft(SplitSize::Factor { factor: 1 }))
             .await;
         assert_eq!(code_of(refused), "SplitCollapsesPosition");
+    }
+
+    // DIV-011, FSD-011, SPL-012, FEE-011, INT-011 — an asset is held when its holding has
+    // a quantity above zero: a closed position keeps its holding at zero and is not, nor
+    // is an asset the account never had.
+    #[tokio::test]
+    async fn an_asset_is_held_only_above_a_quantity_of_zero() {
+        for (holding_quantity, held) in [(Some(1), true), (Some(0), false), (None, false)] {
+            let use_case = split_use_case_holding(holding_quantity, Ok(HELD), 0, None);
+            assert_eq!(use_case.holds("acc-1", "asset-1").await.ok(), Some(held));
+        }
     }
 
     // SPL-012 — a position closed today is refused before anything is previewed, and a

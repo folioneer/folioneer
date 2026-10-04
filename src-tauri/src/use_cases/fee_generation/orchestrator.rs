@@ -1097,6 +1097,48 @@ mod tests {
         );
     }
 
+    // FEE-042 — the period a date falls in ends on the last day of its month, of its
+    // quarter (March, June, September, December) or of its year; the next period starts
+    // the day after.
+    #[test]
+    fn fee_042_a_period_ends_with_its_month_its_quarter_or_its_year() {
+        let day = |year: i32, month: u32, day: u32| NaiveDate::from_ymd_opt(year, month, day);
+        let quarter_end_of_month = [3, 3, 3, 6, 6, 6, 9, 9, 9, 12, 12, 12];
+        for (month, quarter_end) in (1..=12).zip(quarter_end_of_month) {
+            let last_day = if matches!(quarter_end, 6 | 9) { 30 } else { 31 };
+            assert_eq!(
+                period_end_containing(FeeFrequency::Quarterly, day(2025, month, 15).unwrap()),
+                day(2025, quarter_end, last_day),
+                "month {month}"
+            );
+        }
+        // The last day of a quarter is in it; the next day is in the next.
+        assert_eq!(
+            period_end_containing(FeeFrequency::Quarterly, day(2025, 3, 31).unwrap()),
+            day(2025, 3, 31)
+        );
+        assert_eq!(
+            period_end_containing(FeeFrequency::Quarterly, day(2025, 4, 1).unwrap()),
+            day(2025, 6, 30)
+        );
+        assert_eq!(
+            period_end_containing(FeeFrequency::Monthly, day(2024, 2, 10).unwrap()),
+            day(2024, 2, 29)
+        );
+        assert_eq!(
+            period_end_containing(FeeFrequency::Monthly, day(2025, 12, 31).unwrap()),
+            day(2025, 12, 31)
+        );
+        assert_eq!(
+            period_end_containing(FeeFrequency::Annually, day(2025, 5, 1).unwrap()),
+            day(2025, 12, 31)
+        );
+        assert_eq!(
+            next_period_end(FeeFrequency::Quarterly, day(2025, 12, 31).unwrap()),
+            day(2026, 3, 31)
+        );
+    }
+
     // FEE-048/CFR-034/043 — same (account, asset, period) always yields the same id, so two
     // devices generating the same period independently converge on one transaction.
     #[test]
