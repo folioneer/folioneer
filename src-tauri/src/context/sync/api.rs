@@ -11,7 +11,7 @@ use std::result::Result as StdResult;
 use std::sync::Arc;
 
 use crate::context::sync::application::SyncService;
-use crate::context::sync::domain::SyncStatus;
+use crate::context::sync::domain::SyncStatusView;
 use crate::context::sync::error::SyncError;
 
 /// Pauses sync on this device (SYN-070).
@@ -19,8 +19,8 @@ use crate::context::sync::error::SyncError;
 #[specta::specta]
 pub async fn pause_sync(
     svc: tauri::State<'_, Arc<SyncService>>,
-) -> StdResult<SyncStatus, SyncError> {
-    svc.pause_sync().await
+) -> StdResult<SyncStatusView, SyncError> {
+    svc.pause_sync().await.map(Into::into)
 }
 
 /// Leaves sync on this device for good, keeping the local portfolio (SYN-082).
@@ -36,8 +36,8 @@ pub async fn leave_sync(svc: tauri::State<'_, Arc<SyncService>>) -> StdResult<()
 pub async fn rename_sync_device(
     svc: tauri::State<'_, Arc<SyncService>>,
     device_name: String,
-) -> StdResult<SyncStatus, SyncError> {
-    svc.rename_sync_device(device_name).await
+) -> StdResult<SyncStatusView, SyncError> {
+    svc.rename_sync_device(device_name).await.map(Into::into)
 }
 
 /// Dismisses a conflict notice (SYN-066).

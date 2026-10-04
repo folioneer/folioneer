@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use tauri::State;
 
-use crate::context::sync::{SyncFolderState, SyncReport, SyncStatus};
+use crate::context::sync::{SyncFolderState, SyncReportView, SyncStatusView};
 
 use super::error::PortfolioSyncError;
 use super::orchestrator::PortfolioSyncOrchestrator;
@@ -34,8 +34,10 @@ pub async fn enable_sync(
     folder: String,
     passphrase: String,
     device_name: String,
-) -> StdResult<SyncStatus, PortfolioSyncError> {
-    uc.enable_sync(folder, passphrase, device_name).await
+) -> StdResult<SyncStatusView, PortfolioSyncError> {
+    uc.enable_sync(folder, passphrase, device_name)
+        .await
+        .map(Into::into)
 }
 
 /// Starts the portfolio over under a new passphrase (SYN-071).
@@ -46,8 +48,10 @@ pub async fn start_sync_over(
     folder: String,
     passphrase: String,
     device_name: String,
-) -> StdResult<SyncStatus, PortfolioSyncError> {
-    uc.start_sync_over(folder, passphrase, device_name).await
+) -> StdResult<SyncStatusView, PortfolioSyncError> {
+    uc.start_sync_over(folder, passphrase, device_name)
+        .await
+        .map(Into::into)
 }
 
 /// Designates a different folder for an already-enrolled device (SYN-074).
@@ -56,8 +60,8 @@ pub async fn start_sync_over(
 pub async fn change_sync_folder(
     uc: State<'_, Arc<PortfolioSyncOrchestrator>>,
     folder: String,
-) -> StdResult<SyncStatus, PortfolioSyncError> {
-    uc.change_sync_folder(folder).await
+) -> StdResult<SyncStatusView, PortfolioSyncError> {
+    uc.change_sync_folder(folder).await.map(Into::into)
 }
 
 /// Runs a publish-only sync immediately (SYN-061).
@@ -65,8 +69,8 @@ pub async fn change_sync_folder(
 #[specta::specta]
 pub async fn sync_now(
     uc: State<'_, Arc<PortfolioSyncOrchestrator>>,
-) -> StdResult<SyncReport, PortfolioSyncError> {
-    uc.sync_now().await
+) -> StdResult<SyncReportView, PortfolioSyncError> {
+    uc.sync_now().await.map(Into::into)
 }
 
 /// Resumes sync on a paused device (SYN-073).
@@ -74,8 +78,8 @@ pub async fn sync_now(
 #[specta::specta]
 pub async fn resume_sync(
     uc: State<'_, Arc<PortfolioSyncOrchestrator>>,
-) -> StdResult<SyncReport, PortfolioSyncError> {
-    uc.resume_sync().await
+) -> StdResult<SyncReportView, PortfolioSyncError> {
+    uc.resume_sync().await.map(Into::into)
 }
 
 /// Reads the current sync status (SYN-063).
@@ -83,6 +87,6 @@ pub async fn resume_sync(
 #[specta::specta]
 pub async fn get_sync_status(
     uc: State<'_, Arc<PortfolioSyncOrchestrator>>,
-) -> StdResult<SyncStatus, PortfolioSyncError> {
-    uc.get_sync_status().await
+) -> StdResult<SyncStatusView, PortfolioSyncError> {
+    uc.get_sync_status().await.map(Into::into)
 }

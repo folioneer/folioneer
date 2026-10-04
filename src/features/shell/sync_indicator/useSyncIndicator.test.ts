@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SyncStatus } from "@/bindings";
+import type { SyncStatusView } from "@/bindings";
 
 // Capture the gateway's SyncCompleted callback so the test can fire the event.
 let capturedEventListener: (() => void) | null = null;
@@ -18,7 +18,7 @@ vi.mock("../gateway", () => ({
 import * as gateway from "../gateway";
 import { useSyncIndicator } from "./useSyncIndicator";
 
-function makeSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus {
+function makeSyncStatus(overrides: Partial<SyncStatusView> = {}): SyncStatusView {
   return {
     enabled: true,
     paused: false,
@@ -33,6 +33,7 @@ function makeSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus {
     notices: [],
     inconsistent_holdings: [],
     failures: [],
+    health: "up_to_date",
     ...overrides,
   };
 }
@@ -75,72 +76,23 @@ describe("useSyncIndicator — attention badge", () => {
     capturedEventListener = null;
   });
 
-  it("shows the attention badge when failures are non-empty", async () => {
+  // SYN-063 — the indicator shows the attention badge when the core says sync needs
+  // attention, and for nothing else: it reads the health, it does not decide it.
+  it.each([
+    ["needs_attention", true],
+    ["up_to_date", false],
+    ["paused", false],
+  ] as const)("shows what the core says: %s", async (health, badge) => {
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({
       status: "ok",
-      data: makeSyncStatus({ failures: ["PortfolioReset"] }),
+      // A failure is carried in every case: only the health decides.
+      data: makeSyncStatus({ failures: ["PortfolioReset"], health }),
     });
 
     const { result } = renderHook(() => useSyncIndicator());
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.needsAttention).toBe(true);
-  });
-
-  it("shows the attention badge when notices are non-empty", async () => {
-    vi.mocked(gateway.getSyncStatus).mockResolvedValue({
-      status: "ok",
-      data: makeSyncStatus({
-        notices: [
-          {
-            notice_id: "notice-1",
-            kind: "OverruledEdit",
-            record_kind: "Transaction",
-            record_identity: "tx-1",
-            record_label: "Sell 10 AAPL",
-            other_device_id: "device-2",
-            other_device_name: "Laptop",
-            raised_at: "2026-08-20T10:00:00Z",
-          },
-        ],
-      }),
-    });
-
-    const { result } = renderHook(() => useSyncIndicator());
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.needsAttention).toBe(true);
-  });
-
-  it("shows the attention badge when inconsistent holdings are non-empty", async () => {
-    vi.mocked(gateway.getSyncStatus).mockResolvedValue({
-      status: "ok",
-      data: makeSyncStatus({
-        inconsistent_holdings: [
-          {
-            account_id: "acc-1",
-            account_name: "Brokerage",
-            asset_id: "asset-1",
-            asset_name: "AAPL",
-            reason: { Oversold: { quantity: -5_000_000 } },
-          },
-        ],
-      }),
-    });
-
-    const { result } = renderHook(() => useSyncIndicator());
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.needsAttention).toBe(true);
-  });
-
-  it("does not show the attention badge when everything is clean", async () => {
-    vi.mocked(gateway.getSyncStatus).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
-
-    const { result } = renderHook(() => useSyncIndicator());
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.needsAttention).toBe(false);
+    expect(result.current.needsAttention).toBe(badge);
   });
 });
 

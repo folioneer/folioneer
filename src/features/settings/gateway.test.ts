@@ -4,8 +4,8 @@ import type {
   ScheduledFetchRun,
   ScheduledFetchStatus,
   SyncFolderState,
-  SyncReport,
-  SyncStatus,
+  SyncReportView,
+  SyncStatusView,
 } from "@/bindings";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -15,7 +15,7 @@ const mockInvoke = vi.mocked(invoke);
 // Import after mock is registered so bindings.ts picks up the mock
 const { settingsGateway } = await import("./gateway");
 
-function makeSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus {
+function makeSyncStatus(overrides: Partial<SyncStatusView> = {}): SyncStatusView {
   return {
     enabled: true,
     paused: false,
@@ -30,11 +30,12 @@ function makeSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus {
     notices: [],
     inconsistent_holdings: [],
     failures: [],
+    health: "up_to_date",
     ...overrides,
   };
 }
 
-function makeSyncReport(overrides: Partial<SyncReport> = {}): SyncReport {
+function makeSyncReport(overrides: Partial<SyncReportView> = {}): SyncReportView {
   return {
     published_changes: 1,
     applied_changes: 0,
@@ -292,7 +293,7 @@ describe("settingsGateway — leaveSync (SYN-082)", () => {
 describe("settingsGateway — syncNow (SYN-061)", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("syncNow passes through ok SyncReport with no args", async () => {
+  it("syncNow passes through ok SyncReportView with no args", async () => {
     const report = makeSyncReport();
     mockInvoke.mockResolvedValue(report);
 
@@ -314,7 +315,7 @@ describe("settingsGateway — syncNow (SYN-061)", () => {
 describe("settingsGateway — pauseSync (SYN-070)", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("pauseSync passes through ok SyncStatus with no args", async () => {
+  it("pauseSync passes through ok SyncStatusView with no args", async () => {
     const status = makeSyncStatus({ paused: true });
     mockInvoke.mockResolvedValue(status);
 
@@ -336,7 +337,7 @@ describe("settingsGateway — pauseSync (SYN-070)", () => {
 describe("settingsGateway — resumeSync (SYN-073)", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("resumeSync passes through ok SyncReport with no args", async () => {
+  it("resumeSync passes through ok SyncReportView with no args", async () => {
     const report = makeSyncReport();
     mockInvoke.mockResolvedValue(report);
 

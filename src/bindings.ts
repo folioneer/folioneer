@@ -432,7 +432,7 @@ async getCurrencyRates(fromCurrency: string, toCurrency: string) : Promise<Resul
 /**
  * Pauses sync on this device (SYN-070).
  */
-async pauseSync() : Promise<Result<SyncStatus, SyncError>> {
+async pauseSync() : Promise<Result<SyncStatusView, SyncError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("pause_sync") };
 } catch (e) {
@@ -454,7 +454,7 @@ async leaveSync() : Promise<Result<null, SyncError>> {
 /**
  * Renames this device (SYN-072).
  */
-async renameSyncDevice(deviceName: string) : Promise<Result<SyncStatus, SyncError>> {
+async renameSyncDevice(deviceName: string) : Promise<Result<SyncStatusView, SyncError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("rename_sync_device", { deviceName }) };
 } catch (e) {
@@ -487,7 +487,7 @@ async inspectSyncFolder(folder: string) : Promise<Result<SyncFolderState, Portfo
 /**
  * Enables sync on this device (SYN-011).
  */
-async enableSync(folder: string, passphrase: string, deviceName: string) : Promise<Result<SyncStatus, PortfolioSyncError>> {
+async enableSync(folder: string, passphrase: string, deviceName: string) : Promise<Result<SyncStatusView, PortfolioSyncError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("enable_sync", { folder, passphrase, deviceName }) };
 } catch (e) {
@@ -498,7 +498,7 @@ async enableSync(folder: string, passphrase: string, deviceName: string) : Promi
 /**
  * Starts the portfolio over under a new passphrase (SYN-071).
  */
-async startSyncOver(folder: string, passphrase: string, deviceName: string) : Promise<Result<SyncStatus, PortfolioSyncError>> {
+async startSyncOver(folder: string, passphrase: string, deviceName: string) : Promise<Result<SyncStatusView, PortfolioSyncError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("start_sync_over", { folder, passphrase, deviceName }) };
 } catch (e) {
@@ -509,7 +509,7 @@ async startSyncOver(folder: string, passphrase: string, deviceName: string) : Pr
 /**
  * Designates a different folder for an already-enrolled device (SYN-074).
  */
-async changeSyncFolder(folder: string) : Promise<Result<SyncStatus, PortfolioSyncError>> {
+async changeSyncFolder(folder: string) : Promise<Result<SyncStatusView, PortfolioSyncError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_sync_folder", { folder }) };
 } catch (e) {
@@ -520,7 +520,7 @@ async changeSyncFolder(folder: string) : Promise<Result<SyncStatus, PortfolioSyn
 /**
  * Runs a publish-only sync immediately (SYN-061).
  */
-async syncNow() : Promise<Result<SyncReport, PortfolioSyncError>> {
+async syncNow() : Promise<Result<SyncReportView, PortfolioSyncError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("sync_now") };
 } catch (e) {
@@ -531,7 +531,7 @@ async syncNow() : Promise<Result<SyncReport, PortfolioSyncError>> {
 /**
  * Resumes sync on a paused device (SYN-073).
  */
-async resumeSync() : Promise<Result<SyncReport, PortfolioSyncError>> {
+async resumeSync() : Promise<Result<SyncReportView, PortfolioSyncError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("resume_sync") };
 } catch (e) {
@@ -542,7 +542,7 @@ async resumeSync() : Promise<Result<SyncReport, PortfolioSyncError>> {
 /**
  * Reads the current sync status (SYN-063).
  */
-async getSyncStatus() : Promise<Result<SyncStatus, PortfolioSyncError>> {
+async getSyncStatus() : Promise<Result<SyncStatusView, PortfolioSyncError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_sync_status") };
 } catch (e) {
@@ -4191,6 +4191,22 @@ format_readable: boolean;
  */
 installation_holds_user_data: boolean }
 /**
+ * SYN-063 — whether sync needs a look, in one word.
+ */
+export type SyncHealth = 
+/**
+ * Sync is paused on this device.
+ */
+"paused" | 
+/**
+ * The status carries a failure, a held-back change, a notice or an inconsistent holding.
+ */
+"needs_attention" | 
+/**
+ * Nothing waits for the user.
+ */
+"up_to_date"
+/**
  * Outcome of one run — the return value of `sync_now` / `resume_sync`; an automatic run's
  * outcome reaches the frontend through `get_sync_status` after `SyncCompleted`.
  */
@@ -4227,6 +4243,42 @@ completed_at: string;
  * The device state after the run (SYN-084 may have paused it).
  */
 status: SyncStatus }
+/**
+ * A run's outcome as the interface reads it: the report, its status with its health.
+ */
+export type SyncReportView = { 
+/**
+ * Changes published this run.
+ */
+published_changes: number; 
+/**
+ * Changes applied this run.
+ */
+applied_changes: number; 
+/**
+ * Changes held back this run.
+ */
+held_back_changes: number; 
+/**
+ * Changes dropped this run (CFR-032).
+ */
+dropped_changes: number; 
+/**
+ * Conflict notices raised this run.
+ */
+notices_raised: number; 
+/**
+ * Empty when the run completed cleanly.
+ */
+failures: SyncFailure[]; 
+/**
+ * When the run finished.
+ */
+completed_at: string; 
+/**
+ * The device state after the run, with its health.
+ */
+status: SyncStatusView }
 /**
  * What the Settings section and the shell indicator read (SYN-063).
  */
@@ -4285,6 +4337,73 @@ inconsistent_holdings: InconsistentHolding[];
  * Empty when the last run was healthy; several may hold at once.
  */
 failures: SyncFailure[] }
+/**
+ * A sync status as the interface reads it (SYN-063): the status and the health it
+ * states, computed when the status leaves the core so the two cannot disagree.
+ */
+export type SyncStatusView = 
+/**
+ * The status.
+ */
+({ 
+/**
+ * Whether sync is enabled on this device.
+ */
+enabled: boolean; 
+/**
+ * Whether sync is paused on this device.
+ */
+paused: boolean; 
+/**
+ * `None` while disabled.
+ */
+device_id: string | null; 
+/**
+ * `None` while disabled.
+ */
+device_name: string | null; 
+/**
+ * `None` while disabled.
+ */
+folder: string | null; 
+/**
+ * The version of the application running on this device (SYN-063).
+ */
+app_version: string; 
+/**
+ * `None` when never synced.
+ */
+last_sync_completed_at: string | null; 
+/**
+ * Every other device whose manifest the last run read (SYN-037/063).
+ */
+roster: RosterEntry[]; 
+/**
+ * Count of held-back changes (SYN-041). Always 0 in PR-B — nothing holds a change back
+ * until PR-C's apply path exists.
+ */
+held_back_count: number; 
+/**
+ * `None` when `held_back_count == 0`.
+ */
+oldest_held_back_since: string | null; 
+/**
+ * Undismissed conflict notices (SYN-066). Always empty in PR-B.
+ */
+notices: ConflictNotice[]; 
+/**
+ * Derived on read from the account BC's replayed ledger (CFR-042/SYN-040). Always empty
+ * in PR-B.
+ */
+inconsistent_holdings: InconsistentHolding[]; 
+/**
+ * Empty when the last run was healthy; several may hold at once.
+ */
+failures: SyncFailure[] }) & { 
+/**
+ * The health that status states.
+ */
+health: SyncHealth }
 /**
  * Direction of a holding-note price alarm relative to its threshold (HNO-011).
  */

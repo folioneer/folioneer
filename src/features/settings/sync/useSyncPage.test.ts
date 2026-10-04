@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SyncReport, SyncStatus } from "@/bindings";
+import type { SyncReportView, SyncStatusView } from "@/bindings";
 
 // 1. Mock the gateway module before importing the hook (test-rules.md § Mocking gateway modules)
 vi.mock("../gateway", () => ({
@@ -18,7 +18,7 @@ vi.mock("../gateway", () => ({
 import * as gateway from "../gateway";
 import { useSyncPage } from "./useSyncPage";
 
-function makeSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus {
+function makeSyncStatus(overrides: Partial<SyncStatusView> = {}): SyncStatusView {
   return {
     enabled: true,
     paused: false,
@@ -42,11 +42,12 @@ function makeSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus {
     notices: [],
     inconsistent_holdings: [],
     failures: [],
+    health: "up_to_date",
     ...overrides,
   };
 }
 
-function makeSyncReport(overrides: Partial<SyncReport> = {}): SyncReport {
+function makeSyncReport(overrides: Partial<SyncReportView> = {}): SyncReportView {
   return {
     published_changes: 1,
     applied_changes: 0,
@@ -71,6 +72,19 @@ describe("useSyncPage — load status on mount (SYN-063)", () => {
     const { result } = renderHook(() => useSyncPage());
 
     expect(result.current.isLoading).toBe(true);
+  });
+
+  // SYN-063 — the page carries the health the core states with the status, as it is.
+  it("carries the health the core states", async () => {
+    vi.mocked(gateway.getSyncStatus).mockResolvedValue({
+      status: "ok",
+      data: makeSyncStatus({ health: "needs_attention" }),
+    });
+
+    const { result } = renderHook(() => useSyncPage());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.health).toBe("needs_attention");
   });
 
   it("loads the disabled status by default (SYN-010)", async () => {
@@ -139,8 +153,26 @@ describe("useSyncPage — Sync now (SYN-061)", () => {
     expect(result.current.lastSyncCompletedAt).toBe("2026-08-21T09:00:00Z");
   });
 
+  // SYN-063 — the health follows the status a run reports, as the core states it.
+  it("takes the health of the status a run reports", async () => {
+    vi.mocked(gateway.syncNow).mockResolvedValue({
+      status: "ok",
+      data: makeSyncReport({ status: makeSyncStatus({ health: "needs_attention" }) }),
+    });
+
+    const { result } = renderHook(() => useSyncPage());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.health).toBe("up_to_date");
+
+    await act(async () => {
+      await result.current.handleSyncNow();
+    });
+
+    expect(result.current.health).toBe("needs_attention");
+  });
+
   it("sets isSyncing while the call is in flight", async () => {
-    let resolveSync!: (v: { status: "ok"; data: SyncReport }) => void;
+    let resolveSync!: (v: { status: "ok"; data: SyncReportView }) => void;
     vi.mocked(gateway.syncNow).mockReturnValue(
       new Promise((resolve) => {
         resolveSync = resolve;

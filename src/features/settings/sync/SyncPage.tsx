@@ -5,7 +5,7 @@ import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { formatIsoDateTime } from "@/ui/format/date";
 import { formatHoldingInconsistency } from "@/ui/format/holdingInconsistency";
 import { messageText } from "@/ui/format/i18n";
-import { syncFailureToI18n, syncHealth } from "../shared/presenter";
+import { syncFailureToI18n } from "../shared/presenter";
 import { ChangeFolderDialog } from "./ChangeFolderDialog";
 import { EnableSyncModal } from "./enable_modal/EnableSyncModal";
 import { NoticeList } from "./notices/NoticeList";
@@ -85,7 +85,7 @@ export function SyncPage() {
 
   const formatWhen = (iso: string | null) =>
     iso === null ? t("sync.last_sync_never") : formatIsoDateTime(iso, i18n.language);
-  const health = syncHealth(state);
+  const health = state.health;
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">

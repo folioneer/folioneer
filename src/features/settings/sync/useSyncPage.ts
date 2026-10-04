@@ -5,7 +5,8 @@ import type {
   PortfolioSyncError,
   Result,
   SyncFailure,
-  SyncStatus,
+  SyncHealth,
+  SyncStatusView,
 } from "@/bindings";
 import type { I18nMessage } from "@/ui/format/i18n";
 import {
@@ -31,6 +32,8 @@ export interface UseSyncPageResult {
   folder: string | null;
   lastSyncCompletedAt: string | null;
   roster: RosterEntryViewModel[];
+  /** SYN-063 — the health the core states with the status. */
+  health: SyncHealth;
   heldBackCount: number;
   oldestHeldBackSince: string | null;
   notices: ConflictNotice[];
@@ -64,7 +67,7 @@ export interface UseSyncPageResult {
   refresh: () => Promise<void>;
 }
 
-const DISABLED_STATUS: SyncStatus = {
+const DISABLED_STATUS: SyncStatusView = {
   enabled: false,
   paused: false,
   device_id: null,
@@ -78,6 +81,7 @@ const DISABLED_STATUS: SyncStatus = {
   notices: [],
   inconsistent_holdings: [],
   failures: [],
+  health: "up_to_date",
 };
 
 /**
@@ -88,7 +92,7 @@ const DISABLED_STATUS: SyncStatus = {
 export function useSyncPage(): UseSyncPageResult {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<I18nMessage | null>(null);
-  const [status, setStatus] = useState<SyncStatus>(DISABLED_STATUS);
+  const [status, setStatus] = useState<SyncStatusView>(DISABLED_STATUS);
   const [isSyncing, setIsSyncing] = useState(false);
   const [actionError, setActionError] = useState<I18nMessage | null>(null);
   const [confirmingLeave, setConfirmingLeave] = useState(false);
@@ -111,7 +115,7 @@ export function useSyncPage(): UseSyncPageResult {
   }, [refresh]);
 
   const applyStatusResult = useCallback(
-    async (call: () => Promise<Result<SyncStatus, PortfolioSyncError>>): Promise<boolean> => {
+    async (call: () => Promise<Result<SyncStatusView, PortfolioSyncError>>): Promise<boolean> => {
       setActionError(null);
       const result = await call();
       if (result.status === "ok") {
@@ -177,6 +181,7 @@ export function useSyncPage(): UseSyncPageResult {
     folder: status.folder,
     lastSyncCompletedAt: status.last_sync_completed_at,
     roster: rosterToViewModel(status.roster),
+    health: status.health,
     heldBackCount: status.held_back_count,
     oldestHeldBackSince: status.oldest_held_back_since,
     notices: status.notices,

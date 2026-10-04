@@ -309,15 +309,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — a name pasted with a stray control character or of unreasonable length is refused where it is typed.
 - Done when: `Asset::validate` refuses a control character and a name or reference above a stated length, with a typed error the form shows and the command line reports.
 
-## 2026-10-03 — TD-069 — The interface decides whether sync needs attention, in two places
-
-- Found by: the main agent, building the sync page (#010)
-- Where: `syncHealth` in `src/features/settings/shared/presenter.ts` (the sync page's leading word) and `needsAttention` in `src/features/shell/sync_indicator/useSyncIndicator.ts` (the shell indicator)
-- Severity: 🔵
-- Observation: both read the sync status and decide from its failures, notices, inconsistent holdings — and, for the page only, held-back changes — whether sync needs attention. The two rules already differ by one case. The status is assembled in several places of the core (the sync service, the run, the portfolio sync use case), so a health field stored on it would go stale; the core has no single point where a status leaves for the interface.
-- User value: The indicator in the header and the sync page never disagree about whether something needs a look.
-- Done when: the core says the health of sync with the status, from one rule; the page and the indicator show it; neither decides.
-
 ## 2026-10-04 — TD-073 — Correcting a record without typing can change its figures
 
 - Found by: the main agent, building the dividend correction dialog (TD-068): its test showed an exchange rate of 0.9214 pre-filled as 0.921; met by the owner in the installed application (2026-10-04), who queued it

@@ -200,7 +200,7 @@ describe("syncErrorToI18n", () => {
 });
 
 // ---------------------------------------------------------------------------
-// syncFailureToI18n — F27 presenter for SyncStatus/SyncReport.failures
+// syncFailureToI18n — F27 presenter for SyncStatusView/SyncReportView.failures
 // (SYN-034/035/069/084)
 // ---------------------------------------------------------------------------
 
@@ -331,31 +331,5 @@ describe("rosterToViewModel", () => {
         publishedChanges: 3,
       },
     ]);
-  });
-});
-
-// #010 — the word the sync page leads with.
-describe("syncHealth", () => {
-  const calm = {
-    paused: false,
-    failures: [],
-    notices: [],
-    inconsistentHoldings: [],
-    heldBackCount: 0,
-  };
-
-  it("is up to date when the status carries nothing to look at", () => {
-    expect(presenter.syncHealth(calm)).toBe("up_to_date");
-  });
-
-  it("needs attention for a failure, a notice, an inconsistent holding or a held-back change", () => {
-    expect(presenter.syncHealth({ ...calm, failures: [{}] })).toBe("needs_attention");
-    expect(presenter.syncHealth({ ...calm, notices: [{}] })).toBe("needs_attention");
-    expect(presenter.syncHealth({ ...calm, inconsistentHoldings: [{}] })).toBe("needs_attention");
-    expect(presenter.syncHealth({ ...calm, heldBackCount: 1 })).toBe("needs_attention");
-  });
-
-  it("is paused whatever else the status carries", () => {
-    expect(presenter.syncHealth({ ...calm, paused: true, failures: [{}] })).toBe("paused");
   });
 });

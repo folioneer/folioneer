@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SyncFolderState, SyncStatus } from "@/bindings";
+import type { SyncFolderState, SyncStatusView } from "@/bindings";
 
 // 1. Mock the gateway module before importing the hook (test-rules.md § Mocking gateway modules)
 vi.mock("../../gateway", () => ({
@@ -14,7 +14,7 @@ vi.mock("../../gateway", () => ({
 import * as gateway from "../../gateway";
 import { useEnableSyncModal } from "./useEnableSyncModal";
 
-function makeSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus {
+function makeSyncStatus(overrides: Partial<SyncStatusView> = {}): SyncStatusView {
   return {
     enabled: true,
     paused: false,
@@ -29,6 +29,7 @@ function makeSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus {
     notices: [],
     inconsistent_holdings: [],
     failures: [],
+    health: "up_to_date",
     ...overrides,
   };
 }

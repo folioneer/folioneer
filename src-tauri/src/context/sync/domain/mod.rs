@@ -51,7 +51,8 @@ pub use resolution::{
 };
 pub use snapshot::{PortfolioRecord, PortfolioSnapshot};
 pub use status::{
-    HoldingInconsistency, InconsistentHolding, RosterEntry, SyncFailure, SyncReport, SyncStatus,
+    HoldingInconsistency, InconsistentHolding, RosterEntry, SyncFailure, SyncHealth, SyncReport,
+    SyncReportView, SyncStatus, SyncStatusView,
 };
 pub use tombstone::Tombstone;
 

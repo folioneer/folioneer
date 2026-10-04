@@ -7,8 +7,8 @@ import {
   type ScheduledFetchStatus,
   type SyncError,
   type SyncFolderState,
-  type SyncReport,
-  type SyncStatus,
+  type SyncReportView,
+  type SyncStatusView,
 } from "../../bindings";
 
 /**
@@ -40,7 +40,7 @@ export async function enableSync(
   folder: string,
   passphrase: string,
   deviceName: string,
-): Promise<Result<SyncStatus, PortfolioSyncError>> {
+): Promise<Result<SyncStatusView, PortfolioSyncError>> {
   return await commands.enableSync(folder, passphrase, deviceName);
 }
 
@@ -48,7 +48,7 @@ export async function startSyncOver(
   folder: string,
   passphrase: string,
   deviceName: string,
-): Promise<Result<SyncStatus, PortfolioSyncError>> {
+): Promise<Result<SyncStatusView, PortfolioSyncError>> {
   return await commands.startSyncOver(folder, passphrase, deviceName);
 }
 
@@ -56,29 +56,31 @@ export async function leaveSync(): Promise<Result<null, SyncError>> {
   return await commands.leaveSync();
 }
 
-export async function syncNow(): Promise<Result<SyncReport, PortfolioSyncError>> {
+export async function syncNow(): Promise<Result<SyncReportView, PortfolioSyncError>> {
   return await commands.syncNow();
 }
 
-export async function pauseSync(): Promise<Result<SyncStatus, SyncError>> {
+export async function pauseSync(): Promise<Result<SyncStatusView, SyncError>> {
   return await commands.pauseSync();
 }
 
-export async function resumeSync(): Promise<Result<SyncReport, PortfolioSyncError>> {
+export async function resumeSync(): Promise<Result<SyncReportView, PortfolioSyncError>> {
   return await commands.resumeSync();
 }
 
-export async function getSyncStatus(): Promise<Result<SyncStatus, PortfolioSyncError>> {
+export async function getSyncStatus(): Promise<Result<SyncStatusView, PortfolioSyncError>> {
   return await commands.getSyncStatus();
 }
 
-export async function renameSyncDevice(deviceName: string): Promise<Result<SyncStatus, SyncError>> {
+export async function renameSyncDevice(
+  deviceName: string,
+): Promise<Result<SyncStatusView, SyncError>> {
   return await commands.renameSyncDevice(deviceName);
 }
 
 export async function changeSyncFolder(
   folder: string,
-): Promise<Result<SyncStatus, PortfolioSyncError>> {
+): Promise<Result<SyncStatusView, PortfolioSyncError>> {
   return await commands.changeSyncFolder(folder);
 }
 

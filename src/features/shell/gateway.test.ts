@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SyncStatus } from "@/bindings";
+import type { SyncStatusView } from "@/bindings";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
@@ -9,7 +9,7 @@ const mockInvoke = vi.mocked(invoke);
 // Import after mock is registered so bindings.ts picks up the mock
 const { shellGateway } = await import("./gateway");
 
-function makeSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus {
+function makeSyncStatus(overrides: Partial<SyncStatusView> = {}): SyncStatusView {
   return {
     enabled: true,
     paused: false,
@@ -24,6 +24,7 @@ function makeSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus {
     notices: [],
     inconsistent_holdings: [],
     failures: [],
+    health: "up_to_date",
     ...overrides,
   };
 }
