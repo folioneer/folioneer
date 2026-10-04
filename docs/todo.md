@@ -32,7 +32,9 @@
 12. TD-069
 13. TD-063
 14. #058
-15. FLOW-018
+15. #056
+16. #051
+17. FLOW-018
 
 ## #009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
@@ -132,20 +134,27 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
 
-## #056 — (fullstack) — What an asset is, and what identifies it
+## #056 — (fullstack) — An asset has a kind: listed, crypto, custom or cash
 
-Raised by the owner on 2026-10-03, while adding assets from the command line. The model has one notion, the asset, with three identifiers that do different jobs and no rule tying them: the ISIN names an instrument wherever it trades; the reference is a ticker on a market, or any code the user picks for an asset no market lists; the exchange says which market. A reference may be shared by several assets on purpose (AST-009: one ticker, several markets and currencies), and so may an ISIN — nothing checks it — so the same instrument held on two markets is two unrelated assets, and nothing tells that legitimate case from an asset created twice by mistake. The definition must fit both a listed instrument (a stock, an ETF) and a custom asset the user owns (real estate, a fund inside a contract) that has neither ISIN nor market.
+Raised by the owner on 2026-10-03 and decided with the owner on 2026-10-04. Until now an asset had one shape for everything — a name, a reference, an optional ISIN, an optional marketplace — and nothing tied them: a reference or an ISIN could be shared by several assets, and an asset created twice by mistake looked like one instrument held on two marketplaces. An asset now has a **kind**, chosen when it is created and separate from its class (the class says what it is economically; the kind says how it is identified and priced):
 
-**User value:** A user knows what to type to create an asset and what makes two assets the same or different; an asset created twice by mistake is caught, and one instrument held on two markets is understood as such.
-**Done when:** the asset spec defines an asset and each identifier for a listed instrument and for a custom asset; the vocabulary carries the terms; a true duplicate is refused or warned about as the owner decides, by the same rule in the window and on the command line; what a command's `--asset` accepts follows from the definition.
+- **Listed** — a listing: an instrument, by its ISIN, on a marketplace, in a currency. The ISIN is required. The reference is its ticker there. Created from the lookup when one finds it. Its price is fetched where a provider exists, or typed.
+- **Crypto** — identified by its symbol (BTC), unique among crypto assets; its currency is the one it is quoted in, its price the pair's — fetched where a provider exists, or typed. No ISIN, no marketplace. It is an asset, not money: it is bought and sold with a cost and a gain.
+- **Custom** — what no market lists (real estate, a fund inside a contract). No ISIN, no marketplace, no lookup, a typed price. Its reference is proposed from its name, editable, and unique among custom assets, compared without case.
+- **Cash** — the application's own, one per currency; never created, edited or traded by the user. Nothing visible changes for cash: its rules are written down as a kind.
+
+Same or different. Two listed assets are the same when they share ISIN, marketplace and currency; two crypto assets when they share a symbol; two custom assets when they share a reference. Creating a second one is refused, in the window (naming the existing asset) and on the command line (without listing, #044). The same ISIN on another marketplace is another asset, allowed; each then carries a line "also held as …", and no figure is merged.
+
+On the command line, `--asset` takes a name, a reference or an ISIN. When it matches more than one asset the command is refused without listing them; the ISIN, or the reference with its marketplace (`ASML@XAMS`), tells them apart.
+
+Existing assets take a kind from what they carry: the Cash class is cash, the digital-asset class is crypto, an ISIN makes it listed, anything else is custom. An asset the rules would now refuse (a listed one without an ISIN, two that are the same) is not changed: it is listed for the owner to settle. To verify before the first pull request: a kind is a new field on a synced record — whether another computer on the previous version tolerates it, or the data format version rises (SYN-035, SYN-038).
+
+**User value:** A user knows what to type to create an asset and what makes two assets the same or different; an asset created twice by mistake is refused, and one instrument held on two marketplaces is understood as such.
+**Done when:** in three pull requests. (1) The asset spec and the vocabulary define the four kinds and what identifies each; the kind is a column of the asset, filled for every existing asset by a migration that changes nothing else and travelling with the asset in sync; the core refuses what each kind forbids (an ISIN-less listed asset, a marketplace on a custom one, a second identical asset) with typed errors, and reports the existing assets the rules would refuse — sameness is enforced by the core's rules, not yet by a database constraint, which existing duplicates would break. (2) "Add asset" starts with Listed, Crypto or Custom and shows each kind's fields only; a listed asset starts from the lookup; a custom reference is proposed from the name; a refusal names the existing asset; an asset sharing its ISIN with another shows "also held as …"; cash appears as the application's. (3) The command line creates each kind and names an asset by name, reference or ISIN, with `reference@marketplace` for a shared reference, refusing an ambiguous one without listing.
 **Design:** none
-**Open questions:**
+**Open questions:** none
 
-- [ ] Is an asset a listing — a reference on an exchange, in a currency — of an instrument identified by its ISIN? Or one instrument whatever the market?
-- [ ] What makes two assets "the same": the same ISIN, exchange and currency? And is creating a second one refused, or warned about as a shared reference is today (AST-009)?
-- [ ] For a custom asset (no ISIN, no market): is the reference a free label, and must it be unique among custom assets?
-- [ ] Are positions in one instrument across markets shown together anywhere (allocation, performance), or always per asset?
-- [ ] On the command line, is an asset named by its name, its reference, its ISIN — and what when the reference is shared?
+The words "kind", "listed", "crypto" and "custom" enter the vocabulary with the first pull request, for the owner to confirm there.
 
 ## #058 — (fullstack) — Numbers are typed and shown the same way everywhere, by language
 
