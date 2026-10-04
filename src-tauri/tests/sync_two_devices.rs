@@ -23,7 +23,8 @@ use folioneer_lib::context::currency::{
 };
 use folioneer_lib::context::sync::{
     FirstPublish, FsFolderStore, SqliteChangeLogRepository, SqliteChangeRecorder,
-    SqliteSyncStateRepository, SyncRun, SyncService, SyncStateRepository, DATA_FORMAT_VERSION,
+    SqliteSyncStateRepository, SyncFailure, SyncRun, SyncService, SyncStateRepository,
+    DATA_FORMAT_VERSION,
 };
 use folioneer_lib::core::{Event, SideEffectEventBus};
 use folioneer_lib::shared::infrastructure::change_recorder::ChangeRecorder;
@@ -504,10 +505,19 @@ async fn deleting_an_account_drops_a_concurrent_transaction_and_notifies_only_th
         .await
         .unwrap();
 
-    desktop.orchestrator.sync_now().await.unwrap();
-    laptop.orchestrator.sync_now().await.unwrap();
-    desktop.orchestrator.sync_now().await.unwrap();
-    laptop.orchestrator.sync_now().await.unwrap();
+    let mut dropped = 0;
+    for device in [&desktop, &laptop, &desktop, &laptop] {
+        dropped += device
+            .orchestrator
+            .sync_now()
+            .await
+            .unwrap()
+            .dropped_changes;
+    }
+    assert!(
+        dropped >= 1,
+        "CFR-032: the run that drops the concurrent buy counts it"
+    );
 
     assert!(
         desktop
@@ -812,6 +822,183 @@ async fn a_catch_up_sync_announces_itself_once_whatever_the_number_of_applied_re
         (1, Some(&Event::SyncCompleted)),
         "#020: {PRICE_COUNT} applied records must reach subscribers as one SyncCompleted"
     );
+}
+
+/// Desktop and Laptop sharing `dir`, Desktop holding a small portfolio; returns both and
+/// the account, with Desktop's area in the folder.
+async fn two_devices_sharing(dir: &std::path::Path) -> (Ctx, Ctx, String, std::path::PathBuf) {
+    let desktop = build_ctx(dir).await;
+    let (account_id, _asset_id) = seed_small_portfolio(&desktop).await;
+    desktop
+        .orchestrator
+        .enable_sync(
+            dir.to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Desktop".into(),
+        )
+        .await
+        .expect("Desktop must enable as the first device");
+    let mut areas: Vec<std::path::PathBuf> = std::fs::read_dir(dir.join("devices"))
+        .expect("devices")
+        .map(|entry| entry.expect("entry").path())
+        .collect();
+    assert_eq!(
+        areas.len(),
+        1,
+        "only Desktop has an area before Laptop joins"
+    );
+    let desktop_area = areas.remove(0);
+    let laptop = build_ctx(dir).await;
+    laptop
+        .orchestrator
+        .enable_sync(
+            dir.to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Laptop".into(),
+        )
+        .await
+        .expect("Laptop must join the shared portfolio");
+    (desktop, laptop, account_id, desktop_area)
+}
+
+fn segment_names(area: &std::path::Path) -> std::collections::BTreeSet<String> {
+    std::fs::read_dir(area.join("segments"))
+        .expect("segments")
+        .map(|entry| {
+            entry
+                .expect("entry")
+                .file_name()
+                .to_string_lossy()
+                .to_string()
+        })
+        .collect()
+}
+
+// SYN-033/037 — a run applies what another device published since the last one, counts
+// it, and applies nothing twice.
+#[tokio::test]
+async fn syn_037_a_run_applies_each_published_change_once_and_counts_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop, account_id, _area) = two_devices_sharing(dir.path()).await;
+    for date in ["2026-02-01", "2026-02-02"] {
+        desktop
+            .account_service
+            .record_deposit(&account_id, date.into(), 100_000_000, None)
+            .await
+            .unwrap();
+    }
+
+    let published = desktop.orchestrator.sync_now().await.unwrap();
+    assert!(published.published_changes >= 2);
+
+    let applied_from_desktop = |status: &folioneer_lib::context::sync::SyncStatus| {
+        status
+            .roster
+            .iter()
+            .find(|entry| entry.device_name == "Desktop")
+            .and_then(|entry| entry.last_applied_at.clone())
+    };
+    let started = chrono::Utc::now().to_rfc3339();
+    let first = laptop.orchestrator.sync_now().await.unwrap();
+    assert_eq!(first.applied_changes, published.published_changes);
+    // SYN-063 — the roster says when Desktop's changes were last applied here: during
+    // this run, not at the join.
+    let applied_at = applied_from_desktop(&first.status).expect("applied");
+    assert!(applied_at >= started, "{applied_at} is before {started}");
+    assert_eq!((first.dropped_changes, first.held_back_changes), (0, 0));
+    assert!(first.failures.is_empty());
+
+    let deposits: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM transactions WHERE date IN ('2026-02-01', '2026-02-02')",
+    )
+    .fetch_one(&laptop.pool)
+    .await
+    .unwrap();
+    assert_eq!(deposits, 2, "what is counted as applied is on Laptop");
+
+    let second = laptop.orchestrator.sync_now().await.unwrap();
+    assert_eq!(second.applied_changes, 0);
+}
+
+// SYN-033 — a segment this device has not received the predecessor of stops the read of
+// that device's area: nothing past the gap is applied until the missing one arrives, and
+// then all of it is.
+#[tokio::test]
+async fn syn_033_a_gap_in_a_device_s_segments_stops_the_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop, account_id, desktop_area) = two_devices_sharing(dir.path()).await;
+    laptop.orchestrator.sync_now().await.unwrap();
+    let before = segment_names(&desktop_area);
+
+    let mut published = 0;
+    let mut with_first = std::collections::BTreeSet::new();
+    for date in ["2026-02-01", "2026-02-02"] {
+        desktop
+            .account_service
+            .record_deposit(&account_id, date.into(), 100_000_000, None)
+            .await
+            .unwrap();
+        published += desktop
+            .orchestrator
+            .sync_now()
+            .await
+            .unwrap()
+            .published_changes;
+        if with_first.is_empty() {
+            with_first = segment_names(&desktop_area);
+        }
+    }
+
+    let first_new: Vec<&String> = with_first.difference(&before).collect();
+    assert_eq!(first_new.len(), 1, "one run, one segment");
+    let missing = desktop_area.join("segments").join(first_new[0]);
+    let kept = std::fs::read(&missing).unwrap();
+    std::fs::remove_file(&missing).unwrap();
+
+    let stopped = laptop.orchestrator.sync_now().await.unwrap();
+    assert_eq!(stopped.applied_changes, 0);
+    assert!(
+        stopped.failures.is_empty(),
+        "a gap is waited for, not a failure"
+    );
+
+    std::fs::write(&missing, kept).unwrap();
+    let resumed = laptop.orchestrator.sync_now().await.unwrap();
+    assert_eq!(resumed.applied_changes, published);
+}
+
+// SYN-034 — a manifest that cannot be read is skipped and counted, and the run goes on.
+#[tokio::test]
+async fn syn_034_an_unreadable_manifest_is_counted_and_skipped() {
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop, account_id, desktop_area) = two_devices_sharing(dir.path()).await;
+    desktop
+        .account_service
+        .record_deposit(&account_id, "2026-02-01".into(), 100_000_000, None)
+        .await
+        .unwrap();
+    let published = desktop
+        .orchestrator
+        .sync_now()
+        .await
+        .unwrap()
+        .published_changes;
+    let manifest = desktop_area.join("manifest.bin");
+    let kept = std::fs::read(&manifest).unwrap();
+    std::fs::write(&manifest, b"not a manifest").unwrap();
+
+    let skipped = laptop.orchestrator.sync_now().await.unwrap();
+    assert_eq!(
+        skipped.failures,
+        vec![SyncFailure::UnreadableFiles { count: 1 }]
+    );
+    assert_eq!(skipped.applied_changes, 0);
+
+    // The area is read again at the next run: once readable, what waited is applied.
+    std::fs::write(&manifest, kept).unwrap();
+    let retried = laptop.orchestrator.sync_now().await.unwrap();
+    assert!(retried.failures.is_empty());
+    assert_eq!(retried.applied_changes, published);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
