@@ -67,6 +67,12 @@ arch-check *ARGS:
 harness *ARGS:
     bash scripts/harness.sh {{ARGS}}
 
+# Run a recipe and print one line: its verdict by exit code, with the whole output kept in
+# tmp/<recipe>.log and its end shown on failure (just quiet harness, just quiet test src/lib).
+# Not for a recipe that asks or stays up (release, merge, dev): it would read nothing.
+quiet RECIPE *ARGS:
+    @bash scripts/verdict.sh "$1" just "$@"
+
 # ---- shared recipes ----------------------------------------------------
 # Run fast quality check (lint/format only, no tests); pass --frontend or --backend for one layer
 check *ARGS:

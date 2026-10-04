@@ -82,6 +82,11 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
    never the native command.
    Then `just harness`: architecture rules, lint, type-check, build, both suites;
    `just harness --coverage` adds the coverage floors, run before the first push.
+   A run is judged by its exit code, never by a line picked out of its output: a suite
+   can report every test passing and still fail. `just quiet <recipe>` (so `just quiet
+harness`) prints that
+   verdict in one line, keeps the whole output in `tmp/<recipe>.log` and shows its end
+   on a failure.
 6. **Self-review** — run the reviewer agents that match the diff (§ 7); apply the
    triage policy; run them again until no 🔴 remains. CI runs them again on every
    push as the enforced record.

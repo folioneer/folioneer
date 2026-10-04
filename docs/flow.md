@@ -39,18 +39,6 @@ request. The time went to waiting on CI and to rounds that tested nothing new.
 
 ---
 
-## FLOW-001 — A filtered test output hid a failure three times
-
-- Kind: quality
-- Observed: `just merge | tail` ran the next step after a refused merge; `vitest | tail`
-  hid a test file that could not load; `vitest | grep "Test Files"` hid four unhandled
-  errors that failed CI on #91 with every test passing. Each time the count looked right.
-- Proposal: the agent gates on the exit code of a recipe run bare (`just test-unit`,
-  `just harness`) and reads a saved log afterwards. One line in `docs/workflow.md` § 5,
-  and the harness prints its own one-line verdict so nothing needs filtering.
-- Costs: nothing. Protects: a CI round (12 min) per miss, and a wrong "all green" said
-  to the owner.
-
 ## FLOW-002 — The CI reviewers stop when the session's usage window is spent
 
 - Kind: quality + speed
