@@ -8,7 +8,7 @@ import { useTransactions } from "@/features/transactions/useTransactions";
 import { getAutoRecordPrice } from "@/lib/autoRecordPriceStorage";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { computeCostBasisMicro, microToDecimal, microToFormatted } from "@/lib/microUnits";
+import { microToDecimal, microToFormatted } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -73,16 +73,12 @@ export function useSellTransaction({
     [snapshot],
   );
 
-  // TDI-030/031 — potential realized P&L of the typed sell: proceeds minus the
-  // VWAP cost basis of the sold quantity. Shown only when a quantity and price
-  // are entered and the holding is held as of the date.
+  // TDI-030/031 — the gain the typed sale would realize is the core's: the draft check
+  // returns it, or none when it cannot be computed.
   const potentialPnl = useMemo(() => {
-    if (!snapshot || snapshot.quantity <= 0) return null;
-    if (!preview || preview.unit_price <= 0) return null;
-    const costBasis = computeCostBasisMicro(snapshot.average_price, draft.quantity);
-    const pnlMicro = preview.total_amount - costBasis;
-    return { formatted: microToFormatted(pnlMicro), raw: pnlMicro };
-  }, [snapshot, preview, draft.quantity]);
+    const pnlMicro = preview?.realized_pnl ?? null;
+    return pnlMicro === null ? null : { formatted: microToFormatted(pnlMicro), raw: pnlMicro };
+  }, [preview]);
 
   const handleChange = useCallback(
     (field: keyof TransactionFormData, value: string) => {

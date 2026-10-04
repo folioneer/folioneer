@@ -77,6 +77,11 @@ pub struct TransactionDraftPreview {
     pub unit_price: i64,
     /// Total in account currency.
     pub total_amount: i64,
+    /// The gain a new sale would realize (TDI-030), in account currency: its proceeds minus
+    /// the average cost, as of its date, of the quantity sold. `None` for anything but a
+    /// new sale, and when it cannot be computed — the position at that date does not
+    /// hold what is sold, or cannot be read (TDI-031).
+    pub realized_pnl: Option<i64>,
 }
 
 /// The account and asset a user named by what they typed (CLI-011).
@@ -202,6 +207,7 @@ impl HoldingTransactionUseCase {
                 return Ok(TransactionDraftPreview {
                     unit_price,
                     total_amount,
+                    realized_pnl: None,
                 });
             }
         };
@@ -209,6 +215,7 @@ impl HoldingTransactionUseCase {
         Account::ensure_tradable(&draft.asset_id)?;
         let (unit_price, total_amount) =
             Account::preview_trade(transaction_type, &draft.date, draft.quantity, draft.entered)?;
+        let mut realized_pnl = None;
         if draft.kind == DraftKind::Sell && draft.correcting.is_none() {
             let available = self
                 .account_service
@@ -223,10 +230,23 @@ impl HoldingTransactionUseCase {
                 }
                 .into());
             }
+            // TDI-030/031 — the gain against the position as it stood on the sale's date.
+            // It informs and blocks nothing: when that position cannot be read, or does
+            // not hold what is sold, the check stands and returns no gain.
+            realized_pnl = self
+                .account_service
+                .holding_snapshot_as_of(&draft.account_id, &draft.asset_id, &draft.date)
+                .await
+                .ok()
+                .filter(|held| held.quantity > 0 && draft.quantity <= held.quantity)
+                .map(|held| {
+                    Account::preview_realized_pnl(total_amount, held.average_price, draft.quantity)
+                });
         }
         Ok(TransactionDraftPreview {
             unit_price,
             total_amount,
+            realized_pnl,
         })
     }
 
@@ -2752,7 +2772,7 @@ mod tests {
 #[cfg(test)]
 mod draft_tests {
     use super::*;
-    use crate::context::account::{Holding, MockAccountServiceContract};
+    use crate::context::account::{Holding, HoldingSnapshot, MockAccountServiceContract};
     use crate::context::asset::MockAssetServiceContract;
 
     const M: i64 = 1_000_000;
@@ -2783,7 +2803,122 @@ mod draft_tests {
                         .expect("holding")
                 }))
             });
+        // As of any date the position is what is held now, bought at 40 a unit.
+        account
+            .expect_holding_snapshot_as_of()
+            .returning(move |_, _, _| {
+                Ok(HoldingSnapshot {
+                    quantity: held.unwrap_or(0),
+                    average_price: 40 * M,
+                })
+            });
         HoldingTransactionUseCase::new(Arc::new(account), Arc::new(MockAssetServiceContract::new()))
+    }
+
+    /// A use case holding 5 units today, whose position as of the draft's date is `as_of`
+    /// (or cannot be read), and which reads that position `reads` times.
+    fn use_case_as_of(
+        as_of: Result<(i64, i64), AccountError>,
+        reads: usize,
+    ) -> HoldingTransactionUseCase {
+        let mut account = MockAccountServiceContract::new();
+        account
+            .expect_get_holding_by_account_asset()
+            .returning(|account_id, asset_id| {
+                Ok(Some(
+                    Holding::new(account_id.into(), asset_id.into(), 5 * M, M, 0, None)
+                        .expect("holding"),
+                ))
+            });
+        account
+            .expect_holding_snapshot_as_of()
+            .times(reads)
+            .returning(move |_, _, _| {
+                as_of
+                    .clone()
+                    .map(|(quantity, average_price)| HoldingSnapshot {
+                        quantity,
+                        average_price,
+                    })
+            });
+        HoldingTransactionUseCase::new(Arc::new(account), Arc::new(MockAssetServiceContract::new()))
+    }
+
+    // TDI-030 — a new sale previews the gain it would realize: its proceeds minus the
+    // average cost, as of its date, of the quantity sold — the figure recording computes.
+    #[tokio::test]
+    async fn tdi_030_a_sale_previews_the_gain_it_would_realize() {
+        // 2 units sold at 50 with 1 of fees: proceeds 99; cost 2 × 40 = 80; gain 19.
+        let mut sale = draft(DraftKind::Sell);
+        sale.entered = EnteredAmount::UnitPrice {
+            unit_price: 50 * M,
+            exchange_rate: M,
+            fees: M,
+        };
+        let preview = use_case(Some(5 * M))
+            .validate_draft(sale)
+            .await
+            .expect("valid");
+        assert_eq!(preview.total_amount, 99 * M);
+        assert_eq!(preview.realized_pnl, Some(19 * M));
+
+        // Sold under its cost, the gain is a loss.
+        let mut cheap = draft(DraftKind::Sell);
+        cheap.entered = EnteredAmount::UnitPrice {
+            unit_price: 30 * M,
+            exchange_rate: M,
+            fees: 0,
+        };
+        let preview = use_case(Some(5 * M))
+            .validate_draft(cheap)
+            .await
+            .expect("valid");
+        assert_eq!(preview.realized_pnl, Some(-20 * M));
+    }
+
+    // TDI-031 — no gain is previewed where none can be computed, and the check stands:
+    // nothing held at the sale's date, less held then than is sold, a position that
+    // cannot be read. A purchase and a sale being corrected do not read the position.
+    #[tokio::test]
+    async fn tdi_031_no_gain_is_previewed_where_none_can_be_computed() {
+        for as_of in [
+            Ok((0, 0)),
+            Ok((M, 40 * M)),
+            Err(AccountError::DatabaseError),
+        ] {
+            let preview = use_case_as_of(as_of, 1)
+                .validate_draft(draft(DraftKind::Sell))
+                .await
+                .expect("the check stands");
+            assert_eq!(preview.total_amount, 100 * M);
+            assert_eq!(preview.realized_pnl, None);
+        }
+
+        let purchase = use_case_as_of(Ok((5 * M, 40 * M)), 0)
+            .validate_draft(draft(DraftKind::Purchase))
+            .await
+            .expect("valid");
+        assert_eq!(purchase.realized_pnl, None);
+
+        let mut corrected = draft(DraftKind::Sell);
+        corrected.correcting = Some("tx-1".into());
+        let preview = use_case_as_of(Ok((5 * M, 40 * M)), 0)
+            .validate_draft(corrected)
+            .await
+            .expect("valid");
+        assert_eq!(preview.realized_pnl, None);
+    }
+
+    // TDI-030 — the gain is computed on the position of the sale's date, not today's: a
+    // back-dated sale is set against the average cost of that day.
+    #[tokio::test]
+    async fn tdi_030_a_back_dated_sale_uses_the_position_of_its_date() {
+        // Held 3 units at 25 on that day (5 today): 2 sold at 50 → 100 − 50 = 50.
+        let preview = use_case_as_of(Ok((3 * M, 25 * M)), 1)
+            .validate_draft(draft(DraftKind::Sell))
+            .await
+            .expect("valid");
+        assert_eq!(preview.realized_pnl, Some(50 * M));
     }
 
     fn code(result: Result<TransactionDraftPreview, TransactionDraftError>) -> String {
@@ -2806,7 +2941,8 @@ mod draft_tests {
             preview.expect("valid"),
             TransactionDraftPreview {
                 unit_price: 50 * M,
-                total_amount: 100 * M
+                total_amount: 100 * M,
+                realized_pnl: None,
             }
         );
     }

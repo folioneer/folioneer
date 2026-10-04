@@ -1881,6 +1881,12 @@ impl Account {
         (quantity as i128 * unit_price as i128 / MICRO) as i64
     }
 
+    /// TDI-030 — the gain a sale would realize against a position held at `average_price`:
+    /// the figure recording it computes (SEL-024), from the same rule.
+    pub fn preview_realized_pnl(total_sell_amount: i64, average_price: i64, quantity: i64) -> i64 {
+        Self::compute_realized_pnl(total_sell_amount, average_price, quantity)
+    }
+
     /// Computes realized P&L for a sell (SEL-024).
     /// realized_pnl = total_sell_amount - floor(vwap_before_sell × sold_quantity / MICRO)
     fn compute_realized_pnl(

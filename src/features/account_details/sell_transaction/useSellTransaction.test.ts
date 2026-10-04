@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TransactionDraft } from "@/bindings";
+import { microToFormatted } from "@/lib/microUnits";
 import { useSellTransaction } from "./useSellTransaction";
 
 const { mockSellHolding, mockRecordAssetPrice, mockGetSnapshot, mockValidateDraft } = vi.hoisted(
@@ -44,12 +45,12 @@ const fakeDraftCheck = async (draft: TransactionDraft) => {
   if (!draft.asset_id) return { status: "error", error: { code: "AssetMissing" } };
   if (!draft.date) return { status: "error", error: { code: "DateMissing" } };
   const unit_price = draft.entered.mode === "UnitPrice" ? draft.entered.unit_price : 7_000_000;
-  return { status: "ok", data: { unit_price, total_amount: 42_000_000 } };
+  return { status: "ok", data: { unit_price, total_amount: 42_000_000, realized_pnl: null } };
 };
 
 const answers = (unit_price: number, total_amount: number) => ({
   status: "ok",
-  data: { unit_price, total_amount },
+  data: { unit_price, total_amount, realized_pnl: null },
 });
 const oversell = {
   status: "error",
@@ -74,12 +75,86 @@ describe("useSellTransaction", () => {
     mockGetSnapshot.mockResolvedValue({ status: "ok", data: { quantity: 0, average_price: 0 } });
   });
 
-  // TDI-030 — potential P&L = proceeds − VWAP cost basis of the sold quantity.
-  it("computes potentialPnl from the as-of snapshot and the typed sell", async () => {
-    mockValidateDraft.mockResolvedValue(answers(150_000_000, 150_000_000));
+  // TDI-030 — the gain shown is the one the draft check returns; the form computes none.
+  it("shows the gain the draft check returns", async () => {
+    mockValidateDraft.mockResolvedValue({
+      status: "ok",
+      data: { unit_price: 150_000_000, total_amount: 150_000_000, realized_pnl: 50_000_000 },
+    });
+    const { result } = renderHook(() => useSellTransaction(BASE_PROPS));
+    await act(async () => {
+      result.current.handleChange("quantity", "1");
+      result.current.handleChange("unitPrice", "150");
+    });
+    await waitFor(() => expect(result.current.potentialPnl?.raw).toBe(50_000_000));
+    expect(result.current.potentialPnl?.formatted).toBe(microToFormatted(50_000_000));
+
+    // A loss is shown as the core returns it.
+    mockValidateDraft.mockResolvedValue({
+      status: "ok",
+      data: { unit_price: 60_000_000, total_amount: 60_000_000, realized_pnl: -40_000_000 },
+    });
+    await act(async () => result.current.handleChange("unitPrice", "60"));
+    await waitFor(() => expect(result.current.potentialPnl?.raw).toBe(-40_000_000));
+  });
+
+  // TDI-030 — in total-entry mode the gain is still the core's, for the typed total.
+  it("shows the core's gain for a typed total", async () => {
+    mockValidateDraft.mockImplementation(async (draft: TransactionDraft) => ({
+      status: "ok",
+      data:
+        draft.entered.mode === "Total"
+          ? { unit_price: 75_000_000, total_amount: 150_000_000, realized_pnl: 30_000_000 }
+          : { unit_price: 1_000_000, total_amount: 1_000_000, realized_pnl: null },
+    }));
+    const { result } = renderHook(() => useSellTransaction(BASE_PROPS));
+    await act(async () => {
+      result.current.handleChange("quantity", "2");
+      result.current.setEntryMode("total");
+    });
+    await act(async () => result.current.handleTotalAmountChange("150"));
+
+    await waitFor(() => expect(result.current.potentialPnl?.raw).toBe(30_000_000));
+  });
+
+  // TDI-031 — while the check of what was just typed is unanswered, no gain is shown:
+  // never the figure of the previous quantity.
+  it("hides the gain while a new check is unanswered", async () => {
+    mockValidateDraft.mockResolvedValue({
+      status: "ok",
+      data: { unit_price: 150_000_000, total_amount: 150_000_000, realized_pnl: 50_000_000 },
+    });
+    const { result } = renderHook(() => useSellTransaction(BASE_PROPS));
+    await act(async () => {
+      result.current.handleChange("quantity", "1");
+      result.current.handleChange("unitPrice", "150");
+    });
+    await waitFor(() => expect(result.current.potentialPnl?.raw).toBe(50_000_000));
+
+    let answer: (value: unknown) => void = () => {};
+    mockValidateDraft.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    await act(async () => result.current.handleChange("quantity", "2"));
+    expect(result.current.potentialPnl).toBeNull();
+
+    await act(async () =>
+      answer({
+        status: "ok",
+        data: { unit_price: 150_000_000, total_amount: 300_000_000, realized_pnl: 100_000_000 },
+      }),
+    );
+    await waitFor(() => expect(result.current.potentialPnl?.raw).toBe(100_000_000));
+  });
+
+  // TDI-031 — no gain is shown when the check returns none (nothing held at that date,
+  // no price yet), nor while the draft has a problem — whatever the as-of snapshot says.
+  it("shows no gain when the draft check returns none", async () => {
     mockGetSnapshot.mockResolvedValue({
       status: "ok",
       data: { quantity: 2_000_000, average_price: 100_000_000 },
+    });
+    mockValidateDraft.mockResolvedValue({
+      status: "ok",
+      data: { unit_price: 150_000_000, total_amount: 150_000_000, realized_pnl: null },
     });
     const { result } = renderHook(() => useSellTransaction(BASE_PROPS));
     await waitFor(() => expect(result.current.averageCostAsOfDate).not.toBeNull());
@@ -87,38 +162,11 @@ describe("useSellTransaction", () => {
       result.current.handleChange("quantity", "1");
       result.current.handleChange("unitPrice", "150");
     });
-    // proceeds 150 (from the check) − cost basis (100 × 1) = 50
-    expect(result.current.potentialPnl?.raw).toBe(50_000_000);
-  });
-
-  // TDI-031 — no potential P&L until a quantity and price are entered.
-  it("hides potentialPnl when quantity or price is missing", async () => {
-    mockGetSnapshot.mockResolvedValue({
-      status: "ok",
-      data: { quantity: 2_000_000, average_price: 100_000_000 },
-    });
-    const { result } = renderHook(() => useSellTransaction(BASE_PROPS));
-    await waitFor(() => expect(result.current.averageCostAsOfDate).not.toBeNull());
     expect(result.current.potentialPnl).toBeNull();
-  });
 
-  // TDI-030 — cross-currency: average_price (account CCY) and proceeds (account CCY,
-  // rate-converted) are the same currency, so the P&L is correct even when rate ≠ 1.
-  it("computes potentialPnl correctly for a cross-currency sell", async () => {
-    mockValidateDraft.mockResolvedValue(answers(60_000_000, 120_000_000));
-    mockGetSnapshot.mockResolvedValue({
-      status: "ok",
-      data: { quantity: 2_000_000, average_price: 100_000_000 },
-    });
-    const { result } = renderHook(() => useSellTransaction(BASE_PROPS));
-    await waitFor(() => expect(result.current.averageCostAsOfDate).not.toBeNull());
-    await act(async () => {
-      result.current.handleChange("quantity", "1");
-      result.current.handleChange("unitPrice", "60");
-      result.current.handleChange("exchangeRate", "2");
-    });
-    // proceeds (1 × 60 × 2) = 120 account CCY; cost basis (avg 100 × 1) = 100; P&L = 20.
-    expect(result.current.potentialPnl?.raw).toBe(20_000_000);
+    mockValidateDraft.mockResolvedValue(oversell);
+    await act(async () => result.current.handleChange("quantity", "9"));
+    expect(result.current.potentialPnl).toBeNull();
   });
 
   // SEL-023 / TRX-063 — the form shows the net proceeds the draft check returns

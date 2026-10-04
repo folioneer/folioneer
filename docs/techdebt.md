@@ -7,7 +7,7 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-074) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-075) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -300,15 +300,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — the spec says what a correction can change.
 - Done when: TRX-032 lists the fields a correction changes, and no rule mentions moving a transaction to another asset or account.
 
-## 2026-10-04 — TD-070 — The gain a sale would realize is computed in the interface
-
-- Found by: the audit of TD-065 (figures computed in two places), split by the owner's decision of 2026-10-04
-- Where: `src/features/account_details/sell_transaction/useSellTransaction.ts`, `computeCostBasisMicro` in `src/lib/microUnits.ts`, beside `Account::compute_realized_pnl`
-- Severity: 🟡
-- Observation: the sell dialog shows the gain the sale would realize — proceeds minus the average cost of the quantity sold — from a formula of its own. Recording computes the same figure in the core. Only one of the two is exercised by a given test.
-- User value: None directly — the gain shown before a sale is the gain recorded after it.
-- Done when: the draft check of a sale returns the gain it would realize; the dialog shows it; the interface's formula and `computeCostBasisMicro` are deleted.
-
 ## 2026-10-04 — TD-071 — A split's preview is computed in the interface, in floating point
 
 - Found by: the audit of TD-065, split by the owner's decision of 2026-10-04
@@ -362,3 +353,12 @@ Remove an entry once it has been resolved.
 - Observation: a figure is stored with six decimals and shown with three (TRX-024). A correction form is filled with the three-decimal text, so opening a correction and saving it without typing rewrites a quantity of 0.123456 as 0.123 and a rate of 0.9214 as 0.921. The dividend correction dialog fills its fields exactly (`microToExactDecimal`); the other forms do not. The same family as #058 (one conversion reads a typed number, one writes it).
 - User value: Opening a correction and saving it changes only what the user typed.
 - Done when: every form filled from a recorded figure reads back to the same micro-units when saved untouched, shown by a test per form; a recorded market price carries the trade's unit price to its last decimal.
+
+## 2026-10-04 — TD-074 — A back-dated sale passes its draft check and is refused on save
+
+- Found by: reviewer-backend on TD-070
+- Where: `validate_draft` in `src-tauri/src/use_cases/holding_transaction/orchestrator.rs` (the oversell check of a new sale)
+- Severity: 🔵
+- Observation: the draft check compares the quantity sold with what is held today. A sale dated before later purchases can sell more than was held on its date: the draft is clean, and recording refuses it (`CascadingOversell`). The draft now returns no potential gain in that case, but reports no problem.
+- User value: The sell dialog says before saving that the quantity was not held at that date.
+- Done when: the draft check of a new sale refuses a quantity above the position as of the sale's date, with the error recording would give, shown on the quantity field.

@@ -512,7 +512,7 @@ enum EnteredAmount {              // serde tag "mode"
     Total { total: i64, exchange_rate: i64, fees: i64 },           // unit price derived (TRX-060 / SEL-050)
 }
 
-struct TransactionDraftPreview { unit_price: i64, total_amount: i64 }  // what recording would store
+struct TransactionDraftPreview { unit_price: i64, total_amount: i64, realized_pnl: Option<i64> }  // what recording would store; realized_pnl: the gain a new sale would realize (TDI-030), None otherwise, or when the position at the sale's date does not hold what is sold or cannot be read (TDI-031)
 struct OpeningBalanceDraft { account_id: String, asset_id: String, date: String, quantity: i64, total_cost: Option<i64> }  // empty strings and None: not filled yet (TRX-066)
 struct OpeningBalanceDraftPreview { zero_cost: bool }  // TRX-065: warn, never block
 
@@ -569,6 +569,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-10-04 — TD-070 (TDI-030/031): `TransactionDraftPreview.realized_pnl` added — the draft check of a new sale returns the gain it would realize.
 - 2026-10-03 — DIV-040: `DraftKind` gains `Dividend`; `validate_transaction_draft` returns a corrected dividend's total (amount × exchange rate, rounded down).
 - 2026-10-03 — TRX-066: `validate_opening_balance_draft(OpeningBalanceDraft) -> OpeningBalanceDraftPreview { zero_cost }` checks an opening balance draft without writing; `TransactionDraftTask` gains `TotalCostMissing`.
 - 2026-10-03 — CSH-062: `buy_holding`, `sell_holding` and `validate_transaction_draft` return `TradeOnCashAsset` for a Cash Asset.

@@ -1576,6 +1576,13 @@ pub trait AccountServiceContract: Send + Sync {
         account_id: &str,
         asset_id: &str,
     ) -> StdResult<Option<Holding>, AccountError>;
+    /// The holding's quantity and average cost as of a date (TDI-010).
+    async fn holding_snapshot_as_of(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        date: &str,
+    ) -> StdResult<HoldingSnapshot, AccountError>;
     /// Retrieves every transaction for an account across all assets (PRF-021).
     async fn get_all_transactions_for_account(
         &self,
@@ -1824,6 +1831,15 @@ impl AccountServiceContract for AccountService {
         asset_id: &str,
     ) -> StdResult<Option<Holding>, AccountError> {
         AccountService::get_holding_by_account_asset(self, account_id, asset_id).await
+    }
+
+    async fn holding_snapshot_as_of(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        date: &str,
+    ) -> StdResult<HoldingSnapshot, AccountError> {
+        AccountService::holding_snapshot_as_of(self, account_id, asset_id, date).await
     }
 
     async fn get_all_transactions_for_account(

@@ -3797,8 +3797,9 @@ app_version: string | null;
  */
 last_applied_at: string | null; 
 /**
- * How many changes it has published, as its manifest states (SYN-037); 0 when it has
- * joined and published nothing yet.
+ * How many changes it has published: the last sequence its manifest states, which is
+ * a count because a device's sequences start at 1 and leave no gap (SYN-025, SYN-036);
+ * 0 when it has joined and published nothing yet.
  */
 published_changes: number }
 /**
@@ -4325,7 +4326,14 @@ unit_price: number;
 /**
  * Total in account currency.
  */
-total_amount: number }
+total_amount: number; 
+/**
+ * The gain a new sale would realize (TDI-030), in account currency: its proceeds minus
+ * the average cost, as of its date, of the quantity sold. `None` for anything but a
+ * new sale, and when it cannot be computed — no unit price, or nothing held at that
+ * date (TDI-031).
+ */
+realized_pnl: number | null }
 /**
  * A field of a transaction draft not filled yet (TRX-062). The draft's figures are
  * checked by the account domain, whose `AccountError` codes the composite carries.

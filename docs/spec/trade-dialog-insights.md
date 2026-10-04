@@ -61,16 +61,20 @@ display.
 
 ### Potential P&L display (030–039)
 
-**TDI-030 — Potential P&L on the sell dialog**: the sell dialog shows the
-potential realized P&L of the typed sell as an info line under the computed total
-proceeds. It is computed as `total_proceeds − floor(average_price × quantity /
-1_000_000)`, mirroring the realized-P&L formula the backend applies on an actual
-sell (SEL-024): proceeds minus the VWAP cost basis of the sold quantity.
+**TDI-030 — Potential P&L on the sell dialog (backend + frontend)**: the sell dialog
+shows the potential realized P&L of the typed sell as an info line under the computed
+total proceeds. The draft check of a new sale (TRX-062) returns it:
+`total_proceeds − floor(average_price × quantity / 1_000_000)`, where `average_price` is
+the holding's VWAP as of the sell date (TDI-010) — the rule recording a sell applies
+(SEL-024), computed by the same code. The dialog shows the figure it is given and
+computes none.
 
-**TDI-031 — Shown only when computable**: the potential-P&L line is shown only
-when a sell quantity and a unit price are both entered (so total proceeds are
-computable) and the holding is held as of the sell date (snapshot `quantity` >
-0). Otherwise it is hidden.
+**TDI-031 — Shown only when computable (backend + frontend)**: the draft check returns a
+potential P&L only for a new sale whose position, as of the sell date, holds at least the
+quantity sold. It returns none — and the check stands — when nothing is held at that
+date, when less is held than is sold, or when that position cannot be read; and none for
+a purchase, a sale being corrected, or a draft that has a problem. The dialog shows the
+line when a figure is returned and hides it otherwise.
 
 **TDI-032 — Sign-coloured**: a gain renders in the success colour, a loss in the
 error colour, consistent with the realized-P&L column elsewhere (SEL-043).
