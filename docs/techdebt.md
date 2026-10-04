@@ -329,7 +329,7 @@ Remove an entry once it has been resolved.
 
 ## 2026-10-04 — TD-073 — Correcting a record without typing can change its figures
 
-- Found by: the main agent, building the dividend correction dialog (TD-068): its test showed an exchange rate of 0.9214 pre-filled as 0.921
+- Found by: the main agent, building the dividend correction dialog (TD-068): its test showed an exchange rate of 0.9214 pre-filled as 0.921; met by the owner in the installed application (2026-10-04), who queued it
 - Where: `microToDecimal` (three decimals by default) used to pre-fill a form from a recorded figure — `useEditTransactionModal.ts` (quantity, unit price, exchange rate, fees), the shell mounts of the free shares, management fee, interest and split corrections (quantity or factor), `useDepositTransaction.ts` and `useWithdrawalTransaction.ts` (amount); and `parseFloat(microToDecimal(…))` when a trade's unit price is recorded as the asset's price
 - Severity: 🟡
 - Observation: a figure is stored with six decimals and shown with three (TRX-024). A correction form is filled with the three-decimal text, so opening a correction and saving it without typing rewrites a quantity of 0.123456 as 0.123 and a rate of 0.9214 as 0.921. The dividend correction dialog fills its fields exactly (`microToExactDecimal`); the other forms do not. The same family as #058 (one conversion reads a typed number, one writes it).
