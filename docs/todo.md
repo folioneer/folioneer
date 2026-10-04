@@ -18,15 +18,12 @@
 <!-- takes the first ready one, removes a reference when it closes the entry (order and -->
 <!-- additions are the human's), and stops when the queue is empty. -->
 
-1. TD-064
-2. TD-067
-3. TD-069
-4. TD-063
-5. TD-073
-6. #058
-7. #056
-8. #051
-9. FLOW-018
+1. TD-067
+2. TD-069
+3. TD-063
+4. TD-073
+5. #058
+6. FLOW-018
 
 ## #009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
@@ -128,6 +125,8 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 
 ## #056 — (fullstack) — An asset has a kind: listed, crypto, custom or cash
 
+Moved to 0.7.0 by the owner on 2026-10-04 (with #051, which needs it).
+
 Raised by the owner on 2026-10-03 and decided with the owner on 2026-10-04. Until now an asset had one shape for everything — a name, a reference, an optional ISIN, an optional marketplace — and nothing tied them: a reference or an ISIN could be shared by several assets, and an asset created twice by mistake looked like one instrument held on two marketplaces. An asset now has a **kind**, chosen when it is created and separate from its class (the class says what it is economically; the kind says how it is identified and priced):
 
 - **Listed** — a listing: an instrument, by its ISIN, on a marketplace, in a currency. The ISIN is required. The reference is its ticker there. Created from the lookup when one finds it. Its price is fetched where a provider exists, or typed.
@@ -161,6 +160,8 @@ Asked by the owner on 2026-10-03, for 0.6.0. A number's decimal separator is not
 - [x] Does the command line stay on the dot whatever the system language (recommended: yes — a script behaves the same everywhere)? — Yes: always the dot; a comma is refused with a usage message. (Owner, 2026-10-04.)
 
 ## #051 — (fullstack) — An agent works on the portfolio through the open application (MCP)
+
+Moved to 0.7.0 by the owner on 2026-10-04 (after #056).
 
 Requested by the owner on 2026-09-28; the model below was decided with the owner on 2026-10-04. The Model Context Protocol lets an agent (Claude Code, Claude Desktop, others) call an application's tools. An agent reaches the portfolio only through the application the owner has opened: nothing answers when the window is closed.
 
