@@ -15,6 +15,22 @@ use std::result::Result as StdResult;
 /// Micro-unit scale shared by every monetary field (ADR-001).
 pub(crate) const MICRO: i128 = 1_000_000;
 
+/// An amount at a micro-scaled rate, `amount × rate / MICRO` truncated toward zero, on the
+/// 128-bit intermediate of ADR-001: a price or a value in another currency.
+pub(crate) fn at_rate(amount: i128, rate: i64) -> i128 {
+    amount * rate as i128 / MICRO
+}
+
+/// `at_rate` for an amount that is stored: the result is one too.
+pub(crate) fn convert_at_rate(amount: i64, rate: i64) -> i64 {
+    let converted = at_rate(amount as i128, rate);
+    debug_assert!(
+        converted <= i64::MAX as i128 && converted >= i64::MIN as i128,
+        "convert_at_rate i64 overflow: {converted}"
+    );
+    converted as i64
+}
+
 /// FX conversion rates pre-resolved per `(asset_currency, valuation_date)` in
 /// account-currency micros (FXR-035/042). Only foreign pairs with a usable rate
 /// on or before the date appear; a missing entry means "no usable rate" → the
@@ -177,8 +193,10 @@ pub(crate) fn opening_balance_flow_value(
         let converted_price = if priced.currency == account_currency {
             price
         } else {
-            let rate = *rate_map.get(&(priced.currency.clone(), entry_date))? as i128;
-            price * rate / MICRO
+            at_rate(
+                price,
+                *rate_map.get(&(priced.currency.clone(), entry_date))?,
+            )
         };
         let value = transaction.quantity as i128 * converted_price / MICRO;
         i64::try_from(value).ok()
@@ -499,7 +517,7 @@ pub(crate) fn end_value_as_of(
             total += quantity * price / MICRO;
         } else if let Some(rate) = rate_map.get(&(priced.currency.clone(), period_end)) {
             // FXR-042 — value the foreign holding using the rate as of period_end.
-            let converted_price = price * (*rate as i128) / MICRO;
+            let converted_price = at_rate(price, *rate);
             total += quantity * converted_price / MICRO;
         }
         // FXR-034 — a foreign holding with no usable rate as-of period_end contributes 0.
@@ -509,6 +527,30 @@ pub(crate) fn end_value_as_of(
         "end_value_as_of i64 overflow: {total}"
     );
     total as i64
+}
+
+/// PRF-032 — the flows dated within `[period_start, period_end]`: their sum, and their sum
+/// weighted by the fraction of the period each was present for
+/// (`amount × days_remaining / days_in_period`; 0 for a period of no day).
+fn net_and_weighted_flow(
+    flows: &[DatedFlow],
+    period_start: NaiveDate,
+    period_end: NaiveDate,
+) -> (i128, i128) {
+    let days_in_period = (period_end - period_start).num_days();
+    let mut net_flow: i128 = 0;
+    let mut weighted_flow: i128 = 0;
+    for flow in flows {
+        if flow.date < period_start || flow.date > period_end {
+            continue;
+        }
+        net_flow += flow.amount as i128;
+        if days_in_period > 0 {
+            let days_remaining = (period_end - flow.date).num_days() as i128;
+            weighted_flow += flow.amount as i128 * days_remaining / days_in_period as i128;
+        }
+    }
+    (net_flow, weighted_flow)
 }
 
 /// One signed dated flow feeding a Simple Dietz computation, in the metric's
@@ -639,19 +681,7 @@ pub(crate) fn metric_for_span_over_flows(
     period_start: NaiveDate,
     period_end: NaiveDate,
 ) -> PerformanceMetric {
-    let days_in_period = (period_end - period_start).num_days();
-    let mut net_flow: i128 = 0;
-    let mut weighted_flow: i128 = 0;
-    for flow in flows {
-        if flow.date < period_start || flow.date > period_end {
-            continue;
-        }
-        net_flow += flow.amount as i128;
-        if days_in_period > 0 {
-            let days_remaining = (period_end - flow.date).num_days() as i128;
-            weighted_flow += flow.amount as i128 * days_remaining / days_in_period as i128;
-        }
-    }
+    let (net_flow, weighted_flow) = net_and_weighted_flow(flows, period_start, period_end);
 
     let gain = end_value as i128 - start_value as i128 - net_flow;
     debug_assert!(
@@ -817,19 +847,7 @@ pub(crate) fn holding_performance_for_span_over_flows(
     period_start: NaiveDate,
     period_end: NaiveDate,
 ) -> PerformanceMetric {
-    let days_in_period = (period_end - period_start).num_days();
-    let mut net_flow: i128 = 0;
-    let mut weighted_flow: i128 = 0;
-    for flow in trades {
-        if flow.date < period_start || flow.date > period_end {
-            continue;
-        }
-        net_flow += flow.amount as i128;
-        if days_in_period > 0 {
-            let days_remaining = (period_end - flow.date).num_days() as i128;
-            weighted_flow += flow.amount as i128 * days_remaining / days_in_period as i128;
-        }
-    }
+    let (net_flow, weighted_flow) = net_and_weighted_flow(trades, period_start, period_end);
     let dividends_in_window: i128 = dividends
         .iter()
         .filter(|flow| flow.date >= period_start && flow.date <= period_end)
@@ -949,7 +967,7 @@ pub(crate) fn holding_end_value_as_of(
     let value = if priced.currency == account_currency {
         quantity * price / MICRO
     } else if let Some(rate) = rate_map.get(&(priced.currency.clone(), period_end)) {
-        let converted_price = price * (*rate as i128) / MICRO;
+        let converted_price = at_rate(price, *rate);
         quantity * converted_price / MICRO
     } else {
         0

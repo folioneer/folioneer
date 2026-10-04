@@ -9,7 +9,7 @@ use crate::context::account::{
 use crate::context::asset::{AssetClass, AssetServiceContract};
 use crate::context::currency::CurrencyService;
 use crate::use_cases::shared::valuation::{
-    end_value_as_of, holding_close_date_as_of, holding_end_value_as_of,
+    at_rate, end_value_as_of, holding_close_date_as_of, holding_end_value_as_of,
     holding_performance_for_span, holding_performance_for_span_windowed, load_priced_assets,
     load_rate_map, metric_for_span, metric_for_span_windowed, month_periods,
     opening_balance_flow_value, parse_date, year_periods, MonthPeriod, PerformanceMetric,
@@ -582,7 +582,7 @@ pub(crate) fn zero_cost_credit_value(
     if priced.currency == account_currency {
         quantity * price / MICRO
     } else if let Some(rate) = rate_map.get(&(priced.currency.clone(), grant_date)) {
-        let converted_price = price * (*rate as i128) / MICRO;
+        let converted_price = at_rate(price, *rate);
         quantity * converted_price / MICRO
     } else {
         0

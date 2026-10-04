@@ -300,15 +300,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — the spec says what a correction can change.
 - Done when: TRX-032 lists the fields a correction changes, and no rule mentions moving a transaction to another asset or account.
 
-## 2026-10-04 — TD-072 — An account's value as of a date is computed three times
-
-- Found by: the audit of TD-065, split by the owner's decision of 2026-10-04
-- Where: `use_cases/account_details/orchestrator.rs` (the account page as of a date), `end_value_as_of` and `holding_end_value_as_of` in `use_cases/shared/valuation.rs` (the end value of a performance period), `use_cases/shared/price_movement.rs` (the value before a price refresh); the weighted flow of a period, written twice in `use_cases/shared/valuation.rs`; an amount converted at a rate, the same line in `account_summary`, `global_performance`, `price_movement`, `global_value` and `valuation`
-- Severity: 🟡
-- Observation: no test compares the three valuations on the same date. The value read today is settled: a test on the golden portfolio holds the account list and the account page equal. The mutation sweep of 2026-10-04 finds its largest cluster of unnoticed changes in these files (TD-064).
-- User value: None directly — an account is worth the same on its page, in its performance and in the price movement report.
-- Done when: the value as of a date has one computation, or a test holds the three equal on the golden portfolio; the weighted flow and the conversion are each written once.
-
 ## 2026-10-03 — TD-066 — An asset's name, reference and category have no length or character rule
 
 - Found by: reviewer-security on #055

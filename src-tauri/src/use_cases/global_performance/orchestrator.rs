@@ -10,11 +10,12 @@ use crate::use_cases::shared::performance::{
     zero_cost_credit_value, AccountPerformanceResponse, PerformancePeriod, PeriodBridge,
 };
 use crate::use_cases::shared::valuation::{
-    end_value_as_of, external_cash_flows, external_cash_flows_windowed, holding_close_date_as_of,
-    holding_end_value_as_of, holding_performance_for_span_over_flows, load_priced_assets,
-    load_rate_map_for_dates, market_valued_flow_dates, metric_for_span_over_flows, month_periods,
-    opening_balance_flow_value, parse_date, position_flows, position_flows_windowed, year_periods,
-    DatedFlow, MonthPeriod, PerformanceMetric, PricedAsset, RateMap, YearPeriod, MICRO,
+    at_rate, convert_at_rate, end_value_as_of, external_cash_flows, external_cash_flows_windowed,
+    holding_close_date_as_of, holding_end_value_as_of, holding_performance_for_span_over_flows,
+    load_priced_assets, load_rate_map_for_dates, market_valued_flow_dates,
+    metric_for_span_over_flows, month_periods, opening_balance_flow_value, parse_date,
+    position_flows, position_flows_windowed, year_periods, DatedFlow, MonthPeriod,
+    PerformanceMetric, PricedAsset, RateMap, YearPeriod,
 };
 use chrono::{Datelike, Local, NaiveDate};
 use std::collections::{BTreeSet, HashMap};
@@ -393,7 +394,7 @@ impl ConvertedAccount {
             ),
         };
         match self.reference_rate(period_end) {
-            Some(rate) => convert_amount(own_currency_value, rate),
+            Some(rate) => convert_at_rate(own_currency_value, rate),
             None => 0,
         }
     }
@@ -534,7 +535,7 @@ impl ConvertedAccount {
             &self.currency,
         );
         match self.reference_rate(grant_date) {
-            Some(rate) => own_currency_value * rate as i128 / MICRO,
+            Some(rate) => at_rate(own_currency_value, rate),
             None => 0,
         }
     }
@@ -547,28 +548,18 @@ impl ConvertedAccount {
             .filter_map(|flow| {
                 self.reference_rate(flow.date).map(|rate| DatedFlow {
                     date: flow.date,
-                    amount: convert_amount(flow.amount, rate),
+                    amount: convert_at_rate(flow.amount, rate),
                 })
             })
             .collect()
     }
 }
 
-/// Applies a micro-scaled conversion rate to an amount (ADR-001 i128 intermediate).
-fn convert_amount(amount: i64, rate_micros: i64) -> i64 {
-    let converted = amount as i128 * rate_micros as i128 / MICRO;
-    debug_assert!(
-        converted <= i64::MAX as i128 && converted >= i64::MIN as i128,
-        "convert_amount i64 overflow: {converted}"
-    );
-    converted as i64
-}
-
 /// Applies a per-date conversion when a rate exists; contributes 0 otherwise
 /// (GPF-030/040 missing-rate degradation).
 fn convert_or_zero(amount: i64, rate_micros: Option<i64>) -> i128 {
     match rate_micros {
-        Some(rate) => amount as i128 * rate as i128 / MICRO,
+        Some(rate) => at_rate(amount as i128, rate),
         None => 0,
     }
 }

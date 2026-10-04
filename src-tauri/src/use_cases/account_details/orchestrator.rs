@@ -9,8 +9,8 @@ use crate::core::cash::{is_cash_asset, system_cash_asset_id};
 use crate::core::logger::BACKEND;
 use crate::use_cases::shared::inconsistency::holding_inconsistency;
 use crate::use_cases::shared::valuation::{
-    holding_metric_for_span, load_priced_assets, load_rate_map_for_dates, market_valued_flow_dates,
-    PricedAsset, RateMap, MICRO,
+    at_rate, convert_at_rate, holding_metric_for_span, load_priced_assets, load_rate_map_for_dates,
+    market_valued_flow_dates, PricedAsset, RateMap, MICRO,
 };
 use chrono::{Datelike, Local, NaiveDate};
 use serde::Serialize;
@@ -422,9 +422,7 @@ impl AccountDetailsUseCase {
             // the arithmetic is unchanged (MKT-033/034). None when no price is
             // recorded or no usable rate exists for a foreign pair (FXR-034).
             let converted_price: Option<i64> = match (&latest_price, conversion_rate) {
-                (Some(latest), Some(rate)) => {
-                    Some((latest.price as i128 * rate as i128 / 1_000_000) as i64)
-                }
+                (Some(latest), Some(rate)) => Some(convert_at_rate(latest.price, rate)),
                 _ => None,
             };
 
@@ -660,9 +658,7 @@ impl AccountDetailsUseCase {
                         AccountError::DatabaseError
                     })? {
                     // FEE-073 — convert the fee value to account currency as of the fee's date.
-                    Some(resolved) => {
-                        (value_asset_ccy as i128 * resolved.rate_micros as i128 / 1_000_000) as i64
-                    }
+                    Some(resolved) => convert_at_rate(value_asset_ccy, resolved.rate_micros),
                     // FEE-073/054 — no usable rate → contributes 0.
                     None => 0,
                 }
@@ -826,9 +822,7 @@ impl AccountDetailsUseCase {
             // intermediates (ACD-024); same-currency resolves to 1.0. None when no
             // price exists on or before the date or no usable rate (FXR-034).
             let converted_price: Option<i64> = match (price_as_of, conversion_rate) {
-                (Some(price), Some(rate)) => {
-                    Some((price.price as i128 * rate as i128 / 1_000_000) as i64)
-                }
+                (Some(price), Some(rate)) => Some(convert_at_rate(price.price, rate)),
                 _ => None,
             };
 
@@ -1133,10 +1127,12 @@ fn window_position_pct(
         } else {
             // ACD-057 / FXR-034 — a foreign position with no usable rate at the
             // window start cannot be valued.
-            let rate = *inputs
-                .rate_map
-                .get(&(priced.currency.clone(), window_start))? as i128;
-            price * rate / MICRO
+            at_rate(
+                price,
+                *inputs
+                    .rate_map
+                    .get(&(priced.currency.clone(), window_start))?,
+            )
         };
         let value = quantity_at_start as i128 * converted_price / MICRO;
         debug_assert!(

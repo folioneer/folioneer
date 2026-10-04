@@ -8,6 +8,8 @@ use crate::context::account::Holding;
 use crate::context::asset::{AssetClass, AssetPrice};
 use std::collections::HashMap;
 
+use super::valuation::convert_at_rate;
+
 /// Fixed reference currency every cross-account figure is reported in
 /// (GPF-011). Moved here from `use_cases::global_performance::orchestrator` so
 /// the Price Movement report can use it without importing another use case
@@ -69,7 +71,7 @@ pub fn account_global_value(
         let Some(latest) = snapshot.prices.get(&holding.asset_id) else {
             continue;
         };
-        let converted_price = (latest.price as i128 * rate as i128 / 1_000_000) as i64;
+        let converted_price = convert_at_rate(latest.price, rate);
         let market_value = (holding.quantity as i128 * converted_price as i128 / 1_000_000) as i64;
         total = total.saturating_add(market_value);
     }

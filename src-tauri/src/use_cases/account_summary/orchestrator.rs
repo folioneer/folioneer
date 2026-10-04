@@ -8,7 +8,7 @@ use crate::use_cases::shared::global_value::{
     account_global_value, AssetValuationFacts, ValuationSnapshot, REFERENCE_CURRENCY,
 };
 use crate::use_cases::shared::inconsistency::holding_inconsistency;
-use crate::use_cases::shared::valuation::compute_current_ytd_pct;
+use crate::use_cases::shared::valuation::{compute_current_ytd_pct, convert_at_rate};
 use serde::Serialize;
 use specta::Type;
 use std::result::Result as StdResult;
@@ -231,7 +231,7 @@ impl AccountSummaryUseCase {
             };
             // MKT-040/FXR-040 — (converted_price − average_price) × quantity, with
             // i128 intermediates, matching the per-holding detail computation.
-            let converted_price = (latest.price as i128 * rate as i128 / 1_000_000) as i64;
+            let converted_price = convert_at_rate(latest.price, rate);
             let unrealized_pnl = ((converted_price as i128 - holding.average_price as i128)
                 * holding.quantity as i128
                 / 1_000_000) as i64;
@@ -328,7 +328,6 @@ pub(crate) fn portfolio_total(
     summaries: &[AccountSummary],
     rate_to_reference: &HashMap<String, Option<i64>>,
 ) -> PortfolioTotal {
-    let convert = |amount: i64, rate: i64| (amount as i128 * rate as i128 / 1_000_000) as i64;
     let mut total_global_value: i64 = 0;
     let mut total_unrealized_pnl: Option<i64> = None;
     let mut incomplete = false;
@@ -344,12 +343,12 @@ pub(crate) fn portfolio_total(
             continue;
         };
         total_global_value =
-            total_global_value.saturating_add(convert(summary.total_global_value, rate));
+            total_global_value.saturating_add(convert_at_rate(summary.total_global_value, rate));
         if let Some(pnl) = summary.total_unrealized_pnl {
             total_unrealized_pnl = Some(
                 total_unrealized_pnl
                     .unwrap_or(0)
-                    .saturating_add(convert(pnl, rate)),
+                    .saturating_add(convert_at_rate(pnl, rate)),
             );
         }
     }

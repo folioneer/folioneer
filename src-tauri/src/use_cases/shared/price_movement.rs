@@ -10,6 +10,7 @@ use crate::core::event_bus::{PriceMovementReport, PriceMovementRow};
 use std::collections::{HashMap, HashSet};
 
 use super::global_value::{account_global_value, ValuationSnapshot, REFERENCE_CURRENCY};
+use super::valuation::convert_at_rate;
 
 /// The "before" reading plus everything `build_report` needs to compute the
 /// "after" reading without touching the database again (PMV-020/021/026).
@@ -108,8 +109,8 @@ pub fn build_report(
             .get(&(account.currency.clone(), REFERENCE_CURRENCY.to_string()))
             .copied();
         if let Some(rate) = to_reference {
-            total_before = total_before.saturating_add(to_reference_currency(before, rate));
-            total_after = total_after.saturating_add(to_reference_currency(after, rate));
+            total_before = total_before.saturating_add(convert_at_rate(before, rate));
+            total_after = total_after.saturating_add(convert_at_rate(after, rate));
         }
 
         rows.push(PriceMovementRow {
@@ -148,11 +149,6 @@ pub fn build_report(
         observed_to,
         incomplete,
     }
-}
-
-/// PMV-040 — an account-currency amount in the reference currency.
-fn to_reference_currency(amount: i64, rate: i64) -> i64 {
-    (amount as i128 * rate as i128 / 1_000_000) as i64
 }
 
 /// PMV-024/041 — movement as micro-percent of the earlier value. Absent when the

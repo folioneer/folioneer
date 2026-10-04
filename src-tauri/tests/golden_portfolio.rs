@@ -583,9 +583,9 @@ async fn golden_portfolio_figures_are_unchanged() {
     );
 }
 
-// TD-065 — an account's value and unrealized gain are computed once for the account list
-// and once for the account's own page: on the same ledger, read the same day, both views
-// carry the same figures.
+// An account's value and unrealized gain are computed once for the account list and once
+// for the account's own page: on the same ledger, read the same day, both views carry the
+// same figures.
 #[tokio::test]
 async fn the_account_list_and_the_account_page_agree_on_value_and_unrealized_gain() {
     let p = build_portfolio().await;
@@ -617,4 +617,102 @@ async fn the_account_list_and_the_account_page_agree_on_value_and_unrealized_gai
     }
     assert!(list.iter().all(|row| row.total_global_value != 0));
     assert!(list.iter().any(|row| row.total_unrealized_pnl.is_some()));
+}
+
+// An account's value as of a date has three computations: the account's page as of that
+// date, the end value of a performance period, and the price movement report around a
+// refresh. On the same ledger they give the same figure: every period end of the pinned
+// years against the page as of that day, then the page before and after a refresh against
+// the report's two columns. Each figure is in its account's currency: the totals in the
+// reference currency are pinned by the golden figures.
+#[tokio::test]
+async fn the_account_page_the_performance_and_the_price_movement_agree_on_value() {
+    let p = build_portfolio().await;
+    let details = AccountDetailsUseCase::new(
+        p.account_service.clone(),
+        p.asset_service.clone(),
+        p.currency_service.clone(),
+    );
+    let performance = AccountPerformanceUseCase::new(
+        p.account_service.clone(),
+        p.asset_service.clone(),
+        p.currency_service.clone(),
+    );
+    let last_day = |year: i64, month: Option<i64>| {
+        let (next_year, next_month) = match month {
+            Some(month) if month < 12 => (year, month + 1),
+            _ => (year + 1, 1),
+        };
+        chrono::NaiveDate::from_ymd_opt(next_year as i32, next_month as u32, 1)
+            .and_then(|first| first.pred_opt())
+            .expect("period end")
+            .to_string()
+    };
+
+    let mut compared = 0;
+    for id in [&p.main_eur, &p.growth_usd] {
+        let series = serde_json::to_value(
+            performance
+                .get_account_performance(id, None)
+                .await
+                .expect("performance"),
+        )
+        .expect("json");
+        for granularity in ["yearly", "monthly"] {
+            for period in series[granularity].as_array().expect("periods") {
+                let year = period["year"].as_i64().expect("year");
+                if year > LAST_PINNED_YEAR {
+                    continue;
+                }
+                let day = last_day(year, period["month"].as_i64());
+                let page = details
+                    .get_account_details(id, Some(&day))
+                    .await
+                    .expect("details");
+                assert_eq!(
+                    Some(page.total_global_value),
+                    period["end_value"].as_i64(),
+                    "value as of {day}"
+                );
+                compared += 1;
+            }
+        }
+    }
+    assert!(compared > 24, "several years of period ends are compared");
+
+    let mut page_values = Vec::new();
+    for moment in ["before", "after"] {
+        if moment == "after" {
+            let report = refresh_report(&p).await;
+            let rows = report["rows"].as_array().expect("rows");
+            assert_eq!(rows.len(), 2);
+            page_values.push(rows.clone());
+        }
+        let mut by_name = Vec::new();
+        for id in [&p.main_eur, &p.growth_usd] {
+            let page = details
+                .get_account_details(id, None)
+                .await
+                .expect("details");
+            by_name.push(serde_json::json!({
+                "name": page.account_name,
+                "value": page.total_global_value,
+            }));
+        }
+        page_values.push(by_name);
+    }
+    let [before, rows, after] = &page_values[..] else {
+        panic!("before, report, after");
+    };
+    for row in rows {
+        let page_value = |pages: &Vec<Value>| {
+            pages
+                .iter()
+                .find(|page| page["name"] == row["name"])
+                .map(|page| page["value"].clone())
+        };
+        assert_eq!(page_value(before), Some(row["before"].clone()));
+        assert_eq!(page_value(after), Some(row["after"].clone()));
+        assert_ne!(row["before"], row["after"], "the refresh moved the value");
+    }
 }
