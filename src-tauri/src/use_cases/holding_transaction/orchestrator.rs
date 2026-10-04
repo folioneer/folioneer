@@ -304,7 +304,7 @@ impl HoldingTransactionUseCase {
             .account_service
             .get_holding_by_account_asset(account_id, asset_id)
             .await?
-            .is_some_and(|holding| holding.quantity > 0))
+            .is_some_and(|holding| holding.is_active()))
     }
 
     /// SPL-062 — checks a split draft without writing anything: the factor it would store,

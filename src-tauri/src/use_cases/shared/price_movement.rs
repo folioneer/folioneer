@@ -99,7 +99,7 @@ pub fn build_report(
         let incomplete = rate_missing_accounts.contains(&account.id)
             || holdings
                 .iter()
-                .filter(|holding| holding.quantity > 0)
+                .filter(|holding| holding.is_active())
                 .any(|holding| unpriced_asset_ids.contains(&holding.asset_id));
 
         // PMV-040/042 — both totals in the reference currency; an account with no

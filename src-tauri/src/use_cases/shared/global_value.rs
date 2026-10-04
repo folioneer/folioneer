@@ -53,7 +53,7 @@ pub fn account_global_value(
     snapshot: &ValuationSnapshot,
 ) -> i64 {
     let mut total: i64 = 0;
-    for holding in holdings.iter().filter(|holding| holding.quantity > 0) {
+    for holding in holdings.iter().filter(|holding| holding.is_active()) {
         let Some(asset) = snapshot.assets.get(&holding.asset_id) else {
             continue;
         };

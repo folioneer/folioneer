@@ -68,7 +68,7 @@ impl AssetPriceFetchUseCase {
                 .get_holdings_for_account(&account.id)
                 .await?;
             for holding in holdings {
-                if holding.quantity > 0 {
+                if holding.is_active() {
                     asset_ids.insert(holding.asset_id);
                 }
             }
@@ -128,7 +128,7 @@ impl AssetPriceFetchUseCase {
             .await?;
         let asset_ids: HashSet<String> = holdings
             .into_iter()
-            .filter(|holding| holding.quantity > 0)
+            .filter(|holding| holding.is_active())
             .map(|holding| holding.asset_id)
             .collect();
 

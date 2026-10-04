@@ -188,7 +188,7 @@ impl AccountSummaryUseCase {
         let today = today.format("%Y-%m-%d").to_string();
         let mut total: i64 = 0;
         let mut any_qualified = false;
-        for holding in holdings.into_iter().filter(|h| h.quantity > 0) {
+        for holding in holdings.into_iter().filter(|holding| holding.is_active()) {
             let asset = self
                 .asset_service
                 .get_asset_by_id(&holding.asset_id)
@@ -260,7 +260,7 @@ impl AccountSummaryUseCase {
         let mut assets = HashMap::new();
         let mut prices = HashMap::new();
         let mut rates = HashMap::new();
-        for holding in holdings.iter().filter(|holding| holding.quantity > 0) {
+        for holding in holdings.iter().filter(|holding| holding.is_active()) {
             let asset = self
                 .asset_service
                 .get_asset_by_id(&holding.asset_id)

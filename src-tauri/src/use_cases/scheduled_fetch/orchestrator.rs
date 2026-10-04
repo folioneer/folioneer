@@ -304,7 +304,7 @@ impl ScheduledFetchOrchestrator {
                     return Err(());
                 }
             };
-            for holding in holdings.into_iter().filter(|holding| holding.quantity > 0) {
+            for holding in holdings.into_iter().filter(|holding| holding.is_active()) {
                 fx_inputs.push((account.currency.clone(), holding.asset_id.clone()));
                 asset_ids.insert(holding.asset_id);
             }

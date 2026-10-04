@@ -137,7 +137,7 @@ impl PriceHistoryBackfillUseCase {
             .account_service
             .get_holding_by_account_asset(account_id, asset_id)
             .await?
-            .is_some_and(|holding| holding.quantity > 0);
+            .is_some_and(|holding| holding.is_active());
         let Some(yesterday) = (self.today)().pred_opt() else {
             return Ok(None);
         };

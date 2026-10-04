@@ -266,7 +266,7 @@ impl AccountDetailsUseCase {
         // enrichment, so it tests the deterministic cash-asset id prefix, not the class.
         let (active_holdings, closed_holdings_raw): (Vec<_>, Vec<_>) = all_holdings
             .into_iter()
-            .partition(|h| h.quantity > 0 || crate::core::cash::is_cash_asset(&h.asset_id));
+            .partition(|h| h.is_active() || crate::core::cash::is_cash_asset(&h.asset_id));
 
         // ACD-022 — enrich each active holding with asset metadata; ACD-021 — archived assets included
         // CSH-094 — accumulate the Global Value as we go: cash quantity + Σ priced non-cash holdings.

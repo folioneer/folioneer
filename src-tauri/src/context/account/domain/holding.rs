@@ -68,6 +68,12 @@ pub(crate) struct HoldingAsOfReconstruction {
 }
 
 impl Holding {
+    /// Whether this is an active holding: a quantity above zero. A closed holding stays,
+    /// at zero.
+    pub fn is_active(&self) -> bool {
+        self.quantity > 0
+    }
+
     /// Creates a new Holding with a generated ID.
     pub fn new(
         account_id: String,
@@ -165,4 +171,20 @@ pub trait HoldingRepository: Send + Sync {
     async fn has_active_holdings_for_asset(&self, asset_id: &str) -> Result<bool>;
     /// Counts holdings with quantity > 0 for a given account (ACC-020).
     async fn count_active_for_account(&self, account_id: &str) -> Result<u32>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // A holding is active above a quantity of zero; a closed one stays, at zero.
+    #[test]
+    fn a_holding_is_active_above_a_quantity_of_zero() {
+        let holding = |quantity: i64| {
+            Holding::new("acc".into(), "asset".into(), quantity, 1_000_000, 0, None)
+                .expect("holding")
+        };
+        assert!(holding(1).is_active());
+        assert!(!holding(0).is_active());
+    }
 }

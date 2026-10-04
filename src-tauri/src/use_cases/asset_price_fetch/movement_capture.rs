@@ -106,7 +106,7 @@ impl PriceMovementCapture {
                 }
             }
 
-            for holding in holdings.iter().filter(|holding| holding.quantity > 0) {
+            for holding in holdings.iter().filter(|holding| holding.is_active()) {
                 let asset = match self.asset_service.get_asset_by_id(&holding.asset_id).await {
                     Ok(Some(asset)) => asset,
                     Ok(None) => {

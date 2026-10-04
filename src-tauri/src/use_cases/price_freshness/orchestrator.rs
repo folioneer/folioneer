@@ -73,7 +73,7 @@ impl PriceFreshnessUseCase {
             held_asset_ids.extend(
                 holdings
                     .into_iter()
-                    .filter(|holding| holding.quantity > 0)
+                    .filter(|holding| holding.is_active())
                     .map(|holding| holding.asset_id),
             );
         }

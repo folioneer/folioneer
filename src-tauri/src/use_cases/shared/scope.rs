@@ -116,7 +116,7 @@ pub async fn holding_fx_pairs(
             .get_holdings_for_account(&account.id)
             .await
             .map_err(HoldingPairsError::Account)?;
-        for holding in holdings.into_iter().filter(|holding| holding.quantity > 0) {
+        for holding in holdings.into_iter().filter(|holding| holding.is_active()) {
             inputs.push((account.currency.clone(), holding.asset_id.clone()));
             asset_ids.insert(holding.asset_id);
         }
