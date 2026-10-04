@@ -1308,6 +1308,140 @@ mod tests {
         assert_eq!(run.updated_count, 1);
     }
 
+    /// An orchestrator over one account holding 10 units of each of `references` — and
+    /// nothing any more of a `CLOSED` asset — whose provider answers a symbol by `answer`
+    /// and whose price writes fail for the asset `asset-writefail`.
+    fn sweeping_orchestrator(
+        references: &'static [&'static str],
+        answer: fn(&str) -> anyhow::Result<Option<Vec<crate::context::asset::DatedClose>>>,
+    ) -> ScheduledFetchOrchestrator {
+        let mut account_service = MockAccountServiceContract::new();
+        account_service.expect_get_all().returning(|| {
+            Ok(vec![crate::context::account::Account::restore(
+                "acc-1".to_string(),
+                "Portfolio".to_string(),
+                String::new(),
+                "USD".to_string(),
+                crate::context::account::UpdateFrequency::Automatic,
+                false,
+            )])
+        });
+        account_service
+            .expect_get_holdings_for_account()
+            .returning(move |_| {
+                let holding = |reference: &str, quantity: i64| {
+                    crate::context::account::Holding::restore(
+                        format!("holding-{}", reference.to_lowercase()),
+                        "acc-1".to_string(),
+                        format!("asset-{}", reference.to_lowercase()),
+                        quantity,
+                        50_000_000,
+                        0,
+                        None,
+                    )
+                };
+                let mut holdings: Vec<_> = references
+                    .iter()
+                    .map(|reference| holding(reference, 10_000_000))
+                    .collect();
+                holdings.push(holding("CLOSED", 0));
+                Ok(holdings)
+            });
+        let mut asset_service = MockAssetServiceContract::new();
+        asset_service
+            .expect_get_asset_by_id()
+            .returning(|asset_id| {
+                Ok(Some(crate::context::asset::Asset::restore(
+                    asset_id.to_string(),
+                    "Test Asset".to_string(),
+                    crate::context::asset::AssetClass::Stocks,
+                    crate::context::asset::AssetCategory::from_storage(
+                        crate::context::asset::SYSTEM_CATEGORY_ID.to_string(),
+                        "generic.uncategorized".to_string(),
+                    ),
+                    "USD".to_string(),
+                    1,
+                    asset_id.trim_start_matches("asset-").to_uppercase(),
+                    None,
+                    false,
+                    None,
+                    false,
+                    false,
+                )))
+            });
+        asset_service
+            .expect_record_daily_closes()
+            .returning(|asset_id, closes| {
+                if asset_id == "asset-writefail" {
+                    Err(crate::context::asset::AssetError::DatabaseError)
+                } else {
+                    Ok(closes.len() as u32)
+                }
+            });
+        let mut price_provider = MockPriceProvider::new();
+        price_provider
+            .expect_fetch_daily_closes()
+            .returning(move |symbol, _, _| answer(symbol));
+        let mut pair_repo = MockCurrencyPairRepository::new();
+        pair_repo
+            .expect_list_pairs_with_latest_rate()
+            .returning(|| Ok(vec![]));
+        ScheduledFetchOrchestrator::new(
+            Arc::new(account_service),
+            Arc::new(asset_service),
+            Arc::new(price_provider),
+            Arc::new(CurrencyService::new(
+                Box::new(pair_repo),
+                Box::new(MockCurrencyRateRepository::new()),
+            )),
+            Arc::new(configured_repository(None)),
+            Arc::new(MockDailyFetchScheduler::new()),
+            Arc::new(now_after_trigger),
+        )
+    }
+
+    fn one_close() -> Vec<crate::context::asset::DatedClose> {
+        vec![crate::context::asset::DatedClose {
+            date: "2026-06-10".to_string(),
+            price: 100_000_000,
+        }]
+    }
+
+    // SPF-041 — a sweep counts one updated asset per asset whose closes were recorded,
+    // and one skipped asset per asset with no data, an empty answer, a failed write or a
+    // provider error (four of the rule's skip cases; a symbol that cannot be derived is
+    // not exercised here). SPF-040 — a position no longer held is not asked for.
+    #[tokio::test]
+    async fn spf_041_a_sweep_counts_its_updated_and_its_skipped_assets() {
+        let orchestrator = sweeping_orchestrator(
+            &["UPDATED", "WRITEFAIL", "NODATA", "EMPTY", "DOWN"],
+            |symbol| match symbol {
+                "UPDATED" | "WRITEFAIL" => Ok(Some(one_close())),
+                "NODATA" => Ok(None),
+                "EMPTY" => Ok(Some(vec![])),
+                "DOWN" => Err(anyhow::anyhow!("provider error")),
+                other => panic!("{other} is not held and must not be asked for"),
+            },
+        );
+        let run = orchestrator.run_scheduled_fetch().await.unwrap();
+        assert_eq!(run.outcome, ScheduledFetchOutcome::Succeeded);
+        assert_eq!(run.updated_count, 1);
+        assert_eq!(run.skipped_count, 4);
+    }
+
+    // SPF-051 — when every asset fails, the sweep waits longer before each retry and the
+    // run fails after the third attempt. The rule gives no figures: half a second, then
+    // a second, are the code's.
+    #[tokio::test(start_paused = true)]
+    async fn spf_051_a_failing_sweep_waits_longer_before_each_retry() {
+        let orchestrator =
+            sweeping_orchestrator(&["DOWN"], |_| Err(anyhow::anyhow!("provider error")));
+        let started = tokio::time::Instant::now();
+        let run = orchestrator.run_scheduled_fetch().await.unwrap();
+        assert_eq!(run.outcome, ScheduledFetchOutcome::Failed);
+        assert_eq!(started.elapsed(), std::time::Duration::from_millis(1_500));
+    }
+
     // MKT-201 — a run that updated nothing (nothing held, failed, or stopped by the
     // once-per-day guard) leaves the fetch log alone.
     #[tokio::test]
