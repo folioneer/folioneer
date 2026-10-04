@@ -2,7 +2,12 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { OpeningBalanceDraft, Transaction } from "@/bindings";
 import { logger } from "@/lib/logger";
-import { decimalToMicro, microToDecimal, microToFormatted } from "@/lib/microUnits";
+import {
+  decimalToMicro,
+  microToExactDecimal,
+  microToFieldDecimal,
+  microToFormatted,
+} from "@/lib/microUnits";
 import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
@@ -43,12 +48,12 @@ export function useEditTransactionModal({
     assetId: transaction.asset_id,
     date: transaction.date,
     // TRX-051: for OpeningBalance, unitPrice field is repurposed to hold the total cost
-    quantity: microToDecimal(transaction.quantity),
+    quantity: microToFieldDecimal(transaction.quantity),
     unitPrice: isOpeningBalance
-      ? microToDecimal(transaction.total_amount)
-      : microToDecimal(transaction.unit_price),
-    exchangeRate: microToDecimal(transaction.exchange_rate),
-    fees: microToDecimal(transaction.fees),
+      ? microToFieldDecimal(transaction.total_amount)
+      : microToFieldDecimal(transaction.unit_price),
+    exchangeRate: microToFieldDecimal(transaction.exchange_rate),
+    fees: microToFieldDecimal(transaction.fees),
     note: transaction.note ?? "",
   }));
 
@@ -182,10 +187,10 @@ export function useEditTransactionModal({
       if (mode === entryMode) return;
       if (mode === "total") {
         if (preview && preview.unit_price > 0) {
-          setTotalAmountInput(microToDecimal(preview.total_amount));
+          setTotalAmountInput(microToFieldDecimal(preview.total_amount));
         }
       } else if (preview && preview.unit_price > 0) {
-        setFormData((prev) => ({ ...prev, unitPrice: microToDecimal(preview.unit_price) }));
+        setFormData((prev) => ({ ...prev, unitPrice: microToFieldDecimal(preview.unit_price) }));
       }
       setEntryMode(mode);
     },
@@ -230,7 +235,7 @@ export function useEditTransactionModal({
           .recordAssetPrice(
             transaction.asset_id,
             formData.date,
-            parseFloat(microToDecimal(recordedPrice)),
+            parseFloat(microToExactDecimal(recordedPrice)),
           )
           .catch((e) =>
             logger.warn("Failed to record asset price after correction", {

@@ -84,6 +84,24 @@ describe("FreeSharesEditModalMount (FSD-040)", () => {
     expect(modal).toHaveTextContent("tx-fsd-1:5.000");
   });
 
+  // TD-073 — a quantity recorded with more than three decimals fills the form as it is.
+  it("fills the quantity with every recorded decimal", async () => {
+    mockUseSearch.mockReturnValue({
+      modal: "edit-free-shares",
+      editTxId: "tx-fsd-1",
+      editTxAccountId: "acc-1",
+      editTxAssetId: "asset-equity-1",
+    });
+    mockGetTransactions.mockResolvedValue({
+      status: "ok",
+      data: [{ ...freeSharesTx, quantity: 5_123_456 }],
+    });
+
+    render(<FreeSharesEditModalMount />);
+
+    expect(await screen.findByTestId("free-shares-modal")).toHaveTextContent("tx-fsd-1:5.123456");
+  });
+
   it("renders nothing when the transaction is not found in the fetch result", async () => {
     mockUseSearch.mockReturnValue({
       modal: "edit-free-shares",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decimalToMicro, microToExactDecimal } from "./microUnits";
+import { decimalToMicro, microToExactDecimal, microToFieldDecimal } from "./microUnits";
 
 describe("decimalToMicro", () => {
   // TRX-024 — a typed decimal becomes micro-units, with a dot or a comma.
@@ -41,6 +41,26 @@ describe("microToExactDecimal", () => {
   it("reads back to the value it was made from", () => {
     for (const micros of [921_400, 18_600_000, 1, 123_456_789, 1_000_000, -1_250_000]) {
       expect(decimalToMicro(microToExactDecimal(micros))).toBe(micros);
+    }
+  });
+});
+
+// TRX-024 / TD-073 — a field filled from a figure reads back to that figure: every decimal
+// the figure carries, and at least three.
+describe("microToFieldDecimal", () => {
+  it("keeps every decimal and shows at least three", () => {
+    expect(microToFieldDecimal(100_000_000)).toBe("100.000");
+    expect(microToFieldDecimal(18_600_000)).toBe("18.600");
+    expect(microToFieldDecimal(921_400)).toBe("0.9214");
+    expect(microToFieldDecimal(12_345_678)).toBe("12.345678");
+    expect(microToFieldDecimal(0)).toBe("0.000");
+  });
+
+  it("reads back to the same micro-units", () => {
+    for (const micros of [
+      0, 1, -1, 123_456, 921_400, 12_345_678, -12_345_678, 500_123_456, 999_999_999_999,
+    ]) {
+      expect(decimalToMicro(microToFieldDecimal(micros))).toBe(micros);
     }
   });
 });

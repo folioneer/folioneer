@@ -6,7 +6,7 @@ import { SplitModal } from "@/features/account_details/split_transaction/SplitMo
 import { transactionGateway } from "@/features/transactions/gateway";
 import { transactionLoadErrorToI18n } from "@/features/transactions/shared/presenter";
 import { logger } from "@/lib/logger";
-import { microToDecimal } from "@/lib/microUnits";
+import { microToFieldDecimal } from "@/lib/microUnits";
 import { patchModalSearch } from "@/lib/modalSearch";
 import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
@@ -109,7 +109,7 @@ export function SplitEditModalMount() {
         initialDate: transaction.date,
         // The micro-scaled factor rides in `quantity` (SPL-010) — prefill it
         // back as the decimal multiplier the edit field expects.
-        initialFactor: microToDecimal(transaction.quantity),
+        initialFactor: microToFieldDecimal(transaction.quantity),
         initialNote: transaction.note ?? "",
       }}
     />

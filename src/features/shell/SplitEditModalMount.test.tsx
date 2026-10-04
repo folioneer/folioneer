@@ -81,6 +81,24 @@ describe("SplitEditModalMount (SPL-030)", () => {
     expect(modal).toHaveTextContent("tx-spl-1:2.000");
   });
 
+  // TD-073 — a figure recorded with more than three decimals fills the form as it is.
+  it("fills the form with every recorded decimal", async () => {
+    mockUseSearch.mockReturnValue({
+      modal: "edit-split",
+      editTxId: "tx-spl-1",
+      editTxAccountId: "acc-1",
+      editTxAssetId: "asset-equity-1",
+    });
+    mockGetTransactions.mockResolvedValue({
+      status: "ok",
+      data: [{ ...splitTx, quantity: 1_333_333 }],
+    });
+
+    render(<SplitEditModalMount />);
+
+    expect(await screen.findByTestId("split-modal")).toHaveTextContent("tx-spl-1:1.333333");
+  });
+
   it("renders nothing when the transaction is not found in the fetch result", async () => {
     mockUseSearch.mockReturnValue({
       modal: "edit-split",

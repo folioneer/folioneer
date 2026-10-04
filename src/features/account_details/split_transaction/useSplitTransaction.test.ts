@@ -135,7 +135,7 @@ describe("useSplitTransaction — create mode (SPL-061/062/040)", () => {
     });
     // Not the holding the dialog was opened on (10 @ 150): the figures are the core's.
     expect(result.current.preview?.oldQuantity).toContain("7");
-    expect(result.current.priceInput).toBe("66.667");
+    expect(result.current.priceInput).toBe("66.666667");
     expect(result.current.isFormValid).toBe(true);
   });
 

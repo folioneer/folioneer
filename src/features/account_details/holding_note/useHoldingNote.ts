@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ThresholdDirection } from "@/bindings";
 import { logger } from "@/lib/logger";
-import { decimalToMicro, microToDecimal } from "@/lib/microUnits";
+import { decimalToMicro, microToFieldDecimal } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -39,7 +39,9 @@ export function useHoldingNote({ accountId, target, onSubmitSuccess }: UseHoldin
     alarmEnabled: target.existing?.thresholdPrice != null,
     direction: target.existing?.thresholdDirection ?? "Below",
     price:
-      target.existing?.thresholdPrice != null ? microToDecimal(target.existing.thresholdPrice) : "",
+      target.existing?.thresholdPrice != null
+        ? microToFieldDecimal(target.existing.thresholdPrice)
+        : "",
   }));
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);

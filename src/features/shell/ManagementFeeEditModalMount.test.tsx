@@ -84,6 +84,26 @@ describe("ManagementFeeEditModalMount (FEE-063)", () => {
     expect(modal).toHaveTextContent("tx-fee-1:1.000:Apple Inc");
   });
 
+  // TD-073 — a figure recorded with more than three decimals fills the form as it is.
+  it("fills the form with every recorded decimal", async () => {
+    mockUseSearch.mockReturnValue({
+      modal: "edit-management-fee",
+      editTxId: "tx-fee-1",
+      editTxAccountId: "acc-1",
+      editTxAssetId: "asset-equity-1",
+    });
+    mockGetTransactions.mockResolvedValue({
+      status: "ok",
+      data: [{ ...managementFeeTx, quantity: 1_123_456 }],
+    });
+
+    render(<ManagementFeeEditModalMount />);
+
+    expect(await screen.findByTestId("management-fee-edit-modal")).toHaveTextContent(
+      "tx-fee-1:1.123456:Apple Inc",
+    );
+  });
+
   it("renders nothing when the transaction is not found in the fetch result", async () => {
     mockUseSearch.mockReturnValue({
       modal: "edit-management-fee",

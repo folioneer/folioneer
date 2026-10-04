@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import type { AssetPrice } from "@/bindings";
 import { logger } from "@/lib/logger";
-import { microToDecimal } from "@/lib/microUnits";
+import { microToFieldDecimal } from "@/lib/microUnits";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
 import { assetPriceMutationErrorToI18n } from "../shared/presenter";
@@ -30,7 +30,7 @@ export function useEditPrice({
   onSuccess,
 }: UseEditPriceProps): UseEditPriceResult {
   const [date, setDate] = useState(target.date);
-  const [price, setPrice] = useState(() => microToDecimal(target.price, 6));
+  const [price, setPrice] = useState(() => microToFieldDecimal(target.price));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<I18nMessage | null>(null);
 

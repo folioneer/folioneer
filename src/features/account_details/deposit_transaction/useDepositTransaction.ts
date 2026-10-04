@@ -4,7 +4,7 @@ import type { Transaction } from "@/bindings";
 import { transactionMutationErrorToI18n } from "@/features/transactions/shared/presenter";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { decimalToMicro, microToDecimal } from "@/lib/microUnits";
+import { decimalToMicro, microToFieldDecimal } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -38,7 +38,7 @@ export function useDepositTransaction({
     editTransaction
       ? {
           date: editTransaction.date,
-          amount: microToDecimal(editTransaction.total_amount),
+          amount: microToFieldDecimal(editTransaction.total_amount),
           note: editTransaction.note ?? "",
         }
       : { date: getLastOperationDate(accountId), amount: "", note: "" },

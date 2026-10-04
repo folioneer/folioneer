@@ -5,7 +5,7 @@ import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationD
 import { logger } from "@/lib/logger";
 import {
   decimalToMicro,
-  microToDecimal,
+  microToFieldDecimal,
   microToFormattedPrice,
   microToFormattedQuantity,
 } from "@/lib/microUnits";
@@ -23,7 +23,7 @@ export interface SplitEditMode {
   lockedAssetName: string;
   /** Current values to prefill the form when correcting an existing split. */
   initialDate?: string;
-  /** Factor as a decimal multiplier string ("2.000" for a 2-for-1 split). */
+  /** Factor as a decimal multiplier string, every decimal it carries ("2.000", "1.333333"). */
   initialFactor?: string;
   initialNote?: string;
 }
@@ -160,7 +160,7 @@ export function useSplitTransaction({
   // across the split.
   const priceAfterSplit = check.data?.price_after_split ?? null;
   const priceInput =
-    priceOverride ?? (priceAfterSplit === null ? "" : microToDecimal(priceAfterSplit));
+    priceOverride ?? (priceAfterSplit === null ? "" : microToFieldDecimal(priceAfterSplit));
 
   const isFormValid = check.data !== null;
   const factorMicro = check.data?.factor ?? null;

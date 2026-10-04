@@ -4,7 +4,7 @@
  * All financial values are stored and transmitted as i64 micro-units (value × 1_000_000).
  * Decimal ↔ micro conversion occurs ONLY at the UI boundary:
  *   - User input:  decimal string → number (micro-units) via decimalToMicro
- *   - Display:     number (micro-units) → formatted decimal string via microToDecimal
+ *   - A form field: number (micro-units) → decimal string via microToFieldDecimal
  *
  */
 
@@ -30,15 +30,6 @@ export function decimalToMicro(value: string): number {
 }
 
 /**
- * Converts an integer micro-unit value to a plain decimal string using a period separator.
- * Use for form pre-fill only — not locale-aware.
- * e.g. 1_500_000 → "1.500" (3 decimal places by default per TRX-024)
- */
-export function microToDecimal(micros: number, decimals = 3): string {
-  return (micros / MICRO).toFixed(decimals);
-}
-
-/**
  * Converts a micro-unit value to the decimal string that reads back to the same value:
  * every decimal it carries, none it does not (921_400 → "0.9214", 18_600_000 → "18.6").
  * Use to pre-fill a field from a recorded figure, so saving without typing changes nothing.
@@ -46,6 +37,16 @@ export function microToDecimal(micros: number, decimals = 3): string {
 export function microToExactDecimal(micros: number): string {
   const text = (micros / MICRO).toFixed(6);
   return text.includes(".") ? text.replace(/0+$/, "").replace(/\.$/, "") : text;
+}
+
+/**
+ * As `microToExactDecimal`, with at least three decimals, the look of a figure in a form
+ * (100_000_000 → "100.000", 921_400 → "0.9214", 123_456 → "0.123456"). Use to fill a form
+ * field from a recorded or computed figure: saving it untouched changes nothing (TRX-024).
+ */
+export function microToFieldDecimal(micros: number): string {
+  const [whole, decimals = ""] = microToExactDecimal(micros).split(".");
+  return `${whole}.${decimals.padEnd(3, "0")}`;
 }
 
 // Set once at app startup from i18n config — tests may override via setDisplayLocale("en")

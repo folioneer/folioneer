@@ -246,6 +246,48 @@ describe("useEditTransactionModal", () => {
     expect(mockRecordAssetPrice).not.toHaveBeenCalled();
   });
 
+  // TD-073 — a correction opened and saved without typing changes no figure: the form
+  // is filled with every decimal recorded, and sends them back as they were.
+  it("TD-073: a correction saved untouched keeps every recorded decimal", async () => {
+    const precise: Transaction = {
+      ...baseTransaction,
+      id: "tx-precise",
+      quantity: 123_456,
+      unit_price: 12_345_678,
+      exchange_rate: 921_400,
+      fees: 1_500,
+    };
+    mockValidateDraft.mockImplementation(fakeDraftCheck);
+    mockCorrectTransaction.mockResolvedValue({ data: { id: "tx-precise" }, error: null });
+    mockRecordAssetPrice.mockResolvedValue({ status: "ok", data: null });
+    const { result } = renderHook(() => useEditTransactionModal({ transaction: precise }));
+    expect(result.current.formData).toMatchObject({
+      quantity: "0.123456",
+      unitPrice: "12.345678",
+      exchangeRate: "0.9214",
+      fees: "0.0015",
+    });
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
+    act(() => result.current.setRecordPrice(true));
+
+    await act(async () => {
+      await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+    });
+
+    expect(mockCorrectTransaction).toHaveBeenCalledWith(
+      "tx-precise",
+      "account-1",
+      expect.objectContaining({
+        quantity: 123_456,
+        unit_price: 12_345_678,
+        exchange_rate: 921_400,
+        fees: 1_500,
+      }),
+    );
+    // MKT-055 — the price recorded with it carries the unit price to its last decimal.
+    expect(mockRecordAssetPrice).toHaveBeenCalledWith("asset-1", precise.date, 12.345678);
+  });
+
   // TRX-051: OpeningBalance pre-fill uses total_amount (not unit_price) as the "Total Cost" field
   it("TRX-051: pre-fills unitPrice from total_amount for OpeningBalance", () => {
     const { result } = renderHook(() =>

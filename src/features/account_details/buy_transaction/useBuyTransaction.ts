@@ -8,7 +8,7 @@ import { useTransactions } from "@/features/transactions/useTransactions";
 import { getAutoRecordPrice } from "@/lib/autoRecordPriceStorage";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { microToDecimal, microToFormatted } from "@/lib/microUnits";
+import { microToExactDecimal, microToFieldDecimal, microToFormatted } from "@/lib/microUnits";
 import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
@@ -108,10 +108,10 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
       if (mode === entryMode) return;
       if (mode === "total") {
         if (preview && preview.unit_price > 0) {
-          setTotalAmountInput(microToDecimal(preview.total_amount));
+          setTotalAmountInput(microToFieldDecimal(preview.total_amount));
         }
       } else if (preview && preview.unit_price > 0) {
-        setFormData((prev) => ({ ...prev, unitPrice: microToDecimal(preview.unit_price) }));
+        setFormData((prev) => ({ ...prev, unitPrice: microToFieldDecimal(preview.unit_price) }));
       }
       setEntryMode(mode);
     },
@@ -152,7 +152,7 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
           .recordAssetPrice(
             formData.assetId,
             formData.date,
-            parseFloat(microToDecimal(preview.unit_price)),
+            parseFloat(microToExactDecimal(preview.unit_price)),
           )
           .catch((e) => logger.warn("Failed to record asset price after buy", { error: e }));
       }

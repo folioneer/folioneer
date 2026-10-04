@@ -18,9 +18,8 @@
 <!-- takes the first ready one, removes a reference when it closes the entry (order and -->
 <!-- additions are the human's), and stops when the queue is empty. -->
 
-1. TD-073
-2. #058
-3. FLOW-018
+1. #058
+2. FLOW-018
 
 ## #009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 

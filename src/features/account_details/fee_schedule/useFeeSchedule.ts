@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { FeeFrequency } from "@/bindings";
 import { logger } from "@/lib/logger";
-import { decimalToMicro, microToDecimal } from "@/lib/microUnits";
+import { decimalToMicro, microToFieldDecimal } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -59,7 +59,7 @@ export function useFeeSchedule({ accountId, assetId, onSubmitSuccess }: UseFeeSc
         if (schedule) {
           setIsExisting(true);
           setFormData({
-            ratePercent: microToDecimal(schedule.annual_rate_percent_micros, 3),
+            ratePercent: microToFieldDecimal(schedule.annual_rate_percent_micros),
             frequency: schedule.frequency,
             startDate: schedule.start_date,
             endDate: schedule.end_date ?? "",

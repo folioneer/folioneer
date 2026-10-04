@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { getAutoRecordPrice } from "@/lib/autoRecordPriceStorage";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { microToDecimal, microToFormatted } from "@/lib/microUnits";
+import { microToExactDecimal, microToFormatted } from "@/lib/microUnits";
 import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
@@ -114,7 +114,11 @@ export function useAddTransaction({
       const unitPrice = check.preview?.unit_price ?? 0;
       if (recordPrice && unitPrice > 0) {
         transactionGateway
-          .recordAssetPrice(formData.assetId, formData.date, parseFloat(microToDecimal(unitPrice)))
+          .recordAssetPrice(
+            formData.assetId,
+            formData.date,
+            parseFloat(microToExactDecimal(unitPrice)),
+          )
           .catch((e) => logger.warn("Failed to record asset price after buy", { error: e }));
       }
 

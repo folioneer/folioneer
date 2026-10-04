@@ -152,6 +152,17 @@ describe("useDepositTransaction — edit mode (CSH-111)", () => {
     mockShowSnackbar.mockReset();
   });
 
+  // TD-073 — an amount recorded with more than three decimals fills the form as it is.
+  it("fills the amount with every recorded decimal", () => {
+    const { result } = renderHook(() =>
+      useDepositTransaction({
+        accountId: "account-1",
+        editTransaction: { ...editDeposit, quantity: 500_123_456, total_amount: 500_123_456 },
+      }),
+    );
+    expect(result.current.formData.amount).toBe("500.123456");
+  });
+
   it("prefills the form from the edited Deposit (date, amount, note)", () => {
     const { result } = renderHook(() =>
       useDepositTransaction({ accountId: "account-1", editTransaction: editDeposit }),

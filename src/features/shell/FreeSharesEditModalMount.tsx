@@ -6,7 +6,7 @@ import { FreeSharesModal } from "@/features/account_details/free_shares_transact
 import { transactionGateway } from "@/features/transactions/gateway";
 import { transactionLoadErrorToI18n } from "@/features/transactions/shared/presenter";
 import { logger } from "@/lib/logger";
-import { microToDecimal } from "@/lib/microUnits";
+import { microToFieldDecimal } from "@/lib/microUnits";
 import { patchModalSearch } from "@/lib/modalSearch";
 import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
@@ -101,7 +101,7 @@ export function FreeSharesEditModalMount() {
         lockedAssetId: assetId,
         lockedAssetName: assetName,
         initialDate: transaction.date,
-        initialQuantity: microToDecimal(transaction.quantity),
+        initialQuantity: microToFieldDecimal(transaction.quantity),
         initialNote: transaction.note ?? "",
       }}
     />
