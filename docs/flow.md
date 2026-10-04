@@ -182,23 +182,6 @@ itself. Hooks and CI ran their own share on every commit and push; that is not c
 Reading: the reviewers were used as the workflow says. The skills and the recipes were
 not — the work was done by hand, in the skills' spirit, with native commands.
 
-## FLOW-014 — "Always use `just`" was not followed: 330 native commands, no `just harness`
-
-- Kind: quality + speed
-- Observed: CLAUDE.md rule 2 says a recipe is used whenever one exists. In the batch the
-  agent ran `cargo` and `npx` directly 330 times and `just harness` never — not once
-  before a first push, where `docs/workflow.md` § 3 asks for `just harness --coverage`.
-  The reason each time: a recipe runs everything, on a machine that a full run
-  overloads (FLOW-010), when one test filter or one folder was wanted. The hooks and CI
-  caught what the harness would have, except once: the unhandled errors that failed CI
-  on #91 are what a local harness run shows.
-- Proposal: recipes that take a scope, so the rule can be followed — `just test-rust
-<filter>`, `just test-fe <path>`, `just lint` for the changed files, each capped at
-  two build jobs — and `just harness` once before the first push of a code pull request,
-  as written. The rule stays; the tools make it affordable.
-- Costs: half a day on the `justfile` and `scripts/check.py`. Protects: the rule that
-  CI, the hooks and the agent run the same commands, and a CI round per local miss.
-
 ## FLOW-018 — The flow is audited once, by hand
 
 - Kind: quality + speed

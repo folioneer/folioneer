@@ -77,8 +77,11 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
    first command) in the same commit. Confirm red.
 4. **Implement** to green, the right way (§ 6). Logic that lands in the frontend is a
    harness failure, not a style remark.
-5. **Self-check** — `just harness`: architecture rules, lint, type-check, build, both
-   suites; `just harness --coverage` adds the coverage floors, run before the first push.
+5. **Self-check** — while working, the recipes take a scope: `just test <paths>`,
+   `just test-rust <filter>`, `just check --frontend` or `--backend` for lint and types;
+   never the native command.
+   Then `just harness`: architecture rules, lint, type-check, build, both suites;
+   `just harness --coverage` adds the coverage floors, run before the first push.
 6. **Self-review** — run the reviewer agents that match the diff (§ 7); apply the
    triage policy; run them again until no 🔴 remains. CI runs them again on every
    push as the enforced record.

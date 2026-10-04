@@ -1,6 +1,10 @@
 # Folioneer — Command Runner
 # Install just: https://github.com/casey/just
 
+# A recipe's arguments reach its commands as "$@": a path with a space stays one argument and
+# nothing in an argument is read by the shell.
+set positional-arguments
+
 # List all available commands
 default:
     @just --list
@@ -21,13 +25,15 @@ dev-seed *ARGS:
 generate-types:
     cd src-tauri && cargo run --bin generate_bindings
 
-# Run frontend tests
-test:
-    npm test
+# Run frontend tests; pass paths or a vitest filter to run a part (just test src/features/settings)
+test *ARGS:
+    npm test -- "$@"
 
-# Run backend tests
-test-rust:
-    cd src-tauri && cargo test
+# Run backend tests; pass a test-name filter or cargo test flags to run a part (just test-rust div_040,
+# just test-rust --lib sync). Two build jobs unless CARGO_BUILD_JOBS (or KIT_CHECK_JOBS, the check
+# script's own knob) says otherwise: a full parallel build overloads a small machine.
+test-rust *ARGS:
+    cd src-tauri && CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${KIT_CHECK_JOBS:-2}}" cargo test "$@"
 
 # Run frontend tests with lcov coverage (output: coverage/frontend/lcov.info)
 coverage-fe:
@@ -62,10 +68,10 @@ harness *ARGS:
     bash scripts/harness.sh {{ARGS}}
 
 # ---- shared recipes ----------------------------------------------------
-# Run fast quality check (lint/format only, no tests)
-check:
+# Run fast quality check (lint/format only, no tests); pass --frontend or --backend for one layer
+check *ARGS:
     @[ -f scripts/check.py ] || { echo "❌ scripts/check.py not found — restore it from git history"; exit 1; }
-    python3 scripts/check.py --fast
+    python3 scripts/check.py --fast "$@"
 
 # Run full quality check (tests + build + lint)
 check-full:

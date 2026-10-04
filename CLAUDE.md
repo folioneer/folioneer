@@ -58,8 +58,8 @@ Headless, a question only the human can answer goes into the entry's `**Open que
 ## Commands
 
 - `just dev` (a debug build uses its own data folder and never touches the daily fetch; `--reset-db` resets only that database) · `just dev-seed [--replace]` (a detached copy of the installed database).
-- `just test` · `just test-rust` · `just test-unit`. The E2E suite has no recipe: CI runs it (`npm run test:e2e:ci`) and is its gate; the local run is broken on this machine (`docs/lessons.md` L-011).
-- `just harness [--coverage]` · `just check` · `just check-full` · `just format` · `just arch-check` (`--write-allowlist` only lowers the frozen debt) · `just coverage-gate` · `just generate-types` · `just merge`.
+- `just test [paths]` · `just test-rust [filter]` (a part of a suite while working; two build jobs) · `just test-unit`. The E2E suite has no recipe: CI runs it (`npm run test:e2e:ci`) and is its gate; the local run is broken on this machine (`docs/lessons.md` L-011).
+- `just harness [--coverage]` · `just check [--frontend|--backend]` · `just check-full` · `just format` · `just arch-check` (`--write-allowlist` only lowers the frozen debt) · `just coverage-gate` · `just generate-types` · `just merge`.
 - `just install` · `just stat` · `just worktree <branch>`. A recipe exists because CI, a hook, a skill, an agent or a script calls it, or because it is listed here; otherwise it goes.
 - Release (human): `/dep-audit` → `just release [--preview] [-y]`; the workflow builds Windows then Linux and leaves a draft — publish with `gh release edit vX.Y.Z --draft=false` once both attached their assets.
 
