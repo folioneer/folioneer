@@ -1,11 +1,20 @@
-import { describe, expect, it } from "vitest";
-import { decimalToMicro, microToExactDecimal, microToFieldDecimal } from "./microUnits";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  decimalToDisplayed,
+  decimalToMicro,
+  decimalToNumber,
+  microToExactDecimal,
+  microToFieldDecimal,
+  setDisplayLocale,
+  typedToDecimal,
+} from "./microUnits";
 
 describe("decimalToMicro", () => {
-  // TRX-024 — a typed decimal becomes micro-units, with a dot or a comma.
-  it("reads a decimal with a dot or a comma", () => {
+  // TRX-024 — a decimal written with a dot becomes micro-units; a comma is no number
+  // here: what is typed is read by `typedToDecimal` first (NUM-010).
+  it("reads a decimal written with a dot", () => {
     expect(decimalToMicro("1.5")).toBe(1_500_000);
-    expect(decimalToMicro("1,5")).toBe(1_500_000);
+    expect(decimalToMicro("1,5")).toBe(0);
     expect(decimalToMicro(" 12 ")).toBe(12_000_000);
     expect(decimalToMicro("0.000001")).toBe(1);
     expect(decimalToMicro(".5")).toBe(500_000);
@@ -62,5 +71,49 @@ describe("microToFieldDecimal", () => {
     ]) {
       expect(decimalToMicro(microToFieldDecimal(micros))).toBe(micros);
     }
+  });
+});
+
+// NUM-010/011 — one conversion reads what is typed, one writes what is shown, each in the
+// two display languages.
+describe("typedToDecimal and decimalToDisplayed", () => {
+  afterEach(() => setDisplayLocale("fr"));
+
+  it("in French, read a comma or a dot and write a comma", () => {
+    setDisplayLocale("fr");
+    expect(typedToDecimal("1,5")).toBe("1.5");
+    expect(typedToDecimal("1.5")).toBe("1.5");
+    expect(typedToDecimal("100*1,2")).toBe("100*1.2");
+    // A thousands separator is no part of a number: both together are not one.
+    expect(decimalToNumber(typedToDecimal("1.234,56"))).toBeNaN();
+    expect(decimalToNumber(typedToDecimal("1 234,5"))).toBeNaN();
+    expect(decimalToDisplayed("12.345678")).toBe("12,345678");
+    expect(decimalToMicro(typedToDecimal(decimalToDisplayed("12.345678")))).toBe(12_345_678);
+  });
+
+  it("in English, read the dot only and write the dot", () => {
+    setDisplayLocale("en");
+    expect(typedToDecimal("1.5")).toBe("1.5");
+    expect(typedToDecimal("1,5")).toBe("1,5");
+    expect(decimalToMicro(typedToDecimal("1,5"))).toBe(0);
+    expect(decimalToDisplayed("12.345678")).toBe("12.345678");
+  });
+
+  it("follow a regional variant of the language", () => {
+    setDisplayLocale("fr-CH");
+    expect(decimalToDisplayed("1.5")).toBe("1,5");
+    setDisplayLocale("en-GB");
+    expect(decimalToDisplayed("1.5")).toBe("1.5");
+  });
+});
+
+// A text that only starts like a number is not one.
+describe("decimalToNumber", () => {
+  it("reads a decimal written with a dot, and nothing else", () => {
+    expect(decimalToNumber("1.5")).toBe(1.5);
+    expect(decimalToNumber(" 12 ")).toBe(12);
+    expect(decimalToNumber("1,5")).toBeNaN();
+    expect(decimalToNumber("12abc")).toBeNaN();
+    expect(decimalToNumber("")).toBeNaN();
   });
 });

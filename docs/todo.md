@@ -18,8 +18,6 @@
 <!-- takes the first ready one, removes a reference when it closes the entry (order and -->
 <!-- additions are the human's), and stops when the queue is empty. -->
 
-1. #058
-
 ## #009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
 Now that prices and rates arrive on their own, what is missing is a place to think. A new view, opened from the account header, lists the account's active holdings with the figures the holdings table already computes — quantity, current value, YTD performance — and adds three fields that are the user's own judgement, edited inline per row: a target price (in the asset's currency), a horizon (short / medium / long term), and free text. This is not the holding note (HNO): the note carries an alarm the application acts on; this carries an opinion the application only stores. One derived figure belongs in the row: how far the current price stands from the target, computed by the backend.
@@ -141,18 +139,6 @@ Existing assets take a kind from what they carry: the Cash class is cash, the di
 **Open questions:** none
 
 The words "kind", "listed", "crypto" and "custom" enter the vocabulary with the first pull request, for the owner to confirm there.
-
-## #058 — (fullstack) — Numbers are typed and shown the same way everywhere, by language
-
-Asked by the owner on 2026-10-03, for 0.6.0. A number's decimal separator is not handled consistently: the forms accept a comma or a dot in either language; a form pre-filled from a recorded figure (a correction) writes a dot even in French; the display language is set once at start-up and falls back to French. The thousands separator is out of scope. The command line reads and prints the dot only — all its text is English (#044).
-
-**User value:** A number reads and is typed the same way on every screen: with a comma in French, with a dot in English.
-**Done when:** every place a number is typed or shown is listed (forms, pre-filled forms, tables, charts, exports, the command line); in the window each shows and accepts the decimal separator of the display language — a comma in French, a dot in English — and a form pre-filled from a recorded figure uses it too; one conversion reads a typed number and one writes it, both tested in the two languages; what the command line does is decided and stated.
-**Design:** none
-**Open questions:**
-
-- [x] In French, is a dot still accepted when typed (a numeric keypad types one), or refused? — Accepted: a typed dot is read, the field shows a comma. In English only the dot is accepted and shown. (Owner, 2026-10-04.)
-- [x] Does the command line stay on the dot whatever the system language (recommended: yes — a script behaves the same everywhere)? — Yes: always the dot; a comma is refused with a usage message. (Owner, 2026-10-04.)
 
 ## #051 — (fullstack) — An agent works on the portfolio through the open application (MCP)
 

@@ -5,6 +5,7 @@ import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationD
 import { logger } from "@/lib/logger";
 import {
   decimalToMicro,
+  decimalToNumber,
   microToFieldDecimal,
   microToFormattedPrice,
   microToFormattedQuantity,
@@ -213,7 +214,7 @@ export function useSplitTransaction({
 
         // SPL-040 — record the post-split price separately when the checkbox is
         // on and the price is positive (best-effort, like MKT-055).
-        const price = parseFloat(priceInput);
+        const price = decimalToNumber(priceInput);
         if (!editMode && recordPrice && Number.isFinite(price) && price > 0) {
           accountDetailsGateway
             .recordAssetPrice(target.assetId, formData.date, price)

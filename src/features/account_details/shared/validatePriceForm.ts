@@ -1,6 +1,7 @@
+import { decimalToNumber } from "@/lib/microUnits";
 export function isPriceValid(price: string): boolean {
   if (price.length === 0) return false;
-  const n = parseFloat(price);
+  const n = decimalToNumber(price);
   return Number.isFinite(n) && n > 0;
 }
 

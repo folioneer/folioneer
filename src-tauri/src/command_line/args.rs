@@ -312,8 +312,12 @@ impl Options {
         let value = self
             .get(name)
             .ok_or_else(|| Reason(format!("{name} is missing")))?;
-        decimal_to_micro(value)
-            .ok_or_else(|| Reason(format!("{name} is not a decimal number: \"{value}\"")))
+        // CLI-015 — a comma is never read: the decimals are written after a dot, whatever
+        // the system's language. The figure so written is shown only when it is one.
+        decimal_to_micro(value).ok_or_else(|| {
+            let hint = comma_hint(value).unwrap_or_default();
+            Reason(format!("{name} is not a decimal number: \"{value}\"{hint}"))
+        })
     }
 
     fn amount_or(&self, name: &str, default: i64) -> Result<i64, Reason> {
@@ -365,6 +369,14 @@ impl Options {
             ))),
         }
     }
+}
+
+/// CLI-015 — what to write in place of a figure typed with a comma, when replacing the comma
+/// by a dot makes it a decimal; `None` for anything else ("1,234.5", "1,2,3", "abc").
+fn comma_hint(value: &str) -> Option<String> {
+    let dotted = value.replace(',', ".");
+    (value.contains(',') && decimal_to_micro(&dotted).is_some())
+        .then(|| format!(" — write the decimals after a dot: {dotted}"))
 }
 
 /// A decimal with a dot and at most six decimals, in micro-units; `None` when it is not one.
@@ -642,8 +654,18 @@ mod tests {
         );
         assert_eq!(
             reason("holding buy --account A --asset B --quantity 1,5 --price 1"),
-            "--quantity is not a decimal number: \"1,5\""
+            "--quantity is not a decimal number: \"1,5\" — write the decimals after a dot: 1.5"
         );
+        // CLI-015 — the hint shows a figure only when it is one: not for a comma used
+        // between thousands, several commas, or no comma at all.
+        for typed in ["abc", "1,234.5", "1,2,3"] {
+            assert_eq!(
+                reason(&format!(
+                    "holding buy --account A --asset B --quantity {typed} --price 1"
+                )),
+                format!("--quantity is not a decimal number: \"{typed}\"")
+            );
+        }
         assert_eq!(
             reason("holding buy --account A --asset B --quantity 1 --price 1 --date 28/09/2026"),
             "--date is not a date as YYYY-MM-DD: \"28/09/2026\""

@@ -1,3 +1,4 @@
+import { decimalToNumber } from "@/lib/microUnits";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { validateDate } from "./validateCashForm";
 
@@ -10,7 +11,7 @@ import { validateDate } from "./validateCashForm";
  */
 export function validatePercentage(percent: string): I18nMessage | null {
   if (percent.length === 0) return { key: "validation.percentage_not_positive" };
-  const value = parseFloat(percent);
+  const value = decimalToNumber(percent);
   if (!Number.isFinite(value) || value <= 0) return { key: "validation.percentage_not_positive" };
   if (value > 100) return { key: "validation.percentage_above_hundred" };
   return null;
@@ -22,7 +23,7 @@ export function validatePercentage(percent: string): I18nMessage | null {
  * bound is its rejection (FEE-028/029), not a check here.
  */
 export function validateResultingQuantity(quantity: string): I18nMessage | null {
-  const value = quantity.length === 0 ? Number.NaN : Number(quantity);
+  const value = decimalToNumber(quantity);
   if (!Number.isFinite(value) || value < 0) return { key: "validation.resulting_quantity_invalid" };
   return null;
 }

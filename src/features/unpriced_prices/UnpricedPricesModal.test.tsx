@@ -181,6 +181,37 @@ describe("UnpricedPricesModal — confirm wiring (MKT-175)", () => {
     expect(mockRecord).toHaveBeenCalledWith("asset-1", 15.5);
   });
 
+  // NUM-010/011 — the price is typed with a comma in French (the tests' language); a
+  // dot typed on the keypad is read too and shows as a comma.
+  it("reads a price typed with a comma, and shows a typed dot as a comma", async () => {
+    const user = userEvent.setup();
+    const asset = makeAsset({ asset_id: "asset-1" });
+    setupHook([makeRow(asset)]);
+
+    render(<UnpricedPricesModal assets={[asset]} onClose={vi.fn()} />);
+    const input = screen.getByTestId("unpriced-price-input-asset-1");
+
+    await user.type(input, "15.5");
+    expect(input).toHaveValue("15,5");
+    await user.clear(input);
+    await user.type(input, "12,25");
+    await user.click(screen.getByTestId("unpriced-confirm-asset-1"));
+
+    expect(mockRecord).toHaveBeenCalledWith("asset-1", 12.25);
+  });
+
+  // NUM-010 — a text that is not a number cannot be confirmed.
+  it("keeps confirm disabled for a text that is not a number", async () => {
+    const user = userEvent.setup();
+    const asset = makeAsset({ asset_id: "asset-1" });
+    setupHook([makeRow(asset)]);
+
+    render(<UnpricedPricesModal assets={[asset]} onClose={vi.fn()} />);
+    await user.type(screen.getByTestId("unpriced-price-input-asset-1"), "1.234,5");
+
+    expect(screen.getByTestId("unpriced-confirm-asset-1")).toBeDisabled();
+  });
+
   it("disables confirm when price input is empty", () => {
     const asset = makeAsset();
     setupHook([makeRow(asset)]);

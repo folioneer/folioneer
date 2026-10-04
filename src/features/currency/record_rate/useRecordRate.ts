@@ -1,9 +1,15 @@
 import { useCallback, useState } from "react";
 import type { CurrencyRate } from "@/bindings";
+import {
+  decimalToDisplayed,
+  decimalToNumber,
+  microToFieldDecimal,
+  typedToDecimal,
+} from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { recordCurrencyRate, updateCurrencyRate } from "../gateway";
-import { currencyErrorToI18n, formatRateMicros } from "../shared/presenter";
+import { currencyErrorToI18n } from "../shared/presenter";
 
 interface UseRecordRateArgs {
   fromCurrency: string;
@@ -34,8 +40,14 @@ export function useRecordRate({
   const showSnackbar = useSnackbar();
   const isEditMode = initialRate !== undefined;
   const [date, setDate] = useState(initialRate?.date ?? "");
-  const [rate, setRate] = useState(
-    initialRate !== undefined ? formatRateMicros(initialRate.rate) : "",
+  // NUM-010/011 — the field shows the decimal separator of the display language, a rate
+  // being corrected with every decimal recorded (TRX-024).
+  const [rate, setRateText] = useState(
+    initialRate !== undefined ? decimalToDisplayed(microToFieldDecimal(initialRate.rate)) : "",
+  );
+  const setRate = useCallback(
+    (typed: string) => setRateText(decimalToDisplayed(typedToDecimal(typed))),
+    [],
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<I18nMessage | null>(null);
@@ -43,7 +55,7 @@ export function useRecordRate({
   const submit = useCallback(async () => {
     setIsSubmitting(true);
     setError(null);
-    const rateValue = Number(rate);
+    const rateValue = decimalToNumber(typedToDecimal(rate));
 
     const result =
       initialRate !== undefined

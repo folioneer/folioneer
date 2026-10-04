@@ -1,4 +1,5 @@
 import type { CurrencyError, CurrencyRateSource, RateHistoryBackfillError } from "@/bindings";
+import { decimalToDisplayed, decimalToNumber, typedToDecimal } from "@/lib/microUnits";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { formatStalenessLabel, type StalenessLabel } from "@/ui/format/staleness";
 
@@ -55,10 +56,8 @@ export function formatRateMicros(rateMicros: number): string {
   const value = rateMicros / 1_000_000;
   // Sub-unit rates (e.g. 0.92) keep full micro precision so small differences
   // stay visible; rates ≥ 1 collapse to a 2-decimal display.
-  if (Math.abs(value) < 1) {
-    return value.toFixed(6);
-  }
-  return value.toFixed(2);
+  // NUM-013 — written with the decimal separator of the application's language.
+  return decimalToDisplayed(Math.abs(value) < 1 ? value.toFixed(6) : value.toFixed(2));
 }
 
 /**
@@ -139,7 +138,7 @@ export function validateRateForm(
 
   // FXR-021 — rate strictly positive.
   if (input.rate.trim() !== "") {
-    const parsed = Number(input.rate);
+    const parsed = decimalToNumber(typedToDecimal(input.rate));
     if (!Number.isFinite(parsed) || parsed <= 0) {
       errors.rate = "currency.error.rate_not_positive";
     }

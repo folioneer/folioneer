@@ -16,7 +16,7 @@ export function useAccountValueChart(points: ValueChartPoint[]): {
   data: ChartDatum[];
   compactFormatter: Intl.NumberFormat;
 } {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const data = useMemo<ChartDatum[]>(
     () =>
@@ -27,9 +27,10 @@ export function useAccountValueChart(points: ValueChartPoint[]): {
     [points, t],
   );
 
+  // NUM-013 — the axis follows the application's language, not the system's.
   const compactFormatter = useMemo(
-    () => new Intl.NumberFormat(undefined, { notation: "compact" }),
-    [],
+    () => new Intl.NumberFormat(i18n.language, { notation: "compact" }),
+    [i18n.language],
   );
 
   return { data, compactFormatter };

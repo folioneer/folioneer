@@ -11,14 +11,15 @@
 const MICRO = 1_000_000;
 
 /**
- * Converts a decimal string to an integer micro-unit value.
+ * Converts a decimal string, written with a dot, to an integer micro-unit value.
  * e.g. "1.5" → 1_500_000
- * Returns 0 for empty, invalid, or non-numeric input.
+ * Returns 0 for empty, invalid, or non-numeric input: a comma is not a number here —
+ * what a field shows in the display language is read by `typedToDecimal` first (NUM-010).
  *
  * Parses integer and fractional parts separately to avoid IEEE-754 rounding errors.
  */
 export function decimalToMicro(value: string): number {
-  const trimmed = value.trim().replace(",", ".");
+  const trimmed = value.trim();
   if (!trimmed || Number.isNaN(Number(trimmed))) return 0;
   const negative = trimmed.startsWith("-");
   const [intStr, fracStr = ""] = trimmed.replace(/^[+-]/, "").split(".");
@@ -49,11 +50,43 @@ export function microToFieldDecimal(micros: number): string {
   return `${whole}.${decimals.padEnd(3, "0")}`;
 }
 
-// Set once at app startup from i18n config — tests may override via setDisplayLocale("en")
+// Follows the display language: set from the i18n config at start-up and on every change
+// of language — tests may override via setDisplayLocale("en").
 let _displayLocale = "fr";
 
 export function setDisplayLocale(locale: string): void {
   _displayLocale = locale;
+}
+
+/** NUM-001 — the decimal separator of the display language: a comma in French, a dot otherwise. */
+function decimalSeparator(): "," | "." {
+  return _displayLocale.toLowerCase().startsWith("fr") ? "," : ".";
+}
+
+/**
+ * NUM-010 — reads what is typed in a number field: in French a comma or a dot is the decimal
+ * separator; in English only the dot is, and a comma is left as typed, which is no number.
+ * The result is written with a dot, the form in which every figure travels.
+ */
+export function typedToDecimal(typed: string): string {
+  return decimalSeparator() === "," ? typed.replaceAll(",", ".") : typed;
+}
+
+/**
+ * NUM-011 — writes a figure in a number field, from its dot form: with a comma in French,
+ * as it is in English.
+ */
+export function decimalToDisplayed(decimal: string): string {
+  return decimalSeparator() === "," ? decimal.replaceAll(".", ",") : decimal;
+}
+
+/**
+ * Reads a decimal text written with a dot as a number; NaN when it is not one. Unlike
+ * `parseFloat`, it reads nothing out of a text that only starts like a number ("1,5").
+ */
+export function decimalToNumber(decimal: string): number {
+  const trimmed = decimal.trim();
+  return trimmed === "" ? Number.NaN : Number(trimmed);
 }
 
 /**

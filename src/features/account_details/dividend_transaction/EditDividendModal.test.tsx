@@ -68,7 +68,7 @@ describe("EditDividendModal (DIV-042)", () => {
     expect(document.querySelector('[id*="unit-price"]')).toBeNull();
     expect(document.querySelector('[id*="fees"]')).toBeNull();
     expect(document.querySelector('input[type="checkbox"]')).toBeNull();
-    expect(screen.getByLabelText("dividend.form_amount_label (EUR)")).toHaveValue("18.6");
+    expect(screen.getByLabelText("dividend.form_amount_label (EUR)")).toHaveValue("18,6");
   });
 
   // DIV-022 — the exchange rate is asked only when the paying asset and the account
@@ -79,7 +79,7 @@ describe("EditDividendModal (DIV-042)", () => {
     same.unmount();
 
     renderModal("USD");
-    expect(document.getElementById("edit-dividend-exchange-rate")).toHaveValue("0.9214");
+    expect(document.getElementById("edit-dividend-exchange-rate")).toHaveValue("0,9214");
     expect(screen.getByLabelText("dividend.form_amount_label (USD)")).toBeInTheDocument();
   });
 

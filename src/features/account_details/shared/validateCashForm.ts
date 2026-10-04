@@ -1,3 +1,4 @@
+import { decimalToNumber } from "@/lib/microUnits";
 import type { I18nMessage } from "@/ui/format/i18n";
 
 /**
@@ -6,7 +7,7 @@ import type { I18nMessage } from "@/ui/format/i18n";
  */
 export function validateAmount(amount: string): I18nMessage | null {
   if (amount.length === 0) return { key: "validation.amount_not_positive" };
-  const n = parseFloat(amount);
+  const n = decimalToNumber(amount);
   if (!Number.isFinite(n) || n <= 0) return { key: "validation.amount_not_positive" };
   return null;
 }

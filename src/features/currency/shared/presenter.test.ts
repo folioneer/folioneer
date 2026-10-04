@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { CurrencyError, CurrencyRateSource } from "@/bindings";
+import { setDisplayLocale } from "@/lib/microUnits";
 import {
   currencyErrorToI18n,
   formatRateMicros,
@@ -71,6 +72,17 @@ describe("currencyErrorToI18n", () => {
 // ---------------------------------------------------------------------------
 
 describe("formatRateMicros", () => {
+  // The cases below are written with a dot: the display language is English.
+  beforeEach(() => setDisplayLocale("en"));
+  afterEach(() => setDisplayLocale("fr"));
+
+  // NUM-011 — in French a rate is written with a comma.
+  it("writes a comma in French", () => {
+    setDisplayLocale("fr");
+    expect(formatRateMicros(920_000)).toBe("0,920000");
+    expect(formatRateMicros(160_000_000)).toBe("160,00");
+  });
+
   // 1 000 000 micros = 1.000000 → "1.00" (2 decimal minimum)
   it("formats 1_000_000 micros as 1.00", () => {
     expect(formatRateMicros(1_000_000)).toBe("1.00");

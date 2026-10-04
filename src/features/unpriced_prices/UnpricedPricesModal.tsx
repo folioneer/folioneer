@@ -2,7 +2,12 @@ import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { UnpricedAsset } from "@/bindings";
-import { microToFormattedPrice } from "@/lib/microUnits";
+import {
+  decimalToDisplayed,
+  decimalToNumber,
+  microToFormattedPrice,
+  typedToDecimal,
+} from "@/lib/microUnits";
 import { Button } from "@/ui/components/button/Button";
 import { TextField } from "@/ui/components/field/TextField";
 import { FormModal } from "@/ui/components/modal/FormModal";
@@ -48,10 +53,11 @@ interface UnpricedRowItemProps {
 }
 
 function UnpricedRowItem({ row, onRecord, onSkip, t }: UnpricedRowItemProps) {
+  // NUM-010/011 — the field shows and reads the decimal separator of the application's
+  // language.
   const [value, setValue] = useState("");
-  const trimmed = value.trim();
-  const parsed = Number(trimmed);
-  const canConfirm = trimmed !== "" && Number.isFinite(parsed) && !row.isSubmitting;
+  const parsed = decimalToNumber(typedToDecimal(value));
+  const canConfirm = Number.isFinite(parsed) && !row.isSubmitting;
 
   return (
     <li id={`unpriced-row-${row.asset_id}`} className="flex flex-wrap items-end gap-3 py-3">
@@ -86,10 +92,10 @@ function UnpricedRowItem({ row, onRecord, onSkip, t }: UnpricedRowItemProps) {
         <TextField
           id={`unpriced-price-input-${row.asset_id}`}
           label={row.currency}
-          type="number"
+          type="text"
           inputMode="decimal"
           value={value}
-          onChange={(event) => setValue(event.target.value)}
+          onChange={(event) => setValue(decimalToDisplayed(typedToDecimal(event.target.value)))}
           disabled={row.isSubmitting}
         />
       </div>

@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
+import { decimalToNumber } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -43,7 +44,7 @@ const UNKNOWN_ERROR: I18nMessage = { key: "error.Unknown" };
 const today = () => new Date().toISOString().slice(0, 10);
 
 function validatePrice(price: string): I18nMessage | null {
-  const n = parseFloat(price);
+  const n = decimalToNumber(price);
   if (Number.isNaN(n) || n <= 0) return { key: "price_modal.error_price_not_positive" };
   return null;
 }
@@ -107,7 +108,11 @@ export function usePriceModal({
     if (!isFormValid) return false;
     setIsSubmitting(true);
     try {
-      const result = await accountDetailsGateway.recordAssetPrice(assetId, date, parseFloat(price));
+      const result = await accountDetailsGateway.recordAssetPrice(
+        assetId,
+        date,
+        decimalToNumber(price),
+      );
       if (result.status === "ok") {
         // Remember the date so the next operation on this account pre-fills it,
         // consistent with every other operation hook (MKT-011).
