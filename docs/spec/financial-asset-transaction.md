@@ -82,9 +82,9 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-031 — Transaction modification (backend)**: Modifying a transaction triggers a full recalculation of the `Holding` cost basis and quantity for the `(account_id, asset_id)` pair, processing all associated transactions in chronological order (TRX-036).
 
-**TRX-032 — Modifiable fields (backend)**: All fields of a transaction are modifiable except `transaction_type`, which is immutable once saved (see SEL-035). Changing the `asset_id` or `account_id` is permitted and triggers a recalculation of Holdings for both the old and new `(account_id, asset_id)` pairs.
+**TRX-032 — Modifiable fields (backend)**: A correction changes a transaction's date, quantity, unit price, exchange rate, fees, total amount and note. It changes neither its type (SEL-035), nor its account, nor its asset: a transaction entered on the wrong asset or account is deleted (TRX-034) and entered again.
 
-**TRX-033 — Update field validation (backend)**: When modifying a transaction, the same field constraints as TRX-020 apply, and the archived asset guard (TRX-028) is enforced. If `account_id` or `asset_id` is changed, the existence and non-archived status of the new values is verified before proceeding. When the `Sell` transaction type is active, editing a purchase transaction must also verify that no subsequent sell in the chronological sequence for the `(account_id, asset_id)` pair would become invalid (oversell) as a result — see SEL-032.
+**TRX-033 — Update field validation (backend)**: When modifying a transaction, the same field constraints as TRX-020 apply, and the archived asset guard (TRX-028) is enforced. When the `Sell` transaction type is active, editing a purchase transaction must also verify that no subsequent sell in the chronological sequence for the `(account_id, asset_id)` pair would become invalid (oversell) as a result — see SEL-032.
 
 **TRX-034 — Transaction deletion (backend)**: Deleting a transaction triggers a recalculation of the `Holding` for the `(account_id, asset_id)` pair. If no transactions remain for that asset in the account, the `Holding` record is removed.
 

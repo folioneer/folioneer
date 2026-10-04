@@ -291,15 +291,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — the contract describes what the interface receives.
 - Done when: the contract's performance types match `src-tauri/src/use_cases/shared/performance.rs` and `get_global_performance` has its row, checked by contract-reviewer.
 
-## 2026-10-03 — TD-063 — The spec lets a correction change the asset; the code does not
-
-- Found by: spec-reviewer and contract-reviewer on TD-056
-- Where: `docs/spec/financial-asset-transaction.md` — TRX-032; `CorrectTransactionDTO` in `src-tauri/src/use_cases/holding_transaction/api.rs`
-- Severity: 🔵
-- Observation: TRX-032 says changing a transaction's asset or account is permitted and recalculates both holdings. A correction carries neither: it keeps the asset and the account of its transaction. CSH-062 states what the code does.
-- User value: None directly — the spec says what a correction can change.
-- Done when: TRX-032 lists the fields a correction changes, and no rule mentions moving a transaction to another asset or account.
-
 ## 2026-10-03 — TD-066 — An asset's name, reference and category have no length or character rule
 
 - Found by: reviewer-security on #055
@@ -344,3 +335,12 @@ Remove an entry once it has been resolved.
 - Observation: `stale element reference: Stale element found when trying to create the node handle` on `$("#rate-row-…")` once the dialog is gone. The rate list is re-rendered when the rate changes; the scenario asks for a row of the list while it is being replaced. Whether the list re-renders once or twice after an edit, and whether the scenario should wait for the new row before looking for the old one, is not established. The test is skipped (`it.skip`): editing a rate through the interface has no end-to-end coverage until this is fixed.
 - User value: None directly — the scenario protects the rate edit again.
 - Done when: the cause is found (in the scenario or in how the rate list refreshes), fixed, and the scenario is re-enabled and passes twenty runs in a row.
+
+## 2026-10-04 — TD-078 — The spec says correcting a purchase unarchives its asset; the code does not
+
+- Found by: the main agent, closing TD-063
+- Where: `docs/spec/financial-asset-transaction.md` — TRX-028 ("at the time of transaction creation or modification"), TRX-029 (the confirmation shown before saving), TRX-033 ("the archived asset guard is enforced"); `correct_transaction` in `src-tauri/src/use_cases/holding_transaction/orchestrator.rs`, which never looks at the asset
+- Severity: 🟡
+- Observation: recording a purchase on an archived asset unarchives it. Correcting one does not: the correction goes to the account alone. The correction form still shows the confirmation "saving will unarchive the asset" (TRX-029), then saves without doing it. Not verified by a test yet: the first step is one that corrects a purchase on an archived asset and reads the asset back.
+- User value: The confirmation shown before saving a correction says what saving does.
+- Done when: either a corrected purchase on an archived asset unarchives it, as recording does, or the rules and the confirmation stop saying so; one test shows which.
