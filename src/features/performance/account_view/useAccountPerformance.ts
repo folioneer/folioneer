@@ -67,6 +67,8 @@ export function useAccountPerformance(accountId: string): UseAccountPerformanceR
   // Monotonic request token: only the latest fetchPerformance invocation may
   // commit its response, so an older in-flight read never clobbers a newer one.
   const requestSeqRef = useRef(0);
+  // The account the selected year was chosen on (PRF-015).
+  const yearAccountRef = useRef<string | null>(null);
 
   // PRF-080 — the scope only applies to the account it was chosen for; a stale
   // scope from a previously viewed account reads as "All assets".
@@ -94,9 +96,20 @@ export function useAccountPerformance(accountId: string): UseAccountPerformanceR
         // PRF-014 — restore the account's remembered view mode (clamped to availability),
         // falling back to the default when there is no stored preference.
         setViewMode(resolveViewMode(getPerfViewMode(accountId), result.data.month_view_available));
-        // PRF-015 — default the year selector to the most-recent year in the monthly data.
-        const firstMonthlyYear = result.data.monthly[0]?.year ?? null;
-        setSelectedYear(firstMonthlyYear);
+        // PRF-015 — the year selector starts on the most recent year of the monthly data,
+        // and keeps the year the user chose when a later fetch for the same account still
+        // carries it: a price update, a sync or another asset scope must not move the
+        // table back to the current year. Another account opens on its own default.
+        const years = result.data.monthly.map((row) => row.year);
+        const latest = years.reduce<number | null>(
+          (most, year) => (most === null || year > most ? year : most),
+          null,
+        );
+        const sameAccount = yearAccountRef.current === accountId;
+        yearAccountRef.current = accountId;
+        setSelectedYear((chosen) =>
+          sameAccount && chosen !== null && years.includes(chosen) ? chosen : latest,
+        );
       } else {
         logger.error("[useAccountPerformance] fetch failed", result.error);
         setError(presentAccountPerformanceError(result.error));

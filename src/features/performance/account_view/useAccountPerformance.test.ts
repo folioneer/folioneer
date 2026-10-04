@@ -186,6 +186,67 @@ describe("useAccountPerformance — asset scope", () => {
     ).toBe(before + 1);
   });
 
+  // PRF-015 — the year the user chose survives a re-fetch that still carries it, and
+  // falls back to the most recent year when it does not.
+  it("keeps the chosen year across a re-fetch (PRF-015)", async () => {
+    let capturedCallback: ((type: Event["type"]) => void) | null = null;
+    vi.mocked(gateway.accountPerformanceGateway.subscribeToEvents).mockImplementation((cb) => {
+      capturedCallback = cb;
+      return Promise.resolve(() => {});
+    });
+    const month = (year: number) => ({ year, month: 1 }) as PerformancePeriod;
+    vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
+      status: "ok",
+      data: makeResponse({ monthly: [month(2026), month(2021), month(2020)] }),
+    });
+    const { result } = renderHook(() => useAccountPerformance("account-1"));
+    await waitFor(() => expect(result.current.selectedYear).toBe(2026));
+
+    const fetched = () =>
+      vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mock.calls.length;
+    const before = fetched();
+    act(() => result.current.setSelectedYear(2021));
+    await act(async () => {
+      capturedCallback?.("AssetPriceUpdated");
+    });
+    await waitFor(() => expect(fetched()).toBe(before + 1));
+    expect(result.current.selectedYear).toBe(2021);
+
+    vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
+      status: "ok",
+      data: makeResponse({ monthly: [month(2026), month(2025)] }),
+    });
+    await act(async () => {
+      capturedCallback?.("TransactionUpdated");
+    });
+    await waitFor(() => expect(result.current.selectedYear).toBe(2026));
+  });
+
+  // PRF-015 — the chosen year belongs to its account: another account opens on its own
+  // most recent year, even when it carries the year chosen on the first, and whatever
+  // order the months arrive in.
+  it("opens another account on its own most recent year (PRF-015)", async () => {
+    const month = (year: number) => ({ year, month: 1 }) as PerformancePeriod;
+    vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
+      status: "ok",
+      data: makeResponse({ monthly: [month(2021), month(2026), month(2020)] }),
+    });
+    const { result, rerender } = renderHook(({ id }) => useAccountPerformance(id), {
+      initialProps: { id: "account-1" },
+    });
+    await waitFor(() => expect(result.current.selectedYear).toBe(2026));
+    act(() => result.current.setSelectedYear(2021));
+
+    rerender({ id: "account-2" });
+
+    await waitFor(() =>
+      expect(
+        vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance),
+      ).toHaveBeenLastCalledWith("account-2", null),
+    );
+    await waitFor(() => expect(result.current.selectedYear).toBe(2026));
+  });
+
   // PRF-080 — selecting an asset re-fetches with the scoped id
   it("re-fetches with the asset id when a scope is selected (PRF-080)", async () => {
     const { result } = renderHook(() => useAccountPerformance("account-1"));

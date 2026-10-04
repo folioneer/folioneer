@@ -107,11 +107,11 @@ request. The time went to waiting on CI and to rounds that tested nothing new.
 
 - Kind: quality
 - Observed: CI floated on the latest Rust until a new lint broke `main` (TD-059, fixed);
-  the visual reference goes stale when the month changes (TD-060, open); the release
+  the visual reference went stale when the month changed (TD-060, fixed); the release
   workflow's Windows steps run only at a release; the golden portfolio had never been
   read through the live account page (fixed in #87).
 - Proposal: a weekly scheduled run of what otherwise runs only at a release — the
-  Windows build without publishing — and TD-060 queued before the next month change.
+  Windows build without publishing.
 - Costs: about 20 runner-minutes a week. Protects: a release day spent on a workflow
   bug.
 
@@ -259,15 +259,6 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 - Observation: The sub-agent format now offers `maxTurns` (stop a runaway review), `effort` (per agent) and `omitClaudeMd` (skip the project `CLAUDE.md` when the prompt is self-contained). None is set: every CI review loads `CLAUDE.md` seven times per pull request, and nothing bounds a review that loops.
 - User value: None directly — cheaper, bounded reviews on every pull request.
 - Done when: one reviewer runs with `omitClaudeMd: true` and a `maxTurns` cap on a sample diff and reports the same findings as without; if it does, the settings extend to every reviewer, with the review time and cost before and after recorded.
-
-## 2026-10-03 — TD-060 — The account-performance capture changes with the month
-
-- Found by: main agent — the first pull request of October failed the visual comparison without touching the interface
-- Where: `e2e/` (the `account-performance` capture), the visual comparison in `.github/workflows/e2e.yml`
-- Severity: 🟡
-- Observation: the screen charts the current year and lists its months up to today, so its capture differs from `main`'s as soon as the month changes (0.78 % of pixels against a 0.3 % threshold). Until a run on `main` renews the reference, every pull request that touches no interface file fails; the run had to be started by hand.
-- User value: None directly — the first pull request of a month merges like any other.
-- Done when: the capture does not depend on the day it is taken (data and "today" fixed for the run, or the dated parts masked), shown by a comparison that passes across a month change.
 
 ## 2026-10-03 — TD-064 — 218 changes in the logic code that no test notices, none of them in the account
 

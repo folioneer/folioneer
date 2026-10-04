@@ -5,6 +5,7 @@
  * Spec rules covered:
  *   PRF-010 — entry point: "Performance" button in AccountDetailsView header navigates to the page
  *   PRF-013 — month view available for sub-weekly update frequencies (Automatic/ManualDay/ManualWeek)
+ *   PRF-015 — selecting a past year lists that year's twelve months (the capture is taken there)
  *   PRF-037 — YTD column present in month view, absent in year view
  *   PRF-043 — no transactions → empty state rendered (account-performance-empty)
  *   PRF-051 — empty state shows add-transaction affordance
@@ -22,12 +23,6 @@
  *     integration tier (already covered by BE Rust tests). E2E asserts presence of the
  *     rendered table, not the exact computed figures.
  *
- *   PRF-015 (year selector) — the year selector is only visible when month view is active
- *     AND there is data. Its presence and content are covered by the FE integration test
- *     (AccountPerformancePage.integration.test.tsx). E2E verifies the populated path with
- *     a single-year fixture; cycling through year-selector options adds setup complexity
- *     with no incremental cross-stack value.
- *
  * Seed strategy:
  *   - Populated path (PRF-010 / PRF-013 / PRF-037): account seeded via IPC with
  *     update_frequency="Automatic" so month_view_available is true; one deposit gives the
@@ -42,7 +37,7 @@
  */
 
 import assert from "node:assert";
-import { $ } from "@wdio/globals";
+import { $, $$, browser } from "@wdio/globals";
 import { dismissLeftoverModal } from "../helpers/modal";
 import { navigateToAccountDetails, navigateToAccounts } from "../helpers/navigation";
 import { captureScreen } from "../helpers/screenshot";
@@ -52,6 +47,11 @@ import { seedAccount, seedDeposit } from "../helpers/seed";
 const FIXTURE_DATES = {
   deposit: "2020-03-15",
 } as const;
+
+// The year the screen is captured on: complete and in the past, so the capture shows the
+// same twelve months whatever day the suite runs (the default year is the current one,
+// whose list of months grows through the year).
+const CAPTURE_YEAR = "2021";
 
 // ---------------------------------------------------------------------------
 // Suite
@@ -114,7 +114,27 @@ describe("account_performance", () => {
     // PRF-037: in month view the YTD column header must be visible.
     const ytdCol = await $("#account-performance-col-ytd");
     await ytdCol.waitForExist({ timeout: 8000 });
-    await captureScreen("account-performance");
+
+    // PRF-015 — the year selector narrows the table to the chosen year. Capturing on a
+    // past, complete year keeps the capture independent of the day it is taken.
+    const yearSelector = await $("#account-performance-year-selector");
+    await yearSelector.waitForExist({ timeout: 8000 });
+    await yearSelector.selectByAttribute("value", CAPTURE_YEAR);
+    await browser.waitUntil(
+      async () => {
+        const rows = await $$('[id^="account-performance-row-"]');
+        const ids = await rows.map((row) => row.getAttribute("id"));
+        return (
+          ids.length === 12 &&
+          ids.every((id) => id.startsWith(`account-performance-row-${CAPTURE_YEAR}-`))
+        );
+      },
+      {
+        timeout: 8000,
+        timeoutMsg: `PRF-015 — the table must list the twelve months of ${CAPTURE_YEAR} once that year is selected`,
+      },
+    );
+    await captureScreen("account-performance-past-year");
     assert.ok(await ytdCol.isExisting(), "YTD column must be present in month view (PRF-037)");
 
     // Switch to year view via the toggle button (id="account-performance-view-toggle-year").
