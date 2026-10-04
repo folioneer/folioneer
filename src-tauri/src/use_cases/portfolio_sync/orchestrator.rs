@@ -12,7 +12,7 @@ use crate::context::currency::CurrencyService;
 use crate::context::sync::{
     ensure_device_name, ensure_passphrase_length, header_data_format_version, FirstPublish,
     FolderStore, InconsistentHolding, JoinError, SyncError, SyncFailure, SyncFolderState,
-    SyncReport, SyncRun, SyncService, SyncStateRepository, SyncStatus, DATA_FORMAT_VERSION,
+    SyncReportView, SyncRun, SyncService, SyncStateRepository, SyncStatusView, DATA_FORMAT_VERSION,
 };
 use crate::core::cash::is_cash_asset;
 use crate::core::BACKEND;
@@ -161,7 +161,7 @@ impl PortfolioSyncOrchestrator {
         folder: String,
         passphrase: String,
         device_name: String,
-    ) -> Result<SyncStatus, PortfolioSyncError> {
+    ) -> Result<SyncStatusView, PortfolioSyncError> {
         if self.state_repo.get_device().await?.is_some() {
             return Err(SyncError::AlreadyEnabled.into());
         }
@@ -170,7 +170,8 @@ impl PortfolioSyncOrchestrator {
             return Ok(self
                 .first_publish
                 .enable_as_first_device(folder, passphrase, device_name)
-                .await?);
+                .await?
+                .into());
         }
         if self.installation_holds_user_data().await? {
             return Err(PortfolioSyncTask::InstallationHoldsUserData.into());
@@ -180,7 +181,7 @@ impl PortfolioSyncOrchestrator {
             .join(&self.applier, folder, passphrase, device_name)
             .await?;
         self.sync_service.announce_join();
-        Ok(status)
+        Ok(status.into())
     }
 
     /// Re-enrolls this device as the new origin of the portfolio under a new passphrase,
@@ -190,7 +191,7 @@ impl PortfolioSyncOrchestrator {
         folder: String,
         passphrase: String,
         device_name: String,
-    ) -> Result<SyncStatus, PortfolioSyncError> {
+    ) -> Result<SyncStatusView, PortfolioSyncError> {
         ensure_passphrase_length(&passphrase)?;
         ensure_device_name(&device_name)?;
         self.folder_store.retarget(&folder);
@@ -205,7 +206,8 @@ impl PortfolioSyncOrchestrator {
         Ok(self
             .first_publish
             .enable_as_first_device(folder, passphrase, device_name)
-            .await?)
+            .await?
+            .into())
     }
 
     /// Designates a different folder for an already-enrolled device (SYN-074): the same
@@ -213,18 +215,22 @@ impl PortfolioSyncOrchestrator {
     pub async fn change_sync_folder(
         &self,
         folder: String,
-    ) -> Result<SyncStatus, PortfolioSyncError> {
+    ) -> Result<SyncStatusView, PortfolioSyncError> {
         let device = self
             .state_repo
             .get_device()
             .await?
             .ok_or(SyncError::SyncDisabled)?;
-        Ok(self.first_publish.change_folder(device, folder).await?)
+        Ok(self
+            .first_publish
+            .change_folder(device, folder)
+            .await?
+            .into())
     }
 
     /// Runs a full sync immediately (SYN-061): publish, then apply the other devices'
     /// changes through the owning services.
-    pub async fn sync_now(&self) -> Result<SyncReport, PortfolioSyncError> {
+    pub async fn sync_now(&self) -> Result<SyncReportView, PortfolioSyncError> {
         let device = self
             .state_repo
             .get_device()
@@ -233,7 +239,7 @@ impl PortfolioSyncOrchestrator {
         device.ensure_not_paused()?;
         let mut report = self.sync_run.run(&device, &self.applier).await?;
         self.sync_service.remember_run(&mut report).await;
-        Ok(report)
+        Ok(report.into())
     }
 
     /// The automatic sync a settled burst of recorded changes fires (SYN-060/067): a full run
@@ -252,7 +258,7 @@ impl PortfolioSyncOrchestrator {
     /// Resumes sync on a paused device: publishes paused-era changes, then runs as `sync_now`
     /// (SYN-073). The device stays paused while the folder is unavailable or the publish
     /// fails, and after a detected reset (SYN-084).
-    pub async fn resume_sync(&self) -> Result<SyncReport, PortfolioSyncError> {
+    pub async fn resume_sync(&self) -> Result<SyncReportView, PortfolioSyncError> {
         let device = self.sync_service.resume_sync_precondition().await?;
         self.folder_store.retarget(&device.folder);
         self.folder_store
@@ -271,16 +277,16 @@ impl PortfolioSyncOrchestrator {
             self.state_repo.save_device(&resumed).await?;
         }
         self.sync_service.remember_run(&mut report).await;
-        Ok(report)
+        Ok(report.into())
     }
 
     /// Reads the current sync status, enriched with the holdings whose replayed ledger
     /// breaks an invariant (CFR-042/SYN-040) — a cross-BC read of the account BC's holdings
     /// and the asset BC's names.
-    pub async fn get_sync_status(&self) -> Result<SyncStatus, PortfolioSyncError> {
+    pub async fn get_sync_status(&self) -> Result<SyncStatusView, PortfolioSyncError> {
         let mut status = self.sync_service.status().await?;
         status.inconsistent_holdings = self.inconsistent_holdings().await?;
-        Ok(status)
+        Ok(status.into())
     }
 
     async fn inconsistent_holdings(&self) -> Result<Vec<InconsistentHolding>, PortfolioSyncError> {

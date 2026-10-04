@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use crate::context::sync::application::run::SyncRun;
 use crate::context::sync::domain::{
     FolderStore, RosterEntry, SyncDevice, SyncFailure, SyncReport, SyncStateRepository, SyncStatus,
+    SyncStatusView,
 };
 use crate::context::sync::error::SyncError;
 use crate::core::{Event, SideEffectEventBus, BACKEND};
@@ -151,10 +152,10 @@ impl SyncService {
 
     /// Pauses sync on this device (SYN-070). `SyncDisabled` while never enabled;
     /// `AlreadyPaused` when already paused.
-    pub async fn pause_sync(&self) -> Result<SyncStatus, SyncError> {
+    pub async fn pause_sync(&self) -> Result<SyncStatusView, SyncError> {
         let paused = self.require_device().await?.pause()?;
         self.state_repo.save_device(&paused).await?;
-        Ok(self.status_of(&paused).await)
+        Ok(self.status_of(&paused).await.into())
     }
 
     /// The precondition half of `resume_sync` (SYN-073): `SyncDisabled` while never enabled;
@@ -170,10 +171,13 @@ impl SyncService {
 
     /// Renames this device (SYN-072). `DeviceNameBlank` on a blank name; the manifest is
     /// republished at the next sync, not here.
-    pub async fn rename_sync_device(&self, device_name: String) -> Result<SyncStatus, SyncError> {
+    pub async fn rename_sync_device(
+        &self,
+        device_name: String,
+    ) -> Result<SyncStatusView, SyncError> {
         let renamed = self.require_device().await?.rename(device_name)?;
         self.state_repo.save_device(&renamed).await?;
-        Ok(self.status_of(&renamed).await)
+        Ok(self.status_of(&renamed).await.into())
     }
 
     /// Leaves sync on this device for good (SYN-082): publishes unpublished changes, removes

@@ -163,22 +163,3 @@ export function rosterToViewModel(roster: RosterEntry[]): RosterEntryViewModel[]
     publishedChanges: entry.published_changes,
   }));
 }
-
-export type SyncHealth = "up_to_date" | "needs_attention" | "paused";
-
-/**
- * SYN-063 — the one word the sync page leads with: paused, or needing attention when the
- * status carries a failure, a held-back change, a notice or an inconsistent holding.
- */
-export function syncHealth(status: {
-  paused: boolean;
-  failures: readonly unknown[];
-  notices: readonly unknown[];
-  inconsistentHoldings: readonly unknown[];
-  heldBackCount: number;
-}): SyncHealth {
-  if (status.paused) return "paused";
-  const waiting =
-    status.failures.length + status.notices.length + status.inconsistentHoldings.length;
-  return waiting > 0 || status.heldBackCount > 0 ? "needs_attention" : "up_to_date";
-}

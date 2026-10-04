@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { SyncStatus } from "@/bindings";
+import type { SyncStatusView } from "@/bindings";
 import { logger } from "@/lib/logger";
 import { getSyncStatus, onSyncCompleted } from "../gateway";
 
@@ -8,7 +8,7 @@ export interface UseSyncIndicatorResult {
   /** False while sync is disabled on this device (SYN-010). */
   visible: boolean;
   lastSyncCompletedAt: string | null;
-  /** True when the status carries failures, notices or inconsistent holdings (SYN-063). */
+  /** True when the core says sync needs attention (SYN-063). */
   needsAttention: boolean;
 }
 
@@ -18,7 +18,7 @@ export interface UseSyncIndicatorResult {
  */
 export function useSyncIndicator(): UseSyncIndicatorResult {
   const [isLoading, setIsLoading] = useState(true);
-  const [status, setStatus] = useState<SyncStatus | null>(null);
+  const [status, setStatus] = useState<SyncStatusView | null>(null);
 
   const refresh = useCallback(async () => {
     const result = await getSyncStatus();
@@ -42,10 +42,6 @@ export function useSyncIndicator(): UseSyncIndicatorResult {
     isLoading,
     visible: status?.enabled === true,
     lastSyncCompletedAt: status?.last_sync_completed_at ?? null,
-    needsAttention:
-      status !== null &&
-      (status.failures.length > 0 ||
-        status.notices.length > 0 ||
-        status.inconsistent_holdings.length > 0),
+    needsAttention: status?.health === "needs_attention",
   };
 }

@@ -25,6 +25,7 @@ const makeState = (overrides: Record<string, unknown> = {}) => ({
   folder: null,
   lastSyncCompletedAt: null,
   roster: [],
+  health: "up_to_date" as const,
   heldBackCount: 0,
   oldestHeldBackSince: null,
   notices: [],
@@ -121,19 +122,22 @@ describe("SyncPage — enabled state (SYN-061/063/070/072/073/074/082/084)", () 
     expect(screen.getByText("Laptop")).toBeInTheDocument();
   });
 
-  // #010 — the page leads with one word for its health, read from the status.
+  // SYN-063 — the page leads with the health the core states, whatever else the status
+  // carries: it shows it, it does not decide it.
   it("leads with the health of sync: up to date, needing attention, or paused", () => {
     const word = () => document.getElementById("sync-status-state")?.textContent;
+    // A held-back change is carried, and the core says up to date: the page shows the word.
+    mockUseSyncPage.mockReturnValue({ ...enabledState, heldBackCount: 2, health: "up_to_date" });
     const { unmount } = render(<SyncPage />);
     expect(word()).toBe("sync.health.up_to_date");
     unmount();
 
-    mockUseSyncPage.mockReturnValue({ ...enabledState, heldBackCount: 2 });
+    mockUseSyncPage.mockReturnValue({ ...enabledState, health: "needs_attention" });
     const attention = render(<SyncPage />);
     expect(word()).toBe("sync.health.needs_attention");
     attention.unmount();
 
-    mockUseSyncPage.mockReturnValue({ ...enabledState, paused: true, heldBackCount: 2 });
+    mockUseSyncPage.mockReturnValue({ ...enabledState, heldBackCount: 2, health: "paused" });
     render(<SyncPage />);
     expect(word()).toBe("sync.health.paused");
   });

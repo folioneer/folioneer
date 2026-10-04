@@ -7,7 +7,7 @@ import type {
   PriceFreshness,
   PriceFreshnessError,
   Result,
-  SyncStatus,
+  SyncStatusView,
 } from "@/bindings";
 import { commands, events } from "@/bindings";
 
@@ -17,7 +17,7 @@ export function getCapabilities(): Promise<Capabilities> {
 }
 
 // SYN-063 — the shell indicator reads the sync status through its own gateway (F26).
-export function getSyncStatus(): Promise<Result<SyncStatus, PortfolioSyncError>> {
+export function getSyncStatus(): Promise<Result<SyncStatusView, PortfolioSyncError>> {
   return commands.getSyncStatus();
 }
 

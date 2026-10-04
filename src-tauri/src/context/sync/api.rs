@@ -11,7 +11,7 @@ use std::result::Result as StdResult;
 use std::sync::Arc;
 
 use crate::context::sync::application::SyncService;
-use crate::context::sync::domain::SyncStatus;
+use crate::context::sync::domain::SyncStatusView;
 use crate::context::sync::error::SyncError;
 
 /// Pauses sync on this device (SYN-070).
@@ -19,7 +19,7 @@ use crate::context::sync::error::SyncError;
 #[specta::specta]
 pub async fn pause_sync(
     svc: tauri::State<'_, Arc<SyncService>>,
-) -> StdResult<SyncStatus, SyncError> {
+) -> StdResult<SyncStatusView, SyncError> {
     svc.pause_sync().await
 }
 
@@ -36,7 +36,7 @@ pub async fn leave_sync(svc: tauri::State<'_, Arc<SyncService>>) -> StdResult<()
 pub async fn rename_sync_device(
     svc: tauri::State<'_, Arc<SyncService>>,
     device_name: String,
-) -> StdResult<SyncStatus, SyncError> {
+) -> StdResult<SyncStatusView, SyncError> {
     svc.rename_sync_device(device_name).await
 }
 

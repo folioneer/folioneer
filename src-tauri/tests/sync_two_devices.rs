@@ -451,8 +451,15 @@ async fn concurrent_rename_of_the_same_account_produces_one_notice_on_the_losing
         .get_sync_status()
         .await
         .unwrap()
+        .status
         .notices;
-    let laptop_notices = laptop.orchestrator.get_sync_status().await.unwrap().notices;
+    let laptop_notices = laptop
+        .orchestrator
+        .get_sync_status()
+        .await
+        .unwrap()
+        .status
+        .notices;
     let total_notices = desktop_notices.len() + laptop_notices.len();
     assert_eq!(
         total_notices, 1,
@@ -537,7 +544,13 @@ async fn deleting_an_account_drops_a_concurrent_transaction_and_notifies_only_th
             .is_none(),
         "CFR-032: the account must be removed on Laptop too, taking its concurrent buy with it"
     );
-    let laptop_notices = laptop.orchestrator.get_sync_status().await.unwrap().notices;
+    let laptop_notices = laptop
+        .orchestrator
+        .get_sync_status()
+        .await
+        .unwrap()
+        .status
+        .notices;
     assert!(
         !laptop_notices.is_empty(),
         "CFR-032/060: Laptop, whose transaction was dropped, must be told"
