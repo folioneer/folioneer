@@ -1161,6 +1161,27 @@ mod tests {
 
         assert!(response.month_view_available);
         assert!(!response.monthly.is_empty());
+
+        // PRF-042 — the first month has no month before it to compare with; every
+        // other month has, including the same month of a later year.
+        for row in &response.monthly {
+            let is_first = (row.year, row.month) == (2024, Some(3));
+            assert_eq!(
+                row.period_over_period.is_none(),
+                is_first,
+                "{}-{:?}",
+                row.year,
+                row.month
+            );
+        }
+        assert!(response
+            .monthly
+            .iter()
+            .any(|row| row.year == 2025 && row.month == Some(3)));
+        assert!(response
+            .monthly
+            .iter()
+            .any(|row| row.year == 2024 && row.month == Some(4)));
     }
 
     // GPF-012 — an account with no in-scope transactions is excluded from the
@@ -1623,5 +1644,73 @@ mod tests {
             row.previous_value + row.cash_flow + row.asset_flow + row.dividends + row.pnl,
             "GPF-041 bridge identity balances"
         );
+    }
+}
+
+#[cfg(test)]
+mod bridge_reference_tests {
+    use super::*;
+    use crate::use_cases::shared::valuation::test_fixtures::{
+        a_year_of_transactions, day, euro_rate_on_the_grant_date, priced_assets, transaction_on,
+    };
+
+    /// The dollar account of `transactions`, half a euro a dollar on every date.
+    fn dollar_account(transactions: Vec<Transaction>) -> ConvertedAccount {
+        let reference_rate_by_date = transactions
+            .iter()
+            .filter_map(|transaction| parse_date(&transaction.date))
+            .map(|date| (date, 500_000))
+            .collect();
+        ConvertedAccount {
+            currency: "USD".to_string(),
+            transactions,
+            priced_assets: priced_assets(),
+            rate_map: euro_rate_on_the_grant_date(),
+            reference_rate_by_date,
+            trade_flows: Vec::new(),
+            windowed_trade_flows: Vec::new(),
+            dividend_flows: Vec::new(),
+        }
+    }
+
+    // GPF-030 — the bridge of a period in the reference currency, each term converted at
+    // the rate of its date (half a euro a dollar): cash (100 − 20 + 4) / 2; in kind
+    // (30 + 40 + 10) / 2; dividends 6 / 2. The first and the last day of the period
+    // count, the days around it do not.
+    #[test]
+    fn the_account_bridge_converts_each_term_at_the_rate_of_its_date() {
+        let bridge = dollar_account(a_year_of_transactions()).bridge_reference(
+            None,
+            day("2024-01-01"),
+            day("2024-12-31"),
+        );
+        assert_eq!(bridge.cash_flow, 42_000_000);
+        assert_eq!(bridge.asset_flow, 40_000_000);
+        assert_eq!(bridge.dividends, 3_000_000);
+    }
+
+    // PRF-084 — the bridge of one position: its purchases less its sales are its cash
+    // flow, (40 − 10) / 2; its opening balance, free shares and interest its in-kind
+    // flow, (30 + 20 + 10) / 2; its dividends 6 / 2. Deposits are not the position's.
+    #[test]
+    fn the_position_bridge_takes_trades_as_cash_and_credits_as_in_kind() {
+        use TransactionType::*;
+        let position = vec![
+            transaction_on("stock-usd", Purchase, "2024-01-01", 40_000_000),
+            transaction_on("stock-usd", Sell, "2024-02-01", 10_000_000),
+            transaction_on("stock-usd", Dividend, "2024-04-01", 6_000_000),
+            transaction_on("stock-usd", OpeningBalance, "2024-05-01", 3_000_000),
+            transaction_on("stock-usd", FreeShares, "2024-06-01", 2_000_000),
+            transaction_on("stock-usd", Interest, "2024-12-31", 1_000_000),
+            transaction_on("system-cash-usd", Deposit, "2024-07-01", 900_000_000),
+        ];
+        let bridge = dollar_account(position).bridge_reference(
+            Some("stock-usd"),
+            day("2024-01-01"),
+            day("2024-12-31"),
+        );
+        assert_eq!(bridge.cash_flow, 15_000_000);
+        assert_eq!(bridge.asset_flow, 30_000_000);
+        assert_eq!(bridge.dividends, 3_000_000);
     }
 }

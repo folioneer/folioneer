@@ -981,3 +981,43 @@ mod lifetime_unavailable_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod period_bridge_tests {
+    use super::*;
+    use crate::use_cases::shared::valuation::test_fixtures::{
+        a_year_of_transactions, day, euro_rate_on_the_grant_date, priced_assets,
+    };
+
+    // PRF-070/071/072 — the terms of a period's bridge, on figures computed by hand:
+    // cash 100 − 20 + 4; in kind 3 × 10 + 2 × 10 × 2 + 1 × 10; dividends 6. The first and
+    // the last day of the period count, the days around it do not.
+    #[test]
+    fn the_bridge_of_a_period_sums_its_cash_its_in_kind_flows_and_its_dividends() {
+        let bridge = period_bridge(
+            &a_year_of_transactions(),
+            &priced_assets(),
+            &euro_rate_on_the_grant_date(),
+            "USD",
+            day("2024-01-01"),
+            day("2024-12-31"),
+        );
+        assert_eq!(bridge.cash_flow, 84_000_000);
+        assert_eq!(bridge.asset_flow, 80_000_000);
+        assert_eq!(bridge.dividends, 6_000_000);
+    }
+
+    // FXR-034 — free shares in a currency with no rate on their date are worth nothing.
+    #[test]
+    fn free_shares_without_a_rate_add_nothing_to_the_bridge() {
+        let bridge = period_bridge(
+            &a_year_of_transactions(),
+            &priced_assets(),
+            &RateMap::new(),
+            "USD",
+            day("2024-01-01"),
+            day("2024-12-31"),
+        );
+        assert_eq!(bridge.asset_flow, 40_000_000);
+    }
+}

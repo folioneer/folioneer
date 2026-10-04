@@ -362,7 +362,7 @@ pub(crate) fn month_periods(earliest_date: NaiveDate, today: NaiveDate) -> Vec<M
                 year,
                 month,
                 period_start: first_day_of_month(year, month),
-                period_end: if last_day > today { today } else { last_day },
+                period_end: last_day.min(today),
                 year_start: first_day_of_year(year),
                 year_start_baseline: last_day_of_year(year - 1),
             }
@@ -1022,8 +1022,6 @@ pub(crate) fn holding_close_date_as_of(
         }
         if before > 0 && quantity <= 0 {
             close_date = parse_date(&transaction.date);
-        } else if quantity > 0 {
-            close_date = None;
         }
     }
     if quantity <= 0 {
@@ -1035,6 +1033,7 @@ pub(crate) fn holding_close_date_as_of(
 
 #[cfg(test)]
 mod tests {
+    use super::test_fixtures::{day, transaction_on};
     use super::*;
 
     // FXR-035/042 — period_end_dates must pre-resolve a rate for every date the
@@ -1223,6 +1222,213 @@ mod tests {
             None,
             "never held"
         );
+    }
+
+    // PRF-085 — a split rescales the quantity the close-date probe follows: a sale of
+    // what was held before a 2 for 1 leaves the position open, a sale of twice that
+    // closes it on its date. An event that leaves a quantity of 0 at 0 closes nothing.
+    #[test]
+    fn holding_close_date_follows_a_split_and_ignores_events_on_nothing() {
+        let held_then_split = |sold: i64| {
+            vec![
+                transaction_on("asset", TransactionType::Purchase, "2024-01-10", 10_000_000),
+                transaction_on("asset", TransactionType::Split, "2024-02-01", 2_000_000),
+                transaction_on("asset", TransactionType::Sell, "2024-03-01", sold),
+            ]
+        };
+        assert_eq!(
+            holding_close_date_as_of(&held_then_split(10_000_000), day("2024-12-31")),
+            None
+        );
+        assert_eq!(
+            holding_close_date_as_of(&held_then_split(20_000_000), day("2024-12-31")),
+            Some(day("2024-03-01"))
+        );
+
+        let dividend_on_nothing = [transaction_on(
+            "asset",
+            TransactionType::Dividend,
+            "2024-05-01",
+            1_000_000,
+        )];
+        assert_eq!(
+            holding_close_date_as_of(&dividend_on_nothing, day("2024-12-31")),
+            None
+        );
+    }
+
+    // PRF-071 — the dates whose flows are valued at the market: free shares, opening
+    // balances and interest credited in units. Interest on the cash line and trades are
+    // none of them.
+    #[test]
+    fn market_valued_flow_dates_are_those_of_in_kind_contributions() {
+        let transactions = [
+            transaction_on(
+                "asset",
+                TransactionType::FreeShares,
+                "2024-01-10",
+                1_000_000,
+            ),
+            transaction_on(
+                "asset",
+                TransactionType::OpeningBalance,
+                "2024-02-10",
+                1_000_000,
+            ),
+            transaction_on("asset", TransactionType::Interest, "2024-03-10", 1_000_000),
+            transaction_on(
+                "system-cash-eur",
+                TransactionType::Interest,
+                "2024-04-10",
+                1_000_000,
+            ),
+            transaction_on("asset", TransactionType::Purchase, "2024-05-10", 1_000_000),
+        ];
+        assert_eq!(
+            market_valued_flow_dates(&transactions),
+            BTreeSet::from([day("2024-01-10"), day("2024-02-10"), day("2024-03-10")])
+        );
+    }
+
+    // INT-023 — interest on the cash line adds its quantity to the cash an account is
+    // worth; PRF-030 — a withdrawal is a negative flow.
+    #[test]
+    fn cash_interest_adds_to_the_end_value_and_a_withdrawal_is_a_negative_flow() {
+        let transactions = [
+            transaction_on(
+                "system-cash-eur",
+                TransactionType::Deposit,
+                "2024-01-10",
+                100_000_000,
+            ),
+            transaction_on(
+                "system-cash-eur",
+                TransactionType::Interest,
+                "2024-02-10",
+                5_000_000,
+            ),
+            transaction_on(
+                "system-cash-eur",
+                TransactionType::Withdrawal,
+                "2024-03-10",
+                30_000_000,
+            ),
+        ];
+        let no_assets = HashMap::new();
+        let no_rates = RateMap::new();
+        assert_eq!(
+            end_value_as_of(
+                &transactions,
+                &no_assets,
+                &no_rates,
+                "EUR",
+                day("2024-02-28")
+            ),
+            105_000_000
+        );
+        let flows: Vec<(NaiveDate, i64)> =
+            external_cash_flows_windowed(&transactions, &no_assets, &no_rates, "EUR")
+                .iter()
+                .map(|flow| (flow.date, flow.amount))
+                .collect();
+        assert_eq!(
+            flows,
+            vec![
+                (day("2024-01-10"), 100_000_000),
+                (day("2024-03-10"), -30_000_000)
+            ]
+        );
+    }
+
+    // PRF-082 / FXR-042 — a holding in another currency is worth its quantity at its
+    // price converted at the rate of the day: 3 units at 10 USD, 0.9 EUR a dollar.
+    #[test]
+    fn a_foreign_holding_end_value_converts_the_price_at_the_day_rate() {
+        let transactions = [transaction_on(
+            "asset-1",
+            TransactionType::Purchase,
+            "2024-01-10",
+            3_000_000,
+        )];
+        let priced = HashMap::from([(
+            "asset-1".to_string(),
+            priced_with(vec![price_at("2024-01-10", 10_000_000)]),
+        )]);
+        let period_end = day("2024-06-30");
+        let rates = RateMap::from([(("USD".to_string(), period_end), 900_000)]);
+        assert_eq!(
+            holding_end_value_as_of(&transactions, "asset-1", &priced, &rates, "EUR", period_end),
+            27_000_000
+        );
+        assert_eq!(
+            holding_end_value_as_of(
+                &transactions,
+                "asset-1",
+                &priced,
+                &RateMap::new(),
+                "EUR",
+                period_end
+            ),
+            0,
+            "no rate that day: no value (FXR-034)"
+        );
+    }
+
+    // PRF-032 — a flow weighs by the share of the period it was present for: 100 added
+    // at mid-year to 100 held weighs 50, so a gain of 30 is 20 %. A period of no day
+    // weighs nothing and divides by nothing.
+    #[test]
+    fn a_flow_weighs_by_the_days_it_was_present() {
+        let deposit = DatedFlow {
+            date: day("2023-07-02"),
+            amount: 100_000_000,
+        };
+        let year = metric_for_span_over_flows(
+            &[deposit],
+            100_000_000,
+            230_000_000,
+            day("2023-01-01"),
+            day("2023-12-31"),
+        );
+        assert_eq!(year.gain, 30_000_000);
+        assert_eq!(year.pct, Some(20_000_000));
+
+        let same_day = metric_for_span_over_flows(
+            &[DatedFlow {
+                date: day("2023-07-02"),
+                amount: 100_000_000,
+            }],
+            100_000_000,
+            230_000_000,
+            day("2023-07-02"),
+            day("2023-07-02"),
+        );
+        assert_eq!(same_day.pct, Some(30_000_000));
+    }
+
+    // PRF-083 — only the dividends received within the period, its first and last day
+    // included, add to a position's gain.
+    #[test]
+    fn a_dividend_outside_the_period_adds_nothing_to_the_gain() {
+        let dividend = |date: &str| DatedFlow {
+            date: day(date),
+            amount: 7_000_000,
+        };
+        let metric = holding_performance_for_span_over_flows(
+            &[],
+            &[
+                dividend("2022-12-31"),
+                dividend("2023-01-01"),
+                dividend("2023-06-30"),
+                dividend("2023-12-31"),
+                dividend("2024-01-01"),
+            ],
+            100_000_000,
+            100_000_000,
+            day("2023-01-01"),
+            day("2023-12-31"),
+        );
+        assert_eq!(metric.gain, 21_000_000);
     }
 
     fn price_at(date: &str, price: i64) -> AssetPrice {
@@ -1472,5 +1678,82 @@ mod tests {
         .expect("ytd computation");
 
         assert_eq!(ytd_pct, Some(18_000_000));
+    }
+}
+
+/// Figures the tests of the valuation, the performance series and the global performance
+/// compute by hand.
+#[cfg(test)]
+pub(crate) mod test_fixtures {
+    use super::*;
+
+    /// A transaction of `amount` (quantity and total, in micros) on `asset_id`.
+    pub(crate) fn transaction_on(
+        asset_id: &str,
+        transaction_type: TransactionType,
+        date: &str,
+        amount: i64,
+    ) -> Transaction {
+        Transaction::new(
+            "acc".to_string(),
+            asset_id.to_string(),
+            transaction_type,
+            date.to_string(),
+            amount,
+            1_000_000,
+            1_000_000,
+            0,
+            amount,
+            None,
+            None,
+        )
+        .expect("transaction")
+    }
+
+    pub(crate) fn day(raw: &str) -> NaiveDate {
+        parse_date(raw).expect("date")
+    }
+
+    /// A dollar stock at 10 and a euro stock at 10, both priced since 2023.
+    pub(crate) fn priced_assets() -> HashMap<String, PricedAsset> {
+        let priced = |asset_id: &str, currency: &str| {
+            (
+                asset_id.to_string(),
+                PricedAsset {
+                    currency: currency.to_string(),
+                    class: AssetClass::Stocks,
+                    prices: vec![AssetPrice {
+                        asset_id: asset_id.to_string(),
+                        date: "2023-01-01".to_string(),
+                        price: 10_000_000,
+                        source: crate::context::asset::AssetPriceSource::Manual,
+                    }],
+                },
+            )
+        };
+        HashMap::from([priced("stock-usd", "USD"), priced("stock-eur", "EUR")])
+    }
+
+    /// A year of a dollar account: a deposit on the first day, a withdrawal, interest on
+    /// the cash line, a dividend, an opening balance of 3 dollar shares, 2 free euro
+    /// shares (2 dollars a euro that day), interest of 1 dollar share on the last day —
+    /// and a deposit the day before and the day after the year.
+    pub(crate) fn a_year_of_transactions() -> Vec<Transaction> {
+        use TransactionType::*;
+        vec![
+            transaction_on("system-cash-usd", Deposit, "2023-12-31", 900_000_000),
+            transaction_on("system-cash-usd", Deposit, "2024-01-01", 100_000_000),
+            transaction_on("system-cash-usd", Withdrawal, "2024-02-01", 20_000_000),
+            transaction_on("system-cash-usd", Interest, "2024-03-01", 4_000_000),
+            transaction_on("stock-usd", Dividend, "2024-04-01", 6_000_000),
+            transaction_on("stock-usd", OpeningBalance, "2024-05-01", 3_000_000),
+            transaction_on("stock-eur", FreeShares, "2024-06-01", 2_000_000),
+            transaction_on("stock-usd", Interest, "2024-12-31", 1_000_000),
+            transaction_on("system-cash-usd", Deposit, "2025-01-01", 900_000_000),
+        ]
+    }
+
+    pub(crate) fn euro_rate_on_the_grant_date() -> RateMap {
+        RateMap::from([(("EUR".to_string(), day("2024-06-01")), 2_000_000)])
     }
 }
