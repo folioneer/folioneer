@@ -1,12 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Transaction } from "@/bindings";
+import type { OpeningBalanceDraft, Transaction } from "@/bindings";
 import { logger } from "@/lib/logger";
 import { decimalToMicro, microToDecimal, microToFormatted } from "@/lib/microUnits";
 import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
+import { useLatestCheck } from "@/ui/hooks/useLatestCheck";
 import { transactionGateway } from "../gateway";
+import { transactionDraftErrorToI18n } from "../shared/presenter";
 import type { TransactionEntryMode, TransactionFormData } from "../shared/types";
 import { type DraftField, useDraftProblemDisplay } from "../shared/useDraftProblemDisplay";
 import { toTransactionDraft, useTransactionDraftCheck } from "../shared/useTransactionDraftCheck";
@@ -81,16 +83,53 @@ export function useEditTransactionModal({
   const check = useTransactionDraftCheck(draft);
   const preview = check.preview;
 
+  // TRX-066 — a corrected opening balance follows its own draft check: the amount field
+  // holds its total cost (TRX-051), and one not typed yet is sent as none, never as 0.
+  const openingDraft = useMemo<OpeningBalanceDraft | null>(
+    () =>
+      isOpeningBalance
+        ? {
+            account_id: formData.accountId,
+            asset_id: formData.assetId,
+            date: formData.date,
+            quantity: decimalToMicro(formData.quantity),
+            total_cost:
+              formData.unitPrice.trim() === "" ? null : decimalToMicro(formData.unitPrice),
+          }
+        : null,
+    [isOpeningBalance, formData],
+  );
+  const logOpeningCheckFailure = useCallback(
+    (cause: unknown) => logger.error("Failed to check the opening balance draft", { error: cause }),
+    [],
+  );
+  const openingCheck = useLatestCheck(
+    openingDraft,
+    transactionGateway.validateOpeningBalanceDraft,
+    logOpeningCheckFailure,
+  );
+  const openingProblemMessage = useMemo<I18nMessage | null>(() => {
+    if (openingCheck.failed) return { key: "error.Unknown" };
+    return openingCheck.error ? transactionDraftErrorToI18n(openingCheck.error) : null;
+  }, [openingCheck.failed, openingCheck.error]);
+  const problemMessage = isOpeningBalance ? openingProblemMessage : check.problemMessage;
+
   // TRX-067 — the first problem is shown on its field once typed in, as a hint before.
   const problemDisplay = useDraftProblemDisplay(
-    check.problem,
-    check.problemMessage,
+    isOpeningBalance ? openingCheck.error : check.problem,
+    problemMessage,
     isTotalMode ? "total" : "price",
   );
   const touch = problemDisplay.touch;
+  // The form's one amount field shows a total cost's problem (TRX-051).
+  const fieldErrors = useMemo(
+    () =>
+      isOpeningBalance
+        ? { ...problemDisplay.fieldErrors, unitPrice: problemDisplay.fieldErrors.totalCost }
+        : problemDisplay.fieldErrors,
+    [isOpeningBalance, problemDisplay.fieldErrors],
+  );
 
-  // TRX-063 — an opening balance is checked on save (TD-067): what the
-  // user typed is sent as entered and recording's rejection is shown.
   const entered = useMemo(
     () => ({
       qtyMicro: decimalToMicro(formData.quantity),
@@ -100,11 +139,8 @@ export function useEditTransactionModal({
     }),
     [formData, isOpeningBalance],
   );
-  // reviewer-frontend FP: no numeric check on an opening balance — recording rejects a
-  // negative figure on save (TRX-063, F32), and it may cost zero (TRX-045) — see PR #53
-  const isFormValid = isTotalEntryEligible
-    ? check.isClean
-    : Boolean(formData.date && formData.quantity && formData.unitPrice);
+  // TRX-063/066 — saving follows the check of the latest draft.
+  const isFormValid = isOpeningBalance ? openingCheck.data !== null : check.isClean;
   // TRX-051 — an opening balance's amount field holds its total cost, shown as typed; every
   // other total is the core's.
   const totalMicro = isTotalEntryEligible ? (preview?.total_amount ?? 0) : entered.priceMicro;
@@ -120,14 +156,14 @@ export function useEditTransactionModal({
       const typed: Partial<Record<keyof TransactionFormData, DraftField>> = {
         date: "date",
         quantity: "quantity",
-        unitPrice: "unitPrice",
+        unitPrice: isOpeningBalance ? "totalCost" : "unitPrice",
         exchangeRate: "exchangeRate",
         fees: "fees",
       };
       const draftField = typed[field];
       if (draftField) touch(draftField);
     },
-    [touch],
+    [touch, isOpeningBalance],
   );
 
   const handleTotalAmountChange = useCallback(
@@ -157,8 +193,8 @@ export function useEditTransactionModal({
   );
 
   const doSubmit = useCallback(async () => {
-    if (isTotalEntryEligible && !preview) {
-      setError(check.problemMessage);
+    if (isOpeningBalance ? openingCheck.data === null : !preview) {
+      setError(problemMessage);
       return;
     }
 
@@ -213,8 +249,8 @@ export function useEditTransactionModal({
     draft,
     entered,
     preview,
-    isTotalEntryEligible,
-    check.problemMessage,
+    openingCheck.data,
+    problemMessage,
     recordPrice,
     isOpeningBalance,
     correctTransaction,
@@ -266,7 +302,7 @@ export function useEditTransactionModal({
     totalAmountInput,
     handleTotalAmountChange,
     /** TRX-067 — the first problem as an error on the field it concerns, once typed in. */
-    fieldErrors: problemDisplay.fieldErrors,
+    fieldErrors,
     /** TRX-067 — what to enter, for a field not typed in yet. */
     problemHint: problemDisplay.hint,
     /** Derived unit price shown read-only while in total-entry mode. */

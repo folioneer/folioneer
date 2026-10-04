@@ -6,6 +6,8 @@ import type {
   BuyHoldingDTO,
   Event,
   JournalFilter,
+  OpeningBalanceDraft,
+  OpeningBalancePreview,
   SellHoldingDTO,
   Transaction,
   TransactionDraft,
@@ -44,6 +46,13 @@ export const transactionGateway = {
     draft: TransactionDraft,
   ): Promise<Result<TransactionPreview, TransactionDraftError>> {
     return await commands.validateTransactionDraft(draft);
+  },
+
+  // TRX-066 — checks an opening balance draft, new or corrected, without writing.
+  async validateOpeningBalanceDraft(
+    draft: OpeningBalanceDraft,
+  ): Promise<Result<OpeningBalancePreview, TransactionDraftError>> {
+    return await commands.validateOpeningBalanceDraft(draft);
   },
 
   async getTransactions(

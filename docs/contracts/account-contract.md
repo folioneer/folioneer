@@ -584,6 +584,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-10-04 — TD-067 (TRX-066): `validate_opening_balance_draft` is also called for a corrected opening balance; its shape is unchanged.
 - 2026-10-04 — names: `SplitDraft` → `StockSplitDraft`, `SplitDraftPreview` → `StockSplitPreview`, `SplitPositionPreview` → `StockSplitPosition`, `validate_split_draft` → `validate_stock_split_draft`, `TransactionDraftPreview` → `TransactionPreview`, `OpeningBalanceDraftPreview` → `OpeningBalancePreview`. Shapes unchanged.
 - 2026-10-04 — TD-071 (SPL-062/063): `validate_split_draft(SplitDraft) -> SplitDraftPreview { factor, position, price_after_split }` checks a split being entered without writing; `record_split` (SPL-010) and `TransactionType::Split` documented.
 - 2026-10-04 — TD-070 (TDI-030/031): `TransactionDraftPreview.realized_pnl` added — the draft check of a new sale returns the gain it would realize.

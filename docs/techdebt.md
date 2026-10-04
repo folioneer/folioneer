@@ -309,15 +309,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — a name pasted with a stray control character or of unreasonable length is refused where it is typed.
 - Done when: `Asset::validate` refuses a control character and a name or reference above a stated length, with a typed error the form shows and the command line reports.
 
-## 2026-10-03 — TD-067 — The correction form of an opening balance still decides in the interface
-
-- Found by: reviewer-frontend on TD-054
-- Where: `src/features/transactions/edit_transaction_modal/useEditTransactionModal.ts` — the branch of an opening balance: saving enabled on `Boolean(date && quantity && unitPrice)`, the total shown as typed
-- Severity: 🔵
-- Observation: a purchase, a sale and a dividend being corrected follow the core's draft check; a new opening balance does too (TRX-066). The correction of an opening balance is the last transaction form that decides in the interface when it can be saved; recording rejects what is wrong on save.
-- User value: None directly — the form says what is wrong before saving, like the others (TRX-067).
-- Done when: the opening balance draft check covers a correction, the form follows it, and the hook holds no condition of its own.
-
 ## 2026-10-03 — TD-069 — The interface decides whether sync needs attention, in two places
 
 - Found by: the main agent, building the sync page (#010)

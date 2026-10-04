@@ -4,11 +4,13 @@ import type { Account, Asset, Transaction, TransactionDraft } from "@/bindings";
 import { useAppStore } from "@/lib/store";
 import { useEditTransactionModal } from "./useEditTransactionModal";
 
-const { mockCorrectTransaction, mockRecordAssetPrice, mockValidateDraft } = vi.hoisted(() => ({
-  mockCorrectTransaction: vi.fn(),
-  mockRecordAssetPrice: vi.fn(),
-  mockValidateDraft: vi.fn(),
-}));
+const { mockCorrectTransaction, mockRecordAssetPrice, mockValidateDraft, mockValidateOpening } =
+  vi.hoisted(() => ({
+    mockCorrectTransaction: vi.fn(),
+    mockRecordAssetPrice: vi.fn(),
+    mockValidateDraft: vi.fn(),
+    mockValidateOpening: vi.fn(),
+  }));
 
 vi.mock("../useTransactions", () => ({
   useTransactions: () => ({
@@ -24,6 +26,7 @@ vi.mock("../gateway", () => ({
   transactionGateway: {
     recordAssetPrice: mockRecordAssetPrice,
     validateTransactionDraft: mockValidateDraft,
+    validateOpeningBalanceDraft: mockValidateOpening,
   },
 }));
 
@@ -95,6 +98,7 @@ describe("useEditTransactionModal", () => {
     localStorage.clear();
     mockCorrectTransaction.mockReset();
     mockRecordAssetPrice.mockReset();
+    mockValidateOpening.mockReset().mockResolvedValue({ status: "ok", data: { zero_cost: false } });
     mockValidateDraft.mockReset().mockImplementation(fakeDraftCheck);
     useAppStore.setState({
       assets: [
@@ -263,6 +267,7 @@ describe("useEditTransactionModal", () => {
     const fakeSubmit = {
       preventDefault: vi.fn(),
     } as unknown as React.FormEvent;
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
     await act(async () => {
       await result.current.handleSubmit(fakeSubmit);
     });
@@ -342,11 +347,83 @@ describe("useEditTransactionModal", () => {
       expect(mockValidateDraft).toHaveBeenCalledWith(
         expect.objectContaining({ kind: "Sell", correcting: "tx-sell" }),
       );
-      // TRX-063 — an opening balance is checked on save, not by the draft check
+      // TRX-066 — an opening balance has its own check, not the trade's
       expect(mockValidateDraft).not.toHaveBeenCalledWith(
         expect.objectContaining({ correcting: "tx-ob" }),
       );
-      expect(ob.result.current.isFormValid).toBe(true);
+      await waitFor(() => expect(ob.result.current.isFormValid).toBe(true));
+    });
+
+    // TRX-066 — a corrected opening balance sends what is typed to its draft check: the
+    // amount field as its total cost, and none while that field is empty.
+    it("TRX-066: a corrected opening balance follows its draft check", async () => {
+      const { result } = renderHook(() =>
+        useEditTransactionModal({ transaction: openingBalanceTransaction }),
+      );
+      await waitFor(() => expect(result.current.isFormValid).toBe(true));
+      expect(mockValidateOpening).toHaveBeenLastCalledWith({
+        account_id: "account-1",
+        asset_id: "asset-1",
+        date: openingBalanceTransaction.date,
+        quantity: openingBalanceTransaction.quantity,
+        total_cost: 100 * MICRO,
+      });
+
+      mockValidateOpening.mockResolvedValue({
+        status: "error",
+        error: { code: "TotalCostMissing" },
+      });
+      act(() => result.current.handleChange("unitPrice", ""));
+      await waitFor(() =>
+        expect(mockValidateOpening).toHaveBeenLastCalledWith(
+          expect.objectContaining({ total_cost: null }),
+        ),
+      );
+      await waitFor(() => expect(result.current.fieldErrors.unitPrice).toBeDefined());
+      expect(result.current.problemHint).toBeNull();
+      expect(result.current.isFormValid).toBe(false);
+
+      await act(async () => {
+        await result.current.handleSubmit(fakeSubmit);
+      });
+      expect(mockCorrectTransaction).not.toHaveBeenCalled();
+    });
+
+    // TRX-067 — a problem on a field not typed in yet is a hint, and a check that could
+    // not run is said beside the actions: saving is never disabled without a reason.
+    it("TRX-067: a corrected opening balance says why it cannot be saved", async () => {
+      mockValidateOpening.mockResolvedValue({
+        status: "error",
+        error: { code: "QuantityNotPositive" },
+      });
+      const refused = renderHook(() =>
+        useEditTransactionModal({ transaction: openingBalanceTransaction }),
+      );
+      await waitFor(() =>
+        expect(refused.result.current.problemHint).toEqual({
+          key: "transaction.hint_enter_quantity",
+        }),
+      );
+      expect(refused.result.current.fieldErrors.quantity).toBeUndefined();
+      expect(refused.result.current.isFormValid).toBe(false);
+      refused.unmount();
+
+      // TRX-065 — a zero cost warns when an opening balance is created, not when one is
+      // corrected: the correction is valid and says nothing.
+      mockValidateOpening.mockResolvedValue({ status: "ok", data: { zero_cost: true } });
+      const free = renderHook(() =>
+        useEditTransactionModal({ transaction: openingBalanceTransaction }),
+      );
+      await waitFor(() => expect(free.result.current.isFormValid).toBe(true));
+      expect(free.result.current.error).toBeNull();
+      free.unmount();
+
+      mockValidateOpening.mockRejectedValue(new Error("ipc down"));
+      const failed = renderHook(() =>
+        useEditTransactionModal({ transaction: openingBalanceTransaction }),
+      );
+      await waitFor(() => expect(failed.result.current.error).toEqual({ key: "error.Unknown" }));
+      expect(failed.result.current.isFormValid).toBe(false);
     });
 
     it("price mode (default) submits total_amount: null", async () => {

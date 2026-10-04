@@ -110,6 +110,30 @@ describe("transactionGateway", () => {
     });
   });
 
+  // ── validateOpeningBalanceDraft (TRX-066) ───────────────────────────────────
+
+  it("validateOpeningBalanceDraft sends the draft and returns the check's answer", async () => {
+    const draft = {
+      account_id: "acc-1",
+      asset_id: "ast-1",
+      date: "2026-01-02",
+      quantity: 2_000_000,
+      total_cost: null,
+    };
+    mockInvoke.mockResolvedValue({ zero_cost: false });
+    expect(await transactionGateway.validateOpeningBalanceDraft(draft)).toEqual({
+      status: "ok",
+      data: { zero_cost: false },
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("validate_opening_balance_draft", { draft });
+
+    mockInvoke.mockRejectedValue({ code: "TotalCostMissing" });
+    expect(await transactionGateway.validateOpeningBalanceDraft(draft)).toEqual({
+      status: "error",
+      error: { code: "TotalCostMissing" },
+    });
+  });
+
   // ── buyHolding ──────────────────────────────────────────────────────────────
 
   it("buyHolding returns Transaction on success", async () => {
