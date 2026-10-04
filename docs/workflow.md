@@ -121,7 +121,8 @@ and the question joins the closing block — unless nothing else in the queue ca
 
 **Release** — the hand-over starts with `/dep-audit` (a known vulnerability in what
 ships blocks the release) and the human runs `just release -y` when they choose. After
-it, `/prune` runs once. The release re-runs the full
+it, `/prune` runs once and `/flow-audit` measures the batch against the release before
+(`docs/flow.md`). The release re-runs the full
 harness on `main`, computes the version from the merged titles, writes the changelog,
 tags and pushes; CI builds and leaves the draft; the human publishes it. The
 changelog and the git history are the record of what shipped.

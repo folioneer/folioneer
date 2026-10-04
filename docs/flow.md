@@ -15,7 +15,7 @@ The rules for an entry, set by the owner on 2026-10-03:
    questions come in one block for the batch, with what to look at and what a yes means.
 
 Each entry carries a permanent `FLOW-NNN` reference (never renumbered, never reused; next
-free: FLOW-019) so the owner can queue it in `docs/todo.md` § Next like any other. An
+free: FLOW-020) so the owner can queue it in `docs/todo.md` § Next like any other. An
 entry is removed once it is settled.
 
 ---
@@ -130,24 +130,6 @@ itself. Hooks and CI ran their own share on every commit and push; that is not c
 
 Reading: the reviewers were used as the workflow says. The skills and the recipes were
 not — the work was done by hand, in the skills' spirit, with native commands.
-
-## FLOW-018 — The flow is audited once, by hand
-
-- Kind: quality + speed
-- Observed: this file's figures — pull requests and their time to merge, CI rounds and
-  what caused them, run durations, what the agent invoked — were gathered by hand after
-  0.5.0, from `gh` and the session's transcript, in about an hour. Nothing will gather
-  them after 0.6.0 unless someone thinks of it. Raised by the owner on 2026-10-04.
-- Proposal: a `/flow-audit` skill run after each release, on a script
-  (`scripts/flow-audit.py`) that measures the same things between two tags and prints
-  them beside the previous release's. The skill writes the "Measured" and "Used and not
-  used" sections anew, proposes entries only where a figure moved or a rule was not
-  followed, and re-reads the open entries: settled ones leave, "keep" verdicts are
-  re-measured. A skill, not an agent: the judging needs the session's context, the
-  counting does not.
-- Costs: about half a day for the script and its tests; a few minutes per release.
-  Protects: the flow being improved on figures, release after release.
-- Decided: go, built last in the 0.6.0 batch and run first at the 0.6.0 release (owner, 2026-10-04).
 
 ## Moved here from the todo and the tech debt
 
