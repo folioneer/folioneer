@@ -417,14 +417,7 @@ pub fn backfill_window(
 ) -> (NaiveDate, NaiveDate) {
     let capped_from = today - chrono::Duration::days(BACKFILL_CAP_DAYS);
     let from = match last_success {
-        Some(date) => {
-            let day_after = date + chrono::Duration::days(1);
-            if day_after < capped_from {
-                capped_from
-            } else {
-                day_after
-            }
-        }
+        Some(date) => (date + chrono::Duration::days(1)).max(capped_from),
         None => capped_from,
     };
     (from, today)

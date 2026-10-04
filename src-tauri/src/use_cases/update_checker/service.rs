@@ -64,6 +64,20 @@ impl UpdateState {
     }
 }
 
+/// R8 — the share of the download done once `chunk` more bytes have arrived, as a
+/// percentage from 0 to 100; 0 while the total size is not known.
+fn progress_after(
+    downloaded: &std::sync::atomic::AtomicU64,
+    chunk: u64,
+    total: Option<u64>,
+) -> u64 {
+    let current = downloaded.fetch_add(chunk, Ordering::Relaxed) + chunk;
+    total
+        .and_then(|total| (current * 100).checked_div(total))
+        .map(|percent| percent.min(100))
+        .unwrap_or(0)
+}
+
 /// The channel the composition root manages, or the configured one when none is.
 fn managed_channel<R: Runtime>(app_handle: &AppHandle<R>) -> UpdateChannel {
     app_handle
@@ -246,12 +260,10 @@ async fn do_download(app_handle: &AppHandle, state: &UpdateState) -> Result<(), 
     let bytes = match update
         .download(
             move |chunk, total| {
-                let current = downloaded.fetch_add(chunk as u64, Ordering::Relaxed) + chunk as u64;
-                let percent = total
-                    .and_then(|t| (current * 100).checked_div(t))
-                    .map(|p| p.min(100))
-                    .unwrap_or(0);
-                let _ = ah.emit("update:progress", percent);
+                let _ = ah.emit(
+                    "update:progress",
+                    progress_after(&downloaded, chunk as u64, total),
+                );
             },
             || {},
         )
@@ -310,6 +322,29 @@ mod tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
+
+    // R9 — the downloaded installer is kept until it is taken, once.
+    #[test]
+    fn the_downloaded_installer_is_kept_until_it_is_taken_once() {
+        let state = UpdateState::new();
+        assert_eq!(state.take_bytes(), None);
+        state.set_bytes(vec![7, 8, 9]);
+        assert_eq!(state.take_bytes(), Some(vec![7, 8, 9]));
+        assert_eq!(state.take_bytes(), None);
+    }
+
+    // R8 — progress is the share of the bytes received so far, chunk after chunk: 250
+    // then 500 of 1 000 bytes are 25 % then 75 %; never above 100, and 0 while the size
+    // is not known or is nothing.
+    #[test]
+    fn progress_is_the_share_of_the_bytes_received_so_far() {
+        let downloaded = std::sync::atomic::AtomicU64::new(0);
+        assert_eq!(progress_after(&downloaded, 250, Some(1_000)), 25);
+        assert_eq!(progress_after(&downloaded, 500, Some(1_000)), 75);
+        assert_eq!(progress_after(&downloaded, 500, Some(1_000)), 100);
+        assert_eq!(progress_after(&downloaded, 1, None), 0);
+        assert_eq!(progress_after(&downloaded, 1, Some(0)), 0);
+    }
 
     /// A server that answers its one request with `status` and hands the request text back.
     async fn serve_once(status: &'static str) -> (Url, tokio::task::JoinHandle<String>) {
