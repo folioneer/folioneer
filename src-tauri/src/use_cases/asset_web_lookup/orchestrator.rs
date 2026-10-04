@@ -220,6 +220,8 @@ const SEARCH_URL: &str = "https://api.openfigi.com/v3/search";
 /// API key).
 pub struct ReqwestOpenFigiClient {
     client: reqwest::Client,
+    map_url: String,
+    search_url: String,
 }
 
 impl Default for ReqwestOpenFigiClient {
@@ -233,8 +235,22 @@ impl ReqwestOpenFigiClient {
     pub fn new() -> Self {
         Self {
             client: reqwest::Client::new(),
+            map_url: MAP_URL.to_string(),
+            search_url: SEARCH_URL.to_string(),
         }
     }
+}
+
+/// WEB-025 — the answer of OpenFIGI when it can be read: a 429 is the rate limit, any
+/// other status that is not a success is a failure naming `what` was asked.
+fn readable(response: reqwest::Response, what: &str) -> Result<reqwest::Response> {
+    if response.status() == StatusCode::TOO_MANY_REQUESTS {
+        return Err(anyhow::Error::from(RateLimitedError));
+    }
+    if !response.status().is_success() {
+        anyhow::bail!("OpenFIGI {what} returned {}", response.status());
+    }
+    Ok(response)
 }
 
 #[async_trait]
@@ -243,18 +259,13 @@ impl OpenFigiClient for ReqwestOpenFigiClient {
         let body = serde_json::json!([{"idType": "ID_ISIN", "idValue": isin}]);
         let resp = self
             .client
-            .post(MAP_URL)
+            .post(&self.map_url)
             .json(&body)
             .send()
             .await
             .with_context(|| format!("OpenFIGI ISIN mapping request failed for ISIN: {isin}"))?;
 
-        if resp.status() == StatusCode::TOO_MANY_REQUESTS {
-            return Err(anyhow::Error::from(RateLimitedError));
-        }
-        if !resp.status().is_success() {
-            anyhow::bail!("OpenFIGI mapping returned {}", resp.status());
-        }
+        let resp = readable(resp, "mapping")?;
 
         let items: Vec<MappingResultItem> = resp
             .json()
@@ -277,18 +288,13 @@ impl OpenFigiClient for ReqwestOpenFigiClient {
         });
         let resp = self
             .client
-            .post(SEARCH_URL)
+            .post(&self.search_url)
             .json(&body)
             .send()
             .await
             .context("OpenFIGI keyword search request failed")?;
 
-        if resp.status() == StatusCode::TOO_MANY_REQUESTS {
-            return Err(anyhow::Error::from(RateLimitedError));
-        }
-        if !resp.status().is_success() {
-            anyhow::bail!("OpenFIGI search returned {}", resp.status());
-        }
+        let resp = readable(resp, "search")?;
 
         let search_resp: SearchResponse = resp
             .json()
@@ -309,18 +315,13 @@ impl OpenFigiClient for ReqwestOpenFigiClient {
             .collect();
         let resp = self
             .client
-            .post(MAP_URL)
+            .post(&self.map_url)
             .json(&body)
             .send()
             .await
             .context("OpenFIGI share-class mapping request failed")?;
 
-        if resp.status() == StatusCode::TOO_MANY_REQUESTS {
-            return Err(anyhow::Error::from(RateLimitedError));
-        }
-        if !resp.status().is_success() {
-            anyhow::bail!("OpenFIGI share-class mapping returned {}", resp.status());
-        }
+        let resp = readable(resp, "share-class mapping")?;
 
         let items: Vec<MappingResultItem> = resp
             .json()
@@ -971,5 +972,148 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(results[0].isin.as_deref(), Some(normalized));
+    }
+}
+
+#[cfg(test)]
+mod openfigi_client_tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    /// A client whose two addresses are a local server answering its one request with
+    /// `status` and `body`; the server reads the whole request first and hands it back.
+    async fn client_answered(
+        status: &'static str,
+        body: String,
+    ) -> (ReqwestOpenFigiClient, tokio::task::JoinHandle<String>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let address = listener.local_addr().expect("address");
+        let served = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.expect("accept");
+            let mut request = Vec::new();
+            let mut buffer = vec![0; 8192];
+            loop {
+                let read = stream.read(&mut buffer).await.expect("read");
+                request.extend_from_slice(&buffer[..read]);
+                let text = String::from_utf8_lossy(&request);
+                let complete = text.split_once("\r\n\r\n").is_some_and(|(head, sent)| {
+                    let announced = head
+                        .lines()
+                        .find_map(|line| {
+                            line.to_lowercase()
+                                .strip_prefix("content-length:")?
+                                .trim()
+                                .parse::<usize>()
+                                .ok()
+                        })
+                        .unwrap_or(0);
+                    sent.len() >= announced
+                });
+                if complete || read == 0 {
+                    break;
+                }
+            }
+            let response = format!(
+                "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(response.as_bytes()).await.expect("write");
+            String::from_utf8_lossy(&request).to_string()
+        });
+        let client = ReqwestOpenFigiClient {
+            client: reqwest::Client::builder()
+                .no_proxy()
+                .build()
+                .expect("client"),
+            map_url: format!("http://{address}/v3/mapping"),
+            search_url: format!("http://{address}/v3/search"),
+        };
+        (client, served)
+    }
+
+    const ONE_HIT: &str =
+        r#"{"name":"TOTALENERGIES SE","ticker":"TTE","exchCode":"FP","currency":"EUR"}"#;
+
+    // WEB-020 — an ISIN is mapped by one request naming it; every hit of the answer is
+    // read, and an item without data adds none.
+    #[tokio::test]
+    async fn an_isin_mapping_reads_every_hit_of_the_answer() {
+        let body =
+            format!(r#"[{{"data":[{ONE_HIT},{ONE_HIT}]}},{{"warning":"No identifier found."}}]"#);
+        let (client, served) = client_answered("200 OK", body).await;
+        let hits = client.map_isin("FR0000120271").await.expect("hits");
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].name, "TOTALENERGIES SE");
+        assert_eq!(hits[0].ticker.as_deref(), Some("TTE"));
+        let request = served.await.expect("served");
+        assert!(request.starts_with("POST /v3/mapping"));
+        assert!(request.contains(r#""idType":"ID_ISIN""#));
+        assert!(request.contains(r#""idValue":"FR0000120271""#));
+    }
+
+    // WEB-020 — a keyword search reads the hits of the answer's `data`.
+    #[tokio::test]
+    async fn a_keyword_search_reads_the_hits_of_the_answer() {
+        let body = format!(r#"{{"data":[{ONE_HIT}]}}"#);
+        let (client, served) = client_answered("200 OK", body).await;
+        let hits = client.search_keyword("total").await.expect("hits");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].exchange_code.as_deref(), Some("FP"));
+        let request = served.await.expect("served");
+        assert!(request.starts_with("POST /v3/search"));
+        assert!(request.contains(r#""query":"total""#));
+    }
+
+    // WEB-049 — the share classes asked for come back one list of hits each, in order,
+    // an unknown one as an empty list.
+    #[tokio::test]
+    async fn share_classes_come_back_one_list_each() {
+        let body = format!(r#"[{{"data":[{ONE_HIT}]}},{{"warning":"No identifier found."}}]"#);
+        let (client, served) = client_answered("200 OK", body).await;
+        let classes = client
+            .map_share_classes(&["BBG001S5N8V8".to_string(), "BBG000000000".to_string()])
+            .await
+            .expect("classes");
+        let sizes: Vec<usize> = classes.iter().map(Vec::len).collect();
+        assert_eq!(sizes, vec![1, 0]);
+        let request = served.await.expect("served");
+        assert!(request.contains("ID_BB_GLOBAL_SHARE_CLASS_LEVEL"));
+        assert!(request.contains("BBG001S5N8V8"));
+    }
+
+    // WEB-025 — a 429 is the rate limit, told apart from any other refusal; a server
+    // failing is a failure, never an empty answer.
+    #[tokio::test]
+    async fn a_rate_limit_is_told_apart_from_a_failure() {
+        let (client, _served) = client_answered("429 Too Many Requests", "[]".to_string()).await;
+        let limited = client.map_isin("FR0000120271").await.expect_err("refused");
+        assert!(limited.downcast_ref::<RateLimitedError>().is_some());
+
+        // The bodies are ones the client could read: only the status makes these fail.
+        let (client, _served) =
+            client_answered("500 Internal Server Error", r#"{"data":[]}"#.to_string()).await;
+        let failed = client.search_keyword("total").await.expect_err("failed");
+        assert_eq!(
+            failed.to_string(),
+            "OpenFIGI search returned 500 Internal Server Error"
+        );
+
+        let (client, _served) = client_answered("503 Service Unavailable", "[]".to_string()).await;
+        let failed = client
+            .map_share_classes(&["BBG001S5N8V8".to_string()])
+            .await
+            .expect_err("failed");
+        assert_eq!(
+            failed.to_string(),
+            "OpenFIGI share-class mapping returned 503 Service Unavailable"
+        );
+
+        let (client, _served) = client_answered("502 Bad Gateway", "[]".to_string()).await;
+        let failed = client.map_isin("FR0000120271").await.expect_err("failed");
+        assert_eq!(
+            failed.to_string(),
+            "OpenFIGI mapping returned 502 Bad Gateway"
+        );
     }
 }
