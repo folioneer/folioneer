@@ -1,7 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Account, Asset, Transaction, TransactionDraft } from "@/bindings";
-import { microToFormatted } from "@/lib/microUnits";
 import { useAppStore } from "@/lib/store";
 import { useEditTransactionModal } from "./useEditTransactionModal";
 
@@ -241,50 +240,6 @@ describe("useEditTransactionModal", () => {
       expect.objectContaining({ unit_price: 0 }),
     );
     expect(mockRecordAssetPrice).not.toHaveBeenCalled();
-  });
-
-  // TRX-063 / DIV-040 — a corrected dividend is checked by the core as a dividend, and its
-  // total on screen is the core's, not a figure computed here.
-  it("shows the core's total for a corrected dividend", async () => {
-    mockValidateDraft.mockResolvedValue({
-      status: "ok",
-      data: { unit_price: 1 * MICRO, total_amount: 13_750_000 },
-    });
-    const dividend: Transaction = {
-      ...baseTransaction,
-      transaction_type: "Dividend",
-      quantity: 12_500_000,
-      unit_price: 1 * MICRO,
-      exchange_rate: 1_100_000,
-      total_amount: 13_750_000,
-    };
-    const { result } = renderHook(() => useEditTransactionModal({ transaction: dividend }));
-    await act(async () => {});
-
-    expect(mockValidateDraft).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        kind: "Dividend",
-        quantity: 12_500_000,
-        correcting: "tx-existing",
-      }),
-    );
-    expect(result.current.totalAmountDisplay).toBe(microToFormatted(13_750_000));
-    expect(result.current.isFormValid).toBe(true);
-
-    mockValidateDraft.mockResolvedValue({
-      status: "ok",
-      data: { unit_price: 1 * MICRO, total_amount: 15_000_000 },
-    });
-    await act(async () => result.current.handleChange("exchangeRate", "1.2"));
-    expect(result.current.totalAmountDisplay).toBe(microToFormatted(15_000_000));
-
-    mockValidateDraft.mockResolvedValue({
-      status: "error",
-      error: { code: "ExchangeRateNotPositive" },
-    });
-    await act(async () => result.current.handleChange("exchangeRate", "0"));
-    expect(result.current.isFormValid).toBe(false);
-    expect(result.current.fieldErrors.exchangeRate).toBeDefined();
   });
 
   // TRX-051: OpeningBalance pre-fill uses total_amount (not unit_price) as the "Total Cost" field

@@ -38,6 +38,16 @@ export function microToDecimal(micros: number, decimals = 3): string {
   return (micros / MICRO).toFixed(decimals);
 }
 
+/**
+ * Converts a micro-unit value to the decimal string that reads back to the same value:
+ * every decimal it carries, none it does not (921_400 → "0.9214", 18_600_000 → "18.6").
+ * Use to pre-fill a field from a recorded figure, so saving without typing changes nothing.
+ */
+export function microToExactDecimal(micros: number): string {
+  const text = (micros / MICRO).toFixed(6);
+  return text.includes(".") ? text.replace(/0+$/, "").replace(/\.$/, "") : text;
+}
+
 // Set once at app startup from i18n config — tests may override via setDisplayLocale("en")
 let _displayLocale = "fr";
 

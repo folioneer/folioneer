@@ -680,7 +680,11 @@
     "form_account_currency_mode": "Enter the amount in {{currency}} (what the account actually received)",
     "action_record": "Record dividend",
     "action_record_and_add_another": "Record & add another",
-    "recorded": "Dividend recorded."
+    "recorded": "Dividend recorded.",
+    "edit_modal_title": "Edit dividend",
+    "edit_locked_note": "{{account}} ({{currency}}) — the account and the paying asset cannot be changed; delete the dividend and record it again to move it.",
+    "edit_total_label": "Total credited to the account",
+    "updated": "Dividend updated."
   },
   "free_shares": {
     "modal_title": "Record free shares",

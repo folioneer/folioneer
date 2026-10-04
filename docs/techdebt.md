@@ -7,7 +7,7 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-073) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-074) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -345,15 +345,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — the form says what is wrong before saving, like the others (TRX-067).
 - Done when: the opening balance draft check covers a correction, the form follows it, and the hook holds no condition of its own.
 
-## 2026-10-03 — TD-068 — The edit dialog of a dividend shows fields a dividend does not have
-
-- Found by: reviewer-frontend on TD-054
-- Where: `src/features/transactions/edit_transaction_modal/EditTransactionModal.tsx`
-- Severity: 🟡
-- Observation: DIV-040 makes the date, the net amount, the exchange rate and the note editable. The dialog also shows a required unit price and a fees field, labels the amount "Quantity", and offers "use this price as the market price": ticked, it records the dividend's stored unit price — 1 — as the asset's price for that day. The exchange rate field is hidden when the asset and the account share a currency, so a problem on it would show on no field; a total that rounds down to nothing is reported on the unit price, which a dividend's total does not depend on.
-- User value: Editing a dividend shows the fields a dividend has, and cannot record a wrong price for the asset.
-- Done when: for a dividend the dialog shows the date, the amount (labelled as such), the exchange rate when currencies differ and the note; no unit price, no fees, no market-price checkbox (the owner's choice, 2026-10-04); the mock-up `screenshots/design/TD-068-*.png` is validated by the owner before the dialog changes.
-
 ## 2026-10-03 — TD-069 — The interface decides whether sync needs attention, in two places
 
 - Found by: the main agent, building the sync page (#010)
@@ -362,3 +353,12 @@ Remove an entry once it has been resolved.
 - Observation: both read the sync status and decide from its failures, notices, inconsistent holdings — and, for the page only, held-back changes — whether sync needs attention. The two rules already differ by one case. The status is assembled in several places of the core (the sync service, the run, the portfolio sync use case), so a health field stored on it would go stale; the core has no single point where a status leaves for the interface.
 - User value: The indicator in the header and the sync page never disagree about whether something needs a look.
 - Done when: the core says the health of sync with the status, from one rule; the page and the indicator show it; neither decides.
+
+## 2026-10-04 — TD-073 — Correcting a record without typing can change its figures
+
+- Found by: the main agent, building the dividend correction dialog (TD-068): its test showed an exchange rate of 0.9214 pre-filled as 0.921
+- Where: `microToDecimal` (three decimals by default) used to pre-fill a form from a recorded figure — `useEditTransactionModal.ts` (quantity, unit price, exchange rate, fees), the shell mounts of the free shares, management fee, interest and split corrections (quantity or factor), `useDepositTransaction.ts` and `useWithdrawalTransaction.ts` (amount); and `parseFloat(microToDecimal(…))` when a trade's unit price is recorded as the asset's price
+- Severity: 🟡
+- Observation: a figure is stored with six decimals and shown with three (TRX-024). A correction form is filled with the three-decimal text, so opening a correction and saving it without typing rewrites a quantity of 0.123456 as 0.123 and a rate of 0.9214 as 0.921. The dividend correction dialog fills its fields exactly (`microToExactDecimal`); the other forms do not. The same family as #058 (one conversion reads a typed number, one writes it).
+- User value: Opening a correction and saving it changes only what the user typed.
+- Done when: every form filled from a recorded figure reads back to the same micro-units when saved untouched, shown by a test per form; a recorded market price carries the trade's unit price to its last decimal.

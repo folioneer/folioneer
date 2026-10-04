@@ -35,10 +35,6 @@ export function useEditTransactionModal({
   // TRX-061 / SEL-051 — total-entry correction is offered only for the two
   // securities trades whose total decomposes into a derived unit price.
   const isTotalEntryEligible = transaction.transaction_type === "Purchase" || isSell;
-  // TRX-063 / DIV-040 — the core checks a purchase, a sale and a dividend while they are
-  // corrected, and returns the total it would record.
-  const isDividend = transaction.transaction_type === "Dividend";
-  const isDraftChecked = isTotalEntryEligible || isDividend;
 
   const [formData, setFormData] = useState<TransactionFormData>(() => ({
     accountId: transaction.account_id,
@@ -66,21 +62,21 @@ export function useEditTransactionModal({
 
   const isTotalMode = isTotalEntryEligible && entryMode === "total";
 
-  // TRX-063 — a purchase, sale or dividend correction follows the draft check, which
+  // TRX-063 — a purchase or sale correction follows the draft check, which
   // returns the unit price and total it would record; a corrected sale is not checked for
   // oversell (SEL-030).
   const draft = useMemo(
     () =>
-      isDraftChecked
+      isTotalEntryEligible
         ? toTransactionDraft(
-            isDividend ? "Dividend" : isSell ? "Sell" : "Purchase",
+            isSell ? "Sell" : "Purchase",
             formData,
             isTotalMode ? "total" : "price",
             totalAmountInput,
             transaction.id,
           )
         : null,
-    [isDraftChecked, isDividend, formData, isSell, isTotalMode, totalAmountInput, transaction.id],
+    [isTotalEntryEligible, formData, isSell, isTotalMode, totalAmountInput, transaction.id],
   );
   const check = useTransactionDraftCheck(draft);
   const preview = check.preview;
@@ -106,12 +102,12 @@ export function useEditTransactionModal({
   );
   // reviewer-frontend FP: no numeric check on an opening balance — recording rejects a
   // negative figure on save (TRX-063, F32), and it may cost zero (TRX-045) — see PR #53
-  const isFormValid = isDraftChecked
+  const isFormValid = isTotalEntryEligible
     ? check.isClean
     : Boolean(formData.date && formData.quantity && formData.unitPrice);
   // TRX-051 — an opening balance's amount field holds its total cost, shown as typed; every
   // other total is the core's.
-  const totalMicro = isDraftChecked ? (preview?.total_amount ?? 0) : entered.priceMicro;
+  const totalMicro = isTotalEntryEligible ? (preview?.total_amount ?? 0) : entered.priceMicro;
 
   // TRX-029 — derived flag: is the currently selected asset archived?
   const isSelectedAssetArchived = formData.assetId
@@ -161,7 +157,7 @@ export function useEditTransactionModal({
   );
 
   const doSubmit = useCallback(async () => {
-    if (isDraftChecked && !preview) {
+    if (isTotalEntryEligible && !preview) {
       setError(check.problemMessage);
       return;
     }
@@ -217,7 +213,7 @@ export function useEditTransactionModal({
     draft,
     entered,
     preview,
-    isDraftChecked,
+    isTotalEntryEligible,
     check.problemMessage,
     recordPrice,
     isOpeningBalance,

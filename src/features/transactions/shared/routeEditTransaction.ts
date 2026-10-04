@@ -3,9 +3,9 @@ import { patchModalSearch } from "@/lib/modalSearch";
 
 /**
  * Routes a transaction edit to the correct surface (TRX-036). Cash Deposit/Withdrawal,
- * FreeShares, ManagementFee, Split, and Interest corrections open their dedicated
+ * FreeShares, ManagementFee, Split, Interest and Dividend corrections open their dedicated
  * modals via the URL-driven modal mount (the generic modal is cash-excluded,
- * CSH-018 / FSD-040 / FEE-063 / SPL-030 / INT-040); everything else opens the generic
+ * CSH-018 / FSD-040 / FEE-063 / SPL-030 / INT-040 / DIV-040); everything else opens the generic
  * edit modal through `openGenericModal`.
  * Shared by the per-asset and account-wide journals so the branching lives in one place.
  */
@@ -58,6 +58,14 @@ export function routeEditTransaction(
     case "Interest":
       patchModalSearch(navigate, {
         modal: "edit-interest",
+        editTxId: raw.id,
+        editTxAccountId: raw.account_id,
+        editTxAssetId: raw.asset_id,
+      });
+      break;
+    case "Dividend":
+      patchModalSearch(navigate, {
+        modal: "edit-dividend",
         editTxId: raw.id,
         editTxAccountId: raw.account_id,
         editTxAssetId: raw.asset_id,

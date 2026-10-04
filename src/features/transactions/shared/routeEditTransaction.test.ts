@@ -79,6 +79,14 @@ describe("routeEditTransaction", () => {
     );
   });
 
+  it("routes Dividend to the dividend edit dialog (DIV-040)", () => {
+    routeEditTransaction(navigate, tx("Dividend"), vi.fn());
+    expect(patchModalSearch).toHaveBeenCalledWith(
+      navigate,
+      expect.objectContaining({ modal: "edit-dividend" }),
+    );
+  });
+
   it("opens the generic modal for a Purchase (default branch)", () => {
     const openGeneric = vi.fn();
     const purchase = tx("Purchase");

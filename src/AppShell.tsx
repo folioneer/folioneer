@@ -4,6 +4,7 @@ import { AddTransactionModalMount } from "@/features/shell/AddTransactionModalMo
 import { AssetEditModalMount } from "@/features/shell/AssetEditModalMount";
 import { CashTransactionEditMount } from "@/features/shell/CashTransactionEditMount";
 import { CurrencyRateEditMount } from "@/features/shell/CurrencyRateEditMount";
+import { DividendEditModalMount } from "@/features/shell/DividendEditModalMount";
 import { FreeSharesEditModalMount } from "@/features/shell/FreeSharesEditModalMount";
 import { InterestEditModalMount } from "@/features/shell/InterestEditModalMount";
 import { MainLayout } from "@/features/shell/MainLayout";
@@ -26,6 +27,7 @@ export function AppShell() {
       <AssetEditModalMount />
       <CashTransactionEditMount />
       <CurrencyRateEditMount />
+      <DividendEditModalMount />
       <FreeSharesEditModalMount />
       <InterestEditModalMount />
       <ManagementFeeEditModalMount />

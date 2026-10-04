@@ -680,7 +680,11 @@
     "form_account_currency_mode": "Saisir le montant en {{currency}} (ce que le compte a réellement reçu)",
     "action_record": "Enregistrer le dividende",
     "action_record_and_add_another": "Enregistrer et en ajouter un autre",
-    "recorded": "Dividende enregistré."
+    "recorded": "Dividende enregistré.",
+    "edit_modal_title": "Modifier le dividende",
+    "edit_locked_note": "{{account}} ({{currency}}) — le compte et l'actif payeur ne peuvent pas être modifiés ; supprimez le dividende et enregistrez-le à nouveau pour le déplacer.",
+    "edit_total_label": "Total crédité sur le compte",
+    "updated": "Dividende mis à jour."
   },
   "free_shares": {
     "modal_title": "Enregistrer des actions gratuites",
