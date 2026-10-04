@@ -177,9 +177,9 @@ The owner's first use (2026-10-04). An old account is entered from the start of 
 **Design:** none
 **Open questions:**
 
-- [ ] Which recordings the agent gets. The entry lists three; the reconstruction needs an opening balance, a purchase, a sale, a deposit, a withdrawal and a price at a date — and perhaps an asset that does not exist yet (#056) and a dividend.
-- [ ] Redoing a reconstruction. The limits say no deletion and no correction through an agent. Either the agent may cancel the transactions it recorded itself (marked as reconstructed), or the owner removes them by hand in the window before a new attempt.
-- [ ] The position entered at the start of this year. Going further back makes it a duplicate of what the reconstruction arrives at: the agent replaces it, or the owner removes it and the agent checks that the reconstructed state at that date equals it.
+- [x] Which recordings the agent gets. → An opening balance, a purchase, a sale, a deposit, a withdrawal, a dividend and a price at a date, each datable years back. Creating an asset that does not exist waits for #056. (Owner, 2026-10-04.)
+- [x] Redoing a reconstruction. → Every recording made through an agent is marked as such, with the session that made it. An agent may correct or cancel only transactions marked that way, never one the owner typed: what the agent reads (a statement) is content it did not write, and must not be able to steer it into removing real history. The window offers the owner one action, "remove everything this session recorded". This replaces "no deletion, no correction" in the limits above. (Owner, 2026-10-04.)
+- [x] The position entered at the start of this year. → The owner's to handle, not the agent's: the agent reads the account as of that date and reports how the reconstructed state differs from the typed one; the owner removes the typed position in the window. It can only be removed once the past is rebuilt — this year's sales rest on it — so it counts twice from that date until then. (Owner, 2026-10-04.)
 
 Answers kept from the first round (owner, 2026-10-04): read tools first, then the recordings, in two pull requests; Claude Code proves it, Claude Desktop is documented; the same program with `--mcp`. Changed by the discussion: a recording is not confirmed by the client's prompt alone — the owner's one grant in the window, at connection, covers the session; nothing is served without the open application.
 
