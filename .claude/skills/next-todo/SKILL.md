@@ -22,9 +22,9 @@ rules are `docs/workflow.md`; this file is the checklist.
 - **Ready** = has a `**Done when:**`, `**Open questions:** none` (or every box ticked
   with its answer written after it), and `**Design:**` is `none` or `validated`.
   Headless: skip entries that are not ready; if none is ready, print which questions
-  block which entries and stop. Chat: ask the open questions together, once, before
-  anything else; write the answers into the entry (they land in the same PR as the
-  change), then continue.
+  block which entries and stop. Chat: ask the open questions before anything else,
+  one at a time, each with the context needed to answer it; write the answers into the
+  entry (they land in the same PR as the change), then continue.
 
 ## Step 1 — Opening brief, branch and task list
 

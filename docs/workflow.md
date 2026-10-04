@@ -58,7 +58,8 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
 
 1. **Pick** — headless: the first ready entry in Next. In chat: the entry the human
    names (`/next-todo #NNN`); the sentence is the queue, and open questions are asked
-   together, once, before anything starts, their answers written into the entry.
+   before anything starts — one at a time, each with its context — their answers
+   written into the entry.
    Branch `<type>/NNN-slug` (or `<type>/td-NNN-slug`) off fresh `main`, where `<type>` is
    the commit type the change will carry (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`,
    `ci`); work outside an entry is `<type>/slug`.

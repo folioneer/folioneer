@@ -12,7 +12,7 @@ After cloning: `git config core.hooksPath .githooks`. The hooks block commits to
 - The **agent** owns `docs/techdebt.md`, does the task end to end and merges on green. No pull request is validated by a human.
 - The **harness** (`just harness` locally, `--coverage` before a first push; required checks in CI) proves the code.
 
-Headless, a question only the human can answer goes into the entry's `**Open questions:**`, never asked. In a chat run (`/next-todo #NNN`) the open questions are asked together, once, before anything starts, and a design is validated by a yes; the answers are written into the entry either way. In a chat conversation, ask as you would a colleague: state assumptions, name what is unclear.
+Headless, a question only the human can answer goes into the entry's `**Open questions:**`, never asked. In a chat run (`/next-todo #NNN`) the open questions are asked before anything starts, and a design is validated by a yes; the answers are written into the entry either way. In a chat conversation, ask as you would a colleague: state assumptions, name what is unclear. Whenever the human is asked: one question at a time, each with the context needed to answer it — what the thing is, where it shows, what each answer changes.
 
 ## Core rules
 
