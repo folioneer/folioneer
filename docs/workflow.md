@@ -211,6 +211,12 @@ is the row's reason:
 
 Each finding gets its own row — never a silent fix, never a silent pass.
 
+The CI reviewers run on the subscription the chat session uses. A lane stopped by its
+usage limit says "did not run (usage limit)" in its comment and in `just merge`'s
+refusal, and fails: an unreviewed pull request does not merge. It is re-run once the
+limit has reset (`gh run rerun <run> --failed`). Late in a long session, a first push
+waits for the reset rather than spend a round on it.
+
 | Grade        | Action                                                            |
 | ------------ | ----------------------------------------------------------------- |
 | (a)          | Fix in the PR                                                     |

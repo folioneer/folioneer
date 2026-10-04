@@ -230,8 +230,19 @@ jobs:
             # tool problem); surface it instead of a bare "no report".
             last=$(jq -r 'if type=="array" then .[] else . end | select(.type=="result") | .result // empty' \
               review-session.json 2>/dev/null | tail -c 1500 || true)
-            body=$(printf '%s\n## reviewer-%s — no report\n\nThe reviewer produced no report ([run](%s)); the check fails until it does.\n\nSession said:\n\n> %s\n' \
-              "$MARKER" "$REVIEWER" "$RUN_URL" "${last:-(no final message)}")
+            # A session stopped by the subscription's usage limit reviewed nothing:
+            # say "did not run", not "no report", so the red check is not read as
+            # a finding (docs/flow.md FLOW-002). It still fails — an unreviewed
+            # pull request does not merge — and is re-run once the limit resets.
+            if grep -qiE "hit your (session|usage|weekly) limit|usage limit reached" <<<"$last"; then
+              heading="did not run (usage limit)"
+              advice="The reviewer's session was stopped by the usage limit before it read anything. Re-run the failed jobs once the limit has reset: \`gh run rerun ${GITHUB_RUN_ID} --failed\`."
+            else
+              heading="no report"
+              advice="The reviewer produced no report; the check fails until it does."
+            fi
+            body=$(printf '%s\n## reviewer-%s — %s\n\n%s ([run](%s))\n\nSession said:\n\n> %s\n' \
+              "$MARKER" "$REVIEWER" "$heading" "$advice" "$RUN_URL" "${last:-(no final message)}")
             criticals=1
           else
             # verdict:begin — kept inline: a file in the checkout could be rewritten

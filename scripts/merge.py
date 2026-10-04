@@ -200,6 +200,42 @@ def rebase_folding_fixups(target: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def reviewer_heading(comments: list[str], check_name: str) -> str | None:
+    """What a reviewer lane's sticky comment says of itself: the text after the dash of
+    its `## reviewer-<lane> — …` heading ("no report", "did not run (usage limit)"), or
+    None when the lane has no comment or its heading carries no such note."""
+    lane = check_name.removeprefix("reviewer-")
+    marker = f"<!-- review:{lane} -->"
+    for body in comments:
+        if not body.startswith(marker):
+            continue
+        for line in body.splitlines():
+            if line.startswith(f"## {check_name} — "):
+                note = line.split(" — ", 1)[1].strip()
+                # A report's own heading counts files; only a note about the run is told.
+                return note if not note[:1].isdigit() else None
+    return None
+
+
+def _reviewer_notes(number: int, failing: list[str]) -> dict[str, str]:
+    """For the failing reviewer checks, what each one's sticky comment says of its run."""
+    lanes = [name for name in failing if name.startswith("reviewer-")]
+    if not lanes:
+        return {}
+    result = gh(
+        "api",
+        f"repos/{{owner}}/{{repo}}/issues/{number}/comments",
+        "--paginate",
+        "--jq",
+        ".[] | .body | @json",
+    )
+    if result.returncode != 0:
+        return {}
+    comments = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+    notes = {name: reviewer_heading(comments, name) for name in lanes}
+    return {name: note for name, note in notes.items() if note}
+
+
 def ensure_checks_green(branch: str, target: str, before: str, after: str) -> None:
     """Refuse the merge unless CI is green on exactly the commits about to land."""
     number, head = _open_pull_request(branch, target)
@@ -227,11 +263,18 @@ def ensure_checks_green(branch: str, target: str, before: str, after: str) -> No
             )
     runs = _check_runs(head)
     missing = [name for name in _required_checks() if name not in runs]
-    not_green = sorted(
-        f"{name}: {status if status != 'completed' else conclusion}"
+    failing = sorted(
+        name
         for name, (status, conclusion) in runs.items()
         if status != "completed" or conclusion not in PASSING
     )
+    # A reviewer that did not run is told apart from one that found a critical.
+    notes = _reviewer_notes(number, failing) if failing else {}
+    not_green = [
+        f"{name}: {runs[name][0] if runs[name][0] != 'completed' else runs[name][1]}"
+        + (f" — {notes[name]}" if name in notes else "")
+        for name in failing
+    ]
     if missing or not_green:
         fail(
             f"PR #{number} is not green on {head[:7]}.",

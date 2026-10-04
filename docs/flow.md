@@ -39,19 +39,6 @@ request. The time went to waiting on CI and to rounds that tested nothing new.
 
 ---
 
-## FLOW-002 — The CI reviewers stop when the session's usage window is spent
-
-- Kind: quality + speed
-- Observed: on #91 the six reviewer checks went red with "You've hit your session limit";
-  they share the interactive session's window. A red reviewer check then reads like a
-  finding. One round lost, and the push had to wait for the reset.
-- Proposal: the reviewer job tells "did not run" from "found a critical" — a neutral
-  conclusion with the reset time in the sticky comment — and `just merge` refuses a
-  neutral reviewer with that message. Before a first push late in a long session, the
-  agent says so and holds the push when the limit is near.
-- Costs: an hour on `review.yml` and `scripts/merge.py`. Protects: a false red, and a
-  merge that would otherwise wait on an unexplained failure.
-
 ## FLOW-003 — Every merge sends the other open pull requests round again
 
 - Kind: speed

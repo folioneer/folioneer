@@ -171,5 +171,28 @@ class FoldingFixups(unittest.TestCase):
         self.assertFalse(merge._rebase_left_the_checks_standing(tested, code))
 
 
+class ReviewerNotes(unittest.TestCase):
+    # FLOW-002 — a reviewer that did not run says so in its sticky comment's heading; the
+    # refusal repeats it, so a red check is not read as a finding.
+    def test_a_reviewer_that_did_not_run_is_told_apart_from_a_finding(self):
+        comments = [
+            "<!-- e2e-screenshots -->\n## E2E screenshots — success\n",
+            "<!-- review:arch -->\n## reviewer-arch — did not run (usage limit)\n\nRe-run…",
+            "<!-- review:infra -->\n## reviewer-infra — no report\n\nThe reviewer produced…",
+            "<!-- review:backend -->\n## reviewer-backend — 3 files reviewed\n\n🔴 1 critical",
+        ]
+        self.assertEqual(
+            merge.reviewer_heading(comments, "reviewer-arch"),
+            "did not run (usage limit)",
+        )
+        self.assertEqual(
+            merge.reviewer_heading(comments, "reviewer-infra"), "no report"
+        )
+        # A real report's heading is not a note about the run: nothing is added.
+        self.assertIsNone(merge.reviewer_heading(comments, "reviewer-backend"))
+        # A lane with no comment yet.
+        self.assertIsNone(merge.reviewer_heading(comments, "reviewer-sql"))
+
+
 if __name__ == "__main__":
     unittest.main()
