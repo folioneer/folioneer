@@ -228,3 +228,31 @@ pub trait FeeCatchUpRepository: Send + Sync {
     /// Deletes the catch-up position of one (account, asset) pair. No-op if absent.
     async fn delete_by_account_asset(&self, account_id: &str, asset_id: &str) -> Result<()>;
 }
+
+#[cfg(test)]
+mod rate_bound_tests {
+    use super::*;
+
+    // FEE-032 — a rate of exactly 100 % is the highest accepted; anything above is refused.
+    #[test]
+    fn fee_032_a_rate_of_a_hundred_percent_is_the_highest_accepted() {
+        let schedule = || {
+            FeeSchedule::new(
+                "acc".to_string(),
+                "asset".to_string(),
+                1_000_000,
+                FeeFrequency::Annually,
+                "2024-01-01".to_string(),
+                None,
+            )
+            .expect("schedule")
+        };
+        assert!(schedule().update_from(100_000_000, None, true).is_ok());
+        for above in [100_000_001, 150_000_000] {
+            assert!(matches!(
+                schedule().update_from(above, None, true),
+                Err(AccountError::RateAboveHundred)
+            ));
+        }
+    }
+}

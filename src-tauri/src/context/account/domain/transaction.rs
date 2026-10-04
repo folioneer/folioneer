@@ -1417,4 +1417,14 @@ mod tests {
             "FreeShares must round-trip through strum"
         );
     }
+
+    // TRX-020 — the first of January 1900 is the oldest date accepted.
+    #[test]
+    fn the_first_of_january_1900_is_the_oldest_date_accepted() {
+        assert!(Transaction::validate_date("1900-01-01").is_ok());
+        assert!(matches!(
+            Transaction::validate_date("1899-12-31"),
+            Err(AccountError::DateTooOld)
+        ));
+    }
 }

@@ -307,4 +307,16 @@ mod tests {
             Ok(())
         );
     }
+
+    // SYN-034 — the bounds hold at any depth, inside a list as inside an object.
+    #[test]
+    fn syn_034_a_value_out_of_bounds_inside_a_list_is_refused() {
+        let content = serde_json::json!({ "lines": [{ "amount": AMOUNT_BOUND + 1 }] });
+        assert!(matches!(
+            bounded(&content, ""),
+            Err(MalformedChange::AmountOutOfBounds { field }) if field == "lines.amount"
+        ));
+        let within = serde_json::json!({ "lines": [{ "amount": AMOUNT_BOUND }] });
+        assert!(bounded(&within, "").is_ok());
+    }
 }

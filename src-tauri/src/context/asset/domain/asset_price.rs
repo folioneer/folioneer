@@ -307,3 +307,28 @@ mod tests {
         assert_eq!(ap.price, -1);
     }
 }
+
+#[cfg(test)]
+mod provider_default_tests {
+    use super::*;
+
+    /// A provider of latest prices only.
+    struct LatestOnly;
+
+    #[async_trait]
+    impl PriceProvider for LatestOnly {
+        async fn fetch_price(&self, _symbol: &str) -> anyhow::Result<Option<Quote>> {
+            Ok(None)
+        }
+    }
+
+    // A provider that gives no series of daily closes says so: it never
+    // answers "no data", which would read as an asset without history.
+    #[tokio::test]
+    async fn a_provider_without_daily_closes_fails_instead_of_answering_no_data() {
+        let answer = LatestOnly
+            .fetch_daily_closes("AAPL", "2026-01-01", "2026-01-31")
+            .await;
+        assert!(answer.is_err());
+    }
+}

@@ -404,6 +404,19 @@ mod tests {
         assert!(!re_enrolled.paused);
     }
 
+    // A device that enrols again joined the shared portfolio now, not when it first did.
+    #[test]
+    fn re_enroll_dates_the_joining_at_the_re_enrolment() {
+        let mut device = sample();
+        device.joined_at = "2020-01-01T00:00:00+00:00".into();
+        let before = chrono::Utc::now();
+        let re_enrolled = device
+            .re_enroll("Laptop".into(), "/mnt/new".into(), "9".into(), 2)
+            .unwrap();
+        let joined_at = chrono::DateTime::parse_from_rfc3339(&re_enrolled.joined_at).unwrap();
+        assert!(joined_at >= before);
+    }
+
     // SYN-018 — re-enrolling with a blank name is rejected.
     #[test]
     fn re_enroll_rejects_blank_name() {

@@ -874,6 +874,77 @@ fn segment_names(area: &std::path::Path) -> std::collections::BTreeSet<String> {
         .collect()
 }
 
+// SYN-035 — a folder written in a data format newer than this build's is not joined: the
+// device is told to update, and nothing of it is left in the folder.
+#[tokio::test]
+async fn syn_035_a_folder_in_a_newer_data_format_is_not_joined() {
+    let dir = tempfile::tempdir().unwrap();
+    let desktop = build_ctx(dir.path()).await;
+    seed_small_portfolio(&desktop).await;
+    desktop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Desktop".into(),
+        )
+        .await
+        .expect("Desktop must enable as the first device");
+
+    let header_path = dir.path().join("vaultcompass-sync.json");
+    let mut header: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&header_path).unwrap()).unwrap();
+    assert!(header.get("data_format_version").is_some());
+    header["data_format_version"] = serde_json::json!(DATA_FORMAT_VERSION + 1);
+    std::fs::write(&header_path, serde_json::to_vec(&header).unwrap()).unwrap();
+
+    let laptop = build_ctx(dir.path()).await;
+    let refused = laptop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Laptop".into(),
+        )
+        .await
+        .expect_err("a newer data format is not joined");
+    let refusal = serde_json::to_value(&refused).unwrap();
+    assert_eq!(refusal["code"], "UpdateRequired");
+    assert_eq!(refusal["data_format_version"], DATA_FORMAT_VERSION + 1);
+    assert_eq!(
+        std::fs::read_dir(dir.path().join("devices"))
+            .unwrap()
+            .count(),
+        1,
+        "only Desktop's area is in the folder"
+    );
+
+    assert!(!laptop.orchestrator.get_sync_status().await.unwrap().enabled);
+
+    // SYN-035 — nor is such a folder taken as the new place of a portfolio already shared:
+    // the device stays on its folder.
+    let elsewhere = tempfile::tempdir().unwrap();
+    std::fs::write(
+        elsewhere.path().join("vaultcompass-sync.json"),
+        serde_json::to_vec(&header).unwrap(),
+    )
+    .unwrap();
+    let refused = desktop
+        .orchestrator
+        .change_sync_folder(elsewhere.path().to_string_lossy().to_string())
+        .await
+        .expect_err("a newer data format is not moved to");
+    assert_eq!(
+        serde_json::to_value(&refused).unwrap()["code"],
+        "UpdateRequired"
+    );
+    let status = desktop.orchestrator.get_sync_status().await.unwrap();
+    assert_eq!(
+        status.folder.as_deref(),
+        Some(dir.path().to_string_lossy().as_ref())
+    );
+}
+
 // SYN-033/037 — a run applies what another device published since the last one, counts
 // it, and applies nothing twice.
 #[tokio::test]

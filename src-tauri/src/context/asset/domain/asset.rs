@@ -1263,3 +1263,27 @@ pub trait AssetRepository: Send + Sync {
         asset: &Asset,
     ) -> Result<()>;
 }
+
+#[cfg(test)]
+mod default_risk_tests {
+    use super::*;
+
+    // R3 — the risk level a new asset of each class starts at.
+    #[test]
+    fn each_class_has_its_default_risk() {
+        let expected = [
+            (AssetClass::Cash, 1),
+            (AssetClass::Bonds, 2),
+            (AssetClass::RealEstate, 2),
+            (AssetClass::MutualFunds, 3),
+            (AssetClass::ETF, 3),
+            (AssetClass::ETP, 3),
+            (AssetClass::Stocks, 4),
+            (AssetClass::DigitalAsset, 5),
+            (AssetClass::Derivatives, 5),
+        ];
+        for (class, risk) in expected {
+            assert_eq!(class.default_risk(), risk, "{class:?}");
+        }
+    }
+}

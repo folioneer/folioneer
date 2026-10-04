@@ -457,4 +457,12 @@ mod tests {
         assert_eq!(draft.origin, Origin::User);
         assert_eq!(draft.content.as_deref(), Some("{\"name\":\"CTO\"}"));
     }
+
+    // SYN-025 — a logical timestamp gives back the counter it was made from.
+    #[test]
+    fn a_logical_timestamp_gives_back_its_counter() {
+        assert_eq!(LogicalTimestamp::new(0).value(), 0);
+        assert_eq!(LogicalTimestamp::new(1).value(), 1);
+        assert_eq!(LogicalTimestamp::new(4_217).value(), 4_217);
+    }
 }

@@ -155,4 +155,11 @@ mod tests {
     fn with_exchange_empty_reference_returns_none() {
         assert!(derive_yahoo_symbol_with_exchange("", Some(&xpar_exchange())).is_none());
     }
+
+    // MKT-110 — a reference that is empty once trimmed derives no symbol.
+    #[test]
+    fn an_empty_reference_derives_no_symbol() {
+        assert_eq!(derive_yahoo_symbol(""), None);
+        assert_eq!(derive_yahoo_symbol("   "), None);
+    }
 }
