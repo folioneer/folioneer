@@ -7,7 +7,7 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-075) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-081) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -317,6 +317,15 @@ Remove an entry once it has been resolved.
 - Observation: the replay multiplies the quantity by the factor in 128 bits and casts the result back to 64 bits without a check. A factor large enough (far beyond any real split) makes the cast wrap: recording and the split check both then show a quantity that is wrong, or refuse a split for the wrong reason.
 - User value: None in practice — no real split comes near the bound; an absurd factor typed by mistake is refused with a clear reason.
 - Done when: a factor whose rescale cannot be stored is refused when the split is recorded and when it is checked, with one error code, shown by a test on each path.
+
+## 2026-10-04 — TD-080 — The E2E tooling carries 22 known advisories
+
+- Found by: `/dep-audit` before the 0.6.0 release
+- Where: `package.json` — the WebdriverIO packages (`@wdio/*`, `webdriverio`, 9.31.7) and what they bring: `undici` (< 7.29.1), `basic-ftp`, `extract-zip`, `braces`
+- Severity: 🔵
+- Observation: `npm audit` lists 22 advisories (18 high), all in development dependencies; `npm audit --omit=dev` finds none, so nothing of it ships. `npm audit fix` moves WebdriverIO to 9.32.0 and leaves 20: the chain pins the affected versions, and the only complete fix offered is a downgrade to WebdriverIO 8. The tooling runs on CI and on this machine against the application under test, never against untrusted input.
+- User value: None directly — the audit before a release reads clean again.
+- Done when: `npm audit` reports no advisory, by a WebdriverIO release that drops the affected versions or by `overrides` proven on a green E2E run; or each one left is recorded with why it cannot be reached.
 
 ## 2026-10-04 — TD-079 — The rate edit scenario fails at random and is skipped
 

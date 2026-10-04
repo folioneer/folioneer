@@ -119,8 +119,10 @@ not once per entry:
 A question that only appears mid-batch is written on its entry, the entry is skipped,
 and the question joins the closing block — unless nothing else in the queue can run.
 
-**Release** — the hand-over starts with `/dep-audit` (a known vulnerability in what
-ships blocks the release) and the human runs `just release -y` when they choose. After
+**Release** — when the queue empties the agent runs `/dep-audit` without being asked (a
+known vulnerability in what ships blocks the release; the agent fixes it or files it) and
+hands over a clean `main`. The release itself is the human's only part: they run
+`just release -y` when they choose. After
 it, `/prune` runs once and `/flow-audit` measures the batch against the release before
 (`docs/flow.md`). The release re-runs the full
 harness on `main`, computes the version from the merged titles, writes the changelog,
