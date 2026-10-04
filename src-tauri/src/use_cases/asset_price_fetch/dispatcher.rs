@@ -129,11 +129,11 @@ impl Dispatcher {
                                 err = ?e,
                                 "asset_price_fetch: upsert failed; skipping (MKT-114)"
                             );
-                            continue;
+                        } else {
+                            ok += 1;
+                            fetched.insert(asset.id.clone(), written);
+                            self.event_bus.publish(Event::AssetPriceUpdated);
                         }
-                        ok += 1;
-                        fetched.insert(asset.id.clone(), written);
-                        self.event_bus.publish(Event::AssetPriceUpdated);
                     }
                     Ok(None) => {
                         skipped += 1;
@@ -266,5 +266,103 @@ mod tests {
             resolve_observation_date(Some("2026-06-08"), today()),
             "2026-06-07"
         );
+    }
+}
+
+#[cfg(test)]
+mod task_tests {
+    use super::*;
+    use crate::context::asset::{
+        AssetCategory, AssetClass, MockAssetPriceRepository, MockPriceProvider, Quote,
+        SYSTEM_CATEGORY_ID,
+    };
+    use crate::use_cases::asset_price_fetch::guard::FetchGuard;
+
+    fn asset(reference: &str) -> (Asset, String) {
+        (
+            Asset::restore(
+                format!("asset-{}", reference.to_lowercase()),
+                "Test Asset".to_string(),
+                AssetClass::Stocks,
+                AssetCategory::from_storage(
+                    SYSTEM_CATEGORY_ID.to_string(),
+                    "generic.uncategorized".to_string(),
+                ),
+                "USD".to_string(),
+                1,
+                reference.to_string(),
+                None,
+                false,
+                None,
+                false,
+                false,
+            ),
+            reference.to_string(),
+        )
+    }
+
+    // MKT-119/180 — a task over three assets — one priced, one whose price cannot be
+    // written, one the provider has nothing for — ends with 1 priced and 2 skipped, both
+    // named as unpriced, reports its progress after each asset, and pauses once between
+    // two requests: twice for three assets.
+    // The bus keeps the latest event only: each progress is read because the task rests
+    // right after it, on one thread, with mocks that never wait.
+    #[tokio::test(start_paused = true)]
+    async fn mkt_119_a_task_tallies_its_assets_and_pauses_between_two_requests() {
+        let mut provider = MockPriceProvider::new();
+        provider.expect_fetch_price().returning(|symbol| {
+            Ok((symbol != "NODATA").then_some(Quote {
+                price: 100_000_000,
+                date: None,
+            }))
+        });
+        let mut price_repo = MockAssetPriceRepository::new();
+        price_repo.expect_upsert().returning(|record| {
+            if record.asset_id == "asset-writefail" {
+                Err(anyhow::anyhow!("write failed"))
+            } else {
+                Ok(())
+            }
+        });
+        price_repo.expect_get_latest().returning(|_| Ok(None));
+        let bus = Arc::new(SideEffectEventBus::new());
+        let mut events = bus.subscribe();
+        let dispatcher = Arc::new(Dispatcher::new(
+            Arc::new(provider),
+            Arc::new(price_repo),
+            Arc::clone(&bus),
+            Arc::new(|| NaiveDate::from_ymd_opt(2026, 6, 10).expect("date")),
+        ));
+        let lease = Arc::new(FetchGuard::new()).try_acquire().expect("lease");
+
+        let started = tokio::time::Instant::now();
+        dispatcher.spawn(
+            vec![asset("PRICED"), asset("WRITEFAIL"), asset("NODATA")],
+            lease,
+            None,
+        );
+        let mut progress = Vec::new();
+        let (ok, skipped, unpriced) = loop {
+            events.changed().await.expect("bus open");
+            match events.borrow().clone() {
+                Event::AssetPriceFetchProgress { done, total } => progress.push((done, total)),
+                Event::AssetPriceFetchCompleted {
+                    ok,
+                    skipped,
+                    unpriced,
+                    ..
+                } => break (ok, skipped, unpriced),
+                _ => {}
+            }
+        };
+
+        assert_eq!((ok, skipped), (1, 2));
+        let unpriced: Vec<String> = unpriced.into_iter().map(|asset| asset.asset_id).collect();
+        assert_eq!(unpriced, vec!["asset-writefail", "asset-nodata"]);
+        assert!(
+            progress.contains(&(1, 3)) && progress.contains(&(2, 3)),
+            "{progress:?}"
+        );
+        assert_eq!(started.elapsed(), INTER_FETCH_DELAY * 2);
     }
 }
