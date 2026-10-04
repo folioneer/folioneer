@@ -10,7 +10,7 @@ import type {
   Transaction,
   TransactionDraft,
   TransactionDraftError,
-  TransactionDraftPreview,
+  TransactionPreview,
 } from "../../bindings";
 import { commands, events, type Result } from "../../bindings";
 import type { CorrectTransactionFields } from "./shared/types";
@@ -42,7 +42,7 @@ export const transactionGateway = {
 
   async validateTransactionDraft(
     draft: TransactionDraft,
-  ): Promise<Result<TransactionDraftPreview, TransactionDraftError>> {
+  ): Promise<Result<TransactionPreview, TransactionDraftError>> {
     return await commands.validateTransactionDraft(draft);
   },
 

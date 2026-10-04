@@ -609,7 +609,7 @@ async sellHolding(dto: SellHoldingDTO) : Promise<Result<Transaction, AccountErro
  * Checks a transaction draft without writing anything (TRX-062): the unit price and total
  * recording it would store, or the first problem as a code the form displays.
  */
-async validateTransactionDraft(draft: TransactionDraft) : Promise<Result<TransactionDraftPreview, TransactionDraftError>> {
+async validateTransactionDraft(draft: TransactionDraft) : Promise<Result<TransactionPreview, TransactionDraftError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("validate_transaction_draft", { draft }) };
 } catch (e) {
@@ -621,7 +621,7 @@ async validateTransactionDraft(draft: TransactionDraft) : Promise<Result<Transac
  * Checks an opening balance draft without writing anything (TRX-066): whether its total
  * cost of 0 calls for a warning (TRX-065), or the first problem as a code.
  */
-async validateOpeningBalanceDraft(draft: OpeningBalanceDraft) : Promise<Result<OpeningBalanceDraftPreview, TransactionDraftError>> {
+async validateOpeningBalanceDraft(draft: OpeningBalanceDraft) : Promise<Result<OpeningBalancePreview, TransactionDraftError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("validate_opening_balance_draft", { draft }) };
 } catch (e) {
@@ -634,9 +634,9 @@ async validateOpeningBalanceDraft(draft: OpeningBalanceDraft) : Promise<Result<O
  * store, the position before and after, the price to carry across the split — or the
  * first problem as a code.
  */
-async validateSplitDraft(draft: SplitDraft) : Promise<Result<SplitDraftPreview, TransactionDraftError>> {
+async validateStockSplitDraft(draft: StockSplitDraft) : Promise<Result<StockSplitPreview, TransactionDraftError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("validate_split_draft", { draft }) };
+    return { status: "ok", data: await TAURI_INVOKE("validate_stock_split_draft", { draft }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1033,8 +1033,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
+export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 
 /** user-defined types **/
 
@@ -3338,7 +3338,7 @@ total_cost: number | null }
 /**
  * What the user should know about an opening balance that can be recorded (TRX-066).
  */
-export type OpeningBalanceDraftPreview = { 
+export type OpeningBalancePreview = { 
 /**
  * TRX-065 — the total cost is 0: the form and the command line warn, never block.
  */
@@ -3950,48 +3950,6 @@ total_amount: number | null;
  */
 note: string | null }
 /**
- * A split as the user is still entering it (SPL-062/063). Empty strings are fields not filled
- * yet.
- */
-export type SplitDraft = { 
-/**
- * The account.
- */
-account_id: string; 
-/**
- * The asset that splits.
- */
-asset_id: string; 
-/**
- * ISO date, empty until entered.
- */
-date: string; 
-/**
- * The size of the split.
- */
-size: SplitSize; 
-/**
- * The split being corrected, if any: its position is not previewed (SPL-063).
- */
-correcting: string | null }
-/**
- * What recording a split draft would do (SPL-062): the form shows it and computes none.
- */
-export type SplitDraftPreview = { 
-/**
- * The micro-scaled factor recording would store (SPL-061).
- */
-factor: number; 
-/**
- * The position on the split's date, before and after; `None` for a correction.
- */
-position: SplitPositionPreview | null; 
-/**
- * The asset's latest price before the split's date, carried across the split:
- * `round(price × MICRO / factor)` (SPL-040); `None` when it has none.
- */
-price_after_split: number | null }
-/**
  * Use-case composite for the **record split** failure surface.
  * 
  * - `AccountError` — every account-BC rejection (lookup, infrastructure, the
@@ -4007,27 +3965,6 @@ AccountError |
  * Use-case-layer rejection (cross-BC asset checks).
  */
 SplitTask
-/**
- * What a split would make of a position (SPL-020): the holding on the split's date,
- * before and after the rescale. All fields are i64 micro-units (ADR-001).
- */
-export type SplitPositionPreview = { 
-/**
- * Units held on the split's date, before it.
- */
-old_quantity: number; 
-/**
- * Average cost per unit before the split, account currency.
- */
-old_average_price: number; 
-/**
- * Units held once the split is applied.
- */
-new_quantity: number; 
-/**
- * Average cost per unit once the split is applied, account currency.
- */
-new_average_price: number }
 /**
  * How the size of a split is entered (SPL-061).
  */
@@ -4057,6 +3994,69 @@ export type SplitTask =
  * The asset is not currently held (quantity = 0 or no holding) (SPL-012).
  */
 { code: "AssetNotHeld" }
+/**
+ * A split as the user is still entering it (SPL-062/063). Empty strings are fields not filled
+ * yet.
+ */
+export type StockSplitDraft = { 
+/**
+ * The account.
+ */
+account_id: string; 
+/**
+ * The asset that splits.
+ */
+asset_id: string; 
+/**
+ * ISO date, empty until entered.
+ */
+date: string; 
+/**
+ * The size of the split.
+ */
+size: SplitSize; 
+/**
+ * The split being corrected, if any: its position is not previewed (SPL-063).
+ */
+correcting: string | null }
+/**
+ * What a split would make of a position (SPL-020): the holding on the split's date,
+ * before and after the rescale. All fields are i64 micro-units (ADR-001).
+ */
+export type StockSplitPosition = { 
+/**
+ * Units held on the split's date, before it.
+ */
+old_quantity: number; 
+/**
+ * Average cost per unit before the split, account currency.
+ */
+old_average_price: number; 
+/**
+ * Units held once the split is applied.
+ */
+new_quantity: number; 
+/**
+ * Average cost per unit once the split is applied, account currency.
+ */
+new_average_price: number }
+/**
+ * What recording a split draft would do (SPL-062): the form shows it and computes none.
+ */
+export type StockSplitPreview = { 
+/**
+ * The micro-scaled factor recording would store (SPL-061).
+ */
+factor: number; 
+/**
+ * The position on the split's date, before and after; `None` for a correction.
+ */
+position: StockSplitPosition | null; 
+/**
+ * The asset's latest price before the split's date, carried across the split:
+ * `round(price × MICRO / factor)` (SPL-040); `None` when it has none.
+ */
+price_after_split: number | null }
 /**
  * Every failure the `sync` bounded context can raise. `#[serde(tag = "code")]` makes each
  * variant serialize as `{ "code": "VariantName", ...payload }` on the wire.
@@ -4404,25 +4404,6 @@ AccountError |
  */
 TransactionDraftTask
 /**
- * What recording a draft would store (TRX-062): the form shows the total.
- */
-export type TransactionDraftPreview = { 
-/**
- * Unit price in the asset's currency.
- */
-unit_price: number; 
-/**
- * Total in account currency.
- */
-total_amount: number; 
-/**
- * The gain a new sale would realize (TDI-030), in account currency: its proceeds minus
- * the average cost, as of its date, of the quantity sold. `None` for anything but a
- * new sale, and when it cannot be computed — the position at that date does not
- * hold what is sold, or cannot be read (TDI-031).
- */
-realized_pnl: number | null }
-/**
  * A field of a transaction draft not filled yet (TRX-062). The draft's figures are
  * checked by the account domain, whose `AccountError` codes the composite carries.
  */
@@ -4443,6 +4424,25 @@ export type TransactionDraftTask =
  * No total cost entered, for an opening balance (TRX-066).
  */
 { code: "TotalCostMissing" }
+/**
+ * What recording a draft would store (TRX-062): the form shows the total.
+ */
+export type TransactionPreview = { 
+/**
+ * Unit price in the asset's currency.
+ */
+unit_price: number; 
+/**
+ * Total in account currency.
+ */
+total_amount: number; 
+/**
+ * The gain a new sale would realize (TDI-030), in account currency: its proceeds minus
+ * the average cost, as of its date, of the quantity sold. `None` for anything but a
+ * new sale, and when it cannot be computed — the position at that date does not
+ * hold what is sold, or cannot be read (TDI-031).
+ */
+realized_pnl: number | null }
 /**
  * Type of financial transaction.
  */

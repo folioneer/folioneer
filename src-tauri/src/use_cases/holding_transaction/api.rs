@@ -3,8 +3,8 @@
 
 use super::error::{DividendError, OpenHoldingError};
 use super::{
-    HoldingTransactionUseCase, OpeningBalanceDraft, OpeningBalanceDraftPreview, SplitDraft,
-    SplitDraftPreview, TransactionDraft, TransactionDraftError, TransactionDraftPreview,
+    HoldingTransactionUseCase, OpeningBalanceDraft, OpeningBalancePreview, StockSplitDraft,
+    StockSplitPreview, TransactionDraft, TransactionDraftError, TransactionPreview,
 };
 use crate::context::account::{AccountError, ManagementFeeRemoval, Transaction};
 use serde::{Deserialize, Serialize};
@@ -491,7 +491,7 @@ pub async fn record_interest(
 pub async fn validate_transaction_draft(
     uc: State<'_, HoldingTransactionUseCase>,
     draft: TransactionDraft,
-) -> Result<TransactionDraftPreview, TransactionDraftError> {
+) -> Result<TransactionPreview, TransactionDraftError> {
     uc.validate_draft(draft).await
 }
 
@@ -500,11 +500,11 @@ pub async fn validate_transaction_draft(
 /// first problem as a code.
 #[tauri::command]
 #[specta::specta]
-pub async fn validate_split_draft(
+pub async fn validate_stock_split_draft(
     uc: State<'_, HoldingTransactionUseCase>,
-    draft: SplitDraft,
-) -> Result<SplitDraftPreview, TransactionDraftError> {
-    uc.validate_split_draft(draft).await
+    draft: StockSplitDraft,
+) -> Result<StockSplitPreview, TransactionDraftError> {
+    uc.validate_stock_split_draft(draft).await
 }
 
 /// Checks an opening balance draft without writing anything (TRX-066): whether its total
@@ -514,6 +514,6 @@ pub async fn validate_split_draft(
 pub async fn validate_opening_balance_draft(
     uc: State<'_, HoldingTransactionUseCase>,
     draft: OpeningBalanceDraft,
-) -> Result<OpeningBalanceDraftPreview, TransactionDraftError> {
+) -> Result<OpeningBalancePreview, TransactionDraftError> {
     uc.validate_opening_balance_draft(&draft)
 }

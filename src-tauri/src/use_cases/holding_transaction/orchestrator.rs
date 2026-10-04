@@ -6,7 +6,7 @@ use super::error::{
 use super::shared::ensure_cash_asset;
 use crate::context::account::{
     Account, AccountError, AccountServiceContract, EnteredAmount, ManagementFeeRemoval,
-    SplitPositionPreview, Transaction, TransactionType,
+    StockSplitPosition, Transaction, TransactionType,
 };
 use crate::context::asset::{Asset, AssetClass, AssetServiceContract};
 use crate::core::logger::BACKEND;
@@ -65,7 +65,7 @@ pub struct OpeningBalanceDraft {
 
 /// What the user should know about an opening balance that can be recorded (TRX-066).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct OpeningBalanceDraftPreview {
+pub struct OpeningBalancePreview {
     /// TRX-065 — the total cost is 0: the form and the command line warn, never block.
     pub zero_cost: bool,
 }
@@ -92,7 +92,7 @@ pub enum SplitSize {
 /// yet.
 #[derive(Debug, Clone, serde::Deserialize, specta::Type)]
 #[serde(deny_unknown_fields)]
-pub struct SplitDraft {
+pub struct StockSplitDraft {
     /// The account.
     pub account_id: String,
     /// The asset that splits.
@@ -107,11 +107,11 @@ pub struct SplitDraft {
 
 /// What recording a split draft would do (SPL-062): the form shows it and computes none.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct SplitDraftPreview {
+pub struct StockSplitPreview {
     /// The micro-scaled factor recording would store (SPL-061).
     pub factor: i64,
     /// The position on the split's date, before and after; `None` for a correction.
-    pub position: Option<SplitPositionPreview>,
+    pub position: Option<StockSplitPosition>,
     /// The asset's latest price before the split's date, carried across the split:
     /// `round(price × MICRO / factor)` (SPL-040); `None` when it has none.
     pub price_after_split: Option<i64>,
@@ -119,7 +119,7 @@ pub struct SplitDraftPreview {
 
 /// What recording a draft would store (TRX-062): the form shows the total.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
-pub struct TransactionDraftPreview {
+pub struct TransactionPreview {
     /// Unit price in the asset's currency.
     pub unit_price: i64,
     /// Total in account currency.
@@ -216,7 +216,7 @@ impl HoldingTransactionUseCase {
     pub async fn validate_draft(
         &self,
         draft: TransactionDraft,
-    ) -> Result<TransactionDraftPreview, TransactionDraftError> {
+    ) -> Result<TransactionPreview, TransactionDraftError> {
         let missing = |value: &str| value.trim().is_empty();
         if missing(&draft.account_id) {
             return Err(TransactionDraftTask::AccountMissing.into());
@@ -251,7 +251,7 @@ impl HoldingTransactionUseCase {
                     exchange_rate,
                     fees,
                 )?;
-                return Ok(TransactionDraftPreview {
+                return Ok(TransactionPreview {
                     unit_price,
                     total_amount,
                     realized_pnl: None,
@@ -290,7 +290,7 @@ impl HoldingTransactionUseCase {
                     Account::preview_realized_pnl(total_amount, held.average_price, draft.quantity)
                 });
         }
-        Ok(TransactionDraftPreview {
+        Ok(TransactionPreview {
             unit_price,
             total_amount,
             realized_pnl,
@@ -300,10 +300,10 @@ impl HoldingTransactionUseCase {
     /// SPL-062 — checks a split draft without writing anything: the factor it would store,
     /// what it would make of the position, the price to carry across it — or the first
     /// problem, as recording would report it.
-    pub async fn validate_split_draft(
+    pub async fn validate_stock_split_draft(
         &self,
-        draft: SplitDraft,
-    ) -> Result<SplitDraftPreview, TransactionDraftError> {
+        draft: StockSplitDraft,
+    ) -> Result<StockSplitPreview, TransactionDraftError> {
         const MICRO: i128 = 1_000_000;
         // `round(numerator / denominator)` on positive integers, halves up; `None` when
         // the result is no amount the application can hold.
@@ -357,7 +357,7 @@ impl HoldingTransactionUseCase {
             .get_asset_prices(&draft.asset_id)
             .await
             .unwrap_or_else(|e| {
-                tracing::error!(target: BACKEND, asset_id = %draft.asset_id, err = ?e, "validate_split_draft: price read failed");
+                tracing::error!(target: BACKEND, asset_id = %draft.asset_id, err = ?e, "validate_stock_split_draft: price read failed");
                 Vec::new()
             });
         let price_after_split = prices
@@ -365,7 +365,7 @@ impl HoldingTransactionUseCase {
             .filter(|price| price.date < draft.date)
             .max_by(|a, b| a.date.cmp(&b.date))
             .and_then(|latest| rounded(latest.price as i128 * MICRO, factor as i128));
-        Ok(SplitDraftPreview {
+        Ok(StockSplitPreview {
             factor,
             position,
             price_after_split,
@@ -377,7 +377,7 @@ impl HoldingTransactionUseCase {
     pub fn validate_opening_balance_draft(
         &self,
         draft: &OpeningBalanceDraft,
-    ) -> Result<OpeningBalanceDraftPreview, TransactionDraftError> {
+    ) -> Result<OpeningBalancePreview, TransactionDraftError> {
         let missing = |value: &str| value.trim().is_empty();
         if missing(&draft.account_id) {
             return Err(TransactionDraftTask::AccountMissing.into());
@@ -397,7 +397,7 @@ impl HoldingTransactionUseCase {
             draft.quantity,
             total_cost,
         )?;
-        Ok(OpeningBalanceDraftPreview {
+        Ok(OpeningBalancePreview {
             zero_cost: notice.zero_cost,
         })
     }
@@ -2970,7 +2970,7 @@ mod draft_tests {
     /// (read `reads` times), and whose asset has `price` on 2026-01-01, and a later one
     /// on the draft's own date that must not be used.
     fn split_use_case(
-        position: Result<SplitPositionPreview, AccountError>,
+        position: Result<StockSplitPosition, AccountError>,
         reads: usize,
         price: Option<i64>,
     ) -> HoldingTransactionUseCase {
@@ -2980,7 +2980,7 @@ mod draft_tests {
     /// As `split_use_case`, with what the account holds of the asset today.
     fn split_use_case_holding(
         held_today: Option<i64>,
-        position: Result<SplitPositionPreview, AccountError>,
+        position: Result<StockSplitPosition, AccountError>,
         reads: usize,
         price: Option<i64>,
     ) -> HoldingTransactionUseCase {
@@ -3021,8 +3021,8 @@ mod draft_tests {
         HoldingTransactionUseCase::new(Arc::new(account), Arc::new(asset))
     }
 
-    fn split_draft(size: SplitSize) -> SplitDraft {
-        SplitDraft {
+    fn split_draft(size: SplitSize) -> StockSplitDraft {
+        StockSplitDraft {
             account_id: "acc-1".into(),
             asset_id: "asset-1".into(),
             date: "2026-01-02".into(),
@@ -3031,7 +3031,7 @@ mod draft_tests {
         }
     }
 
-    const HELD: SplitPositionPreview = SplitPositionPreview {
+    const HELD: StockSplitPosition = StockSplitPosition {
         old_quantity: 4 * M,
         old_average_price: 30 * M,
         new_quantity: 6 * M,
@@ -3047,7 +3047,7 @@ mod draft_tests {
             old: Some(old),
         };
         let preview = split_use_case(Ok(HELD), 1, Some(100 * M))
-            .validate_split_draft(split_draft(ratio(3, 2)))
+            .validate_stock_split_draft(split_draft(ratio(3, 2)))
             .await
             .expect("valid");
         assert_eq!(preview.factor, 1_500_000);
@@ -3057,7 +3057,7 @@ mod draft_tests {
 
         // 1 for 3 does not divide: the factor rounds at the micro (SPL-061).
         let preview = split_use_case(Ok(HELD), 1, None)
-            .validate_split_draft(split_draft(ratio(1, 3)))
+            .validate_stock_split_draft(split_draft(ratio(1, 3)))
             .await
             .expect("valid");
         assert_eq!(preview.factor, 333_333);
@@ -3068,7 +3068,7 @@ mod draft_tests {
     // ratio not typed yet or not positive, and what the account refuses.
     #[tokio::test]
     async fn spl_062_a_split_draft_reports_its_first_problem() {
-        let code_of = |result: Result<SplitDraftPreview, TransactionDraftError>| match result {
+        let code_of = |result: Result<StockSplitPreview, TransactionDraftError>| match result {
             Ok(_) => "ok".to_string(),
             Err(error) => serde_json::to_value(&error).expect("serialize")["code"]
                 .as_str()
@@ -3079,7 +3079,7 @@ mod draft_tests {
         let mut undated = split_draft(SplitSize::Factor { factor: 2 * M });
         undated.date = String::new();
         assert_eq!(
-            code_of(unread().validate_split_draft(undated).await),
+            code_of(unread().validate_stock_split_draft(undated).await),
             "DateMissing"
         );
         for (new, old) in [
@@ -3092,12 +3092,12 @@ mod draft_tests {
         ] {
             let draft = split_draft(SplitSize::Ratio { new, old });
             assert_eq!(
-                code_of(unread().validate_split_draft(draft).await),
+                code_of(unread().validate_stock_split_draft(draft).await),
                 "SplitFactorNotPositive"
             );
         }
         let refused = split_use_case(Err(AccountError::SplitCollapsesPosition), 1, None)
-            .validate_split_draft(split_draft(SplitSize::Factor { factor: 1 }))
+            .validate_stock_split_draft(split_draft(SplitSize::Factor { factor: 1 }))
             .await;
         assert_eq!(code_of(refused), "SplitCollapsesPosition");
     }
@@ -3108,7 +3108,7 @@ mod draft_tests {
     async fn spl_062_a_split_draft_needs_a_position_held_today() {
         for held_today in [None, Some(0)] {
             let refused = split_use_case_holding(held_today, Ok(HELD), 0, None)
-                .validate_split_draft(split_draft(SplitSize::Factor { factor: 2 * M }))
+                .validate_stock_split_draft(split_draft(SplitSize::Factor { factor: 2 * M }))
                 .await;
             assert!(matches!(
                 refused,
@@ -3133,7 +3133,7 @@ mod draft_tests {
             .expect_get_asset_prices()
             .returning(|_| Err(crate::context::asset::AssetError::DatabaseError));
         let preview = HoldingTransactionUseCase::new(Arc::new(account), Arc::new(asset))
-            .validate_split_draft(split_draft(SplitSize::Factor { factor: 2 * M }))
+            .validate_stock_split_draft(split_draft(SplitSize::Factor { factor: 2 * M }))
             .await
             .expect("valid");
         assert_eq!(
@@ -3149,7 +3149,7 @@ mod draft_tests {
         let mut draft = split_draft(SplitSize::Factor { factor: 2 * M });
         draft.correcting = Some("tx-1".into());
         let preview = split_use_case(Ok(HELD), 0, Some(100 * M))
-            .validate_split_draft(draft.clone())
+            .validate_stock_split_draft(draft.clone())
             .await
             .expect("valid");
         assert_eq!((preview.factor, preview.position), (2 * M, None));
@@ -3157,7 +3157,7 @@ mod draft_tests {
 
         draft.size = SplitSize::Factor { factor: M };
         let refused = split_use_case(Ok(HELD), 0, None)
-            .validate_split_draft(draft)
+            .validate_stock_split_draft(draft)
             .await;
         assert!(matches!(
             refused,
@@ -3244,7 +3244,7 @@ mod draft_tests {
         assert_eq!(preview.realized_pnl, Some(50 * M));
     }
 
-    fn code(result: Result<TransactionDraftPreview, TransactionDraftError>) -> String {
+    fn code(result: Result<TransactionPreview, TransactionDraftError>) -> String {
         match result {
             Ok(_) => "ok".into(),
             Err(error) => serde_json::to_value(&error).expect("serialize")["code"]
@@ -3262,7 +3262,7 @@ mod draft_tests {
             .await;
         assert_eq!(
             preview.expect("valid"),
-            TransactionDraftPreview {
+            TransactionPreview {
                 unit_price: 50 * M,
                 total_amount: 100 * M,
                 realized_pnl: None,
@@ -3300,7 +3300,7 @@ mod draft_tests {
         }
     }
 
-    fn opening_code(result: Result<OpeningBalanceDraftPreview, TransactionDraftError>) -> String {
+    fn opening_code(result: Result<OpeningBalancePreview, TransactionDraftError>) -> String {
         match result {
             Ok(preview) if preview.zero_cost => "zero-cost".into(),
             Ok(_) => "ok".into(),

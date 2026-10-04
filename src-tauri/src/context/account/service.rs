@@ -1,7 +1,7 @@
 use super::domain::{
     Account, AccountJournal, AccountRepository, FeeCatchUpPosition, FeeCatchUpRepository,
     FeeSchedule, FeeScheduleRepository, Holding, HoldingNote, HoldingNoteRepository,
-    HoldingRepository, HoldingSnapshot, JournalFilter, ManagementFeeRemoval, SplitPositionPreview,
+    HoldingRepository, HoldingSnapshot, JournalFilter, ManagementFeeRemoval, StockSplitPosition,
     ThresholdDirection, Transaction, TransactionRepository, UpdateFrequency,
 };
 use super::error::AccountError;
@@ -378,7 +378,7 @@ impl AccountService {
         asset_id: &str,
         date: &str,
         factor: i64,
-    ) -> StdResult<SplitPositionPreview, AccountError> {
+    ) -> StdResult<StockSplitPosition, AccountError> {
         load_account(&*self.account_repo, account_id)
             .await?
             .preview_split(asset_id, date, factor)
@@ -1599,7 +1599,7 @@ pub trait AccountServiceContract: Send + Sync {
         asset_id: &str,
         date: &str,
         factor: i64,
-    ) -> StdResult<SplitPositionPreview, AccountError>;
+    ) -> StdResult<StockSplitPosition, AccountError>;
     /// The holding's quantity and average cost as of a date (TDI-010).
     async fn holding_snapshot_as_of(
         &self,
@@ -1872,7 +1872,7 @@ impl AccountServiceContract for AccountService {
         asset_id: &str,
         date: &str,
         factor: i64,
-    ) -> StdResult<SplitPositionPreview, AccountError> {
+    ) -> StdResult<StockSplitPosition, AccountError> {
         AccountService::preview_split(self, account_id, asset_id, date, factor).await
     }
 

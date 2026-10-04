@@ -957,7 +957,7 @@ describe("accountDetailsGateway — validateTransactionDraft (TRX-062)", () => {
   });
 });
 
-describe("accountDetailsGateway — validateSplitDraft (SPL-062)", () => {
+describe("accountDetailsGateway — validateStockSplitDraft (SPL-062)", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("sends the draft and returns the check's answer", async () => {
@@ -970,14 +970,14 @@ describe("accountDetailsGateway — validateSplitDraft (SPL-062)", () => {
     };
     const preview = { factor: 2_000_000, position: null, price_after_split: null };
     mockInvoke.mockResolvedValue(preview);
-    expect(await accountDetailsGateway.validateSplitDraft(draft)).toEqual({
+    expect(await accountDetailsGateway.validateStockSplitDraft(draft)).toEqual({
       status: "ok",
       data: preview,
     });
-    expect(mockInvoke).toHaveBeenCalledWith("validate_split_draft", { draft });
+    expect(mockInvoke).toHaveBeenCalledWith("validate_stock_split_draft", { draft });
 
     mockInvoke.mockRejectedValue({ code: "SplitFactorIsOne" });
-    expect(await accountDetailsGateway.validateSplitDraft(draft)).toEqual({
+    expect(await accountDetailsGateway.validateStockSplitDraft(draft)).toEqual({
       status: "error",
       error: { code: "SplitFactorIsOne" },
     });

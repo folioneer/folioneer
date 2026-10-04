@@ -1,5 +1,5 @@
 use super::fee_schedule::{FeeCatchUpPosition, FeeSchedule};
-use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot, SplitPositionPreview};
+use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot, StockSplitPosition};
 use super::holding_note::HoldingNote;
 use super::journal::CashEffect;
 use super::transaction::{EnteredAmount, Transaction, TransactionType};
@@ -1889,7 +1889,7 @@ impl Account {
         asset_id: &str,
         date: &str,
         factor: i64,
-    ) -> Result<SplitPositionPreview> {
+    ) -> Result<StockSplitPosition> {
         let split = Transaction::split(
             self.id.clone(),
             asset_id.to_string(),
@@ -1901,7 +1901,7 @@ impl Account {
         let mut replayed = self.clone();
         replayed.apply_split(split)?;
         let after = Self::holding_snapshot_as_of(&replayed.transactions, asset_id, date);
-        Ok(SplitPositionPreview {
+        Ok(StockSplitPosition {
             old_quantity: before.quantity,
             old_average_price: before.average_price,
             new_quantity: after.quantity,

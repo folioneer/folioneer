@@ -23,7 +23,6 @@ pub use error::{
     SplitError, SplitTask, TransactionDraftError, TransactionDraftTask,
 };
 pub use orchestrator::{
-    DraftKind, HoldingTransactionUseCase, NamedTarget, OpeningBalanceDraft,
-    OpeningBalanceDraftPreview, SplitDraft, SplitDraftPreview, SplitSize, TransactionDraft,
-    TransactionDraftPreview,
+    DraftKind, HoldingTransactionUseCase, NamedTarget, OpeningBalanceDraft, OpeningBalancePreview,
+    SplitSize, StockSplitDraft, StockSplitPreview, TransactionDraft, TransactionPreview,
 };

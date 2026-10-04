@@ -170,7 +170,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             holding_transaction::sell_holding,
             holding_transaction::validate_transaction_draft,
             holding_transaction::validate_opening_balance_draft,
-            holding_transaction::validate_split_draft,
+            holding_transaction::validate_stock_split_draft,
             holding_transaction::correct_transaction,
             holding_transaction::cancel_transaction,
             holding_transaction::record_deposit,

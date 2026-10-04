@@ -15,7 +15,7 @@ use folioneer_lib::context::asset::{
 };
 use folioneer_lib::core::SideEffectEventBus;
 use folioneer_lib::use_cases::holding_transaction::{
-    HoldingTransactionUseCase, SplitDraft, SplitError, SplitSize,
+    HoldingTransactionUseCase, SplitError, SplitSize, StockSplitDraft,
 };
 use std::sync::Arc;
 
@@ -318,7 +318,7 @@ async fn record_split_dated_before_position_opens_rejected() {
 async fn spl_062_the_split_draft_check_previews_what_recording_leaves() {
     let ctx = build_ctx().await;
     let (account_id, asset_id) = seed_held_position(&ctx).await;
-    let draft = |account_id: &str| SplitDraft {
+    let draft = |account_id: &str| StockSplitDraft {
         account_id: account_id.to_string(),
         asset_id: asset_id.clone(),
         date: "2024-06-15".to_string(),
@@ -331,7 +331,7 @@ async fn spl_062_the_split_draft_check_previews_what_recording_leaves() {
 
     let preview = ctx
         .use_case
-        .validate_split_draft(draft(&account_id))
+        .validate_stock_split_draft(draft(&account_id))
         .await
         .expect("a held position can be split");
     let position = preview.position.expect("a new split previews its position");
@@ -372,7 +372,7 @@ async fn spl_062_the_split_draft_check_previews_what_recording_leaves() {
 
     assert!(ctx
         .use_case
-        .validate_split_draft(draft("no-such-account"))
+        .validate_stock_split_draft(draft("no-such-account"))
         .await
         .is_err());
 }

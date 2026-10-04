@@ -22,19 +22,19 @@ import type {
   OpenHoldingDTO,
   OpenHoldingError,
   OpeningBalanceDraft,
-  OpeningBalanceDraftPreview,
+  OpeningBalancePreview,
   PriceHistoryBackfillError,
   PriceHistoryBackfillOutcome,
   RecordInterestDTO,
   RecordSplitDTO,
   Result,
-  SplitDraft,
-  SplitDraftPreview,
   SplitError,
+  StockSplitDraft,
+  StockSplitPreview,
   Transaction,
   TransactionDraft,
   TransactionDraftError,
-  TransactionDraftPreview,
+  TransactionPreview,
   UpdateFeeScheduleDTO,
   UpsertHoldingNoteDTO,
   WithdrawalDTO,
@@ -173,23 +173,23 @@ export const accountDetailsGateway = {
   // unit price and total recording would store.
   async validateTransactionDraft(
     draft: TransactionDraft,
-  ): Promise<Result<TransactionDraftPreview, TransactionDraftError>> {
+  ): Promise<Result<TransactionPreview, TransactionDraftError>> {
     return commands.validateTransactionDraft(draft);
   },
 
   // SPL-062 — checks a split draft without writing: its first problem, or the factor,
   // the position before and after and the price to carry across the split.
-  async validateSplitDraft(
-    draft: SplitDraft,
-  ): Promise<Result<SplitDraftPreview, TransactionDraftError>> {
-    return commands.validateSplitDraft(draft);
+  async validateStockSplitDraft(
+    draft: StockSplitDraft,
+  ): Promise<Result<StockSplitPreview, TransactionDraftError>> {
+    return commands.validateStockSplitDraft(draft);
   },
 
   // TRX-066 — checks an opening balance draft without writing: its first problem, or
   // whether its zero cost calls for a warning (TRX-065).
   async validateOpeningBalanceDraft(
     draft: OpeningBalanceDraft,
-  ): Promise<Result<OpeningBalanceDraftPreview, TransactionDraftError>> {
+  ): Promise<Result<OpeningBalancePreview, TransactionDraftError>> {
     return commands.validateOpeningBalanceDraft(draft);
   },
 

@@ -40,7 +40,7 @@ pub struct HoldingSnapshot {
 /// What a split would make of a position (SPL-020): the holding on the split's date,
 /// before and after the rescale. All fields are i64 micro-units (ADR-001).
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
-pub struct SplitPositionPreview {
+pub struct StockSplitPosition {
     /// Units held on the split's date, before it.
     pub old_quantity: i64,
     /// Average cost per unit before the split, account currency.

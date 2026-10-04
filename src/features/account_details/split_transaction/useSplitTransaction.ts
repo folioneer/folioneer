@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { SplitDraft } from "@/bindings";
+import type { StockSplitDraft } from "@/bindings";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
 import {
@@ -92,7 +92,7 @@ export function useSplitTransaction({
   // SPL-062 — the core checks the split as it is typed and returns the factor, what it
   // makes of the position and the price to carry across it. The form computes none of
   // them: it sends the ratio as typed (create) or the factor (correction, SPL-030).
-  const draft = useMemo<SplitDraft>(
+  const draft = useMemo<StockSplitDraft>(
     () => ({
       account_id: accountId,
       asset_id: target.assetId,
@@ -121,7 +121,7 @@ export function useSplitTransaction({
     (cause: unknown) => logger.error("Failed to check the split draft", { error: cause }),
     [],
   );
-  const check = useLatestCheck(draft, accountDetailsGateway.validateSplitDraft, logFailure);
+  const check = useLatestCheck(draft, accountDetailsGateway.validateStockSplitDraft, logFailure);
   const problemCode = check.error?.code ?? null;
 
   // SPL-011 — the factor must be strictly positive and different from ×1: the core says.

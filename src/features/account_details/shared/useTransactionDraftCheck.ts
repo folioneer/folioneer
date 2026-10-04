@@ -3,7 +3,7 @@ import type {
   DraftKind,
   TransactionDraft,
   TransactionDraftError,
-  TransactionDraftPreview,
+  TransactionPreview,
 } from "@/bindings";
 import { logger } from "@/lib/logger";
 import { decimalToMicro } from "@/lib/microUnits";
@@ -26,7 +26,7 @@ export interface TradeFormFields {
 /** What the draft check (TRX-062) answered for the latest draft. */
 export interface TransactionDraftCheck {
   /** The unit price and total recording would store; null until a draft checks clean. */
-  preview: TransactionDraftPreview | null;
+  preview: TransactionPreview | null;
   /** The draft's first problem, as the check reported it. */
   problem: TransactionDraftError | null;
   /** The first problem as a message, or a generic error when the check itself failed. */
