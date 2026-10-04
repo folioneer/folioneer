@@ -1,9 +1,12 @@
 name: Quality
 
 on:
+  # Not `edited`: no job reads a pull request's title or body, and an edit of its text
+  # would cancel the running jobs and start them all again (docs/flow.md FLOW-012). A
+  # pull request retargeted to main gets its checks at its next push, or by hand below.
   pull_request:
     branches: [main]
-    types: [opened, edited, synchronize, reopened]
+    types: [opened, synchronize, reopened]
   push:
     branches: [main]
   # Manual trigger: `gh workflow run Quality --ref <branch>` or via Actions tab.

@@ -128,17 +128,6 @@ request. The time went to waiting on CI and to rounds that tested nothing new.
 - Costs: about 20 runner-minutes a week. Protects: a release day spent on a workflow
   bug.
 
-## FLOW-012 — Editing a pull request's text restarts its checks
-
-- Kind: speed
-- Observed: `quality.yml` runs on `edited`, so recording the triage table in the body
-  after a push restarted every job (#77, #82), and a fixup aimed at a commit already
-  merged forced a new pull request (#77 → #78).
-- Proposal: only the `pr-checks` job, which reads the title and the body, runs on
-  `edited`; the build and test jobs run on new commits. The body is written with the
-  push. `just merge` already refuses a fixup that names no commit of the branch.
-- Costs: a condition on four jobs. Protects: a 12-minute round per edit.
-
 ## FLOW-013 — `just merge` cannot run from a worktree
 
 - Kind: speed
