@@ -389,6 +389,10 @@ mod tests {
             "an equal-date upsert must be applied"
         );
         assert_eq!(report.rows[0].movement_pct, Some(5_000_000), "5.00% move");
+        assert_eq!(
+            report.observed_to, None,
+            "PMV-051: a price on the date the portfolio already carried does not advance it"
+        );
     }
 
     // ── PMV-020 — rates are frozen at refresh start ─────────────────────────

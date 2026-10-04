@@ -83,14 +83,8 @@ impl PriceFreshnessUseCase {
                 tracing::error!(target: BACKEND, asset_id = %asset_id, err = ?e, "price_freshness: reading the latest price failed");
                 PriceFreshnessError::DatabaseError
             })?;
-            if let Some(price) = latest {
-                if newest
-                    .as_deref()
-                    .is_none_or(|date| price.date.as_str() > date)
-                {
-                    newest = Some(price.date);
-                }
-            }
+            // ISO dates order as text, and no date orders before any.
+            newest = newest.max(latest.map(|price| price.date));
         }
         Ok(newest)
     }

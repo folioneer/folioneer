@@ -57,12 +57,10 @@ impl RateHistoryBackfillUseCase {
                 })?;
             for transaction in transactions {
                 // ISO dates order lexically, so a plain min works.
-                if earliest_date
-                    .as_deref()
-                    .is_none_or(|current| transaction.date.as_str() < current)
-                {
-                    earliest_date = Some(transaction.date.clone());
-                }
+                earliest_date = Some(match earliest_date {
+                    Some(current) => current.min(transaction.date),
+                    None => transaction.date,
+                });
             }
         }
 

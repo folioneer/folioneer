@@ -146,12 +146,8 @@ impl PriceMovementCapture {
                     {
                         // PMV-050 — the earlier observation date spans the assets this
                         // fetch is about to attempt, not every holding.
-                        if scope_asset_ids.contains(&holding.asset_id)
-                            && observed_from
-                                .as_deref()
-                                .is_none_or(|from| latest.date.as_str() > from)
-                        {
-                            observed_from = Some(latest.date.clone());
+                        if scope_asset_ids.contains(&holding.asset_id) {
+                            observed_from = observed_from.max(Some(latest.date.clone()));
                         }
                         prices.insert(holding.asset_id.clone(), latest);
                     }
@@ -215,6 +211,101 @@ mod tests {
             Box::new(MockCurrencyPairRepository::new()),
             Box::new(MockCurrencyRateRepository::new()),
         ))
+    }
+
+    // PMV-050 — the date the portfolio carried before the refresh is the most recent
+    // observation among the holdings the fetch attempts: neither the oldest, nor the
+    // first met, nor the date of a holding left out of the fetch.
+    #[tokio::test]
+    async fn pmv_050_the_earlier_date_is_the_most_recent_among_the_holdings_in_scope() {
+        const LAST_PRICE: [(&str, &str); 4] = [
+            ("asset-a", "2026-09-08"),
+            ("asset-b", "2026-09-10"),
+            ("asset-c", "2026-09-09"),
+            ("asset-locked", "2026-09-11"),
+        ];
+        let mut account_service = MockAccountServiceContract::new();
+        account_service.expect_get_all().returning(|| {
+            Ok(vec![crate::context::account::Account::restore(
+                "acc-1".to_string(),
+                "Alpha".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                crate::context::account::UpdateFrequency::ManualMonth,
+                false,
+            )])
+        });
+        account_service
+            .expect_get_holdings_for_account()
+            .returning(|_| {
+                Ok(LAST_PRICE
+                    .iter()
+                    .map(|(asset_id, _)| {
+                        crate::context::account::Holding::restore(
+                            format!("holding-{asset_id}"),
+                            "acc-1".to_string(),
+                            asset_id.to_string(),
+                            1_000_000,
+                            0,
+                            0,
+                            None,
+                        )
+                    })
+                    .collect())
+            });
+        let mut asset_service = MockAssetServiceContract::new();
+        asset_service
+            .expect_get_asset_by_id()
+            .returning(|asset_id| {
+                Ok(Some(crate::context::asset::Asset::restore(
+                    asset_id.to_string(),
+                    "Test Asset".to_string(),
+                    AssetClass::Stocks,
+                    crate::context::asset::AssetCategory::from_storage(
+                        crate::context::asset::SYSTEM_CATEGORY_ID.to_string(),
+                        "generic.uncategorized".to_string(),
+                    ),
+                    "EUR".to_string(),
+                    1,
+                    asset_id.to_uppercase(),
+                    None,
+                    false,
+                    None,
+                    false,
+                    false,
+                )))
+            });
+        asset_service
+            .expect_get_latest_price()
+            .returning(|asset_id| {
+                Ok(LAST_PRICE
+                    .iter()
+                    .find(|(id, _)| *id == asset_id)
+                    .map(|(id, date)| {
+                        AssetPrice::restore(
+                            id.to_string(),
+                            date.to_string(),
+                            100_000_000,
+                            crate::context::asset::AssetPriceSource::Manual,
+                        )
+                    }))
+            });
+        let capture = PriceMovementCapture::new(
+            Arc::new(account_service),
+            Arc::new(asset_service),
+            make_currency_service(),
+        );
+        let in_scope: HashSet<String> = ["asset-a", "asset-b", "asset-c"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+
+        let baseline = capture
+            .capture(&in_scope, today())
+            .await
+            .expect("a baseline");
+
+        assert_eq!(baseline.observed_from.as_deref(), Some("2026-09-10"));
     }
 
     // PMV-014 — a failure loading accounts degrades to None; the fetch itself
