@@ -171,14 +171,14 @@ reference it was filed under and is queued by it.
 
 ## #049 — (tooling) — References name what they point at: TODO-NNN, DEBT-NNN, ghNN
 
-Decided by the owner on 2026-09-27: a todo entry becomes `TODO-NNN` (today `#NNN`), a tech-debt entry `DEBT-NNN` (today `TD-NNN`), and a GitHub issue `ghNN`. Today `#043` reads like pull request #43 on GitHub, where it also links to the wrong thing. Measured the same day: `TD-NNN` appears 53 times in 10 files, a `#0NN` todo reference in 47 files, `gh#NN` 16 times; three scripts parse the formats (`scripts/next-todo.sh`, `scripts/check.py`, `scripts/release.py`), as do the skills (`/next-todo`, `/techdebt`, `/review-triage`, `/whats-next`), `CLAUDE.md` and `docs/workflow-c.md`.
+Decided by the owner on 2026-09-27: a todo entry becomes `TODO-NNN` (today `#NNN`), a tech-debt entry `DEBT-NNN` (today `TD-NNN`), and a GitHub issue `ghNN`. Today `#043` reads like pull request #43 on GitHub, where it also links to the wrong thing. `FLOW-NNN`, which appeared since, already says what it points at and stays. Measured on 2026-10-05, the changelog left out: `TD-NNN` about 140 times in 36 files, a `#0NN` todo reference about 250 times in 61 files, `gh#NN` 13 times. The formats are parsed by `scripts/whats-next.py` and `scripts/next-todo.sh` and described in `CLAUDE.md`, `docs/workflow.md` and the skills `/next-todo`, `/design-proposal` and `/whats-next`; branch names (`<type>/NNN-slug`, `<type>/td-NNN-slug`) carry them too.
 
 **User value:** None directly — a reference says what it points at and no longer collides with a pull request number.
-**Done when:** The three formats are written into `CLAUDE.md`, `docs/workflow-c.md` and the skills; the scripts parse and emit the new forms, with a test each; every live file uses them (`docs/todo.md`, `docs/techdebt.md`, specs, lessons, code comments and test names); a check fails on an old-form reference in a changed file (seen red); `CHANGELOG.md` and git history stay as they are.
+**Done when:** The three formats are written into `CLAUDE.md`, `docs/workflow.md` and the skills; the scripts parse and emit the new forms, with a test each; every live file uses them (`docs/todo.md`, `docs/techdebt.md`, `docs/flow.md`, specs, lessons, code comments and test names); a check fails on an old-form reference in a changed file (seen red); `CHANGELOG.md` and git history stay as they are.
 **Design:** none
 **Open questions:**
 
-- [ ] Rewrite existing references, or only new ones? (Recommended: rewrite every live file in one pull request, so one format exists at a time; the changelog and git history keep the old form.)
+- [x] Rewrite existing references, or only new ones? — Rewrite every live file in one pull request, so one format exists at a time; the changelog and git history keep the old form (owner, 2026-10-05).
 
 ## #014 — (e2e) — Drive a second device in the E2E suite
 
