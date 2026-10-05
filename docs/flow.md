@@ -15,49 +15,48 @@ The rules for an entry, set by the owner on 2026-10-03:
    questions come in one block for the batch, with what to look at and what a yes means.
 
 Each entry carries a permanent `FLOW-NNN` reference (never renumbered, never reused; next
-free: FLOW-020) so the owner can queue it in `docs/todo.md` § Next like any other. An
+free: FLOW-022) so the owner can queue it in `docs/todo.md` § Next like any other. An
 entry is removed once it is settled.
 
 ---
 
-## Measured — the 0.5.0 batch (2026-09-29 → 2026-10-03)
+## Measured — the 0.6.0 batch (2026-10-03 → 2026-10-05)
 
-| What                                             | Figure                                                                                                                                                                         |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Pull requests merged (one closed and redone)     | 24 (#66–#91), about 6 900 lines added                                                                                                                                          |
-| Mean time from opening a pull request to merging | 25 min                                                                                                                                                                         |
-| CI rounds                                        | 43 for 26 branches — 17 beyond the first round                                                                                                                                 |
-| What caused the 17 extra rounds                  | a rebase after another merge (about 10), a fix (about 6), 1 lost to the usage limit                                                                                            |
-| Workflow failures on pull requests               | 9: Review 6 (2 of them the usage limit), Quality 2, E2E 1                                                                                                                      |
-| E2E run, before and after TD-044                 | 15.3 min → 5.0 min (median of the day's runs)                                                                                                                                  |
-| Quality run / Review run                         | about 3 min / about 2 min                                                                                                                                                      |
-| Real defects found by reviewers before merge     | at least 9 (the core accepted a Cash asset, a wrong sign in a conversion, the Cash Category could be deleted, a stale error in a dialog, a readiness rule that failed open, …) |
-| Real defects found by challenging an entry first | 2 (TD-062 hid a refused correction; TD-056 aimed at the wrong layer)                                                                                                           |
+Counted by `scripts/flow-audit.py v0.5.0 v0.6.0 --previous v0.4.0`; "was" is the 0.5.0
+batch counted the same way, which is why its figures differ from those gathered by hand
+a release ago.
 
-Reading: the reviewers and the challenge step paid for themselves on almost every pull
-request. The time went to waiting on CI and to rounds that tested nothing new.
+| What                                                    | Figure                                                                                                                                                                                                                                              |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pull requests merged (one closed and redone, each time) | 36 (#95–#131), 9 100 lines added — was 27, 7 476                                                                                                                                                                                                    |
+| By type                                                 | test 10, refactor 8, docs 8, chore 4, fix 4, feat 1, ci 1 — was docs 9, feat 5, refactor 5, ci 3, chore 2, fix 2, test 1                                                                                                                            |
+| Time from opening a pull request to merging             | median 10.9 min, mean 15.4 — was 17.5 and 22.8                                                                                                                                                                                                      |
+| CI rounds                                               | 61 for 37 branches, 24 beyond the first — was 46 for 28, 18 beyond                                                                                                                                                                                  |
+| What caused the 24 extra rounds                         | not counted                                                                                                                                                                                                                                         |
+| Workflow failures on pull requests                      | 8: Review 7, E2E 1 — was 9: Review 6, Quality 2, E2E 1                                                                                                                                                                                              |
+| E2E run / Quality run / Review run (median, green)      | 4.6 / 2.9 / 2.1 min — was 9.6 / 3.5 / 2.0                                                                                                                                                                                                           |
+| Real defects found by reviewers before merge            | at least 5 (a conversion done in the command layer, a reset device read as paused without the spec saying so, a cursor that jumped in a number field, a hint showing a figure that was no number, a list cut short without notice) — was at least 9 |
+| Real defects found by writing the missing tests         | 2 (a corrected deposit was refused before its own balance counted; a failed price write stalled the fetch progress)                                                                                                                                 |
+| Real defects found by challenging or closing an entry   | 1 (TD-078: the spec says a corrected purchase unarchives its asset, the code does not) — was 2                                                                                                                                                      |
+| Mutation sweep on `main`                                | 63 changes no test notices out of 1 634 — was 218                                                                                                                                                                                                   |
+
+Reading: a pull request merges in two thirds of the time, because the E2E run halved and
+because most of this batch was tests and refactors. Four rounds in ten still come after
+the first, the same share as before, and nobody counted why. The tests written for the
+sweep found two bugs no reviewer had.
 
 ---
 
 ## FLOW-003 — Every merge sends the other open pull requests round again
 
 - Kind: speed
-- Observed: about 10 of the 43 rounds re-tested a pull request whose own files had not
-  changed, because another had merged first. `just merge` already waives the round when
-  the rebase changes only record files.
-- Verdict: **keep, and re-measure in 0.6.0.** The round now costs about 12 min instead
-  of 25 (FLOW-004), and what worked in this batch — one code pull request in CI at a
-  time, the next one stacked locally — needs no tool. A merge queue would cost a
-  rewrite of `just merge` for a saving that has already shrunk by half.
-
-## FLOW-004 — The E2E suite's start-up wait
-
-- Kind: speed
-- Observed: 30 s lost at each of 23 application starts, for a missing session bus.
-- Verdict: **settled** by TD-044 (lesson L-020): 15.3 → 5.0 min a run. What is worth
-  keeping is how it was found — timestamps of one CI log, then one experiment run started
-  by hand on a branch with no pull request. A suspicion about CI costs one such run to
-  test; say so in `docs/workflow.md`.
+- Observed: in 0.5.0 about 10 of the rounds re-tested a pull request whose own files had
+  not changed, because another had merged first. In 0.6.0, 24 rounds of 61 came after the
+  first (39 %; was 18 of 46, 39 %), and what caused them was not counted. `just merge`
+  already waives the round when the rebase changes only record files.
+- Verdict: **keep, and count the causes in 0.7.0 (FLOW-020).** A round costs about 5 min
+  where it cost 25, and the median pull request merges in 11 min. A merge queue would
+  cost a rewrite of `just merge` for a saving that is now small.
 
 ## FLOW-006 — An entry whose Done-when is an audit cannot close
 
@@ -81,17 +80,21 @@ request. The time went to waiting on CI and to rounds that tested nothing new.
   and its findings are filed as debt, not fixed in the release.
 - Costs: one agent run per touched spec at release time. Protects: the specs' claim to
   describe the application.
+- 0.6.0: `spec-checker` was not run once, although three entries closed with spec rules
+  (TD-071, TD-063, #058), and closing TD-063 found a third promise the code does not keep
+  (TD-078). The figures argue for the proposal.
 
 ## FLOW-008 — The same reviewers run locally and in CI
 
 - Kind: quality + speed
-- Observed: each lane costs about a minute locally and about two in CI. They did not
-  find the same things: CI's architecture lane caught a critical on #77 that the local
-  run had not been asked — the lane was skipped locally.
+- Observed: each lane costs about a minute locally and about two in CI. They do not find
+  the same things. In 0.6.0 the architecture lane was launched locally 4 times for 24
+  backend and frontend launches, and CI's architecture lane then refused #124 (a
+  conversion in the command layer): one round. The same skip cost a round on #77 in
+  0.5.0.
 - Verdict: **keep both.** The local run is what makes the first CI round green; CI is
-  the one that cannot be skipped. One change: the architecture lane is launched locally
-  with the backend or frontend lane every time, as CLAUDE.md already says — the skip
-  cost a round.
+  the one that cannot be skipped. The rule — the architecture lane goes with the backend
+  or frontend lane every time — is written and was not followed twice: see FLOW-021.
 
 ## FLOW-010 — The local machine cannot carry a mutation sweep
 
@@ -102,6 +105,8 @@ request. The time went to waiting on CI and to rounds that tested nothing new.
 - Proposal: sweeps run in CI only (`mutants.yml`); a background job is stopped by its
   task or process id, never by name. One line each in `docs/workflow.md`.
 - Costs: nothing. Protects: an hour, and a neighbour's build.
+- 0.6.0: the sweep ran in CI (about four hours, no local load). The two lines are still
+  to write in `docs/workflow.md`.
 
 ## FLOW-011 — Parts of the harness run only on the day they matter
 
@@ -115,21 +120,49 @@ request. The time went to waiting on CI and to rounds that tested nothing new.
 - Costs: about 20 runner-minutes a week. Protects: a release day spent on a workflow
   bug.
 
-## Used and not used — the 0.5.0 batch
+## FLOW-020 — Nobody counts why a pull request goes round again
 
-Counted from the session's transcript, 2026-09-29 → 2026-10-03: what the agent invoked
-itself. Hooks and CI ran their own share on every commit and push; that is not counted.
+- Kind: speed
+- Observed: 24 rounds of 61 came after the first in 0.6.0, the same share as in 0.5.0,
+  and the cause — a rebase after another merge, a fix after a review, a failed check —
+  was counted by hand once and not at all this time. FLOW-003's verdict rests on it.
+- Proposal: `scripts/flow-audit.py` sorts each later round by comparing its commit with
+  the round before: same changed files (a rebase) or different ones (a fix), and whether
+  the round before had a failed check.
+- Costs: about two hours, with tests; one `gh` call per later round at audit time.
+  Protects: the decision on a merge queue being taken on a figure.
 
-| What                  | Used (times)                                                                                                                                          | Not used                                                                                                                                                                                                                         |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Skills, invoked       | none                                                                                                                                                  | all nine — `/next-todo`, `/design-proposal`, `/visual-proof`, `/review-triage`, `/techdebt`, `/whats-next`, `/adr-writer`, `/dep-audit`, `/prune`                                                                                |
-| Agents, local         | reviewer-backend 9, reviewer-frontend 6, reviewer-infra 4, reviewer-arch 4, spec-reviewer 3, reviewer-security 3, reviewer-e2e 2, contract-reviewer 1 | spec-checker, adr-reviewer, reviewer-sql                                                                                                                                                                                         |
-| Recipes               | `merge` 47, `arch-check` 12, `generate-types` 9, `test-scripts` 9, `worktree` 4, `release` 3, `licence-check` 2, `test-rust` 1                        | `harness`, `check`, `check-full`, `format`, `test`, `test-unit`, `coverage-fe`, `coverage-be`, `coverage-gate`, `dev`, `dev-seed`, `install`, `stat`, `db-migrate`, `prepare-sqlx`, `next-todo`, `test-e2e`, `test-e2e-headless` |
-| Native commands       | `cargo test` 71, `cargo fmt` 53, `npx vitest run` 45, `npx prettier` 44, `npx biome` 42, `npx tsc` 40, `cargo clippy` 35                              | —                                                                                                                                                                                                                                |
-| Scripts, run directly | `whats-next.py` 8, `visual-proof-capture.mjs` 1                                                                                                       | `build.sh` and the two E2E recipes, which nothing ran — deleted; every other script is called by a recipe, a hook, CI or a skill                                                                                                 |
+## FLOW-021 — Two written rules were not followed, and nothing noticed
 
-Reading: the reviewers were used as the workflow says. The skills and the recipes were
-not — the work was done by hand, in the skills' spirit, with native commands.
+- Kind: quality + speed
+- Observed: (1) the architecture lane goes with the backend or frontend lane every time
+  (FLOW-008): launched 4 times for 24, and CI refused #124 for it. (2) The coverage
+  harness runs in the foreground on this machine (a note of 2026-09-15): it was started
+  in the background, stopped for lack of memory, and the last entry waited for the
+  owner's word to run it again.
+- Proposal: the rules move from prose to the place that acts — the `/next-todo` skill
+  names the architecture lane in its reviewer step, and `just harness --coverage`
+  refuses to start without a terminal when the machine has 8 GiB of memory or less.
+- Costs: about an hour. Risk: a refusal in a legitimate background run, which the
+  message must explain how to override. Protects: a CI round, and a stalled batch.
+
+## Used and not used — the 0.6.0 batch
+
+Counted from the session's transcript, 2026-10-03 → 2026-10-05: what the agent invoked
+itself; "was" is the 0.5.0 batch. Hooks and CI ran their own share on every commit and
+push; that is not counted.
+
+| What                  | Used (times)                                                                                                                                                                                                                                  | Not used                                                               |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Skills, invoked       | `/next-todo` 4, `/whats-next` 1, `/design-proposal` 1, `/flow-audit` 1; `/dep-audit` and `/visual-proof` followed without being invoked — was none                                                                                            | `/adr-writer`, `/prune`                                                |
+| Agents, local         | reviewer-backend 16, reviewer-frontend 8, reviewer-infra 4, reviewer-arch 4, spec-reviewer 3, reviewer-security 2, contract-reviewer 2, reviewer-e2e 1 — was 9, 6, 4, 4, 3, 3, 1, 2                                                           | spec-checker, adr-reviewer, reviewer-sql                               |
+| Recipes               | `format` 97, `check` 96, `test-rust` 70, `harness` 64, `merge` 55, `test` 55, `test-scripts` 27, `generate-types` 10, `check-full` 6, `arch-check` 6, `test-unit` 4, `stat` 1, `licence-check` 1 — was `merge` 47 and little else             | `coverage-gate`, `dev`, `dev-seed`, `install`, `worktree`, `next-todo` |
+| Native commands       | `npx prettier` 76, `cargo test` 37, `ruff` 17, `cargo check` 4, `npx biome` 3, `cargo fmt` 3, `cargo clippy` 1 — was `cargo test` 71, `cargo fmt` 53, `npx vitest run` 45, `npx prettier` 44, `npx biome` 42, `npx tsc` 40, `cargo clippy` 35 | —                                                                      |
+| Scripts, run directly | `whats-next.py` 9, `visual-proof-capture.mjs` 3, `flow-audit.py` 3                                                                                                                                                                            | every other script is called by a recipe, a hook, CI or a skill        |
+
+Reading: the recipes replaced the native commands, as the 0.5.0 audit asked. What is left
+is `npx prettier` on documents, which `just format` also does, and `cargo test` for the
+loop that sorts one mutant. `spec-checker` is prescribed and was never launched.
 
 ## Moved here from the todo and the tech debt
 
@@ -223,16 +256,6 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 - User value: None — the merge gate's headroom.
 - Done when: `sync-settings` is byte-identical across two runs of the same commit; the E2E sync folder carries a fixed name (the suite runs one instance, `maxInstances: 1`) or the value is not rendered into the capture.
 
-## 2026-09-27 — TD-039 — The currency rates spec's rate edit can hit a stale element
-
-- Found by: the main agent (PR #18, a records-only pull request, E2E attempt 1 after a rebase; attempt 2 green)
-- Where: e2e/currency/currency_rates.test.ts (`FXR-052: editing a rate via the UI updates the rate row`)
-- Severity: 🟡
-- Observation: The test failed with `stale element reference` while creating a node handle for an `element` call — the same failure as TD-019, in a different spec. The Currency Rates view re-fetches its pairs and rates on `CurrencyRateUpdated`, so the row a step located can be re-rendered before the next step uses it. The same pull request hit TD-019 on its first run: two once-only failures on a change the suite cannot execute (see #041).
-- User value: None — suite reliability.
-- Cause fixed (2026-09-27): views no longer unmount their rows on an event-driven re-fetch (F29), and the currency rates drill-ins locate a row's cell with one selector instead of chaining from a row handle. The entry closes after a month of pull-request runs without this failure.
-- Done when: the test re-locates the row after the edit is saved, or waits for the view's re-fetch to settle; a month of pull-request runs shows no failure of it.
-
 ## 2026-09-27 — TD-043 — The reviewer agents run without a turn cap and load the whole CLAUDE.md
 
 - Found by: the main agent, comparing the agent files with the Claude Code sub-agent documentation
@@ -249,22 +272,22 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 - Severity: 🟡
 - Observation: each needs a two-device scenario of its own (`tests/sync_two_devices.rs` has the fixture: `two_devices_sharing`). A manifest or a segment in a newer format is sealed, so the test must write one with the format's own encoder. To sort a change, apply it by hand and watch the test fail: a small loop (replace, `cargo test`, restore) takes 20 seconds a change on a unit test and a minute on a scenario.
 - User value: None directly — a device that joins, leaves or resumes wrongly would be caught by a test.
-- Done when: each of the 15 is a test added, dead code deleted, or code simplified so the change no longer exists; the figures are corrected from the sweep that follows this entry's merge.
+- Done when: each of the 15 is a test added, dead code deleted, or code simplified so the change no longer exists; the sweep of 2026-10-04 on this entry's own commit (run 37222025189: 63 missed out of 1 634) confirms these 15.
 
-## 2026-10-04 — TD-076 — Sync, what a run applies and reports: 17 changes in the code that no test notices
+## 2026-10-04 — TD-076 — Sync, what a run applies and reports: 20 changes in the code that no test notices
 
 - Found by: the split of TD-064 (owner, 2026-10-04)
-- Where: `context/sync/application/run.rs` (5: a header whose check does not match this device's key, the count of notices, the device named in a notice), `apply.rs` (1), `intake.rs` (3: a segment in a newer format; two that re-read what is already applied, which the conflict rules ignore — nothing to observe), `use_cases/portfolio_sync/applier.rs` (4: a name clash on an account or a category, the currency of a cash line), `rank_stamper.rs` (3: the rows ranked at first publish), `snapshot.rs` (1)
+- Where: `context/sync/application/run.rs` (7: a header whose check does not match this device's key, the count of a notice's kind, the applied and refused counts of an intake, the device named in a notice), `apply.rs` (1), `intake.rs` (4: a segment in a newer format; three that re-read what is already applied, which the conflict rules ignore — nothing to observe), `use_cases/portfolio_sync/applier.rs` (4: a name clash on an account or a category, the currency of a cash line), `rank_stamper.rs` (3: the rows ranked at first publish), `snapshot.rs` (1)
 - Severity: 🟡
-- Observation: as TD-064. The two re-reads in `intake.rs` change nothing a user or a test can see; they are listed so nobody investigates them again — sort them by simplifying the comparison if it can be done without changing the read.
+- Observation: as TD-064. The three re-reads in `intake.rs` change nothing a user or a test can see; they are listed so nobody investigates them again — sort them by simplifying the comparison if it can be done without changing the read.
 - User value: None directly — a wrong notice, or a change applied under the wrong rank, would be caught by a test.
-- Done when: each of the 17 is a test added, dead code deleted, code simplified, or recorded here as having nothing to observe with the reason.
+- Done when: each of the 20 (counted by the sweep of 2026-10-04, run 37222025189) is a test added, dead code deleted, code simplified, or recorded here as having nothing to observe with the reason.
 
-## 2026-10-04 — TD-077 — Account service, backfills and the headless fetch: 21 changes in the code that no test notices
+## 2026-10-04 — TD-077 — Account service, transaction checks, backfills and the headless fetch: 28 changes in the code that no test notices
 
 - Found by: the split of TD-064 (owner, 2026-10-04)
-- Where: `context/account/service.rs` (4: the bounds of a fee deduction and of an interest credit, the fee schedules of an account, the event after a schedule changes), `context/account/domain/journal.rs` (3: the balance held at the largest amount), `context/currency/application/service.rs` (1), `use_cases/price_history_backfill/orchestrator.rs` (2: the week that must hold a trading day), `use_cases/scheduled_fetch/headless.rs` (3), `use_cases/account_details/orchestrator.rs` (3: a fee dated on the as-of day, the as-of loop's skip of cash lines — nothing to observe —, the window-start dates given to the rate lookup), `use_cases/fee_generation/orchestrator.rs` (1: a schedule ending on a period's last day), `use_cases/update_checker/service.rs` (3: the download and the installation themselves, which need the running application), the last one in `use_cases/shared/price_movement.rs`
+- Where: `context/account/service.rs` (5: the bounds of a fee deduction and of an interest credit, a management fee given as a rate alone, the fee schedules of an account, the event after a schedule changes), `use_cases/holding_transaction/orchestrator.rs` (5: a sale of exactly the quantity held, a split whose ratio holds a zero), `context/asset/domain/yahoo_symbol.rs` (1), `context/account/domain/journal.rs` (3: the balance held at the largest amount), `context/currency/application/service.rs` (1), `use_cases/price_history_backfill/orchestrator.rs` (2: the week that must hold a trading day), `use_cases/scheduled_fetch/headless.rs` (3), `use_cases/account_details/orchestrator.rs` (3: a fee dated on the as-of day, the as-of loop's skip of cash lines — nothing to observe —, the window-start dates given to the rate lookup), `use_cases/fee_generation/orchestrator.rs` (1: a schedule ending on a period's last day), `use_cases/update_checker/service.rs` (3: the download and the installation themselves, which need the running application), the last one in `use_cases/shared/valuation.rs` (the date a holding closed)
 - Severity: 🔵
 - Observation: mostly unit tests on existing fixtures. The three of the update checker cannot be reached without the running application: record them as such, or move the download behind a seam a test can drive.
 - User value: None directly.
-- Done when: each of the 21 is a test added, dead code deleted, code simplified, or recorded here as out of a test's reach with the reason; a sweep on `main` confirms the three entries; issue 65 is closed.
+- Done when: each of the 28 (counted by the sweep of 2026-10-04, run 37222025189) is a test added, dead code deleted, code simplified, or recorded here as out of a test's reach with the reason; issue 65 is closed.
