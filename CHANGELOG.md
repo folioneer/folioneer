@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-10-05
+
+### Added
+
+- numbers are typed and shown with the comma in French
+
+### Fixed
+
+- correcting a transaction keeps the figures you did not touch
+- the fetch progress counts an asset whose price could not be saved
+- editing a dividend shows what a dividend has
+- the performance page keeps the year you chose when it refreshes
+
 ## [0.5.0] - 2026-10-03
 
 ### Added
