@@ -15,7 +15,7 @@ The rules for an entry, set by the owner on 2026-10-03:
    questions come in one block for the batch, with what to look at and what a yes means.
 
 Each entry carries a permanent `FLOW-NNN` reference (never renumbered, never reused; next
-free: FLOW-022) so the owner can queue it in `docs/todo.md` § Next like any other. An
+free: FLOW-023) so the owner can queue it in `docs/todo.md` § Next like any other. An
 entry is removed once it is settled.
 
 ---
@@ -145,6 +145,20 @@ sweep found two bugs no reviewer had.
   refuses to start without a terminal when the machine has 8 GiB of memory or less.
 - Costs: about an hour. Risk: a refusal in a legitimate background run, which the
   message must explain how to override. Protects: a CI round, and a stalled batch.
+
+## FLOW-022 — What's next proposes no flow entry and no GitHub issue
+
+- Kind: speed
+- Observed: `/whats-next` lists the flow entries and the open GitHub issues but builds
+  its proposed queue from the todo and the tech debt only. On 2026-10-05 the owner had
+  to ask for flow entries to be considered, and for a rename entry (#049) he remembered
+  and the proposal had left out.
+- Proposal: the skill's ordering step also takes the ready flow entries and the open
+  GitHub issues: a flow entry whose figure moved in the last audit before one that did
+  not, an issue with no entry yet named as "to file or close". The script already
+  collects both; one test on the skill's example output.
+- Costs: about an hour. Risk: a longer proposal — capped at ten lines. Protects: the
+  owner setting a batch from one list.
 
 ## Used and not used — the 0.6.0 batch
 
