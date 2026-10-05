@@ -7,7 +7,7 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-081) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-082) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -317,6 +317,15 @@ Remove an entry once it has been resolved.
 - Observation: the replay multiplies the quantity by the factor in 128 bits and casts the result back to 64 bits without a check. A factor large enough (far beyond any real split) makes the cast wrap: recording and the split check both then show a quantity that is wrong, or refuse a split for the wrong reason.
 - User value: None in practice — no real split comes near the bound; an absurd factor typed by mistake is refused with a clear reason.
 - Done when: a factor whose rescale cannot be stored is refused when the split is recorded and when it is checked, with one error code, shown by a test on each path.
+
+## 2026-10-05 — TD-081 — "Today" is the UTC day in five places and the local day in three
+
+- Found by: `/prune` after the 0.6.0 release
+- Where: `new Date().toISOString().slice(0, 10)` in `src/features/account_details/account_details_view/usePriceModal.ts`, `src/features/account_details/shared/validateCashForm.ts`, `src/features/account_details/fee_schedule/useFeeSchedule.ts`, `src/features/unpriced_prices/useUnpricedPrices.ts`, `src/lib/lastOperationDateStorage.ts`; the local day in `useHoldingSnapshotAsOf.ts`, `useAccountDetailsView.ts` and `src/ui/components/field/useDateField.ts`
+- Severity: 🟡
+- Observation: `toISOString` gives the UTC date. In France, between midnight and 01:00 (02:00 in summer), the five places read yesterday: a price or a fee schedule is dated a day early by default, and a cash movement dated today is refused as "in the future". Read in the code, not reproduced in the application.
+- User value: A date proposed or checked late in the evening is the day the user is living.
+- Done when: one function gives the local day and the eight places use it; a test sets the clock just after local midnight and reads today's date from each.
 
 ## 2026-10-04 — TD-080 — The E2E tooling carries 22 known advisories
 
