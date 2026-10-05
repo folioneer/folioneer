@@ -267,7 +267,7 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 
 ## 2026-10-03 — TD-064 — Sync, joining and leaving: 15 changes in the code that no test notices
 
-- Found by: the mutation sweep of 2026-10-04 on `main` (run 37151658259: 218 missed). Twelve pull requests of 2026-10-04 sorted 165 of them (valuation, performance, account page, conflict rules, transaction recording, fee periods, update checker, lookup client, scheduled sweep, sync reading, price fetch task, price dates, small domain rules) and found two real bugs. What is left was split in three by the owner's decision of 2026-10-04, one part a version: this entry, TD-076 and TD-077.
+- Found by: the mutation sweep of 2026-10-04 on `main` (run 37151658259: 218 missed). Twelve pull requests of 2026-10-04 sorted 165 of them (valuation, performance, account page, conflict rules, transaction recording, fee periods, update checker, lookup client, scheduled sweep, sync reading, price fetch task, price dates, small domain rules) and found two real bugs. What is left was split in three by the owner's decision of 2026-10-04, one part a version: this entry in 0.7.0, TD-076 in 0.8.0, TD-077 in 0.9.0.
 - Where: `context/sync/application/join.rs` (4: a manifest or a segment in a newer format, the clock a joined device starts at, the area taken back out when the enrolment fails), `first_publish.rs` (3: the clock and the sequence of a first publish), `service.rs` (3: leaving sync), `publisher.rs` (2: the settling delay), `use_cases/portfolio_sync/orchestrator.rs` (3: an installation that holds user data, resuming)
 - Severity: 🟡
 - Observation: each needs a two-device scenario of its own (`tests/sync_two_devices.rs` has the fixture: `two_devices_sharing`). A manifest or a segment in a newer format is sealed, so the test must write one with the format's own encoder. To sort a change, apply it by hand and watch the test fail: a small loop (replace, `cargo test`, restore) takes 20 seconds a change on a unit test and a minute on a scenario.
@@ -276,7 +276,7 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 
 ## 2026-10-04 — TD-076 — Sync, what a run applies and reports: 20 changes in the code that no test notices
 
-- Found by: the split of TD-064 (owner, 2026-10-04)
+- Found by: the split of TD-064 (owner, 2026-10-04); this part is for 0.8.0
 - Where: `context/sync/application/run.rs` (7: a header whose check does not match this device's key, the count of a notice's kind, the applied and refused counts of an intake, the device named in a notice), `apply.rs` (1), `intake.rs` (4: a segment in a newer format; three that re-read what is already applied, which the conflict rules ignore — nothing to observe), `use_cases/portfolio_sync/applier.rs` (4: a name clash on an account or a category, the currency of a cash line), `rank_stamper.rs` (3: the rows ranked at first publish), `snapshot.rs` (1)
 - Severity: 🟡
 - Observation: as TD-064. The three re-reads in `intake.rs` change nothing a user or a test can see; they are listed so nobody investigates them again — sort them by simplifying the comparison if it can be done without changing the read.
@@ -285,7 +285,7 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 
 ## 2026-10-04 — TD-077 — Account service, transaction checks, backfills and the headless fetch: 28 changes in the code that no test notices
 
-- Found by: the split of TD-064 (owner, 2026-10-04)
+- Found by: the split of TD-064 (owner, 2026-10-04); this part is for 0.9.0
 - Where: `context/account/service.rs` (5: the bounds of a fee deduction and of an interest credit, a management fee given as a rate alone, the fee schedules of an account, the event after a schedule changes), `use_cases/holding_transaction/orchestrator.rs` (5: a sale of exactly the quantity held, a split whose ratio holds a zero), `context/asset/domain/yahoo_symbol.rs` (1), `context/account/domain/journal.rs` (3: the balance held at the largest amount), `context/currency/application/service.rs` (1), `use_cases/price_history_backfill/orchestrator.rs` (2: the week that must hold a trading day), `use_cases/scheduled_fetch/headless.rs` (3), `use_cases/account_details/orchestrator.rs` (3: a fee dated on the as-of day, the as-of loop's skip of cash lines — nothing to observe —, the window-start dates given to the rate lookup), `use_cases/fee_generation/orchestrator.rs` (1: a schedule ending on a period's last day), `use_cases/update_checker/service.rs` (3: the download and the installation themselves, which need the running application), the last one in `use_cases/shared/valuation.rs` (the date a holding closed)
 - Severity: 🔵
 - Observation: mostly unit tests on existing fixtures. The three of the update checker cannot be reached without the running application: record them as such, or move the download behind a seam a test can drive.
