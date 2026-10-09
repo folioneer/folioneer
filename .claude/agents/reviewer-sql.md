@@ -87,11 +87,11 @@ Use the format in `## Output format` below. Lead with the headline summary.
 
 ### Transaction Wrapping
 
-- Any migration with more than one DDL or DML statement must be wrapped in an explicit `BEGIN; ... COMMIT;` (🔴)
-- **SQLx exception**: SQLx runs each migration in one implicit transaction, and in SQLite a schema change is part of that transaction like any write: when a later statement of the migration fails, the `ALTER` or `CREATE` before it is rolled back with it. In a project that uses SQLx on SQLite, a migration with several statements — schema changes, data changes, or both — needs no explicit `BEGIN; ... COMMIT;`, and adding one fails, a transaction being already open. Note the implicit transaction as 🔵 at most; never 🔴.
-- Multi-statement migrations without any transaction (no SQLx, no explicit `BEGIN`) (🔴)
+- **This project runs SQLite through SQLx.** SQLx runs each migration in one implicit transaction, and in SQLite a schema change is part of that transaction like any write: when any statement of the migration fails, everything before it — an `ALTER`, a `CREATE`, a default a new column gave to existing rows — is rolled back with it. No statement of a migration can therefore be left half-applied, whatever the mix of schema and data changes.
+- A missing explicit `BEGIN; ... COMMIT;` is **never a finding** in such a migration, at any severity, and an explicit one would fail: a transaction is already open.
+- The one case to flag (🔴): a migration that opts out of the implicit transaction with `-- no-transaction` on its first line and has more than one statement without its own `BEGIN; ... COMMIT;`.
 
-Worked SQLx-on-SQLite example. Both pass (implicit transaction is sufficient):
+Worked example. Both pass with no finding (the implicit transaction is sufficient):
 
 ```sql
 CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, total INTEGER NOT NULL);
@@ -102,8 +102,6 @@ CREATE INDEX IF NOT EXISTS idx_orders_total ON orders(total);
 ALTER TABLE users ADD COLUMN tier TEXT NOT NULL DEFAULT 'free';
 UPDATE users SET tier = 'pro' WHERE plan_id IN (SELECT id FROM plans WHERE level > 2);
 ```
-
-A migration that opts out of the implicit transaction (`-- no-transaction` on its first line) is the case to flag: it then needs its own `BEGIN; ... COMMIT;` (🔴 without one).
 
 ### Idempotency
 
