@@ -253,6 +253,16 @@ pub struct AssetCreationDefaults {
 }
 
 impl AssetCreationDefaults {
+    /// AST-037 — the class preselected for an asset of `kind`; none for a kind no user
+    /// creates an asset of.
+    pub fn class_of(kind: AssetKind) -> Option<AssetClass> {
+        Self::current()
+            .kinds
+            .into_iter()
+            .find(|form| form.kind == kind)
+            .map(|form| form.class)
+    }
+
     /// The defaults of this application.
     pub fn current() -> Self {
         Self {

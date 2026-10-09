@@ -18,9 +18,8 @@
 <!-- takes the first ready one, removes a reference when it closes the entry (order and -->
 <!-- additions are the human's), and stops when the queue is empty. -->
 
-1. #056
-2. #051
-3. #049
+1. #051
+2. #049
 
 ## #009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
@@ -119,34 +118,6 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Are management fees part of this report, or a separate one? (Recommended: part of it — income without the cost of holding tells half the story, and the data is already there.)
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
-
-## #056 — (fullstack) — An asset has a kind: listed, crypto, custom or cash
-
-Moved to 0.7.0 by the owner on 2026-10-04 (with #051, which needs it).
-
-Raised by the owner on 2026-10-03 and decided with the owner on 2026-10-04. Until now an asset had one shape for everything — a name, a reference, an optional ISIN, an optional marketplace — and nothing tied them: a reference or an ISIN could be shared by several assets, and an asset created twice by mistake looked like one instrument held on two marketplaces. An asset now has a **kind**, chosen when it is created and separate from its class (the class says what it is economically; the kind says how it is identified and priced):
-
-- **Listed** — a listing: an instrument, by its ISIN, on a marketplace, in a currency. The ISIN is required. The reference is its ticker there. Created from the lookup when one finds it. Its price is fetched where a provider exists, or typed.
-- **Crypto** — identified by its symbol (BTC), unique among crypto assets; its currency is the one it is quoted in, its price the pair's — fetched where a provider exists, or typed. No ISIN, no marketplace. It is an asset, not money: it is bought and sold with a cost and a gain.
-- **Custom** — what no market lists (real estate, a fund inside a contract). No ISIN, no marketplace, no lookup, a typed price. Its reference is proposed from its name, editable, and unique among custom assets, compared without case.
-- **Cash** — the application's own, one per currency; never created, edited or traded by the user. Nothing visible changes for cash: its rules are written down as a kind.
-
-Same or different. Two listed assets are the same when they share ISIN, marketplace and currency; two crypto assets when they share a symbol; two custom assets when they share a reference. Creating a second one is refused, in the window (naming the existing asset) and on the command line (without listing, #044). The same ISIN on another marketplace is another asset, allowed; each then carries a line "also held as …", and no figure is merged.
-
-On the command line, `--asset` takes a name, a reference or an ISIN. When it matches more than one asset the command is refused without listing them; the ISIN, or the reference with its marketplace (`ASML@XAMS`), tells them apart.
-
-Existing assets take a kind from what they carry: the Cash class is cash, the digital-asset class is crypto, an ISIN makes it listed, anything else is custom. An asset the rules would now refuse (a listed one without an ISIN, two that are the same) is not changed: it is listed for the owner to settle. To verify before the first pull request: a kind is a new field on a synced record — whether another computer on the previous version tolerates it, or the data format version rises (SYN-035, SYN-038).
-
-**User value:** A user knows what to type to create an asset and what makes two assets the same or different; an asset created twice by mistake is refused, and one instrument held on two marketplaces is understood as such.
-**Done when:** in three pull requests. (1) The asset spec and the vocabulary define the four kinds and what identifies each; the kind is a column of the asset, filled for every existing asset by a migration that changes nothing else and travelling with the asset in sync; the core refuses what each kind forbids (an ISIN-less listed asset, a marketplace on a custom one, a second identical asset) with typed errors, and reports the existing assets the rules would refuse — sameness is enforced by the core's rules, not yet by a database constraint, which existing duplicates would break. (2) "Add asset" starts with Listed, Crypto or Custom and shows each kind's fields only; a listed asset starts from the lookup; a custom reference is proposed from the name; a refusal names the existing asset; an asset sharing its ISIN with another shows "also held as …"; cash appears as the application's. (3) The command line creates each kind and names an asset by name, reference or ISIN, with `reference@marketplace` for a shared reference, refusing an ambiguous one without listing.
-**Design:** validated
-**Open questions:**
-
-- [x] The term "Asset to settle" ("Actif à régulariser") for an asset that breaks a rule of its kind or is the same as another. → Confirmed. (Owner, 2026-10-09.)
-- [x] The term "Listing" ("Cotation") for one of several listed assets that share an ISIN. → Confirmed. (Owner, 2026-10-09.)
-- [x] The SQL reviewer in CI refuses the migration for having no explicit `BEGIN; … COMMIT;`, which is wrong for SQLite through SQLx. May the migration carry the false-positive note of the triage policy? → Yes. (Owner, 2026-10-09.)
-
-Vocabulary (owner, 2026-10-09): the terms are Kind — Listed, Crypto, Custom, Cash; in French "Nature" — "Coté", "Crypto", "Non coté", "Liquidités". Where a listed asset trades stays the Exchange ("Place de cotation"): "marketplace" above reads as Exchange, and the mock-up's "Marketplace" label is "Exchange". They enter the vocabulary with the first pull request.
 
 ## #051 — (fullstack) — An agent works on the portfolio through the open application (MCP)
 

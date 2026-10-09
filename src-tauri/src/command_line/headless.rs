@@ -275,7 +275,7 @@ mod tests {
         assert_eq!(value["code"], "AssetNotFound");
         assert_eq!(
             value["message"],
-            "no asset matches \"CW9\" by name or reference"
+            "no asset matches \"CW9\" by name, reference or ISIN"
         );
         assert_eq!(value.as_object().map(|object| object.len()), Some(3));
 
@@ -290,7 +290,7 @@ mod tests {
         .await;
         assert_eq!(
             ambiguous.stderr.as_deref(),
-            Some("Refused: \"twin\" matches more than one asset — use its reference")
+            Some("Refused: \"twin\" matches more than one asset — use its name, its ISIN, or its reference with its exchange (ASML@XAMS)")
         );
         let by_reference = run_line(
             &dir,
@@ -355,7 +355,7 @@ mod tests {
         assert_eq!(refused.exit_code, REFUSED);
         assert_eq!(
             refused.stderr.as_deref(),
-            Some("Refused: no asset matches \"EUR\" by name or reference")
+            Some("Refused: no asset matches \"EUR\" by name, reference or ISIN")
         );
     }
 
@@ -431,9 +431,11 @@ mod tests {
             serde_json::json!({
                 "name": "Amundi MSCI World",
                 "reference": "CW8",
+                "kind": "Custom",
                 "class": "ETF",
                 "currency": "EUR",
                 "isin": null,
+                "exchange": null,
                 "archived": true
             })
         );
@@ -583,9 +585,11 @@ mod tests {
                 "asset": {
                     "name": "Apple",
                     "reference": "AAPL",
+                    "kind": "Listed",
                     "class": "Stocks",
                     "currency": "USD",
                     "isin": "US0378331005",
+                    "exchange": "XNAS",
                     "archived": false
                 }
             })
@@ -612,10 +616,109 @@ mod tests {
         );
     }
 
-    // AST-009 / CLI-026 — a reference another asset has is added and said: one ticker,
-    // several markets. A command then names that asset by its name.
+    // CLI-026 / CLI-011 — the command line creates each kind, and an asset is then named by
+    // its ISIN or, when its reference is shared, by its reference with its exchange; what
+    // matches two assets is refused without listing them.
     #[tokio::test]
-    async fn cli_026_a_shared_reference_is_recorded_with_a_warning() {
+    async fn cli_026_each_kind_is_added_and_named_by_isin_or_reference_at_exchange() {
+        let dir = portfolio("asset-add-kinds").await;
+        let json = |printed: Printed| -> serde_json::Value {
+            serde_json::from_str(printed.stdout.as_deref().expect("json")).expect("valid json")
+        };
+        let add = |options: &str| format!("asset add {options} --json");
+
+        for (options, kind, class) in [
+            (
+                "--name ASML_Amsterdam --reference ASML --kind listed --isin NL0010273215 --exchange XAMS --currency EUR",
+                "Listed",
+                "Stocks",
+            ),
+            (
+                "--name ASML_Nasdaq --reference ASML --kind Listed --isin NL0010273215 --exchange XNAS --currency USD",
+                "Listed",
+                "Stocks",
+            ),
+            (
+                "--name Apple --reference AAPL --class Stocks --isin US0378331005 --currency USD",
+                "Listed",
+                "Stocks",
+            ),
+            (
+                "--name Bitcoin --reference btc --kind crypto --currency EUR",
+                "Crypto",
+                "DigitalAsset",
+            ),
+            (
+                "--name Flat --reference FLAT-PARIS --kind custom --currency EUR",
+                "Custom",
+                "RealEstate",
+            ),
+            (
+                "--name Fund --reference FUND --kind custom --class MutualFunds --currency EUR",
+                "Custom",
+                "MutualFunds",
+            ),
+        ] {
+            let added = json(run_line(&dir, &add(options)).await);
+            assert_eq!(added["status"], "recorded", "{options}");
+            assert_eq!(added["asset"]["kind"], kind, "{options}");
+            assert_eq!(added["asset"]["class"], class, "{options}");
+        }
+
+        for (options, expected) in [
+            (
+                "--name NoIsin --reference NOI --kind listed --currency EUR",
+                "IsinRequired",
+            ),
+            (
+                "--name Coin --reference COIN --kind crypto --isin US0378331005 --currency EUR",
+                "IsinNotAllowed",
+            ),
+            (
+                "--name Stock --reference STK --kind crypto --class Stocks --currency EUR",
+                "ClassNotAllowed",
+            ),
+            (
+                "--name Bitcoin2 --reference BTC --kind crypto --currency USD",
+                "AssetAlreadyExists",
+            ),
+        ] {
+            let refused = run_line(&dir, &add(options)).await;
+            assert_eq!(refused.exit_code, REFUSED, "{options}");
+            assert_eq!(json(refused)["code"], expected, "{options}");
+        }
+
+        let open = |asset: &str| {
+            format!("holding open --account PEA --asset {asset} --quantity 1 --total-cost 1")
+        };
+        for shared in ["ASML", "nl0010273215"] {
+            let refused = run_line(&dir, &open(shared)).await;
+            assert_eq!(refused.exit_code, REFUSED, "{shared}");
+            assert_eq!(
+                refused.stderr,
+                Some(format!(
+                    "Refused: \"{shared}\" matches more than one asset — use its name, its ISIN, or its reference with its exchange (ASML@XAMS)"
+                ))
+            );
+        }
+        for one in ["asml@xnas", "ASML@XAMS", "us0378331005", "BTC"] {
+            assert_eq!(
+                run_line(&dir, &open(one)).await.exit_code,
+                RECORDED,
+                "{one}"
+            );
+        }
+        let nowhere = run_line(&dir, &open("ASML@XPAR")).await;
+        assert_eq!(
+            nowhere.stderr.as_deref(),
+            Some("Refused: no asset matches \"ASML@XPAR\" by name, reference or ISIN")
+        );
+    }
+
+    // CLI-041 — a reference another asset has is added and said: one ticker, several
+    // markets. A command then names that asset by its name.
+    #[tokio::test]
+    async fn cli_041_a_shared_reference_is_recorded_with_a_warning() {
         let dir = portfolio("asset-add-shared").await;
 
         let added = run_line(
@@ -630,7 +733,7 @@ mod tests {
         );
         assert_eq!(
             added.stderr.as_deref(),
-            Some("Warning: another asset has the reference CW8; name this one by its name in --asset.")
+            Some("Warning: another asset has the reference CW8; name this one in --asset by its name or its ISIN.")
         );
 
         let json = run_line(

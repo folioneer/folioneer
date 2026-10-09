@@ -72,7 +72,7 @@ pub fn help(program: &str, topic: HelpTopic) -> String {
             ],
             &[
                 ("--account <name>", "Account name"),
-                ("--asset <name>", "Asset name or reference"),
+                ("--asset <name>", "Asset name, reference, ISIN or REF@EXCHANGE"),
                 ("--quantity <n>", "Quantity held"),
                 ("--total-cost <amount>", "What the position cost in total"),
             ],
@@ -89,7 +89,7 @@ pub fn help(program: &str, topic: HelpTopic) -> String {
             ],
             &[
                 ("--account <name>", "Account name"),
-                ("--asset <name>", "Asset name or reference"),
+                ("--asset <name>", "Asset name, reference, ISIN or REF@EXCHANGE"),
                 ("--quantity <n>", "Quantity bought"),
                 ("--price <amount>", "Unit price"),
                 (
@@ -110,7 +110,7 @@ pub fn help(program: &str, topic: HelpTopic) -> String {
             ],
             &[
                 ("--account <name>", "Account name"),
-                ("--asset <name>", "Asset name or reference"),
+                ("--asset <name>", "Asset name, reference, ISIN or REF@EXCHANGE"),
                 ("--quantity <n>", "Quantity sold"),
                 ("--price <amount>", "Unit price"),
                 (
@@ -135,19 +135,23 @@ pub fn help(program: &str, topic: HelpTopic) -> String {
             "asset add",
             "Add an asset, so that a holding of it can be recorded.",
             &[
-                "--name <name> --reference <ref> --class <class>",
-                "--currency <code> [options]",
+                "--name <name> --reference <ref> --currency <code>",
+                "(--kind <kind> | --class <class>) [options]",
             ],
             &[
                 ("--name <name>", "Asset name"),
                 ("--reference <ref>", "Ticker or reference"),
                 (
-                    "--class <class>",
-                    "RealEstate, Stocks, Bonds, ETF, ETP, MutualFunds, DigitalAsset or Derivatives",
-                ),
-                (
                     "--currency <code>",
                     "Currency it is quoted in (EUR, USD, ...)",
+                ),
+                (
+                    "--kind <kind>",
+                    "Listed (needs --isin), Crypto or Custom; decided from the class and the ISIN when left out",
+                ),
+                (
+                    "--class <class>",
+                    "RealEstate, Stocks, Bonds, ETF, ETP, MutualFunds, DigitalAsset or Derivatives; its kind's when left out",
                 ),
             ],
             &[
@@ -344,7 +348,7 @@ Usage: folioneer holding buy --account <name> --asset <name> --quantity <n>
 
 Required:
   --account <name>      Account name
-  --asset <name>        Asset name or reference
+  --asset <name>        Asset name, reference, ISIN or REF@EXCHANGE
   --quantity <n>        Quantity bought
   --price <amount>      Unit price
   --total <amount>      or, in place of --price: total paid, fees included
@@ -409,11 +413,13 @@ Exit codes: 0 listed, 1 refused, 2 wrong usage."
     fn cli_026_the_page_of_asset_add_names_its_classes_and_defaults() {
         let page = help("folioneer", HelpTopic::AssetAdd);
         assert!(page.contains(
-            "Usage: folioneer asset add --name <name> --reference <ref> --class <class>\n"
+            "Usage: folioneer asset add --name <name> --reference <ref> --currency <code>\n"
         ));
         assert!(page.contains(
             "RealEstate, Stocks, Bonds, ETF, ETP, MutualFunds, DigitalAsset or Derivatives"
         ));
+        assert!(page.contains("(--kind <kind> | --class <class>) [options]"));
+        assert!(page.contains("Listed (needs --isin), Crypto or Custom"));
         assert!(page.contains("--risk <1-5>        Risk level"));
         assert!(page.contains("[default: its class's]"));
         assert!(page.contains("[default: none]"));

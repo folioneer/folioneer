@@ -6,7 +6,9 @@ use std::sync::Arc;
 use serde::Serialize;
 
 use crate::context::account::{AccountError, AccountServiceContract, Transaction, TransactionType};
-use crate::context::asset::{Asset, AssetClass, AssetError, AssetServiceContract, NamedAsset};
+use crate::context::asset::{
+    Asset, AssetClass, AssetError, AssetKind, AssetServiceContract, NamedAsset,
+};
 use crate::core::BACKEND;
 use crate::use_cases::holding_transaction::{
     HoldingTransactionUseCase, NameLookupError, OpenHoldingError, OpenHoldingTask,
@@ -73,12 +75,16 @@ pub struct AssetRow {
     pub name: String,
     /// The asset's reference.
     pub reference: String,
+    /// The asset's kind.
+    pub kind: AssetKind,
     /// The asset's class.
     pub class: AssetClass,
     /// The asset's currency.
     pub currency: String,
     /// The asset's ISIN, when it has one.
     pub isin: Option<String>,
+    /// The code of the asset's exchange, when it has one: what follows `@` in `--asset`.
+    pub exchange: Option<String>,
     /// Whether the asset is archived.
     pub archived: bool,
 }
@@ -258,9 +264,11 @@ fn row_of(asset: Asset) -> AssetRow {
     AssetRow {
         name: asset.name,
         reference: asset.reference,
+        kind: asset.kind,
         class: asset.class,
         currency: asset.currency,
         isin: asset.isin,
+        exchange: asset.exchange.map(|exchange| exchange.code),
         archived: asset.is_archived,
     }
 }
@@ -281,10 +289,12 @@ fn refusal_from_lookup(error: &NameLookupError) -> Refusal {
             format!("more than one account is named \"{typed}\"")
         }
         NameLookupError::AssetNotFound { typed } => {
-            format!("no asset matches \"{typed}\" by name or reference")
+            format!("no asset matches \"{typed}\" by name, reference or ISIN")
         }
         NameLookupError::AssetAmbiguous { typed } => {
-            format!("\"{typed}\" matches more than one asset — use its reference")
+            format!(
+                "\"{typed}\" matches more than one asset — use its name, its ISIN, or its reference with its exchange (ASML@XAMS)"
+            )
         }
         NameLookupError::DatabaseError => "the portfolio could not be read".to_string(),
     };
@@ -569,12 +579,12 @@ mod tests {
             (
                 NameLookupError::AssetNotFound { typed: typed() },
                 "AssetNotFound",
-                "no asset matches \"PEA\" by name or reference",
+                "no asset matches \"PEA\" by name, reference or ISIN",
             ),
             (
                 NameLookupError::AssetAmbiguous { typed: typed() },
                 "AssetAmbiguous",
-                "\"PEA\" matches more than one asset — use its reference",
+                "\"PEA\" matches more than one asset — use its name, its ISIN, or its reference with its exchange (ASML@XAMS)",
             ),
             (
                 NameLookupError::DatabaseError,

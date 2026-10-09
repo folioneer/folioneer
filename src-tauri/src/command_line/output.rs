@@ -2,7 +2,7 @@
 
 use serde_json::json;
 
-use super::orchestrator::{verb, Listing, Outcome, Refusal};
+use super::orchestrator::{verb, AssetRow, Listing, Outcome, Refusal};
 
 /// A command recorded.
 pub const RECORDED: i32 = 0;
@@ -122,11 +122,12 @@ pub fn render(outcome: &Outcome, json: bool) -> Printed {
                 asset.class,
                 asset.currency
             )),
-            // AST-009 — allowed, and worth saying: `--asset` by this reference is now ambiguous.
+            // CLI-041 — allowed, and worth saying: `--asset` by this reference is now ambiguous.
             stderr: reference_shared.then(|| {
                 format!(
-                    "Warning: another asset has the reference {}; name this one by its name in --asset.",
-                    printable(&asset.reference)
+                    "Warning: another asset has the reference {}; name this one in --asset by {}.",
+                    printable(&asset.reference),
+                    ways_to_name(asset)
                 )
             }),
             exit_code: RECORDED,
@@ -151,6 +152,20 @@ fn listed_as_json(listing: &Listing) -> String {
         Listing::Assets(rows) => json!({ "status": "listed", "assets": rows }),
     }
     .to_string()
+}
+
+/// CLI-041 — what still names an asset whose reference another asset has: its name, its
+/// ISIN when it has one, and its reference with its exchange when it is on one.
+fn ways_to_name(asset: &AssetRow) -> String {
+    match (&asset.isin, &asset.exchange) {
+        (Some(_), Some(code)) => format!(
+            "its name, its ISIN or {}@{}",
+            printable(&asset.reference),
+            printable(code)
+        ),
+        (Some(_), None) => "its name or its ISIN".to_string(),
+        (None, _) => "its name".to_string(),
+    }
 }
 
 /// CLI-020 — a list as a table: a header, then what a command needs to name each row.
@@ -345,5 +360,43 @@ mod tests {
         assert_eq!(money(992_195_000), "992.20");
         assert_eq!(money(-5_000), "-0.01");
         assert_eq!(money(0), "0.00");
+    }
+    // CLI-041 — the warning names what still tells the added asset apart: always its name,
+    // its ISIN when it has one, its reference with its own exchange when it is on one.
+    #[test]
+    fn cli_041_the_shared_reference_warning_names_what_tells_the_asset_apart() {
+        use crate::context::asset::{AssetClass, AssetKind};
+
+        let warned = |isin: Option<&str>, exchange: Option<&str>| {
+            render(
+                &Outcome::AssetAdded {
+                    asset: AssetRow {
+                        name: "ASML".to_string(),
+                        reference: "ASML".to_string(),
+                        kind: AssetKind::Listed,
+                        class: AssetClass::Stocks,
+                        currency: "EUR".to_string(),
+                        isin: isin.map(str::to_string),
+                        exchange: exchange.map(str::to_string),
+                        archived: false,
+                    },
+                    reference_shared: true,
+                },
+                false,
+            )
+            .stderr
+            .expect("warning")
+        };
+        let start = "Warning: another asset has the reference ASML; name this one in --asset by";
+
+        assert_eq!(
+            warned(Some("NL0010273215"), Some("XAMS")),
+            format!("{start} its name, its ISIN or ASML@XAMS.")
+        );
+        assert_eq!(
+            warned(Some("NL0010273215"), None),
+            format!("{start} its name or its ISIN.")
+        );
+        assert_eq!(warned(None, None), format!("{start} its name."));
     }
 }

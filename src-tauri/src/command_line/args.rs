@@ -1,7 +1,7 @@
 //! Reading a command line (CLI-010): the command, its options and their values, in
 //! micro-units (TRX-024). Anything wrong is a usage error (CLI-022).
 
-use crate::context::asset::{AssetClass, NamedAsset};
+use crate::context::asset::{AssetClass, AssetCreationDefaults, AssetKind, NamedAsset};
 
 use super::help::{closest, commands, HelpTopic};
 
@@ -179,6 +179,7 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
         "asset add" => &[
             "--name",
             "--reference",
+            "--kind",
             "--class",
             "--currency",
             "--isin",
@@ -219,7 +220,8 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
             command: Command::Write(Writing::AddAsset(NamedAsset {
                 name: options.text("--name")?,
                 reference: options.text("--reference")?,
-                class: options.class()?,
+                kind: options.kind()?,
+                class: options.class(options.kind()?)?,
                 currency: options.text("--currency")?,
                 isin: options.get("--isin").map(str::to_string),
                 exchange_code: options.get("--exchange").map(str::to_string),
@@ -327,9 +329,40 @@ impl Options {
         }
     }
 
-    /// CLI-026 — `--class` as one of the classes the core lets a user add an asset in, case
+    /// CLI-026 — `--kind` as one of the kinds the core lets a user add an asset of, case
     /// ignored.
-    fn class(&self) -> Result<AssetClass, Reason> {
+    fn kind(&self) -> Result<Option<AssetKind>, Reason> {
+        let Some(typed) = self.get("--kind") else {
+            return Ok(None);
+        };
+        let kinds: Vec<AssetKind> = AssetCreationDefaults::current()
+            .kinds
+            .into_iter()
+            .map(|form| form.kind)
+            .collect();
+        kinds
+            .iter()
+            .find(|kind| kind.to_string().eq_ignore_ascii_case(typed))
+            .copied()
+            .map(Some)
+            .ok_or_else(|| {
+                let names: Vec<String> = kinds.iter().map(ToString::to_string).collect();
+                Reason(format!(
+                    "--kind is not one of {}: \"{}\"",
+                    names.join(", "),
+                    typed.escape_debug()
+                ))
+            })
+    }
+
+    /// CLI-026 — `--class` as one of the classes the core lets a user add an asset in, case
+    /// ignored; left out, it is the class the core preselects for `kind` (AST-037).
+    fn class(&self, kind: Option<AssetKind>) -> Result<AssetClass, Reason> {
+        if self.get("--class").is_none() {
+            if let Some(class) = kind.and_then(AssetCreationDefaults::class_of) {
+                return Ok(class);
+            }
+        }
         let typed = self.text("--class")?;
         let addable = AssetClass::user_addable();
         addable
@@ -514,6 +547,7 @@ mod tests {
                 command: Command::Write(Writing::AddAsset(NamedAsset {
                     name: "ASML".to_string(),
                     reference: "asml".to_string(),
+                    kind: None,
                     class: AssetClass::Stocks,
                     currency: "EUR".to_string(),
                     isin: None,
@@ -537,10 +571,39 @@ mod tests {
         assert_eq!(full.risk_level, Some(3));
         assert_eq!(full.category_name.as_deref(), Some("Tech"));
 
+        let named = |line: &str| match read(line) {
+            Ok(Invocation::Run {
+                command: Command::Write(Writing::AddAsset(named)),
+                ..
+            }) => named,
+            other => panic!("asset add: {other:?}"),
+        };
+        let crypto = named("asset add --name Bitcoin --reference BTC --kind crypto --currency EUR");
+        assert_eq!(
+            (crypto.kind, crypto.class),
+            (Some(AssetKind::Crypto), AssetClass::DigitalAsset)
+        );
+        let custom = named("asset add --name Flat --reference FLAT --kind CUSTOM --currency EUR");
+        assert_eq!(custom.class, AssetClass::RealEstate);
+        let both =
+            named("asset add --name A --reference B --kind Custom --class Bonds --currency EUR");
+        assert_eq!(
+            (both.kind, both.class),
+            (Some(AssetKind::Custom), AssetClass::Bonds)
+        );
+
         let reason = |line: &str| read(line).expect_err("usage error").message;
         assert_eq!(
             reason("asset add --reference B --class ETF --currency USD"),
             "--name is missing"
+        );
+        assert_eq!(
+            reason("asset add --name A --reference B --currency USD"),
+            "--class is missing"
+        );
+        assert_eq!(
+            reason("asset add --name A --reference B --kind Cash --currency USD"),
+            "--kind is not one of Listed, Crypto, Custom: \"Cash\""
         );
         assert_eq!(
             reason("asset add --name A --reference B --class Cash --currency USD"),

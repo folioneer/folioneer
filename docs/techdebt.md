@@ -7,7 +7,7 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-084) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-086) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -317,6 +317,28 @@ Remove an entry once it has been resolved.
 - Observation: the replay multiplies the quantity by the factor in 128 bits and casts the result back to 64 bits without a check. A factor large enough (far beyond any real split) makes the cast wrap: recording and the split check both then show a quantity that is wrong, or refuse a split for the wrong reason.
 - User value: None in practice — no real split comes near the bound; an absurd factor typed by mistake is refused with a clear reason.
 - Done when: a factor whose rescale cannot be stored is refused when the split is recorded and when it is checked, with one error code, shown by a test on each path.
+
+## 2026-10-09 — TD-085 — The assets to settle are reported by the core and shown nowhere
+
+- Found by: `spec-checker`, closing #056
+- Where: `get_assets_to_settle` in `src-tauri/src/context/asset/api.rs` (AST-035); no call in `src/features/assets/gateway.ts`, no command of the command line
+- Severity: 🟡
+- Observation: an asset that existed before kinds and that the rules would now refuse — a listed one without an ISIN, two that are the same — is kept as it is and reported by the core, but no screen and no command shows the report, so its owner is never told which assets to settle
+- User value: A user sees which of their assets break a rule of their kind, and why, and settles each from its edit dialog.
+- Done when: the assets to settle show where the owner decides — the assets table, a notice, the command line — each with its problem and a way to its edit dialog; a test holds it.
+
+**Open questions:**
+
+- [ ] Where do the assets to settle show: a line or a badge on their row of the assets table, a notice above it, or both with a command of the command line? (A screen changes: a design to validate.)
+
+## 2026-10-09 — TD-084 — Three rules of the assets screen that the screen does not keep
+
+- Found by: `spec-checker`, closing #056
+- Where: `src/features/assets/asset_table/AssetTable.tsx` — the empty state is tested before `fetchError` (AST-015), and the archive and unarchive confirmations close before the result is known, the failure showing above the table (AST-014); `activeCount` in `src/features/assets/useAssets.ts`, which nothing shows (AST-007)
+- Severity: 🔵
+- Observation: a failed first load shows "No assets" instead of the error and Retry; a refused archive is told outside the dialog that asked; the page header shows no count of active assets. All three are older than #056, and none has a test
+- User value: A user whose assets cannot be read is told so and can retry; a refused archive is explained where it was asked.
+- Done when: each of the three is fixed with a test, or its rule is rewritten to what the screen does and the unused count removed.
 
 ## 2026-10-09 — TD-083 — A currency pair alone stops a device from joining; the spec does not say so
 

@@ -67,6 +67,8 @@ pub struct NamedAsset {
     pub name: String,
     /// Ticker or reference.
     pub reference: String,
+    /// Kind; decided from the class and the ISIN when left out (AST-034).
+    pub kind: Option<AssetKind>,
     /// Classification.
     pub class: AssetClass,
     /// ISO currency code.
@@ -86,7 +88,7 @@ pub struct NamedAsset {
 pub struct AddedAsset {
     /// The asset as created.
     pub asset: Asset,
-    /// Another asset, archived or not, has the same reference (AST-009): allowed — the
-    /// same ticker trades on several markets — and worth saying.
+    /// Another asset, archived or not, has the same reference without being the same asset
+    /// (AST-032): allowed — the same ticker trades on several markets — and worth saying.
     pub reference_shared: bool,
 }

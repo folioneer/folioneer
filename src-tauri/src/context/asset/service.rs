@@ -1,8 +1,8 @@
-use super::domain::proposed_reference;
 use super::domain::{
-    Asset, AssetCategory, AssetCategoryRepository, AssetClass, AssetKind, AssetListings,
-    AssetPrice, AssetPriceRepository, AssetPriceSource, AssetRepository, AssetToSettle, DatedClose,
-    KindProblem, OtherListing, PriceHistoryBackfillOutcome, SYSTEM_CATEGORY_ID,
+    proposed_reference, Asset, AssetCategory, AssetCategoryRepository, AssetClass, AssetKind,
+    AssetListings, AssetPrice, AssetPriceRepository, AssetPriceSource, AssetRepository,
+    AssetToSettle, DatedClose, KindProblem, OtherListing, PriceHistoryBackfillOutcome,
+    SYSTEM_CATEGORY_ID,
 };
 use super::error::AssetError;
 use crate::{
@@ -211,10 +211,10 @@ impl AssetService {
     }
 
     /// CLI-026 — adds an asset described by name, through the rules of the window's form
-    /// and no other. A reference another asset has, archived or not, is allowed and
-    /// reported, as the form warns (AST-009). The risk level left out is the class's
-    /// default, the category left out the system one; a category is found by its name, an
-    /// exchange by its code (AST-001).
+    /// and no other. A reference another asset has, archived or not, without the two being
+    /// the same asset (AST-032), is allowed and reported. The risk level left out is the
+    /// class's default, the category left out the system one; a category is found by its
+    /// name, an exchange by its code (AST-001).
     pub async fn add_named_asset(&self, named: NamedAsset) -> StdResult<AddedAsset, AssetError> {
         let reference = named.reference.trim().to_lowercase();
         let reference_shared = self
@@ -250,7 +250,7 @@ impl AssetService {
         };
         let asset = self
             .create_asset(CreateAssetDTO {
-                kind: None,
+                kind: named.kind,
                 name: named.name,
                 reference: named.reference,
                 isin: named.isin,
@@ -1389,6 +1389,7 @@ mod tests {
         NamedAsset {
             name: name.to_string(),
             reference: reference.to_string(),
+            kind: None,
             class: AssetClass::ETF,
             currency: "EUR".to_string(),
             isin: None,
@@ -1761,7 +1762,7 @@ mod tests {
         ));
     }
 
-    // AST-009 / CLI-026 — a reference another asset has is allowed — one ticker, several
+    // AST-032 / CLI-026 — a reference another asset has is allowed — one ticker, several
     // markets — and reported; a new reference is not.
     #[tokio::test]
     async fn cli_026_a_shared_reference_is_added_and_reported() {
@@ -3746,6 +3747,80 @@ mod tests {
         )
         .await
         .expect("CFR-017: applying an archived asset must succeed, no re-validation");
+    }
+
+    // AST-033 — a change from another device is applied as it is: an asset its kind's rules
+    // refuse (listed, no ISIN) is written without a check, and no read looks for the same
+    // asset among those held.
+    #[tokio::test]
+    async fn ast_033_an_asset_its_kind_refuses_is_applied_as_it_is() {
+        let incoming = Asset {
+            isin: None,
+            ..listed("from-laptop", "XAMS", false)
+        };
+        assert!(incoming.kind_problem().is_some());
+        let mut ar = MockAssetRepository::new();
+        ar.expect_get_all_including_archived().never();
+        ar.expect_apply_asset()
+            .withf(|_, asset, _| {
+                asset.id == "from-laptop" && asset.kind == AssetKind::Listed && asset.isin.is_none()
+            })
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+        let svc = make_svc(
+            ar,
+            MockAssetCategoryRepository::new(),
+            MockAssetPriceRepository::new(),
+        );
+
+        svc.apply_asset(
+            &mut *apply_conn().await,
+            &serde_json::to_string(&incoming).expect("json"),
+            incoming_rank("laptop", 100),
+        )
+        .await
+        .expect("applied as it is");
+    }
+
+    // AST-036 — a change written before kinds keeps the kind this device holds for the
+    // asset; the record it holds is read by the asset's identity.
+    #[tokio::test]
+    async fn ast_036_a_change_written_before_kinds_keeps_the_kind_held() {
+        let incoming = listed("a1", "XAMS", false);
+        let mut written = serde_json::to_value(&incoming).expect("json");
+        written.as_object_mut().expect("object").remove("kind");
+        let held = serde_json::to_string(&Asset {
+            kind: AssetKind::Custom,
+            ..incoming.clone()
+        })
+        .expect("json");
+        let mut ar = MockAssetRepository::new();
+        ar.expect_synced_record()
+            .withf(|_, kind, identity| *kind == RecordKind::Asset && identity == "a1")
+            .times(1)
+            .return_once(move |_, _, _| {
+                Ok(Some(SyncedRecord {
+                    rank: None,
+                    content: held,
+                }))
+            });
+        ar.expect_apply_asset()
+            .withf(|_, asset, _| asset.id == "a1" && asset.kind == AssetKind::Custom)
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+        let svc = make_svc(
+            ar,
+            MockAssetCategoryRepository::new(),
+            MockAssetPriceRepository::new(),
+        );
+
+        svc.apply_asset(
+            &mut *apply_conn().await,
+            &written.to_string(),
+            incoming_rank("laptop", 100),
+        )
+        .await
+        .expect("applied with the kind held");
     }
 
     // CFR-017 — apply_category writes the incoming category verbatim.

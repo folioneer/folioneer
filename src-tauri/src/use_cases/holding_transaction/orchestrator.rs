@@ -169,11 +169,29 @@ fn match_account<'a>(accounts: &'a [Account], typed: &str) -> Result<&'a Account
     Ok(account)
 }
 
-/// CLI-011 — the one asset with this name or reference, among assets that are not cash.
+/// CLI-011 — whether `typed` names this asset: its name, its reference, its ISIN, or its
+/// reference with the code of its exchange (`ASML@XAMS`).
+fn names_asset(asset: &Asset, typed: &str) -> bool {
+    same_words(&asset.name, typed)
+        || same_words(&asset.reference, typed)
+        || asset
+            .isin
+            .as_deref()
+            .is_some_and(|isin| same_words(isin, typed))
+        || typed.rsplit_once('@').is_some_and(|(reference, code)| {
+            same_words(&asset.reference, reference)
+                && asset
+                    .exchange
+                    .as_ref()
+                    .is_some_and(|exchange| same_words(&exchange.code, code))
+        })
+}
+
+/// CLI-011 — the one asset `typed` names, among assets that are not cash.
 fn match_asset<'a>(assets: &'a [Asset], typed: &str) -> Result<&'a Asset, NameLookupError> {
-    let mut matches = assets.iter().filter(|asset| {
-        !asset.is_cash() && (same_words(&asset.name, typed) || same_words(&asset.reference, typed))
-    });
+    let mut matches = assets
+        .iter()
+        .filter(|asset| !asset.is_cash() && names_asset(asset, typed));
     let asset = matches
         .next()
         .ok_or_else(|| NameLookupError::AssetNotFound {

@@ -183,7 +183,7 @@ The table displays only active assets (`is_archived = false`) by default. A page
 
 **AST-039 — Other listings of the same instrument (frontend + backend)**: Two listed assets that share an ISIN are listings of one instrument (AST-032 makes them two assets). The core reports, for each of them, the other active listings, by exchange label then currency, a listing on no exchange first. The table shows them under the asset's name as "also held as" followed by reference, exchange and currency: one in full; several as the first followed by "…", the whole list being the hint of the line. No figure of the two assets is merged.
 
-**AST-040 — The kind comes first in the asset dialogs (frontend)**: "New asset" opens on the choice of kind — Listed, Crypto, Custom — with one line saying what the chosen kind means; the edit dialog carries the same choice (AST-012). At creation, a listed asset starts from the lookup (WEB-010), with a way to fill it in by hand and, once a result is chosen, a way back to the search (WEB-047); a crypto or a custom asset opens on its form. Changing the kind keeps what was typed, a reference that was only proposed apart (AST-038).
+**AST-040 — The kind comes first in the asset dialogs (frontend)**: "New asset" opens on the choice of kind — Listed, Crypto, Custom — with one line saying what the chosen kind means; the edit dialog carries the same choice (AST-012). At creation, a listed asset starts from the lookup (WEB-010), with a way to fill it in by hand and, once a result is chosen, a way back to the search (WEB-047); a crypto or a custom asset opens on its form. Changing the kind between two that show their form keeps what was typed, a reference that was only proposed apart (AST-038); choosing Listed at creation returns to the search, and what was typed is not carried there.
 
 **AST-041 — A refusal for the same asset names it (frontend)**: When the core refuses an asset because it already exists (AST-032), the message names the existing asset with its reference, its exchange when it has one, and its currency.
 
@@ -276,4 +276,4 @@ None — all questions have been resolved.
 - **SYN-038** — the kind is a field of a synced record: it arrives with data format version 2 (see `multi-device-sync.md`); AST-036 says what a version 1 change becomes.
 - **WEB-041 / WEB-046** — a keyword lookup result pre-fills an exchange and no ISIN; saving it as it is is refused (AST-031): the user types the ISIN, or chooses the custom kind (see `asset-web-lookup.md`).
 - **CSH-015** — Cash Assets appear in the table as the application's (AST-040) (see `cash-tracking.md`).
-- **CLI-026** — `asset add` states no kind, so AST-034 decides it, and AST-031 and AST-032 refuse what the window refuses (see `command-line.md`).
+- **CLI-026** — `asset add` states a kind or leaves AST-034 to decide it; either way AST-031 and AST-032 refuse what the window refuses (see `command-line.md`).
