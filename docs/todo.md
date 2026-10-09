@@ -149,8 +149,8 @@ Existing assets take a kind from what they carry: the Cash class is cash, the di
 **Design:** validated
 **Open questions:**
 
-- [ ] The term "Asset to settle" ("Actif à régulariser") for an asset that breaks a rule of its kind or is the same as another: confirmed? It names the report of AST-035 in the code, the spec and the contract; it is `proposed` in the vocabulary, and a term must be confirmed before the code uses it (B5). (Raised by the reviewers of pull request #138, 2026-10-09.)
-- [ ] The SQL reviewer in CI refuses the migration three times for having no explicit `BEGIN; … COMMIT;` around its `ALTER TABLE` and its fill. The claim is wrong for this stack: SQLx runs each migration in one transaction and SQLite rolls a schema change back with it, and an explicit `BEGIN` inside would fail. The reviewer's prompt was corrected in the pull request and it still reports it. May the migration carry the one-line note `-- reviewer-sql FP: …` the triage policy gives for a false positive? (Third red on the same gate, pull request #138 left open, 2026-10-09.)
+- [x] The term "Asset to settle" ("Actif à régulariser") for an asset that breaks a rule of its kind or is the same as another. → Confirmed. (Owner, 2026-10-09.)
+- [x] The SQL reviewer in CI refuses the migration for having no explicit `BEGIN; … COMMIT;`, which is wrong for SQLite through SQLx. May the migration carry the false-positive note of the triage policy? → Yes. (Owner, 2026-10-09.)
 
 Vocabulary (owner, 2026-10-09): the terms are Kind — Listed, Crypto, Custom, Cash; in French "Nature" — "Coté", "Crypto", "Non coté", "Liquidités". Where a listed asset trades stays the Exchange ("Place de cotation"): "marketplace" above reads as Exchange, and the mock-up's "Marketplace" label is "Exchange". They enter the vocabulary with the first pull request.
 

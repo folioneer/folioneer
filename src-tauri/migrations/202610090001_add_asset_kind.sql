@@ -5,6 +5,9 @@
 -- fill records no change to publish.
 -- IRREVERSIBLE: the kind is derived from the class and the ISIN; no earlier value exists
 -- to restore.
+-- reviewer-sql FP: no explicit BEGIN; … COMMIT; — SQLx runs this migration in one
+-- transaction and SQLite rolls the new column back with a failed fill; an explicit BEGIN
+-- inside it would fail — see PR #138.
 ALTER TABLE assets ADD COLUMN kind TEXT NOT NULL DEFAULT 'Custom';
 
 UPDATE assets

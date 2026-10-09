@@ -132,9 +132,9 @@ Two assets are the same when they are of one kind and share what identifies it: 
 
 ### Asset to settle
 
-An asset that breaks a rule of its kind, or is the same as another, because it existed before kinds did or arrived from another device. The application leaves it as it is and lists it; the user settles it by editing it.
+An asset that breaks a rule of its kind, or is the same as another, because it existed before kinds did or arrived from another device. The application leaves it as it is and lists it; the user settles it by editing it. In French: "Actif à régulariser".
 
-> Status: proposed
+> Status: confirmed
 
 ---
 
