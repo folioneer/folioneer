@@ -336,15 +336,6 @@ Remove an entry once it has been resolved.
 - User value: None directly — a reviewer that needs another command fails visibly, and the list grows on purpose.
 - Done when: the reviewer step grants only named commands and the refused list is gone; every reviewer lane completes on a pull request that touches its files; gh#79 is closed.
 
-## 2026-10-05 — TD-081 — "Today" is the UTC day in five places and the local day in three
-
-- Found by: `/prune` after the 0.6.0 release
-- Where: `new Date().toISOString().slice(0, 10)` in `src/features/account_details/account_details_view/usePriceModal.ts`, `src/features/account_details/shared/validateCashForm.ts`, `src/features/account_details/fee_schedule/useFeeSchedule.ts`, `src/features/unpriced_prices/useUnpricedPrices.ts`, `src/lib/lastOperationDateStorage.ts`; the local day in `useHoldingSnapshotAsOf.ts`, `useAccountDetailsView.ts` and `src/ui/components/field/useDateField.ts`
-- Severity: 🟡
-- Observation: `toISOString` gives the UTC date. In France, between midnight and 01:00 (02:00 in summer), the five places read yesterday: a price or a fee schedule is dated a day early by default, and a cash movement dated today is refused as "in the future". Read in the code, not reproduced in the application.
-- User value: A date proposed or checked late in the evening is the day the user is living.
-- Done when: one function gives the local day and the eight places use it; a test sets the clock just after local midnight and reads today's date from each.
-
 ## 2026-10-04 — TD-080 — The E2E tooling carries 22 known advisories
 
 - Found by: `/dep-audit` before the 0.6.0 release

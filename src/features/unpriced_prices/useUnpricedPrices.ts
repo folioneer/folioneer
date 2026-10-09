@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { UnpricedAsset } from "@/bindings";
+import { todayIso } from "@/ui/format/date";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { unpricedPricesGateway } from "./gateway";
 import { recordPriceErrorToI18n } from "./shared/presenter";
-
-/** Today's local calendar date as an ISO `yyyy-mm-dd` string (project convention). */
-const today = () => new Date().toISOString().slice(0, 10);
 
 /** A modal row: the unpriced asset plus its per-row submission state (MKT-178). */
 export interface UnpricedRow extends UnpricedAsset {
@@ -48,7 +46,7 @@ export function useUnpricedPrices(assets: UnpricedAsset[], onClose: () => void):
         row.asset_id === assetId ? { ...row, isSubmitting: true, error: null } : row,
       ),
     );
-    const result = await unpricedPricesGateway.recordPrice(assetId, today(), price);
+    const result = await unpricedPricesGateway.recordPrice(assetId, todayIso(), price);
     if (result.status === "ok") {
       setRows((prev) => prev.filter((row) => row.asset_id !== assetId));
     } else {

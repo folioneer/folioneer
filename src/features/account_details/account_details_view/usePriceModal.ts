@@ -4,6 +4,7 @@ import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationD
 import { logger } from "@/lib/logger";
 import { decimalToNumber } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
+import { todayIso } from "@/ui/format/date";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
 import { assetPriceMutationErrorToI18n } from "../shared/presenter";
@@ -41,8 +42,6 @@ export interface UsePriceModalResult {
 
 const UNKNOWN_ERROR: I18nMessage = { key: "error.Unknown" };
 
-const today = () => new Date().toISOString().slice(0, 10);
-
 function validatePrice(price: string): I18nMessage | null {
   const n = decimalToNumber(price);
   if (Number.isNaN(n) || n <= 0) return { key: "price_modal.error_price_not_positive" };
@@ -51,7 +50,7 @@ function validatePrice(price: string): I18nMessage | null {
 
 function validateDate(date: string): I18nMessage | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { key: "price_modal.error_invalid_date" };
-  if (date > today()) return { key: "price_modal.error_future_date" };
+  if (date > todayIso()) return { key: "price_modal.error_future_date" };
   return null;
 }
 

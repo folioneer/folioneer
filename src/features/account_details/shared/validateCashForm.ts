@@ -1,4 +1,5 @@
 import { decimalToNumber } from "@/lib/microUnits";
+import { todayIso } from "@/ui/format/date";
 import type { I18nMessage } from "@/ui/format/i18n";
 
 /**
@@ -16,8 +17,7 @@ export function validateDate(date: string): I18nMessage | null {
   if (date.length === 0 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return { key: "validation.invalid_date" };
   }
-  const today = new Date().toISOString().slice(0, 10);
-  if (date > today) return { key: "validation.date_in_future" };
+  if (date > todayIso()) return { key: "validation.date_in_future" };
   if (date < "1900-01-01") return { key: "validation.date_too_old" };
   return null;
 }

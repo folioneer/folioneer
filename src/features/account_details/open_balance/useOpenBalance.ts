@@ -6,6 +6,7 @@ import { transactionMutationErrorToI18n } from "@/features/transactions/shared/p
 import { logger } from "@/lib/logger";
 import { decimalToMicro } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
+import { todayIso } from "@/ui/format/date";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { useLatestCheck } from "@/ui/hooks/useLatestCheck";
 import { accountDetailsGateway } from "../gateway";
@@ -33,7 +34,7 @@ export function useOpenBalance({ accountId, assetId, onSubmitSuccess }: UseOpenB
   const [formData, setFormData] = useState<OpenBalanceFormData>(() => ({
     accountId,
     assetId,
-    date: new Date().toISOString().slice(0, 10),
+    date: todayIso(),
     quantity: "",
     totalCost: "",
   }));

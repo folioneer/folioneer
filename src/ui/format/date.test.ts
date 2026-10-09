@@ -1,5 +1,51 @@
-import { describe, expect, it } from "vitest";
-import { formatIsoDateNumeric, formatIsoDateTime, formatIsoDateTimeNumeric } from "./date";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  formatIsoDateNumeric,
+  formatIsoDateTime,
+  formatIsoDateTimeNumeric,
+  todayIso,
+} from "./date";
+
+/** The text of every source file of the application, by path. */
+const SOURCES = import.meta.glob<string>("../../**/*.{ts,tsx}", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+
+describe("todayIso", () => {
+  // 00:30 in Paris on 9 October is still 22:30 on the 8th in UTC: the half hour in which
+  // the UTC day is yesterday.
+  const justAfterMidnightInParis = new Date("2026-10-08T22:30:00Z");
+
+  beforeEach(() => {
+    vi.stubEnv("TZ", "Europe/Paris");
+    vi.useFakeTimers();
+    vi.setSystemTime(justAfterMidnightInParis);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it("is the day the user is living, not the UTC day", () => {
+    expect(justAfterMidnightInParis.toISOString().slice(0, 10)).toBe("2026-10-08");
+    expect(todayIso()).toBe("2026-10-09");
+  });
+
+  it("pads the month and the day", () => {
+    expect(todayIso(new Date(2026, 0, 5, 12))).toBe("2026-01-05");
+  });
+
+  it("is the only way the interface reads today's date", () => {
+    const utcDay = /toISOString\(\)\s*\.(slice\(0, 10\)|split\("T"\))/;
+    const sources = Object.entries(SOURCES).filter(([path]) => !/\.test\.tsx?$/.test(path));
+    expect(sources.length).toBeGreaterThan(100);
+    const offenders = sources.filter(([, text]) => utcDay.test(text)).map(([path]) => path);
+    expect(offenders).toEqual([]);
+  });
+});
 
 describe("formatIsoDateNumeric", () => {
   it("formats an ISO date as French numeric DD/MM/YYYY", () => {

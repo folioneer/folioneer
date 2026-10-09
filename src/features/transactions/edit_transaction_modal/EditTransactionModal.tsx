@@ -13,6 +13,7 @@ import { TextField } from "@/ui/components/field/TextField";
 import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { FormModal } from "@/ui/components/modal/FormModal";
 import { FormProblem } from "@/ui/components/modal/FormProblem";
+import { todayIso } from "@/ui/format/date";
 import { messageText } from "@/ui/format/i18n";
 import { EntryModeToggle } from "../shared/EntryModeToggle";
 import { RecordPriceCheckbox } from "../shared/RecordPriceCheckbox";
@@ -146,7 +147,7 @@ export function EditTransactionModal({
             label={t("transaction.form_date_label")}
             value={formData.date}
             onChange={(e) => handleChange("date", e.target.value)}
-            max={isOpeningBalance ? new Date().toISOString().slice(0, 10) : undefined}
+            max={isOpeningBalance ? todayIso() : undefined}
             required
             error={messageText(t, fieldErrors.date)}
           />

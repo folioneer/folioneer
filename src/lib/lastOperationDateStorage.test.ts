@@ -1,7 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { todayIso } from "@/ui/format/date";
 import { getLastOperationDate, setLastOperationDate } from "./lastOperationDateStorage";
-
-const todayIso = () => new Date().toISOString().slice(0, 10);
 
 describe("lastOperationDateStorage", () => {
   afterEach(() => localStorage.clear());
@@ -34,5 +33,23 @@ describe("lastOperationDateStorage", () => {
   it("ignores a stored value that is not a well-formed ISO date", () => {
     localStorage.setItem("last_operation_date_acc-1", "garbage");
     expect(getLastOperationDate("acc-1")).toBe(todayIso());
+  });
+});
+
+describe("getLastOperationDate just after local midnight", () => {
+  // 00:30 in Paris on 9 October is still the 8th in UTC.
+  beforeEach(() => {
+    vi.stubEnv("TZ", "Europe/Paris");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-08T22:30:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it("falls back to today as the user lives it", () => {
+    expect(getLastOperationDate("an-account-with-no-operation")).toBe("2026-10-09");
   });
 });

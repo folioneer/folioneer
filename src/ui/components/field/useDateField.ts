@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { todayIso } from "@/ui/format/date";
 
 // Calendar popup dimensions for viewport clamping (w-64 = 256px, approx height 290px)
 const CALENDAR_WIDTH = 256;
@@ -7,7 +8,6 @@ const CALENDAR_HEIGHT = 290;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const pad2 = (n: number) => String(n).padStart(2, "0");
 const toIsoLocal = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-const todayIsoLocal = () => toIsoLocal(new Date());
 
 /**
  * useDateField - Logic for the DateField component.
@@ -144,7 +144,7 @@ export function useDateField(
       next.setDate(next.getDate() + deltaDays);
       isoDate = toIsoLocal(next);
     } else {
-      isoDate = todayIsoLocal();
+      isoDate = todayIso();
     }
     setDisplayValue(formatDateForDisplay(isoDate));
     lastEmittedIso.current = isoDate;

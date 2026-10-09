@@ -12,7 +12,7 @@ import {
 } from "@/lib/perfPeriodStorage";
 import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
-import { formatIsoDateNumeric } from "@/ui/format/date";
+import { formatIsoDateNumeric, todayIso } from "@/ui/format/date";
 import { accountDetailsGateway, useCachedAssets } from "../gateway";
 import {
   priceHistoryBackfillErrorToI18n,
@@ -22,15 +22,6 @@ import {
 } from "../shared/presenter";
 import type { HoldingNoteTarget, ModalTarget, SellTarget, SplitTarget } from "../shared/types";
 import { useAccountDetails } from "./useAccountDetails";
-
-/** Local calendar date as ISO `YYYY-MM-DD` — the as-of selector's "today" default. */
-function todayIso(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
 
 /**
  * Orchestration hook for AccountDetailsView. Bundles the data hook

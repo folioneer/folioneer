@@ -8,6 +8,7 @@ import { DateField } from "@/ui/components/field/DateField";
 import { TextField } from "@/ui/components/field/TextField";
 import { FormModal } from "@/ui/components/modal/FormModal";
 import { FormProblem } from "@/ui/components/modal/FormProblem";
+import { todayIso } from "@/ui/format/date";
 import { messageText } from "@/ui/format/i18n";
 import { useOpenBalance } from "./useOpenBalance";
 
@@ -96,7 +97,7 @@ export function OpenBalanceModal({
           label={t("transaction.form_date_label")}
           value={formData.date}
           onChange={(e) => handleChange("date", e.target.value)}
-          max={new Date().toISOString().slice(0, 10)}
+          max={todayIso()}
           required
           error={messageText(t, fieldErrors.date)}
         />

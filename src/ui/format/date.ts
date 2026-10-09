@@ -1,4 +1,15 @@
 /**
+ * Today as the user lives it: the local calendar day as `YYYY-MM-DD`. The one definition
+ * of "today" for every date the interface proposes or checks — the UTC day is yesterday
+ * between local midnight and the UTC offset.
+ */
+export function todayIso(now: Date = new Date()): string {
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/**
  * Format an ISO date (YYYY-MM-DD) as a locale-numeric date — e.g. `14/06/2026`
  * for `fr`, `6/14/2026` for `en`. Anchored at noon so the rendered day never
  * shifts under a timezone offset. Returns the raw input unchanged if it does not

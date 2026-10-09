@@ -4,6 +4,7 @@ import type { FeeFrequency } from "@/bindings";
 import { logger } from "@/lib/logger";
 import { decimalToMicro, microToFieldDecimal } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
+import { todayIso } from "@/ui/format/date";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
 import { managementFeeErrorToI18n } from "../shared/presenter";
@@ -22,8 +23,6 @@ interface FeeScheduleFormData {
   endDate: string;
   active: boolean;
 }
-
-const todayIso = (): string => new Date().toISOString().slice(0, 10);
 
 export function useFeeSchedule({ accountId, assetId, onSubmitSuccess }: UseFeeScheduleProps) {
   const { t } = useTranslation();
