@@ -119,20 +119,6 @@ sweep found two bugs no reviewer had.
 - Costs: about two hours, with tests; one `gh` call per later round at audit time.
   Protects: the decision on a merge queue being taken on a figure.
 
-## FLOW-022 — What's next proposes no flow entry and no GitHub issue
-
-- Kind: speed
-- Observed: `/whats-next` lists the flow entries and the open GitHub issues but builds
-  its proposed queue from the todo and the tech debt only. On 2026-10-05 the owner had
-  to ask for flow entries to be considered, and for a rename entry (#049) he remembered
-  and the proposal had left out.
-- Proposal: the skill's ordering step also takes the ready flow entries and the open
-  GitHub issues: a flow entry whose figure moved in the last audit before one that did
-  not, an issue with no entry yet named as "to file or close". The script already
-  collects both; one test on the skill's example output.
-- Costs: about an hour. Risk: a longer proposal — capped at ten lines. Protects: the
-  owner setting a batch from one list.
-
 ## Used and not used — the 0.6.0 batch
 
 Counted from the session's transcript, 2026-10-03 → 2026-10-05: what the agent invoked

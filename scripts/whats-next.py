@@ -417,8 +417,35 @@ def collect_roadmap() -> dict | None:
     return None
 
 
+ENTRY_REF = re.compile(r"#\d{3}\b|\bTD-\d{3}\b|\bFLOW-\d{3}\b")
+
+
+def entries_naming(number: int, texts: list[str]) -> list[str]:
+    """The references of the entries that name GitHub issue `number` — as `gh#N`, by its
+    URL, or as `issue N` — in the order the documents are given. An issue no entry names
+    has nothing tracking it in the repository: it is to file or to close."""
+    mention = re.compile(rf"\bgh#{number}\b|/issues/{number}\b|\bissue {number}\b")
+    refs = []
+    for text in texts:
+        for heading, body in _sections(text):
+            ref = ENTRY_REF.search(heading)
+            if ref and mention.search("\n".join(body)) and ref.group(0) not in refs:
+                refs.append(ref.group(0))
+    return refs
+
+
 def collect_gh_issues() -> list[dict]:
-    """Open GitHub issues."""
+    """Open GitHub issues, each with the entries that name it (`entries`)."""
+    texts = [
+        _read(ROOT / "docs" / name) or "" for name in ("todo.md", "techdebt.md", "flow.md")
+    ]
+    return [
+        {**issue, "entries": entries_naming(issue["number"], texts)}
+        for issue in _open_gh_issues()
+    ]
+
+
+def _open_gh_issues() -> list[dict]:
     return _gh_json(
         "issue",
         "list",
@@ -439,7 +466,7 @@ def main() -> int:
     args = parser.parse_args()
 
     out = {
-        "version": 3,
+        "version": 4,
         **collect_work(),
         "pull_requests": collect_pull_requests(),
         "in_flight": collect_in_flight(),

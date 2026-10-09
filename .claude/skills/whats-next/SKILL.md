@@ -46,20 +46,29 @@ One JSON document:
   entries that are about the flow.
 - `pull_requests` — open pull requests with `ci`: `green`, `running`, `failing`, `none`.
 - `in_flight` — uncommitted files, unmerged local branches, recent commits.
-- `roadmap`, `gh_issues` — the roadmap's headings and the open GitHub issues.
+- `roadmap` — the roadmap's headings.
+- `gh_issues` — the open GitHub issues, each with `entries`: the references of the
+  entries that name it. An issue with none has nothing tracking it in the repository.
 
 The readiness rule is the script's (`docs/workflow.md`): never re-derive it by reading
 entries. If the script fails, say so and stop; a manual scan would not apply the rule.
 
 ### Step 2 — Propose an order
 
-From `queued` (minus `closed`), `ready` and the tech-debt themes, propose one queue:
+From `queued` (minus `closed`), `ready`, the tech-debt themes, the ready flow entries
+and the open issues, propose one queue of ten lines at most:
 
 1. What is already queued keeps the owner's order.
 2. An open pull request's entry comes first: finishing beats starting.
 3. Entries with user value before entries without; a 🔴 or 🟡 debt theme before a 🔵 one.
 4. A theme is proposed as one line (`TD-046–TD-053`), not one line per entry.
 5. Blocked entries are never proposed; they are listed with what they wait on.
+6. A ready flow entry is proposed like a debt theme. One whose figure moved in the last
+   audit (the measured sections of `docs/flow.md`) comes before one that did not.
+7. An open issue no entry names is proposed as "to file or close": it is work nobody
+   tracks. An issue an entry names is never proposed; its entry is.
+8. Ten lines at most. What does not fit stays in its section, unranked: the proposal is
+   the next batch, not the backlog in order.
 
 Say in one line why each proposed reference sits where it does. No "do now", no value or
 effort score: the order is the proposal, and the owner accepts or edits it.
@@ -99,11 +108,14 @@ Print the output below, then save it to the path given by
 - {ref} — {title} — {ready | waits on the owner's decision}
 
 ### GitHub issues
-- gh#{n} — {title}
+- gh#{n} — {title} — {the entries that name it | no entry}
 
 ### Proposed queue
 1. {ref} — {why here}
-2. …
+2. FLOW-{NNN} — {the figure that moved}
+3. gh#{n} — to file or close: {what it asks}
+…
+10. {the last line the proposal may hold}
 ```
 
 Omit a section that is empty. Escape `|` in issue titles and cut them at 80 characters:

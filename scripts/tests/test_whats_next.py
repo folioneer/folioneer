@@ -300,5 +300,85 @@ class CiState(unittest.TestCase):
             )
 
 
+ISSUE_DOCS = [
+    """# TODO
+
+## Next
+
+1. #003
+
+## #003 — (ci) — Named commands for the reviewers
+
+Asked in gh#79 and again in https://github.com/o/r/issues/12.
+""",
+    """# Tech Debt
+
+## 2026-10-04 — TD-077 — Twenty-eight unnoticed changes
+
+- Done when: each is sorted; issue 65 is closed.
+
+## 2026-10-04 — TD-079 — Unrelated
+
+- Observation: figure 790, gh#7 and issues/650 are other numbers.
+""",
+    """# Flow
+
+## FLOW-020 — Nobody counts why a pull request goes round again
+
+- Observed: see gh#79.
+""",
+]
+
+
+class IssuesAndTheirEntries(unittest.TestCase):
+    def test_an_issue_is_found_under_each_way_of_naming_it(self):
+        self.assertEqual(whats_next.entries_naming(79, ISSUE_DOCS), ["#003", "FLOW-020"])
+        self.assertEqual(whats_next.entries_naming(12, ISSUE_DOCS), ["#003"])
+        self.assertEqual(whats_next.entries_naming(65, ISSUE_DOCS), ["TD-077"])
+
+    def test_another_number_that_starts_or_ends_the_same_is_not_the_issue(self):
+        self.assertEqual(whats_next.entries_naming(7, ISSUE_DOCS), ["TD-079"])
+        self.assertEqual(whats_next.entries_naming(6, ISSUE_DOCS), [])
+        self.assertEqual(whats_next.entries_naming(790, ISSUE_DOCS), [])
+
+    def test_an_issue_no_entry_names_has_none(self):
+        self.assertEqual(whats_next.entries_naming(42, ISSUE_DOCS), [])
+        self.assertEqual(whats_next.entries_naming(79, []), [])
+
+
+class SkillProposal(unittest.TestCase):
+    """The skill's own example is what the agent copies: it must show what it is told to
+    propose."""
+
+    SKILL = (
+        Path(__file__).resolve().parents[2] / ".claude" / "skills" / "whats-next" / "SKILL.md"
+    ).read_text()
+
+    def proposal_example(self):
+        block = self.SKILL.split("### Proposed queue", 1)[1].split("```", 1)[0]
+        return [line for line in block.splitlines() if line.strip()]
+
+    def test_the_example_proposes_a_flow_entry_and_an_untracked_issue(self):
+        example = self.proposal_example()
+        self.assertTrue(any("FLOW-" in line for line in example), example)
+        self.assertTrue(
+            any("gh#" in line and "to file or close" in line for line in example), example
+        )
+
+    def test_the_example_stops_at_ten_lines_as_the_ordering_step_says(self):
+        numbers = [
+            int(line.split(".", 1)[0]) for line in self.proposal_example() if line[0].isdigit()
+        ]
+        self.assertEqual(max(numbers), 10)
+        ordering = self.SKILL.split("### Step 2", 1)[1].split("### Step 3", 1)[0]
+        self.assertIn("ten lines at most", ordering)
+        self.assertIn("flow entr", ordering)
+        self.assertIn("to file or close", ordering)
+
+    def test_the_issues_section_says_which_entries_name_each_issue(self):
+        issues = self.SKILL.split("### GitHub issues", 1)[1].split("###", 1)[0]
+        self.assertIn("no entry", issues)
+
+
 if __name__ == "__main__":
     unittest.main()
