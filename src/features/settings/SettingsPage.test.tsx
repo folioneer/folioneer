@@ -30,6 +30,11 @@ vi.mock("./sync/SyncSummary", () => ({
   SyncSummary: () => <div data-testid="sync-summary-mounted" />,
 }));
 
+// The agents setting reads its state on its own (AgentsAllowedSetting.test.tsx).
+vi.mock("./agent_connection/AgentsAllowedSetting", () => ({
+  AgentsAllowedSetting: () => <div data-testid="agents-allowed-mounted" />,
+}));
+
 const { SettingsPage } = await import("./SettingsPage");
 const { useAppStore } = await import("@/lib/store");
 

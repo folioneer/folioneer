@@ -214,6 +214,7 @@ export const useAppStore = create<AppState>((set, get) => {
         "CurrencyRateUpdated",
         "CurrencyPairUpdated",
         "HoldingNoteUpdated",
+        "AgentConnectionChanged",
       ]);
 
       // Setup event listeners

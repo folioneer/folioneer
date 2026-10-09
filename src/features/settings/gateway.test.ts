@@ -447,3 +447,32 @@ describe("settingsGateway — dismissConflictNotice (SYN-066)", () => {
     });
   });
 });
+
+describe("settingsGateway — the agent connection setting (AGT-022, AGT-023)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const state = { available: true, allowed: true, user: "phil", requests: [], sessions: [] };
+
+  it("getAgentConnectionState returns the state as the core gives it", async () => {
+    mockInvoke.mockResolvedValue(state);
+
+    expect(await settingsGateway.getAgentConnectionState()).toEqual(state);
+    expect(mockInvoke).toHaveBeenCalledWith("get_agent_connection_state");
+  });
+
+  it("setAgentsAllowed sends the switch and returns the new state", async () => {
+    mockInvoke.mockResolvedValue(state);
+
+    expect(await settingsGateway.setAgentsAllowed(true)).toEqual({ status: "ok", data: state });
+    expect(mockInvoke).toHaveBeenCalledWith("set_agents_allowed", { allowed: true });
+  });
+
+  it("setAgentsAllowed passes through NoAgentChannel", async () => {
+    mockInvoke.mockRejectedValue({ code: "NoAgentChannel" });
+
+    expect(await settingsGateway.setAgentsAllowed(true)).toEqual({
+      status: "error",
+      error: { code: "NoAgentChannel" },
+    });
+  });
+});

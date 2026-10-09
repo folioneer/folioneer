@@ -29,9 +29,12 @@ lib.rs               the crate root: modules, the headless entry, tracing — th
 app.rs               the Tauri shell (feature `app`, B46): wires services, use cases and dispatchers
                      into the window
 command_line/        the command line (CLI): an interface beside the shell, calling the same use cases without a window
+agent_connection/    the agent connection (AGT, ADR-023): the `--mcp` bridge, which holds no data, the local channel,
+                     the owner's consent and the tools the running application serves to an agent
 ../cli/main.rs       `folioneer-cli`, the command line as a console program (installed beside the main one on Windows)
 extensions.rs        the one file a build differs by: external data sources and update channel (ADR-020)
-main.rs              entry point; `--scheduled-fetch` runs the daily download, `holding …` a command (CLI), both without a window
+main.rs              entry point; `--scheduled-fetch` runs the daily download, `holding …` a command (CLI), `--mcp` the
+                     agent bridge (AGT), all without a window
 ```
 
 `sync/` owns device identity, the encrypted shared folder and the conflict-resolution engine (`domain/resolution.rs`, ADR-019); `use_cases/portfolio_sync/` applies resolved changes through the other contexts' services.

@@ -12,6 +12,7 @@
       "src-tauri/src/context/*/application/*",
       "src-tauri/src/context/*/service.rs",
       "src-tauri/src/use_cases/*",
+      "src-tauri/src/agent_connection/*",
       "src-tauri/src/shared/domain/*"
     ],
     "exclude": ["*/api.rs", "*/mod.rs"],

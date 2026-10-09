@@ -8,6 +8,11 @@ fn main() {
     if folioneer_lib::starts_command_line(&arguments) {
         std::process::exit(folioneer_lib::run_command_line("folioneer", &arguments));
     }
+    // AGT-012 — an agent starts the bridge, which passes its calls to the open
+    // application and exits when the client leaves.
+    if folioneer_lib::starts_agent_bridge(&arguments) {
+        std::process::exit(folioneer_lib::run_agent_bridge());
+    }
     // SPF-020 — the OS-scheduled invocation runs the daily download invisibly
     // and exits without ever creating a window.
     if arguments

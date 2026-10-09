@@ -7,7 +7,7 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-086) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-087) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -317,6 +317,15 @@ Remove an entry once it has been resolved.
 - Observation: the replay multiplies the quantity by the factor in 128 bits and casts the result back to 64 bits without a check. A factor large enough (far beyond any real split) makes the cast wrap: recording and the split check both then show a quantity that is wrong, or refuse a split for the wrong reason.
 - User value: None in practice — no real split comes near the bound; an absurd factor typed by mistake is refused with a clear reason.
 - Done when: a factor whose rescale cannot be stored is refused when the split is recorded and when it is checked, with one error code, shown by a test on each path.
+
+## 2026-10-09 — TD-086 — The agent connection does not exist on Windows
+
+- Found by: the owner's decision of 2026-10-09 while building #051 (Linux first)
+- Where: `src-tauri/src/agent_connection/channel.rs` (the channel is a Unix socket; `AVAILABLE` is false elsewhere); `.github/workflows/` — no job compiles for Windows on a pull request, only `release.yml` does
+- Severity: 🟡
+- Observation: on Windows the setting "Allow agents to connect" is disabled and says the agent connection is not available on this system yet (AGT-023). The Windows channel is a named pipe restricted to the owner's user, which needs Windows-only code that no pull request compiles today: written blind, its first compilation would be the release
+- User value: A Windows user lets an agent read the portfolio through the open application, as on Linux.
+- Done when: a pull request that touches the Rust code is compiled for Windows before it merges; the channel exists on Windows as a named pipe only the owner's user can open, refusing remote clients; AGT-021 and AGT-023 say so, and the tests that can run on Windows run there.
 
 ## 2026-10-09 — TD-085 — The assets to settle are reported by the core and shown nowhere
 

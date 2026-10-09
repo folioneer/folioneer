@@ -236,7 +236,26 @@
       "status_succeeded": "Dernier téléchargement : {{executedAt}} — {{updatedCount}} mis à jour, {{skippedCount}} ignorés.",
       "status_failed": "Le dernier téléchargement a échoué le {{executedAt}}. Il sera retenté automatiquement.",
       "status_skipped": "Dernière vérification le {{executedAt}} : les prix étaient déjà à jour."
-    }
+    },
+    "agents_allowed_label": "Autoriser les agents à se connecter",
+    "agents_allowed_description": "Un agent sur cet ordinateur (Claude Code, Claude Desktop) peut demander à lire votre portefeuille tant que Folioneer est ouvert. Chaque connexion attend votre réponse. Désactivé : rien ne peut se connecter.",
+    "agents_unavailable_description": "Pas encore disponible sur ce système. Rien ne peut se connecter."
+  },
+  "agent": {
+    "connection_title": "Un agent demande à se connecter",
+    "connection_agent": "Agent",
+    "connection_started_by": "Lancé par",
+    "connection_started_by_user": "{{user}}, sur cet ordinateur",
+    "connection_started_by_unknown": "un de vos programmes, sur cet ordinateur",
+    "connection_asked_at": "Demandé à",
+    "connection_covers": "Si vous autorisez, jusqu'à la déconnexion ou la fermeture de Folioneer, il peut :",
+    "connection_covers_read": "lire vos comptes, vos actifs, vos positions et vos totaux.",
+    "connection_never": "Il ne peut rien enregistrer ni modifier, et ne lit jamais un fichier, un réglage ou votre dossier de synchronisation.",
+    "connection_allow": "Autoriser pour cette session",
+    "connection_refuse": "Refuser",
+    "connected": "{{client}} est connecté",
+    "disconnect": "Déconnecter",
+    "disconnect_client": "Déconnecter {{client}}"
   },
   "sync": {
     "title": "Synchronisation multi-appareils",
@@ -983,7 +1002,11 @@
     "ThresholdNotPositive": "Le seuil d'alarme doit être un prix positif.",
     "ThresholdIncomplete": "L'alarme nécessite un seuil et une direction.",
     "NoteOnCashAsset": "Impossible d'épingler une note à la ligne de liquidités.",
-    "NoteOnUnheldAsset": "Cette position n'a aucun historique de détention pour y épingler une note."
+    "NoteOnUnheldAsset": "Cette position n'a aucun historique de détention pour y épingler une note.",
+    "NoAgentChannel": "La connexion des agents n'est pas encore disponible sur ce système.",
+    "AgentChannelFailed": "La connexion des agents n'a pas pu être modifiée.",
+    "ConnectionRequestGone": "Cet agent ne demande plus à se connecter.",
+    "SessionAlreadyEnded": "Cet agent était déjà déconnecté."
   },
   "price_freshness": {
     "label": "Prix",

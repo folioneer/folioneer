@@ -61,6 +61,10 @@ pub enum Event {
     /// (SYN-063/064). A bare marker: the frontend treats it as a global refresh and re-reads
     /// `get_sync_status`.
     SyncCompleted,
+    /// The agent connection changed: the setting, a request waiting for the owner's answer,
+    /// a session opened or ended, a tool called (AGT-036). A bare marker: the frontend
+    /// re-reads `get_agent_connection_state`.
+    AgentConnectionChanged,
 }
 
 /// One asset a price-fetch task could not price (MKT-170/171), carried in the

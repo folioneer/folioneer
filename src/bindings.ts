@@ -1044,6 +1044,46 @@ async getCapabilities() : Promise<Capabilities> {
     return await TAURI_INVOKE("get_capabilities");
 },
 /**
+ * AGT-036 — the setting, who asks to connect and who is connected. Infallible: it reads
+ * what the application holds in memory.
+ */
+async getAgentConnectionState() : Promise<AgentConnectionState> {
+    return await TAURI_INVOKE("get_agent_connection_state");
+},
+/**
+ * AGT-022 — the owner allows or stops allowing agents to connect.
+ */
+async setAgentsAllowed(allowed: boolean) : Promise<Result<AgentConnectionState, AgentConnectionError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_agents_allowed", { allowed }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * AGT-032 — the owner's answer to a connection request.
+ */
+async answerAgentConnection(requestId: number, allow: boolean) : Promise<Result<null, AgentConnectionError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("answer_agent_connection", { requestId, allow }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * AGT-034 — the owner disconnects an agent client.
+ */
+async disconnectAgent(sessionId: number) : Promise<Result<null, AgentConnectionError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("disconnect_agent", { sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Tauri command allowing the frontend to emit structured log entries
  * into the backend tracing system (visible in app logs and collect-logs output).
  */
@@ -1063,8 +1103,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
+export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 
 /** user-defined types **/
 
@@ -1509,6 +1549,83 @@ ytd_performance_pct: number | null;
  * CFR-042) — marks the account row in the Accounts list.
  */
 has_inconsistent_holding: boolean }
+/**
+ * Failures of the agent connection commands.
+ */
+export type AgentConnectionError = 
+/**
+ * This system has no agent connection yet (AGT-023).
+ */
+{ code: "NoAgentChannel" } | 
+/**
+ * The setting or the channel could not be written; the cause is in the log.
+ */
+{ code: "AgentChannelFailed" } | 
+/**
+ * The request was already answered, or its agent client went away.
+ */
+{ code: "ConnectionRequestGone" } | 
+/**
+ * The session already ended.
+ */
+{ code: "SessionAlreadyEnded" }
+/**
+ * An agent client waiting for the owner's answer (AGT-030).
+ */
+export type AgentConnectionRequest = { 
+/**
+ * Identifies the request in the owner's answer.
+ */
+id: number; 
+/**
+ * The name the agent client gave for itself.
+ */
+client: string; 
+/**
+ * When it asked, as an RFC 3339 timestamp in this computer's time.
+ */
+asked_at: string }
+/**
+ * What the window shows of the agent connection (AGT-036).
+ */
+export type AgentConnectionState = { 
+/**
+ * Whether this system has an agent connection (AGT-023).
+ */
+available: boolean; 
+/**
+ * Whether the owner allows agents to connect (AGT-022).
+ */
+allowed: boolean; 
+/**
+ * The user this application runs as — the only one whose programs can connect
+ * (AGT-021); absent when the system does not say.
+ */
+user: string | null; 
+/**
+ * The agent clients waiting for the owner's answer, oldest first.
+ */
+requests: AgentConnectionRequest[]; 
+/**
+ * The agent clients connected, oldest first.
+ */
+sessions: AgentSession[] }
+/**
+ * A connected agent client (AGT-033).
+ */
+export type AgentSession = { 
+/**
+ * Identifies the session when the owner disconnects it.
+ */
+id: number; 
+/**
+ * The name the agent client gave for itself.
+ */
+client: string; 
+/**
+ * How many tool calls it made.
+ */
+calls: number }
 /**
  * Use-case composite for the **archive asset** failure surface — the single
  * command `archive_asset` (OQ-6) and its full chain of rejections.
@@ -2595,7 +2712,13 @@ export type Event =
  * (SYN-063/064). A bare marker: the frontend treats it as a global refresh and re-reads
  * `get_sync_status`.
  */
-{ type: "SyncCompleted" }
+{ type: "SyncCompleted" } | 
+/**
+ * The agent connection changed: the setting, a request waiting for the owner's answer,
+ * a session opened or ended, a tool called (AGT-036). A bare marker: the frontend
+ * re-reads `get_agent_connection_state`.
+ */
+{ type: "AgentConnectionChanged" }
 /**
  * A canonical trading venue identified by its ISO 10383 MIC code.
  */
@@ -3429,9 +3552,8 @@ export type OpenHoldingTask =
  */
 { code: "AssetNotFound" } | 
 /**
- * Target asset is archived — cannot open a holding (TRX-050).
- * The orchestrator does not auto-unarchive; the caller must unarchive
- * explicitly through the asset BC first.
+ * Target asset is archived — cannot open a holding (TRX-050). The asset is
+ * unarchived first, through the asset BC.
  */
 { code: "ArchivedAsset" } | 
 /**

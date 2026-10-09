@@ -74,3 +74,38 @@ describe("shellGateway — getPriceFreshness (MKT-202)", () => {
     expect(result).toEqual({ status: "error", error: { code: "DatabaseError" } });
   });
 });
+
+describe("shellGateway — the agent connection (AGT-032, AGT-034, AGT-036)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("getAgentConnectionState returns the state as the core gives it", async () => {
+    const state = { available: true, allowed: true, user: "phil", requests: [], sessions: [] };
+    mockInvoke.mockResolvedValue(state);
+
+    expect(await shellGateway.getAgentConnectionState()).toEqual(state);
+    expect(mockInvoke).toHaveBeenCalledWith("get_agent_connection_state");
+  });
+
+  it("answerAgentConnection sends the request and the answer", async () => {
+    mockInvoke.mockResolvedValue(null);
+
+    expect(await shellGateway.answerAgentConnection(4, false)).toEqual({
+      status: "ok",
+      data: null,
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("answer_agent_connection", {
+      requestId: 4,
+      allow: false,
+    });
+  });
+
+  it("disconnectAgent passes through SessionAlreadyEnded", async () => {
+    mockInvoke.mockRejectedValue({ code: "SessionAlreadyEnded" });
+
+    expect(await shellGateway.disconnectAgent(2)).toEqual({
+      status: "error",
+      error: { code: "SessionAlreadyEnded" },
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("disconnect_agent", { sessionId: 2 });
+  });
+});

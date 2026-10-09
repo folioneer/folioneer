@@ -18,6 +18,8 @@ use anyhow::Context;
 use std::{fs, sync::Arc};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
+/// The agent connection: an interface beside the window, reached through a bridge (AGT).
+mod agent_connection;
 /// The Tauri shell: window, commands, updater (feature `app`).
 #[cfg(feature = "app")]
 mod app;
@@ -72,6 +74,31 @@ pub fn run_command_line(program: &str, args: &[String]) -> i32 {
             .and_then(|()| initialize_tracing_to(&log_dir, false));
     }
     execute_command_line(program, args)
+}
+
+/// AGT-012 — whether the arguments start the bridge an agent talks to: `--mcp`, first.
+pub fn starts_agent_bridge(args: &[String]) -> bool {
+    args.first().is_some_and(|first| first == "--mcp")
+}
+
+/// Headless entry of the bridge (ADR-023, AGT-010): serves one agent client on the standard
+/// input and output until it leaves, passing its tool calls to the running application. It
+/// opens no database and writes no log: it holds nothing of the portfolio.
+pub fn run_agent_bridge() -> i32 {
+    exit_code_on_new_runtime(async {
+        let connector: agent_connection::bridge::Connector = Box::new(|| {
+            Box::pin(async {
+                let data_dir = shared::infrastructure::app_directories::resolve_local_data_dir()?;
+                agent_connection::channel::reach(&data_dir).await
+            })
+        });
+        match agent_connection::bridge::serve(tokio::io::stdin(), tokio::io::stdout(), connector)
+            .await
+        {
+            Ok(()) => 0,
+            Err(_) => 1,
+        }
+    })
 }
 
 /// CLI-010 — whether the arguments start a command: `holding`, `account`, `asset`, or a
@@ -175,6 +202,20 @@ mod tests {
         assert!(!starts("--scheduled-fetch"));
         assert!(!starts("--scheduled-fetch --help"));
         assert!(!starts("portfolio.db"));
+    }
+
+    // AGT-012 — `--mcp` first starts the bridge and nothing else: not a command of the
+    // command line, and not when it comes after another argument.
+    #[test]
+    fn agt_012_mcp_as_the_first_argument_starts_the_bridge_and_nothing_else() {
+        let args =
+            |line: &str| -> Vec<String> { line.split_whitespace().map(str::to_string).collect() };
+        assert!(starts_agent_bridge(&args("--mcp")));
+        assert!(starts_agent_bridge(&args("--mcp anything")));
+        assert!(!starts_agent_bridge(&args("")));
+        assert!(!starts_agent_bridge(&args("holding --mcp")));
+        assert!(!starts_agent_bridge(&args("--scheduled-fetch --mcp")));
+        assert!(!starts_command_line(&args("--mcp")));
     }
 
     #[test]

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
 import { selectHasExternalProvider, useAppStore } from "@/lib/store";
+import { AgentsAllowedSetting } from "./agent_connection/AgentsAllowedSetting";
 import { ScheduledFetchSection } from "./scheduled_fetch/ScheduledFetchSection";
 import { SyncSummary } from "./sync/SyncSummary";
 import { type LanguageChoice, useSettings } from "./useSettings";
@@ -86,6 +87,8 @@ export function SettingsPage() {
         )}
 
         <SyncSummary />
+
+        <AgentsAllowedSetting />
 
         <section className="flex flex-col gap-2">
           <label className="flex items-start gap-3 cursor-pointer group">

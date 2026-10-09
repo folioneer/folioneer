@@ -2,6 +2,7 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { AddTransactionModalMount } from "@/features/shell/AddTransactionModalMount";
 import { AssetEditModalMount } from "@/features/shell/AssetEditModalMount";
+import { AgentConnectionMount } from "@/features/shell/agent_connection/AgentConnectionMount";
 import { CashTransactionEditMount } from "@/features/shell/CashTransactionEditMount";
 import { CurrencyRateEditMount } from "@/features/shell/CurrencyRateEditMount";
 import { DividendEditModalMount } from "@/features/shell/DividendEditModalMount";
@@ -35,6 +36,7 @@ export function AppShell() {
       <UnpricedPricesModalMount />
       <AddTransactionModalMount />
       <WhatsNewDialogMount />
+      <AgentConnectionMount />
     </MainLayout>
   );
 }

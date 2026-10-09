@@ -1,4 +1,5 @@
 use crate::{
+    agent_connection,
     context::{account, asset, currency, sync},
     core::{logger, Event},
     use_cases::{
@@ -203,6 +204,10 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             price_freshness::get_price_freshness,
             price_history_backfill::backfill_holding_price_history,
             capabilities::get_capabilities,
+            agent_connection::api::get_agent_connection_state,
+            agent_connection::api::set_agents_allowed,
+            agent_connection::api::answer_agent_connection,
+            agent_connection::api::disconnect_agent,
             // ----- core -----
             logger::log_frontend
         ])

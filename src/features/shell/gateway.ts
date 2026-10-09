@@ -1,5 +1,7 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  AgentConnectionError,
+  AgentConnectionState,
   Capabilities,
   Event,
   FeeGenerationError,
@@ -30,6 +32,33 @@ export function onSyncCompleted(callback: () => void): Promise<UnlistenFn> {
   });
 }
 
+// AGT-036 — who asks to connect and who is connected.
+export function getAgentConnectionState(): Promise<AgentConnectionState> {
+  return commands.getAgentConnectionState();
+}
+
+// AGT-032 — the owner's answer to a connection request.
+export function answerAgentConnection(
+  requestId: number,
+  allow: boolean,
+): Promise<Result<null, AgentConnectionError>> {
+  return commands.answerAgentConnection(requestId, allow);
+}
+
+// AGT-034 — the owner disconnects an agent.
+export function disconnectAgent(sessionId: number): Promise<Result<null, AgentConnectionError>> {
+  return commands.disconnectAgent(sessionId);
+}
+
+// AGT-036 — the agent connection changed: a request, a session, the setting.
+export function onAgentConnectionChanged(callback: () => void): Promise<UnlistenFn> {
+  return events.event.listen((event) => {
+    if (event.payload.type === "AgentConnectionChanged") {
+      callback();
+    }
+  });
+}
+
 // MKT-202 — the header's price item reads its two figures through the shell's gateway (F26).
 export function getPriceFreshness(): Promise<Result<PriceFreshness, PriceFreshnessError>> {
   return commands.getPriceFreshness();
@@ -52,6 +81,10 @@ export const shellGateway = {
 
   getSyncStatus,
   onSyncCompleted,
+  getAgentConnectionState,
+  answerAgentConnection,
+  disconnectAgent,
+  onAgentConnectionChanged,
   getPriceFreshness,
   subscribeToEvents,
 };

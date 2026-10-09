@@ -1,5 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import {
+  type AgentConnectionError,
+  type AgentConnectionState,
   commands,
   type PortfolioSyncError,
   type Result,
@@ -96,8 +98,22 @@ export async function pickSyncFolder(): Promise<string | null> {
   return await open({ directory: true, multiple: false });
 }
 
+// AGT-036 — the owner's setting, and whether this system has an agent connection.
+export async function getAgentConnectionState(): Promise<AgentConnectionState> {
+  return await commands.getAgentConnectionState();
+}
+
+// AGT-022 — the owner allows or stops allowing agents to connect.
+export async function setAgentsAllowed(
+  allowed: boolean,
+): Promise<Result<AgentConnectionState, AgentConnectionError>> {
+  return await commands.setAgentsAllowed(allowed);
+}
+
 export const settingsGateway = {
   configureScheduledFetch,
+  getAgentConnectionState,
+  setAgentsAllowed,
   getScheduledFetchStatus,
   inspectSyncFolder,
   enableSync,

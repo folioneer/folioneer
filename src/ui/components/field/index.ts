@@ -1,4 +1,5 @@
 export { CalcField } from "./CalcField";
+export { CheckboxField } from "./CheckboxField";
 export { ComboboxField } from "./ComboboxField";
 export { DateField } from "./DateField";
 export { SearchField } from "./SearchField";

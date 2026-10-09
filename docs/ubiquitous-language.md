@@ -289,6 +289,7 @@ The `…Updated` events are raised by changes made on this device. Changes appli
 | `FeeScheduleUpdated`       | Account BC             | A fee schedule was created, changed, paused, resumed or deleted                                                                                              | confirmed |
 | `HoldingNoteUpdated`       | Account BC             | A holding note was written or deleted on this device                                                                                                         | confirmed |
 | `SyncCompleted`            | Sync BC                | A sync applied changes from the user's other devices, or changed this device's sync failures or paused state; carries nothing                                | confirmed |
+| `AgentConnectionChanged`   | Agent connection       | An agent asked to connect, was answered, connected, called a tool or left, or the owner switched the setting; carries nothing                                | confirmed |
 
 ---
 
@@ -420,6 +421,32 @@ A third-party HTTP service that returns current asset prices and their daily-clo
 | `delete_asset_price` | Remove a specific price record by `(asset_id, date)`. Errors: `NotFound`, `Unknown`                                                                                                   | confirmed |
 
 ---
+
+## Agent Connection Concepts (introduced by AGT spec)
+
+### Agent
+
+> Status: confirmed
+
+A program working for the owner that reads the portfolio through the application's tools, such as Claude Code or Claude Desktop. It reaches the portfolio only through the open application, and only once the owner allowed it. In French: "Agent".
+
+### Bridge
+
+> Status: confirmed
+
+The program an agent client starts to reach the application. It holds no data: it passes each call to the open application and returns the answer. Never shown on screen. In French: "Passerelle".
+
+### Connection request
+
+> Status: confirmed
+
+An agent waiting for the owner's answer in the window. Nothing is served to it until the owner allows; refusing gives it nothing. In French: "Demande de connexion".
+
+### Agent session
+
+> Status: confirmed
+
+What one "Allow for this session" opens: the agent's calls are served without another question until the owner disconnects it, it leaves, or the application closes. Nothing of it is remembered afterwards. In French: "Session".
 
 ## Multi-Device Sync Concepts (introduced by SYN spec)
 

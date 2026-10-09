@@ -3,6 +3,7 @@ import {
   formatIsoDateNumeric,
   formatIsoDateTime,
   formatIsoDateTimeNumeric,
+  formatIsoTime,
   todayIso,
 } from "./date";
 
@@ -91,5 +92,16 @@ describe("formatIsoDateTimeNumeric", () => {
 
   it("returns the raw input unchanged when it does not parse", () => {
     expect(formatIsoDateTimeNumeric("not-a-timestamp", "fr")).toBe("not-a-timestamp");
+  });
+});
+
+describe("formatIsoTime", () => {
+  it("formats the time of an ISO date-time in the locale's short form", () => {
+    expect(formatIsoTime("2026-10-09T14:32:07", "fr")).toBe("14:32");
+    expect(formatIsoTime("2026-10-09T14:32:07", "en")).toBe("2:32 PM");
+  });
+
+  it("returns what does not parse unchanged", () => {
+    expect(formatIsoTime("soon", "en")).toBe("soon");
   });
 });

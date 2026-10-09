@@ -47,3 +47,14 @@ export function formatIsoDateTimeNumeric(isoDateTime: string, locale: string): s
   const time = new Intl.DateTimeFormat(locale, { timeStyle: "short" }).format(date);
   return `${day} ${time}`;
 }
+
+/**
+ * Format an ISO date-time as the locale's short time — `14:32` for `fr`, `2:32 PM` for
+ * `en`. Returns the raw input unchanged if it does not parse.
+ */
+export function formatIsoTime(isoDateTime: string, locale: string): string {
+  const date = new Date(isoDateTime);
+  return Number.isNaN(date.getTime())
+    ? isoDateTime
+    : new Intl.DateTimeFormat(locale, { timeStyle: "short" }).format(date);
+}

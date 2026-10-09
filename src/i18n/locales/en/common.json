@@ -236,7 +236,26 @@
       "status_succeeded": "Last download: {{executedAt}} — {{updatedCount}} updated, {{skippedCount}} skipped.",
       "status_failed": "Last download failed on {{executedAt}}. It will be retried automatically.",
       "status_skipped": "Last check on {{executedAt}}: prices were already up to date."
-    }
+    },
+    "agents_allowed_label": "Allow agents to connect",
+    "agents_allowed_description": "An agent on this computer (Claude Code, Claude Desktop) may ask to read your portfolio while Folioneer is open. Each connection waits for your answer. Off: nothing can connect.",
+    "agents_unavailable_description": "Not available on this system yet. Nothing can connect."
+  },
+  "agent": {
+    "connection_title": "An agent asks to connect",
+    "connection_agent": "Agent",
+    "connection_started_by": "Started by",
+    "connection_started_by_user": "{{user}}, on this computer",
+    "connection_started_by_unknown": "a program of yours, on this computer",
+    "connection_asked_at": "Asked at",
+    "connection_covers": "If you allow, until you disconnect or close Folioneer, it may:",
+    "connection_covers_read": "read your accounts, assets, holdings and totals.",
+    "connection_never": "It cannot record or change anything, and it never reads a file, a setting or your sync folder.",
+    "connection_allow": "Allow for this session",
+    "connection_refuse": "Refuse",
+    "connected": "{{client}} is connected",
+    "disconnect": "Disconnect",
+    "disconnect_client": "Disconnect {{client}}"
   },
   "sync": {
     "title": "Multi-device sync",
@@ -983,7 +1002,11 @@
     "ThresholdNotPositive": "The alarm threshold must be a positive price.",
     "ThresholdIncomplete": "The alarm needs both a threshold and a direction.",
     "NoteOnCashAsset": "A note cannot be pinned to the cash line.",
-    "NoteOnUnheldAsset": "This position has no holding history to pin a note to."
+    "NoteOnUnheldAsset": "This position has no holding history to pin a note to.",
+    "NoAgentChannel": "The agent connection is not available on this system yet.",
+    "AgentChannelFailed": "The agent connection could not be changed.",
+    "ConnectionRequestGone": "This agent is no longer asking to connect.",
+    "SessionAlreadyEnded": "This agent was already disconnected."
   },
   "price_freshness": {
     "label": "Prices",

@@ -1,6 +1,9 @@
 //! The Tauri shell: the composition root that wires services, use cases and
 //! dispatchers into the window, the command registry and the updater.
 
+use crate::agent_connection::connections::AgentConnections;
+use crate::agent_connection::gate::AgentGate;
+use crate::agent_connection::tools::AgentTools;
 use crate::context::account::AccountService;
 use crate::context::asset::{
     AssetPriceRepository, AssetService, PriceProvider, SqliteAssetPriceRepository,
@@ -139,6 +142,7 @@ pub fn run() {
 
             tauri::async_runtime::block_on(async move {
                 // R18 — emit migration error and keep app running so frontend can show error screen
+                let agent_data_dir = dirs.local_data_dir.clone();
                 let db = match Database::new(dirs.local_data_dir).await {
                     Ok(db) => Arc::new(db),
                     Err(e) => {
@@ -346,6 +350,23 @@ pub fn run() {
 
                 app_handle.manage(portfolio_sync_uc);
                 app_handle.manage(sync_service);
+
+                // AGT-022 — the agent connection: its channel opens only when the owner's
+                // setting allows it, and every change is told to the window (AGT-036).
+                let agent_events = Arc::clone(&event_bus);
+                let agent_gate = Arc::new(AgentGate::new(
+                    agent_data_dir,
+                    Arc::new(AgentConnections::new(move || {
+                        agent_events.publish(Event::AgentConnectionChanged);
+                    })),
+                    Arc::new(AgentTools::new(
+                        account_service.clone(),
+                        asset_service.clone(),
+                        Arc::clone(&currency_service),
+                    )),
+                ));
+                agent_gate.open_if_allowed();
+                app_handle.manage(agent_gate);
 
                 app_handle.manage(Arc::clone(&currency_service));
 
