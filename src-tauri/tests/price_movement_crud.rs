@@ -114,6 +114,7 @@ where
 
     let asset = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Apple".to_string(),
             reference: "AAPL".to_string(),
             isin: None,

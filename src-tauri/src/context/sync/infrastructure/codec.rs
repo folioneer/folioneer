@@ -12,7 +12,7 @@ use crate::core::logger::BACKEND;
 /// The data format this build writes and reads (SYN-035). Bumped whenever the written form of
 /// what is synced changes: `tests/sync_format/v{N}.json` pins that form per version, and the
 /// test suite fails while this build writes anything else (SYN-038).
-pub const DATA_FORMAT_VERSION: u32 = 1;
+pub const DATA_FORMAT_VERSION: u32 = 2;
 
 /// Width of the cleartext `data_format_version` prefix, in bytes.
 const VERSION_PREFIX_LENGTH: usize = 4;

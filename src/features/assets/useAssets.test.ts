@@ -59,6 +59,7 @@ const makeAsset = (overrides: Partial<Asset> = {}): Asset => ({
   is_archived: false,
   price_refresh_blocked: false,
   interest_bearing: false,
+  kind: "Custom",
   ...overrides,
   exchange: null,
 });
@@ -112,6 +113,7 @@ describe("useAssets", () => {
       isin: null,
       exchange: null,
       interest_bearing: false,
+      kind: null,
     };
     await act(async () => {
       ret = await result.current.addAsset(dto);
@@ -143,6 +145,7 @@ describe("useAssets", () => {
       isin: null,
       exchange: null,
       interest_bearing: false,
+      kind: null,
     };
     await act(async () => {
       ret = await result.current.addAsset(dto);
@@ -168,6 +171,7 @@ describe("useAssets", () => {
       isin: null,
       exchange: null,
       interest_bearing: false,
+      kind: null,
     };
     let ret: { data: Asset | null; error: I18nMessage | null } = {
       data: null,
@@ -199,6 +203,7 @@ describe("useAssets", () => {
       isin: null,
       exchange: null,
       interest_bearing: false,
+      kind: null,
     };
     let ret: { data: Asset | null; error: I18nMessage | null } = {
       data: null,

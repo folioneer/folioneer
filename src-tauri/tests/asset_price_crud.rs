@@ -34,6 +34,7 @@ async fn setup() -> (AssetService, Arc<SideEffectEventBus>) {
 
 async fn create_asset(svc: &AssetService) -> String {
     svc.create_asset(CreateAssetDTO {
+        kind: None,
         name: "Apple".to_string(),
         reference: "AAPL".to_string(),
         isin: None,
@@ -56,6 +57,7 @@ async fn get_asset_prices_returns_all_sorted_descending_and_scoped() {
     let asset_a = create_asset(&svc).await;
     let asset_b = svc
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Google".to_string(),
             reference: "GOOG".to_string(),
             isin: None,

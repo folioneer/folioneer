@@ -93,6 +93,7 @@ export function useEditAssetModal({ asset, onClose }: UseEditAssetModalProps) {
     setError(null);
     setIsSubmitting(true);
     const result = await updateAsset({
+      kind: null,
       asset_id: asset.id,
       name: formData.name,
       reference: formData.reference,

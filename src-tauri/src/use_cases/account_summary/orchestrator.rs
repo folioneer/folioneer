@@ -451,6 +451,7 @@ mod tests {
             .unwrap();
         let bond = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Bond".to_string(),
                 reference: "BOND".to_string(),
                 isin: None,
@@ -528,6 +529,7 @@ mod tests {
         // USD-denominated asset held in EUR account; no rate recorded → contributes 0
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "US Stock".to_string(),
                 reference: "USX".to_string(),
                 isin: None,
@@ -585,6 +587,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Unpriced".to_string(),
                 reference: "UNP".to_string(),
                 isin: None,
@@ -694,6 +697,7 @@ mod tests {
 
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "US Stock".to_string(),
                 reference: "USX".to_string(),
                 isin: None,
@@ -760,6 +764,7 @@ mod tests {
 
         let bond = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Bond".to_string(),
                 reference: "BOND".to_string(),
                 isin: None,
@@ -831,6 +836,7 @@ mod tests {
 
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "US Stock".to_string(),
                 reference: "USX".to_string(),
                 isin: None,
@@ -892,6 +898,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Closed".to_string(),
                 reference: "CLS".to_string(),
                 isin: None,
@@ -962,6 +969,7 @@ mod tests {
             .unwrap();
         let stock = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Priced Stock".to_string(),
                 reference: "PRC".to_string(),
                 isin: None,
@@ -1059,6 +1067,7 @@ mod tests {
             .unwrap();
         let stock = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Unpriced".to_string(),
                 reference: "UNP2".to_string(),
                 isin: None,

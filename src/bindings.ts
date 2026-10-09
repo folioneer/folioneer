@@ -1033,8 +1033,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
+export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 
 /** user-defined types **/
 
@@ -1543,6 +1543,10 @@ id: string;
  */
 name: string; 
 /**
+ * How the asset is identified and priced (AST-030).
+ */
+kind: AssetKind; 
+/**
  * Asset classification.
  */
 class: AssetClass; 
@@ -1690,6 +1694,27 @@ export type AssetError =
  */
 { code: "InvalidIsinFormat" } | 
 /**
+ * A listed asset must carry an ISIN (AST-031).
+ */
+{ code: "IsinRequired" } | 
+/**
+ * A crypto or a custom asset carries no ISIN (AST-031).
+ */
+{ code: "IsinNotAllowed"; kind: AssetKind } | 
+/**
+ * A crypto or a custom asset is on no exchange (AST-031).
+ */
+{ code: "ExchangeNotAllowed"; kind: AssetKind } | 
+/**
+ * The class and the kind do not go together (AST-031): the Cash class with the cash
+ * kind, the digital-asset class with the crypto kind, and neither with another.
+ */
+{ code: "ClassNotAllowed"; kind: AssetKind; class: AssetClass } | 
+/**
+ * The same asset already exists, archived or not (AST-032).
+ */
+{ code: "AssetAlreadyExists"; existing_id: string; existing_name: string } | 
+/**
  * Price must be strictly positive.
  */
 { code: "NotPositive" } | 
@@ -1748,6 +1773,27 @@ export type AssetError =
  * translation site. FE shows the i18n key `error.DatabaseError`.
  */
 { code: "DatabaseError" }
+/**
+ * How an asset is identified and priced (AST-030); separate from its class, which says
+ * what it is economically.
+ */
+export type AssetKind = 
+/**
+ * A listing: an instrument, by its ISIN, on an exchange, in a currency.
+ */
+"Listed" | 
+/**
+ * Identified by its symbol, unique among crypto assets.
+ */
+"Crypto" | 
+/**
+ * What no market lists; its reference is unique among custom assets.
+ */
+"Custom" | 
+/**
+ * The application's own, one per currency.
+ */
+"Cash"
 /**
  * Transient value object returned by the orchestrator's `search` method.
  * Mirrors the shape exposed at the Tauri boundary.
@@ -2048,6 +2094,11 @@ management_fees_enabled: boolean }
  * Parameters for creating a new asset.
  */
 export type CreateAssetDTO = { 
+/**
+ * How the asset is identified and priced (AST-030). Left out: the kind its class and
+ * ISIN make it (AST-034).
+ */
+kind: AssetKind | null; 
 /**
  * Display name.
  */
@@ -4680,6 +4731,10 @@ export type UpdateAssetDTO = {
  * Target asset ID.
  */
 asset_id: string; 
+/**
+ * New kind (AST-030). Left out: the asset keeps its kind.
+ */
+kind: AssetKind | null; 
 /**
  * New display name.
  */

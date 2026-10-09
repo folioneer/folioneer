@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                a.id, a.name, a.reference, a.isin, a.asset_class, a.currency, a.risk_level,\n                c.id as \"category_id?: String\",\n                c.name as \"category_name?: String\",\n                a.is_archived as \"is_archived: bool\",\n                a.exchange_code,\n                a.price_refresh_blocked as \"price_refresh_blocked: bool\",\n                a.interest_bearing as \"interest_bearing: bool\"\n            FROM assets a\n            LEFT JOIN categories c ON a.category_id = c.id AND c.is_deleted = 0\n            WHERE a.is_deleted = 0 AND a.is_archived = 0\n            ",
+  "query": "\n            SELECT\n                a.id, a.kind, a.name, a.reference, a.isin, a.asset_class, a.currency, a.risk_level,\n                c.id as \"category_id?: String\",\n                c.name as \"category_name?: String\",\n                a.is_archived as \"is_archived: bool\",\n                a.exchange_code,\n                a.price_refresh_blocked as \"price_refresh_blocked: bool\",\n                a.interest_bearing as \"interest_bearing: bool\"\n            FROM assets a\n            LEFT JOIN categories c ON a.category_id = c.id AND c.is_deleted = 0\n            WHERE a.is_deleted = 0 AND a.is_archived = 0\n            ",
   "describe": {
     "columns": [
       {
@@ -9,63 +9,68 @@
         "type_info": "Text"
       },
       {
-        "name": "name",
+        "name": "kind",
         "ordinal": 1,
         "type_info": "Text"
       },
       {
-        "name": "reference",
+        "name": "name",
         "ordinal": 2,
         "type_info": "Text"
       },
       {
-        "name": "isin",
+        "name": "reference",
         "ordinal": 3,
         "type_info": "Text"
       },
       {
-        "name": "asset_class",
+        "name": "isin",
         "ordinal": 4,
         "type_info": "Text"
       },
       {
-        "name": "currency",
+        "name": "asset_class",
         "ordinal": 5,
         "type_info": "Text"
       },
       {
-        "name": "risk_level",
+        "name": "currency",
         "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "risk_level",
+        "ordinal": 7,
         "type_info": "Integer"
       },
       {
         "name": "category_id?: String",
-        "ordinal": 7,
-        "type_info": "Text"
-      },
-      {
-        "name": "category_name?: String",
         "ordinal": 8,
         "type_info": "Text"
       },
       {
-        "name": "is_archived: bool",
+        "name": "category_name?: String",
         "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "is_archived: bool",
+        "ordinal": 10,
         "type_info": "Integer"
       },
       {
         "name": "exchange_code",
-        "ordinal": 10,
+        "ordinal": 11,
         "type_info": "Text"
       },
       {
         "name": "price_refresh_blocked: bool",
-        "ordinal": 11,
+        "ordinal": 12,
         "type_info": "Integer"
       },
       {
         "name": "interest_bearing: bool",
-        "ordinal": 12,
+        "ordinal": 13,
         "type_info": "Integer"
       }
     ],
@@ -73,6 +78,7 @@
       "Right": 0
     },
     "nullable": [
+      false,
       false,
       false,
       false,
@@ -88,5 +94,5 @@
       false
     ]
   },
-  "hash": "38937dd2bcd14e463707341731095cb28367a6bdc31d249a6936bcf88d7a0001"
+  "hash": "277c23f025697e63c800817443fa6ec1f17039f2f2dc7bc131e152913a85dd72"
 }

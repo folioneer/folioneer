@@ -115,6 +115,27 @@ A canonical reference to a trading venue, independent of any market-data provide
 
 > Status: confirmed
 
+### Kind
+
+How an asset is identified and priced, chosen when it is created. The class says what the asset is economically; the kind says what makes it this asset and no other, and where its price comes from. In French: "Nature".
+
+| Kind       | Meaning                                                                                         | In French    |
+| ---------- | ----------------------------------------------------------------------------------------------- | ------------ |
+| **Listed** | An instrument on an exchange, in a currency. It has an ISIN; its reference is its ticker there. | "Coté"       |
+| **Crypto** | A crypto asset, known by its symbol. It is bought and sold like any asset; it is not money.     | "Crypto"     |
+| **Custom** | What no market lists — real estate, a fund inside a contract. Its price is typed.               | "Non coté"   |
+| **Cash**   | The application's own money line, one per currency. Never created or edited by the user.        | "Liquidités" |
+
+Two assets are the same when they are of one kind and share what identifies it: ISIN, exchange and currency for listed assets; the symbol for crypto assets; the reference for custom ones. The same instrument on two exchanges is two assets.
+
+> Status: confirmed
+
+### Asset to settle
+
+An asset that breaks a rule of its kind, or is the same as another, because it existed before kinds did or arrived from another device. The application leaves it as it is and lists it; the user settles it by editing it.
+
+> Status: proposed
+
 ---
 
 ## Aggregate Root Methods (Account)

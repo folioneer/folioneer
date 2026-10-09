@@ -1589,6 +1589,7 @@ mod tests {
             Ok(Some(match asset_id {
                 "system-cash-eur" => Asset::restore(
                     "system-cash-eur".to_string(),
+                    crate::context::asset::AssetKind::Cash,
                     "Cash".to_string(),
                     AssetClass::Cash,
                     asset_category(),
@@ -1603,6 +1604,7 @@ mod tests {
                 ),
                 _ => Asset::restore(
                     "usd-stock".to_string(),
+                    crate::context::asset::AssetKind::Custom,
                     "US Stock".to_string(),
                     AssetClass::Stocks,
                     asset_category(),

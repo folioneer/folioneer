@@ -5,7 +5,7 @@
 
 use folioneer_lib::context::asset::exchange::Exchange;
 use folioneer_lib::context::asset::{
-    AssetClass, AssetError, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
+    AssetClass, AssetError, AssetKind, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
     SqliteAssetPriceRepository, SqliteAssetRepository, UpdateAssetDTO, SYSTEM_CATEGORY_ID,
 };
 use folioneer_lib::core::{Event, SideEffectEventBus};
@@ -40,6 +40,7 @@ async fn setup() -> (AssetService, Arc<SideEffectEventBus>) {
 
 fn base_create_dto(name: &str) -> CreateAssetDTO {
     CreateAssetDTO {
+        kind: None,
         name: name.to_string(),
         reference: "REF".to_string(),
         isin: None,
@@ -122,6 +123,7 @@ async fn test_update_asset_rejected_when_archived() {
 
     let err = svc
         .update_asset(UpdateAssetDTO {
+            kind: None,
             asset_id: asset.id,
             name: "NewName".to_string(),
             reference: "REF".to_string(),
@@ -152,6 +154,7 @@ async fn test_update_asset_rejected_when_category_not_found() {
 
     let err = svc
         .update_asset(UpdateAssetDTO {
+            kind: None,
             asset_id: asset.id,
             name: "CatCheck".to_string(),
             reference: "REF".to_string(),
@@ -274,9 +277,10 @@ async fn test_create_asset_with_canonical_exchange_persists_and_round_trips() {
 
     let asset = svc
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Air Liquide".to_string(),
             reference: "AI".to_string(),
-            isin: None,
+            isin: Some("US0378331005".to_string()),
             class: AssetClass::Stocks,
             currency: "EUR".to_string(),
             risk_level: 4,
@@ -314,9 +318,10 @@ async fn test_create_asset_with_non_curated_exchange_returns_invalid_exchange() 
 
     let err = svc
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Some Asset".to_string(),
             reference: "REF".to_string(),
-            isin: None,
+            isin: Some("US0378331005".to_string()),
             class: AssetClass::Stocks,
             currency: "USD".to_string(),
             risk_level: 3,
@@ -343,6 +348,7 @@ async fn test_create_asset_with_no_exchange_persists_and_round_trips() {
 
     let asset = svc
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "AAPL".to_string(),
             reference: "AAPL".to_string(),
             isin: None,
@@ -388,10 +394,11 @@ async fn test_update_asset_sets_exchange_from_none() {
 
     let updated = svc
         .update_asset(UpdateAssetDTO {
+            kind: Some(AssetKind::Listed),
             asset_id: asset.id.clone(),
             name: "SetExchange".to_string(),
             reference: "REF".to_string(),
-            isin: None,
+            isin: Some("US0378331005".to_string()),
             class: AssetClass::Stocks,
             currency: "USD".to_string(),
             risk_level: 1,
@@ -418,9 +425,10 @@ async fn test_update_asset_changes_exchange_to_different_canonical_value() {
 
     let asset = svc
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "ChangeExchange".to_string(),
             reference: "REF".to_string(),
-            isin: None,
+            isin: Some("US0378331005".to_string()),
             class: AssetClass::Stocks,
             currency: "USD".to_string(),
             risk_level: 3,
@@ -433,10 +441,11 @@ async fn test_update_asset_changes_exchange_to_different_canonical_value() {
 
     let updated = svc
         .update_asset(UpdateAssetDTO {
+            kind: None,
             asset_id: asset.id.clone(),
             name: "ChangeExchange".to_string(),
             reference: "REF".to_string(),
-            isin: None,
+            isin: Some("US0378331005".to_string()),
             class: AssetClass::Stocks,
             currency: "USD".to_string(),
             risk_level: 3,
@@ -460,9 +469,10 @@ async fn test_update_asset_clears_exchange() {
 
     let asset = svc
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "ClearExchange".to_string(),
             reference: "REF".to_string(),
-            isin: None,
+            isin: Some("US0378331005".to_string()),
             class: AssetClass::Stocks,
             currency: "USD".to_string(),
             risk_level: 3,
@@ -475,10 +485,11 @@ async fn test_update_asset_clears_exchange() {
 
     let updated = svc
         .update_asset(UpdateAssetDTO {
+            kind: None,
             asset_id: asset.id.clone(),
             name: "ClearExchange".to_string(),
             reference: "REF".to_string(),
-            isin: None,
+            isin: Some("US0378331005".to_string()),
             class: AssetClass::Stocks,
             currency: "USD".to_string(),
             risk_level: 3,
@@ -507,10 +518,11 @@ async fn test_update_asset_with_non_curated_exchange_returns_invalid_exchange() 
 
     let err = svc
         .update_asset(UpdateAssetDTO {
+            kind: None,
             asset_id: asset.id,
             name: "InvalidExchangeUpdate".to_string(),
             reference: "REF".to_string(),
-            isin: None,
+            isin: Some("US0378331005".to_string()),
             class: AssetClass::Stocks,
             currency: "USD".to_string(),
             risk_level: 1,
@@ -553,6 +565,7 @@ async fn test_interest_bearing_round_trips_through_create_and_update() {
 
     let updated = svc
         .update_asset(UpdateAssetDTO {
+            kind: None,
             asset_id: asset.id.clone(),
             name: "EuroFund".to_string(),
             reference: "REF".to_string(),

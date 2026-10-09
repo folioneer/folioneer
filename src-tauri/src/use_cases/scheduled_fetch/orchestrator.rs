@@ -1160,6 +1160,7 @@ mod tests {
         asset_service.expect_get_asset_by_id().returning(|_| {
             Ok(Some(crate::context::asset::Asset::restore(
                 "asset-1".to_string(),
+                crate::context::asset::AssetKind::Custom,
                 "Test Asset".to_string(),
                 crate::context::asset::AssetClass::Stocks,
                 crate::context::asset::AssetCategory::from_storage(
@@ -1249,6 +1250,7 @@ mod tests {
         asset_service.expect_get_asset_by_id().returning(|_| {
             Ok(Some(crate::context::asset::Asset::restore(
                 "asset-1".to_string(),
+                crate::context::asset::AssetKind::Custom,
                 "Test Asset".to_string(),
                 crate::context::asset::AssetClass::Stocks,
                 crate::context::asset::AssetCategory::from_storage(
@@ -1353,6 +1355,7 @@ mod tests {
             .returning(|asset_id| {
                 Ok(Some(crate::context::asset::Asset::restore(
                     asset_id.to_string(),
+                    crate::context::asset::AssetKind::Custom,
                     "Test Asset".to_string(),
                     crate::context::asset::AssetClass::Stocks,
                     crate::context::asset::AssetCategory::from_storage(

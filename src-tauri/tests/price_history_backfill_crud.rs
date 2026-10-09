@@ -124,6 +124,7 @@ async fn build_ctx(opened_on: &str, today: &str, provider: ScriptedProvider) -> 
 
     let asset = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Air Liquide".to_string(),
             reference: "AI".to_string(),
             isin: None,

@@ -3,11 +3,14 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::domain::{Asset, AssetClass, Exchange};
+use super::domain::{Asset, AssetClass, AssetKind, Exchange};
 
 /// Parameters for creating a new asset.
 #[derive(Debug, Serialize, Deserialize, Type)]
 pub struct CreateAssetDTO {
+    /// How the asset is identified and priced (AST-030). Left out: the kind its class and
+    /// ISIN make it (AST-034).
+    pub kind: Option<AssetKind>,
     /// Display name.
     pub name: String,
     /// Ticker / user-defined reference (mandatory — R1).
@@ -34,6 +37,8 @@ pub struct CreateAssetDTO {
 pub struct UpdateAssetDTO {
     /// Target asset ID.
     pub asset_id: String,
+    /// New kind (AST-030). Left out: the asset keeps its kind.
+    pub kind: Option<AssetKind>,
     /// New display name.
     pub name: String,
     /// New reference (mandatory — R1).

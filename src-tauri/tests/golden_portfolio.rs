@@ -175,6 +175,7 @@ async fn build_portfolio() -> Portfolio {
     ] {
         let asset = asset_service
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: name.into(),
                 reference: reference.into(),
                 isin: None,

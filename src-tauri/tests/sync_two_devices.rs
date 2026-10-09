@@ -170,6 +170,7 @@ async fn seed_small_portfolio(ctx: &Ctx) -> (String, String) {
     let asset = ctx
         .asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "AAPL".into(),
             reference: "AAPL".into(),
             isin: None,
@@ -1147,6 +1148,7 @@ async fn written_form_of_every_record_kind() -> serde_json::Value {
     let asset = ctx
         .asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Air Liquide".into(),
             reference: "AI".into(),
             isin: Some("FR0000120073".into()),
@@ -1242,7 +1244,7 @@ fn sync_format_snapshot_path(version: u32) -> std::path::PathBuf {
 /// Every value of every enum that travels in a synced record or in its envelope.
 fn written_values_of_every_synced_enum() -> serde_json::Value {
     use folioneer_lib::context::account::{FeeFrequency, ThresholdDirection, TransactionType};
-    use folioneer_lib::context::asset::AssetPriceSource;
+    use folioneer_lib::context::asset::{AssetKind, AssetPriceSource};
     use folioneer_lib::context::currency::CurrencyRateSource;
     use folioneer_lib::shared::domain::{Operation, Origin, RecordKind};
 
@@ -1265,6 +1267,9 @@ fn written_values_of_every_synced_enum() -> serde_json::Value {
             AssetClass::RealEstate, AssetClass::Cash, AssetClass::Stocks, AssetClass::Bonds,
             AssetClass::ETF, AssetClass::ETP, AssetClass::MutualFunds, AssetClass::DigitalAsset,
             AssetClass::Derivatives,
+        ]),
+        "AssetKind": written_values!(AssetKind, [
+            AssetKind::Listed, AssetKind::Crypto, AssetKind::Custom, AssetKind::Cash,
         ]),
         "AssetPriceSource": written_values!(AssetPriceSource, [
             AssetPriceSource::Manual, AssetPriceSource::YahooFinance,

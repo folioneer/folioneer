@@ -1,6 +1,8 @@
 use serde::Serialize;
 use specta::Type;
 
+use super::domain::{AssetClass, AssetKind};
+
 /// Single flat error enum for the `asset` bounded context (gold error model).
 ///
 /// Every failure the BC can raise — asset / category / price value-object and
@@ -48,6 +50,39 @@ pub enum AssetError {
     /// check digit) collapse to this single wire code.
     #[error("Invalid ISIN format")]
     InvalidIsinFormat,
+
+    /// A listed asset must carry an ISIN (AST-031).
+    #[error("A listed asset needs an ISIN")]
+    IsinRequired,
+    /// A crypto or a custom asset carries no ISIN (AST-031).
+    #[error("An asset of kind {kind} has no ISIN")]
+    IsinNotAllowed {
+        /// The kind that forbids it.
+        kind: AssetKind,
+    },
+    /// A crypto or a custom asset is on no exchange (AST-031).
+    #[error("An asset of kind {kind} has no exchange")]
+    ExchangeNotAllowed {
+        /// The kind that forbids it.
+        kind: AssetKind,
+    },
+    /// The class and the kind do not go together (AST-031): the Cash class with the cash
+    /// kind, the digital-asset class with the crypto kind, and neither with another.
+    #[error("An asset of kind {kind} cannot be of class {class}")]
+    ClassNotAllowed {
+        /// The kind asked for.
+        kind: AssetKind,
+        /// The class asked for.
+        class: AssetClass,
+    },
+    /// The same asset already exists, archived or not (AST-032).
+    #[error("The same asset already exists: {existing_name}")]
+    AssetAlreadyExists {
+        /// The existing asset.
+        existing_id: String,
+        /// Its name, for the interface to show.
+        existing_name: String,
+    },
 
     // --- AssetPrice value-object validation ---
     /// Price must be strictly positive.

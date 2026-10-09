@@ -264,6 +264,7 @@ mod tests {
         let (account_service, asset_service, snapshot) = build(&pool);
         let asset = asset_service
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "AAPL".into(),
                 reference: "AAPL".into(),
                 isin: None,
