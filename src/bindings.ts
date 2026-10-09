@@ -54,6 +54,18 @@ async addAsset(dto: CreateAssetDTO) : Promise<Result<Asset, AssetError>> {
 }
 },
 /**
+ * The assets the rules of their kind would refuse today, each with the rule it breaks
+ * (AST-035).
+ */
+async getAssetsToSettle() : Promise<Result<AssetToSettle[], AssetError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_assets_to_settle") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Updates an existing asset.
  */
 async updateAsset(dto: UpdateAssetDTO) : Promise<Result<Asset, AssetError>> {
@@ -1862,6 +1874,18 @@ export type AssetPriceSource =
  * Fetched from Yahoo Finance by a fetch task or a price history backfill (MKT-102).
  */
 "YahooFinance"
+/**
+ * An asset the rules of its kind would refuse today, and the first rule it breaks (AST-035).
+ */
+export type AssetToSettle = { 
+/**
+ * The asset, as it is.
+ */
+asset: Asset; 
+/**
+ * What its kind forbids, or the asset it is the same as.
+ */
+problem: AssetError }
 /**
  * Parameters for recording a purchase of an asset into an account.
  */
