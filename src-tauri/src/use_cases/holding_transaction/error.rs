@@ -247,9 +247,8 @@ pub enum OpenHoldingTask {
     /// No asset exists with the requested ID (TRX-056).
     #[error("Asset not found")]
     AssetNotFound,
-    /// Target asset is archived — cannot open a holding (TRX-050).
-    /// The orchestrator does not auto-unarchive; the caller must unarchive
-    /// explicitly through the asset BC first.
+    /// Target asset is archived — cannot open a holding (TRX-050). The asset is
+    /// unarchived first, through the asset BC.
     #[error("Cannot open a holding for an archived asset")]
     ArchivedAsset,
     /// Target asset is a system Cash Asset (CSH-061). Initial cash should be

@@ -39,13 +39,10 @@ vi.mock("./useAddTransaction", () => ({
     problemHint: null,
     isSubmitting: false,
     isFormValid: false,
-    showArchivedConfirm: false,
     recordPrice: false,
     setRecordPrice: vi.fn(),
     handleChange: vi.fn(),
     handleSubmit: vi.fn(),
-    handleConfirmArchived: vi.fn(),
-    handleCancelArchived: vi.fn(),
   })),
 }));
 

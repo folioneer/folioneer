@@ -1,8 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Account, Asset, TransactionDraft } from "@/bindings";
+import type { TransactionDraft } from "@/bindings";
 import { setDisplayLocale } from "@/lib/microUnits";
-import { useAppStore } from "@/lib/store";
 import { useBuyTransaction } from "./useBuyTransaction";
 
 const AUTO_RECORD_PRICE_KEY = "auto_record_price";
@@ -73,10 +72,6 @@ describe("useBuyTransaction", () => {
     mockGetSnapshot.mockReset();
     mockValidateDraft.mockReset().mockImplementation(fakeDraftCheck);
     mockGetSnapshot.mockResolvedValue({ status: "ok", data: { quantity: 0, average_price: 0 } });
-    useAppStore.setState({
-      assets: [{ id: "asset-1", name: "Apple", is_archived: false, currency: "USD" }] as Asset[],
-      accounts: [{ id: "account-1", name: "My Account" }] as Account[],
-    });
   });
 
   // MKT-052 — recordPrice defaults to the global toggle value at hook mount (create mode)

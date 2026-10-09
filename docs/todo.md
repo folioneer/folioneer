@@ -20,8 +20,7 @@
 
 1. #056
 2. #051
-3. TD-078
-4. #049
+3. #049
 
 ## #009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 

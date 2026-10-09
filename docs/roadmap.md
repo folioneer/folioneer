@@ -44,7 +44,7 @@ Record a purchase that opens or increases a position in an account.
 | Multi-currency support        | ✅ Done | Exchange rate stored per transaction (TRX-021)                                                                                   |
 | VWAP cost basis update        | ✅ Done | `avg_price = Σ total_amount / Σ quantity` (TRX-030)                                                                              |
 | Atomic holding update         | ✅ Done | Transaction + holding in one DB transaction (TRX-027)                                                                            |
-| Archived asset auto-unarchive | ✅ Done | With frontend confirmation dialog (TRX-028, TRX-029)                                                                             |
+| Purchase on an archived asset | ✅ Done | Saved; the asset stays archived until unarchived by hand (TRX-028)                                                               |
 | Edit purchase transaction     | ✅ Done | Full recalculation of holding on save (TRX-031)                                                                                  |
 | Delete transaction            | ✅ Done | Full flow: backend + confirmation dialog + snackbar (TRX-035)                                                                    |
 | Delete confirmation dialog    | ✅ Done | ConfirmationDialog in TransactionListPage (TRX-035)                                                                              |
@@ -133,7 +133,7 @@ An asset can be archived once it has no active positions, preserving its histori
 | Operation                  | Status  | Notes                                                                    |
 | -------------------------- | ------- | ------------------------------------------------------------------------ |
 | Archive action             | ✅ Done | Available from asset table                                               |
-| Auto-unarchive on new buy  | ✅ Done | Transparent to user, with confirmation dialog (TRX-028, TRX-029)         |
+| Buy on an archived asset   | ✅ Done | Saved; the asset stays archived (TRX-028)                                |
 | Archive eligibility guard  | ✅ Done | Block archiving if any `Holding.quantity > 0` across all accounts (OQ-6) |
 | Archived asset in holdings | ✅ Done | Included in Account Details as long as `quantity > 0` (ACD-021)          |
 

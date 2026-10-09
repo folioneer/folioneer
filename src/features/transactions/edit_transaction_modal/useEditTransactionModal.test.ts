@@ -1,7 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Account, Asset, Transaction, TransactionDraft } from "@/bindings";
-import { useAppStore } from "@/lib/store";
+import type { Transaction, TransactionDraft } from "@/bindings";
 import { useEditTransactionModal } from "./useEditTransactionModal";
 
 const { mockCorrectTransaction, mockRecordAssetPrice, mockValidateDraft, mockValidateOpening } =
@@ -100,13 +99,6 @@ describe("useEditTransactionModal", () => {
     mockRecordAssetPrice.mockReset();
     mockValidateOpening.mockReset().mockResolvedValue({ status: "ok", data: { zero_cost: false } });
     mockValidateDraft.mockReset().mockImplementation(fakeDraftCheck);
-    useAppStore.setState({
-      assets: [
-        { id: "asset-1", name: "Apple", is_archived: false, currency: "USD" },
-        { id: "asset-archived", name: "OldCo", is_archived: true, currency: "USD" },
-      ] as Asset[],
-      accounts: [{ id: "account-1", name: "My Account" }] as Account[],
-    });
   });
 
   // Pre-fill: micro-unit values are converted to decimal strings; the total comes from the check

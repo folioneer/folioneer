@@ -10,7 +10,6 @@ import { DateField } from "@/ui/components/field/DateField";
 import { SelectField } from "@/ui/components/field/SelectField";
 import { TextareaField } from "@/ui/components/field/TextareaField";
 import { TextField } from "@/ui/components/field/TextField";
-import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { useAddTransaction } from "../add_transaction/useAddTransaction";
 
 export function AddTransactionPage() {
@@ -47,11 +46,8 @@ export function AddTransactionPage() {
     error,
     isSubmitting,
     isFormValid,
-    showArchivedConfirm,
     handleChange,
     handleSubmit,
-    handleConfirmArchived,
-    handleCancelArchived,
   } = useAddTransaction({
     prefillAssetId,
     prefillAccountId,
@@ -219,23 +215,12 @@ export function AddTransactionPage() {
             form="add-transaction-form"
             variant="primary"
             loading={isSubmitting}
-            disabled={isSubmitting || showArchivedConfirm || !isFormValid}
+            disabled={isSubmitting || !isFormValid}
           >
             {t("action.add")}
           </Button>
         </div>
       </div>
-
-      {/* TRX-029 — archived asset confirmation */}
-      <ConfirmationDialog
-        isOpen={showArchivedConfirm}
-        onCancel={handleCancelArchived}
-        onConfirm={handleConfirmArchived}
-        title={t("transaction.archived_asset_confirm_title")}
-        message={t("transaction.archived_asset_confirm_message")}
-        confirmLabel={t("action.confirm")}
-        cancelLabel={t("action.cancel")}
-      />
     </div>
   );
 }

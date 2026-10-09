@@ -28,7 +28,7 @@ No new entity and no Tauri command, so no contract: a command records a `Transac
 
 **CLI-012 — The window's rules (backend)**: A command records through the same checks as the window, and is refused with the rejection recording makes: an opening balance as TRX-044 to TRX-048, TRX-050 (archived asset) and CSH-061 (a second line behind CLI-011, which never matches a Cash Asset); a purchase as TRX-020, TRX-060 and CSH-041 (cash short); a sale as SEL-020, SEL-021 (oversell), SEL-012 (closed position), SEL-037 (archived asset) and SEL-050; either one as CSH-062 (a second line behind CLI-011).
 
-**CLI-017 — A purchase of an archived asset (backend)**: A purchase of an archived asset is recorded and brings the asset back from the archive (TRX-028), without the confirmation the window asks for (TRX-029).
+**CLI-017 — A purchase of an archived asset (backend)**: A purchase of an archived asset is recorded, and the asset stays archived, as in the window (TRX-028).
 
 **CLI-018 — List the accounts (backend)**: `folioneer account list` prints every account with what `--account` takes and what a figure is counted in: its name and its currency, sorted by name, case ignored. It takes `--json` and no other option. It only reads: it records nothing, never changes the portfolio file, takes no lock (CLI-030) and answers while the window is open.
 

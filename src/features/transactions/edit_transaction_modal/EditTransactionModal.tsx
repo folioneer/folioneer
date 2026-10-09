@@ -10,7 +10,6 @@ import { DateField } from "@/ui/components/field/DateField";
 import { SelectField } from "@/ui/components/field/SelectField";
 import { TextareaField } from "@/ui/components/field/TextareaField";
 import { TextField } from "@/ui/components/field/TextField";
-import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { FormModal } from "@/ui/components/modal/FormModal";
 import { FormProblem } from "@/ui/components/modal/FormProblem";
 import { todayIso } from "@/ui/format/date";
@@ -52,7 +51,6 @@ export function EditTransactionModal({
     error,
     isSubmitting,
     isFormValid,
-    showArchivedConfirm,
     recordPrice,
     setRecordPrice,
     isTotalEntryEligible,
@@ -66,8 +64,6 @@ export function EditTransactionModal({
     unitPriceDisplay,
     handleChange,
     handleSubmit,
-    handleConfirmArchived,
-    handleCancelArchived,
   } = useEditTransactionModal({
     transaction,
     onSubmitSuccess: onSuccess ?? onClose,
@@ -98,7 +94,7 @@ export function EditTransactionModal({
         form="edit-transaction-form"
         variant="primary"
         loading={isSubmitting}
-        disabled={isSubmitting || showArchivedConfirm || !isFormValid}
+        disabled={isSubmitting || !isFormValid}
       >
         {t("action.save")}
       </Button>
@@ -268,17 +264,6 @@ export function EditTransactionModal({
           )}
         </form>
       </FormModal>
-
-      {/* TRX-029 — archived asset confirmation */}
-      <ConfirmationDialog
-        isOpen={showArchivedConfirm}
-        onCancel={handleCancelArchived}
-        onConfirm={handleConfirmArchived}
-        title={t("transaction.archived_asset_confirm_title")}
-        message={t("transaction.archived_asset_confirm_message")}
-        confirmLabel={t("action.confirm")}
-        cancelLabel={t("action.cancel")}
-      />
     </>
   );
 }

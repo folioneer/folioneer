@@ -39,13 +39,10 @@ vi.mock("./useEditTransactionModal", () => ({
     isFormValid: true,
     fieldErrors: {},
     problemHint: null,
-    showArchivedConfirm: false,
     recordPrice: false,
     setRecordPrice: vi.fn(),
     handleChange: vi.fn(),
     handleSubmit: vi.fn(),
-    handleConfirmArchived: vi.fn(),
-    handleCancelArchived: vi.fn(),
   })),
 }));
 

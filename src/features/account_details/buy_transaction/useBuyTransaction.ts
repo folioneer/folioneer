@@ -9,7 +9,6 @@ import { getAutoRecordPrice } from "@/lib/autoRecordPriceStorage";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
 import { microToExactDecimal, microToFieldDecimal, microToFormatted } from "@/lib/microUnits";
-import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -27,7 +26,6 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
   const { t } = useTranslation();
   const showSnackbar = useSnackbar();
   const { buyHolding } = useTransactions();
-  const assets = useAppStore((state) => state.assets);
 
   const [formData, setFormData] = useState<TransactionFormData>(() => ({
     accountId,
@@ -41,7 +39,6 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
   }));
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showArchivedConfirm, setShowArchivedConfirm] = useState(false);
   // MKT-052/053 — snapshot of the global auto-record toggle at hook mount
   const [recordPrice, setRecordPrice] = useState<boolean>(() => getAutoRecordPrice());
   // TRX-060 — entry mode: unit price typed (default) or all-in total typed
@@ -67,12 +64,6 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
   const averageCostAsOfDate = useMemo(
     () => (snapshot && snapshot.quantity > 0 ? microToFormatted(snapshot.average_price) : null),
     [snapshot],
-  );
-
-  // TRX-029 — is the pre-determined asset archived?
-  const isAssetArchived = useMemo(
-    () => assets.find((a) => a.id === assetId)?.is_archived ?? false,
-    [assets, assetId],
   );
 
   const handleChange = useCallback(
@@ -178,23 +169,10 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (isAssetArchived) {
-        setShowArchivedConfirm(true);
-        return;
-      }
       await doSubmit();
     },
-    [isAssetArchived, doSubmit],
+    [doSubmit],
   );
-
-  const handleConfirmArchived = useCallback(async () => {
-    setShowArchivedConfirm(false);
-    await doSubmit();
-  }, [doSubmit]);
-
-  const handleCancelArchived = useCallback(() => {
-    setShowArchivedConfirm(false);
-  }, []);
 
   return {
     formData,
@@ -216,12 +194,9 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
     error: error ?? problemDisplay.alert,
     isSubmitting,
     isFormValid: check.isClean,
-    showArchivedConfirm,
     recordPrice,
     setRecordPrice,
     handleChange,
     handleSubmit,
-    handleConfirmArchived,
-    handleCancelArchived,
   };
 }

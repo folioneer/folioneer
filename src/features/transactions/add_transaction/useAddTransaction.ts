@@ -4,7 +4,6 @@ import { getAutoRecordPrice } from "@/lib/autoRecordPriceStorage";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
 import { microToExactDecimal, microToFormatted } from "@/lib/microUnits";
-import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { transactionGateway } from "../gateway";
@@ -40,7 +39,6 @@ export function useAddTransaction({
   const { t } = useTranslation();
   const showSnackbar = useSnackbar();
   const { buyHolding } = useTransactions();
-  const assets = useAppStore((state) => state.assets);
 
   const [formData, setFormData] = useState<TransactionFormData>(() => ({
     ...defaultForm(prefillAccountId ?? ""),
@@ -48,7 +46,6 @@ export function useAddTransaction({
   }));
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showArchivedConfirm, setShowArchivedConfirm] = useState(false);
   // MKT-052/053 — snapshot of the global auto-record toggle at hook mount
   const [recordPrice, setRecordPrice] = useState<boolean>(() => getAutoRecordPrice());
 
@@ -59,11 +56,6 @@ export function useAddTransaction({
   // TRX-067 — the first problem is shown on its field once typed in, as a hint before.
   const problemDisplay = useDraftProblemDisplay(check.problem, check.problemMessage);
   const touch = problemDisplay.touch;
-
-  // TRX-029 — derived flag: is the currently selected asset archived?
-  const isSelectedAssetArchived = formData.assetId
-    ? (assets.find((a) => a.id === formData.assetId)?.is_archived ?? false)
-    : false;
 
   const handleChange = useCallback(
     (field: keyof TransactionFormData, value: string) => {
@@ -147,24 +139,10 @@ export function useAddTransaction({
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (isSelectedAssetArchived) {
-        // TRX-029 — show confirmation before submitting with an archived asset
-        setShowArchivedConfirm(true);
-        return;
-      }
       await doSubmit();
     },
-    [isSelectedAssetArchived, doSubmit],
+    [doSubmit],
   );
-
-  const handleConfirmArchived = useCallback(async () => {
-    setShowArchivedConfirm(false);
-    await doSubmit();
-  }, [doSubmit]);
-
-  const handleCancelArchived = useCallback(() => {
-    setShowArchivedConfirm(false);
-  }, []);
 
   return {
     formData,
@@ -177,12 +155,9 @@ export function useAddTransaction({
     problemHint: problemDisplay.hint,
     isSubmitting,
     isFormValid: check.isClean,
-    showArchivedConfirm,
     recordPrice,
     setRecordPrice,
     handleChange,
     handleSubmit,
-    handleConfirmArchived,
-    handleCancelArchived,
   };
 }

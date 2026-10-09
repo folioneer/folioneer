@@ -1,7 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Account, Asset, TransactionDraft } from "@/bindings";
-import { useAppStore } from "@/lib/store";
+import type { TransactionDraft } from "@/bindings";
 import { useAddTransaction } from "./useAddTransaction";
 
 const { mockBuyHolding, mockRecordAssetPrice, mockValidateDraft } = vi.hoisted(() => ({
@@ -52,13 +51,6 @@ describe("useAddTransaction", () => {
     mockBuyHolding.mockReset();
     mockRecordAssetPrice.mockReset();
     mockValidateDraft.mockReset().mockImplementation(fakeDraftCheck);
-    useAppStore.setState({
-      assets: [
-        { id: "asset-1", name: "Apple", is_archived: false, currency: "USD" },
-        { id: "asset-archived", name: "OldCo", is_archived: true, currency: "USD" },
-      ] as Asset[],
-      accounts: [{ id: "account-1", name: "My Account" }] as Account[],
-    });
   });
 
   // TRX-011 — pre-fill assetId from props
@@ -116,42 +108,6 @@ describe("useAddTransaction", () => {
       key: "transaction.error_validation_account",
     });
     expect(result.current.isFormValid).toBe(false);
-  });
-
-  // TRX-029 — archived asset triggers confirmation dialog on submit
-  it("sets showArchivedConfirm when submitting with an archived asset", async () => {
-    const { result } = renderHook(() => useAddTransaction({ prefillAccountId: "account-1" }));
-
-    await act(async () => {
-      result.current.handleChange("assetId", "asset-archived");
-    });
-
-    await act(async () => {
-      await result.current.handleSubmit(fakeSubmit);
-    });
-
-    expect(result.current.showArchivedConfirm).toBe(true);
-  });
-
-  // TRX-029 — cancelling archived confirmation does not submit
-  it("handleCancelArchived resets showArchivedConfirm without submitting", async () => {
-    const { result } = renderHook(() => useAddTransaction({ prefillAccountId: "account-1" }));
-
-    await act(async () => {
-      result.current.handleChange("assetId", "asset-archived");
-    });
-
-    await act(async () => {
-      await result.current.handleSubmit(fakeSubmit);
-    });
-    expect(result.current.showArchivedConfirm).toBe(true);
-
-    await act(async () => {
-      result.current.handleCancelArchived();
-    });
-
-    expect(result.current.showArchivedConfirm).toBe(false);
-    expect(mockBuyHolding).not.toHaveBeenCalled();
   });
 
   // TRX-063 — the check's first problem blocks the submit and becomes the error
@@ -262,25 +218,6 @@ describe("useAddTransaction", () => {
     expect(result.current.formData.accountId).toBe("account-1");
     expect(result.current.formData.quantity).toBe("");
     expect(localStorage.getItem("last_operation_date_account-1")).toBe("2018-03-01");
-  });
-
-  // handleSubmit with archived asset → does not call buyHolding (waits for confirmation)
-  it("handleSubmit with archived asset does not submit immediately", async () => {
-    const onSubmitSuccess = vi.fn();
-    const { result } = renderHook(() =>
-      useAddTransaction({ prefillAccountId: "account-1", onSubmitSuccess }),
-    );
-
-    await act(async () => {
-      result.current.handleChange("assetId", "asset-archived");
-    });
-
-    await act(async () => {
-      await result.current.handleSubmit(fakeSubmit);
-    });
-
-    expect(mockBuyHolding).not.toHaveBeenCalled();
-    expect(onSubmitSuccess).not.toHaveBeenCalled();
   });
 
   // MKT-052 — recordPrice defaults to false when localStorage key is absent

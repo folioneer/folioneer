@@ -8,7 +8,6 @@ import { CalcField } from "@/ui/components/field/CalcField";
 import { DateField } from "@/ui/components/field/DateField";
 import { TextareaField } from "@/ui/components/field/TextareaField";
 import { TextField } from "@/ui/components/field/TextField";
-import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { FormModal } from "@/ui/components/modal/FormModal";
 import { FormProblem } from "@/ui/components/modal/FormProblem";
 import { messageText } from "@/ui/format/i18n";
@@ -59,13 +58,10 @@ export function BuyTransactionModal({
     error,
     isSubmitting,
     isFormValid,
-    showArchivedConfirm,
     recordPrice,
     setRecordPrice,
     handleChange,
     handleSubmit,
-    handleConfirmArchived,
-    handleCancelArchived,
   } = useBuyTransaction({ accountId, assetId, onSubmitSuccess });
 
   const footer = useMemo(
@@ -77,11 +73,7 @@ export function BuyTransactionModal({
           error={messageText(t, error)}
           hint={messageText(t, problemHint)}
         />
-        <Button
-          variant="secondary"
-          onClick={onClose}
-          disabled={isSubmitting || showArchivedConfirm}
-        >
+        <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
           {t("action.cancel")}
         </Button>
         <Button
@@ -89,13 +81,13 @@ export function BuyTransactionModal({
           form="buy-transaction-form"
           variant="primary"
           loading={isSubmitting}
-          disabled={isSubmitting || showArchivedConfirm || !isFormValid}
+          disabled={isSubmitting || !isFormValid}
         >
           {t("transaction.action_buy")}
         </Button>
       </div>
     ),
-    [isSubmitting, showArchivedConfirm, isFormValid, error, problemHint, t, onClose],
+    [isSubmitting, isFormValid, error, problemHint, t, onClose],
   );
 
   return (
@@ -245,17 +237,6 @@ export function BuyTransactionModal({
           />
         </form>
       </FormModal>
-
-      {/* TRX-029 — archived asset confirmation */}
-      <ConfirmationDialog
-        isOpen={showArchivedConfirm}
-        onCancel={handleCancelArchived}
-        onConfirm={handleConfirmArchived}
-        title={t("transaction.archived_asset_confirm_title")}
-        message={t("transaction.archived_asset_confirm_message")}
-        confirmLabel={t("action.confirm")}
-        cancelLabel={t("action.cancel")}
-      />
     </>
   );
 }

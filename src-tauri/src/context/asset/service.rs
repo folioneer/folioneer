@@ -59,7 +59,7 @@ impl AssetService {
     }
 
     /// TRX-064 — every asset a purchase or a sale can be recorded on: all but the Cash
-    /// Assets, archived ones included (TRX-029 confirms those).
+    /// Assets, archived ones included (a purchase leaves them archived, TRX-028).
     pub async fn get_non_cash_assets(&self) -> StdResult<Vec<Asset>, AssetError> {
         let assets = self.get_all_assets_with_archived().await?;
         Ok(assets

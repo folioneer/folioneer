@@ -72,9 +72,9 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-027 — Atomicity of transaction and holding updates (backend)**: The transaction record insert and all associated `Holding` mutations (quantity and average_price) must be performed within a single database transaction. A failure in any step rolls back the entire operation.
 
-**TRX-028 — Archived asset auto-unarchive on purchase (backend)**: For `Purchase` transactions only — if the referenced asset is archived at the time of transaction creation or modification, the use case atomically unarchives the asset and persists the transaction in a single database operation. The archived flag is reverted if the transaction fails. `Sell` transactions are explicitly excluded: selling an archived asset is rejected (see SEL-037).
+**TRX-028 — A purchase on an archived asset leaves it archived (backend)**: A `Purchase` recorded or corrected on an archived asset is saved like any other, and the asset stays archived: recording a transaction never changes an asset. The user brings an asset back by unarchiving it (AST-018). `Sell` transactions on an archived asset are rejected (see SEL-037).
 
-**TRX-029 — Archived asset confirmation (frontend)**: If the selected asset is archived, a confirmation dialog is shown before form submission, informing the user that saving will automatically unarchive the asset. The transaction is submitted only upon explicit user confirmation.
+**TRX-029 — Archived asset confirmation (frontend)**: _Retired._ No form asks for a confirmation before saving a purchase on an archived asset: nothing happens to the asset (TRX-028), so there is nothing to confirm.
 
 ### Update and Deletion
 
@@ -84,7 +84,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-032 — Modifiable fields (backend)**: A correction changes a transaction's date, quantity, unit price, exchange rate, fees, total amount and note. It changes neither its type (SEL-035), nor its account, nor its asset: a transaction entered on the wrong asset or account is deleted (TRX-034) and entered again.
 
-**TRX-033 — Update field validation (backend)**: When modifying a transaction, the same field constraints as TRX-020 apply, and the archived asset guard (TRX-028) is enforced. When the `Sell` transaction type is active, editing a purchase transaction must also verify that no subsequent sell in the chronological sequence for the `(account_id, asset_id)` pair would become invalid (oversell) as a result — see SEL-032.
+**TRX-033 — Update field validation (backend)**: When modifying a transaction, the same field constraints as TRX-020 apply. When the `Sell` transaction type is active, editing a purchase transaction must also verify that no subsequent sell in the chronological sequence for the `(account_id, asset_id)` pair would become invalid (oversell) as a result — see SEL-032.
 
 **TRX-034 — Transaction deletion (backend)**: Deleting a transaction triggers a recalculation of the `Holding` for the `(account_id, asset_id)` pair. If no transactions remain for that asset in the account, the `Holding` record is removed.
 
@@ -120,7 +120,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-049 — Multiple opening balances allowed (backend)**: Multiple `OpeningBalance` transactions may exist for the same (account, asset) pair, and may coexist with `Purchase` and `Sell` transactions for the same pair. Each participates in chronological recalculation (TRX-036) in date order alongside regular transactions.
 
-**TRX-050 — Opening balance archived asset guard (backend)**: If the target asset is archived when an opening balance is submitted, the backend rejects with `ArchivedAsset`. No auto-unarchive occurs. The asset selector (TRX-043) lists only active assets, so this guard is reached only via a race condition (asset archived between form load and submission); the frontend displays the error inline (TRX-028). The TRX-029 confirmation dialog does not apply to opening balance.
+**TRX-050 — Opening balance archived asset guard (backend)**: If the target asset is archived when an opening balance is submitted, the backend rejects with `ArchivedAsset`. The asset selector (TRX-043) lists only active assets, so this guard is reached only via a race condition (asset archived between form load and submission); the frontend displays the error inline.
 
 **TRX-051 — Opening balance edit (frontend + backend)**: When editing an `OpeningBalance` transaction, the edit form shows date, quantity, and total cost — no fees field, no exchange rate field. The correction mechanism (TRX-031) is used. TRX-047 applies on edit: the entered total cost is stored as the transaction's total amount and the unit price is always derived from it as `floor(total_cost / quantity)` — any unit price sent is ignored; validation is that of TRX-044/TRX-045; TRX-026 does not apply.
 
@@ -156,7 +156,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-067 — A form says why it cannot be saved (frontend)**: A form that follows a draft check (TRX-063, TRX-066) never keeps saving disabled without a visible reason: it shows the first problem the check reports, in one of three places. On the field the problem concerns, as an error under it, once the user has typed in that field. As a plain hint beside the actions, saying what to enter (`Enter the quantity.`), while the user has not typed in that field yet — a field not filled is never shown as an error before it is touched. As an error beside the actions when the problem concerns no field (a check that could not run, a rejection on saving such as cash that is short). The error and the hint beside the actions are always in view, whatever the form's scroll position. A total that is not positive is shown on the unit price while the unit price is typed, on the total while the total is typed (TRX-060). The texts exist in both languages.
 
-**TRX-064 — Assets a purchase or a sale is recorded on (frontend + backend)**: The backend lists the assets a purchase or a sale can be recorded on: every asset but the Cash Assets (CSH-018), archived ones included — a purchase on one asks the user to confirm (TRX-029), a sale of one is rejected on save (SEL-037). This rule sets no order. The add and edit transaction forms offer these assets. Recording a purchase or a sale on a Cash Asset is rejected whatever the interface (CSH-062).
+**TRX-064 — Assets a purchase or a sale is recorded on (frontend + backend)**: The backend lists the assets a purchase or a sale can be recorded on: every asset but the Cash Assets (CSH-018), archived ones included — a purchase on one is saved and leaves it archived (TRX-028), a sale of one is rejected on save (SEL-037). This rule sets no order. The add and edit transaction forms offer these assets. Recording a purchase or a sale on a Cash Asset is rejected whatever the interface (CSH-062).
 
 ---
 

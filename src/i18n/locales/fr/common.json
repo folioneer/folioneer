@@ -385,8 +385,6 @@
     "edit_modal_title": "Modifier la transaction",
     "delete_confirm_title": "Supprimer la transaction",
     "delete_confirm_message": "Êtes-vous sûr de vouloir supprimer cette transaction ? Cette action est irréversible.",
-    "archived_asset_confirm_title": "Actif archivé",
-    "archived_asset_confirm_message": "L'actif sélectionné est archivé. Enregistrer cette transaction le désarchivera automatiquement. Voulez-vous continuer ?",
     "form_account_label": "Compte",
     "form_asset_label": "Actif",
     "form_asset_placeholder": "Rechercher un actif…",

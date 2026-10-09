@@ -30,7 +30,7 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 
 ### Eligibility and Initiation (010–019)
 
-**SEL-010 — Sell entry point (frontend)**: A sell can be initiated from the "Account Details" view via a "Sell" action button on each holding row. The button is visible only when `Holding.quantity > 0` (zero-quantity holdings are excluded from display by ACD-020). The button is disabled and visually greyed out when the asset is archived, to prevent sells on potentially stale positions until the archive eligibility guard (OQ-6) is enforced.
+**SEL-010 — Sell entry point (frontend)**: A sell can be initiated from the "Account Details" view via a "Sell" action button on each holding row. The button is visible only when `Holding.quantity > 0` (zero-quantity holdings are excluded from display by ACD-020). The button is disabled and visually greyed out when the asset is archived, since a sale of an archived asset is rejected (SEL-037).
 
 **SEL-011 — Contextual pre-filling (frontend)**: When initiated from a holding row, both the account and the asset are pre-filled in the sell form and cannot be changed by the user.
 
@@ -60,7 +60,7 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 
 **SEL-036 — Exchange rate field visibility (frontend)**: The Exchange Rate field in the sell form is visible only when the asset's currency differs from the account's currency. When both currencies are the same, the field is hidden and `exchange_rate` is implicitly `1.0`, consistent with the purchase form (TRX-023).
 
-**SEL-037 — Archived asset sell guard (backend + frontend)**: The backend rejects a sell submission if the asset is archived at the time of processing. The frontend disables the Sell button (SEL-010) when the asset is archived as a defensive guard, since the archive eligibility guard (OQ-6 in asset spec) is not yet enforced and an archived asset could theoretically still carry a position. Once OQ-6 is implemented, this guard becomes redundant but remains harmless.
+**SEL-037 — Archived asset sell guard (backend + frontend)**: The backend rejects a sell submission if the asset is archived at the time of processing. The frontend disables the Sell button (SEL-010) when the asset is archived: an archived asset can carry a position — one it held when archived, or one a purchase built since (TRX-028) — and selling it requires unarchiving it first (AST-018).
 
 **SEL-038 — Realized P&L aggregation service method (backend)**: `TransactionService` exposes a method that returns the sum of `realized_pnl` across all sell transactions grouped by `asset_id` for a given `account_id`. When no sell transactions exist for an `(account_id, asset_id)` pair, the method returns `0` for that asset. If the query fails, the error is propagated to the use case, which returns an error response; the frontend transitions to the error state (ACD-038). This method is called by `use_cases/account_details/` to populate the `realized_pnl` field in `AccountDetailsResponse` per holding (SEL-042, B18).
 

@@ -8,7 +8,6 @@ import {
   microToFieldDecimal,
   microToFormatted,
 } from "@/lib/microUnits";
-import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { useLatestCheck } from "@/ui/hooks/useLatestCheck";
@@ -35,7 +34,6 @@ export function useEditTransactionModal({
   const { t } = useTranslation();
   const showSnackbar = useSnackbar();
   const { correctTransaction } = useTransactions();
-  const assets = useAppStore((state) => state.assets);
 
   const isOpeningBalance = transaction.transaction_type === "OpeningBalance";
   const isSell = transaction.transaction_type === "Sell";
@@ -59,7 +57,6 @@ export function useEditTransactionModal({
 
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showArchivedConfirm, setShowArchivedConfirm] = useState(false);
   // MKT-052 — edit mode always starts OFF, regardless of the global toggle.
   // The user can manually opt in per-edit; the prior price record is independent (MKT-059).
   const [recordPrice, setRecordPrice] = useState<boolean>(false);
@@ -149,11 +146,6 @@ export function useEditTransactionModal({
   // TRX-051 — an opening balance's amount field holds its total cost, shown as typed; every
   // other total is the core's.
   const totalMicro = isTotalEntryEligible ? (preview?.total_amount ?? 0) : entered.priceMicro;
-
-  // TRX-029 — derived flag: is the currently selected asset archived?
-  const isSelectedAssetArchived = formData.assetId
-    ? (assets.find((a) => a.id === formData.assetId)?.is_archived ?? false)
-    : false;
 
   const handleChange = useCallback(
     (field: keyof TransactionFormData, value: string) => {
@@ -270,24 +262,10 @@ export function useEditTransactionModal({
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (isSelectedAssetArchived) {
-        // TRX-029 — show confirmation before submitting with an archived asset
-        setShowArchivedConfirm(true);
-        return;
-      }
       await doSubmit();
     },
-    [isSelectedAssetArchived, doSubmit],
+    [doSubmit],
   );
-
-  const handleConfirmArchived = useCallback(async () => {
-    setShowArchivedConfirm(false);
-    await doSubmit();
-  }, [doSubmit]);
-
-  const handleCancelArchived = useCallback(() => {
-    setShowArchivedConfirm(false);
-  }, []);
 
   return {
     formData,
@@ -296,7 +274,6 @@ export function useEditTransactionModal({
     error: error ?? problemDisplay.alert,
     isSubmitting,
     isFormValid,
-    showArchivedConfirm,
     recordPrice,
     setRecordPrice,
     // TRX-061 / SEL-051 — total-entry correction (Purchase / Sell only).
@@ -314,7 +291,5 @@ export function useEditTransactionModal({
     unitPriceDisplay: preview ? microToFormatted(preview.unit_price) : "—",
     handleChange,
     handleSubmit,
-    handleConfirmArchived,
-    handleCancelArchived,
   };
 }
