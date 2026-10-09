@@ -7,7 +7,7 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-082) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-083) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -317,6 +317,15 @@ Remove an entry once it has been resolved.
 - Observation: the replay multiplies the quantity by the factor in 128 bits and casts the result back to 64 bits without a check. A factor large enough (far beyond any real split) makes the cast wrap: recording and the split check both then show a quantity that is wrong, or refuse a split for the wrong reason.
 - User value: None in practice — no real split comes near the bound; an absurd factor typed by mistake is refused with a clear reason.
 - Done when: a factor whose rescale cannot be stored is refused when the split is recorded and when it is checked, with one error code, shown by a test on each path.
+
+## 2026-10-09 — TD-082 — The CI reviewers get the whole shell, narrowed by a list of refused commands
+
+- Found by: gh#79, checked against the workflow on 2026-10-09
+- Where: `.github/workflows/review.yml` — the `claude_args` of "Run the reviewer prompt" (`--allowedTools … "Bash"`, `--disallowedTools "Bash(gh *)" …`) and the comment above the step
+- Severity: 🟡
+- Observation: a reviewer session may run any command that is not on the refused list, and a refused list is open-ended: what nobody thought to name still runs. The commands the reviewers need are few — `bash scripts/branch.sh`, `bash scripts/review-path.sh`, the `git` read commands (`diff`, `log`, `show`, `status`), `grep`, `shellcheck`, `python3 -m unittest`. The list comes from the issue, not from a count: the first step is to read what each lane ran in the session logs of recent pull requests.
+- User value: None directly — a reviewer that needs another command fails visibly, and the list grows on purpose.
+- Done when: the reviewer step grants only named commands and the refused list is gone; every reviewer lane completes on a pull request that touches its files; gh#79 is closed.
 
 ## 2026-10-05 — TD-081 — "Today" is the UTC day in five places and the local day in three
 
