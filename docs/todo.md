@@ -143,6 +143,7 @@ Existing assets take a kind from what they carry: the Cash class is cash, the di
 **Open questions:**
 
 - [x] The term "Asset to settle" ("Actif à régulariser") for an asset that breaks a rule of its kind or is the same as another. → Confirmed. (Owner, 2026-10-09.)
+- [x] The term "Listing" ("Cotation") for one of several listed assets that share an ISIN. → Confirmed. (Owner, 2026-10-09.)
 - [x] The SQL reviewer in CI refuses the migration for having no explicit `BEGIN; … COMMIT;`, which is wrong for SQLite through SQLx. May the migration carry the false-positive note of the triage policy? → Yes. (Owner, 2026-10-09.)
 
 Vocabulary (owner, 2026-10-09): the terms are Kind — Listed, Crypto, Custom, Cash; in French "Nature" — "Coté", "Crypto", "Non coté", "Liquidités". Where a listed asset trades stays the Exchange ("Place de cotation"): "marketplace" above reads as Exchange, and the mock-up's "Marketplace" label is "Exchange". They enter the vocabulary with the first pull request.

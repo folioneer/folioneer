@@ -1,7 +1,8 @@
+use super::domain::proposed_reference;
 use super::domain::{
-    Asset, AssetCategory, AssetCategoryRepository, AssetClass, AssetKind, AssetPrice,
-    AssetPriceRepository, AssetPriceSource, AssetRepository, AssetToSettle, DatedClose,
-    KindProblem, PriceHistoryBackfillOutcome, SYSTEM_CATEGORY_ID,
+    Asset, AssetCategory, AssetCategoryRepository, AssetClass, AssetKind, AssetListings,
+    AssetPrice, AssetPriceRepository, AssetPriceSource, AssetRepository, AssetToSettle, DatedClose,
+    KindProblem, OtherListing, PriceHistoryBackfillOutcome, SYSTEM_CATEGORY_ID,
 };
 use super::error::AssetError;
 use crate::{
@@ -280,6 +281,48 @@ impl AssetService {
             }),
             None => Ok(()),
         }
+    }
+
+    /// AST-038 — the reference proposed for a custom asset named `name`.
+    pub fn propose_reference(&self, name: &str) -> String {
+        proposed_reference(name)
+    }
+
+    /// AST-039 — every listed asset another active asset is a listing of the same instrument
+    /// as, archived ones included, with those other listings by exchange label then
+    /// currency; a listing on no exchange comes first.
+    pub async fn other_listings(&self) -> StdResult<Vec<AssetListings>, AssetError> {
+        let assets = self.get_all_assets_with_archived().await?;
+        Ok(assets
+            .iter()
+            .filter_map(|asset| {
+                let mut others: Vec<OtherListing> = assets
+                    .iter()
+                    .filter(|other| !other.is_archived && asset.is_another_listing_of(other))
+                    .map(|other| OtherListing {
+                        asset_id: other.id.clone(),
+                        reference: other.reference.clone(),
+                        exchange: other.exchange.clone(),
+                        currency: other.currency.clone(),
+                    })
+                    .collect();
+                others.sort_by(|a, b| {
+                    let label = |listing: &'_ OtherListing| -> Option<String> {
+                        listing
+                            .exchange
+                            .as_ref()
+                            .map(|exchange| exchange.label.clone())
+                    };
+                    label(a)
+                        .cmp(&label(b))
+                        .then_with(|| a.currency.cmp(&b.currency))
+                });
+                (!others.is_empty()).then(|| AssetListings {
+                    asset_id: asset.id.clone(),
+                    others,
+                })
+            })
+            .collect())
     }
 
     /// AST-035 — the assets the rules of their kind would refuse today, archived or not,
@@ -1529,6 +1572,100 @@ mod tests {
             .await
             .expect("an asset is not the same as itself");
         assert_eq!(kept.kind, AssetKind::Listed);
+    }
+
+    // AST-039 — the other listings of an instrument are reported for each of its listings,
+    // by exchange then currency; an archived listing is not one to point at, but is told
+    // of the active ones.
+    #[tokio::test]
+    async fn ast_039_each_listing_is_told_of_the_other_active_listings_of_its_instrument() {
+        let alone = Asset {
+            isin: Some("IE00B53L3W79".to_string()),
+            ..listed("alone", "XPAR", false)
+        };
+        let held = vec![
+            listed("nasdaq", "XNAS", false),
+            listed("amsterdam", "XAMS", false),
+            listed("paris-archived", "XPAR", true),
+            alone,
+            make_asset("custom", false),
+        ];
+        let mut ar = MockAssetRepository::new();
+        ar.expect_get_all_including_archived()
+            .returning(move || Ok(held.clone()));
+        let svc = make_svc(
+            ar,
+            MockAssetCategoryRepository::new(),
+            MockAssetPriceRepository::new(),
+        );
+
+        let listings = svc.other_listings().await.expect("listings");
+
+        let told: Vec<(&str, Vec<&str>)> = listings
+            .iter()
+            .map(|entry| {
+                (
+                    entry.asset_id.as_str(),
+                    entry
+                        .others
+                        .iter()
+                        .map(|other| other.asset_id.as_str())
+                        .collect(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            told,
+            vec![
+                ("nasdaq", vec!["amsterdam"]),
+                ("amsterdam", vec!["nasdaq"]),
+                ("paris-archived", vec!["amsterdam", "nasdaq"]),
+            ]
+        );
+        assert_eq!(listings[0].others[0].reference, "ASML");
+        assert_eq!(listings[0].others[0].currency, "USD");
+    }
+
+    // AST-039 — the other listings come by exchange label then currency, a listing on no
+    // exchange first.
+    #[tokio::test]
+    async fn ast_039_other_listings_come_by_exchange_then_currency() {
+        let on = |id: &str, exchange_code: Option<&str>, currency: &str| Asset {
+            exchange: exchange_code.and_then(super::super::domain::exchange::lookup),
+            currency: currency.to_string(),
+            ..listed(id, "XAMS", false)
+        };
+        let held = vec![
+            on("me", Some("XPAR"), "EUR"),
+            on("nasdaq-usd", Some("XNAS"), "USD"),
+            on("amsterdam-usd", Some("XAMS"), "USD"),
+            on("amsterdam-eur", Some("XAMS"), "EUR"),
+            on("nowhere", None, "EUR"),
+        ];
+        let mut ar = MockAssetRepository::new();
+        ar.expect_get_all_including_archived()
+            .returning(move || Ok(held.clone()));
+        let svc = make_svc(
+            ar,
+            MockAssetCategoryRepository::new(),
+            MockAssetPriceRepository::new(),
+        );
+
+        let listings = svc.other_listings().await.expect("listings");
+
+        let mine: Vec<&str> = listings
+            .iter()
+            .find(|entry| entry.asset_id == "me")
+            .expect("my listings")
+            .others
+            .iter()
+            .map(|other| other.asset_id.as_str())
+            .collect();
+        assert_eq!(
+            mine,
+            vec!["nowhere", "amsterdam-eur", "amsterdam-usd", "nasdaq-usd"]
+        );
+        assert_eq!(svc.propose_reference("Flat, Paris"), "FLAT-PARIS");
     }
 
     // AST-035 — the assets the rules would refuse today are reported, each with the first

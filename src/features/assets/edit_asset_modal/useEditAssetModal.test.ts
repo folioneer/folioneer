@@ -17,7 +17,7 @@ const mockAsset: Asset = {
   is_archived: false,
   price_refresh_blocked: false,
   interest_bearing: false,
-  kind: "Custom",
+  kind: "Listed",
   exchange: null,
 };
 
@@ -67,13 +67,41 @@ describe("useEditAssetModal", () => {
     expect(result.current.formData.risk_level).toBe(4);
   });
 
-  // R9 — duplicate warning excludes self
-  it("does not warn about duplicate reference for own asset", () => {
+  // AST-031 — the asset keeps its kind unless the user changes it; a kind without an ISIN
+  // or an exchange sends neither, whatever the fields still hold.
+  it("sends the kind chosen and only the fields that kind has", async () => {
+    const listed: Asset = {
+      ...mockAsset,
+      kind: "Listed",
+      isin: "US0378331005",
+      exchange: { code: "XNAS", label: "Nasdaq" },
+    };
+    mockUpdateAsset.mockResolvedValue({ data: listed, error: null });
     const onClose = vi.fn();
-    const { result } = renderHook(() => useEditAssetModal({ asset: mockAsset, onClose }));
+    const { result } = renderHook(() => useEditAssetModal({ asset: listed, onClose }));
+    expect(result.current.formData.kind).toBe("Listed");
 
-    // reference is already "AAPL" (same as mockAsset) — should not warn since it's self
-    expect(result.current.duplicateWarning).toBe(false);
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(mockUpdateAsset).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: "Listed", isin: "US0378331005", exchange: listed.exchange }),
+    );
+
+    act(() => {
+      result.current.handleKindChange("Custom");
+    });
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(mockUpdateAsset).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: "Custom", isin: null, exchange: null, class: "Stocks" }),
+    );
+
+    act(() => {
+      result.current.handleKindChange("Crypto");
+    });
+    expect(result.current.formData.class).toBe("DigitalAsset");
   });
 
   // R14 — does not close on backend error, exposes error message
@@ -223,6 +251,22 @@ describe("useEditAssetModal", () => {
 
     expect(mockUpdateAsset).toHaveBeenCalledWith(
       expect.objectContaining({ interest_bearing: true }),
+    );
+  });
+
+  // AST-037 — a kind that cannot bear interest never sends the flag, whatever the asset held.
+  it("sends no interest for a kind that cannot bear any", async () => {
+    mockUpdateAsset.mockResolvedValue({ data: mockAsset, error: null });
+    const bearing: Asset = { ...mockAsset, interest_bearing: true };
+    const { result } = renderHook(() => useEditAssetModal({ asset: bearing, onClose: vi.fn() }));
+
+    act(() => result.current.handleKindChange("Crypto"));
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+
+    expect(mockUpdateAsset).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "Crypto", interest_bearing: false }),
     );
   });
 

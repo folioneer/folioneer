@@ -2,6 +2,7 @@ import {
   type ArchiveAssetError,
   type Asset,
   type AssetError,
+  type AssetListings,
   type AssetLookupResult,
   type CreateAssetDTO,
   commands,
@@ -51,6 +52,16 @@ export const assetGateway = {
     mode: LookupMode,
   ): Promise<Result<AssetLookupResult[], WebLookupError>> {
     return await commands.lookupAsset(query, mode);
+  },
+
+  /** AST-039 — the other listings of every listed asset whose instrument is held more than once. */
+  async getOtherListings(): Promise<Result<AssetListings[], AssetError>> {
+    return await commands.getOtherListings();
+  },
+
+  /** AST-038 — the reference the core proposes for a custom asset from its name. */
+  async proposeAssetReference(name: string): Promise<string> {
+    return await commands.proposeAssetReference(name);
   },
 
   async getSupportedExchanges(): Promise<Exchange[]> {

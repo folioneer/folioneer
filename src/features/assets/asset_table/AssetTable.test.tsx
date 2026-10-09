@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Asset } from "@/bindings";
+import type { Asset, AssetListings } from "@/bindings";
 import { AssetTable } from "./AssetTable";
 
 const navigateMock = vi.fn();
@@ -14,6 +14,13 @@ vi.mock("react-i18next", () => ({
 
 vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), error: vi.fn() },
+}));
+
+let mockOtherListings: AssetListings[] = [];
+vi.mock("../gateway", () => ({
+  assetGateway: {
+    getOtherListings: async () => ({ status: "ok", data: mockOtherListings }),
+  },
 }));
 
 let mockAssets: Asset[] = [];
@@ -55,6 +62,7 @@ describe("AssetTable — router-driven edit", () => {
   beforeEach(() => {
     navigateMock.mockClear();
     mockAssets = [makeAsset()];
+    mockOtherListings = [];
   });
 
   it("edit button opens the edit-asset modal via URL params", () => {
@@ -92,5 +100,55 @@ describe("AssetTable — router-driven edit", () => {
     render(<AssetTable searchTerm="" showArchived={false} />);
     fireEvent.keyDown(screen.getByRole("button", { name: "asset.action_edit" }), { key: "Enter" });
     expect(navigateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("AssetTable — kinds", () => {
+  beforeEach(() => {
+    navigateMock.mockClear();
+    mockOtherListings = [];
+  });
+
+  // CSH-015 — the application's cash shows as such and offers no action, by click or key.
+  it("shows a cash row as managed by the application, with no action", () => {
+    mockAssets = [
+      makeAsset({ id: "system-cash-eur", name: "Cash EUR", kind: "Cash", class: "Cash" }),
+    ];
+    render(<AssetTable searchTerm="" showArchived={false} />);
+
+    expect(document.getElementById("asset-managed-system-cash-eur")).not.toBeNull();
+    expect(document.getElementById("action-edit-asset-system-cash-eur")).toBeNull();
+    expect(document.getElementById("action-archive-asset-system-cash-eur")).toBeNull();
+
+    const row = document.getElementById("asset-row-system-cash-eur") as HTMLElement;
+    fireEvent.doubleClick(row);
+    fireEvent.keyDown(row, { key: "Enter" });
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  // AST-039 — an asset whose instrument has other listings says so under its name; an asset
+  // alone says nothing.
+  it("says under the name what else an instrument is held as", async () => {
+    mockAssets = [makeAsset({ id: "ams", kind: "Listed" }), makeAsset({ id: "alone" })];
+    mockOtherListings = [
+      {
+        asset_id: "ams",
+        others: [
+          {
+            asset_id: "nas",
+            reference: "ASML",
+            exchange: { code: "XNAS", label: "Nasdaq" },
+            currency: "USD",
+          },
+          { asset_id: "otc", reference: "ASMLF", exchange: null, currency: "USD" },
+        ],
+      },
+    ];
+    render(<AssetTable searchTerm="" showArchived={false} />);
+
+    await waitFor(() => expect(document.getElementById("asset-also-held-ams")).not.toBeNull());
+    const line = document.getElementById("asset-also-held-ams");
+    expect(line?.getAttribute("title")).toBe("ASML · Nasdaq · USD\nASMLF · USD");
+    expect(document.getElementById("asset-also-held-alone")).toBeNull();
   });
 });

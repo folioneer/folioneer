@@ -4,6 +4,7 @@ import type { Asset } from "@/bindings";
 import { logger } from "@/lib/logger";
 import { Button } from "@/ui/components/button/Button";
 import { Dialog } from "@/ui/components/modal/Dialog";
+import { FormProblem } from "@/ui/components/modal/FormProblem";
 import { AssetForm } from "../shared/AssetForm";
 import { useEditAssetModal } from "./useEditAssetModal";
 
@@ -35,8 +36,8 @@ export function EditAssetModal({ isOpen, onClose, asset, focusField }: EditAsset
     formData,
     error,
     isSubmitting,
-    duplicateWarning,
     handleChange,
+    handleKindChange,
     handleClassChange,
     handleExchangeChange,
     handleSubmit,
@@ -48,10 +49,12 @@ export function EditAssetModal({ isOpen, onClose, asset, focusField }: EditAsset
 
   const actions = (
     <>
-      <Button variant="secondary" onClick={onClose}>
+      <FormProblem idPrefix="edit-asset" error={error ? t(error.key, error.vars) : undefined} />
+      <Button id="edit-asset-cancel" variant="secondary" onClick={onClose}>
         {t("action.cancel")}
       </Button>
       <Button
+        id="edit-asset-submit"
         type="submit"
         form="edit-asset-form"
         variant="primary"
@@ -76,17 +79,12 @@ export function EditAssetModal({ isOpen, onClose, asset, focusField }: EditAsset
         <AssetForm
           formData={formData}
           handleChange={handleChange}
+          onKindChange={handleKindChange}
           onClassChange={handleClassChange}
           onExchangeChange={handleExchangeChange}
           categories={categories}
-          duplicateWarning={duplicateWarning}
           idPrefix="edit-asset"
         />
-        {error && (
-          <p role="alert" className="mt-3 text-sm text-m3-error">
-            {t(error.key, error.vars)}
-          </p>
-        )}
       </form>
     </Dialog>
   );

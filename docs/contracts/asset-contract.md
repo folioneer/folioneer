@@ -1,7 +1,7 @@
 # Contract — Asset
 
 > Domain: `asset`
-> Last updated by: market-price (MKT-190–213), financial-asset-transaction (TRX-064), asset (AST-030–035)
+> Last updated by: market-price (MKT-190–213), financial-asset-transaction (TRX-064), asset (AST-030–040)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Per-command reachable codes are listed in the "Errors" column of each table below. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic chain preserved server-side via `tracing::error!`).
 >
@@ -21,6 +21,8 @@
 | `add_asset`                   | `CreateAssetDTO { kind: Option<AssetKind>, name: String, class: AssetClass, category_id: String, currency: String, risk_level: i32, reference: String, isin: Option<String>, exchange: Option<Exchange>, interest_bearing: bool }`                   | `Asset`              | `NameEmpty` (R1), `ReferenceEmpty` (R1), `InvalidIsinFormat` (AST-023, WEB-016), `InvalidRiskLevel { received: i32 }` (AST-002), `InvalidCurrency { currency }` (TRX-021), `InvalidExchange { exchange_code: String }` (AST-001), `CategoryNotFound { id }` (when `category_id` missing), `CashAssetNotEditable` (CSH-015), `IsinRequired` (AST-031), `IsinNotAllowed { kind: AssetKind }` (AST-031), `ExchangeNotAllowed { kind: AssetKind }` (AST-031), `ClassNotAllowed { kind: AssetKind, class: AssetClass }` (AST-031), `AssetAlreadyExists { existing_id: String, existing_name: String }` (AST-032), `DatabaseError`                                                                                                                                                            |
 | `update_asset`                | `UpdateAssetDTO { asset_id: String, kind: Option<AssetKind>, name: String, reference: String, isin: Option<String>, class: AssetClass, currency: String, risk_level: i32, category_id: String, exchange: Option<Exchange>, interest_bearing: bool }` | `Asset`              | `AssetNotFound { id }` (asset missing), `CategoryNotFound { id }` (category missing — including a category that stands removed after a multi-device merge, CFR-030: the user picks another), `Archived` (R18 — archived asset cannot be edited), `CashAssetNotEditable` (CSH-016), `NameEmpty`, `ReferenceEmpty`, `InvalidIsinFormat` (AST-023, WEB-016), `InvalidRiskLevel { received: i32 }`, `InvalidCurrency { currency }`, `InvalidExchange { exchange_code: String }` (AST-001), `IsinRequired` (AST-031), `IsinNotAllowed { kind: AssetKind }` (AST-031), `ExchangeNotAllowed { kind: AssetKind }` (AST-031), `ClassNotAllowed { kind: AssetKind, class: AssetClass }` (AST-031), `AssetAlreadyExists { existing_id: String, existing_name: String }` (AST-032), `DatabaseError` |
 | `get_assets_to_settle`        | —                                                                                                                                                                                                                                                    | `Vec<AssetToSettle>` | `DatabaseError` (AST-035)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `get_other_listings`          | —                                                                                                                                                                                                                                                    | `Vec<AssetListings>` | `DatabaseError` (AST-039)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `propose_asset_reference`     | `name: String`                                                                                                                                                                                                                                       | `String`             | _(infallible — a pure function of the name; empty for a name with no letter or digit; AST-038)_                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `unarchive_asset`             | `id: String`                                                                                                                                                                                                                                         | `()`                 | `AssetNotFound { id }`, `CashAssetNotEditable` (CSH-016), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `block_asset_price_refresh`   | `id: String`                                                                                                                                                                                                                                         | `()`                 | `AssetNotFound { id }` (MKT-156), `CashAssetNotEditable` (CSH-016 / MKT-154), `DatabaseError` _(MKT-150/156 — sets `price_refresh_blocked = true`; idempotent; publishes `AssetUpdated`)_                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `unblock_asset_price_refresh` | `id: String`                                                                                                                                                                                                                                         | `()`                 | `AssetNotFound { id }` (MKT-156), `CashAssetNotEditable` (CSH-016 / MKT-154), `DatabaseError` _(MKT-150/156 — clears `price_refresh_blocked`; idempotent; publishes `AssetUpdated`)_                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -142,6 +144,21 @@ struct AssetCategory {
 struct AssetToSettle {
     asset: Asset,
     problem: KindProblem,
+}
+
+// AST-039 — a listed asset, archived or not, and the other active listings of its
+// instrument, by exchange label then currency, a listing on no exchange first. An asset
+// with no other active listing is absent.
+struct AssetListings {
+    asset_id: String,
+    others: Vec<OtherListing>,
+}
+
+struct OtherListing {
+    asset_id: String,
+    reference: String,
+    exchange: Option<Exchange>,
+    currency: String,
 }
 
 // Serialized as `{ code: "VariantName", ...payload }`, like an error.
@@ -303,6 +320,40 @@ struct PriceHistoryBackfillOutcome {
 
 ---
 
+## Constants
+
+Generated with the bindings; read by the window, never sent.
+
+```rust
+// AST-037 — `ASSET_CREATION_DEFAULTS`: what "New asset" offers and preselects.
+struct AssetCreationDefaults {
+    kinds: Vec<AssetKindForm>,       // the kinds a user may create, in the order offered; never Cash
+    kind: AssetKind,                 // the kind preselected
+    classes: Vec<AssetClassDefault>, // the classes a user may create an asset in
+    class: AssetClass,               // the class preselected
+    risk_levels: Vec<u8>,            // lowest risk first
+    risk_level: u8,                  // the preselected class's
+    category_id: String,             // the category of a new asset until one is picked
+}
+
+// AST-037 — what the form of one kind asks for.
+struct AssetKindForm {
+    kind: AssetKind,
+    classes: Vec<AssetClassDefault>, // the classes of this kind, in the order offered
+    class: AssetClass,               // the class preselected
+    has_isin: bool,                  // has an ISIN, required when it does (AST-031)
+    has_exchange: bool,              // may be on an exchange (AST-031)
+    has_lookup: bool,                // starts from the lookup (WEB-010)
+    proposes_reference: bool,        // its reference is proposed from its name (AST-038)
+    may_bear_interest: bool,         // may be marked as bearing interest (AST-024)
+}
+
+struct AssetClassDefault {
+    class: AssetClass,
+    default_risk: u8,                // AST-003
+}
+```
+
 ## Events
 
 | Event                      | Payload                                                                                          | Direction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -317,6 +368,7 @@ struct PriceHistoryBackfillOutcome {
 
 ## Changelog
 
+- 2026-10-09 — AST-037–039: new `get_other_listings` and `propose_asset_reference` commands with the `AssetListings` and `OtherListing` shared types; the `ASSET_CREATION_DEFAULTS` constant gains `kinds` and `kind` (what each kind's form asks for).
 - 2026-10-09 — AST-030–032: `Asset.kind`, the `AssetKind` enum, `kind` on the inputs of `add_asset` and `update_asset`, and five codes on both (`IsinRequired`, `IsinNotAllowed`, `ExchangeNotAllowed`, `ClassNotAllowed`, `AssetAlreadyExists`); new `get_assets_to_settle` command with the `AssetToSettle` and `KindProblem` shared types (AST-035).
 - 2026-10-03 — CSH-015: `add_asset` rejects `class = Cash` with `CashAssetNotEditable`.
 - 2026-09-27 — #038: the public build has no External provider; `YahooFinance` is written only by a Yahoo Finance provider (the owner's private build). No wire change.

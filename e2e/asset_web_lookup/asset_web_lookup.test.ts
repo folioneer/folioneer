@@ -30,7 +30,7 @@ describe("asset_web_lookup", () => {
   // WEB-010 — Opening the FAB shows the search modal (no network required)
   // -------------------------------------------------------------------------
   it("WEB-010: FAB opens web-lookup search modal with title visible", async () => {
-    const fab = await $('button[aria-label="Add asset"]');
+    const fab = await $("#fab-add-asset");
     await fab.waitForExist({ timeout: 10000 });
     await fab.click();
 
@@ -44,7 +44,7 @@ describe("asset_web_lookup", () => {
     assert.ok(await searchInput.isExisting(), "ISIN input must be present");
 
     // The "Fill manually" button must be visible immediately.
-    const fillManuallyBtn = await $('button[aria-label="Fill manually"]');
+    const fillManuallyBtn = await $("#web-lookup-fill-manually");
     await fillManuallyBtn.waitForDisplayed({ timeout: 5000 });
     assert.ok(await fillManuallyBtn.isDisplayed(), '"Fill manually" button must be visible');
   });
@@ -53,12 +53,12 @@ describe("asset_web_lookup", () => {
   // WEB-040 — "Fill manually" skips search and opens Add Asset form (no network required)
   // -------------------------------------------------------------------------
   it("WEB-040: clicking Fill manually opens the Add Asset form without prefill", async () => {
-    const fab = await $('button[aria-label="Add asset"]');
+    const fab = await $("#fab-add-asset");
     await fab.waitForExist({ timeout: 10000 });
     await fab.click();
 
     // Wait for the search modal to open.
-    const fillManuallyBtn = await $('button[aria-label="Fill manually"]');
+    const fillManuallyBtn = await $("#web-lookup-fill-manually");
     await fillManuallyBtn.waitForDisplayed({ timeout: 8000 });
     await fillManuallyBtn.click();
 
@@ -78,7 +78,7 @@ describe("asset_web_lookup", () => {
     );
 
     // The Back button must NOT be rendered (back is only available in form-prefilled step).
-    const backBtn = await $('button[aria-label="Back"]');
+    const backBtn = await $("#add-asset-back");
     assert.ok(
       !(await backBtn.isExisting()),
       "Back button must not be visible in manual (non-prefilled) form step",

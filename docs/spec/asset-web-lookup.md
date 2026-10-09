@@ -29,7 +29,7 @@ A transient value object returned by the OpenFIGI API. Not persisted; used only 
 
 ### Entry Point and Initiation (010–019)
 
-**WEB-010 — Asset creation entry point (frontend)**: Initiating the creation of a new asset opens the web lookup step instead of going directly to the blank Add Asset form.
+**WEB-010 — Asset creation entry point (frontend)**: Initiating the creation of a new asset opens the web lookup step instead of going directly to the blank Add Asset form. Since assets have a kind, the step belongs to the listed kind, preselected when "New asset" opens: choosing another kind there goes to that kind's form (AST-040).
 
 **WEB-011 — Minimum query length (frontend)**: Each lookup field's search action requires at least 1 character in its input. An empty field disables that field's search action; the other field's action is independent. The ISIN search button is enabled at ≥1 character (the strict 12-character format check is the backend's responsibility — WEB-016 — so the user receives a clear typed error if the entered value is malformed rather than a silently-disabled button that gives no hint why).
 
@@ -111,7 +111,7 @@ In all cases the "Fill manually" bypass (WEB-013) remains accessible. No navigat
 
 **WEB-040 — Result selection (frontend)**: Selecting a result from the list transitions to the Add Asset form with fields pre-filled from the selected `AssetLookupResult`.
 
-**WEB-041 — Pre-filled fields (frontend)**: The following Add Asset form fields are pre-filled from the selected result: `name` ← `AssetLookupResult.name`; `reference` ← `AssetLookupResult.reference` (blank if absent); `isin` ← `AssetLookupResult.isin` (blank if absent); `currency` ← `AssetLookupResult.currency` (blank if absent); `asset_class` ← `AssetLookupResult.asset_class` (no selection if absent); `exchange` ← `AssetLookupResult.exchange` (no selection if absent). All pre-filled values remain user-editable per WEB-043.
+**WEB-041 — Pre-filled fields (frontend)**: The following Add Asset form fields are pre-filled from the selected result: `name` ← `AssetLookupResult.name`; `reference` ← `AssetLookupResult.reference` (blank if absent); `isin` ← `AssetLookupResult.isin` (blank if absent); `currency` ← `AssetLookupResult.currency` (blank if absent); `asset_class` ← `AssetLookupResult.asset_class` (no selection if absent); `exchange` ← `AssetLookupResult.exchange` (no selection if absent). All pre-filled values remain user-editable per WEB-043. A result whose class the kind searched does not offer opens on the kind that offers it (AST-037): a crypto result opens the crypto form, which has no ISIN and no exchange; going back to the search returns to the listed kind.
 
 **WEB-042 — Risk level default from asset class (frontend)**: When opening the Add Asset form from the web lookup path (creation only), if `asset_class` is pre-filled, `risk_level` is automatically set to the class default, consistent with the `AssetClass::default_risk()` behaviour defined in AST-010. When `asset_class` is absent, `risk_level` is left at its form default. This rule applies exclusively to the creation flow; it does not affect the edit form.
 
@@ -119,7 +119,7 @@ In all cases the "Fill manually" bypass (WEB-013) remains accessible. No navigat
 
 **WEB-044 — Category default (frontend)**: The `category` field is not provided by the OpenFIGI lookup and defaults to the system default category, consistent with the existing manual form behaviour.
 
-**WEB-045 — Save via existing add_asset command (frontend + backend)**: Saving the pre-filled form uses the existing `add_asset` command. All existing Asset creation rules apply — reference uniqueness check, field validation, and `AssetUpdated` event publication — as defined in the AST spec. The web lookup path introduces no new save rules.
+**WEB-045 — Save via existing add_asset command (frontend + backend)**: Saving the pre-filled form uses the existing `add_asset` command. All existing Asset creation rules apply — the kind's rules (AST-031), the refusal of the same asset (AST-032), and `AssetUpdated` event publication — as defined in the AST spec. The web lookup path introduces no new save rules.
 
 **WEB-046 — Reference and ISIN field sources (backend)**: `AssetLookupResult.reference` is the ticker symbol returned by OpenFIGI when available; absent when OpenFIGI does not return a ticker for the result. This is consistent across both lookup paths so `reference` always carries the value that market-data providers expect (ticker, not ISIN). `AssetLookupResult.isin` is populated only on the ISIN path with the normalized ISIN query (per WEB-016: trimmed + uppercased + format-validated); absent on the keyword path because OpenFIGI's `/v3/search` response does not expose ISIN.
 

@@ -133,6 +133,101 @@ pub struct AssetClassDefault {
     pub default_risk: u8,
 }
 
+/// What the form of one kind asks for (AST-037): the classes it offers and the fields it
+/// shows, so that no interface decides it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct AssetKindForm {
+    /// The kind.
+    pub kind: AssetKind,
+    /// The classes an asset of this kind may be of, in the order they are offered.
+    pub classes: Vec<AssetClassDefault>,
+    /// The class preselected.
+    pub class: AssetClass,
+    /// Whether an asset of this kind has an ISIN — required when it does (AST-031).
+    pub has_isin: bool,
+    /// Whether an asset of this kind may be on an exchange (AST-031).
+    pub has_exchange: bool,
+    /// Whether an asset of this kind starts from the lookup (AST-037).
+    pub has_lookup: bool,
+    /// Whether the reference of an asset of this kind is proposed from its name (AST-038).
+    pub proposes_reference: bool,
+    /// Whether an asset of this kind may be marked as bearing interest (AST-024).
+    pub may_bear_interest: bool,
+}
+
+impl AssetKindForm {
+    fn of(kind: AssetKind, class: AssetClass) -> Self {
+        let classes = AssetClass::user_addable()
+            .iter()
+            .filter(|class| {
+                (AssetKind::of(class, None) == AssetKind::Crypto) == (kind == AssetKind::Crypto)
+            })
+            .map(|class| AssetClassDefault {
+                class: class.clone(),
+                default_risk: class.default_risk(),
+            })
+            .collect();
+        Self {
+            kind,
+            classes,
+            class,
+            has_isin: kind == AssetKind::Listed,
+            has_exchange: kind == AssetKind::Listed,
+            has_lookup: kind == AssetKind::Listed,
+            proposes_reference: kind == AssetKind::Custom,
+            may_bear_interest: kind != AssetKind::Crypto,
+        }
+    }
+}
+
+/// AST-038 — the reference proposed for a custom asset from its name: its letters and
+/// digits in capitals, every run of anything else as one hyphen. A Latin letter loses its
+/// accent; a mark that belongs to another script is part of its letter and stays.
+pub fn proposed_reference(name: &str) -> String {
+    use unicode_normalization::char::is_combining_mark;
+    use unicode_normalization::UnicodeNormalization;
+
+    let mut reference = String::new();
+    let mut after_latin_letter = false;
+    for character in name.nfd() {
+        if is_combining_mark(character) {
+            if !after_latin_letter && !reference.is_empty() && !reference.ends_with('-') {
+                reference.push(character);
+            }
+            continue;
+        }
+        after_latin_letter = character.is_ascii_alphabetic();
+        if character.is_alphanumeric() {
+            reference.extend(character.to_uppercase());
+        } else if !reference.is_empty() && !reference.ends_with('-') {
+            reference.push('-');
+        }
+    }
+    reference.trim_end_matches('-').nfc().collect()
+}
+
+/// Another asset that is a listing of the same instrument (AST-039).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct OtherListing {
+    /// The other asset.
+    pub asset_id: String,
+    /// Its reference there.
+    pub reference: String,
+    /// Its exchange, when it has one.
+    pub exchange: Option<Exchange>,
+    /// Its currency.
+    pub currency: String,
+}
+
+/// A listed asset and the other listings of its instrument (AST-039).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct AssetListings {
+    /// The asset.
+    pub asset_id: String,
+    /// The other listings of the same instrument, by exchange then currency.
+    pub others: Vec<OtherListing>,
+}
+
 /// The risk scale of an asset: the levels a user may pick, lowest risk first.
 pub const RISK_LEVELS: std::ops::RangeInclusive<u8> = 1..=5;
 
@@ -140,6 +235,11 @@ pub const RISK_LEVELS: std::ops::RangeInclusive<u8> = 1..=5;
 /// (CSH-015), each with its default risk level (R3), and the category preselected.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct AssetCreationDefaults {
+    /// The kinds a user may create an asset of, in the order they are offered, each with
+    /// what its form asks for (AST-037).
+    pub kinds: Vec<AssetKindForm>,
+    /// The kind preselected.
+    pub kind: AssetKind,
     /// The classes a user may create an asset in, in the order they are offered.
     pub classes: Vec<AssetClassDefault>,
     /// The class preselected.
@@ -156,6 +256,12 @@ impl AssetCreationDefaults {
     /// The defaults of this application.
     pub fn current() -> Self {
         Self {
+            kinds: vec![
+                AssetKindForm::of(AssetKind::Listed, AssetClass::Stocks),
+                AssetKindForm::of(AssetKind::Crypto, AssetClass::DigitalAsset),
+                AssetKindForm::of(AssetKind::Custom, AssetClass::RealEstate),
+            ],
+            kind: AssetKind::Listed,
             classes: AssetClass::user_addable()
                 .iter()
                 .map(|class| AssetClassDefault {
@@ -367,6 +473,16 @@ impl Asset {
             Err(AssetError::ExchangeNotAllowed { .. }) => Some(KindProblem::ExchangeNotAllowed),
             _ => None,
         }
+    }
+
+    /// AST-039 — whether `other` is another listing of this asset's instrument: both are
+    /// listed and share their ISIN.
+    pub fn is_another_listing_of(&self, other: &Asset) -> bool {
+        self.id != other.id
+            && self.kind == AssetKind::Listed
+            && other.kind == AssetKind::Listed
+            && self.isin.is_some()
+            && self.isin == other.isin
     }
 
     /// AST-032 — whether `other` is the same asset as this one: two listed assets sharing
@@ -1786,5 +1902,148 @@ mod kind_tests {
             ..build(AssetKind::Cash, AssetClass::Cash, "EUR", None, None, "EUR").expect("cash")
         };
         assert!(!cash("system-cash-eur").is_same_as(&cash("another")));
+    }
+}
+
+#[cfg(test)]
+mod form_tests {
+    use super::*;
+
+    // AST-037 — what each kind's form asks for is the core's: the fields, the classes and
+    // the class preselected.
+    #[test]
+    fn ast_037_each_kind_says_what_its_form_asks_for() {
+        let defaults = AssetCreationDefaults::current();
+        let form = |kind: AssetKind| {
+            defaults
+                .kinds
+                .iter()
+                .find(|form| form.kind == kind)
+                .expect("a form for the kind")
+        };
+        let classes = |kind: AssetKind| -> Vec<AssetClass> {
+            form(kind)
+                .classes
+                .iter()
+                .map(|entry| entry.class.clone())
+                .collect()
+        };
+
+        assert_eq!(defaults.kind, AssetKind::Listed);
+        assert_eq!(
+            defaults
+                .kinds
+                .iter()
+                .map(|form| form.kind)
+                .collect::<Vec<_>>(),
+            vec![AssetKind::Listed, AssetKind::Crypto, AssetKind::Custom],
+            "cash is never offered"
+        );
+
+        let listed = form(AssetKind::Listed);
+        assert!(listed.has_isin && listed.has_exchange && listed.has_lookup);
+        assert!(!listed.proposes_reference);
+        assert_eq!(listed.class, AssetClass::Stocks);
+        assert!(!classes(AssetKind::Listed).contains(&AssetClass::DigitalAsset));
+        assert!(!classes(AssetKind::Listed).contains(&AssetClass::Cash));
+
+        let crypto = form(AssetKind::Crypto);
+        assert!(!crypto.has_isin && !crypto.has_exchange && !crypto.has_lookup);
+        assert!(!crypto.may_bear_interest && listed.may_bear_interest);
+        assert_eq!(classes(AssetKind::Crypto), vec![AssetClass::DigitalAsset]);
+        assert_eq!(crypto.class, AssetClass::DigitalAsset);
+
+        let custom = form(AssetKind::Custom);
+        assert!(!custom.has_isin && !custom.has_exchange && !custom.has_lookup);
+        assert!(custom.proposes_reference);
+        assert!(custom.may_bear_interest);
+        assert_eq!(custom.class, AssetClass::RealEstate);
+        assert_eq!(classes(AssetKind::Custom), classes(AssetKind::Listed));
+    }
+
+    // AST-037 — a form built from what the core says is accepted by the rules of its kind.
+    #[test]
+    fn ast_037_the_preselected_class_of_each_kind_is_one_its_rules_accept() {
+        for form in AssetCreationDefaults::current().kinds {
+            let created = Asset::new(
+                form.kind,
+                "Some asset".to_string(),
+                form.class.clone(),
+                AssetCategory::default(),
+                "EUR".to_string(),
+                3,
+                "REF".to_string(),
+                form.has_isin.then(|| "US0378331005".to_string()),
+                None,
+                false,
+            );
+            assert!(created.is_ok(), "{}: {created:?}", form.kind);
+        }
+    }
+
+    // AST-038 — the reference proposed from a name.
+    #[test]
+    fn ast_038_a_reference_is_proposed_from_the_name() {
+        assert_eq!(
+            proposed_reference("SCPI Pierval Santé"),
+            "SCPI-PIERVAL-SANTE"
+        );
+        assert_eq!(
+            proposed_reference("  Appartement — Paris 15e (T2) "),
+            "APPARTEMENT-PARIS-15E-T2"
+        );
+        assert_eq!(proposed_reference("Œuvre d'art"), "ŒUVRE-D-ART");
+        assert_eq!(proposed_reference("Straße 5"), "STRASSE-5");
+        assert_eq!(proposed_reference("--"), "");
+        assert_eq!(proposed_reference(""), "");
+    }
+
+    // AST-038 — a mark that belongs to a letter of another script is not an accent: two
+    // names that differ by it keep two references.
+    #[test]
+    fn ast_038_a_name_in_another_script_keeps_its_letters_whole() {
+        assert_eq!(proposed_reference("Газпром Нефть"), "ГАЗПРОМ-НЕФТЬ");
+        assert_eq!(proposed_reference("Йошкар"), "ЙОШКАР");
+        assert_eq!(proposed_reference("삼성 전자"), "삼성-전자");
+        assert_eq!(proposed_reference("がく"), "がく");
+        assert_ne!(proposed_reference("がく"), proposed_reference("かく"));
+        assert_eq!(proposed_reference("不動産 東京"), "不動産-東京");
+    }
+
+    // AST-039 — another listing of the same instrument: listed, the same ISIN, another asset.
+    #[test]
+    fn ast_039_two_listed_assets_sharing_an_isin_are_listings_of_one_instrument() {
+        let asset = |id: &str, kind: AssetKind, isin: Option<&str>| {
+            Asset::restore(
+                id.to_string(),
+                kind,
+                "ASML".to_string(),
+                AssetClass::Stocks,
+                AssetCategory::default(),
+                "EUR".to_string(),
+                4,
+                "ASML".to_string(),
+                isin.map(str::to_string),
+                false,
+                None,
+                false,
+                false,
+            )
+        };
+        let amsterdam = asset("ams", AssetKind::Listed, Some("NL0010273215"));
+        assert!(amsterdam.is_another_listing_of(&asset(
+            "nas",
+            AssetKind::Listed,
+            Some("NL0010273215")
+        )));
+        assert!(!amsterdam.is_another_listing_of(&amsterdam));
+        assert!(!amsterdam.is_another_listing_of(&asset(
+            "other",
+            AssetKind::Listed,
+            Some("US0378331005")
+        )));
+        assert!(!amsterdam.is_another_listing_of(&asset("custom", AssetKind::Custom, None)));
+        assert!(!asset("crypto", AssetKind::Crypto, Some("NL0010273215"))
+            .is_another_listing_of(&amsterdam));
     }
 }

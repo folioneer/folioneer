@@ -5,7 +5,9 @@ use crate::context::asset::error::AssetError;
 use crate::AppState;
 use tauri::State;
 
-use super::domain::{exchange, Asset, AssetCategory, AssetPrice, AssetToSettle, Exchange};
+use super::domain::{
+    exchange, Asset, AssetCategory, AssetListings, AssetPrice, AssetToSettle, Exchange,
+};
 use super::dto::{CreateAssetDTO, UpdateAssetDTO};
 
 // --- Assets ---
@@ -42,6 +44,23 @@ pub async fn get_assets_to_settle(
     state: State<'_, AppState>,
 ) -> Result<Vec<AssetToSettle>, AssetError> {
     state.asset_service.assets_to_settle().await
+}
+
+/// The other listings of every listed asset whose instrument is held more than once
+/// (AST-039).
+#[tauri::command]
+#[specta::specta]
+pub async fn get_other_listings(
+    state: State<'_, AppState>,
+) -> Result<Vec<AssetListings>, AssetError> {
+    state.asset_service.other_listings().await
+}
+
+/// The reference proposed for a custom asset from its name (AST-038).
+#[tauri::command]
+#[specta::specta]
+pub fn propose_asset_reference(state: State<'_, AppState>, name: String) -> String {
+    state.asset_service.propose_reference(&name)
 }
 
 /// Adds a new asset.

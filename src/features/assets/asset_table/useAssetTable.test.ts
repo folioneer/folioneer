@@ -1,7 +1,19 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Asset } from "@/bindings";
 import { useAssetTable } from "./useAssetTable";
+
+const mockGetOtherListings = vi.fn();
+vi.mock("../gateway", () => ({
+  assetGateway: {
+    getOtherListings: () => mockGetOtherListings(),
+  },
+}));
+
+const showSnackbarMock = vi.fn();
+vi.mock("@/ui/components/snackbar/snackbarStore", () => ({
+  useSnackbar: () => showSnackbarMock,
+}));
 
 const navigateMock = vi.fn();
 vi.mock("@tanstack/react-router", () => ({
@@ -43,6 +55,9 @@ const archivedAsset = makeAsset({
 describe("useAssetTable", () => {
   beforeEach(() => {
     navigateMock.mockClear();
+    showSnackbarMock.mockClear();
+    mockGetOtherListings.mockReset();
+    mockGetOtherListings.mockResolvedValue({ status: "ok", data: [] });
   });
 
   // F10 — navigation lives in the hook; openEditAsset drives the router-mounted modal
@@ -61,21 +76,64 @@ describe("useAssetTable", () => {
     expect(result.current.sortedAndFilteredAssets[0]?.id).toBe("active");
   });
 
-  // CSH-015 — system Cash Assets are filtered out of the Asset Manager regardless of showArchived
-  it("filters out system Cash Assets even when showArchived is true (CSH-015)", () => {
+  // CSH-015 — the application's cash is listed with the other assets.
+  it("lists the system Cash Assets", () => {
     const cashAsset = makeAsset({
       id: "system-cash-eur",
       name: "Cash EUR",
       reference: "EUR",
       isin: null,
       class: "Cash",
+      kind: "Cash",
     });
-    const { result } = renderHook(() =>
-      useAssetTable([activeAsset, cashAsset, archivedAsset], "", true),
+    const { result } = renderHook(() => useAssetTable([activeAsset, cashAsset], "", false));
+    expect(result.current.sortedAndFilteredAssets.map((a) => a.id)).toContain("system-cash-eur");
+  });
+
+  // AST-039 — the other listings come from the core, keyed by asset; a failed read leaves
+  // the table without them.
+  it("reads the other listings of each asset from the core", async () => {
+    const others = [
+      {
+        asset_id: "nasdaq",
+        reference: "ASML",
+        exchange: { code: "XNAS", label: "Nasdaq" },
+        currency: "USD",
+      },
+    ];
+    mockGetOtherListings.mockResolvedValue({
+      status: "ok",
+      data: [{ asset_id: "active", others }],
+    });
+    const assets = [activeAsset];
+    const { result } = renderHook(() => useAssetTable(assets, "", false));
+    await waitFor(() => expect(result.current.otherListings).toEqual({ active: others }));
+  });
+
+  it("shows no other listing and says so when the read fails", async () => {
+    mockGetOtherListings.mockResolvedValue({ status: "error", error: { code: "DatabaseError" } });
+    const assets = [activeAsset];
+    const { result } = renderHook(() => useAssetTable(assets, "", false));
+    await waitFor(() =>
+      expect(showSnackbarMock).toHaveBeenCalledWith("error.DatabaseError", "error"),
     );
-    expect(result.current.sortedAndFilteredAssets.map((a) => a.id)).not.toContain(
-      "system-cash-eur",
+    expect(result.current.otherListings).toEqual({});
+  });
+
+  it("forgets the other listings once no asset is left", async () => {
+    mockGetOtherListings.mockResolvedValue({
+      status: "ok",
+      data: [{ asset_id: "active", others: [] }],
+    });
+    const { result, rerender } = renderHook(
+      ({ assets }: { assets: Asset[] }) => useAssetTable(assets, "", false),
+      { initialProps: { assets: [activeAsset] } },
     );
+    await waitFor(() => expect(result.current.otherListings).toEqual({ active: [] }));
+
+    rerender({ assets: [] });
+
+    await waitFor(() => expect(result.current.otherListings).toEqual({}));
   });
 
   // R19 — includes archived assets when showArchived is true

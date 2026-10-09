@@ -209,12 +209,7 @@ export function SearchPanel({
       </div>
 
       <div className="flex justify-start pt-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-label={t("asset.web_lookup.action_fill_manually")}
-          onClick={onFillManually}
-        >
+        <Button id="web-lookup-fill-manually" variant="outline" size="sm" onClick={onFillManually}>
           {t("asset.web_lookup.action_fill_manually")}
         </Button>
       </div>

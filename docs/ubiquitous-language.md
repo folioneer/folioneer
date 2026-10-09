@@ -115,6 +115,12 @@ A canonical reference to a trading venue, independent of any market-data provide
 
 > Status: confirmed
 
+### Listing
+
+> Status: confirmed
+
+One of several listed assets that share an ISIN: the same instrument on another exchange, or in another currency. Each listing is an asset of its own, with its own reference, prices and positions; nothing of two listings is merged. The assets table says of each which other listings exist ("also held as"). In French: "Cotation".
+
 ### Kind
 
 How an asset is identified and priced, chosen when it is created. The class says what the asset is economically; the kind says what makes it this asset and no other, and where its price comes from. In French: "Nature".
@@ -186,7 +192,7 @@ A transaction as the user is still entering it: a purchase or a sale with its ac
 
 > Status: confirmed
 
-A system-seeded `Asset` of `class = AssetClass::Cash`, one per ISO currency, with deterministic id `system-cash-{ccy}`. Acts as the asset reference for cash positions. Not user-editable, not user-creatable, not displayed in the asset catalog.
+A system-seeded `Asset` of `class = AssetClass::Cash`, one per ISO currency, with deterministic id `system-cash-{ccy}`. Acts as the asset reference for cash positions. Not user-editable, not user-creatable; shown in the asset catalog as the application's, with no action.
 
 ### Cash Holding
 

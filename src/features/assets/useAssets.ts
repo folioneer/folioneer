@@ -27,13 +27,13 @@ export function useAssets() {
           showSnackbar(t("asset.success_created"), "success");
           return { data: res.data, error: null };
         }
-        return { data: null, error: assetMutationErrorToI18n(res.error) };
+        return { data: null, error: assetMutationErrorToI18n(res.error, assets) };
       } catch (e) {
         logger.error("Failed to add asset", { error: e });
         return { data: null, error: UNKNOWN_ERROR };
       }
     },
-    [fetchAssets, showSnackbar, t],
+    [assets, fetchAssets, showSnackbar, t],
   );
 
   const updateAsset = useCallback(
@@ -45,13 +45,13 @@ export function useAssets() {
           showSnackbar(t("asset.success_updated"), "success");
           return { data: res.data, error: null };
         }
-        return { data: null, error: assetMutationErrorToI18n(res.error) };
+        return { data: null, error: assetMutationErrorToI18n(res.error, assets) };
       } catch (e) {
         logger.error("Failed to update asset", { error: e });
         return { data: null, error: UNKNOWN_ERROR };
       }
     },
-    [fetchAssets, showSnackbar, t],
+    [assets, fetchAssets, showSnackbar, t],
   );
 
   const archiveAsset = useCallback(

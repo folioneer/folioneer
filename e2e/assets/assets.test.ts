@@ -36,10 +36,11 @@ describe("assets", () => {
     const fab = await $("#fab-add-asset");
     await fab.click();
 
-    // WebLookupModal opens first — click Fill manually to go to the form.
-    const fillManually = await $('button[aria-label="Fill manually"]');
-    await fillManually.waitForDisplayed({ timeout: 8000 });
-    await fillManually.click();
+    // The dialog opens on a listed asset and its lookup; a custom asset goes straight to
+    // its form (AST-040).
+    const customKind = await $("#add-asset-kind-Custom");
+    await customKind.waitForDisplayed({ timeout: 8000 });
+    await customKind.click();
 
     const form = await $("form#add-asset-form");
     await form.waitForExist({ timeout: 8000 });

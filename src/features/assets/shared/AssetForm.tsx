@@ -1,11 +1,14 @@
 import { useTranslation } from "react-i18next";
-import type { AssetCategory, AssetClass, Exchange } from "@/bindings";
+import type { AssetCategory, AssetClass, AssetKind, Exchange } from "@/bindings";
 import { SelectField } from "@/ui/components/field/SelectField";
 import { TextField } from "@/ui/components/field/TextField";
-import { ADDABLE_ASSET_CLASSES, RISK_LEVELS } from "./creationDefaults";
+import { kindFormOf, RISK_LEVELS } from "./creationDefaults";
 import { ExchangePicker } from "./ExchangePicker";
+import { KindPicker } from "./KindPicker";
+import { currencyLabelKey, formatAssetClass, referenceLabelKey } from "./presenter";
 
 interface AssetFormData {
+  kind: AssetKind;
   name: string;
   reference: string;
   isin: string;
@@ -21,32 +24,40 @@ interface AssetFormData {
 interface AssetFormProps {
   formData: AssetFormData;
   handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  onKindChange: (kind: AssetKind) => void;
   onClassChange?: (assetClass: AssetClass) => void;
   onExchangeChange: (exchange: Exchange | null) => void;
   categories: AssetCategory[];
-  duplicateWarning?: boolean;
+  /** AST-038 — the reference shown was proposed from the name and not yet typed over. */
+  referenceProposed?: boolean;
   idPrefix?: string;
 }
 
+/**
+ * AST-040 — the fields of an asset, for the kind chosen: which ones show, and the classes
+ * offered, are read from the core's description of that kind's form (AST-037).
+ */
 export function AssetForm({
   formData,
   handleChange,
+  onKindChange,
   onClassChange,
   onExchangeChange,
   categories,
-  duplicateWarning = false,
+  referenceProposed = false,
   idPrefix = "asset",
 }: AssetFormProps) {
   const { t } = useTranslation();
+  const kindForm = kindFormOf(formData.kind);
 
   const categoryOptions = categories.map((cat) => ({
     label: cat.name,
     value: cat.id,
   }));
 
-  const classOptions = ADDABLE_ASSET_CLASSES.map((c) => ({
-    label: c,
-    value: c,
+  const classOptions = (kindForm?.classes ?? []).map((entry) => ({
+    label: formatAssetClass(entry.class, t),
+    value: entry.class,
   }));
 
   const handleClassSelect = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -56,102 +67,151 @@ export function AssetForm({
     }
   };
 
-  return (
-    <div className="space-y-6">
+  const nameField = (
+    <TextField
+      label={t("asset.form_name_label")}
+      id={`${idPrefix}-name`}
+      name="name"
+      required
+      placeholder={t("asset.form_name_placeholder")}
+      value={formData.name}
+      onChange={handleChange}
+    />
+  );
+
+  const referenceField = (
+    <div className="flex flex-col gap-1">
       <TextField
-        label={t("asset.form_name_label")}
-        id={`${idPrefix}-name`}
-        name="name"
+        label={t(referenceLabelKey(formData.kind))}
+        id={`${idPrefix}-reference`}
+        name="reference"
         required
-        placeholder={t("asset.form_name_placeholder")}
-        value={formData.name}
+        className="uppercase"
+        value={formData.reference}
         onChange={handleChange}
+        aria-describedby={referenceProposed ? `${idPrefix}-reference-proposed` : undefined}
       />
+      {referenceProposed && (
+        <p
+          id={`${idPrefix}-reference-proposed`}
+          className="text-xs text-m3-on-surface-variant ml-1"
+        >
+          {t("asset.form_reference_proposed")}
+        </p>
+      )}
+    </div>
+  );
+
+  const currencyField = (
+    <TextField
+      label={t(currencyLabelKey(formData.kind))}
+      id={`${idPrefix}-currency`}
+      name="currency"
+      required
+      className="uppercase"
+      placeholder={t("asset.form_currency_placeholder")}
+      value={formData.currency}
+      onChange={handleChange}
+    />
+  );
+
+  const categoryField = (
+    <SelectField
+      label={t("asset.form_category_label")}
+      id={`${idPrefix}-category`}
+      name="category_id"
+      value={formData.category_id}
+      onChange={handleChange}
+      options={categoryOptions}
+    />
+  );
+
+  return (
+    <div className="flex flex-col gap-6">
+      <KindPicker value={formData.kind} onChange={onKindChange} idPrefix={idPrefix} />
+
+      {kindForm?.has_isin ? (
+        <>
+          {nameField}
+          <div className="grid grid-cols-2 gap-4">
+            <TextField
+              label={t("asset.form_isin_label")}
+              id={`${idPrefix}-isin`}
+              name="isin"
+              required
+              className="uppercase"
+              placeholder={t("asset.form_isin_placeholder")}
+              value={formData.isin}
+              onChange={handleChange}
+            />
+            {currencyField}
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2">
+              <ExchangePicker
+                value={formData.exchange}
+                onChange={onExchangeChange}
+                idPrefix={idPrefix}
+              />
+            </div>
+            {referenceField}
+          </div>
+        </>
+      ) : kindForm?.proposes_reference ? (
+        <>
+          {nameField}
+          <div className="grid grid-cols-2 gap-4">
+            {referenceField}
+            {currencyField}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-4">
+            {referenceField}
+            {currencyField}
+          </div>
+          {nameField}
+        </>
+      )}
+
+      {kindForm?.may_bear_interest && (
+        <label
+          htmlFor={`${idPrefix}-interest-bearing`}
+          className="flex items-center gap-3 cursor-pointer group"
+        >
+          <input
+            type="checkbox"
+            id={`${idPrefix}-interest-bearing`}
+            name="interest_bearing"
+            checked={formData.interest_bearing}
+            onChange={handleChange}
+            className="accent-m3-primary w-4 h-4"
+          />
+          <span className="text-sm text-m3-on-surface group-hover:text-m3-primary transition-colors">
+            {t("asset.form_interest_bearing_label")}
+          </span>
+        </label>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <TextField
-            label={t("asset.form_reference_label")}
-            id={`${idPrefix}-reference`}
-            name="reference"
-            required
-            placeholder={t("asset.form_reference_placeholder")}
-            value={formData.reference}
-            onChange={handleChange}
-            aria-describedby={duplicateWarning ? `${idPrefix}-reference-warning` : undefined}
+        {classOptions.length > 1 && (
+          <SelectField
+            label={t("asset.form_class_label")}
+            id={`${idPrefix}-class`}
+            name="class"
+            value={formData.class}
+            onChange={handleClassSelect}
+            options={classOptions}
           />
-          {duplicateWarning && (
-            <p
-              id={`${idPrefix}-reference-warning`}
-              role="alert"
-              className="text-xs text-m3-tertiary bg-m3-tertiary-container/40 rounded-lg px-3 py-2"
-            >
-              {t("asset.warning_duplicate_reference")}
-            </p>
-          )}
-        </div>
-        <TextField
-          label={t("asset.form_currency_label")}
-          id={`${idPrefix}-currency`}
-          name="currency"
-          required
-          className="uppercase"
-          placeholder={t("asset.form_currency_placeholder")}
-          value={formData.currency}
-          onChange={handleChange}
-        />
+        )}
+        {categoryField}
       </div>
-
-      <TextField
-        label={t("asset.form_isin_label")}
-        id={`${idPrefix}-isin`}
-        name="isin"
-        className="uppercase"
-        placeholder={t("asset.form_isin_placeholder")}
-        value={formData.isin}
-        onChange={handleChange}
-      />
-
-      <SelectField
-        label={t("asset.form_category_label")}
-        id={`${idPrefix}-category`}
-        name="category_id"
-        value={formData.category_id}
-        onChange={handleChange}
-        options={categoryOptions}
-      />
-
-      <SelectField
-        label={t("asset.form_class_label")}
-        id={`${idPrefix}-class`}
-        name="class"
-        value={formData.class}
-        onChange={handleClassSelect}
-        options={classOptions}
-      />
-
-      <ExchangePicker value={formData.exchange} onChange={onExchangeChange} idPrefix={idPrefix} />
-
-      {/* AST-024 — Interest-credit eligibility flag */}
-      <label className="flex items-center gap-3 cursor-pointer group">
-        <input
-          type="checkbox"
-          id={`${idPrefix}-interest-bearing`}
-          name="interest_bearing"
-          checked={formData.interest_bearing}
-          onChange={handleChange}
-          className="accent-m3-primary w-4 h-4"
-        />
-        <span className="text-sm text-m3-on-surface group-hover:text-m3-primary transition-colors">
-          {t("asset.form_interest_bearing_label")}
-        </span>
-      </label>
 
       <fieldset className="flex flex-col gap-1.5 border-none p-0 m-0">
         <legend className="m3-input-label">{t("asset.form_risk_label")}</legend>
         <div
           role="radiogroup"
-          aria-labelledby={`${idPrefix}-risk-label`}
           className="flex p-1 bg-m3-surface-variant rounded-2xl gap-1 overflow-hidden"
         >
           {RISK_LEVELS.map((level) => {
@@ -160,6 +220,7 @@ export function AssetForm({
             return (
               <label
                 key={level}
+                id={`${idPrefix}-risk-${level}`}
                 className={`
                   relative flex-1 flex items-center justify-center py-2 rounded-xl
                   text-sm font-bold cursor-pointer transition-all duration-200

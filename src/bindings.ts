@@ -66,6 +66,24 @@ async getAssetsToSettle() : Promise<Result<AssetToSettle[], AssetError>> {
 }
 },
 /**
+ * The other listings of every listed asset whose instrument is held more than once
+ * (AST-039).
+ */
+async getOtherListings() : Promise<Result<AssetListings[], AssetError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_other_listings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The reference proposed for a custom asset from its name (AST-038).
+ */
+async proposeAssetReference(name: string) : Promise<string> {
+    return await TAURI_INVOKE("propose_asset_reference", { name });
+},
+/**
  * Updates an existing asset.
  */
 async updateAsset(dto: UpdateAssetDTO) : Promise<Result<Asset, AssetError>> {
@@ -1045,7 +1063,7 @@ event: "event"
 
 /** user-defined constants **/
 
-export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
+export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 
 /** user-defined types **/
@@ -1806,6 +1824,18 @@ export type AssetKind =
  * The application's own, one per currency.
  */
 "Cash"
+/**
+ * A listed asset and the other listings of its instrument (AST-039).
+ */
+export type AssetListings = { 
+/**
+ * The asset.
+ */
+asset_id: string; 
+/**
+ * The other listings of the same instrument, by exchange then currency.
+ */
+others: OtherListing[] }
 /**
  * Transient value object returned by the orchestrator's `search` method.
  * Mirrors the shape exposed at the Tauri boundary.
@@ -3443,6 +3473,26 @@ export type OpeningBalancePreview = {
  * TRX-065 — the total cost is 0: the form and the command line warn, never block.
  */
 zero_cost: boolean }
+/**
+ * Another asset that is a listing of the same instrument (AST-039).
+ */
+export type OtherListing = { 
+/**
+ * The other asset.
+ */
+asset_id: string; 
+/**
+ * Its reference there.
+ */
+reference: string; 
+/**
+ * Its exchange, when it has one.
+ */
+exchange: Exchange | null; 
+/**
+ * Its currency.
+ */
+currency: string }
 /**
  * Net-of-flows performance figures for one period (PRF-031, PRF-032).
  */

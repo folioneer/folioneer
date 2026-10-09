@@ -8,7 +8,7 @@ import { IconButton } from "@/ui/components/button/IconButton";
 import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { SortIcon } from "@/ui/components/SortIcon";
 import type { I18nMessage } from "@/ui/format/i18n";
-import { getRiskBadgeClasses } from "../shared/presenter";
+import { getRiskBadgeClasses, presentOtherListings } from "../shared/presenter";
 import { useAssets } from "../useAssets";
 import { useAssetTable } from "./useAssetTable";
 
@@ -28,11 +28,8 @@ export function AssetTable({ searchTerm, showArchived }: AssetTableProps) {
     logger.info("[AssetTable] mounted");
   }, []);
 
-  const { sortedAndFilteredAssets, sortConfig, handleSort, openEditAsset } = useAssetTable(
-    assets,
-    searchTerm,
-    showArchived,
-  );
+  const { sortedAndFilteredAssets, otherListings, sortConfig, handleSort, openEditAsset } =
+    useAssetTable(assets, searchTerm, showArchived);
 
   // Archive state
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
@@ -167,120 +164,145 @@ export function AssetTable({ searchTerm, showArchived }: AssetTableProps) {
               </td>
             </tr>
           ) : (
-            sortedAndFilteredAssets.map((asset) => (
-              <tr
-                key={asset.id}
-                id={`asset-row-${asset.id}`}
-                tabIndex={0}
-                aria-label={
-                  asset.is_archived ? undefined : t("asset.open_edit", { name: asset.name })
-                }
-                onClick={() => setSelectedAssetId(asset.id)}
-                onDoubleClick={() => {
-                  if (!asset.is_archived) openEditAsset(asset.id);
-                }}
-                onKeyDown={(e) => {
-                  // Enter/Space on an inner interactive element (action buttons)
-                  // bubbles up to the row — never treat it as a row action.
-                  if (e.defaultPrevented) return;
-                  if ((e.target as HTMLElement).closest("button, a, input, select, textarea")) {
-                    return;
-                  }
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (!asset.is_archived) openEditAsset(asset.id);
-                  } else if (e.key === " ") {
-                    e.preventDefault();
-                    setSelectedAssetId(asset.id);
-                  }
-                }}
-                className={`m3-tr ${selectedAssetId === asset.id ? "m3-tr-selected" : ""} ${
-                  asset.is_archived ? "opacity-50" : ""
-                }`}
-              >
-                <td className="m3-td font-medium text-m3-on-surface">{asset.name}</td>
-                <td className="m3-td font-mono text-m3-on-surface-variant">{asset.reference}</td>
-                <td className="m3-td">
-                  <span className="m3-chip-outline">{asset.class}</span>
-                </td>
-                <td className="m3-td text-m3-on-surface-variant">{asset.category.name}</td>
-                <td className="m3-td text-center text-m3-on-surface font-bold text-xs">
-                  {asset.currency}
-                </td>
-                <td className="m3-td text-center">
-                  <span
-                    className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-[11px] font-bold ${getRiskBadgeClasses(asset.risk_level)}`}
-                  >
-                    {asset.risk_level}
-                  </span>
-                </td>
-                <td className="m3-td">
-                  {asset.is_archived && (
-                    <span className="m3-chip-outline text-xs text-m3-on-surface-variant">
-                      {t("asset.badge_archived")}
-                    </span>
-                  )}
-                </td>
-                <td className="m3-td text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <IconButton
-                      icon={<ShoppingCart size={16} />}
-                      size="sm"
-                      aria-label={t("transaction.action_buy")}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate({
-                          to: "/transactions/new",
-                          search: {
-                            prefillAssetId: asset.id,
-                            prefillAccountId: undefined,
-                          },
-                        });
-                      }}
-                    />
-                    <IconButton
-                      icon={<Edit2 size={16} />}
-                      size="sm"
-                      id={`action-edit-asset-${asset.id}`}
-                      disabled={asset.is_archived}
-                      aria-label={t("asset.action_edit")}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditAsset(asset.id);
-                      }}
-                    />
-                    {asset.is_archived ? (
-                      <IconButton
-                        icon={<ArchiveRestore size={16} />}
-                        size="sm"
-                        id={`action-unarchive-asset-${asset.id}`}
-                        aria-label={t("asset.action_unarchive")}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAssetToUnarchive({
-                            id: asset.id,
-                            name: asset.name,
-                          });
-                          setIsUnarchiveDialogOpen(true);
-                        }}
-                      />
-                    ) : (
-                      <IconButton
-                        icon={<Archive size={16} />}
-                        size="sm"
-                        id={`action-archive-asset-${asset.id}`}
-                        aria-label={t("asset.action_archive")}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAssetToArchive({ id: asset.id, name: asset.name });
-                          setIsArchiveDialogOpen(true);
-                        }}
-                      />
+            sortedAndFilteredAssets.map((asset) => {
+              // CSH-015 — cash is the application's: its row shows it and offers no action.
+              const isCash = asset.kind === "Cash";
+              const canEdit = !asset.is_archived && !isCash;
+              const others = presentOtherListings(otherListings[asset.id] ?? []);
+              return (
+                <tr
+                  key={asset.id}
+                  id={`asset-row-${asset.id}`}
+                  tabIndex={0}
+                  aria-label={canEdit ? t("asset.open_edit", { name: asset.name }) : undefined}
+                  onClick={() => setSelectedAssetId(asset.id)}
+                  onDoubleClick={() => {
+                    if (canEdit) openEditAsset(asset.id);
+                  }}
+                  onKeyDown={(e) => {
+                    // Enter/Space on an inner interactive element (action buttons)
+                    // bubbles up to the row — never treat it as a row action.
+                    if (e.defaultPrevented) return;
+                    if ((e.target as HTMLElement).closest("button, a, input, select, textarea")) {
+                      return;
+                    }
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (canEdit) openEditAsset(asset.id);
+                    } else if (e.key === " ") {
+                      e.preventDefault();
+                      setSelectedAssetId(asset.id);
+                    }
+                  }}
+                  className={`m3-tr ${selectedAssetId === asset.id ? "m3-tr-selected" : ""} ${
+                    asset.is_archived ? "opacity-50" : ""
+                  }`}
+                >
+                  <td className="m3-td font-medium text-m3-on-surface">
+                    {asset.name}
+                    {others && (
+                      <div
+                        id={`asset-also-held-${asset.id}`}
+                        title={others.hint}
+                        className="text-xs font-normal text-m3-on-surface-variant whitespace-nowrap"
+                      >
+                        {t("asset.also_held_as", { listings: others.shown })}
+                      </div>
                     )}
-                  </div>
-                </td>
-              </tr>
-            ))
+                  </td>
+                  <td className="m3-td font-mono text-m3-on-surface-variant">{asset.reference}</td>
+                  <td className="m3-td">
+                    <span className="m3-chip-outline">{asset.class}</span>
+                  </td>
+                  <td className="m3-td text-m3-on-surface-variant">{asset.category.name}</td>
+                  <td className="m3-td text-center text-m3-on-surface font-bold text-xs">
+                    {asset.currency}
+                  </td>
+                  <td className="m3-td text-center">
+                    <span
+                      className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-[11px] font-bold ${getRiskBadgeClasses(asset.risk_level)}`}
+                    >
+                      {asset.risk_level}
+                    </span>
+                  </td>
+                  <td className="m3-td">
+                    {asset.is_archived && (
+                      <span className="m3-chip-outline text-xs text-m3-on-surface-variant">
+                        {t("asset.badge_archived")}
+                      </span>
+                    )}
+                    {isCash && (
+                      <span
+                        id={`asset-managed-${asset.id}`}
+                        className="m3-chip-outline text-xs text-m3-on-surface-variant"
+                      >
+                        {t("asset.badge_managed")}
+                      </span>
+                    )}
+                  </td>
+                  <td className="m3-td text-right">
+                    {!isCash && (
+                      <div className="flex items-center justify-end gap-1">
+                        <IconButton
+                          icon={<ShoppingCart size={16} />}
+                          size="sm"
+                          aria-label={t("transaction.action_buy")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate({
+                              to: "/transactions/new",
+                              search: {
+                                prefillAssetId: asset.id,
+                                prefillAccountId: undefined,
+                              },
+                            });
+                          }}
+                        />
+                        <IconButton
+                          icon={<Edit2 size={16} />}
+                          size="sm"
+                          id={`action-edit-asset-${asset.id}`}
+                          disabled={asset.is_archived}
+                          aria-label={t("asset.action_edit")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditAsset(asset.id);
+                          }}
+                        />
+                        {asset.is_archived ? (
+                          <IconButton
+                            icon={<ArchiveRestore size={16} />}
+                            size="sm"
+                            id={`action-unarchive-asset-${asset.id}`}
+                            aria-label={t("asset.action_unarchive")}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAssetToUnarchive({
+                                id: asset.id,
+                                name: asset.name,
+                              });
+                              setIsUnarchiveDialogOpen(true);
+                            }}
+                          />
+                        ) : (
+                          <IconButton
+                            icon={<Archive size={16} />}
+                            size="sm"
+                            id={`action-archive-asset-${asset.id}`}
+                            aria-label={t("asset.action_archive")}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAssetToArchive({ id: asset.id, name: asset.name });
+                              setIsArchiveDialogOpen(true);
+                            }}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>

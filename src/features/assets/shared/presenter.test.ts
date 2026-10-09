@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { assetMutationErrorToI18n, formatAssetClass, getRiskBadgeClasses } from "./presenter";
+import type { Asset, AssetKind } from "@/bindings";
+import {
+  assetKindLabelKey,
+  assetKindSaysKey,
+  assetMutationErrorToI18n,
+  currencyLabelKey,
+  formatAssetClass,
+  getRiskBadgeClasses,
+  presentOtherListings,
+  referenceLabelKey,
+} from "./presenter";
 
 describe("getRiskBadgeClasses", () => {
   // R11 — 5 distinct colours for risk levels 1–5
@@ -89,6 +99,26 @@ describe("assetMutationErrorToI18n", () => {
     ).toEqual({ key: "error.AssetAlreadyExists", vars: { existing_name: "ASML Holding" } });
   });
 
+  // AST-041 — when the existing asset is known, the refusal says what tells it apart.
+  it("AssetAlreadyExists adds the reference, exchange and currency of a known asset", () => {
+    const existing = {
+      id: "a1",
+      name: "ASML Holding",
+      reference: "ASML",
+      exchange: { code: "XAMS", label: "Euronext Amsterdam" },
+      currency: "EUR",
+    } as Asset;
+    expect(
+      assetMutationErrorToI18n(
+        { code: "AssetAlreadyExists", existing_id: "a1", existing_name: "ASML Holding" },
+        [existing],
+      ),
+    ).toEqual({
+      key: "error.AssetAlreadyExists",
+      vars: { existing_name: "ASML Holding (ASML · Euronext Amsterdam · EUR)" },
+    });
+  });
+
   // AST-031 — what a kind forbids has its own message, never the unknown one.
   it("maps what a kind forbids to its own message", () => {
     expect(assetMutationErrorToI18n({ code: "IsinRequired" })).toEqual({
@@ -154,6 +184,44 @@ describe("assetMutationErrorToI18n", () => {
   it("an unreachable BC-wide code falls back to error.Unknown", () => {
     expect(assetMutationErrorToI18n({ code: "Oversell", available: 1, requested: 2 })).toEqual({
       key: "error.Unknown",
+    });
+  });
+});
+
+describe("kinds and listings", () => {
+  // AST-040 — every kind has a name, a line saying what it means, and a label for its
+  // reference and its currency.
+  it("gives every kind its own keys", () => {
+    const kinds: AssetKind[] = ["Listed", "Crypto", "Custom", "Cash"];
+    expect(new Set(kinds.map(assetKindLabelKey)).size).toBe(4);
+    expect(new Set(kinds.map(assetKindSaysKey)).size).toBe(4);
+    expect(referenceLabelKey("Listed")).toBe("asset.form_reference_label_listed");
+    expect(referenceLabelKey("Crypto")).toBe("asset.form_reference_label_crypto");
+    expect(referenceLabelKey("Custom")).toBe("asset.form_reference_label");
+    expect(referenceLabelKey("Cash")).toBe("asset.form_reference_label");
+    expect(currencyLabelKey("Crypto")).toBe("asset.form_currency_label_crypto");
+    expect(currencyLabelKey("Listed")).toBe("asset.form_currency_label");
+  });
+
+  // AST-039 — one other listing shows in full; several show the first and an ellipsis,
+  // the whole list being the hint; none shows nothing.
+  it("presents the other listings of an instrument", () => {
+    const nasdaq = {
+      asset_id: "n",
+      reference: "ASML",
+      exchange: { code: "XNAS", label: "Nasdaq" },
+      currency: "USD",
+    };
+    const otc = { asset_id: "o", reference: "ASMLF", exchange: null, currency: "USD" };
+
+    expect(presentOtherListings([])).toBeNull();
+    expect(presentOtherListings([nasdaq])).toEqual({
+      shown: "ASML · Nasdaq · USD",
+      hint: "ASML · Nasdaq · USD",
+    });
+    expect(presentOtherListings([nasdaq, otc])).toEqual({
+      shown: "ASML · Nasdaq · USD, …",
+      hint: "ASML · Nasdaq · USD\nASMLF · USD",
     });
   });
 });

@@ -34,6 +34,25 @@ describe("useWebLookupModal", () => {
     mockLookupAsset.mockReset();
   });
 
+  // WEB-041 — a crypto result found from the listed kind opens on the crypto kind, and the
+  // way back returns to the search of the listed kind.
+  it("opens a result on the kind that offers its class", () => {
+    const { result } = renderHook(() => useWebLookupModal());
+
+    act(() => result.current.selectResult({ ...appleResult, asset_class: "DigitalAsset" }));
+    expect(result.current.kind).toBe("Crypto");
+    expect(result.current.modalStep.step).toBe("form-prefilled");
+
+    act(() => result.current.back());
+    expect(result.current.kind).toBe("Listed");
+    expect(result.current.modalStep.step).toBe("search");
+
+    act(() => result.current.selectResult(appleResult));
+    expect(result.current.kind).toBe("Listed");
+    act(() => result.current.selectResult({ ...appleResult, asset_class: null }));
+    expect(result.current.kind).toBe("Listed");
+  });
+
   // Initial state
   it("starts in the search step", () => {
     const { result } = renderHook(() => useWebLookupModal());
@@ -120,6 +139,32 @@ describe("useWebLookupModal", () => {
 
     expect(result.current.modalStep.step).toBe("form-manual");
     expect(result.current.canGoBack).toBe(false);
+  });
+
+  // AST-040 — the dialog opens on the kind the core preselects, whose form starts from the
+  // lookup; a kind without a lookup goes straight to its form, and coming back to a kind
+  // with one returns to the search.
+  it("opens on the search for a listed asset and on the form for the other kinds", () => {
+    const { result } = renderHook(() => useWebLookupModal());
+    expect(result.current.kind).toBe("Listed");
+    expect(result.current.modalStep.step).toBe("search");
+
+    act(() => {
+      result.current.selectKind("Custom");
+    });
+    expect(result.current.kind).toBe("Custom");
+    expect(result.current.modalStep.step).toBe("form-manual");
+    expect(result.current.canGoBack).toBe(false);
+
+    act(() => {
+      result.current.selectKind("Crypto");
+    });
+    expect(result.current.modalStep.step).toBe("form-manual");
+
+    act(() => {
+      result.current.selectKind("Listed");
+    });
+    expect(result.current.modalStep.step).toBe("search");
   });
 
   // WEB-047 — back IS available from form-prefilled

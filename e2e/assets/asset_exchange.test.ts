@@ -59,7 +59,7 @@ describe("asset_exchange", () => {
     await fab.click();
 
     // WebLookupModal opens first — skip to the manual form.
-    const fillManually = await $('button[aria-label="Fill manually"]');
+    const fillManually = await $("#web-lookup-fill-manually");
     await fillManually.waitForDisplayed({ timeout: 8000 });
     await fillManually.click();
 

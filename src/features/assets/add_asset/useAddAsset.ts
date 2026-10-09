@@ -1,64 +1,112 @@
-import { useMemo, useState } from "react";
-import type { AssetClass, AssetLookupResult, Exchange } from "@/bindings";
+import { useEffect, useState } from "react";
+import type { AssetClass, AssetKind, AssetLookupResult, Exchange } from "@/bindings";
+import { logger } from "@/lib/logger";
 import { useAppStore } from "@/lib/store";
 import type { I18nMessage } from "@/ui/format/i18n";
+import { assetGateway } from "../gateway";
 import {
-  DEFAULT_ASSET_CLASS,
+  classForKind,
   DEFAULT_CATEGORY_ID,
   defaultRiskOf,
+  kindFormOf,
 } from "../shared/creationDefaults";
-import { hasDuplicateReference } from "../shared/validateAsset";
 import { useAssets } from "../useAssets";
 
 interface UseAddAssetProps {
+  /** AST-040 — the kind chosen, held by whoever shows the form. */
+  kind: AssetKind;
   onSubmitSuccess?: (assetId: string) => void;
   prefill?: AssetLookupResult;
 }
 
-export function useAddAsset({ onSubmitSuccess, prefill }: UseAddAssetProps = {}) {
-  const { addAsset, assets } = useAssets();
-  const categories = useAppStore((s) => s.categories);
+interface AddAssetFields {
+  name: string;
+  reference: string;
+  isin: string;
+  class: AssetClass;
+  currency: string;
+  risk_level: number;
+  category_id: string;
+  exchange: Exchange | null;
+  interest_bearing: boolean;
+}
 
-  // CSH-015 — the class, risk level and category a new asset starts from are the core's
-  // (`creationDefaults`); `Cash` is the application's alone and never offered.
-  const [formData, setFormData] = useState<{
-    name: string;
-    reference: string;
-    isin: string;
-    class: AssetClass;
-    currency: string;
-    risk_level: number;
-    category_id: string;
-    exchange: Exchange | null;
-    interest_bearing: boolean;
-  }>({
+function emptyFields(kind: AssetKind, prefill?: AssetLookupResult): AddAssetFields {
+  const assetClass = classForKind(kind, prefill?.asset_class);
+  return {
     name: prefill?.name ?? "",
     reference: prefill?.reference ?? "",
     isin: prefill?.isin ?? "",
-    class: (prefill?.asset_class ?? DEFAULT_ASSET_CLASS) as AssetClass,
+    class: assetClass,
     currency: prefill?.currency ?? "EUR",
-    risk_level: defaultRiskOf((prefill?.asset_class ?? DEFAULT_ASSET_CLASS) as AssetClass),
+    risk_level: defaultRiskOf(assetClass),
     category_id: DEFAULT_CATEGORY_ID,
     exchange: prefill?.exchange ?? null,
     interest_bearing: false,
-  });
+  };
+}
+
+/**
+ * The state of the "New asset" form. What the form of each kind asks for is the core's
+ * (AST-037): this hook holds what the user typed and sends only the fields the kind has.
+ */
+export function useAddAsset({ kind, onSubmitSuccess, prefill }: UseAddAssetProps) {
+  const { addAsset } = useAssets();
+  const categories = useAppStore((s) => s.categories);
+  const kindForm = kindFormOf(kind);
+
+  const [fields, setFields] = useState<AddAssetFields>(() => emptyFields(kind, prefill));
+  const [referenceTyped, setReferenceTyped] = useState(!!prefill?.reference);
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Duplicate reference warning — R9 (includes archived assets)
-  const duplicateWarning = useMemo(
-    () => hasDuplicateReference(formData.reference, assets),
-    [formData.reference, assets],
-  );
+  // AST-037 — a kind offers its own classes: a class the new kind does not offer gives way
+  // to the kind's preselected one, with that class's risk level (R10). AST-038 — a
+  // reference that was only proposed does not follow the asset to a kind that proposes none.
+  useEffect(() => {
+    const proposes = !!kindFormOf(kind)?.proposes_reference;
+    setFields((prev) => {
+      const assetClass = classForKind(kind, prev.class);
+      const reference = proposes || referenceTyped ? prev.reference : "";
+      return assetClass === prev.class && reference === prev.reference
+        ? prev
+        : {
+            ...prev,
+            reference,
+            class: assetClass,
+            risk_level: assetClass === prev.class ? prev.risk_level : defaultRiskOf(assetClass),
+          };
+    });
+    setError(null);
+  }, [kind, referenceTyped]);
+
+  // AST-038 — until the user types a reference, a custom asset's is proposed from its name
+  // by the core.
+  const proposesReference = !!kindForm?.proposes_reference && !referenceTyped;
+  const { name } = fields;
+  useEffect(() => {
+    if (!proposesReference) return;
+    let isCurrent = true;
+    assetGateway
+      .proposeAssetReference(name)
+      .then((reference) => {
+        if (isCurrent) setFields((prev) => ({ ...prev, reference }));
+      })
+      .catch((e) => logger.error("[useAddAsset] no reference proposed", { error: e }));
+    return () => {
+      isCurrent = false;
+    };
+  }, [proposesReference, name]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    setFormData((prev) => ({
+    const { name: field, value, type } = e.target;
+    if (field === "reference") setReferenceTyped(true);
+    setFields((prev) => ({
       ...prev,
-      [name]:
+      [field]:
         type === "checkbox" && "checked" in e.target
           ? e.target.checked
-          : name === "risk_level"
+          : field === "risk_level"
             ? parseInt(value, 10)
             : value,
     }));
@@ -66,7 +114,7 @@ export function useAddAsset({ onSubmitSuccess, prefill }: UseAddAssetProps = {})
 
   // Auto-fill risk_level when class changes — R10 (creation only)
   const handleClassChange = (assetClass: AssetClass) => {
-    setFormData((prev) => ({
+    setFields((prev) => ({
       ...prev,
       class: assetClass,
       risk_level: defaultRiskOf(assetClass),
@@ -75,7 +123,7 @@ export function useAddAsset({ onSubmitSuccess, prefill }: UseAddAssetProps = {})
 
   // AST-021 — exchange picker change handler
   const handleExchangeChange = (exchange: Exchange | null) => {
-    setFormData((prev) => ({ ...prev, exchange }));
+    setFields((prev) => ({ ...prev, exchange }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -84,16 +132,16 @@ export function useAddAsset({ onSubmitSuccess, prefill }: UseAddAssetProps = {})
     setIsSubmitting(true);
 
     const result = await addAsset({
-      kind: null,
-      name: formData.name,
-      reference: formData.reference,
-      isin: formData.isin.trim() ? formData.isin.trim() : null,
-      class: formData.class,
-      currency: formData.currency,
-      risk_level: formData.risk_level,
-      category_id: formData.category_id || DEFAULT_CATEGORY_ID,
-      exchange: formData.exchange,
-      interest_bearing: formData.interest_bearing,
+      kind,
+      name: fields.name,
+      reference: fields.reference,
+      isin: kindForm?.has_isin && fields.isin.trim() ? fields.isin.trim() : null,
+      class: fields.class,
+      currency: fields.currency,
+      risk_level: fields.risk_level,
+      category_id: fields.category_id || DEFAULT_CATEGORY_ID,
+      exchange: kindForm?.has_exchange ? fields.exchange : null,
+      interest_bearing: !!kindForm?.may_bear_interest && fields.interest_bearing,
     });
 
     setIsSubmitting(false);
@@ -107,24 +155,15 @@ export function useAddAsset({ onSubmitSuccess, prefill }: UseAddAssetProps = {})
       onSubmitSuccess(result.data.id);
     }
 
-    setFormData({
-      name: "",
-      reference: "",
-      isin: "",
-      class: DEFAULT_ASSET_CLASS,
-      currency: "EUR",
-      risk_level: defaultRiskOf(DEFAULT_ASSET_CLASS),
-      category_id: DEFAULT_CATEGORY_ID,
-      exchange: null,
-      interest_bearing: false,
-    });
+    setFields(emptyFields(kind));
+    setReferenceTyped(false);
   };
 
   return {
-    formData,
+    formData: { ...fields, kind },
+    referenceProposed: proposesReference && fields.reference !== "",
     error,
     isSubmitting,
-    duplicateWarning,
     handleChange,
     handleClassChange,
     handleExchangeChange,

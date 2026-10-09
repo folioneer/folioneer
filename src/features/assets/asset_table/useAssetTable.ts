@@ -1,7 +1,11 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import type { Asset } from "@/bindings";
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { Asset, OtherListing } from "@/bindings";
+import { logger } from "@/lib/logger";
 import { patchModalSearch } from "@/lib/modalSearch";
+import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
+import { assetGateway } from "../gateway";
 
 export type SortConfig = {
   key: "name" | "reference" | "class" | "category" | "currency" | "risk_level";
@@ -10,10 +14,40 @@ export type SortConfig = {
 
 export function useAssetTable(assets: Asset[], searchTerm: string, showArchived: boolean) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const showSnackbar = useSnackbar();
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "name",
     direction: "asc",
   });
+
+  // AST-039 — the other listings of each listed asset's instrument, as the core reports
+  // them; read again whenever the assets change.
+  const [otherListings, setOtherListings] = useState<Record<string, OtherListing[]>>({});
+  useEffect(() => {
+    if (assets.length === 0) {
+      setOtherListings({});
+      return;
+    }
+    let isCurrent = true;
+    assetGateway
+      .getOtherListings()
+      .then((result) => {
+        if (!isCurrent) return;
+        if (result.status !== "ok") {
+          setOtherListings({});
+          showSnackbar(t(`error.${result.error.code}`), "error");
+          return;
+        }
+        setOtherListings(
+          Object.fromEntries(result.data.map((entry) => [entry.asset_id, entry.others])),
+        );
+      })
+      .catch((e) => logger.error("[useAssetTable] other listings not read", { error: e }));
+    return () => {
+      isCurrent = false;
+    };
+  }, [assets, showSnackbar, t]);
 
   const handleSort = (key: SortConfig["key"]) => {
     setSortConfig((prev) => ({
@@ -29,13 +63,8 @@ export function useAssetTable(assets: Asset[], searchTerm: string, showArchived:
   };
 
   const sortedAndFilteredAssets = useMemo(() => {
-    // CSH-015 — system Cash Assets are infrastructure, never shown in Asset Manager.
-    const nonCashAssets = assets.filter((a) => a.class !== "Cash");
-
     // R7/R19: filter by archive state first
-    const visibleAssets = showArchived
-      ? nonCashAssets
-      : nonCashAssets.filter((a) => !a.is_archived);
+    const visibleAssets = showArchived ? assets : assets.filter((a) => !a.is_archived);
 
     // R16: fuzzy search applies only to currently displayed assets
     const filtered = visibleAssets.filter(
@@ -71,6 +100,7 @@ export function useAssetTable(assets: Asset[], searchTerm: string, showArchived:
 
   return {
     sortedAndFilteredAssets,
+    otherListings,
     sortConfig,
     handleSort,
     openEditAsset,

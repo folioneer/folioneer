@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import type { Asset, AssetClass, Exchange } from "@/bindings";
+import { useEffect, useState } from "react";
+import type { Asset, AssetClass, AssetKind, Exchange } from "@/bindings";
 import { logger } from "@/lib/logger";
 import { useAppStore } from "@/lib/store";
 import type { I18nMessage } from "@/ui/format/i18n";
-import { hasDuplicateReference } from "../shared/validateAsset";
+import { classForKind, DEFAULT_ASSET_KIND, kindFormOf } from "../shared/creationDefaults";
 import { useAssets } from "../useAssets";
 
 interface UseEditAssetModalProps {
@@ -12,10 +12,11 @@ interface UseEditAssetModalProps {
 }
 
 export function useEditAssetModal({ asset, onClose }: UseEditAssetModalProps) {
-  const { updateAsset, assets } = useAssets();
+  const { updateAsset } = useAssets();
   const categories = useAppStore((s) => s.categories);
 
   const [formData, setFormData] = useState<{
+    kind: AssetKind;
     name: string;
     reference: string;
     isin: string;
@@ -26,6 +27,7 @@ export function useEditAssetModal({ asset, onClose }: UseEditAssetModalProps) {
     exchange: Exchange | null;
     interest_bearing: boolean;
   }>({
+    kind: DEFAULT_ASSET_KIND,
     name: "",
     reference: "",
     isin: "",
@@ -43,6 +45,7 @@ export function useEditAssetModal({ asset, onClose }: UseEditAssetModalProps) {
   useEffect(() => {
     if (asset) {
       setFormData({
+        kind: asset.kind,
         name: asset.name,
         reference: asset.reference,
         isin: asset.isin ?? "",
@@ -57,11 +60,11 @@ export function useEditAssetModal({ asset, onClose }: UseEditAssetModalProps) {
     }
   }, [asset]);
 
-  // Duplicate reference warning — R9 (excludes self, includes archived)
-  const duplicateWarning = useMemo(
-    () => hasDuplicateReference(formData.reference, assets, asset?.id),
-    [formData.reference, assets, asset?.id],
-  );
+  // AST-031 — an edit may change the kind, to settle an asset its kind's rules refuse; a
+  // class the new kind does not offer gives way to the kind's preselected one.
+  const handleKindChange = (kind: AssetKind) => {
+    setFormData((prev) => ({ ...prev, kind, class: classForKind(kind, prev.class) }));
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -92,18 +95,19 @@ export function useEditAssetModal({ asset, onClose }: UseEditAssetModalProps) {
 
     setError(null);
     setIsSubmitting(true);
+    const kindForm = kindFormOf(formData.kind);
     const result = await updateAsset({
-      kind: null,
+      kind: formData.kind,
       asset_id: asset.id,
       name: formData.name,
       reference: formData.reference,
-      isin: formData.isin.trim() ? formData.isin.trim() : null,
+      isin: kindForm?.has_isin && formData.isin.trim() ? formData.isin.trim() : null,
       class: formData.class,
       currency: formData.currency,
       risk_level: formData.risk_level,
       category_id: formData.category_id,
-      exchange: formData.exchange,
-      interest_bearing: formData.interest_bearing,
+      exchange: kindForm?.has_exchange ? formData.exchange : null,
+      interest_bearing: !!kindForm?.may_bear_interest && formData.interest_bearing,
     });
 
     setIsSubmitting(false);
@@ -123,8 +127,8 @@ export function useEditAssetModal({ asset, onClose }: UseEditAssetModalProps) {
     formData,
     error,
     isSubmitting,
-    duplicateWarning,
     handleChange,
+    handleKindChange,
     handleClassChange,
     handleExchangeChange,
     handleSubmit,

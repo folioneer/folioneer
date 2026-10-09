@@ -132,16 +132,16 @@ The Price column says where the price of an asset of that kind is expected to co
 
 **AST-007 (was R7) — Asset table (frontend)**: The table displays the following columns, in this order, sorted by Name ascending by default:
 
-| Column    | Content                                   | Sortable |
-| --------- | ----------------------------------------- | -------- |
-| Name      | `asset.name`                              | Yes      |
-| Reference | `asset.reference`                         | Yes      |
-| Class     | `asset.class`                             | Yes      |
-| Category  | `asset.category.name`                     | Yes      |
-| CCY       | `asset.currency`                          | Yes      |
-| Risk      | `asset.risk_level` — risk badge (AST-011) | Yes      |
-| Status    | "Archived" badge if `is_archived = true`  | No       |
-| Actions   | See AST-013, AST-019, AST-020             | No       |
+| Column    | Content                                                                                    | Sortable |
+| --------- | ------------------------------------------------------------------------------------------ | -------- |
+| Name      | `asset.name`, and under it the other listings of its instrument (AST-039)                  | Yes      |
+| Reference | `asset.reference`                                                                          | Yes      |
+| Class     | `asset.class`                                                                              | Yes      |
+| Category  | `asset.category.name`                                                                      | Yes      |
+| CCY       | `asset.currency`                                                                           | Yes      |
+| Risk      | `asset.risk_level` — risk badge (AST-011)                                                  | Yes      |
+| Status    | "Archived" badge if `is_archived = true`; "Managed by Folioneer" on a Cash Asset (CSH-015) | No       |
+| Actions   | See AST-013, AST-019, AST-020                                                              | No       |
 
 The table displays only active assets (`is_archived = false`) by default. A page header shows the title "Assets" and the total active asset count.
 
@@ -149,19 +149,19 @@ The table displays only active assets (`is_archived = false`) by default. A page
 
 **AST-017 (was R17) — Column sorting (frontend)**: Clicking a sortable column header sorts the list by that column ascending. A second click toggles to descending. Every primary sort breaks ties by name ascending as the secondary key — independent of the primary direction — so rows sharing a primary value stay in alphabetical (default) order.
 
-**AST-008 (was R8) — Creation via FAB (frontend)**: A floating FAB at the bottom right opens a creation modal. The form contains: Name (required), Reference (required — ticker / free-form identifier), ISIN (optional, see AST-023), ISO Currency (required), Category (select, pre-selected to `default-uncategorized`, see AST-002), Class (select, pre-selected to `Cash`), Risk level (1–5 selector, pre-filled per class, see AST-010). Submission is blocked if name, reference, or currency is missing, or if the ISIN field is filled with a value that fails the format validation (AST-023 / WEB-016). The `Exchange` picker is optional and defaults to (none) — see AST-021.
+**AST-008 (was R8) — Creation via FAB (frontend)**: A floating FAB at the bottom right opens the "New asset" dialog, which starts with the kind (AST-040). The form of the kind chosen contains the fields the core says that kind has (AST-037), among: Name (required), Reference (required — the ticker of a listed asset, the symbol of a crypto asset, the reference of a custom one, proposed from its name, AST-038), ISIN (a listed asset only, required), ISO Currency (required), Exchange (a listed asset only, optional — AST-021), Interest bearing (not for a crypto asset), Class (the classes of that kind; not shown when the kind has one class), Category (select, pre-selected to `default-uncategorized`, see AST-002), Risk level (1–5 selector, pre-filled per class, see AST-010). Submission is blocked if name, reference, or currency is missing; every other refusal is the core's, shown beside the actions (AST-014).
 
-**AST-009 (was R9) — Reference duplicate warning (frontend)**: When creating or modifying an asset, if the entered reference matches (case-insensitive) the reference of an existing asset — active or archived — regardless of class, a non-blocking warning is shown in the form. It warns about a shared reference only: one ticker may designate listings on several exchanges or in several currencies. Saving the same asset twice is refused by the core (AST-032), whatever the warning showed.
+**AST-009 (was R9) — Reference duplicate warning (frontend)**: _Retired._ The form no longer warns about a shared reference: saving the same asset twice is refused by the core, naming the existing asset (AST-032, AST-040), and a reference two listings share is expected.
 
-**AST-010 (was R10) — Risk level suggestion at creation (frontend)**: At creation only, when the user selects a class, the `risk_level` field is automatically pre-filled with the `default_risk` of that class (AST-003), then editable manually.
+**AST-010 (was R10) — Risk level suggestion at creation (frontend)**: At creation only, the `risk_level` field is pre-filled with the `default_risk` (AST-003) of the class shown — the one the kind preselects, then each one the user selects — and stays editable manually.
 
 **AST-011 (was R11) — Risk badge in the table (frontend)**: The risk level is displayed in the table as a colored badge, one color per level: light green (1), green (2), orange (3), light red (4), red (5).
 
-**AST-012 (was R12) — Asset modification (frontend)**: The Edit button opens a modal showing the same form as creation, pre-filled with the current asset values. The same validation rules apply (AST-008): submission is blocked if a required field is missing. The existing `risk_level` is shown as-is and is never automatically replaced when the class changes — the automatic suggestion (AST-010) does not apply in edit mode. After save, the modal closes and the table refreshes.
+**AST-012 (was R12) — Asset modification (frontend)**: The Edit button opens a modal showing the same form as creation, pre-filled with the current asset values. The same validation rules apply (AST-008): submission is blocked if name, reference, or currency is missing; every other refusal is the core's. The existing `risk_level` is shown as-is and is never automatically replaced when the class changes — the automatic suggestion (AST-010) does not apply in edit mode. After save, the modal closes and the table refreshes. The form opens on the asset's kind, on its fields and never on the lookup, and lets the user change the kind (AST-031), which is how an asset to settle is settled (AST-035). What the kind chosen does not have is saved empty: no ISIN, no exchange, not bearing interest. No reference is proposed (AST-038).
 
 **AST-013 (was R13) — Asset archival (frontend)**: The Archive button opens a confirmation dialog stating that the asset will be removed from active lists and will no longer receive new prices, but that all historical data is preserved. Confirmation triggers archival (AST-006).
 
-**AST-014 (was R14) — Backend errors (frontend)**: The modal stays open during the backend call and only closes on success. Any failure displays an inline error message in the active modal or dialog.
+**AST-014 (was R14) — Backend errors (frontend)**: The modal stays open during the backend call and only closes on success. Any failure displays an inline error message in the active modal or dialog. In the asset dialogs the message sits beside the actions, always in view.
 
 **AST-015 (was R15) — Load error state (frontend)**: If the initial list load fails, the table displays an error message with a Retry button.
 
@@ -169,13 +169,23 @@ The table displays only active assets (`is_archived = false`) by default. A page
 
 **AST-020 (was R20) — Unarchive from the table (frontend)**: The Unarchive button (visible only on archived rows when the AST-019 toggle is on) opens a confirmation dialog. Confirmation triggers unarchival (AST-018) and the asset reappears in the active list.
 
-**AST-021 — Optional exchange picker (frontend)**: The asset creation (AST-008) and edit (AST-012) forms expose an optional `Exchange` picker. The picker lists the canonical curated set (see Entity Definition). Selecting "(none)" submits `exchange = None`. The picker pre-fill behavior from the web-lookup path is defined in WEB-041.
+**AST-021 — Optional exchange picker (frontend)**: The asset creation (AST-008) and edit (AST-012) forms expose an optional `Exchange` picker for a listed asset. The picker lists the canonical curated set (see Entity Definition). Selecting "(none)" submits `exchange = None`. The picker pre-fill behavior from the web-lookup path is defined in WEB-041.
 
 **AST-022 — Exchange persistence (backend)**: The backend accepts the submitted `Exchange` value as-is and persists it without transformation. Editing an asset MAY set, change, or clear `exchange` on a listed asset (subject to AST-005, AST-001, AST-031 and AST-032); an asset of another kind has none.
 
 **AST-023 — Optional ISIN field (backend)**: An asset MAY carry an optional `isin: Option<String>`. When present, `isin` MUST satisfy the ISIN format validation defined in WEB-016 (12 characters, ASCII alphanumeric with letter prefix and digit suffix, Luhn-mod-10 check digit); the trimmed + uppercased form is the value persisted. When absent, the asset has no canonical ISO 6166 identity (typical for non-quoted assets or assets discovered via the keyword path of web lookup). The `isin` field is independent of `reference`: both may be populated for quoted assets discovered via the ISIN path. Whether an asset carries one follows its kind (AST-031): a listed asset always does, a crypto or a custom asset never; editing a listed asset MAY change its `isin` (subject to AST-005, AST-001 and AST-032).
 
 **AST-024 — Interest-bearing opt-in flag (backend)**: An asset carries an `interest_bearing: bool` flag, `false` by default. The flag is set at creation and freely editable afterwards (subject to AST-005), persisted as-is with no validation of its own. It marks the asset as an eligible target for Interest credits: the interest record path rejects a non-cash, non-`interest_bearing` target (INT-012), and the interest modal's asset selector only lists flagged non-cash holdings (INT-020). The account's Cash Asset is always interest-eligible regardless of this flag (INT-023); the flag has no effect on a Cash-class asset.
+
+**AST-037 — The core says what each kind's form asks for (backend)**: For each kind a user may create an asset of — listed, crypto, custom, in that order, never cash — the core states: the classes offered and the one preselected (listed: every class a user may pick but `DigitalAsset`, `Stocks` preselected; crypto: `DigitalAsset` alone; custom: the same classes as listed, `RealEstate` preselected), whether an asset of that kind has an ISIN, may be on an exchange, starts from the lookup (a listed asset does all three; the others none), has its reference proposed from its name (a custom asset), and may be marked as bearing interest (not a crypto asset). The kind preselected is listed. No interface decides any of it.
+
+**AST-038 — A custom asset's reference is proposed from its name (frontend + backend)**: At creation only, while the user has not typed a reference, the reference of a custom asset is the one the core proposes from its name: its letters and digits in capitals, a Latin letter without its accent, every run of anything else as one hyphen ("SCPI Pierval Santé" gives `SCPI-PIERVAL-SANTE`); a name with no letter or digit proposes nothing. The form says under the field that it was proposed and can be changed; once the user types in the field, nothing is proposed again. A reference that was only proposed is dropped when the kind changes to one that proposes none.
+
+**AST-039 — Other listings of the same instrument (frontend + backend)**: Two listed assets that share an ISIN are listings of one instrument (AST-032 makes them two assets). The core reports, for each of them, the other active listings, by exchange label then currency, a listing on no exchange first. The table shows them under the asset's name as "also held as" followed by reference, exchange and currency: one in full; several as the first followed by "…", the whole list being the hint of the line. No figure of the two assets is merged.
+
+**AST-040 — The kind comes first in the asset dialogs (frontend)**: "New asset" opens on the choice of kind — Listed, Crypto, Custom — with one line saying what the chosen kind means; the edit dialog carries the same choice (AST-012). At creation, a listed asset starts from the lookup (WEB-010), with a way to fill it in by hand and, once a result is chosen, a way back to the search (WEB-047); a crypto or a custom asset opens on its form. Changing the kind keeps what was typed, a reference that was only proposed apart (AST-038).
+
+**AST-041 — A refusal for the same asset names it (frontend)**: When the core refuses an asset because it already exists (AST-032), the message names the existing asset with its reference, its exchange when it has one, and its currency.
 
 ---
 
@@ -189,8 +199,9 @@ The table displays only active assets (`is_archived = false`) by default. A page
           ├─ [Click on header] → Ascending/descending sort (AST-017)
           │
           ├─ [FAB] → Creation modal
-          │            → Class selection → risk_level pre-filled (AST-010)
-          │            → Duplicate warning if reference exists (AST-009)
+          │            → Kind first: lookup for a listed asset, form otherwise (AST-040)
+          │            → Class preselected or selected → risk_level pre-filled (AST-010)
+          │            → The same asset twice is refused, naming the existing one (AST-032)
           │            → Submit → asset created → modal closed → table refreshed
           │
           ├─ [Edit] → Edit modal pre-filled → Modification → table refreshed
@@ -219,7 +230,7 @@ Full-width table page, sorted by Name ascending by default. Floating FAB at the 
 - **Empty**: "No assets. Create your first asset with the + button."
 - **Loading**: Loading indicator in the table
 - **Load error**: Error message + Retry button (AST-015)
-- **Duplicate warning**: Inline banner in the form, non-blocking (AST-009)
+- **Refusal**: beside the actions of the dialog, naming the existing asset when it is the same (AST-041)
 - **Archive confirmation**: Dialog explaining that the asset will be removed from active lists and that historical data is preserved (AST-013)
 - **Archived assets visible**: Visually distinct rows, Unarchive button instead of Archive, Edit button disabled (AST-019)
 - **Unarchive confirmation**: Confirmation dialog before reactivation (AST-020)
@@ -227,9 +238,9 @@ Full-width table page, sorted by Name ascending by default. Floating FAB at the 
 
 ### User flow — asset creation
 
-1. The user clicks the FAB → creation modal opens.
-2. They select a class → `risk_level` automatically pre-filled (AST-010).
-3. They fill in the other fields. If the reference already exists → non-blocking warning (AST-009).
+1. The user clicks the FAB → the "New asset" dialog opens on the kind (AST-040).
+2. They choose a kind; its class is preselected, and where the kind offers several they may select another → `risk_level` automatically pre-filled (AST-010).
+3. They fill in the other fields. An asset that already exists is refused on submit, naming it (AST-032).
 4. They submit → asset created → modal closed → table refreshed.
 
 ### User flow — asset archival
@@ -261,7 +272,8 @@ None — all questions have been resolved.
 
 ## Cross-amendments
 
-- **CFR-017** — a transaction or price recorded on another device against an asset archived here is applied as it is; AST-006's "can no longer be modified" binds user entry on a device, not merge (see `sync-conflict-resolution.md`).
+- **CFR-017** — a transaction or price recorded on another device against an asset archived here is applied as it is; AST-006's "can no longer be modified" binds what a user does to the asset and its prices on a device, not merge (see `sync-conflict-resolution.md`). Transactions on an archived asset have their own rules: a purchase is saved (TRX-028), an opening balance and a sale are refused (TRX-050, SEL-037).
 - **SYN-038** — the kind is a field of a synced record: it arrives with data format version 2 (see `multi-device-sync.md`); AST-036 says what a version 1 change becomes.
-- **WEB-041 / WEB-046** — a keyword lookup result pre-fills an exchange and no ISIN; saving it as it is is refused (AST-031): the user types the ISIN, or clears the exchange for a custom asset (see `asset-web-lookup.md`).
+- **WEB-041 / WEB-046** — a keyword lookup result pre-fills an exchange and no ISIN; saving it as it is is refused (AST-031): the user types the ISIN, or chooses the custom kind (see `asset-web-lookup.md`).
+- **CSH-015** — Cash Assets appear in the table as the application's (AST-040) (see `cash-tracking.md`).
 - **CLI-026** — `asset add` states no kind, so AST-034 decides it, and AST-031 and AST-032 refuse what the window refuses (see `command-line.md`).
