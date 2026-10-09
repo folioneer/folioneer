@@ -327,15 +327,6 @@ Remove an entry once it has been resolved.
 - User value: A fresh installation that only declared a currency pair either joins, or is told why it cannot, as the rules say.
 - Done when: the owner says whether a declared currency pair is user data; SYN-014 and the code agree, and a test holds the answer.
 
-## 2026-10-09 — TD-082 — The CI reviewers get the whole shell, narrowed by a list of refused commands
-
-- Found by: gh#79, checked against the workflow on 2026-10-09
-- Where: `.github/workflows/review.yml` — the `claude_args` of "Run the reviewer prompt" (`--allowedTools … "Bash"`, `--disallowedTools "Bash(gh *)" …`) and the comment above the step
-- Severity: 🟡
-- Observation: a reviewer session may run any command that is not on the refused list, and a refused list is open-ended: what nobody thought to name still runs. The commands the reviewers need are few — `bash scripts/branch.sh`, `bash scripts/review-path.sh`, the `git` read commands (`diff`, `log`, `show`, `status`), `grep`, `shellcheck`, `python3 -m unittest`. The list comes from the issue, not from a count: the first step is to read what each lane ran in the session logs of recent pull requests.
-- User value: None directly — a reviewer that needs another command fails visibly, and the list grows on purpose.
-- Done when: the reviewer step grants only named commands and the refused list is gone; every reviewer lane completes on a pull request that touches its files; gh#79 is closed.
-
 ## 2026-10-04 — TD-080 — The E2E tooling carries 22 known advisories
 
 - Found by: `/dep-audit` before the 0.6.0 release
