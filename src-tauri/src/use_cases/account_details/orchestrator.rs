@@ -1257,6 +1257,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "AAPL".to_string(),
                 reference: "AAPL".to_string(),
                 isin: None,
@@ -1310,6 +1311,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Bond".to_string(),
                 reference: "BOND".to_string(),
                 isin: None,
@@ -1370,6 +1372,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Archived Stock".to_string(),
                 reference: "ARCH".to_string(),
                 isin: None,
@@ -1459,6 +1462,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "A".to_string(),
                 reference: "A".to_string(),
                 isin: None,
@@ -1510,6 +1514,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Closed Co".to_string(),
                 reference: "CC".to_string(),
                 isin: None,
@@ -1566,6 +1571,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Meta Inc".to_string(),
                 reference: "META".to_string(),
                 isin: None,
@@ -1621,6 +1627,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Q".to_string(),
                 reference: "Q".to_string(),
                 isin: None,
@@ -1675,6 +1682,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Q".to_string(),
                 reference: "Q".to_string(),
                 isin: None,
@@ -1758,6 +1766,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "E".to_string(),
                 reference: "E".to_string(),
                 isin: None,
@@ -1812,6 +1821,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "G".to_string(),
                 reference: "G".to_string(),
                 isin: None,
@@ -1859,6 +1869,7 @@ mod tests {
         for (name, reference) in [("Zebra", "ZBR"), ("Alpha", "ALP"), ("Mango", "MNG")] {
             let asset = asset_svc
                 .create_asset(CreateAssetDTO {
+                    kind: None,
                     name: name.to_string(),
                     reference: reference.to_string(),
                     isin: None,
@@ -1921,6 +1932,7 @@ mod tests {
         // Active holding with partial sells (pnl = 10)
         let asset1 = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Active".to_string(),
                 reference: "ACT".to_string(),
                 isin: None,
@@ -1951,6 +1963,7 @@ mod tests {
         // Closed holding (pnl = 25)
         let asset2 = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Closed".to_string(),
                 reference: "CLO".to_string(),
                 isin: None,
@@ -2052,6 +2065,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "X".to_string(),
                 reference: "X".to_string(),
                 isin: None,
@@ -2106,6 +2120,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "X".to_string(),
                 reference: "X".to_string(),
                 isin: None,
@@ -2166,6 +2181,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "X".to_string(),
                 reference: "X".to_string(),
                 isin: None,
@@ -2227,6 +2243,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "X".to_string(),
                 reference: "X".to_string(),
                 isin: None,
@@ -2280,6 +2297,7 @@ mod tests {
     ) -> String {
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: name.to_string(),
                 reference: name.to_string(),
                 isin: None,
@@ -2433,6 +2451,7 @@ mod tests {
             .unwrap();
         let unpriced = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "NoPrice".to_string(),
                 reference: "NOP".to_string(),
                 isin: None,
@@ -2447,6 +2466,7 @@ mod tests {
             .unwrap();
         let foreign = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "NoRate".to_string(),
                 reference: "NOR".to_string(),
                 isin: None,
@@ -2551,6 +2571,7 @@ mod tests {
         for (name, reference) in [("Scheduled Fund", "SFD"), ("Plain Stock", "PLS")] {
             let asset = asset_svc
                 .create_asset(CreateAssetDTO {
+                    kind: None,
                     name: name.to_string(),
                     reference: reference.to_string(),
                     isin: None,
@@ -2916,6 +2937,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "X".to_string(),
                 reference: "X".to_string(),
                 isin: None,
@@ -2966,6 +2988,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "X".to_string(),
                 reference: "X".to_string(),
                 isin: None,
@@ -3025,6 +3048,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "X".to_string(),
                 reference: "X".to_string(),
                 isin: None,
@@ -3084,6 +3108,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "X".to_string(),
                 reference: "X".to_string(),
                 isin: None,
@@ -3171,6 +3196,7 @@ mod tests {
         // Holding 1: EUR asset, gain 20.00
         let asset1 = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "A1".to_string(),
                 reference: "A1".to_string(),
                 isin: None,
@@ -3205,6 +3231,7 @@ mod tests {
         // Holding 2: USD asset (mismatch) — should NOT contribute
         let asset2 = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "A2".to_string(),
                 reference: "A2".to_string(),
                 isin: None,
@@ -3270,6 +3297,7 @@ mod tests {
         ] {
             let asset = asset_svc
                 .create_asset(CreateAssetDTO {
+                    kind: None,
                     name: name.to_string(),
                     reference: reference.to_string(),
                     isin: None,
@@ -3337,6 +3365,7 @@ mod tests {
         // so it contributes 0 to the global value (CSH-094 no-fallback semantic).
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Bond".to_string(),
                 reference: "BOND".to_string(),
                 isin: None,
@@ -3492,6 +3521,7 @@ mod tests {
             .unwrap();
         let asset = real_asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "X".to_string(),
                 reference: "X".to_string(),
                 isin: None,
@@ -3538,6 +3568,7 @@ mod tests {
             .unwrap();
         let asset = real_asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "X".to_string(),
                 reference: "X".to_string(),
                 isin: None,
@@ -3751,6 +3782,7 @@ mod tests {
         // USD-denominated asset
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "US Stock".to_string(),
                 reference: "USX".to_string(),
                 isin: None,
@@ -3861,6 +3893,7 @@ mod tests {
 
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "US Stock".to_string(),
                 reference: "USX".to_string(),
                 isin: None,
@@ -3951,6 +3984,7 @@ mod tests {
 
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "EUR Bond".to_string(),
                 reference: "EURBND".to_string(),
                 isin: None,
@@ -4020,6 +4054,7 @@ mod tests {
     async fn make_stock(asset_svc: &AssetService, name: &str, currency: &str) -> String {
         asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: name.to_string(),
                 reference: name.to_string(),
                 isin: None,
@@ -4848,6 +4883,7 @@ mod tests {
             .unwrap();
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "No Fee Stock".to_string(),
                 reference: "NFS".to_string(),
                 isin: None,
@@ -4945,6 +4981,7 @@ mod tests {
         let account = enable_management_fees(&account_svc, &account).await;
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Fee Stock".to_string(),
                 reference: "FEES".to_string(),
                 isin: None,
@@ -5042,6 +5079,7 @@ mod tests {
         // USD-denominated asset (currency differs from the account currency).
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "US Fee Stock".to_string(),
                 reference: "USFEE".to_string(),
                 isin: None,
@@ -5133,6 +5171,7 @@ mod tests {
         let account = enable_management_fees(&account_svc, &account).await;
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "No Price Stock".to_string(),
                 reference: "NOPX".to_string(),
                 isin: None,
@@ -5225,6 +5264,7 @@ mod tests {
         let account = enable_management_fees(&account_svc, &account).await;
         let asset = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "As-Of Fee Stock".to_string(),
                 reference: "AOFEE".to_string(),
                 isin: None,

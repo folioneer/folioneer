@@ -14,6 +14,7 @@ const makeAsset = (id: string, reference: string, is_archived = false): Asset =>
   is_archived,
   price_refresh_blocked: false,
   interest_bearing: false,
+  kind: "Custom",
   exchange: null,
 });
 

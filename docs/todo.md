@@ -141,7 +141,10 @@ Existing assets take a kind from what they carry: the Cash class is cash, the di
 **User value:** A user knows what to type to create an asset and what makes two assets the same or different; an asset created twice by mistake is refused, and one instrument held on two marketplaces is understood as such.
 **Done when:** in three pull requests. (1) The asset spec and the vocabulary define the four kinds and what identifies each; the kind is a column of the asset, filled for every existing asset by a migration that changes nothing else and travelling with the asset in sync; the core refuses what each kind forbids (an ISIN-less listed asset, a marketplace on a custom one, a second identical asset) with typed errors, and reports the existing assets the rules would refuse — sameness is enforced by the core's rules, not yet by a database constraint, which existing duplicates would break. (2) "Add asset" starts with Listed, Crypto or Custom and shows each kind's fields only; a listed asset starts from the lookup; a custom reference is proposed from the name; a refusal names the existing asset; an asset sharing its ISIN with another shows "also held as …"; cash appears as the application's. (3) The command line creates each kind and names an asset by name, reference or ISIN, with `reference@marketplace` for a shared reference, refusing an ambiguous one without listing.
 **Design:** validated
-**Open questions:** none
+**Open questions:**
+
+- [x] The term "Asset to settle" ("Actif à régulariser") for an asset that breaks a rule of its kind or is the same as another. → Confirmed. (Owner, 2026-10-09.)
+- [x] The SQL reviewer in CI refuses the migration for having no explicit `BEGIN; … COMMIT;`, which is wrong for SQLite through SQLx. May the migration carry the false-positive note of the triage policy? → Yes. (Owner, 2026-10-09.)
 
 Vocabulary (owner, 2026-10-09): the terms are Kind — Listed, Crypto, Custom, Cash; in French "Nature" — "Coté", "Crypto", "Non coté", "Liquidités". Where a listed asset trades stays the Exchange ("Place de cotation"): "marketplace" above reads as Exchange, and the mock-up's "Marketplace" label is "Exchange". They enter the vocabulary with the first pull request.
 

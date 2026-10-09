@@ -84,6 +84,7 @@ export function useAddAsset({ onSubmitSuccess, prefill }: UseAddAssetProps = {})
     setIsSubmitting(true);
 
     const result = await addAsset({
+      kind: null,
       name: formData.name,
       reference: formData.reference,
       isin: formData.isin.trim() ? formData.isin.trim() : null,

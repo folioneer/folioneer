@@ -114,6 +114,7 @@ mod tests {
             .returning(|asset_id| {
                 Ok(Some(Asset::restore(
                     asset_id.to_string(),
+                    crate::context::asset::AssetKind::Custom,
                     "Apple".to_string(),
                     AssetClass::Stocks,
                     AssetCategory::from_storage(

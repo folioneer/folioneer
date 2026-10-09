@@ -236,6 +236,7 @@ mod tests {
     fn make_asset(reference: &str, archived: bool, locked: bool) -> Asset {
         Asset::restore(
             ASSET.to_string(),
+            crate::context::asset::AssetKind::Custom,
             "Air Liquide".to_string(),
             AssetClass::Stocks,
             AssetCategory::from_storage(

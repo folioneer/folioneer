@@ -31,6 +31,7 @@ const makeAsset = (): Asset => ({
   is_archived: false,
   price_refresh_blocked: false,
   interest_bearing: false,
+  kind: "Custom",
   exchange: null,
 });
 
@@ -44,6 +45,7 @@ const baseCreateDto: CreateAssetDTO = {
   category_id: "cat-1",
   exchange: null,
   interest_bearing: false,
+  kind: null,
 };
 
 const baseUpdateDto: UpdateAssetDTO = {
@@ -57,6 +59,7 @@ const baseUpdateDto: UpdateAssetDTO = {
   category_id: "cat-1",
   exchange: null,
   interest_bearing: false,
+  kind: null,
 };
 
 describe("asset gateway — CRUD", () => {

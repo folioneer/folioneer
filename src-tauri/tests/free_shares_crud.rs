@@ -77,6 +77,7 @@ async fn build_ctx() -> Ctx {
 
 fn stocks_asset_dto(name: &str, reference: &str, currency: &str) -> CreateAssetDTO {
     CreateAssetDTO {
+        kind: None,
         name: name.to_string(),
         reference: reference.to_string(),
         isin: None,

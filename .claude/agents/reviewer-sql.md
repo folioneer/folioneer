@@ -87,25 +87,21 @@ Use the format in `## Output format` below. Lead with the headline summary.
 
 ### Transaction Wrapping
 
-- Any migration with more than one DDL or DML statement must be wrapped in an explicit `BEGIN; ... COMMIT;` (🔴)
-- **SQLx exception**: SQLx wraps each migration in an implicit transaction by default. When the project uses SQLx, only flag the absence of an explicit transaction as 🔴 if the migration mixes DDL and DML in a way where partial failure would leave the schema in an inconsistent state. Otherwise note the implicit transaction and demote to 🔵.
-- Multi-statement migrations without any transaction (no SQLx, no explicit `BEGIN`) (🔴)
+- **This project runs SQLite through SQLx.** SQLx runs each migration in one implicit transaction, and in SQLite a schema change is part of that transaction like any write: when any statement of the migration fails, everything before it — an `ALTER`, a `CREATE`, a default a new column gave to existing rows — is rolled back with it. No statement of a migration can therefore be left half-applied, whatever the mix of schema and data changes.
+- A missing explicit `BEGIN; ... COMMIT;` is **never a finding** in such a migration, at any severity, and an explicit one would fail: a transaction is already open.
+- The one case to flag (🔴): a migration that opts out of the implicit transaction with `-- no-transaction` on its first line and has more than one statement without its own `BEGIN; ... COMMIT;`.
 
-Worked SQLx-exception example. Pass (🔵 — implicit transaction is sufficient):
+Worked example. Both pass with no finding (the implicit transaction is sufficient):
 
 ```sql
 CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, total INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_orders_total ON orders(total);
 ```
 
-Fail (🔴 — DDL+DML mix; partial failure leaves orphaned data without the column it expects):
-
 ```sql
 ALTER TABLE users ADD COLUMN tier TEXT NOT NULL DEFAULT 'free';
 UPDATE users SET tier = 'pro' WHERE plan_id IN (SELECT id FROM plans WHERE level > 2);
 ```
-
-The second case needs `BEGIN; ... COMMIT;` explicitly so the `UPDATE` never runs against a half-altered schema if the `ALTER` fails mid-flight.
 
 ### Idempotency
 
@@ -196,7 +192,7 @@ Pre-existing issues on unchanged lines go in a separate section per file — no 
 
 Omit the pre-existing section entirely when none.
 
-Use `[DECISION]` on a Critical when the correct fix requires architectural input — typically the previously-committed-migration case (fix forward vs amend in place is a discipline call the team must own), and the SQLx-exception partial-failure reasoning when DDL+DML mix is non-trivial. Do not use `[DECISION]` for mechanical fixes (add `IF NOT EXISTS`, add an index, swap `BOOLEAN` for `INTEGER`).
+Use `[DECISION]` on a Critical when the correct fix requires architectural input — typically the previously-committed-migration case (fix forward vs amend in place is a discipline call the team must own). Do not use `[DECISION]` for mechanical fixes (add `IF NOT EXISTS`, add an index, swap `BOOLEAN` for `INTEGER`).
 
 **Empty-result form** (Step 1 halt — no migration files in the branch):
 

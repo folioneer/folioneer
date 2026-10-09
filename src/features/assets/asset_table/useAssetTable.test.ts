@@ -20,6 +20,7 @@ const makeAsset = (overrides: Partial<Asset> = {}): Asset => ({
   is_archived: false,
   price_refresh_blocked: false,
   interest_bearing: false,
+  kind: "Custom",
   ...overrides,
   exchange: null,
 });

@@ -944,6 +944,7 @@ mod tests {
     async fn create_stock(asset_svc: &AssetService, name: &str, reference: &str) -> String {
         asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: name.to_string(),
                 reference: reference.to_string(),
                 isin: None,
@@ -1569,6 +1570,7 @@ mod tests {
         // conversion, so the only FX leg is USD→EUR (GPF-020/030/040).
         let stock = asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "US Stock".to_string(),
                 reference: "UST".to_string(),
                 isin: None,

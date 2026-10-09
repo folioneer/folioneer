@@ -2,9 +2,10 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use super::super::domain::{
-    exchange, Asset, AssetCategory, AssetClass, AssetPrice, AssetRepository,
+    exchange, Asset, AssetCategory, AssetClass, AssetKind, AssetPrice, AssetRepository,
 };
 use super::asset_price::source_from_storage;
+use crate::core::logger::BACKEND;
 use crate::shared::domain::{
     ChangeDraft, LogicalTimestamp, Operation, Origin, Rank, RecordIdentity, RecordKind,
     SyncedRecord,
@@ -18,6 +19,7 @@ use sqlx::{Pool, Sqlite, SqliteConnection};
 #[derive(sqlx::FromRow)]
 struct AssetRow {
     id: String,
+    kind: String,
     name: String,
     reference: String,
     isin: Option<String>,
@@ -35,6 +37,14 @@ struct AssetRow {
 impl From<AssetRow> for Asset {
     fn from(row: AssetRow) -> Self {
         let asset_class = AssetClass::from_str(&row.asset_class).unwrap_or_default();
+        let kind = AssetKind::from_str(&row.kind).unwrap_or_else(|_| {
+            tracing::warn!(
+                target: BACKEND,
+                value = %row.kind,
+                "unknown asset kind value, falling back to the kind its class and ISIN make it"
+            );
+            AssetKind::of(&asset_class, row.isin.as_deref())
+        });
         let exchange = row.exchange_code.as_deref().and_then(exchange::lookup);
         // CFR-030 — an asset whose category stands removed is shown in the default category,
         // derived on read; the stored category id is left as it is.
@@ -44,6 +54,7 @@ impl From<AssetRow> for Asset {
         };
         Asset::restore(
             row.id,
+            kind,
             row.name,
             asset_class,
             category,
@@ -66,7 +77,7 @@ pub(super) async fn fetch_asset(conn: &mut SqliteConnection, id: &str) -> Result
         AssetRow,
         r#"
         SELECT
-            a.id, a.name, a.reference, a.isin, a.asset_class, a.currency, a.risk_level,
+            a.id, a.kind, a.name, a.reference, a.isin, a.asset_class, a.currency, a.risk_level,
             c.id as "category_id?: String",
             c.name as "category_name?: String",
             a.is_archived as "is_archived: bool",
@@ -290,7 +301,7 @@ impl AssetRepository for SqliteAssetRepository {
             AssetRow,
             r#"
             SELECT
-                a.id, a.name, a.reference, a.isin, a.asset_class, a.currency, a.risk_level,
+                a.id, a.kind, a.name, a.reference, a.isin, a.asset_class, a.currency, a.risk_level,
                 c.id as "category_id?: String",
                 c.name as "category_name?: String",
                 a.is_archived as "is_archived: bool",
@@ -314,7 +325,7 @@ impl AssetRepository for SqliteAssetRepository {
             AssetRow,
             r#"
             SELECT
-                a.id, a.name, a.reference, a.isin, a.asset_class, a.currency, a.risk_level,
+                a.id, a.kind, a.name, a.reference, a.isin, a.asset_class, a.currency, a.risk_level,
                 c.id as "category_id?: String",
                 c.name as "category_name?: String",
                 a.is_archived as "is_archived: bool",
@@ -338,7 +349,7 @@ impl AssetRepository for SqliteAssetRepository {
             AssetRow,
             r#"
             SELECT
-                a.id, a.name, a.reference, a.isin, a.asset_class, a.currency, a.risk_level,
+                a.id, a.kind, a.name, a.reference, a.isin, a.asset_class, a.currency, a.risk_level,
                 c.id as "category_id?: String",
                 c.name as "category_name?: String",
                 a.is_archived as "is_archived: bool",
@@ -360,6 +371,7 @@ impl AssetRepository for SqliteAssetRepository {
 
     async fn create(&self, asset: Asset) -> Result<Asset> {
         let asset_class_str = asset.class.to_string();
+        let kind = asset.kind.to_string();
         let exchange_code = asset.exchange.as_ref().map(|e| e.code.clone());
         let mut tx = self
             .pool
@@ -367,8 +379,9 @@ impl AssetRepository for SqliteAssetRepository {
             .await
             .context("Failed to begin asset create")?;
         sqlx::query!(
-            r#"INSERT INTO assets (id, name, reference, isin, asset_class, currency, risk_level, is_deleted, is_archived, category_id, exchange_code, interest_bearing) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)"#,
+            r#"INSERT INTO assets (id, kind, name, reference, isin, asset_class, currency, risk_level, is_deleted, is_archived, category_id, exchange_code, interest_bearing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)"#,
             asset.id,
+            kind,
             asset.name,
             asset.reference,
             asset.isin,
@@ -390,6 +403,7 @@ impl AssetRepository for SqliteAssetRepository {
 
     async fn update(&self, asset: Asset) -> Result<Asset> {
         let asset_class_str = asset.class.to_string();
+        let kind = asset.kind.to_string();
         let exchange_code = asset.exchange.as_ref().map(|e| e.code.clone());
         let mut tx = self
             .pool
@@ -398,7 +412,8 @@ impl AssetRepository for SqliteAssetRepository {
             .context("Failed to begin asset update")?;
         let based_on = current_asset_timestamp(&mut tx, &asset.id).await?;
         let written = sqlx::query!(
-            r#"UPDATE assets SET name = ?, reference = ?, isin = ?, asset_class = ?, currency = ?, risk_level = ?, category_id = ?, exchange_code = ?, interest_bearing = ? WHERE id = ? AND is_archived = 0"#,
+            r#"UPDATE assets SET kind = ?, name = ?, reference = ?, isin = ?, asset_class = ?, currency = ?, risk_level = ?, category_id = ?, exchange_code = ?, interest_bearing = ? WHERE id = ? AND is_archived = 0"#,
+            kind,
             asset.name,
             asset.reference,
             asset.isin,
@@ -592,14 +607,16 @@ impl AssetRepository for SqliteAssetRepository {
         rank: &Rank,
     ) -> Result<()> {
         let asset_class_str = asset.class.to_string();
+        let kind = asset.kind.to_string();
         let exchange_code = asset.exchange.as_ref().map(|e| e.code.clone());
         let columns = RankColumns::from(rank.clone());
         sqlx::query!(
-            r#"INSERT INTO assets (id, name, reference, isin, asset_class, currency, risk_level, is_deleted,
+            r#"INSERT INTO assets (id, kind, name, reference, isin, asset_class, currency, risk_level, is_deleted,
                                    is_archived, category_id, exchange_code, price_refresh_blocked, interest_bearing,
                                    sync_logical_timestamp, sync_origin, sync_device_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(id) DO UPDATE SET
+                   kind = excluded.kind,
                    name = excluded.name,
                    reference = excluded.reference,
                    isin = excluded.isin,
@@ -616,6 +633,7 @@ impl AssetRepository for SqliteAssetRepository {
                    sync_origin = excluded.sync_origin,
                    sync_device_id = excluded.sync_device_id"#,
             asset.id,
+            kind,
             asset.name,
             asset.reference,
             asset.isin,
@@ -763,10 +781,12 @@ impl AssetRepository for SqliteAssetRepository {
         .await
         .with_context(|| format!("Failed to seed category {}", category.id))?;
         let asset_class_str = asset.class.to_string();
+        let kind = asset.kind.to_string();
         sqlx::query!(
-            r#"INSERT OR IGNORE INTO assets (id, name, reference, isin, asset_class, currency, risk_level, is_deleted, is_archived, category_id, exchange_code, interest_bearing)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?)"#,
+            r#"INSERT OR IGNORE INTO assets (id, kind, name, reference, isin, asset_class, currency, risk_level, is_deleted, is_archived, category_id, exchange_code, interest_bearing)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?)"#,
             asset.id,
+            kind,
             asset.name,
             asset.reference,
             asset.isin,
@@ -814,6 +834,61 @@ mod tests {
         .expect("seed asset");
     }
 
+    // AST-030 — the kind is stored with the asset and read back, on creation and on edit.
+    #[tokio::test]
+    async fn ast_030_the_kind_is_stored_and_read_back() {
+        let pool = setup_pool().await;
+        let repo = SqliteAssetRepository::new(pool.clone());
+        let listed = Asset::new(
+            AssetKind::Listed,
+            "ASML".to_string(),
+            AssetClass::Stocks,
+            AssetCategory::default(),
+            "EUR".to_string(),
+            4,
+            "ASML".to_string(),
+            Some("US0378331005".to_string()),
+            None,
+            false,
+        )
+        .expect("listed");
+        let created = repo.create(listed).await.expect("create");
+        let stored = repo
+            .get_by_id(&created.id)
+            .await
+            .expect("read")
+            .expect("found");
+        assert_eq!(stored.kind, AssetKind::Listed);
+
+        let as_custom = Asset {
+            kind: AssetKind::Custom,
+            isin: None,
+            ..stored
+        };
+        repo.update(as_custom).await.expect("update");
+        let edited = repo
+            .get_by_id(&created.id)
+            .await
+            .expect("read")
+            .expect("found");
+        assert_eq!(edited.kind, AssetKind::Custom);
+    }
+
+    // AST-034 — an asset stored without a kind column value reads as custom, and a stored
+    // value this build does not know reads as the kind the class and the ISIN make it.
+    #[tokio::test]
+    async fn ast_034_a_stored_kind_this_build_does_not_know_falls_back_to_the_decided_one() {
+        let pool = setup_pool().await;
+        seed_asset(&pool, "plain").await;
+        sqlx::query("UPDATE assets SET kind = 'Unheard', isin = 'US0378331005' WHERE id = 'plain'")
+            .execute(&pool)
+            .await
+            .expect("drift");
+        let repo = SqliteAssetRepository::new(pool.clone());
+        let read = repo.get_by_id("plain").await.expect("read").expect("found");
+        assert_eq!(read.kind, AssetKind::Listed);
+    }
+
     // MKT-150 — block_price_refresh sets the flag; get_by_id reflects it.
     #[tokio::test]
     async fn block_price_refresh_sets_flag_and_round_trips() {
@@ -838,6 +913,7 @@ mod tests {
     fn asset_with_interest_bearing(id: &str, interest_bearing: bool) -> Asset {
         Asset::restore(
             id.to_string(),
+            AssetKind::Custom,
             "Euro Fund".to_string(),
             AssetClass::MutualFunds,
             AssetCategory::from_storage(
@@ -942,6 +1018,7 @@ mod tests {
     fn test_asset(id: &str) -> Asset {
         Asset::restore(
             id.to_string(),
+            AssetKind::Custom,
             "Euro Fund".to_string(),
             AssetClass::MutualFunds,
             AssetCategory::from_storage(
@@ -975,6 +1052,41 @@ mod tests {
             .await
             .unwrap();
         assert!(row.sync_logical_timestamp.is_some());
+    }
+
+    // AST-030 — the kind travels with the asset: an applied change writes it, over the kind
+    // held, and the record this device would publish carries it.
+    #[tokio::test]
+    async fn ast_030_the_kind_travels_with_the_asset_in_sync() {
+        let pool = make_pool().await;
+        let repo = SqliteAssetRepository::new(pool.clone());
+        repo.create(test_asset("a-synced")).await.unwrap();
+        let from_another_device = Asset {
+            kind: AssetKind::Listed,
+            isin: Some("US0378331005".to_string()),
+            ..test_asset("a-synced")
+        };
+        let rank = Rank {
+            origin: Origin::User,
+            logical_timestamp: crate::shared::domain::LogicalTimestamp::new(7),
+            device_id: "laptop".to_string(),
+        };
+
+        let mut conn = pool.acquire().await.unwrap();
+        repo.apply_asset(&mut conn, &from_another_device, &rank)
+            .await
+            .unwrap();
+        let published = repo
+            .synced_record(&mut conn, RecordKind::Asset, "a-synced")
+            .await
+            .unwrap()
+            .expect("the asset is held");
+        drop(conn);
+
+        let stored = repo.get_by_id("a-synced").await.unwrap().expect("found");
+        assert_eq!(stored.kind, AssetKind::Listed);
+        let written: serde_json::Value = serde_json::from_str(&published.content).unwrap();
+        assert_eq!(written["kind"], "Listed");
     }
 
     // CFR-014/D6 — stamp_sync_rank ranks only the rows that were never ranked; a row the

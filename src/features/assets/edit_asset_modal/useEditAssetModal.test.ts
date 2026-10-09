@@ -17,6 +17,7 @@ const mockAsset: Asset = {
   is_archived: false,
   price_refresh_blocked: false,
   interest_bearing: false,
+  kind: "Custom",
   exchange: null,
 };
 

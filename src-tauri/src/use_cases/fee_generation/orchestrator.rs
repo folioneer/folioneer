@@ -278,6 +278,7 @@ mod tests {
     async fn seed_stock(asset_svc: &AssetService) -> String {
         asset_svc
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: "Fee Stock".to_string(),
                 reference: "FEES".to_string(),
                 isin: None,

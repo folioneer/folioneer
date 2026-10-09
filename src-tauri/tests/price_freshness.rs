@@ -76,6 +76,7 @@ async fn freshness_read_on_completion(provider: Arc<dyn PriceProvider>) -> Price
     ));
     let asset = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Apple".to_string(),
             reference: "AAPL".to_string(),
             isin: None,

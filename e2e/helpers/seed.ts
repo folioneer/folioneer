@@ -49,7 +49,7 @@ export async function seedAsset(
   categoryId: string,
   options?: { reference?: string; assetClass?: string },
 ): Promise<string> {
-  const reference = options?.reference ?? name.slice(0, 6).toUpperCase();
+  const reference = options?.reference ?? name.toUpperCase().replace(/[^A-Z0-9]+/g, "-");
   const assetClass = options?.assetClass ?? "Stocks";
   const asset = (await browser.executeAsync(
     (n: string, ref: string, catId: string, cls: string, done: (r: unknown) => void) => {

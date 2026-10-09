@@ -5,7 +5,7 @@ use crate::context::asset::error::AssetError;
 use crate::AppState;
 use tauri::State;
 
-use super::domain::{exchange, Asset, AssetCategory, AssetPrice, Exchange};
+use super::domain::{exchange, Asset, AssetCategory, AssetPrice, AssetToSettle, Exchange};
 use super::dto::{CreateAssetDTO, UpdateAssetDTO};
 
 // --- Assets ---
@@ -32,6 +32,16 @@ pub async fn get_assets_with_archived(
     state: State<'_, AppState>,
 ) -> Result<Vec<Asset>, AssetError> {
     state.asset_service.get_all_assets_with_archived().await
+}
+
+/// The assets the rules of their kind would refuse today, each with the rule it breaks
+/// (AST-035).
+#[tauri::command]
+#[specta::specta]
+pub async fn get_assets_to_settle(
+    state: State<'_, AppState>,
+) -> Result<Vec<AssetToSettle>, AssetError> {
+    state.asset_service.assets_to_settle().await
 }
 
 /// Adds a new asset.

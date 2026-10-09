@@ -145,6 +145,7 @@ mod tests {
     fn make_asset(id: &str, reference: &str, locked: bool) -> Asset {
         Asset::restore(
             id.to_string(),
+            crate::context::asset::AssetKind::Custom,
             "Test Asset".to_string(),
             AssetClass::Stocks,
             make_category(),

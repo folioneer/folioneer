@@ -160,6 +160,7 @@ async fn get_account_performance_priced_stock_included_in_end_value() {
     let stock = ctx
         .asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Blue Chip".to_string(),
             reference: "BLU".to_string(),
             isin: None,
@@ -248,6 +249,7 @@ async fn zero_cost_opening_balance_suppresses_lifetime_metrics_until_corrected()
     let stock = ctx
         .asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Granted Stock".to_string(),
             reference: "GRT".to_string(),
             isin: None,

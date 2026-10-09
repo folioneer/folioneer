@@ -223,9 +223,10 @@ async fn fetch_for_account_passes_exchange_qualified_symbol_to_provider() {
 
     let asset = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Air Liquide".to_string(),
             reference: "AI".to_string(),
-            isin: None,
+            isin: Some("US0378331005".to_string()),
             class: folioneer_lib::context::asset::AssetClass::Stocks,
             currency: "EUR".to_string(),
             risk_level: 4,
@@ -349,6 +350,7 @@ async fn fetch_for_account_skips_locked_asset() {
 
     let asset = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Apple".to_string(),
             reference: "AAPL".to_string(),
             isin: None,
@@ -461,6 +463,7 @@ async fn fetch_for_account_includes_unblocked_asset() {
 
     let asset = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Apple".to_string(),
             reference: "AAPL".to_string(),
             isin: None,
@@ -573,6 +576,7 @@ async fn fetch_publishes_completion_event_with_counts() {
 
     let asset = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Apple".to_string(),
             reference: "AAPL".to_string(),
             isin: None,
@@ -708,6 +712,7 @@ async fn fetch_completion_event_unpriced_list_contains_skipped_asset_with_last_p
     // Seed an asset with an ISIN so we can assert it is forwarded.
     let asset = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Unpriced Corp".to_string(),
             reference: "UNPX".to_string(),
             isin: Some("US0231351067".to_string()),
@@ -876,6 +881,7 @@ async fn fetch_completion_unpriced_entry_has_none_last_price_when_never_priced()
     // Seed an asset with NO prior price recorded.
     let asset = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Never Priced".to_string(),
             reference: "NVPR".to_string(),
             isin: None,
@@ -1004,6 +1010,7 @@ async fn fetch_completion_unpriced_list_excludes_successfully_fetched_asset() {
 
     let asset = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Fetched Ok".to_string(),
             reference: "FOKO".to_string(),
             isin: None,
@@ -1137,6 +1144,7 @@ async fn fetch_completion_unpriced_len_equals_skipped_count_in_mixed_outcome() {
 
     let asset_ok = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Asset Ok".to_string(),
             reference: "AOK".to_string(),
             isin: None,
@@ -1151,6 +1159,7 @@ async fn fetch_completion_unpriced_len_equals_skipped_count_in_mixed_outcome() {
         .expect("seed asset ok");
     let asset_err = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Asset Err".to_string(),
             reference: "AERR".to_string(),
             isin: None,
@@ -1296,6 +1305,7 @@ async fn fetch_completion_locked_asset_absent_from_unpriced_list() {
 
     let asset = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Locked Asset".to_string(),
             reference: "LKDA".to_string(),
             isin: None,
@@ -1410,6 +1420,7 @@ async fn a_price_fetch_leaves_exchange_rates_alone() {
     ));
     let asset = asset_service
         .create_asset(CreateAssetDTO {
+            kind: None,
             name: "Apple".to_string(),
             reference: "AAPL".to_string(),
             isin: None,

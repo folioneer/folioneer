@@ -1046,6 +1046,7 @@ mod tests {
 
     fn base_asset_dto() -> CreateAssetDTO {
         CreateAssetDTO {
+            kind: None,
             name: "Test Asset".to_string(),
             reference: "TST".to_string(),
             isin: None,

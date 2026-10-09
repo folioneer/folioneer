@@ -282,6 +282,7 @@ mod task_tests {
         (
             Asset::restore(
                 format!("asset-{}", reference.to_lowercase()),
+                crate::context::asset::AssetKind::Custom,
                 "Test Asset".to_string(),
                 AssetClass::Stocks,
                 AssetCategory::from_storage(

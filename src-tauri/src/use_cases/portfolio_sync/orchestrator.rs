@@ -508,6 +508,7 @@ mod tests {
 
         ctx.asset_service
             .create_asset(crate::context::asset::CreateAssetDTO {
+                kind: None,
                 name: "Apple".into(),
                 reference: "AAPL".into(),
                 isin: None,
@@ -1292,6 +1293,7 @@ mod tests {
         let asset = ctx
             .asset_service
             .create_asset(crate::context::asset::CreateAssetDTO {
+                kind: None,
                 name: "AAPL".into(),
                 reference: "AAPL".into(),
                 isin: None,

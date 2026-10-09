@@ -69,6 +69,8 @@ describe("asset_exchange", () => {
     // Fill the required fields.
     await setReactInputValue("add-asset-name", ASSET_NAME);
     await setReactInputValue("add-asset-reference", "XPRADD");
+    // AST-031 — an asset on an exchange is listed, and a listed asset has an ISIN.
+    await setReactInputValue("add-asset-isin", "FR0000120073");
     await setReactInputValue("add-asset-currency", "EUR");
 
     const categorySelect = await $("#add-asset-category");
@@ -139,6 +141,8 @@ describe("asset_exchange", () => {
               asset_id: id,
               name: "E2E Exchange Change",
               reference: "XPRCNG",
+              kind: "Listed",
+              isin: "NL0010273215",
               class: "Stocks",
               currency: "EUR",
               risk_level: 3,
@@ -226,6 +230,8 @@ describe("asset_exchange", () => {
               asset_id: id,
               name: "E2E Exchange Clear",
               reference: "XPRCLR",
+              kind: "Listed",
+              isin: "IE00B53L3W79",
               class: "Stocks",
               currency: "EUR",
               risk_level: 3,

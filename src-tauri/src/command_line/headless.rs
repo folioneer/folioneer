@@ -163,6 +163,7 @@ mod tests {
         container
             .asset_service
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: name.to_string(),
                 reference: reference.to_string(),
                 isin: None,
@@ -619,7 +620,7 @@ mod tests {
 
         let added = run_line(
             &dir,
-            "asset add --name World_USD --reference cw8 --class ETF --currency USD",
+            "asset add --name World_USD --reference cw8 --isin IE00B53L3W79 --class ETF --currency USD",
         )
         .await;
         assert_eq!(added.exit_code, RECORDED);
@@ -634,7 +635,7 @@ mod tests {
 
         let json = run_line(
             &dir,
-            "asset add --name World_GBP --reference CW8 --class ETF --currency GBP --json",
+            "asset add --name World_GBP --reference CW8 --isin IE00B53L3W79 --class ETF --currency GBP --json",
         )
         .await;
         let value: serde_json::Value =

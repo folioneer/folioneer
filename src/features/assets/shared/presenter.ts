@@ -12,6 +12,13 @@ export function assetMutationErrorToI18n(
   err: AssetError | ArchiveAssetError | DeleteAssetError,
 ): I18nMessage {
   switch (err.code) {
+    case "AssetAlreadyExists":
+      return { key: "error.AssetAlreadyExists", vars: { existing_name: err.existing_name } };
+    case "IsinRequired":
+    case "IsinNotAllowed":
+    case "ExchangeNotAllowed":
+    case "ClassNotAllowed":
+      return { key: `error.${err.code}` };
     case "InvalidExchange":
       return { key: "error.InvalidExchange", vars: { exchange_code: err.exchange_code } };
     case "InvalidCurrency":

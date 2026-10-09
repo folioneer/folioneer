@@ -1,6 +1,7 @@
 use super::domain::{
-    Asset, AssetCategory, AssetCategoryRepository, AssetClass, AssetPrice, AssetPriceRepository,
-    AssetPriceSource, AssetRepository, DatedClose, PriceHistoryBackfillOutcome, SYSTEM_CATEGORY_ID,
+    Asset, AssetCategory, AssetCategoryRepository, AssetClass, AssetKind, AssetPrice,
+    AssetPriceRepository, AssetPriceSource, AssetRepository, AssetToSettle, DatedClose,
+    KindProblem, PriceHistoryBackfillOutcome, SYSTEM_CATEGORY_ID,
 };
 use super::error::AssetError;
 use crate::{
@@ -146,6 +147,7 @@ impl AssetService {
 
         let asset = Asset::with_id(
             asset_id.clone(),
+            AssetKind::Cash,
             format!("Cash {}", currency.to_uppercase()),
             AssetClass::Cash,
             category,
@@ -176,7 +178,12 @@ impl AssetService {
         }
         let category = find_category_for_asset_crud(&*self.category_repo, &dto.category_id).await?;
 
+        // AST-034 — a kind left out is the one the asset's class and ISIN make it.
+        let kind = dto
+            .kind
+            .unwrap_or_else(|| AssetKind::of(&dto.class, dto.isin.as_deref()));
         let asset = Asset::new(
+            kind,
             dto.name,
             dto.class,
             category,
@@ -187,6 +194,7 @@ impl AssetService {
             dto.exchange,
             dto.interest_bearing,
         )?;
+        self.ensure_no_same_asset(&asset).await?;
 
         let asset = self.asset_repo.create(asset).await.map_err(|e| {
             tracing::error!(target: BACKEND, err = ?e, "create_asset: repository failure");
@@ -241,6 +249,7 @@ impl AssetService {
         };
         let asset = self
             .create_asset(CreateAssetDTO {
+                kind: None,
                 name: named.name,
                 reference: named.reference,
                 isin: named.isin,
@@ -260,6 +269,44 @@ impl AssetService {
         })
     }
 
+    /// AST-032 — refuses an asset that is the same as another, archived or not, naming the
+    /// one that exists.
+    async fn ensure_no_same_asset(&self, asset: &Asset) -> StdResult<(), AssetError> {
+        let existing = self.get_all_assets_with_archived().await?;
+        match existing.iter().find(|other| asset.is_same_as(other)) {
+            Some(same) => Err(AssetError::AssetAlreadyExists {
+                existing_id: same.id.clone(),
+                existing_name: same.name.clone(),
+            }),
+            None => Ok(()),
+        }
+    }
+
+    /// AST-035 — the assets the rules of their kind would refuse today, archived or not,
+    /// each with the first rule it breaks: what its kind forbids (AST-031), or being the
+    /// same as another (AST-032). They are left as they are, for the user to settle.
+    pub async fn assets_to_settle(&self) -> StdResult<Vec<AssetToSettle>, AssetError> {
+        let assets = self.get_all_assets_with_archived().await?;
+        Ok(assets
+            .iter()
+            .filter_map(|asset| {
+                let problem = asset.kind_problem().or_else(|| {
+                    assets
+                        .iter()
+                        .find(|other| asset.is_same_as(other))
+                        .map(|same| KindProblem::SameAsAnother {
+                            other_id: same.id.clone(),
+                            other_name: same.name.clone(),
+                        })
+                })?;
+                Some(AssetToSettle {
+                    asset: asset.clone(),
+                    problem,
+                })
+            })
+            .collect())
+    }
+
     /// Updates an existing asset. Rejects if the asset is the system Cash Asset
     /// (CSH-016) or archived (R6) — both invariants are enforced inside
     /// `Asset::update_from` on the loaded aggregate (single source of truth).
@@ -267,7 +314,9 @@ impl AssetService {
         let existing = load_asset_for_crud(&*self.asset_repo, &dto.asset_id).await?;
         let category = find_category_for_asset_crud(&*self.category_repo, &dto.category_id).await?;
 
+        let kind = dto.kind.unwrap_or(existing.kind);
         let asset = existing.update_from(
+            kind,
             dto.name,
             dto.class,
             category,
@@ -278,6 +327,7 @@ impl AssetService {
             dto.exchange,
             dto.interest_bearing,
         )?;
+        self.ensure_no_same_asset(&asset).await?;
 
         let asset = self.asset_repo.update(asset).await.map_err(|e| {
             tracing::error!(target: BACKEND, asset_id = %dto.asset_id, err = ?e, "update_asset: repository failure");
@@ -734,6 +784,7 @@ impl AssetService {
         )?;
         let asset = Asset::with_id(
             crate::core::cash::system_cash_asset_id(currency),
+            AssetKind::Cash,
             format!("Cash {}", currency.to_uppercase()),
             AssetClass::Cash,
             category.clone(),
@@ -761,7 +812,17 @@ impl AssetService {
         content: &str,
         rank: Rank,
     ) -> StdResult<(), AssetError> {
-        let asset: Asset = synced_content(content)?;
+        let written: serde_json::Value = synced_content(content)?;
+        let asset = if written.get("kind").is_some() {
+            asset_of_any_format(written, None)?
+        } else {
+            let held = self
+                .asset_repo
+                .synced_record(conn, RecordKind::Asset, &asset_identity_of(&written)?)
+                .await
+                .map_err(|e| applied_write_error("apply_asset", e))?;
+            asset_of_any_format(written, held.as_ref().map(|held| held.content.as_str()))?
+        };
         self.asset_repo
             .apply_asset(conn, &asset, &rank)
             .await
@@ -832,6 +893,50 @@ impl AssetService {
 fn synced_content<T: serde::de::DeserializeOwned>(content: &str) -> StdResult<T, AssetError> {
     serde_json::from_str(content).map_err(|e| {
         tracing::error!(target: BACKEND, err = %e, "synced content: malformed payload");
+        AssetError::DatabaseError
+    })
+}
+
+/// The id of the asset a synced change carries.
+fn asset_identity_of(written: &serde_json::Value) -> StdResult<String, AssetError> {
+    written
+        .get("id")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| {
+            tracing::error!(target: BACKEND, "synced content: an asset without an id");
+            AssetError::DatabaseError
+        })
+}
+
+/// AST-036 — reads an asset change written in any data format (SYN-035). One written before
+/// kinds carries none: the asset keeps the kind this device holds for it, or takes the one
+/// its class and ISIN make it (AST-034) when this device has never held it.
+fn asset_of_any_format(
+    mut written: serde_json::Value,
+    held: Option<&str>,
+) -> StdResult<Asset, AssetError> {
+    if written.get("kind").is_none() {
+        let held_kind = held
+            .and_then(|held| serde_json::from_str::<Asset>(held).ok())
+            .map(|held| held.kind);
+        let kind = match held_kind {
+            Some(kind) => kind,
+            None => {
+                let class: AssetClass = written
+                    .get("class")
+                    .cloned()
+                    .and_then(|class| serde_json::from_value(class).ok())
+                    .unwrap_or_default();
+                AssetKind::of(&class, written.get("isin").and_then(|isin| isin.as_str()))
+            }
+        };
+        if let Some(fields) = written.as_object_mut() {
+            fields.insert("kind".to_string(), serde_json::json!(kind));
+        }
+    }
+    serde_json::from_value(written).map_err(|e| {
+        tracing::error!(target: BACKEND, err = %e, "synced content: malformed asset");
         AssetError::DatabaseError
     })
 }
@@ -1109,6 +1214,7 @@ mod tests {
     fn make_asset(id: &str, archived: bool) -> Asset {
         Asset::restore(
             id.to_string(),
+            AssetKind::Custom,
             "Test Asset".to_string(),
             AssetClass::Stocks,
             make_category(),
@@ -1126,6 +1232,7 @@ mod tests {
     fn make_cash_asset(id: &str) -> Asset {
         Asset::restore(
             id.to_string(),
+            AssetKind::Cash,
             "Cash".to_string(),
             AssetClass::Cash,
             make_category(),
@@ -1168,6 +1275,7 @@ mod tests {
 
     fn base_dto(name: &str) -> CreateAssetDTO {
         CreateAssetDTO {
+            kind: None,
             name: name.to_string(),
             reference: "REF-001".to_string(),
             isin: None,
@@ -1280,14 +1388,255 @@ mod tests {
         assert!(!added.reference_shared);
     }
 
+    fn listed(id: &str, exchange_code: &str, archived: bool) -> Asset {
+        Asset {
+            kind: AssetKind::Listed,
+            name: format!("ASML on {exchange_code}"),
+            reference: "ASML".to_string(),
+            isin: Some("US0378331005".to_string()),
+            exchange: super::super::domain::exchange::lookup(exchange_code),
+            ..make_asset(id, archived)
+        }
+    }
+
+    fn listed_dto(exchange_code: &str) -> CreateAssetDTO {
+        CreateAssetDTO {
+            kind: Some(AssetKind::Listed),
+            reference: "asml".to_string(),
+            isin: Some("us0378331005".to_string()),
+            exchange: super::super::domain::exchange::lookup(exchange_code),
+            ..base_dto("ASML Holding")
+        }
+    }
+
+    // AST-032 — a second identical asset is refused, naming the one that exists, even
+    // archived; the same ISIN on another exchange is another asset.
+    #[tokio::test]
+    async fn ast_032_creating_the_same_asset_twice_is_refused_naming_the_existing_one() {
+        let svc_holding = |existing: Asset| {
+            let mut ar = MockAssetRepository::new();
+            ar.expect_get_all_including_archived()
+                .returning(move || Ok(vec![existing.clone()]));
+            ar.expect_create().returning(Ok);
+            let mut cr = MockAssetCategoryRepository::new();
+            cr.expect_get_by_id()
+                .returning(|_| Ok(Some(make_category())));
+            make_svc(ar, cr, MockAssetPriceRepository::new())
+        };
+
+        let refused = svc_holding(listed("old", "XAMS", true))
+            .create_asset(listed_dto("XAMS"))
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            refused,
+            AssetError::AssetAlreadyExists { existing_id, existing_name }
+                if existing_id == "old" && existing_name == "ASML on XAMS"
+        ));
+
+        let other_exchange = svc_holding(listed("old", "XAMS", false))
+            .create_asset(listed_dto("XNAS"))
+            .await
+            .expect("AST-032: the same ISIN on another exchange is another asset");
+        assert_eq!(other_exchange.kind, AssetKind::Listed);
+    }
+
+    // AST-034 — a kind left out is the one the class and the ISIN make; a kind given is
+    // held to its rules.
+    #[tokio::test]
+    async fn ast_034_a_kind_left_out_is_decided_and_a_kind_given_is_checked() {
+        let svc = || {
+            let mut ar = MockAssetRepository::new();
+            ar.expect_get_all_including_archived()
+                .returning(|| Ok(vec![]));
+            ar.expect_create().returning(Ok);
+            let mut cr = MockAssetCategoryRepository::new();
+            cr.expect_get_by_id()
+                .returning(|_| Ok(Some(make_category())));
+            make_svc(ar, cr, MockAssetPriceRepository::new())
+        };
+        let decided = svc()
+            .create_asset(CreateAssetDTO {
+                kind: None,
+                ..listed_dto("XAMS")
+            })
+            .await
+            .expect("an ISIN makes it listed");
+        assert_eq!(decided.kind, AssetKind::Listed);
+
+        let crypto = svc()
+            .create_asset(CreateAssetDTO {
+                class: AssetClass::DigitalAsset,
+                reference: "btc".to_string(),
+                ..base_dto("Bitcoin")
+            })
+            .await
+            .expect("the digital-asset class makes it crypto");
+        assert_eq!(crypto.kind, AssetKind::Crypto);
+
+        let refused = svc()
+            .create_asset(CreateAssetDTO {
+                isin: None,
+                ..listed_dto("XAMS")
+            })
+            .await
+            .unwrap_err();
+        assert!(matches!(refused, AssetError::IsinRequired));
+    }
+
+    // AST-032 — an edit that makes an asset the same as another is refused; an edit of the
+    // asset itself is not compared with itself. A kind left out is kept.
+    #[tokio::test]
+    async fn ast_032_an_edit_is_refused_when_it_makes_the_asset_the_same_as_another() {
+        let svc = || {
+            let mut ar = MockAssetRepository::new();
+            ar.expect_get_by_id()
+                .returning(|_| Ok(Some(listed("mine", "XNAS", false))));
+            ar.expect_get_all_including_archived().returning(|| {
+                Ok(vec![
+                    listed("mine", "XNAS", false),
+                    listed("other", "XAMS", false),
+                ])
+            });
+            ar.expect_update().returning(Ok);
+            let mut cr = MockAssetCategoryRepository::new();
+            cr.expect_get_by_id()
+                .returning(|_| Ok(Some(make_category())));
+            make_svc(ar, cr, MockAssetPriceRepository::new())
+        };
+        let edit = |exchange_code: &str| UpdateAssetDTO {
+            asset_id: "mine".to_string(),
+            kind: None,
+            name: "ASML".to_string(),
+            reference: "ASML".to_string(),
+            isin: Some("US0378331005".to_string()),
+            class: AssetClass::Stocks,
+            currency: "USD".to_string(),
+            risk_level: 4,
+            category_id: SYSTEM_CATEGORY_ID.to_string(),
+            exchange: super::super::domain::exchange::lookup(exchange_code),
+            interest_bearing: false,
+        };
+
+        let refused = svc().update_asset(edit("XAMS")).await.unwrap_err();
+        assert!(matches!(
+            refused,
+            AssetError::AssetAlreadyExists { existing_id, .. } if existing_id == "other"
+        ));
+
+        let kept = svc()
+            .update_asset(edit("XNAS"))
+            .await
+            .expect("an asset is not the same as itself");
+        assert_eq!(kept.kind, AssetKind::Listed);
+    }
+
+    // AST-035 — the assets the rules would refuse today are reported, each with the first
+    // rule it breaks; an asset in order is not.
+    #[tokio::test]
+    async fn ast_035_the_assets_the_rules_would_refuse_are_reported_with_their_problem() {
+        let custom_on_an_exchange = Asset {
+            exchange: super::super::domain::exchange::lookup("XPAR"),
+            reference: "OLD".to_string(),
+            ..make_asset("on-exchange", false)
+        };
+        let twin = |id: &str| Asset {
+            reference: "TWIN".to_string(),
+            ..make_asset(id, id == "twin-archived")
+        };
+        let in_order = Asset {
+            reference: "FINE".to_string(),
+            ..make_asset("fine", false)
+        };
+        let held = vec![
+            custom_on_an_exchange,
+            twin("twin-a"),
+            twin("twin-archived"),
+            in_order,
+            make_cash_asset("system-cash-eur"),
+        ];
+        let mut ar = MockAssetRepository::new();
+        ar.expect_get_all_including_archived()
+            .returning(move || Ok(held.clone()));
+        let svc = make_svc(
+            ar,
+            MockAssetCategoryRepository::new(),
+            MockAssetPriceRepository::new(),
+        );
+
+        let to_settle = svc.assets_to_settle().await.expect("report");
+
+        let reported: Vec<(&str, String)> = to_settle
+            .iter()
+            .map(|entry| {
+                let problem = match &entry.problem {
+                    KindProblem::SameAsAnother { other_id, .. } => other_id.clone(),
+                    other => format!("{other:?}"),
+                };
+                (entry.asset.id.as_str(), problem)
+            })
+            .collect();
+        assert_eq!(
+            reported,
+            vec![
+                ("on-exchange", "ExchangeNotAllowed".to_string()),
+                ("twin-a", "twin-archived".to_string()),
+                ("twin-archived", "twin-a".to_string()),
+            ]
+        );
+    }
+
+    // AST-036 — an asset change written before kinds keeps the kind this device holds, or
+    // takes the one its class and ISIN make it; a change that carries a kind keeps it.
+    #[test]
+    fn ast_036_an_asset_change_written_before_kinds_is_given_one() {
+        let written_before_kinds = |asset: &Asset| {
+            let mut written = serde_json::to_value(asset).expect("json");
+            written.as_object_mut().expect("object").remove("kind");
+            written
+        };
+        let incoming = listed("a1", "XAMS", false);
+        let old_form = written_before_kinds(&incoming);
+
+        let never_seen = asset_of_any_format(old_form.clone(), None).expect("read");
+        assert_eq!(never_seen.kind, AssetKind::Listed);
+        assert_eq!(never_seen.isin, incoming.isin);
+
+        let held = serde_json::to_string(&Asset {
+            kind: AssetKind::Custom,
+            ..incoming.clone()
+        })
+        .expect("json");
+        let known = asset_of_any_format(old_form, Some(&held)).expect("read");
+        assert_eq!(known.kind, AssetKind::Custom);
+
+        let current_form = serde_json::to_value(&incoming).expect("json");
+        let carried = asset_of_any_format(current_form, Some(&held)).expect("read");
+        assert_eq!(carried.kind, AssetKind::Listed);
+
+        assert!(matches!(
+            asset_of_any_format(serde_json::json!("not an asset"), None),
+            Err(AssetError::DatabaseError)
+        ));
+        assert!(matches!(
+            asset_identity_of(&serde_json::json!({ "name": "no id" })),
+            Err(AssetError::DatabaseError)
+        ));
+    }
+
     // AST-009 / CLI-026 — a reference another asset has is allowed — one ticker, several
     // markets — and reported; a new reference is not.
     #[tokio::test]
     async fn cli_026_a_shared_reference_is_added_and_reported() {
         for (reference, shared) in [(" ref ", true), ("NEW", false)] {
             let mut ar = MockAssetRepository::new();
-            ar.expect_get_all_including_archived()
-                .returning(|| Ok(vec![make_asset("old", true)]));
+            ar.expect_get_all_including_archived().returning(|| {
+                Ok(vec![Asset {
+                    kind: AssetKind::Listed,
+                    isin: Some("US0378331005".to_string()),
+                    ..make_asset("old", true)
+                }])
+            });
             ar.expect_create().times(1).return_once(Ok);
             let mut cr = MockAssetCategoryRepository::new();
             cr.expect_get_by_id()
@@ -1295,7 +1644,10 @@ mod tests {
             let svc = make_svc(ar, cr, MockAssetPriceRepository::new());
 
             let added = svc
-                .add_named_asset(named("Other listing", reference))
+                .add_named_asset(NamedAsset {
+                    isin: Some("IE00B53L3W79".to_string()),
+                    ..named("Other listing", reference)
+                })
                 .await
                 .expect("added");
 
@@ -1328,6 +1680,7 @@ mod tests {
                 category_name: Some(" Tech ".to_string()),
                 exchange_code: Some("xpar".to_string()),
                 risk_level: Some(2),
+                isin: Some("IE00B53L3W79".to_string()),
                 ..named("World", "CW8")
             })
             .await
@@ -1464,6 +1817,8 @@ mod tests {
     #[tokio::test]
     async fn test_create_asset_normalizes_reference_to_uppercase() {
         let mut ar = MockAssetRepository::new();
+        ar.expect_get_all_including_archived()
+            .returning(|| Ok(vec![]));
         ar.expect_create()
             .withf(|a| a.reference == "AAPL")
             .times(1)
@@ -1488,6 +1843,8 @@ mod tests {
     #[tokio::test]
     async fn test_create_asset_normalizes_reference_trims_spaces() {
         let mut ar = MockAssetRepository::new();
+        ar.expect_get_all_including_archived()
+            .returning(|| Ok(vec![]));
         ar.expect_create()
             .withf(|a| a.reference == "AAPL")
             .times(1)
@@ -1513,6 +1870,8 @@ mod tests {
     #[tokio::test]
     async fn test_create_asset_passes_interest_bearing_flag() {
         let mut ar = MockAssetRepository::new();
+        ar.expect_get_all_including_archived()
+            .returning(|| Ok(vec![]));
         ar.expect_create()
             .withf(|a| a.interest_bearing)
             .times(1)
@@ -1545,6 +1904,7 @@ mod tests {
         let svc = make_svc(ar, cr, MockAssetPriceRepository::new());
         let err = svc
             .update_asset(UpdateAssetDTO {
+                kind: None,
                 asset_id: "asset-id".to_string(),
                 name: "Apple Updated".to_string(),
                 reference: "AAPL".to_string(),
@@ -2502,6 +2862,7 @@ mod tests {
 
         let err = svc
             .update_asset(UpdateAssetDTO {
+                kind: None,
                 asset_id: "a-id".to_string(),
                 name: "New".to_string(),
                 reference: "REF".to_string(),
@@ -2534,6 +2895,7 @@ mod tests {
 
         let err = svc
             .update_asset(UpdateAssetDTO {
+                kind: None,
                 asset_id: "a-id".to_string(),
                 name: "New".to_string(),
                 reference: "REF".to_string(),
@@ -2636,6 +2998,7 @@ mod tests {
 
         let err = svc
             .update_asset(UpdateAssetDTO {
+                kind: None,
                 asset_id: "system-cash-USD".to_string(),
                 name: "Renamed".to_string(),
                 reference: "USD".to_string(),
@@ -2902,6 +3265,8 @@ mod tests {
         cr.expect_get_by_id()
             .return_once(|_| Ok(Some(make_category())));
         let mut ar = MockAssetRepository::new();
+        ar.expect_get_all_including_archived()
+            .returning(|| Ok(vec![]));
         ar.expect_create()
             .return_once(|_| Err(SimulatedDbError.into()));
         let svc = make_svc(ar, cr, MockAssetPriceRepository::new());

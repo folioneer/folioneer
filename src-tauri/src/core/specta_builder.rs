@@ -115,6 +115,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             asset::get_assets_with_archived,
             asset::get_non_cash_assets,
             asset::add_asset,
+            asset::get_assets_to_settle,
             asset::update_asset,
             asset::unarchive_asset,
             asset::block_asset_price_refresh,
