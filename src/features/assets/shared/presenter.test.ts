@@ -78,6 +78,33 @@ describe("assetMutationErrorToI18n", () => {
     });
   });
 
+  // AST-032 — the refusal of an asset that already exists names it.
+  it("AssetAlreadyExists names the existing asset", () => {
+    expect(
+      assetMutationErrorToI18n({
+        code: "AssetAlreadyExists",
+        existing_id: "a1",
+        existing_name: "ASML Holding",
+      }),
+    ).toEqual({ key: "error.AssetAlreadyExists", vars: { existing_name: "ASML Holding" } });
+  });
+
+  // AST-031 — what a kind forbids has its own message, never the unknown one.
+  it("maps what a kind forbids to its own message", () => {
+    expect(assetMutationErrorToI18n({ code: "IsinRequired" })).toEqual({
+      key: "error.IsinRequired",
+    });
+    expect(assetMutationErrorToI18n({ code: "IsinNotAllowed", kind: "Custom" })).toEqual({
+      key: "error.IsinNotAllowed",
+    });
+    expect(assetMutationErrorToI18n({ code: "ExchangeNotAllowed", kind: "Crypto" })).toEqual({
+      key: "error.ExchangeNotAllowed",
+    });
+    expect(
+      assetMutationErrorToI18n({ code: "ClassNotAllowed", kind: "Listed", class: "DigitalAsset" }),
+    ).toEqual({ key: "error.ClassNotAllowed" });
+  });
+
   it("InvalidCurrency interpolates the currency payload", () => {
     expect(assetMutationErrorToI18n({ code: "InvalidCurrency", currency: "ZZZ" })).toEqual({
       key: "error.InvalidCurrency",

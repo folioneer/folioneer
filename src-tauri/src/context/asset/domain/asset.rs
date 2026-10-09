@@ -171,13 +171,35 @@ impl AssetCreationDefaults {
     }
 }
 
+/// The rule an asset to settle breaks (AST-035): one of what its kind forbids (AST-031), or
+/// being the same as another asset (AST-032).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+#[serde(tag = "code")]
+pub enum KindProblem {
+    /// Its class and its kind do not go together.
+    ClassNotAllowed,
+    /// It is listed and has no ISIN.
+    IsinRequired,
+    /// It is not listed and has an ISIN.
+    IsinNotAllowed,
+    /// It is not listed and is on an exchange.
+    ExchangeNotAllowed,
+    /// It is the same asset as another.
+    SameAsAnother {
+        /// The other asset.
+        other_id: String,
+        /// Its name, for the interface to show.
+        other_name: String,
+    },
+}
+
 /// An asset the rules of its kind would refuse today, and the first rule it breaks (AST-035).
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct AssetToSettle {
     /// The asset, as it is.
     pub asset: Asset,
-    /// What its kind forbids, or the asset it is the same as.
-    pub problem: AssetError,
+    /// The rule it breaks.
+    pub problem: KindProblem,
 }
 
 /// A financial instrument or resource held by a user.
@@ -332,14 +354,19 @@ impl Asset {
 
     /// AST-031 — the rule of its kind this asset breaks, if any: one that existed before
     /// kinds may break one, and is left as it is for the user to settle (AST-035).
-    pub fn kind_problem(&self) -> Option<AssetError> {
-        Self::ensure_kind_allows(
+    pub fn kind_problem(&self) -> Option<KindProblem> {
+        match Self::ensure_kind_allows(
             self.kind,
             &self.class,
             self.isin.as_deref(),
             self.exchange.as_ref(),
-        )
-        .err()
+        ) {
+            Err(AssetError::ClassNotAllowed { .. }) => Some(KindProblem::ClassNotAllowed),
+            Err(AssetError::IsinRequired) => Some(KindProblem::IsinRequired),
+            Err(AssetError::IsinNotAllowed { .. }) => Some(KindProblem::IsinNotAllowed),
+            Err(AssetError::ExchangeNotAllowed { .. }) => Some(KindProblem::ExchangeNotAllowed),
+            _ => None,
+        }
     }
 
     /// AST-032 — whether `other` is the same asset as this one: two listed assets sharing
@@ -1566,7 +1593,7 @@ mod kind_tests {
         }
         let cash = build(AssetKind::Cash, AssetClass::Cash, "EUR", None, None, "EUR")
             .expect("the application's cash");
-        assert_eq!(cash.kind_problem().map(|problem| problem.to_string()), None);
+        assert_eq!(cash.kind_problem(), None);
     }
 
     // AST-031 — changing an asset checks the rules of the kind it is given.
@@ -1662,12 +1689,37 @@ mod kind_tests {
             false,
             false,
         );
-        assert!(matches!(
+        assert_eq!(
             custom_on_an_exchange.kind_problem(),
-            Some(AssetError::ExchangeNotAllowed {
-                kind: AssetKind::Custom
-            })
-        ));
+            Some(KindProblem::ExchangeNotAllowed)
+        );
+        let listed_without_an_isin = Asset {
+            kind: AssetKind::Listed,
+            exchange: None,
+            ..custom_on_an_exchange.clone()
+        };
+        assert_eq!(
+            listed_without_an_isin.kind_problem(),
+            Some(KindProblem::IsinRequired)
+        );
+        let custom_with_an_isin = Asset {
+            isin: Some(ISIN.to_string()),
+            exchange: None,
+            ..custom_on_an_exchange.clone()
+        };
+        assert_eq!(
+            custom_with_an_isin.kind_problem(),
+            Some(KindProblem::IsinNotAllowed)
+        );
+        let crypto_of_another_class = Asset {
+            kind: AssetKind::Crypto,
+            exchange: None,
+            ..custom_on_an_exchange
+        };
+        assert_eq!(
+            crypto_of_another_class.kind_problem(),
+            Some(KindProblem::ClassNotAllowed)
+        );
     }
 
     // AST-032 — two listed assets are the same when they share ISIN, exchange and currency.

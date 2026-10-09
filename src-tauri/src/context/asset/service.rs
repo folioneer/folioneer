@@ -1,7 +1,7 @@
 use super::domain::{
     Asset, AssetCategory, AssetCategoryRepository, AssetClass, AssetKind, AssetPrice,
     AssetPriceRepository, AssetPriceSource, AssetRepository, AssetToSettle, DatedClose,
-    PriceHistoryBackfillOutcome, SYSTEM_CATEGORY_ID,
+    KindProblem, PriceHistoryBackfillOutcome, SYSTEM_CATEGORY_ID,
 };
 use super::error::AssetError;
 use crate::{
@@ -294,9 +294,9 @@ impl AssetService {
                     assets
                         .iter()
                         .find(|other| asset.is_same_as(other))
-                        .map(|same| AssetError::AssetAlreadyExists {
-                            existing_id: same.id.clone(),
-                            existing_name: same.name.clone(),
+                        .map(|same| KindProblem::SameAsAnother {
+                            other_id: same.id.clone(),
+                            other_name: same.name.clone(),
                         })
                 })?;
                 Some(AssetToSettle {
@@ -1570,9 +1570,8 @@ mod tests {
             .iter()
             .map(|entry| {
                 let problem = match &entry.problem {
-                    AssetError::ExchangeNotAllowed { .. } => "exchange".to_string(),
-                    AssetError::AssetAlreadyExists { existing_id, .. } => existing_id.clone(),
-                    other => other.to_string(),
+                    KindProblem::SameAsAnother { other_id, .. } => other_id.clone(),
+                    other => format!("{other:?}"),
                 };
                 (entry.asset.id.as_str(), problem)
             })
@@ -1580,7 +1579,7 @@ mod tests {
         assert_eq!(
             reported,
             vec![
-                ("on-exchange", "exchange".to_string()),
+                ("on-exchange", "ExchangeNotAllowed".to_string()),
                 ("twin-a", "twin-archived".to_string()),
                 ("twin-archived", "twin-a".to_string()),
             ]

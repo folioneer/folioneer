@@ -138,24 +138,20 @@ struct AssetCategory {
 }
 
 // AST-035 — an asset the rules of its kind would refuse today, as it is, with the first
-// rule it breaks: one of the AST-031 codes, or `AssetAlreadyExists` naming the asset it is
-// the same as.
+// rule it breaks.
 struct AssetToSettle {
     asset: Asset,
-    problem: AssetError,
+    problem: KindProblem,
 }
 
-// Canonical reference to a trading venue, independent of any market-data provider.
-// AST Entity Definition. Provider symbols (Yahoo venue suffixes, OpenFIGI exchange
-// codes) are resolved by per-provider mappers at the boundary, NOT stored here.
-struct Exchange {
-    code: String,                // ISO 10383 Market Identifier Code (MIC), e.g. "XPAR", "XNAS"
-    label: String,               // human-readable display name, e.g. "Euronext Paris"
+// Serialized as `{ code: "VariantName", ...payload }`, like an error.
+enum KindProblem {
+    ClassNotAllowed,      // its class and its kind do not go together (AST-031)
+    IsinRequired,         // listed, without an ISIN (AST-031)
+    IsinNotAllowed,       // not listed, with an ISIN (AST-031)
+    ExchangeNotAllowed,   // not listed, on an exchange (AST-031)
+    SameAsAnother { other_id: String, other_name: String }, // AST-032
 }
-
-// Note on write DTOs: CreateAssetDTO and UpdateAssetDTO carry `category_id: String`
-// (the FK), not the nested `AssetCategory`. The service resolves the id to the
-// aggregate at write time and the read shape returns the resolved category.
 ```
 
 ```rust
@@ -321,7 +317,7 @@ struct PriceHistoryBackfillOutcome {
 
 ## Changelog
 
-- 2026-10-09 — AST-030–032: `Asset.kind`, the `AssetKind` enum, `kind` on the inputs of `add_asset` and `update_asset`, and five codes on both (`IsinRequired`, `IsinNotAllowed`, `ExchangeNotAllowed`, `ClassNotAllowed`, `AssetAlreadyExists`); new `get_assets_to_settle` command and `AssetToSettle` shared type (AST-035).
+- 2026-10-09 — AST-030–032: `Asset.kind`, the `AssetKind` enum, `kind` on the inputs of `add_asset` and `update_asset`, and five codes on both (`IsinRequired`, `IsinNotAllowed`, `ExchangeNotAllowed`, `ClassNotAllowed`, `AssetAlreadyExists`); new `get_assets_to_settle` command with the `AssetToSettle` and `KindProblem` shared types (AST-035).
 - 2026-10-03 — CSH-015: `add_asset` rejects `class = Cash` with `CashAssetNotEditable`.
 - 2026-09-27 — #038: the public build has no External provider; `YahooFinance` is written only by a Yahoo Finance provider (the owner's private build). No wire change.
 - 2026-09-19 — Amended by `market-price` spec (MKT-200–203): new `get_price_freshness` command and `PriceFreshness` shared type. No event added; the header item re-reads on `AssetPriceFetchCompleted`, `AssetPriceUpdated`, `TransactionUpdated` and `SyncCompleted`.

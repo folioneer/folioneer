@@ -1883,9 +1883,9 @@ export type AssetToSettle = {
  */
 asset: Asset; 
 /**
- * What its kind forbids, or the asset it is the same as.
+ * The rule it breaks.
  */
-problem: AssetError }
+problem: KindProblem }
 /**
  * Parameters for recording a purchase of an asset into an account.
  */
@@ -3195,6 +3195,31 @@ cash_in: number | null;
  * whatever the filter (micro-units).
  */
 cash_balance: number }
+/**
+ * The rule an asset to settle breaks (AST-035): one of what its kind forbids (AST-031), or
+ * being the same as another asset (AST-032).
+ */
+export type KindProblem = 
+/**
+ * Its class and its kind do not go together.
+ */
+{ code: "ClassNotAllowed" } | 
+/**
+ * It is listed and has no ISIN.
+ */
+{ code: "IsinRequired" } | 
+/**
+ * It is not listed and has an ISIN.
+ */
+{ code: "IsinNotAllowed" } | 
+/**
+ * It is not listed and is on an exchange.
+ */
+{ code: "ExchangeNotAllowed" } | 
+/**
+ * It is the same asset as another.
+ */
+{ code: "SameAsAnother"; other_id: string; other_name: string }
 /**
  * PRF-087 — why the lifetime metrics (since-inception %, annualized yield) cannot be
  * computed: the Simple Dietz denominator over the lifetime span is not positive (PRF-032).
