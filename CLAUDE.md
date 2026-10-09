@@ -51,7 +51,7 @@ Headless, a question only the human can answer goes into the entry's `**Open que
 - **After completing**, update the source docs in the same PR: the spec rules (+ `spec-reviewer`), the contract (+ `contract-reviewer`), an ADR only for a technical choice (`/adr-writer` + `adr-reviewer`), `docs/lessons.md` for an empirical failure worth teaching, `ARCHITECTURE.md` when a top-level folder appears.
 - **Vocabulary**: `docs/ubiquitous-language.md` — use confirmed terms in identifiers, comments and logs; never extend a discrepant one; changes need the owner. Give it to every reviewer you launch.
 - **Skills**: `/next-todo`, `/design-proposal NNN`, `/visual-proof`, `/adr-writer`, `/dep-audit`, `/prune`, `/whats-next`, `/flow-audit` (after a release).
-- **Agents**: the reviewers matched to the diff (locally until no 🔴, and in CI on every push); `reviewer-security` before every release; `spec-checker` before closing an entry with spec rules; `spec-reviewer` / `contract-reviewer` / `adr-reviewer` when those documents change.
+- **Agents**: the reviewers matched to the diff (locally until no 🔴, and in CI on every push); `reviewer-security` before every release; `spec-checker` before closing an entry with spec rules, and before a release on every spec the batch touched (`bash scripts/batch-specs.sh`); `spec-reviewer` / `contract-reviewer` / `adr-reviewer` when those documents change.
 - **Task tracking**: `TaskCreate` / `TaskUpdate` for any task of more than one file or step.
 - **Plans** (asked in chat): exact paths, functions and components per layer, gold work with its size, the tests for each clause. Once the human says go, the plan is the authority for the batch.
 

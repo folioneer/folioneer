@@ -70,20 +70,6 @@ sweep found two bugs no reviewer had.
 - Costs: minutes per entry. Protects: a pull request written to a promise the rules
   refuse.
 
-## FLOW-007 — A spec promised what the code did not do
-
-- Kind: quality
-- Observed: CSH-015 said the core refuses the Cash class (it did not), TRX-032 that a
-  correction can change the asset (it cannot — TD-063). `spec-checker` runs only when an
-  entry with spec rules closes, so a rule nobody touches is never re-read.
-- Proposal: before a release, `spec-checker` runs once on every spec the batch touched,
-  and its findings are filed as debt, not fixed in the release.
-- Costs: one agent run per touched spec at release time. Protects: the specs' claim to
-  describe the application.
-- 0.6.0: `spec-checker` was not run once, although three entries closed with spec rules
-  (TD-071, TD-063, #058), and closing TD-063 found a third promise the code does not keep
-  (TD-078). The figures argue for the proposal.
-
 ## FLOW-008 — The same reviewers run locally and in CI
 
 - Kind: quality + speed

@@ -1,6 +1,6 @@
 ---
 name: spec-checker
-description: Checks that every rule (TRIGRAM-NNN) of a feature spec is implemented and tested. Use before closing an entry that carries spec rules.
+description: Checks that every rule (TRIGRAM-NNN) of a feature spec is implemented and tested. Use before closing an entry that carries spec rules, and before a release on every spec the batch touched.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---
@@ -26,6 +26,7 @@ The user normally passes the spec path explicitly. If no document is specified, 
 
 - **After implementation is complete** — once code and tests exist for the feature, as the final spec-compliance gate before commit
 - **Before closing an entry that carries rules** (`docs/workflow.md`) — its sign-off (every rule implemented + tested) is the gate before the closing commit
+- **Before a release** — once on every spec the batch touched (`bash scripts/batch-specs.sh` lists them); what it finds is filed as tech debt, not fixed in that release (`docs/workflow.md` § 3)
 - **After re-implementation** — when the user fixes gaps and re-runs, run again to confirm full coverage
 
 ---
