@@ -578,6 +578,33 @@ mod tests {
         assert_eq!(status.device_name.as_deref(), Some("Laptop"));
     }
 
+    // SYN-082/084 — a device that detected a reset leaves without touching the folder, and
+    // what it remembered of its runs goes with its device state: a later status starts
+    // from nothing.
+    #[tokio::test]
+    async fn leave_sync_after_a_reset_skips_the_folder_and_forgets_its_runs() {
+        let mut state_repo = repository_remembering_syncs();
+        state_repo
+            .expect_get_device()
+            .returning(|| Ok(Some(active_device())));
+        state_repo
+            .expect_discard_device_state()
+            .times(1)
+            .returning(|| Ok(()));
+        let service = SyncService::new(Arc::new(state_repo), Arc::new(MockFolderStore::new()));
+        let mut reset = quiet_report("2026-08-22T10:00:00Z");
+        reset.failures = vec![SyncFailure::PortfolioReset];
+        service.remember_run(&mut reset).await;
+        assert!(service.last_run().is_some());
+
+        service
+            .leave_sync()
+            .await
+            .expect("a device that detected a reset leaves");
+
+        assert!(service.last_run().is_none());
+    }
+
     // SYN-010 — leave_sync rejects SyncDisabled while never enabled.
     #[tokio::test]
     async fn leave_sync_rejects_when_disabled() {

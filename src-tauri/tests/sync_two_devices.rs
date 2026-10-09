@@ -50,6 +50,7 @@ async fn make_pool() -> sqlx::Pool<sqlx::Sqlite> {
 /// (SYN-020: every synced repository records through the real change recorder).
 struct Ctx {
     orchestrator: PortfolioSyncOrchestrator,
+    sync_service: Arc<SyncService>,
     account_service: Arc<AccountService>,
     asset_service: Arc<AssetService>,
     currency_service: Arc<CurrencyService>,
@@ -151,7 +152,7 @@ async fn build_ctx_on_bus(folder: &std::path::Path, bus: Arc<SideEffectEventBus>
         account_service: account_service.clone(),
         asset_service: asset_service.clone(),
         currency_service: currency_service.clone(),
-        sync_service,
+        sync_service: sync_service.clone(),
         first_publish,
         sync_run,
         state_repo,
@@ -159,6 +160,7 @@ async fn build_ctx_on_bus(folder: &std::path::Path, bus: Arc<SideEffectEventBus>
     });
     Ctx {
         orchestrator,
+        sync_service,
         account_service,
         asset_service,
         currency_service,
@@ -885,6 +887,312 @@ fn segment_names(area: &std::path::Path) -> std::collections::BTreeSet<String> {
                 .to_string()
         })
         .collect()
+}
+
+/// The one area of `dir` that is not `other`: the second device's.
+fn other_area(dir: &std::path::Path, other: &std::path::Path) -> std::path::PathBuf {
+    std::fs::read_dir(dir.join("devices"))
+        .expect("devices")
+        .map(|entry| entry.expect("entry").path())
+        .find(|area| area != other)
+        .expect("a second area")
+}
+
+/// Makes every later segment write of `area` fail while the folder itself stays
+/// available: its segments directory becomes a file.
+fn break_segment_writes(area: &std::path::Path) {
+    let segments = area.join("segments");
+    std::fs::remove_dir_all(&segments).expect("segments removed");
+    std::fs::write(&segments, b"not a directory").expect("segments replaced");
+}
+
+async fn logical_clock(ctx: &Ctx) -> i64 {
+    sqlx::query_scalar("SELECT logical_clock FROM sync_device")
+        .fetch_one(&ctx.pool)
+        .await
+        .expect("an enrolled device")
+}
+
+async fn latest_timestamp(ctx: &Ctx) -> i64 {
+    let latest: String = sqlx::query_scalar("SELECT MAX(logical_timestamp) FROM changes")
+        .fetch_one(&ctx.pool)
+        .await
+        .expect("changes");
+    latest.parse().expect("a logical timestamp is a number")
+}
+
+// SYN-013 — a first publish stamps the whole portfolio one tick after the device's clock,
+// and the device carries on from there.
+#[tokio::test]
+async fn syn_013_a_first_publish_ticks_the_clock_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let desktop = build_ctx(dir.path()).await;
+    seed_small_portfolio(&desktop).await;
+    let before: i64 = sqlx::query_scalar("SELECT COALESCE(MAX(logical_clock), 0) FROM sync_device")
+        .fetch_one(&desktop.pool)
+        .await
+        .unwrap();
+    assert_eq!(before, 0, "a device that never synced has not ticked");
+
+    desktop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Desktop".into(),
+        )
+        .await
+        .expect("Desktop must enable as the first device");
+
+    assert_eq!(latest_timestamp(&desktop).await, 1);
+    assert_eq!(logical_clock(&desktop).await, 1);
+}
+
+// SYN-036 — a device that joins starts its clock one tick after the latest change of the
+// history it replayed, so its first change ranks after everything it has seen.
+#[tokio::test]
+async fn syn_036_a_joined_device_starts_its_clock_after_the_history() {
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, _laptop, account_id, _desktop_area) = two_devices_sharing(dir.path()).await;
+    desktop
+        .account_service
+        .record_deposit(&account_id, "2026-02-01".into(), 5_000_000, None)
+        .await
+        .unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    let history_ends_at = latest_timestamp(&desktop).await;
+    assert!(history_ends_at > 1, "the history has more than one tick");
+
+    let tablet = build_ctx(dir.path()).await;
+    tablet
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Tablet".into(),
+        )
+        .await
+        .expect("Tablet must join");
+
+    assert_eq!(logical_clock(&tablet).await, history_ends_at + 1);
+}
+
+// SYN-013/036 — a portfolio with nothing to publish is still one a device can join: its
+// origin says it has published nothing.
+#[tokio::test]
+async fn syn_036_an_empty_portfolio_can_be_joined() {
+    let dir = tempfile::tempdir().unwrap();
+    let desktop = build_ctx(dir.path()).await;
+    desktop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Desktop".into(),
+        )
+        .await
+        .expect("an empty installation enables as the first device");
+    let published: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM changes")
+        .fetch_one(&desktop.pool)
+        .await
+        .unwrap();
+    assert_eq!(published, 0, "an empty portfolio publishes no change");
+
+    let laptop = build_ctx(dir.path()).await;
+    laptop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Laptop".into(),
+        )
+        .await
+        .expect("Laptop must join an empty portfolio");
+    laptop.orchestrator.sync_now().await.expect("a first sync");
+    let status = laptop.orchestrator.get_sync_status().await.unwrap();
+    let origin = status
+        .roster
+        .iter()
+        .find(|device| device.device_name == "Desktop")
+        .expect("Desktop in the roster");
+    assert_eq!(origin.published_changes, 0);
+}
+
+// SYN-082 — leaving publishes what is unpublished, takes the device's manifest out of the
+// folder and disables sync here; the portfolio stays.
+#[tokio::test]
+async fn syn_082_leaving_removes_the_manifest_and_disables_sync() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_desktop, laptop, _account_id, desktop_area) = two_devices_sharing(dir.path()).await;
+    let laptop_area = other_area(dir.path(), &desktop_area);
+    let manifest = laptop_area.join("manifest.bin");
+    assert!(manifest.exists(), "a device that joined has its manifest");
+    let account_id = laptop.account_service.get_all().await.unwrap()[0]
+        .id
+        .clone();
+    laptop
+        .account_service
+        .record_deposit(&account_id, "2026-02-01".into(), 5_000_000, None)
+        .await
+        .unwrap();
+
+    laptop
+        .sync_service
+        .leave_sync()
+        .await
+        .expect("Laptop leaves");
+
+    assert!(
+        !manifest.exists(),
+        "the manifest is taken out of the folder"
+    );
+    assert_eq!(
+        segment_names(&laptop_area).len(),
+        1,
+        "what was unpublished is published before leaving, and the area stays"
+    );
+    assert!(!laptop.orchestrator.get_sync_status().await.unwrap().enabled);
+    assert_eq!(
+        laptop.account_service.get_all().await.unwrap().len(),
+        1,
+        "the portfolio stays on the device that left"
+    );
+}
+
+// SYN-082 — a device whose unpublished changes cannot be written does not leave: its
+// work is never abandoned.
+#[tokio::test]
+async fn syn_082_leaving_is_refused_while_unpublished_changes_cannot_be_written() {
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, _laptop, account_id, desktop_area) = two_devices_sharing(dir.path()).await;
+    desktop
+        .account_service
+        .record_deposit(&account_id, "2026-02-01".into(), 5_000_000, None)
+        .await
+        .unwrap();
+    break_segment_writes(&desktop_area);
+
+    let refused = desktop
+        .sync_service
+        .leave_sync()
+        .await
+        .expect_err("unpublished changes keep the device in");
+
+    assert_eq!(
+        serde_json::to_value(&refused).unwrap()["code"],
+        "PublishFailed"
+    );
+    assert!(
+        desktop
+            .orchestrator
+            .get_sync_status()
+            .await
+            .unwrap()
+            .enabled
+    );
+}
+
+// SYN-073 — resuming publishes what was recorded while paused and the device is no longer
+// paused.
+#[tokio::test]
+async fn syn_073_resuming_ends_the_pause() {
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, _laptop, account_id, desktop_area) = two_devices_sharing(dir.path()).await;
+    desktop.sync_service.pause_sync().await.expect("paused");
+    assert!(desktop.orchestrator.get_sync_status().await.unwrap().paused);
+    desktop
+        .account_service
+        .record_deposit(&account_id, "2026-02-01".into(), 5_000_000, None)
+        .await
+        .unwrap();
+    let published_before = segment_names(&desktop_area);
+
+    desktop.orchestrator.resume_sync().await.expect("resumed");
+
+    assert!(!desktop.orchestrator.get_sync_status().await.unwrap().paused);
+    assert_eq!(
+        segment_names(&desktop_area).len(),
+        published_before.len() + 1,
+        "what was recorded while paused is published on resuming"
+    );
+}
+
+// SYN-073 — a device whose paused-era changes cannot be written stays paused.
+#[tokio::test]
+async fn syn_073_resuming_is_refused_while_the_publish_fails() {
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, _laptop, account_id, desktop_area) = two_devices_sharing(dir.path()).await;
+    desktop.sync_service.pause_sync().await.expect("paused");
+    desktop
+        .account_service
+        .record_deposit(&account_id, "2026-02-01".into(), 5_000_000, None)
+        .await
+        .unwrap();
+    break_segment_writes(&desktop_area);
+
+    let refused = desktop
+        .orchestrator
+        .resume_sync()
+        .await
+        .expect_err("the publish fails");
+
+    assert_eq!(
+        serde_json::to_value(&refused).unwrap()["code"],
+        "PublishFailed"
+    );
+    assert!(desktop.orchestrator.get_sync_status().await.unwrap().paused);
+}
+
+// SYN-035 — a folder whose header this build reads, but where a device already publishes
+// in a newer data format, is not joined either: the device is told to update, not that
+// the history is incomplete, and nothing of it is left in the folder.
+#[tokio::test]
+async fn syn_035_a_device_publishing_in_a_newer_data_format_stops_the_join() {
+    let dir = tempfile::tempdir().unwrap();
+    let desktop = build_ctx(dir.path()).await;
+    seed_small_portfolio(&desktop).await;
+    desktop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Desktop".into(),
+        )
+        .await
+        .expect("Desktop must enable as the first device");
+    let desktop_area = std::fs::read_dir(dir.path().join("devices"))
+        .unwrap()
+        .next()
+        .expect("Desktop's area")
+        .unwrap()
+        .path();
+    let manifest_path = desktop_area.join("manifest.bin");
+    let mut manifest = std::fs::read(&manifest_path).unwrap();
+    manifest[..4].copy_from_slice(&(DATA_FORMAT_VERSION + 1).to_be_bytes());
+    std::fs::write(&manifest_path, manifest).unwrap();
+
+    let laptop = build_ctx(dir.path()).await;
+    let refused = laptop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Laptop".into(),
+        )
+        .await
+        .expect_err("a device publishing in a newer format stops the join");
+
+    let refusal = serde_json::to_value(&refused).unwrap();
+    assert_eq!(refusal["code"], "UpdateRequired");
+    assert_eq!(refusal["data_format_version"], DATA_FORMAT_VERSION + 1);
+    assert_eq!(
+        std::fs::read_dir(dir.path().join("devices"))
+            .unwrap()
+            .count(),
+        1,
+        "only Desktop's area is in the folder"
+    );
+    assert!(!laptop.orchestrator.get_sync_status().await.unwrap().enabled);
 }
 
 // SYN-035 — a folder written in a data format newer than this build's is not joined: the

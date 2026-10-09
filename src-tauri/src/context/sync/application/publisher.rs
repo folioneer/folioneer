@@ -153,6 +153,25 @@ mod tests {
         assert_eq!(publisher.publish_count(), 1);
     }
 
+    // SYN-067 — the publish fires at the end of the settling window itself, not one turn of
+    // the runtime later: a burst whose window has just elapsed is not put back to sleep.
+    #[tokio::test(start_paused = true)]
+    async fn a_burst_publishes_at_the_very_end_of_its_settling_window() {
+        let publisher = Publisher::new();
+        let fired = Arc::new(CounterCell::new(0));
+        let fired_for_callback = Arc::clone(&fired);
+        publisher
+            .notify_change(move || {
+                fired_for_callback.fetch_add(1, Ordering::SeqCst);
+            })
+            .await;
+
+        tokio::time::advance(SETTLING_INTERVAL).await;
+
+        assert_eq!(fired.load(Ordering::SeqCst), 1);
+        assert_eq!(publisher.publish_count(), 1);
+    }
+
     // SYN-067 — further changes inside the settling window restart it: the whole burst
     // publishes exactly once.
     #[tokio::test(start_paused = true)]

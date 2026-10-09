@@ -481,6 +481,72 @@ mod tests {
         assert!(state.format_readable);
     }
 
+    // SYN-014/027 — the cash asset the application seeds is not user data; an asset the user
+    // created is, on its own.
+    #[tokio::test]
+    async fn inspect_sync_folder_counts_a_user_asset_but_not_the_seeded_cash() {
+        let pool = make_pool().await;
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = build_ctx_with_state_repo(
+            &pool,
+            Arc::new(SqliteSyncStateRepository::new(pool.clone())),
+            Arc::new(crate::context::sync::FsFolderStore::new(dir.path())),
+        );
+        let holds_user_data = || async {
+            ctx.orchestrator
+                .inspect_sync_folder(dir.path().to_string_lossy().to_string())
+                .await
+                .expect("inspect_sync_folder never rejects")
+                .installation_holds_user_data
+        };
+
+        ctx.asset_service.seed_cash_asset("EUR").await.unwrap();
+        assert!(
+            !holds_user_data().await,
+            "SYN-027: a seeded cash asset is not user data"
+        );
+
+        ctx.asset_service
+            .create_asset(crate::context::asset::CreateAssetDTO {
+                name: "Apple".into(),
+                reference: "AAPL".into(),
+                isin: None,
+                class: crate::context::asset::AssetClass::Stocks,
+                currency: "USD".into(),
+                risk_level: 4,
+                category_id: crate::context::asset::SYSTEM_CATEGORY_ID.into(),
+                exchange: None,
+                interest_bearing: false,
+            })
+            .await
+            .unwrap();
+        assert!(
+            holds_user_data().await,
+            "SYN-014: an asset the user created is user data"
+        );
+    }
+
+    // SYN-014 — a category the user created is user data on its own.
+    #[tokio::test]
+    async fn inspect_sync_folder_counts_a_user_category() {
+        let pool = make_pool().await;
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = build_ctx_with_state_repo(
+            &pool,
+            Arc::new(SqliteSyncStateRepository::new(pool.clone())),
+            Arc::new(crate::context::sync::FsFolderStore::new(dir.path())),
+        );
+        ctx.asset_service.create_category("Tech").await.unwrap();
+
+        let state = ctx
+            .orchestrator
+            .inspect_sync_folder(dir.path().to_string_lossy().to_string())
+            .await
+            .expect("inspect_sync_folder never rejects");
+
+        assert!(state.installation_holds_user_data);
+    }
+
     // SYN-019 — a fresh installation and a missing folder: the problem is reported, never
     // thrown.
     #[tokio::test]
@@ -856,7 +922,9 @@ mod tests {
     }
 
     /// The folder as the joiner sees it: Desktop's area, and room for the joiner's manifest.
-    fn folder_holding(published: PublishedPortfolio) -> MockFolderStore {
+    /// `published` in a folder a join can read; what it does with the joining device's own
+    /// writes is the caller's to say.
+    fn readable_folder_holding(published: PublishedPortfolio) -> MockFolderStore {
         let mut folder_store = MockFolderStore::new();
         folder_store.expect_retarget().return_const(());
         folder_store.expect_check_available().returning(|| Ok(()));
@@ -879,6 +947,12 @@ mod tests {
         folder_store
             .expect_read_segment_bytes()
             .returning(move |_, _| Ok(Some(segment.clone())));
+        folder_store
+    }
+
+    /// `published` in a folder that takes a joining device's manifest.
+    fn folder_holding(published: PublishedPortfolio) -> MockFolderStore {
+        let mut folder_store = readable_folder_holding(published);
         folder_store
             .expect_write_manifest()
             .returning(|_, _| Ok(()));
@@ -1066,6 +1140,60 @@ mod tests {
                 .is_none(),
             "SYN-080: the change applied before the interruption must be rolled back"
         );
+    }
+
+    // SYN-080 — a join whose manifest cannot be written leaves nothing behind: its area is
+    // taken back out of the folder, no device is enrolled and the replayed portfolio is
+    // rolled back.
+    #[tokio::test]
+    async fn enable_sync_join_branch_leaves_nothing_when_its_manifest_cannot_be_written() {
+        let pool = make_pool().await;
+        let state_repo: Arc<dyn SyncStateRepository> =
+            Arc::new(SqliteSyncStateRepository::new(pool.clone()));
+        let published = published_portfolio(
+            vec![desktop_change(
+                1,
+                RecordKind::Account,
+                "account-desktop",
+                &account_content("account-desktop", "Livret A"),
+            )],
+            1,
+        );
+        let mut folder_store = readable_folder_holding(published);
+        folder_store.expect_write_manifest().returning(|_, _| {
+            Err(SyncError::PublishFailed {
+                problem: FolderProblem::IoFailure,
+            })
+        });
+        folder_store
+            .expect_remove_device_area()
+            .times(1)
+            .returning(|_| Ok(()));
+        let ctx = build_ctx_with_state_repo(&pool, state_repo, Arc::new(folder_store));
+
+        let result = ctx
+            .orchestrator
+            .enable_sync("/tmp/sync".into(), PASSPHRASE.into(), "Laptop".into())
+            .await;
+
+        assert!(
+            matches!(
+                result,
+                Err(PortfolioSyncError::Sync(SyncError::PublishFailed { .. }))
+            ),
+            "got {result:?}"
+        );
+        let device_row_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sync_device")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(device_row_count, 0);
+        assert!(ctx
+            .account_service
+            .get_by_id("account-desktop")
+            .await
+            .unwrap()
+            .is_none());
     }
 
     // -------------------------------------------------------------------------

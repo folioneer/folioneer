@@ -57,6 +57,15 @@ struct History {
     cursors: Vec<SyncCursor>,
 }
 
+/// A manifest or a segment a join could not read: one written in a newer data format asks
+/// for an update (SYN-035); anything else leaves the history incomplete (SYN-036).
+fn unreadable(error: SyncError) -> JoinError {
+    match error {
+        SyncError::UpdateRequired { .. } => JoinError::Sync(error),
+        _ => JoinError::HistoryIncomplete,
+    }
+}
+
 /// Reads one device's complete history: its manifest, then its segments, which must cover
 /// `1..=latest_sequence` without a gap (SYN-036).
 async fn read_device_history(
@@ -71,14 +80,8 @@ async fn read_device_history(
         .ok_or(JoinError::HistoryIncomplete)?;
     let manifest = decode_manifest(key, &manifest_bytes).map_err(|error| {
         tracing::warn!(target: BACKEND, device_id, err = %error, "join: manifest unreadable");
-        JoinError::HistoryIncomplete
+        unreadable(error)
     })?;
-    if manifest.data_format_version > DATA_FORMAT_VERSION {
-        return Err(SyncError::UpdateRequired {
-            data_format_version: manifest.data_format_version,
-        }
-        .into());
-    }
     let mut names: Vec<(i64, i64, String)> = folder_store
         .list_segment_names(device_id)
         .await?
@@ -97,14 +100,8 @@ async fn read_device_history(
             .ok_or(JoinError::HistoryIncomplete)?;
         let segment = decode_segment(key, &bytes).map_err(|error| {
             tracing::warn!(target: BACKEND, device_id, name = %name, err = %error, "join: segment unreadable");
-            JoinError::HistoryIncomplete
+            unreadable(error)
         })?;
-        if segment.data_format_version > DATA_FORMAT_VERSION {
-            return Err(SyncError::UpdateRequired {
-                data_format_version: segment.data_format_version,
-            }
-            .into());
-        }
         for segment_change in segment.changes {
             let sequence = segment_change.sequence;
             let change =
@@ -321,4 +318,204 @@ async fn rebuild(
         state_repo.upsert_cursor_on(conn, cursor).await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::sync::domain::{
+        segment_file_name, DerivationParameters, MockFolderStore, Segment,
+    };
+    use crate::context::sync::infrastructure::codec::encode_segment;
+    use crate::context::sync::infrastructure::crypto::{derive_key, Key};
+
+    const DEVICE: &str = "desktop-device";
+
+    fn key() -> Key {
+        let params = DerivationParameters {
+            salt: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+            memory_cost_kib: 19_456,
+            iterations: 2,
+            parallelism: 1,
+        };
+        derive_key("correct horse battery staple", &params).expect("valid parameters")
+    }
+
+    fn manifest_written_in(data_format_version: u32) -> Vec<u8> {
+        let manifest = Manifest {
+            device_id: DEVICE.into(),
+            device_name: "Desktop".into(),
+            data_format_version,
+            app_version: Some(APP_VERSION.to_string()),
+            latest_sequence: 1,
+        };
+        encode_manifest(&key(), &manifest).expect("sealed manifest")
+    }
+
+    fn segment_written_in(data_format_version: u32) -> Vec<u8> {
+        let segment = Segment {
+            device_id: DEVICE.into(),
+            first_sequence: 1,
+            last_sequence: 1,
+            data_format_version,
+            changes: vec![],
+        };
+        encode_segment(&key(), &segment).expect("sealed segment")
+    }
+
+    async fn read(folder_store: MockFolderStore) -> Result<usize, JoinError> {
+        let mut history = History {
+            changes: vec![],
+            cursors: vec![],
+        };
+        read_device_history(&folder_store, &key(), DEVICE, &mut history).await?;
+        Ok(history.cursors.len())
+    }
+
+    fn update_required(outcome: Result<usize, JoinError>) -> Option<u32> {
+        match outcome {
+            Err(JoinError::Sync(SyncError::UpdateRequired {
+                data_format_version,
+            })) => Some(data_format_version),
+            _ => None,
+        }
+    }
+
+    // SYN-035 — a device whose manifest was written in a newer data format is not read as
+    // an incomplete history: the joining device is told to update.
+    #[tokio::test]
+    async fn syn_035_a_manifest_in_a_newer_data_format_asks_for_an_update() {
+        let mut folder_store = MockFolderStore::new();
+        folder_store
+            .expect_read_manifest_bytes()
+            .returning(|_| Ok(Some(manifest_written_in(DATA_FORMAT_VERSION + 1))));
+
+        assert_eq!(
+            update_required(read(folder_store).await),
+            Some(DATA_FORMAT_VERSION + 1)
+        );
+    }
+
+    // SYN-035 — the same for one of its segments, its manifest being readable.
+    #[tokio::test]
+    async fn syn_035_a_segment_in_a_newer_data_format_asks_for_an_update() {
+        let mut folder_store = MockFolderStore::new();
+        folder_store
+            .expect_read_manifest_bytes()
+            .returning(|_| Ok(Some(manifest_written_in(DATA_FORMAT_VERSION))));
+        folder_store
+            .expect_list_segment_names()
+            .returning(|_| Ok(vec![segment_file_name(1, 1)]));
+        folder_store
+            .expect_read_segment_bytes()
+            .returning(|_, _| Ok(Some(segment_written_in(DATA_FORMAT_VERSION + 1))));
+
+        assert_eq!(
+            update_required(read(folder_store).await),
+            Some(DATA_FORMAT_VERSION + 1)
+        );
+    }
+
+    // SYN-036 — a history written in this build's format is read whole, and a file that
+    // cannot be opened leaves it incomplete.
+    #[tokio::test]
+    async fn syn_036_a_history_in_this_format_is_read_and_a_damaged_file_is_not() {
+        let mut readable = MockFolderStore::new();
+        readable
+            .expect_read_manifest_bytes()
+            .returning(|_| Ok(Some(manifest_written_in(DATA_FORMAT_VERSION))));
+        readable
+            .expect_list_segment_names()
+            .returning(|_| Ok(vec![segment_file_name(1, 1)]));
+        readable
+            .expect_read_segment_bytes()
+            .returning(|_, _| Ok(Some(segment_written_in(DATA_FORMAT_VERSION))));
+        assert!(matches!(read(readable).await, Ok(1)));
+
+        let mut damaged = MockFolderStore::new();
+        damaged.expect_read_manifest_bytes().returning(|_| {
+            let mut bytes = manifest_written_in(DATA_FORMAT_VERSION);
+            let last = bytes.len() - 1;
+            bytes[last] ^= 0xff;
+            Ok(Some(bytes))
+        });
+        assert!(matches!(
+            read(damaged).await,
+            Err(JoinError::HistoryIncomplete)
+        ));
+    }
+
+    // SYN-035 — a folder with both a file in a newer format and a gap reports the first
+    // one the read meets: the manifest, then the segments in order, a gap before the
+    // segment that follows it.
+    #[tokio::test]
+    async fn syn_035_the_first_problem_met_is_the_one_reported() {
+        let mut newer_then_short = MockFolderStore::new();
+        newer_then_short
+            .expect_read_manifest_bytes()
+            .returning(|_| {
+                let manifest = Manifest {
+                    device_id: DEVICE.into(),
+                    device_name: "Desktop".into(),
+                    data_format_version: DATA_FORMAT_VERSION,
+                    app_version: Some(APP_VERSION.to_string()),
+                    latest_sequence: 5,
+                };
+                Ok(Some(encode_manifest(&key(), &manifest).expect("sealed")))
+            });
+        newer_then_short
+            .expect_list_segment_names()
+            .returning(|_| Ok(vec![segment_file_name(1, 1)]));
+        newer_then_short
+            .expect_read_segment_bytes()
+            .returning(|_, _| Ok(Some(segment_written_in(DATA_FORMAT_VERSION + 1))));
+        assert_eq!(
+            update_required(read(newer_then_short).await),
+            Some(DATA_FORMAT_VERSION + 1),
+            "a newer segment is met before the history is found short of its manifest"
+        );
+
+        let mut gap_then_newer = MockFolderStore::new();
+        gap_then_newer
+            .expect_read_manifest_bytes()
+            .returning(|_| Ok(Some(manifest_written_in(DATA_FORMAT_VERSION))));
+        gap_then_newer
+            .expect_list_segment_names()
+            .returning(|_| Ok(vec![segment_file_name(2, 2)]));
+        gap_then_newer
+            .expect_read_segment_bytes()
+            .times(0)
+            .returning(|_, _| Ok(Some(segment_written_in(DATA_FORMAT_VERSION + 1))));
+        assert!(
+            matches!(
+                read(gap_then_newer).await,
+                Err(JoinError::HistoryIncomplete)
+            ),
+            "a missing first segment is met before the newer one that follows it"
+        );
+    }
+
+    // SYN-080 — an enrolment that does not complete takes the device's area back out of
+    // the folder; a folder that refuses is logged, never an error of its own.
+    #[tokio::test]
+    async fn syn_080_an_unfinished_enrolment_takes_its_area_out_of_the_folder() {
+        let mut folder_store = MockFolderStore::new();
+        folder_store
+            .expect_remove_device_area()
+            .withf(|device_id| device_id == DEVICE)
+            .times(1)
+            .returning(|_| Ok(()));
+        remove_device_area(&folder_store, DEVICE).await;
+
+        let mut refusing = MockFolderStore::new();
+        refusing
+            .expect_remove_device_area()
+            .times(1)
+            .returning(|_| {
+                Err(SyncError::FolderUnavailable {
+                    problem: FolderProblem::Missing,
+                })
+            });
+        remove_device_area(&refusing, DEVICE).await;
+    }
 }

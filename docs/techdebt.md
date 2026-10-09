@@ -7,7 +7,7 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `TD-NNN` reference (never renumbered, never reused; next free:
-TD-083) so the human can queue it in `docs/todo.md` § Next like any todo.
+TD-084) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -317,6 +317,15 @@ Remove an entry once it has been resolved.
 - Observation: the replay multiplies the quantity by the factor in 128 bits and casts the result back to 64 bits without a check. A factor large enough (far beyond any real split) makes the cast wrap: recording and the split check both then show a quantity that is wrong, or refuse a split for the wrong reason.
 - User value: None in practice — no real split comes near the bound; an absurd factor typed by mistake is refused with a clear reason.
 - Done when: a factor whose rescale cannot be stored is refused when the split is recorded and when it is checked, with one error code, shown by a test on each path.
+
+## 2026-10-09 — TD-083 — A currency pair alone stops a device from joining; the spec does not say so
+
+- Found by: `spec-checker`, closing TD-064
+- Where: `installation_holds_user_data` in `src-tauri/src/use_cases/portfolio_sync/orchestrator.rs` (its last test: any currency pair); `docs/spec/multi-device-sync.md` — SYN-014 (what counts as user data: accounts, user-created assets and categories, transactions, manual prices and rates) and SYN-083 (pairs fetched before joining are discarded by the rebuild)
+- Severity: 🟡
+- Observation: an installation whose only record is a declared currency pair is refused as "holding user data" when it joins, while SYN-014 does not list pairs and SYN-083 treats them as observations the rebuild replaces. Either the spec is missing a line (a pair the user declared is the user's) or the code refuses too much. No test covers that branch, so that either reading can be made true without one failing.
+- User value: A fresh installation that only declared a currency pair either joins, or is told why it cannot, as the rules say.
+- Done when: the owner says whether a declared currency pair is user data; SYN-014 and the code agree, and a test holds the answer.
 
 ## 2026-10-09 — TD-082 — The CI reviewers get the whole shell, narrowed by a list of refused commands
 
