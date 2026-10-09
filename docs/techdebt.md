@@ -362,4 +362,4 @@ Remove an entry once it has been resolved.
 - Severity: 🟡
 - Observation: recording a purchase on an archived asset unarchives it. Correcting one does not: the correction goes to the account alone. The correction form still shows the confirmation "saving will unarchive the asset" (TRX-029), then saves without doing it. Not verified by a test yet: the first step is one that corrects a purchase on an archived asset and reads the asset back.
 - User value: The confirmation shown before saving a correction says what saving does.
-- Done when: either a corrected purchase on an archived asset unarchives it, as recording does, or the rules and the confirmation stop saying so; one test shows which.
+- Done when: a corrected purchase on an archived asset unarchives it, as recording does (owner, 2026-10-09: "yes, unarchive it"), atomically with the correction (TRX-028); a test corrects a purchase on an archived asset and reads the asset back active.

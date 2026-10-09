@@ -146,10 +146,10 @@ Existing assets take a kind from what they carry: the Cash class is cash, the di
 
 **User value:** A user knows what to type to create an asset and what makes two assets the same or different; an asset created twice by mistake is refused, and one instrument held on two marketplaces is understood as such.
 **Done when:** in three pull requests. (1) The asset spec and the vocabulary define the four kinds and what identifies each; the kind is a column of the asset, filled for every existing asset by a migration that changes nothing else and travelling with the asset in sync; the core refuses what each kind forbids (an ISIN-less listed asset, a marketplace on a custom one, a second identical asset) with typed errors, and reports the existing assets the rules would refuse — sameness is enforced by the core's rules, not yet by a database constraint, which existing duplicates would break. (2) "Add asset" starts with Listed, Crypto or Custom and shows each kind's fields only; a listed asset starts from the lookup; a custom reference is proposed from the name; a refusal names the existing asset; an asset sharing its ISIN with another shows "also held as …"; cash appears as the application's. (3) The command line creates each kind and names an asset by name, reference or ISIN, with `reference@marketplace` for a shared reference, refusing an ambiguous one without listing.
-**Design:** none
+**Design:** validated
 **Open questions:** none
 
-The words "kind", "listed", "crypto" and "custom" enter the vocabulary with the first pull request, for the owner to confirm there.
+Vocabulary (owner, 2026-10-09): the terms are Kind — Listed, Crypto, Custom, Cash; in French "Nature" — "Coté", "Crypto", "Non coté", "Liquidités". Where a listed asset trades stays the Exchange ("Place de cotation"): "marketplace" above reads as Exchange, and the mock-up's "Marketplace" label is "Exchange". They enter the vocabulary with the first pull request.
 
 ## #051 — (fullstack) — An agent works on the portfolio through the open application (MCP)
 
@@ -167,7 +167,7 @@ The owner's first use (2026-10-04). An old account is entered from the start of 
 
 **User value:** With the application open, ask an agent "what is my portfolio worth?" or "record 10 shares of X in my PEA at 52 €" and see it done in the window, through the application's own rules — and know that nothing can reach the portfolio when the application is closed or the connection was not allowed.
 **Done when:** with the setting off, no channel exists; with it on, the program started with `--mcp` and no open application answers that the application is not open; a connection waits for the owner's answer in the window and a refusal gives the agent nothing; once allowed, the read tools (portfolio summary, accounts, holdings of an account, the two lists) answer from the running application; in a second pull request, the three recordings of the command line (opening balance, buy, sell) work, each shown in the window and logged; disconnecting or closing the application ends the grant; the header shows a connected agent; a recorded Claude Code session lists and calls the tools; Claude Desktop's set-up is documented; nothing listens on the network; a test proves another user's process cannot open the channel.
-**Design:** none
+**Design:** validated
 **Open questions:**
 
 - [x] Which recordings the agent gets. → An opening balance, a purchase, a sale, a deposit, a withdrawal, a dividend and a price at a date, each datable years back. Creating an asset that does not exist waits for #056. (Owner, 2026-10-04.)
