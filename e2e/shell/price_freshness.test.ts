@@ -1,7 +1,7 @@
 /**
- * E2E tests — Header price item (#023, MKT-200/202/203)
+ * E2E tests — Header price item (TODO-023, MKT-200/202/203)
  *
- * Todo entry: #023 — the header says which "sync" it is about and shows the price update
+ * Todo entry: TODO-023 — the header says which "sync" it is about and shows the price update
  * beside it.
  *
  * What this file proves on the real app:
@@ -47,7 +47,7 @@ describe("price_freshness", () => {
     await dismissLeftoverModal();
   });
 
-  it("#023: the header's price item follows a newly recorded price", async () => {
+  it("TODO-023: the header's price item follows a newly recorded price", async () => {
     await navigateToAccounts();
     const item = await $("#price-freshness");
     await item.waitForDisplayed({ timeout: 10000 });

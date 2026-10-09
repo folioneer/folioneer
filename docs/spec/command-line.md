@@ -2,7 +2,7 @@
 
 ## Context
 
-The installed program records holdings from a terminal or a script without opening a window (#044): an opening balance of an existing asset in an existing account, then a purchase or a sale. It starts the way the scheduled price download does (SPF-020), calls the same core as the window, and is checked by the same rules. All its text is English. The Windows program is built without a console, so PowerShell would neither show its output nor wait for its exit code; on Windows the commands therefore run in a small console program installed beside the main one (CLI-040). The README (§ Command line) documents calling it from a Linux terminal, from PowerShell and from WSL.
+The installed program records holdings from a terminal or a script without opening a window (TODO-044): an opening balance of an existing asset in an existing account, then a purchase or a sale. It starts the way the scheduled price download does (SPF-020), calls the same core as the window, and is checked by the same rules. All its text is English. The Windows program is built without a console, so PowerShell would neither show its output nor wait for its exit code; on Windows the commands therefore run in a small console program installed beside the main one (CLI-040). The README (§ Command line) documents calling it from a Linux terminal, from PowerShell and from WSL.
 
 ## Entity Definition
 

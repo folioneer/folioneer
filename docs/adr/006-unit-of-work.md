@@ -125,5 +125,5 @@ combination it needs.
 
 ## Guard
 
-- **Reversal looks like**: a use case writing two aggregates through separate service calls that each commit, or opening its own `pool.begin()` for them, instead of the unit of work (not yet implemented — TD-005).
+- **Reversal looks like**: a use case writing two aggregates through separate service calls that each commit, or opening its own `pool.begin()` for them, instead of the unit of work (not yet implemented — DEBT-005).
 - **Guard**: `reviewer-arch` matches the sign.

@@ -56,7 +56,7 @@ def granted_tools() -> list[str]:
 
 
 class NamedCommands(unittest.TestCase):
-    """TD-082 — the reviewers run the commands granted by name, and no other."""
+    """DEBT-082 — the reviewers run the commands granted by name, and no other."""
 
     REACHING_OUT = (
         "gh",

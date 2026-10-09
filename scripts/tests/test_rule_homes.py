@@ -1,4 +1,4 @@
-"""Tests for scripts/rule-homes.py (todo #050) — run with `just test-scripts`."""
+"""Tests for scripts/rule-homes.py (todo TODO-050) — run with `just test-scripts`."""
 
 import importlib.util
 import unittest
@@ -12,7 +12,7 @@ SPEC.loader.exec_module(rule_homes)
 
 
 class Definitions(unittest.TestCase):
-    # #050 — the three shapes a rule is defined with are recognised; a mention is not.
+    # TODO-050 — the three shapes a rule is defined with are recognised; a mention is not.
     def test_definitions_and_mentions(self):
         text = "\n".join(
             [
@@ -26,7 +26,7 @@ class Definitions(unittest.TestCase):
 
 
 class OneHome(unittest.TestCase):
-    # #050 — a rule defined in two places is reported with both homes.
+    # TODO-050 — a rule defined in two places is reported with both homes.
     def test_a_rule_defined_twice_is_reported(self):
         found = {
             "docs/backend-rules.md": ["B24", "B25"],
@@ -37,7 +37,7 @@ class OneHome(unittest.TestCase):
             {"B24": ["CLAUDE.md", "docs/backend-rules.md"]},
         )
 
-    # #050 — every rule in one place: nothing reported.
+    # TODO-050 — every rule in one place: nothing reported.
     def test_one_home_each_reports_nothing(self):
         self.assertEqual(rule_homes.duplicates({"a.md": ["B1"], "b.md": ["E1"]}), {})
 

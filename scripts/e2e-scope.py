@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Decides whether a pull request must run the E2E suite (todo #041).
+"""Decides whether a pull request must run the E2E suite (todo TODO-041).
 
 Reads the pull request's file paths on stdin, one per line, and prints `true` when the
 suite must run, `false` when the change holds records only. The E2E workflow calls it

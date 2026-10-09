@@ -323,7 +323,7 @@ Promotion destinations (see F28): generic UI hooks → `ui/hooks/`; generic comp
 **F29** — The frontend MUST be deterministically instrumentable: the same state renders the same DOM, and what a test or an assistive technology holds stays valid until the state it shows changes. Concretely:
 
 - A re-fetch after a change keeps the current content mounted. The loading state shows for the first load and for a change of key (another account, another date) only — never for an event-driven re-fetch, which would unmount and remount every row.
-- Every control a user or a test must reach carries a stable `id` (F25) and an accessible name; a clickable container holds a real control of its own rather than relying on a click bubbling from a child (TD-041).
+- Every control a user or a test must reach carries a stable `id` (F25) and an accessible name; a clickable container holds a real control of its own rather than relying on a click bubbling from a child (DEBT-041).
 - Pending, empty and error states are explicit elements with their own `id`, not the absence of content.
 
 A flaky E2E step is read as a symptom of a breach of this rule: the fix goes to the component or hook that made it fragile, not to a retry or a longer wait in the test.
@@ -345,4 +345,4 @@ what may be done) or a draft check returning the first problem and the figures i
 query parameters, the interface holding only the user's choice. A hook fetches and holds view
 state; a presenter formats. Architecture rule A12 fails on a new `validate*.ts` file or a new
 `.sort(` / `.filter(` in feature code; today's sites are frozen per file in `arch-allowlist.json`,
-one tech-debt entry per feature (TD-046–TD-053), and may only disappear.
+one tech-debt entry per feature (DEBT-046–DEBT-053), and may only disappear.

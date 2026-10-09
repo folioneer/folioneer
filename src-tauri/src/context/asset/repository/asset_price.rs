@@ -303,7 +303,7 @@ mod tests {
         pool
     }
 
-    // #020 — a retired provider's source reads as Manual, and only its first sighting in a
+    // TODO-020 — a retired provider's source reads as Manual, and only its first sighting in a
     // run is worth a log line.
     #[test]
     fn a_retired_provider_source_reads_as_manual_and_is_sighted_once() {

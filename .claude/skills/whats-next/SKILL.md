@@ -61,7 +61,7 @@ and the open issues, propose one queue of ten lines at most:
 1. What is already queued keeps the owner's order.
 2. An open pull request's entry comes first: finishing beats starting.
 3. Entries with user value before entries without; a 🔴 or 🟡 debt theme before a 🔵 one.
-4. A theme is proposed as one line (`TD-046–TD-053`), not one line per entry.
+4. A theme is proposed as one line (`DEBT-046–DEBT-053`), not one line per entry.
 5. Blocked entries are never proposed; they are listed with what they wait on.
 6. A ready flow entry is proposed like a debt theme. One whose figure moved in the last
    audit (the measured sections of `docs/flow.md`) comes before one that did not.
@@ -108,12 +108,12 @@ Print the output below, then save it to the path given by
 - {ref} — {title} — {ready | waits on the owner's decision}
 
 ### GitHub issues
-- gh#{n} — {title} — {the entries that name it | no entry}
+- gh{n} — {title} — {the entries that name it | no entry}
 
 ### Proposed queue
 1. {ref} — {why here}
 2. FLOW-{NNN} — {the figure that moved}
-3. gh#{n} — to file or close: {what it asks}
+3. gh{n} — to file or close: {what it asks}
 …
 10. {the last line the proposal may hold}
 ```

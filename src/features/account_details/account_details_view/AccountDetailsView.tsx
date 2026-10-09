@@ -299,7 +299,7 @@ export function AccountDetailsView() {
           </div>
         )}
 
-        {/* Content — #022: its horizontal scrollbar is the one rendered below the area */}
+        {/* Content — TODO-022: its horizontal scrollbar is the one rendered below the area */}
         <div
           id="holdings-scroll-area"
           ref={scrollAreaRef}
@@ -423,7 +423,7 @@ export function AccountDetailsView() {
               )}
 
               {/* ACD-048 — Closed positions section (collapsible) */}
-              {/* #022 — as wide as the window so it stays put while the active table
+              {/* TODO-022 — as wide as the window so it stays put while the active table
                   scrolls; when its own columns need more, it scrolls with the rest. */}
               {view.hasClosedHoldings && (
                 <div
@@ -442,7 +442,7 @@ export function AccountDetailsView() {
                     onClick={toggleClosedSection}
                     className="w-full flex items-center px-6 py-3 bg-m3-surface-container-high text-left hover:bg-m3-surface-container-highest"
                   >
-                    {/* #001 — the label stays in view while the tables scroll sideways */}
+                    {/* TODO-001 — the label stays in view while the tables scroll sideways */}
                     <span className="sticky left-6 flex items-center gap-2">
                       <ChevronDown
                         size={16}
@@ -462,7 +462,7 @@ export function AccountDetailsView() {
                           <th className={`m3-th ${PINNED_ACTIONS_HEADER}`}>
                             {t("transaction.column_actions")}
                           </th>
-                          {/* #021 — as wide as its content, like the rows' Asset cell */}
+                          {/* TODO-021 — as wide as its content, like the rows' Asset cell */}
                           <th className={`m3-th ${PINNED_ASSET_HEADER} w-px whitespace-nowrap`}>
                             {t("account_details.column_asset")}
                           </th>
@@ -506,7 +506,7 @@ export function AccountDetailsView() {
             </div>
           )}
         </div>
-        {/* #022 — the scrollbar of the columns that move: its track starts where the pinned
+        {/* TODO-022 — the scrollbar of the columns that move: its track starts where the pinned
             block ends. The content area above still scrolls natively, so this one is a
             pointer affordance only and stays out of the tab order and the accessibility tree. */}
         <div

@@ -88,7 +88,7 @@ const handlers = {
   handleAddTransaction: vi.fn(),
 };
 
-/** What `usePinnedScrollbar` reports; unmeasured by default, as under jsdom (#022). */
+/** What `usePinnedScrollbar` reports; unmeasured by default, as under jsdom (TODO-022). */
 const pinnedScrollbar = (overrides: Record<string, unknown> = {}) => ({
   scrollAreaRef: { current: null },
   scrollbarRef: { current: null },
@@ -303,8 +303,8 @@ describe("AccountDetailsView — add-transaction FAB (ACD-035/036)", () => {
   });
 });
 
-// #005 — Actions is the first column of both holdings tables, before Asset.
-describe("AccountDetailsView — column order (#005)", () => {
+// TODO-005 — Actions is the first column of both holdings tables, before Asset.
+describe("AccountDetailsView — column order (TODO-005)", () => {
   it("heads the active and closed tables with Actions, then Asset", () => {
     mockUseAccountDetailsView.mockReturnValue(makeView({ hasClosedHoldings: true }));
     render(<AccountDetailsView />);
@@ -324,10 +324,10 @@ describe("AccountDetailsView — column order (#005)", () => {
   });
 });
 
-// #021 — the closed table has few columns, so its Asset column must not take a share of
+// TODO-021 — the closed table has few columns, so its Asset column must not take a share of
 // the spare width; jsdom has no layout, so this asserts the shrink-to-fit classes and the
 // committed screenshots show the width.
-describe("AccountDetailsView — closed table Asset column (#021)", () => {
+describe("AccountDetailsView — closed table Asset column (TODO-021)", () => {
   it("sizes the closed table's Asset header to its content, leaving the active table's alone", () => {
     mockUseAccountDetailsView.mockReturnValue(makeView({ hasClosedHoldings: true }));
     render(<AccountDetailsView />);
@@ -346,12 +346,12 @@ describe("AccountDetailsView — closed table Asset column (#021)", () => {
   });
 });
 
-// #001 — jsdom has no layout: these assert the pinning classes; the scrolling itself
+// TODO-001 — jsdom has no layout: these assert the pinning classes; the scrolling itself
 // is checked on the real app by e2e/account_details/holdings_scrollbar.test.ts.
-// #001 — Actions and Asset stay pinned while the tables scroll sideways, and both
+// TODO-001 — Actions and Asset stay pinned while the tables scroll sideways, and both
 // tables scroll in the view's one content area, so the header sticks and a single
 // horizontal scrollbar stays in view.
-describe("AccountDetailsView — pinned columns (#001)", () => {
+describe("AccountDetailsView — pinned columns (TODO-001)", () => {
   const renderWithClosedOpen = () => {
     mockUseAccountDetailsView.mockReturnValue(makeView({ hasClosedHoldings: true }));
     render(<AccountDetailsView />);
@@ -383,14 +383,14 @@ describe("AccountDetailsView — pinned columns (#001)", () => {
     expect(scrollers[0]).toBe(scrollers[1]);
     // The active table's wrapper grows to its table, so row backgrounds span the whole
     // scrolled width; the column grows with it, which gives the closed section room to
-    // stay put (#022).
+    // stay put (TODO-022).
     expect(tables[0]?.parentElement).toHaveClass("w-max", "min-w-full");
     expect(tables[0]?.parentElement?.parentElement).toHaveClass("w-max", "min-w-full");
   });
 
-  // #022 — jsdom has no layout: these assert what the view does with the geometry its
+  // TODO-022 — jsdom has no layout: these assert what the view does with the geometry its
   // hook reports; the scrolling itself is proven by the E2E scenario.
-  it("#022 holds the closed section at the window's width and keeps it put when it fits", () => {
+  it("TODO-022 holds the closed section at the window's width and keeps it put when it fits", () => {
     mockUsePinnedScrollbar.mockReturnValue(
       pinnedScrollbar({ viewportWidth: 1100, closedStaysPut: true }),
     );
@@ -400,7 +400,7 @@ describe("AccountDetailsView — pinned columns (#001)", () => {
     expect(section).toHaveStyle({ width: "1100px" });
   });
 
-  it("#022 lets a closed section too wide for the window scroll with the rest", () => {
+  it("TODO-022 lets a closed section too wide for the window scroll with the rest", () => {
     mockUsePinnedScrollbar.mockReturnValue(
       pinnedScrollbar({ viewportWidth: 700, closedStaysPut: false }),
     );
@@ -410,7 +410,7 @@ describe("AccountDetailsView — pinned columns (#001)", () => {
     expect(section).not.toHaveClass("sticky");
   });
 
-  it("#022 starts the scrollbar's track where the pinned block ends", () => {
+  it("TODO-022 starts the scrollbar's track where the pinned block ends", () => {
     mockUsePinnedScrollbar.mockReturnValue(
       pinnedScrollbar({ viewportWidth: 1100, trackOffset: 480, spacerWidth: 1420, visible: true }),
     );
@@ -422,7 +422,7 @@ describe("AccountDetailsView — pinned columns (#001)", () => {
     expect(document.querySelector("#holdings-scroll-area")).toHaveClass("pinned-scroll-area");
   });
 
-  it("#022 hides the scrollbar, from assistive tech always and from sight when nothing scrolls", () => {
+  it("TODO-022 hides the scrollbar, from assistive tech always and from sight when nothing scrolls", () => {
     renderWithClosedOpen();
     const scrollbar = document.querySelector("#holdings-scrollbar");
     expect(scrollbar).toHaveAttribute("aria-hidden", "true");

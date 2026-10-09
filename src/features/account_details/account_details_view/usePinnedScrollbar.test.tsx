@@ -29,8 +29,8 @@ function Harness({ closedSection = "none" }: { closedSection?: "none" | "folded"
   );
 }
 
-// #022 — the scrollbar and the content area stay scrolled together, whichever moves first.
-describe("usePinnedScrollbar (#022)", () => {
+// TODO-022 — the scrollbar and the content area stay scrolled together, whichever moves first.
+describe("usePinnedScrollbar (TODO-022)", () => {
   it("scrolls the content area when the scrollbar moves", () => {
     render(<Harness />);
     const area = document.getElementById("area") as HTMLElement;

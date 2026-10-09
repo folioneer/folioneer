@@ -128,9 +128,13 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       - name: Architecture check
         run: python3 scripts/arch-check.py
-      # scripts/rule-homes.py: every rule ID is defined in one document only (#050).
+      # scripts/rule-homes.py: every rule ID is defined in one document only (TODO-050).
       - name: One home per rule
         run: python3 scripts/rule-homes.py
+      # scripts/reference-forms.py: a reference says what it points at — TODO-NNN,
+      # DEBT-NNN, FLOW-NNN, ghNN — and the forms they replaced are refused (TODO-049).
+      - name: Reference forms
+        run: python3 scripts/reference-forms.py
 
   licences:
     name: Licences — what the application ships
@@ -217,7 +221,7 @@ jobs:
     runs-on: ubuntu-latest
     # 40: a Cargo.lock change misses the Rust cache and a cold instrumented
     # build is the slow path; the warm baseline
-    # with llvm-cov is measured in TD-020's closure.
+    # with llvm-cov is measured in DEBT-020's closure.
     timeout-minutes: 40
     env:
       CARGO_INCREMENTAL: "0"
@@ -278,7 +282,7 @@ jobs:
       - name: Quality checks
         # --skip-tests: the suite runs once, under llvm-cov, two steps below.
         run: python3 scripts/check.py --backend --skip-tests
-      # The application core builds without the Tauri shell (#047, B46): no `app`
+      # The application core builds without the Tauri shell (TODO-047, B46): no `app`
       # feature, and no Tauri crate in its dependency tree.
       - name: Core builds without Tauri
         working-directory: src-tauri
@@ -297,7 +301,7 @@ jobs:
       - name: Coverage with llvm-cov
         # Same report path and flags as `just coverage-be`: the binaries are
         # instrumented at compile time and the suite runs as usual, so the run
-        # costs the tests' own time once the build is warm (TD-020).
+        # costs the tests' own time once the build is warm (DEBT-020).
         # Inline `#[cfg(test)]` modules are then stripped from the report so a
         # file's own tests never count as covered logic.
         if: steps.scope.outputs.backend == 'true'

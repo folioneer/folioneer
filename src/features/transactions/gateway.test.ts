@@ -15,7 +15,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 const mockInvoke = vi.mocked(invoke);
 const { transactionGateway } = await import("./gateway");
 
-describe("transactionGateway — subscribeToEvents (TD-011)", () => {
+describe("transactionGateway — subscribeToEvents (DEBT-011)", () => {
   it("passes the callback the generated event discriminant, not a bare string", () => {
     expectTypeOf(transactionGateway.subscribeToEvents)
       .parameter(0)

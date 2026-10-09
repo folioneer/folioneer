@@ -3804,7 +3804,7 @@ mod tests {
 
     // TRX-051 (backend) — correct_transaction on an OpeningBalance row recomputes
     // total_amount = quantity * unit_price / MICRO (not TRX-026 purchase formula)
-    // TRX-051 / TD-033 — an opening balance corrected with its typed total cost stores
+    // TRX-051 / DEBT-033 — an opening balance corrected with its typed total cost stores
     // that total verbatim and derives the unit price by the TRX-047 rule.
     #[test]
     fn trx_051_opening_balance_correction_keeps_the_typed_total_and_derives_the_unit_price() {
@@ -3836,7 +3836,7 @@ mod tests {
         assert_eq!(corrected.unit_price, 33_333_333, "floor(100 / 3) in micros");
     }
 
-    // TRX-045 / TD-033 — a corrected opening balance rejects a negative total cost.
+    // TRX-045 / DEBT-033 — a corrected opening balance rejects a negative total cost.
     #[test]
     fn trx_051_opening_balance_correction_rejects_a_negative_total() {
         let mut acc = cash_seeded_account();

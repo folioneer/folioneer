@@ -41,8 +41,8 @@ if [[ "$(git branch --show-current)" != "main" ]]; then
 fi
 git pull --ff-only --quiet origin main || { log "main could not be fast-forwarded"; exit 1; }
 
-# The queue: references (#NNN, TD-NNN or FLOW-NNN) under § Next, comments ignored.
-queued=$(awk '/^## Next/{f=1; next} /^## /{f=0} f' docs/todo.md | grep -v '^<!--' | grep -Eo '#[0-9]{3}|TD-[0-9]{3}|FLOW-[0-9]{3}' || true)
+# The queue: references (TODO-NNN, DEBT-NNN or FLOW-NNN) under § Next, comments ignored.
+queued=$(awk '/^## Next/{f=1; next} /^## /{f=0} f' docs/todo.md | grep -v '^<!--' | grep -Eo 'TODO-[0-9]{3}|DEBT-[0-9]{3}|FLOW-[0-9]{3}' || true)
 if [[ -z "$queued" ]]; then
     log "nothing queued"
     exit 0

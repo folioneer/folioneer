@@ -81,7 +81,7 @@ describe("SplitEditModalMount (SPL-030)", () => {
     expect(modal).toHaveTextContent("tx-spl-1:2.000");
   });
 
-  // TD-073 — a figure recorded with more than three decimals fills the form as it is.
+  // DEBT-073 — a figure recorded with more than three decimals fills the form as it is.
   it("fills the form with every recorded decimal", async () => {
     mockUseSearch.mockReturnValue({
       modal: "edit-split",

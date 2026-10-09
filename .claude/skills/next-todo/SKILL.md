@@ -1,7 +1,7 @@
 ---
 name: next-todo
 description: Runs the first ready entry of the human's Next queue in docs/todo.md end to end under the project workflow — branch, design gate, acceptance tests, implementation, harness, reviewers, PR, merge on green, closure — without asking the human anything; questions go into the entry. Use to advance the backlog autonomously, one entry per invocation.
-argument-hint: "[#NNN | TD-NNN]"
+argument-hint: "[TODO-NNN | DEBT-NNN]"
 ---
 
 # Skill — `next-todo`
@@ -13,11 +13,11 @@ rules are `docs/workflow.md`; this file is the checklist.
 
 - `git status --short` is empty and the branch is `main`, fresh (`git pull --ff-only`).
   Otherwise stop and report; never work on a dirty tree.
-- With an argument (`/next-todo #NNN` or `/next-todo TD-NNN`): that entry, and the
+- With an argument (`/next-todo TODO-NNN` or `/next-todo DEBT-NNN`): that entry, and the
   human is in the chat — **chat mode**. Without one: read `docs/todo.md` § Next and
   take references in order — **headless mode**, nobody to ask. Load the entry
-  (`## #NNN` in `docs/todo.md`, `## … — TD-NNN — …` in `docs/techdebt.md`, or
-  `## FLOW-NNN — …` in `docs/flow.md`, which also holds the `#NNN` and `TD-NNN` entries
+  (`## TODO-NNN` in `docs/todo.md`, `## … — DEBT-NNN — …` in `docs/techdebt.md`, or
+  `## FLOW-NNN — …` in `docs/flow.md`, which also holds the `TODO-NNN` and `DEBT-NNN` entries
   that are about the flow).
 - **Ready** = has a `**Done when:**`, `**Open questions:** none` (or every box ticked
   with its answer written after it), and `**Design:**` is `none` or `validated`.
@@ -31,7 +31,7 @@ rules are `docs/workflow.md`; this file is the checklist.
 - The opening brief first (CLAUDE.md § Opening and closing a piece of work): Task,
   Scope, Design, Touching. Chat: the first message. Headless: the top of the PR body.
 
-- `git checkout -b <type>/NNN-<slug>` (or `<type>/td-NNN-<slug>`), `<type>` being the commit
+- `git checkout -b <type>/todo-NNN-<slug>` (or `<type>/debt-NNN-<slug>`, `<type>/flow-NNN-<slug>`), `<type>` being the commit
   type the change will carry (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `ci`).
 - `TaskCreate` one task per step below; mark each `in_progress` / `completed` as you go.
 
@@ -51,7 +51,7 @@ which renders the mocks and flips the line to `proposed (…)`.
 
 - Read the convention docs the entry's layers require (CLAUDE.md § Where things are).
 - Translate every clause of Done when into a failing test: Rust for logic, Vitest for
-  rendering, E2E for what a user does. Name each test with the ref (`#NNN`) or the spec
+  rendering, E2E for what a user does. Name each test with the ref (`TODO-NNN`) or the spec
   rule (`TRIGRAM-NNN`); when the domain has a spec and the entry adds a rule, write the
   rule in `docs/spec/<feature>.md` in the same commit. A domain without a spec gets one,
   its trigram registered in `docs/spec-index.md`.
@@ -82,7 +82,7 @@ Launch the reviewer agents that match the diff (`docs/workflow.md` § 7) in one
 batch. `reviewer-arch` is in that batch whenever `reviewer-backend` or
 `reviewer-frontend` is: a `.rs`, `.ts` or `.tsx` change launches both lanes, every time. Grade every finding by the four questions of `docs/workflow.md` § 7, one row
 each, and apply the policy: (a) fix,
-(b) `TD-NNN` entry, (c) one-off inline comment, (c) pattern → edit the reviewer prompt,
+(b) `DEBT-NNN` entry, (c) one-off inline comment, (c) pattern → edit the reviewer prompt,
 `[DECISION]` → open question on the entry. Re-run the reviewers until no 🔴 remains.
 No question to the human. CI runs the same reviewers on every push (Step 8).
 
@@ -102,11 +102,11 @@ for `feat`/`fix`), body ≤ 2 lines with the ref.
   run, exit when all are completed) until every run completes.
 - A red `reviewer-<lane>` check: read its sticky comment on the PR (`gh api
 repos/{owner}/{repo}/issues/<n>/comments`), grade every finding with
-  the four questions of `docs/workflow.md` § 7 and apply the policy — (a) fix, (b) `TD-NNN` entry, (c)
+  the four questions of `docs/workflow.md` § 7 and apply the policy — (a) fix, (b) `DEBT-NNN` entry, (c)
   one-off inline comment, (c) pattern → edit the reviewer prompt, `[DECISION]` → open
   question on the entry — then record the table in the PR body, push, and watch again.
 - A test that fails for a reason the change cannot explain is a flaky test, and is never
-  accepted by re-running it: skip that one test in its own pull request, file a `TD-NNN`
+  accepted by re-running it: skip that one test in its own pull request, file a `DEBT-NNN`
   with the failure text and the run's link to find out why, and continue; the fix that
   re-enables it closes the entry. Any other red: fix, commit with `git commit --fixup <sha>` (the entry lands as one
   commit — `just merge` folds it), push, watch again. The same gate red

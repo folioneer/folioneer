@@ -165,7 +165,7 @@ describe("useAccountPerformance — asset scope", () => {
     );
   });
 
-  // #020 / SYN-064 — changes applied from another device arrive as one SyncCompleted.
+  // TODO-020 / SYN-064 — changes applied from another device arrive as one SyncCompleted.
   it("re-fetches once when a sync completes", async () => {
     let capturedCallback: ((type: Event["type"]) => void) | null = null;
     vi.mocked(gateway.accountPerformanceGateway.subscribeToEvents).mockImplementation((cb) => {

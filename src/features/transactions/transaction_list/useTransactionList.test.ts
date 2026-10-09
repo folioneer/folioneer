@@ -274,7 +274,7 @@ describe("useTransactionList", () => {
     expect(result.current.transactions).toHaveLength(1);
   });
 
-  // #020 / SYN-064 — changes applied from another device arrive as one SyncCompleted.
+  // TODO-020 / SYN-064 — changes applied from another device arrive as one SyncCompleted.
   it("re-fetches transactions once when a sync completes", async () => {
     renderHook(() => useTransactionList());
     await act(async () => {});

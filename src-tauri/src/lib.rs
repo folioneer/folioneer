@@ -63,7 +63,7 @@ pub fn run_scheduled_fetch_headless() -> i32 {
     }))
 }
 
-/// Headless entry for the command line (CLI spec, #044): reads the arguments after the
+/// Headless entry for the command line (CLI spec, TODO-044): reads the arguments after the
 /// program name, runs the command without a window, prints its result and returns the exit
 /// code (CLI-022). Its log lines go to the log file only, never to the terminal.
 pub fn run_command_line(program: &str, args: &[String]) -> i32 {
@@ -168,9 +168,9 @@ fn initialize_tracing_to(log_dir: &std::path::Path, echo_to_stderr: bool) -> any
 mod tests {
     use super::*;
 
-    // The core sets up its own logging (#047): the log file is created in the given folder,
+    // The core sets up its own logging (TODO-047): the log file is created in the given folder,
     // and a folder that does not exist is an error, not a panic.
-    // The headless entry returns the exit code its run produces (#047, SPF-020).
+    // The headless entry returns the exit code its run produces (TODO-047, SPF-020).
     // CLI-022 — the command-line entry returns the exit code of what it ran.
     #[test]
     fn the_command_line_entry_returns_the_exit_code() {

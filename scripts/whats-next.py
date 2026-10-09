@@ -69,12 +69,12 @@ def _git(*args: str) -> str:
         return ""
 
 
-ENTRY_HEADING = re.compile(r"^##\s+#(?P<number>\d+)\s+—\s+(?P<title>.+?)\s*$")
+ENTRY_HEADING = re.compile(r"^##\s+TODO-(?P<number>\d+)\s+—\s+(?P<title>.+?)\s*$")
 DEBT_HEADING = re.compile(
-    r"^##\s+(?P<date>\d{4}-\d{2}-\d{2})\s+—\s+(?P<ref>TD-\d+)\s+—\s+(?P<title>.+?)\s*$"
+    r"^##\s+(?P<date>\d{4}-\d{2}-\d{2})\s+—\s+(?P<ref>DEBT-\d+)\s+—\s+(?P<title>.+?)\s*$"
 )
 FLOW_HEADING = re.compile(r"^##\s+(?P<ref>FLOW-\d+)\s+—\s+(?P<title>.+?)\s*$")
-QUEUE_LINE = re.compile(r"^\s*\d+\.\s+(?P<ref>#\d+|TD-\d+|FLOW-\d+)\b")
+QUEUE_LINE = re.compile(r"^\s*\d+\.\s+(?P<ref>TODO-\d+|DEBT-\d+|FLOW-\d+)\b")
 
 
 def _sections(text: str) -> list[tuple[str, list[str]]]:
@@ -160,7 +160,7 @@ def readiness(body: list[str]) -> list[str]:
 
 
 def parse_entries(todo_text: str) -> list[dict]:
-    """Every `## #NNN — …` entry of the todo file, with what it waits on."""
+    """Every `## TODO-NNN — …` entry of the todo file, with what it waits on."""
     entries: list[dict] = []
     for heading, body in _sections(todo_text):
         match = ENTRY_HEADING.match(heading)
@@ -168,7 +168,7 @@ def parse_entries(todo_text: str) -> list[dict]:
             continue
         entries.append(
             {
-                "ref": f"#{match.group('number')}",
+                "ref": f"TODO-{match.group('number')}",
                 "title": match.group("title"),
                 "user_value": _field(body, "User value"),
                 "waits_on": readiness(body),
@@ -192,7 +192,7 @@ def _debt_field(body: list[str], name: str) -> str | None:
 
 
 def parse_debt(debt_text: str) -> list[dict]:
-    """Every `## date — TD-NNN — …` entry of the tech-debt file. An entry waits on its
+    """Every `## date — DEBT-NNN — …` entry of the tech-debt file. An entry waits on its
     Done when and, like a todo entry, on each unticked item under `**Open questions:**`."""
     entries: list[dict] = []
     for heading, body in _sections(debt_text):
@@ -423,14 +423,14 @@ def collect_roadmap() -> dict | None:
     return None
 
 
-ENTRY_REF = re.compile(r"#\d{3}\b|\bTD-\d{3}\b|\bFLOW-\d{3}\b")
+ENTRY_REF = re.compile(r"\bTODO-\d{3}\b|\bDEBT-\d{3}\b|\bFLOW-\d{3}\b")
 
 
 def entries_naming(number: int, texts: list[str]) -> list[str]:
-    """The references of the entries that name GitHub issue `number` — as `gh#N`, by its
+    """The references of the entries that name GitHub issue `number` — as `ghN`, by its
     URL, or as `issue N` — in the order the documents are given. An issue no entry names
     has nothing tracking it in the repository: it is to file or to close."""
-    mention = re.compile(rf"\bgh#{number}\b|/issues/{number}\b|\bissue {number}\b")
+    mention = re.compile(rf"\bgh{number}\b|/issues/{number}\b|\bissue {number}\b")
     refs = []
     for text in texts:
         for heading, body in _sections(text):

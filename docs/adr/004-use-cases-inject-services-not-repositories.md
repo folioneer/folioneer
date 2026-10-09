@@ -23,4 +23,4 @@ Any data access or mutation a use case needs from a bounded context must go thro
 ## Guard
 
 - **Reversal looks like**: a use case importing a context's `repository` or `infrastructure` module, or taking a repository as a dependency.
-- **Guard**: architecture rule A9 (`scripts/arch-check.py`): a `repository` / `infrastructure` module path or a concrete implementation a context defines (`Sqlite…`, `Fs…`) in a use case; `reviewer-arch` for a repository trait taken instead of a service (two such cases today, TD-045).
+- **Guard**: architecture rule A9 (`scripts/arch-check.py`): a `repository` / `infrastructure` module path or a concrete implementation a context defines (`Sqlite…`, `Fs…`) in a use case; `reviewer-arch` for a repository trait taken instead of a service (two such cases today, DEBT-045).

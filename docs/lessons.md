@@ -117,7 +117,7 @@ Append-only; supersede in place if the underlying ecosystem changes.
 
 ## L-015 — A private GitHub release is served only through the API, and a refused token reads as "not found"
 
-**First observed**: 2026-09-25 (the transport probe of #038, on a throwaway pre-release of a private repository)
+**First observed**: 2026-09-25 (the transport probe of TODO-038, on a throwaway pre-release of a private repository)
 
 **Symptom** — A self-updater pointed at a private repository's releases fails although the token is valid: the release's download address answers 404 with the credential attached. A revoked or wrong token then produces the same 404 as a missing file, so a "refused access" check keyed on 401/403 never fires.
 
@@ -137,7 +137,7 @@ Append-only; supersede in place if the underlying ecosystem changes.
 
 ## L-017 — An import inside a path-scoped rule loads at launch, defeating the scope
 
-**First observed**: 2026-09-28 (#050, `.claude/rules/*.md` with a `paths:` header)
+**First observed**: 2026-09-28 (TODO-050, `.claude/rules/*.md` with a `paths:` header)
 
 **Symptom** — A rule scoped to `src/**` is in the session's context although only a file outside that path was read.
 
@@ -147,7 +147,7 @@ Append-only; supersede in place if the underlying ecosystem changes.
 
 ## L-018 — A `beforeEach` arrow that returns a function runs it as the test's teardown
 
-**First observed**: 2026-09-28 (#047 part 3, `useTransactionDraftCheck.test.ts`)
+**First observed**: 2026-09-28 (TODO-047 part 3, `useTransactionDraftCheck.test.ts`)
 
 **Symptom** — A test fails with the error of a rejecting mock ("ipc down") after its own assertions passed, and the same test with a block-bodied `beforeEach` passes.
 
@@ -157,7 +157,7 @@ Append-only; supersede in place if the underlying ecosystem changes.
 
 ## L-019 — In WebKitGTK, React does not always take a synthetic input event
 
-**First observed**: 2026-09-28 (TD-055, `buy_sell` TRX-010 and TRX-020 in CI)
+**First observed**: 2026-09-28 (DEBT-055, `buy_sell` TRX-010 and TRX-020 in CI)
 
 **Symptom** — An E2E test types a quantity with the native-setter helper, the field is empty a moment later, and Save never enables; the same test passes on a re-run.
 
@@ -167,7 +167,7 @@ Append-only; supersede in place if the underlying ecosystem changes.
 
 ## L-020 — A GTK application started without a session bus waits 30 seconds for one
 
-**First observed**: 2026-09-27, cause found 2026-10-03 (TD-044, the E2E job)
+**First observed**: 2026-09-27, cause found 2026-10-03 (DEBT-044, the E2E job)
 
 **Symptom** — Under `xvfb-run` in CI, each start of the application sits 30 seconds between its first log line (`AT-SPI: Error retrieving accessibility bus address`) and the webview's first one. With a fresh application per spec file, 23 files of about 80 seconds of tests took 12 to 15 minutes.
 

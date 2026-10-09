@@ -18,7 +18,7 @@ SPEC.loader.exec_module(release)
 
 
 class LockfileVersion(unittest.TestCase):
-    # TD-035 — a release leaves the lockfile stating the released version, and nothing else moves.
+    # DEBT-035 — a release leaves the lockfile stating the released version, and nothing else moves.
     def test_the_lockfile_states_the_released_version(self):
         with tempfile.TemporaryDirectory() as folder:
             lockfile = Path(folder) / "package-lock.json"

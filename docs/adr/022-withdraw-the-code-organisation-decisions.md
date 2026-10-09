@@ -5,7 +5,7 @@
 
 ## Context
 
-An ADR records a technical choice that is costly to reverse, with the guard that stops an agent undoing it (#048). Four ADRs record something else: how code is organised or tested. ADR-003 and ADR-005 say how a use case composes bounded contexts, ADR-004 that a use case injects services, never repositories, and ADR-007 where E2E tests stop. The rules docs already carry the first three — and ADR-004 contradicted rule B24, which lets a use case take a repository trait — so an agent following one broke the other.
+An ADR records a technical choice that is costly to reverse, with the guard that stops an agent undoing it (TODO-048). Four ADRs record something else: how code is organised or tested. ADR-003 and ADR-005 say how a use case composes bounded contexts, ADR-004 that a use case injects services, never repositories, and ADR-007 where E2E tests stop. The rules docs already carry the first three — and ADR-004 contradicted rule B24, which lets a use case take a repository trait — so an agent following one broke the other.
 
 ## Decision
 

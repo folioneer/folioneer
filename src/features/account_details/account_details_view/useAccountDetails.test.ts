@@ -282,7 +282,7 @@ describe("useAccountDetails — market price events (MKT)", () => {
   });
 
   // HNO-020/SYN-064 — a note written here announces itself; changes applied from another
-  // device arrive as one SyncCompleted per sync (#020).
+  // device arrive as one SyncCompleted per sync (TODO-020).
   it("HNO-020/SYN-064 — re-fetches on HoldingNoteUpdated and once on SyncCompleted", async () => {
     let capturedCallback: ((type: string) => void) | null = null;
     const { accountDetailsGateway } = await import("../gateway");

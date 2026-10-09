@@ -1,4 +1,4 @@
-"""Tests for scripts/licence-check.py (todo #031) — run with `just test-scripts`."""
+"""Tests for scripts/licence-check.py (todo TODO-031) — run with `just test-scripts`."""
 
 import importlib.util
 import unittest

@@ -20,9 +20,15 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
 
 ## 2. The two files
 
+A reference says what it points at: a todo entry is `TODO-NNN`, a tech-debt entry
+`DEBT-NNN`, a flow entry `FLOW-NNN`, a GitHub issue `ghNN`. A pull request keeps GitHub's
+own `#NN`. The forms these replaced are refused in every tracked file by
+`scripts/reference-forms.py` (harness and CI); `CHANGELOG.md` keeps what was released
+under them.
+
 ### `docs/todo.md` — human-owned
 
-- `## Next` at the top holds the queue: `#NNN` and `TD-NNN` references in the order to
+- `## Next` at the top holds the queue: `TODO-NNN` and `DEBT-NNN` references in the order to
   work them. The agent takes the first **ready** one. Order and additions are the
   human's; the agent only removes a reference, when it closes the entry.
 - Every entry ends with `**User value:**`, `**Done when:**`, `**Design:**` and
@@ -36,7 +42,7 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
 
 ### `docs/techdebt.md` — agent-owned
 
-- Every entry carries a permanent `TD-NNN` reference (`## YYYY-MM-DD — TD-NNN — title`).
+- Every entry carries a permanent `DEBT-NNN` reference (`## YYYY-MM-DD — DEBT-NNN — title`).
 - The agent files here: reviewer findings it did not fix, smells met on the way,
   proposals for new work, surviving mutants, coverage holes, frozen architecture debt.
 - Entries are observations, not commitments: an entry says what is odd, not what to do.
@@ -59,10 +65,10 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
 ## 3. The loop — one run, one entry
 
 1. **Pick** — headless: the first ready entry in Next. In chat: the entry the human
-   names (`/next-todo #NNN`); the sentence is the queue, and open questions are asked
+   names (`/next-todo TODO-NNN`); the sentence is the queue, and open questions are asked
    before anything starts — one at a time, each with its context — their answers
    written into the entry.
-   Branch `<type>/NNN-slug` (or `<type>/td-NNN-slug`) off fresh `main`, where `<type>` is
+   Branch `<type>/todo-NNN-slug` (or `<type>/debt-NNN-slug`, `<type>/flow-NNN-slug`) off fresh `main`, where `<type>` is
    the commit type the change will carry (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`,
    `ci`); work outside an entry is `<type>/slug`.
 2. **Design gate** — if the entry changes what the user sees (a new screen, a moved or
@@ -72,7 +78,7 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
    the line. In chat: show the mocks, ask, and on a yes set the line to `validated`
    and continue in the same run.
 3. **Acceptance first** — turn Done when into failing tests: Rust for logic, Vitest for
-   rendering, E2E for what a user does. Test names carry `#NNN` (or the `TRIGRAM-NNN`
+   rendering, E2E for what a user does. Test names carry `TODO-NNN` (or the `TRIGRAM-NNN`
    rule when the domain has a spec; the agent writes the rule from Done when in the
    same commit). A feature in a domain without a spec starts one (`docs/spec/<feature>.md`,
    its trigram registered in `docs/spec-index.md`). A new or changed command updates the
@@ -228,7 +234,7 @@ waits for the reset rather than spend a round on it.
 | Grade        | Action                                                            |
 | ------------ | ----------------------------------------------------------------- |
 | (a)          | Fix in the PR                                                     |
-| (b)          | `TD-NNN` entry in `docs/techdebt.md`, linked from the PR body     |
+| (b)          | `DEBT-NNN` entry in `docs/techdebt.md`, linked from the PR body   |
 | (c) one-off  | Inline comment `// <reviewer> FP: <reason> — see PR #NN`          |
 | (c) pattern  | Edit the reviewer prompt in the same PR; note it in the PR body   |
 | `[DECISION]` | Open question on the entry; the PR stays open; the agent moves on |
@@ -243,7 +249,7 @@ treated as a new open question on the entry.
 - The same gate failing three times on one entry → open question, move on.
 - A test fails for a reason the change cannot explain → it is flaky, and is never
   accepted by re-running it: that one test is skipped in its own pull request and a
-  `TD-NNN` is filed with the failure text and the run's link, to find out why; the fix
+  `DEBT-NNN` is filed with the failure text and the run's link, to find out why; the fix
   that re-enables it closes the entry. The run continues.
 - Never touch the live portfolio database, never force-push, never bypass a hook,
   never edit a released changelog line, never reorder Next, never cut a release.
@@ -287,7 +293,7 @@ in the same pull request only when all three hold — otherwise it keeps the sta
 The "two stories" check overrides the number: a pull request that tells the feature and a layout
 migration tells two stories, and the migration waits. A mixed-standard codebase is acceptable; a
 half-done migration that leaves neither standard intact is not. The larger migrations are
-tracked in `docs/techdebt.md` (TD-008, TD-009) and run when queued.
+tracked in `docs/techdebt.md` (DEBT-008, DEBT-009) and run when queued.
 
 ## 11. Splitting a feature by layer
 

@@ -128,7 +128,7 @@ describe("useEnableSyncModal — folder step (SYN-011/019)", () => {
     expect(result.current.joinRefused).toBe(true);
   });
 
-  // #010 — the remedy is shown only for a folder that holds a portfolio this installation
+  // TODO-010 — the remedy is shown only for a folder that holds a portfolio this installation
   // cannot join: not for an empty folder, and not for a fresh installation.
   it.each([
     [false, true],

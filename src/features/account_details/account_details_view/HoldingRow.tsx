@@ -180,7 +180,7 @@ export function HoldingRow({
   if (row.isCash) {
     return (
       <tr className="group m3-tr">
-        {/* #005 — actions first, filling two rows */}
+        {/* TODO-005 — actions first, filling two rows */}
         <td className={`m3-td ${PINNED_ACTIONS_CELL}`}>
           <div className="grid grid-flow-col grid-rows-2 gap-1 justify-start">
             {/* As-of view is read-only: Deposit/Withdraw are hidden (CSH-091). */}
@@ -260,7 +260,7 @@ export function HoldingRow({
       onDoubleClick={readOnly ? undefined : handleOpenAssetDetail}
       onKeyDown={readOnly ? undefined : handleRowKeyDown}
     >
-      {/* #005 — actions first, filling two rows */}
+      {/* TODO-005 — actions first, filling two rows */}
       <td className={`m3-td ${PINNED_ACTIONS_CELL}`}>
         <div className="grid grid-flow-col grid-rows-2 gap-1 justify-start">
           {/* As-of view is read-only: Buy/Sell/price-history/backfill/lock are hidden. */}

@@ -238,9 +238,9 @@ describe("useEditTransactionModal", () => {
     expect(mockRecordAssetPrice).not.toHaveBeenCalled();
   });
 
-  // TD-073 — a correction opened and saved without typing changes no figure: the form
+  // DEBT-073 — a correction opened and saved without typing changes no figure: the form
   // is filled with every decimal recorded, and sends them back as they were.
-  it("TD-073: a correction saved untouched keeps every recorded decimal", async () => {
+  it("DEBT-073: a correction saved untouched keeps every recorded decimal", async () => {
     const precise: Transaction = {
       ...baseTransaction,
       id: "tx-precise",
@@ -288,7 +288,7 @@ describe("useEditTransactionModal", () => {
     expect(result.current.formData.unitPrice).toBe("100.000");
   });
 
-  // TRX-051 / TD-033: submit sends the typed total cost; the backend derives the unit price
+  // TRX-051 / DEBT-033: submit sends the typed total cost; the backend derives the unit price
   it("TRX-051: submit sends the typed total cost, zero fees, unit exchange_rate, null note", async () => {
     mockCorrectTransaction.mockResolvedValue({
       data: { id: "tx-ob" },

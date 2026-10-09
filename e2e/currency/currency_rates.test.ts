@@ -216,8 +216,8 @@ describe("currency_rates", () => {
   // through the UI. Changing the date also exercises the delete-old+upsert-new
   // code path in update_currency_rate.
   // -------------------------------------------------------------------------
-  // Skipped: flaky (TD-079) — a stale element just after the edit dialog closes. A flaky
-  // test is never re-run and accepted; the fix that re-enables it closes TD-079.
+  // Skipped: flaky (DEBT-079) — a stale element just after the edit dialog closes. A flaky
+  // test is never re-run and accepted; the fix that re-enables it closes DEBT-079.
   it.skip("FXR-052: editing a rate via the UI updates the rate row", async () => {
     // Seed pair + rate via IPC so this test doesn't depend on the record test.
     await seedCurrencyRate(PAIR_FROM, PAIR_TO, RATE_ISO_DATE_RECORD, 1.08);

@@ -2333,7 +2333,7 @@ mod tests {
         asset.id
     }
 
-    // MKT-143 / TD-033 — the current value is price × quantity in the asset's own
+    // MKT-143 / DEBT-033 — the current value is price × quantity in the asset's own
     // currency, computed by the backend even when no rate converts it to the account's.
     #[tokio::test]
     async fn mkt_143_current_value_is_price_times_quantity_in_the_asset_currency() {
@@ -2375,7 +2375,7 @@ mod tests {
         assert_eq!(unpriced.current_value, None);
     }
 
-    // ACD-052 / TD-033 — the weight is the holding's share of the Global Value in
+    // ACD-052 / DEBT-033 — the weight is the holding's share of the Global Value in
     // micro-percent, None for a holding without a market value.
     #[tokio::test]
     async fn acd_052_weight_is_the_holding_share_of_the_global_value() {

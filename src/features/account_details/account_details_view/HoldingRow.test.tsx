@@ -460,7 +460,7 @@ describe("HoldingRow — read-only as-of view", () => {
     navigateMock.mockClear();
   });
 
-  // #006 — the view-transactions button shows the ledger the header's journal
+  // TODO-006 — the view-transactions button shows the ledger the header's journal
   // button uses, on a holding row and on the cash row alike.
   it.each([
     ["holding", baseRow],
@@ -933,9 +933,9 @@ describe("HoldingRow — split action (SPL-061)", () => {
     expect(document.querySelector("#action-split-system-cash-eur")).toBeNull();
   });
 
-  // #005 — the actions come first on the asset line, before the asset name, and
+  // TODO-005 — the actions come first on the asset line, before the asset name, and
   // their buttons fill two rows.
-  it("#005 puts the asset line's actions in the first cell, before the asset, on two rows", () => {
+  it("TODO-005 puts the asset line's actions in the first cell, before the asset, on two rows", () => {
     renderInTable(baseRow);
     const actionsCell = document.querySelector("tr > td:first-child");
     const assetCell = document.querySelector("tr > td:nth-child(2)");
@@ -945,8 +945,8 @@ describe("HoldingRow — split action (SPL-061)", () => {
     expect(actionsCell?.firstElementChild).toHaveClass("grid-rows-2", "grid-flow-col");
   });
 
-  // #005 — the cash line follows the same order: deposit, withdrawal and history first.
-  it("#005 puts the cash line's actions in the first cell, before the asset, on two rows", () => {
+  // TODO-005 — the cash line follows the same order: deposit, withdrawal and history first.
+  it("TODO-005 puts the cash line's actions in the first cell, before the asset, on two rows", () => {
     renderInTable({ ...baseRow, isCash: true, assetName: "Cash", assetReference: "EUR" });
     const actionsCell = document.querySelector("tr > td:first-child");
     const assetCell = document.querySelector("tr > td:nth-child(2)");
@@ -956,11 +956,11 @@ describe("HoldingRow — split action (SPL-061)", () => {
     expect(actionsCell?.firstElementChild).toHaveClass("grid-rows-2", "grid-flow-col");
   });
 
-  // #001 — jsdom has no layout: these assert the pinning classes; the scrolling
+  // TODO-001 — jsdom has no layout: these assert the pinning classes; the scrolling
   // itself is checked on the real app by e2e/account_details/holdings_scrollbar.test.ts.
-  // #001 — the actions and the asset stay pinned at the left edge while the table
+  // TODO-001 — the actions and the asset stay pinned at the left edge while the table
   // scrolls sideways, on an opaque background; the columns after them scroll.
-  it("#001 pins the asset line's actions and asset cells on an opaque background", () => {
+  it("TODO-001 pins the asset line's actions and asset cells on an opaque background", () => {
     renderInTable(baseRow);
     const actionsCell = document.querySelector("tr > td:first-child");
     const assetCell = document.querySelector("tr > td:nth-child(2)");
@@ -970,7 +970,7 @@ describe("HoldingRow — split action (SPL-061)", () => {
     expect(document.querySelector("tr > td:nth-child(3)")).not.toHaveClass("sticky");
   });
 
-  it("#001 pins the cash line's actions and asset cells", () => {
+  it("TODO-001 pins the cash line's actions and asset cells", () => {
     renderInTable({ ...baseRow, isCash: true, assetName: "Cash", assetReference: "EUR" });
     const actionsCell = document.querySelector("tr > td:first-child");
     const assetCell = document.querySelector("tr > td:nth-child(2)");

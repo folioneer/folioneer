@@ -84,7 +84,7 @@ describe("FreeSharesEditModalMount (FSD-040)", () => {
     expect(modal).toHaveTextContent("tx-fsd-1:5.000");
   });
 
-  // TD-073 — a quantity recorded with more than three decimals fills the form as it is.
+  // DEBT-073 — a quantity recorded with more than three decimals fills the form as it is.
   it("fills the quantity with every recorded decimal", async () => {
     mockUseSearch.mockReturnValue({
       modal: "edit-free-shares",

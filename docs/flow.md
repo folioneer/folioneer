@@ -37,7 +37,7 @@ a release ago.
 | E2E run / Quality run / Review run (median, green)      | 4.6 / 2.9 / 2.1 min — was 9.6 / 3.5 / 2.0                                                                                                                                                                                                           |
 | Real defects found by reviewers before merge            | at least 5 (a conversion done in the command layer, a reset device read as paused without the spec saying so, a cursor that jumped in a number field, a hint showing a figure that was no number, a list cut short without notice) — was at least 9 |
 | Real defects found by writing the missing tests         | 2 (a corrected deposit was refused before its own balance counted; a failed price write stalled the fetch progress)                                                                                                                                 |
-| Real defects found by challenging or closing an entry   | 1 (TD-078: the spec says a corrected purchase unarchives its asset, the code does not) — was 2                                                                                                                                                      |
+| Real defects found by challenging or closing an entry   | 1 (DEBT-078: the spec says a corrected purchase unarchives its asset, the code does not) — was 2                                                                                                                                                    |
 | Mutation sweep on `main`                                | 63 changes no test notices out of 1 634 — was 218                                                                                                                                                                                                   |
 
 Reading: a pull request merges in two thirds of the time, because the E2E run halved and
@@ -61,8 +61,8 @@ sweep found two bugs no reviewer had.
 ## FLOW-006 — An entry whose Done-when is an audit cannot close
 
 - Kind: speed
-- Observed: TD-065 ("every figure listed with where it is computed") took four pull
-  requests and is still open: the audit kept finding work. #055 promised a refusal that
+- Observed: DEBT-065 ("every figure listed with where it is computed") took four pull
+  requests and is still open: the audit kept finding work. TODO-055 promised a refusal that
   an existing rule (AST-009) forbids, found only when the owner read the result.
 - Proposal: the challenge step, already run before starting a TD or an issue, also (a)
   splits an entry whose Done-when is a survey into "list them" and one entry per thing
@@ -98,8 +98,8 @@ sweep found two bugs no reviewer had.
 ## FLOW-011 — Parts of the harness run only on the day they matter
 
 - Kind: quality
-- Observed: CI floated on the latest Rust until a new lint broke `main` (TD-059, fixed);
-  the visual reference went stale when the month changed (TD-060, fixed); the release
+- Observed: CI floated on the latest Rust until a new lint broke `main` (DEBT-059, fixed);
+  the visual reference went stale when the month changed (DEBT-060, fixed); the release
   workflow's Windows steps run only at a release; the golden portfolio had never been
   read through the live account page (fixed in #87).
 - Proposal: a weekly scheduled run of what otherwise runs only at a release — the
@@ -142,18 +142,7 @@ loop that sorts one mutant. `spec-checker` is prescribed and was never launched.
 Entries that are about how work moves, not about the application. Each keeps the
 reference it was filed under and is queued by it.
 
-## #049 — (tooling) — References name what they point at: TODO-NNN, DEBT-NNN, ghNN
-
-Decided by the owner on 2026-09-27: a todo entry becomes `TODO-NNN` (today `#NNN`), a tech-debt entry `DEBT-NNN` (today `TD-NNN`), and a GitHub issue `ghNN`. Today `#043` reads like pull request #43 on GitHub, where it also links to the wrong thing. `FLOW-NNN`, which appeared since, already says what it points at and stays. Measured on 2026-10-05, the changelog left out: `TD-NNN` about 140 times in 36 files, a `#0NN` todo reference about 250 times in 61 files, `gh#NN` 13 times. The formats are parsed by `scripts/whats-next.py` and `scripts/next-todo.sh` and described in `CLAUDE.md`, `docs/workflow.md` and the skills `/next-todo`, `/design-proposal` and `/whats-next`; branch names (`<type>/NNN-slug`, `<type>/td-NNN-slug`) carry them too.
-
-**User value:** None directly — a reference says what it points at and no longer collides with a pull request number.
-**Done when:** The three formats are written into `CLAUDE.md`, `docs/workflow.md` and the skills; the scripts parse and emit the new forms, with a test each; every live file uses them (`docs/todo.md`, `docs/techdebt.md`, `docs/flow.md`, specs, lessons, code comments and test names); a check fails on an old-form reference in a changed file (seen red); `CHANGELOG.md` and git history stay as they are.
-**Design:** none
-**Open questions:**
-
-- [x] Rewrite existing references, or only new ones? — Rewrite every live file in one pull request, so one format exists at a time; the changelog and git history keep the old form (owner, 2026-10-05).
-
-## #014 — (e2e) — Drive a second device in the E2E suite
+## TODO-014 — (e2e) — Drive a second device in the E2E suite
 
 The multi-device sync E2E covers the single-device critical path only (plan § Halt Artifact H1): `wdio.conf.ts` launches one binary with one `VAULT_COMPASS_E2E_DATA_DIR` and `maxInstances: 1`, so joining a folder another device created (SYN-014/036) is proven by the two-database integration test `src-tauri/tests/sync_two_devices.rs`, not through the UI. A real two-device E2E needs an `e2e/helpers/second_device.ts` that launches a second binary against its own data directory plus a wdio multi-remote configuration — a separate, pre-requisite task before any join scenario is written.
 
@@ -162,7 +151,7 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 **Design:** none
 **Open questions:** none
 
-## 2026-09-12 — TD-015 — Three E2E specs select by text or duplicate a shared helper
+## 2026-09-12 — DEBT-015 — Three E2E specs select by text or duplicate a shared helper
 
 - Found by: reviewer-e2e (`.review/reviewer-e2e-2026-09-12-01.md`, pre-existing section)
 - Where: e2e/accounts/accounts.test.ts:23 (local `navigateToAccounts` next to the shared one in e2e/helpers/navigation.ts), e2e/asset_web_lookup/asset_web_lookup.test.ts:47 (`button[aria-label="Fill manually"]`), e2e/assets/assets.test.ts:79 and :102 (XPath on `normalize-space(text())`)
@@ -171,7 +160,7 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 - User value: None — suite robustness.
 - Done when: the three sites select by `id` (adding the ids on the frontend elements in the same commit) and the local helper is replaced by the shared import.
 
-## 2026-09-12 — TD-016 — A controlled-input value can be lost once in the E2E buy flow
+## 2026-09-12 — DEBT-016 — A controlled-input value can be lost once in the E2E buy flow
 
 - Found by: manual (first pull-request E2E run, attempt 1)
 - Where: e2e/account_details/buy_sell.test.ts (TRX-010), e2e/helpers/react.ts (`setReactInputValue`), src/ui/components/field/CalcField.tsx
@@ -180,7 +169,7 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 - User value: None — suite reliability.
 - Done when: the loss is reproduced (or its trigger understood) and either the helper waits for the field to report the value back before returning, or the field's handling is changed so a dispatched `input` event can never be dropped; TRX-010 no longer needs a re-run to pass.
 
-## 2026-09-12 — TD-017 — Backend logic coverage sits at 89 % against the 90 % target
+## 2026-09-12 — DEBT-017 — Backend logic coverage sits at 89 % against the 90 % target
 
 - Found by: manual (`python3 scripts/coverage-gate.py --backend`; figures refreshed 2026-09-19)
 - Where: src-tauri/src/use_cases/update_checker/service.rs (0 %), src-tauri/src/use_cases/scheduled_fetch/headless.rs (5 %), src-tauri/src/use_cases/portfolio_sync/applier.rs (60 %), src-tauri/src/use_cases/asset_web_lookup/orchestrator.rs (62 %), src-tauri/src/context/sync/application/join.rs (74 %), src-tauri/src/use_cases/holding_transaction/orchestrator.rs (77 %), src-tauri/src/context/asset/service.rs (86 %), src-tauri/src/context/account/service.rs (87 %)
@@ -190,19 +179,19 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 - Mutation survivors: the 2026-09-14 sweep (issue #137) found 301 logic changes no test notices — `context/account/domain/account.rs` 52, `use_cases/shared/valuation.rs` 33, `context/sync/domain/resolution.rs` 24, `use_cases/global_performance/orchestrator.rs` 21; each names an assertion that is missing or too weak.
 - Done when: the backend floor in `coverage-gates.json` reads 90.0 and the gate passes on `main`.
 
-## 2026-09-13 — TD-019 — The assets spec's before-each hook can hit a stale element
+## 2026-09-13 — DEBT-019 — The assets spec's before-each hook can hit a stale element
 
 - Found by: manual (an E2E run, attempt 1, on a pull request that touched no app code)
 - Seen again: a `main` push run, attempt 1 (2026-09-15, after a change that touched no E2E or assets code) — same `before each` hook, same stale node handle on an `element` call; attempt 2 green.
 - Seen again: PR #18, a records-only pull request, attempt 1 (2026-09-27); attempt 2 green.
 - Where: e2e/assets/assets.test.ts (`beforeEach`), e2e/helpers/modal.ts (`dismissLeftoverModal`), e2e/helpers/navigation.ts (`navigateToAssets`)
 - Severity: 🟡
-- Observation: The hook failed with `stale element reference` while creating a node handle for an `element` call — an element located by one step had been replaced by a re-render before the next step used it. It is the second distinct once-only E2E failure in two days (TD-016 is the first); both sit in setup or navigation code shared by many specs, so each has many chances to fire per run. With E2E as a required check, every such failure costs a re-run before a green PR can merge.
+- Observation: The hook failed with `stale element reference` while creating a node handle for an `element` call — an element located by one step had been replaced by a re-render before the next step used it. It is the second distinct once-only E2E failure in two days (DEBT-016 is the first); both sit in setup or navigation code shared by many specs, so each has many chances to fire per run. With E2E as a required check, every such failure costs a re-run before a green PR can merge.
 - User value: None — suite reliability.
-- Cause not found yet (2026-09-27): the F29 fix for TD-039 does not reach this hook — the assets spec's navigation and modal helpers depend on none of the hooks it changed. Next step: capture which element the `element` call was locating when it went stale (the failure screenshot and the hook's last command), then fix the component that replaces it.
+- Cause not found yet (2026-09-27): the F29 fix for DEBT-039 does not reach this hook — the assets spec's navigation and modal helpers depend on none of the hooks it changed. Next step: capture which element the `element` call was locating when it went stale (the failure screenshot and the hook's last command), then fix the component that replaces it.
 - Done when: the hook re-locates elements after each navigation step instead of reusing handles across renders, or the shared helpers wait for the route to settle before returning; a month of pull-request runs shows no before-each failure.
 
-## 2026-09-13 — TD-021 — The rust-cache pin is labelled with the wrong tag in three workflows
+## 2026-09-13 — DEBT-021 — The rust-cache pin is labelled with the wrong tag in three workflows
 
 - Found by: reviewer-infra (phase 12 review, `.review/reviewer-infra-2026-09-13-10.md`)
 - Where: `.github/workflows/quality.yml`, `e2e.yml`, `release.yml` (twice) — `Swatinem/rust-cache@e18b4977…` labelled v2.9.1, while that tag peels to `c1937114…`; `security-audit.yml` pins `taiki-e/install-action@f48d2f8b…` with no version label at all
@@ -211,7 +200,7 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 - User value: None — whoever audits a pinned action reads the release notes of the version actually running.
 - Done when: every pinned action in `.github/workflows/` carries the label of the tag its commit belongs to, or the pin moves to the commit of the labelled tag.
 
-## 2026-09-14 — TD-023 — E2E specs still locate controls by label, role or form attribute
+## 2026-09-14 — DEBT-023 — E2E specs still locate controls by label, role or form attribute
 
 - Found by: manual (selector count while fixing dangling references in the E2E headers)
 - Where: `e2e/asset_web_lookup/asset_web_lookup.test.ts` (`button[aria-label="Add asset"]`, `"Back"`, `"Fill manually"`), `e2e/account_details/manual_price_fill.test.ts` and `e2e/account_details/auto_fetch.test.ts` (`[role="dialog"]`, `[role="status"]`, `body`), `e2e/open_balance/open_balance.test.ts` and `e2e/account_details/buy_sell.test.ts` (`button[type="submit"][form="…"]`)
@@ -220,7 +209,7 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 - User value: None — E2E specs that survive a wording or locale change.
 - Done when: every selector in those five specs is an `id`, the controls they target carry one, and `reviewer-e2e` passes on them.
 
-## 2026-09-21 — TD-037 — The settings capture still carries a random folder path
+## 2026-09-21 — DEBT-037 — The settings capture still carries a random folder path
 
 - Found by: the main agent (PR #8, a Markdown-only pull request, visual gate red)
 - Where: `e2e/sync/sync.test.ts:114` (`mkdtempSync(join(tmpdir(), "folioneer-sync-"))`), captured in `sync-settings-{light,dark}`
@@ -229,7 +218,7 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 - User value: None — the merge gate's headroom.
 - Done when: `sync-settings` is byte-identical across two runs of the same commit; the E2E sync folder carries a fixed name (the suite runs one instance, `maxInstances: 1`) or the value is not rendered into the capture.
 
-## 2026-09-27 — TD-043 — The reviewer agents run without a turn cap and load the whole CLAUDE.md
+## 2026-09-27 — DEBT-043 — The reviewer agents run without a turn cap and load the whole CLAUDE.md
 
 - Found by: the main agent, comparing the agent files with the Claude Code sub-agent documentation
 - Where: `.claude/agents/reviewer-*.md` (frontmatter), `.github/workflows/review.yml`
@@ -238,7 +227,7 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 - User value: None directly — cheaper, bounded reviews on every pull request.
 - Done when: one reviewer runs with `omitClaudeMd: true` and a `maxTurns` cap on a sample diff and reports the same findings as without; if it does, the settings extend to every reviewer, with the review time and cost before and after recorded.
 
-## 2026-10-04 — TD-076 — Sync, what a run applies and reports: 20 changes in the code that no test notices
+## 2026-10-04 — DEBT-076 — Sync, what a run applies and reports: 20 changes in the code that no test notices
 
 - Found by: the mutation sweep of 2026-10-04 (run 37222025189: 63 missed out of 1 634), split in three by the owner on 2026-10-04; the first part (joining and leaving, 15) is done, this one is for 0.8.0
 - Where: `context/sync/application/run.rs` (7: a header whose check does not match this device's key, the count of a notice's kind, the applied and refused counts of an intake, the device named in a notice), `apply.rs` (1), `intake.rs` (4: a segment in a newer format; three that re-read what is already applied, which the conflict rules ignore — nothing to observe), `use_cases/portfolio_sync/applier.rs` (4: a name clash on an account or a category, the currency of a cash line), `rank_stamper.rs` (3: the rows ranked at first publish), `snapshot.rs` (1)
@@ -247,7 +236,7 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 - User value: None directly — a wrong notice, or a change applied under the wrong rank, would be caught by a test.
 - Done when: each of the 20 (counted by the sweep of 2026-10-04, run 37222025189) is a test added, dead code deleted, code simplified, or recorded here as having nothing to observe with the reason.
 
-## 2026-10-04 — TD-077 — Account service, transaction checks, backfills and the headless fetch: 28 changes in the code that no test notices
+## 2026-10-04 — DEBT-077 — Account service, transaction checks, backfills and the headless fetch: 28 changes in the code that no test notices
 
 - Found by: the mutation sweep of 2026-10-04 (run 37222025189), split in three by the owner on 2026-10-04; this part is for 0.9.0
 - Where: `context/account/service.rs` (5: the bounds of a fee deduction and of an interest credit, a management fee given as a rate alone, the fee schedules of an account, the event after a schedule changes), `use_cases/holding_transaction/orchestrator.rs` (5: a sale of exactly the quantity held, a split whose ratio holds a zero), `context/asset/domain/yahoo_symbol.rs` (1), `context/account/domain/journal.rs` (3: the balance held at the largest amount), `context/currency/application/service.rs` (1), `use_cases/price_history_backfill/orchestrator.rs` (2: the week that must hold a trading day), `use_cases/scheduled_fetch/headless.rs` (3), `use_cases/account_details/orchestrator.rs` (3: a fee dated on the as-of day, the as-of loop's skip of cash lines — nothing to observe —, the window-start dates given to the rate lookup), `use_cases/fee_generation/orchestrator.rs` (1: a schedule ending on a period's last day), `use_cases/update_checker/service.rs` (3: the download and the installation themselves, which need the running application), the last one in `use_cases/shared/valuation.rs` (the date a holding closed)

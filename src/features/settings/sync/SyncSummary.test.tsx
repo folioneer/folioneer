@@ -18,7 +18,7 @@ const status = (enabled: boolean, paused: boolean) => ({
   data: { enabled, paused },
 });
 
-// #010 — the settings keep one line about sync and the way to its page.
+// TODO-010 — the settings keep one line about sync and the way to its page.
 describe("SyncSummary", () => {
   beforeEach(() => {
     vi.clearAllMocks();

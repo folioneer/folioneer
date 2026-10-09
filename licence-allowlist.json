@@ -1,5 +1,5 @@
 {
-  "about": "Licences that what the application ships may carry (scripts/licence-check.py, todo #031). `allowed` holds permissive licences that leave the owner free to offer the application under any terms. `exceptions` holds packages accepted by name under one exact licence: MPL-2.0 asks only that changes to its own files be published, and these crates are used unmodified; OFL-1.1 lets a font be bundled and sold with software, not sold alone. Anything else — the GPL family, SSPL, UNLICENSED, no licence at all — fails.",
+  "about": "Licences that what the application ships may carry (scripts/licence-check.py, todo TODO-031). `allowed` holds permissive licences that leave the owner free to offer the application under any terms. `exceptions` holds packages accepted by name under one exact licence: MPL-2.0 asks only that changes to its own files be published, and these crates are used unmodified; OFL-1.1 lets a font be bundled and sold with software, not sold alone. Anything else — the GPL family, SSPL, UNLICENSED, no licence at all — fails.",
   "allowed": [
     "MIT",
     "Apache-2.0",

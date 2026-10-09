@@ -114,7 +114,7 @@ struct CurrencyPairSummary {
 
 ## Changelog
 
-- 2026-09-25 — #042 (FXR-071, FXR-074–077, FXR-110–114): `refresh_currency_rates` added (launch rate refresh, every build); `backfill_currency_rate_history` backs "Update rates", ensures holding pairs first and publishes one `CurrencyRateUpdated` when it wrote a rate; the price fetch tasks no longer fetch rates
+- 2026-09-25 — TODO-042 (FXR-071, FXR-074–077, FXR-110–114): `refresh_currency_rates` added (launch rate refresh, every build); `backfill_currency_rate_history` backs "Update rates", ensures holding pairs first and publishes one `CurrencyRateUpdated` when it wrote a rate; the price fetch tasks no longer fetch rates
 - 2026-09-19 — SYN-064 amended: applied pairs, rates and removals raise no event of their own (`CurrencyPairUpdated` / `CurrencyRateUpdated` are published by local writes only); the Currency Rates view subscribes to `SyncCompleted`
 - 2026-09-12 — `CurrencyPairUpdated` event (FXR-056): published by `declare_currency_pair`, `apply_currency_pair` and an applied pair removal (SYN-064); the Currency Rates view subscribes to it instead of the bare `SyncCompleted` marker
 - 2026-07-14 — Added by `fx-rate` spec (FXR-110–114): `backfill_currency_rate_history` (historical dated-series download); `CurrencyError` gains `ProviderUnreachable`

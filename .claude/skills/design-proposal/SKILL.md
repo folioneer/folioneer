@@ -6,14 +6,14 @@ argument-hint: "[NNN]"
 
 # Skill — `design-proposal`
 
-Invocation: `/design-proposal NNN` (a `#NNN` todo reference).
+Invocation: `/design-proposal NNN` (a `TODO-NNN` todo reference).
 
 The proposal is what the human validates instead of the pull request. It shows the
 target state with the real components and tokens, so what they approve is what ships.
 
 ## Step 1 — Read the entry
 
-Load `## #NNN` from `docs/todo.md`. From its text and Done when, list the screens and
+Load `## TODO-NNN` from `docs/todo.md`. From its text and Done when, list the screens and
 states that change. One state per distinct thing the human must see (the row with the
 new column, the dialog with the moved buttons, the empty case if it changes).
 

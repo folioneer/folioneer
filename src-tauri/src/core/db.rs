@@ -106,7 +106,7 @@ fn reset_requested(debug_build: bool, variable: Option<&str>) -> bool {
 mod tests {
     use super::*;
 
-    // #040 — `just dev --reset-db` sets the variable; a debug build obeys it.
+    // TODO-040 — `just dev --reset-db` sets the variable; a debug build obeys it.
     #[test]
     fn a_debug_build_obeys_the_reset_variable() {
         assert!(reset_requested(true, Some("true")));
@@ -116,7 +116,7 @@ mod tests {
         assert!(!reset_requested(true, None));
     }
 
-    // #040 — a release binary ignores the variable, whatever it holds.
+    // TODO-040 — a release binary ignores the variable, whatever it holds.
     #[test]
     fn a_release_build_ignores_the_reset_variable() {
         assert!(!reset_requested(false, Some("true")));

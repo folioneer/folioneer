@@ -46,9 +46,9 @@ SKIP_FRONTEND_ABSENT = "package.json absent"
 SKIP_BACKEND_ABSENT = f"{BACKEND_DIR}/Cargo.toml absent"
 SKIP_SQLX_ABSENT = f"{BACKEND_DIR}/.sqlx/ absent"
 
-# Markdown drift gate (gh#68). Biome doesn't cover .md, so this is
+# Markdown drift gate (gh68). Biome doesn't cover .md, so this is
 # the only formatting check for markdown. `just format`'s fixer runs
-# prettier with the SAME args plus `--write` (gh#82), so checker and
+# prettier with the SAME args plus `--write` (gh82), so checker and
 # fixer stay in lockstep by construction — no reliance on a project's
 # `format:docs` glob. Gated on package.json because prettier ships via
 # the JS devDep stack; pure-backend projects skip rather than carry an
@@ -67,7 +67,7 @@ _PRETTIER_DOCS_CMD = [
 
 # Below this much allocatable RAM (GiB), a full run serialises the FE and BE
 # groups and caps cargo's job count so it doesn't drive a low-memory desktop
-# into swap (gh#81). Above it — and on CI — behaviour is unchanged.
+# into swap (gh81). Above it — and on CI — behaviour is unchanged.
 _MEMORY_PRESSURE_GB = 8.0
 
 
@@ -78,7 +78,7 @@ def _available_ram_gb() -> float | None:
 
     Reads host memory, not any cgroup limit, so a memory-capped CI container
     sees the host's (large) figure and does not throttle — the desired
-    CI-unaffected behaviour (gh#81)."""
+    CI-unaffected behaviour (gh81)."""
     # Linux: MemAvailable is the kernel's own estimate of what can be allocated
     # without swapping — the right signal for "how many build jobs fit?".
     try:
@@ -168,7 +168,7 @@ class QualityChecker:
         # (--frontend / --backend / --format / --fast) imply sequential —
         # there's nothing to parallelise against.
         base_sequential = sequential or fast_mode or frontend_only or backend_only
-        # gh#81 — on a low-memory machine a full run (Vite build + cargo
+        # gh81 — on a low-memory machine a full run (Vite build + cargo
         # compiles, cargo spawning one rustc/linker per core) can exhaust RAM
         # and swap the whole desktop. Auto-throttle two ways, each with an env
         # override; both no-op on CI / high-RAM boxes and never change results,
@@ -559,7 +559,7 @@ class QualityChecker:
                 # yet (mid-bootstrap, fresh feature start) would otherwise exit 1
                 # from vitest's "No test files found" path and fail the suite.
                 # The flag short-circuits to exit 0 in that case; harmless once
-                # tests exist. See gh#27.
+                # tests exist. See gh27.
                 if self.run_step(
                     "React Tests", ["npm", "test", "--", "--run", "--passWithNoTests"]
                 ):
@@ -610,7 +610,7 @@ class QualityChecker:
         Env contract: KIT_CHECK_JOBS=N forces the cap to N on any machine (a
         value < 1 or non-integer is ignored, falling through to auto-detect);
         when the auto-cap is active it overrides any ambient CARGO_BUILD_JOBS,
-        but leaves it untouched when it returns {} (gh#81)."""
+        but leaves it untouched when it returns {} (gh81)."""
         override = os.environ.get("KIT_CHECK_JOBS")
         if override:
             try:

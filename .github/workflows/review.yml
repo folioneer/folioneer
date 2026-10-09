@@ -150,7 +150,7 @@ jobs:
       - name: Run the reviewer prompt
         # The session is granted the commands the reviewers run, by name, and
         # nothing else: a command nobody listed is refused, the lane says so
-        # in its session log, and the list grows on purpose (TD-082). The
+        # in its session log, and the list grows on purpose (DEBT-082). The
         # names come from the session logs of the lanes — the two helpers,
         # the reading commands of git, and the text tools they pipe into.
         # None runs code the pull request brings: the two helpers come from
@@ -189,7 +189,7 @@ jobs:
             restating of the diff, no narrative, no unrequested alternatives.
           claude_args: |
             --model claude-sonnet-5
-            --max-turns 40
+            --max-turns 80
             --allowedTools "Read" "Grep" "Glob" "Write(.review/**)" "Edit(.review/**)" "Bash(bash scripts/branch.sh *)" "Bash(bash scripts/review-path.sh *)" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(git status *)" "Bash(git rev-parse *)" "Bash(git merge-base *)" "Bash(git cat-file *)" "Bash(git ls-remote --tags https://github.com/*)" "Bash(grep *)" "Bash(head *)" "Bash(tail *)" "Bash(cat *)" "Bash(ls *)" "Bash(wc *)" "Bash(sort *)" "Bash(uniq *)" "Bash(cut *)" "Bash(tr *)" "Bash(sed -n *)" "Bash(echo *)" "Bash(test *)" "Bash(shellcheck *)"
 
       - name: Redact secret-shaped strings from what leaves the runner

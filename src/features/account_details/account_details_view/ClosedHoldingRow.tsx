@@ -38,13 +38,13 @@ export function ClosedHoldingRow({
     onBackfillPriceHistory?.(row.assetId);
   }, [onBackfillPriceHistory, row.assetId]);
 
-  // #019 — a closed line is set apart by muting its figures and its asset text. The
+  // TODO-019 — a closed line is set apart by muting its figures and its asset text. The
   // Actions cell stays at full strength so an enabled button looks enabled, and the pinned
   // Asset cell stays opaque — only its content is muted — so scrolled columns never show
   // through it.
   return (
     <tr className="group m3-tr">
-      {/* ACD-049 / #005 — actions first; Buy/Sell omitted for closed positions */}
+      {/* ACD-049 / TODO-005 — actions first; Buy/Sell omitted for closed positions */}
       <td className={`m3-td ${PINNED_ACTIONS_CELL}`}>
         <div className="grid grid-flow-col grid-rows-2 gap-1 justify-start">
           <IconButton
@@ -68,7 +68,7 @@ export function ClosedHoldingRow({
           )}
         </div>
       </td>
-      {/* #021 — as wide as its content; the spare width goes to the unpinned columns */}
+      {/* TODO-021 — as wide as its content; the spare width goes to the unpinned columns */}
       <td className={`m3-td ${PINNED_ASSET_CELL} w-px whitespace-nowrap`}>
         <div className="flex flex-col opacity-70">
           <span className="font-medium text-m3-on-surface">{row.assetName}</span>

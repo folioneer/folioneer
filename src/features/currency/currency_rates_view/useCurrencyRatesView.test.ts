@@ -95,7 +95,7 @@ describe("useCurrencyRatesView", () => {
   });
 
   // FXR-054/SYN-064 — a pair declared here announces itself; pairs and rates applied from
-  // another device arrive as one SyncCompleted per sync (#020).
+  // another device arrive as one SyncCompleted per sync (TODO-020).
   it("re-fetches pairs on CurrencyPairUpdated and once on SyncCompleted", async () => {
     const { result } = renderHook(() => useCurrencyRatesView());
     await waitFor(() => expect(result.current.isLoading).toBe(false));

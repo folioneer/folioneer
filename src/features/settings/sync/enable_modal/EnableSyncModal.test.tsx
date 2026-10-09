@@ -122,7 +122,7 @@ describe("EnableSyncModal — step 2 passphrase (SYN-011/012/014/015/019)", () =
     );
     render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="enable" />);
 
-    // #010 — the refusal names the remedy: why, the three steps, and where the data lives.
+    // TODO-010 — the refusal names the remedy: why, the three steps, and where the data lives.
     const refusal = document.getElementById("sync-enable-join-refused");
     expect(refusal).toHaveAttribute("role", "alert");
     for (const key of ["title", "why", "step_keep", "step_rename", "step_join", "where"]) {

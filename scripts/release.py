@@ -83,7 +83,7 @@ class _Resolution(Enum):
 
 def set_lockfile_version(lockfile: Path, version: str) -> None:
     """The npm lockfile states the version it locks: its own `version` and its root
-    package's (TD-035). Written back the way npm writes it, so nothing else moves."""
+    package's (DEBT-035). Written back the way npm writes it, so nothing else moves."""
     data = json.loads(lockfile.read_text(encoding="utf-8"))
     data["version"] = version
     root = data.get("packages", {}).get("")
@@ -162,7 +162,7 @@ class ReleaseManager:
         # Changelog bullets are user-facing — some projects render CHANGELOG.md
         # in an in-app "What's new" dialog. Keep only the title line; the body
         # (rule IDs, layer notes, rationale) stays developer-facing in git
-        # history via `original`, never leaking into the changelog (gh#86).
+        # history via `original`, never leaking into the changelog (gh86).
         title = description.splitlines()[0].strip()
 
         return {

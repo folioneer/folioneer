@@ -1,5 +1,5 @@
 /**
- * #001 — the Actions and Asset columns stay pinned at the left edge of the holdings
+ * TODO-001 — the Actions and Asset columns stay pinned at the left edge of the holdings
  * tables while the view's content area scrolls sideways. Actions has a fixed width —
  * nine 32px buttons in five grid columns, their gaps and the cell padding — so Asset
  * can be pinned right after it. Pinned cells carry an opaque background (tinted like

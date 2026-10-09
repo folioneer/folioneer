@@ -54,7 +54,7 @@ export async function navigateToSettings(): Promise<void> {
 }
 
 /**
- * Opens the sync page the way a user does: Settings, then its "Open sync" link (#010).
+ * Opens the sync page the way a user does: Settings, then its "Open sync" link (TODO-010).
  * Waits for the page's own content — "Enable sync" while disabled, the status otherwise.
  */
 export async function navigateToSync(): Promise<void> {

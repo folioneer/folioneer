@@ -16,7 +16,7 @@ const mockInvoke = vi.mocked(invoke);
 // Import after mock is registered so bindings.ts picks up the mock
 const { accountPerformanceGateway, globalPerformanceGateway } = await import("./gateway");
 
-describe("performance gateways — subscribeToEvents (TD-011)", () => {
+describe("performance gateways — subscribeToEvents (DEBT-011)", () => {
   it("passes the callback the generated event discriminant, not a bare string", () => {
     expectTypeOf(accountPerformanceGateway.subscribeToEvents)
       .parameter(0)

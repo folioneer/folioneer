@@ -4,7 +4,7 @@ on:
   # Every pull request runs this job, and every push to main that touches more
   # than records. Pull requests carry no path filter on purpose: a filtered-out
   # run leaves a required check "Expected" forever and the PR can never merge.
-  # Instead the job starts every time and decides inside itself (#041): a pull
+  # Instead the job starts every time and decides inside itself (TODO-041): a pull
   # request of records only (scripts/e2e-scope.py) reports green in a minute,
   # anything the suite can execute pays for the build and the suite. Pushes to
   # main keep the filter — nothing gates on them.

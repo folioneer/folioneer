@@ -1,4 +1,4 @@
-"""Tests for scripts/dev-seed.py (todo #040) — run with `just test-scripts`."""
+"""Tests for scripts/dev-seed.py (todo TODO-040) — run with `just test-scripts`."""
 
 import hashlib
 import importlib.util

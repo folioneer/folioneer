@@ -54,7 +54,7 @@ describe("microToExactDecimal", () => {
   });
 });
 
-// TRX-024 / TD-073 — a field filled from a figure reads back to that figure: every decimal
+// TRX-024 / DEBT-073 — a field filled from a figure reads back to that figure: every decimal
 // the figure carries, and at least three.
 describe("microToFieldDecimal", () => {
   it("keeps every decimal and shows at least three", () => {

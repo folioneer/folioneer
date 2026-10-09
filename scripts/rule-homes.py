@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Every rule has one home (todo #050).
+"""Every rule has one home (todo TODO-050).
 
 A rule is defined where its ID opens a line followed by an em dash:
 `**B24** — …` and `## E11 — …` in the rules docs, `**MKT-143 — …**` in a spec.

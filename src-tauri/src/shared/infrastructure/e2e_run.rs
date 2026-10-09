@@ -18,7 +18,7 @@ pub fn e2e_data_dir() -> Option<PathBuf> {
 mod tests {
     use super::*;
 
-    // #033 — an E2E run names its data folder through the variable. The only test that
+    // TODO-033 — an E2E run names its data folder through the variable. The only test that
     // sets the variable.
     #[test]
     fn an_e2e_run_is_recognised_by_its_variable() {

@@ -120,7 +120,7 @@ describe("useAccountSummaries", () => {
     expect(mockGetAccountSummaries.mock.calls.length).toBeGreaterThan(beforeCount);
   });
 
-  // #020 / SYN-064 — changes applied from another device arrive as one SyncCompleted.
+  // TODO-020 / SYN-064 — changes applied from another device arrive as one SyncCompleted.
   it("re-fetches summaries once when a sync completes", async () => {
     let capturedCallback: ((type: string) => void) | null = null;
     mockSubscribeToEvents.mockImplementation((cb: (type: string) => void) => {

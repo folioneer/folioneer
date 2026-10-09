@@ -152,7 +152,7 @@ describe("useDepositTransaction — edit mode (CSH-111)", () => {
     mockShowSnackbar.mockReset();
   });
 
-  // TD-073 — an amount recorded with more than three decimals fills the form as it is.
+  // DEBT-073 — an amount recorded with more than three decimals fills the form as it is.
   it("fills the amount with every recorded decimal", () => {
     const { result } = renderHook(() =>
       useDepositTransaction({

@@ -408,7 +408,7 @@ mod tests {
         app
     }
 
-    // #037 — a build that manages no channel updates from the configured endpoint.
+    // TODO-037 — a build that manages no channel updates from the configured endpoint.
     #[test]
     fn a_build_without_a_managed_channel_reads_the_configured_one() {
         let app = app_with(None);
@@ -419,7 +419,7 @@ mod tests {
         assert!(channel.headers.is_empty());
     }
 
-    // #037 — the channel the composition root manages is the one every request uses.
+    // TODO-037 — the channel the composition root manages is the one every request uses.
     #[tokio::test]
     async fn the_managed_channel_is_the_one_the_check_uses() {
         let (endpoint, served) = serve_once("204 No Content").await;
@@ -465,7 +465,7 @@ mod tests {
         assert!(matches!(outcome, Ok(None)));
     }
 
-    // #037 — the endpoint and the headers of the channel are the ones the updater's own
+    // TODO-037 — the endpoint and the headers of the channel are the ones the updater's own
     // check request goes to and carries.
     #[tokio::test]
     async fn a_replaced_endpoint_and_header_reach_the_update_request() {

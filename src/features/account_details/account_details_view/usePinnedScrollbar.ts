@@ -23,7 +23,7 @@ function pinnedWidth(table: HTMLTableElement): number {
 }
 
 /**
- * #022 — drives the holdings scrollbar: measures the content area whenever it or its
+ * TODO-022 — drives the holdings scrollbar: measures the content area whenever it or its
  * tables change size, and keeps the scrollbar and the content area scrolled together.
  * The content area keeps scrolling natively, so the keyboard and the trackpad still work.
  */

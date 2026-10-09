@@ -726,7 +726,7 @@
     border-radius: 3px;
   }
 
-  /* #022 — a scroll area whose horizontal scrollbar lives elsewhere: its own is hidden,
+  /* TODO-022 — a scroll area whose horizontal scrollbar lives elsewhere: its own is hidden,
      the vertical one keeps the thin tinted look. */
   .pinned-scroll-area::-webkit-scrollbar {
     width: 6px;
@@ -744,7 +744,7 @@
     border-radius: 3px;
   }
 
-  /* #022 — the relocated horizontal scrollbar: thin, tinted, over the moving columns only. */
+  /* TODO-022 — the relocated horizontal scrollbar: thin, tinted, over the moving columns only. */
   .pinned-scrollbar::-webkit-scrollbar {
     height: 6px;
   }

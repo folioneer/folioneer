@@ -1,7 +1,7 @@
 /**
- * E2E tests — Holdings scrollbar (#022)
+ * E2E tests — Holdings scrollbar (TODO-022)
  *
- * Todo entry: #022 — the holdings' horizontal scrollbar starts where the pinned columns end.
+ * Todo entry: TODO-022 — the holdings' horizontal scrollbar starts where the pinned columns end.
  *
  * What this file proves on the real app, where there is a layout engine (the Vitest suite
  * has none):
@@ -85,7 +85,7 @@ describe("holdings_scrollbar", () => {
     await dismissLeftoverModal();
   });
 
-  it("#022: the scrollbar starts after the pinned columns and scrolls the holdings with it", async () => {
+  it("TODO-022: the scrollbar starts after the pinned columns and scrolls the holdings with it", async () => {
     await navigateToAccounts();
     await navigateToAccountDetails(accountId);
 
@@ -138,7 +138,7 @@ describe("holdings_scrollbar", () => {
     });
   });
 
-  it("#001: the table header stays at the top of the content area after scrolling down", async () => {
+  it("TODO-001: the table header stays at the top of the content area after scrolling down", async () => {
     await navigateToAccounts();
     await navigateToAccountDetails(accountId);
     const table = await $("#holdings-table");

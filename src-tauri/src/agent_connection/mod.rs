@@ -1,4 +1,4 @@
-//! The agent connection (AGT spec, #051): an interface beside the window, like the command
+//! The agent connection (AGT spec, TODO-051): an interface beside the window, like the command
 //! line. An agent client starts the program with `--mcp`; that bridge holds no data and
 //! passes each tool call to the running application over a local channel (ADR-023). The
 //! application asks its owner before serving a connection, and runs every tool through the

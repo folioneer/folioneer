@@ -56,7 +56,7 @@ export function toTransactionDraft(
 
 /**
  * TRX-063 — sends the draft to the check each time it changes and keeps only the answer
- * to the latest one. Each feature that records a trade has its own copy (TD-008). While a check runs, the draft is not clean. `null` checks nothing.
+ * to the latest one. Each feature that records a trade has its own copy (DEBT-008). While a check runs, the draft is not clean. `null` checks nothing.
  */
 export function useTransactionDraftCheck(draft: TransactionDraft | null): TransactionDraftCheck {
   const logFailure = useCallback(

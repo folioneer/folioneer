@@ -4,7 +4,7 @@ import type { I18nMessage } from "@/ui/format/i18n";
 import { useProblemPlacement } from "@/ui/hooks/useProblemPlacement";
 
 // The same file lives in `features/account_details/shared/`: a feature does not import another's
-// (TD-008). A change here is made there too.
+// (DEBT-008). A change here is made there too.
 
 /** The fields of a transaction form a draft problem can concern. */
 export type DraftField =

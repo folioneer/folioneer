@@ -49,14 +49,14 @@ describe("SettingsPage — scheduled fetch section (SPF-010)", () => {
     render(<SettingsPage />);
 
     expect(screen.getByTestId("scheduled-fetch-section-mounted")).toBeInTheDocument();
-    // #010 — the settings keep a line about sync, with the way to its page.
+    // TODO-010 — the settings keep a line about sync, with the way to its page.
     expect(screen.getByTestId("sync-summary-mounted")).toBeInTheDocument();
   });
 });
 
-// #035 — the shell's content area never scrolls, so the page must scroll itself: in a
+// TODO-035 — the shell's content area never scrolls, so the page must scroll itself: in a
 // window shorter than the page, every setting down to the last one stays reachable.
-describe("SettingsPage — scrolling (#035)", () => {
+describe("SettingsPage — scrolling (TODO-035)", () => {
   it("is its own vertical scroll container, holding every setting down to the last", () => {
     const { container } = render(<SettingsPage />);
 

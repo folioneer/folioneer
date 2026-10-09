@@ -12,13 +12,13 @@ After cloning: `git config core.hooksPath .githooks`. The hooks block commits to
 - The **agent** owns `docs/techdebt.md`, does the task end to end and merges on green. No pull request is validated by a human.
 - The **harness** (`just harness` locally, `--coverage` before a first push; required checks in CI) proves the code.
 
-Headless, a question only the human can answer goes into the entry's `**Open questions:**`, never asked. In a chat run (`/next-todo #NNN`) the open questions are asked before anything starts, and a design is validated by a yes; the answers are written into the entry either way. In a chat conversation, ask as you would a colleague: state assumptions, name what is unclear. Whenever the human is asked: one question at a time, each with the context needed to answer it — what the thing is, where it shows, what each answer changes.
+Headless, a question only the human can answer goes into the entry's `**Open questions:**`, never asked. In a chat run (`/next-todo TODO-NNN`) the open questions are asked before anything starts, and a design is validated by a yes; the answers are written into the entry either way. In a chat conversation, ask as you would a colleague: state assumptions, name what is unclear. Whenever the human is asked: one question at a time, each with the context needed to answer it — what the thing is, where it shows, what each answer changes.
 
 ## Core rules
 
-1. **Authority follows the entry.** Running a queued entry, a queued `TD-NNN`, or a phase the human said "go" to, the agent branches, commits, pushes, opens the PR and runs `just merge` on green without asking. In an open-ended chat, ask once for the task, not per step. Always: never push to `main`, never force-push, never bypass a hook, never cut a release, never touch the live portfolio database (`~/.local/share/com.folioneer.desktop/` and `~/.local/share/com.phileggel.vault-compass/` are read-only reference data).
+1. **Authority follows the entry.** Running a queued entry, a queued `DEBT-NNN`, or a phase the human said "go" to, the agent branches, commits, pushes, opens the PR and runs `just merge` on green without asking. In an open-ended chat, ask once for the task, not per step. Always: never push to `main`, never force-push, never bypass a hook, never cut a release, never touch the live portfolio database (`~/.local/share/com.folioneer.desktop/` and `~/.local/share/com.phileggel.vault-compass/` are read-only reference data).
 2. **Always use `just`** when a recipe exists; never the native command (`cargo build`, `npm install`, `sqlx migrate`).
-3. **Every change goes through the harness**: branch (`<type>/NNN-slug`) → PR → every check green → `just merge`. Docs-only changes too. The entry's Done when is the plan. Anything the user sees changing goes through the design gate first (`/design-proposal`).
+3. **Every change goes through the harness**: branch (`<type>/todo-NNN-slug`, `<type>/debt-NNN-slug`) → PR → every check green → `just merge`. Docs-only changes too. The entry's Done when is the plan. Anything the user sees changing goes through the design gate first (`/design-proposal`).
 4. **Only prescribed agents.** Launch only the agents this file, a skill or `docs/workflow.md` names. Implementation and review fixes are done by the main agent — never a general-purpose "implementer" or "fix" agent.
 
 ## Per-task discipline (in priority order)
@@ -27,14 +27,14 @@ Headless, a question only the human can answer goes into the entry's `**Open que
 2. **Gold for new code, bit by bit for existing** — `docs/workflow.md` § 10. When in doubt, defer.
 3. **Boyscout** — small mechanical fixes inside the files already edited ship in the same PR. Known dead code is removed in the same commit (live-vs-dead table in the PR body). No transition comments: code and docs describe what is, not what was.
 4. **Coverage when a real gap surfaces** — add a focused test; the floors in `coverage-gates.json` only rise.
-5. **Challenge reviewer returns** — every finding graded (`docs/workflow.md` § 7) and recorded in the PR body: (a) in scope → fix; (b) bigger → `TD-NNN`; (c) false positive → inline `// <reviewer> FP: <reason> — see PR #NN`, or edit the reviewer prompt when it is a pattern. A `[DECISION]` critical becomes an open question on the entry.
+5. **Challenge reviewer returns** — every finding graded (`docs/workflow.md` § 7) and recorded in the PR body: (a) in scope → fix; (b) bigger → `DEBT-NNN`; (c) false positive → inline `// <reviewer> FP: <reason> — see PR #NN`, or edit the reviewer prompt when it is a pattern. A `[DECISION]` critical becomes an open question on the entry.
 6. **PR size ≤ 1000 lines** as a target; split when a PR crosses it or tells two stories (`docs/workflow.md` § 11).
 
 ## Opening and closing a piece of work
 
 **Opening brief** — four lines before the first edit (first message in chat; top of the PR body headless):
 
-    **Task**     — the entry (`#NNN` / `TD-NNN`) or the request, in one line
+    **Task**     — the entry (`TODO-NNN` / `DEBT-NNN`) or the request, in one line
     **Scope**    — the commit type and the layers (backend / frontend / E2E / docs / CI)
     **Design**   — none, validated, or needed (then the mocks come before anything else)
     **Touching** — the paths, so the reviewer lanes are known before the diff exists
@@ -52,6 +52,7 @@ Headless, a question only the human can answer goes into the entry's `**Open que
 - **Vocabulary**: `docs/ubiquitous-language.md` — use confirmed terms in identifiers, comments and logs; never extend a discrepant one; changes need the owner. Give it to every reviewer you launch.
 - **Skills**: `/next-todo`, `/design-proposal NNN`, `/visual-proof`, `/adr-writer`, `/dep-audit`, `/prune`, `/whats-next`, `/flow-audit` (after a release).
 - **Agents**: the reviewers matched to the diff (locally until no 🔴, and in CI on every push); `reviewer-security` before every release; `spec-checker` before closing an entry with spec rules, and before a release on every spec the batch touched (`bash scripts/batch-specs.sh`); `spec-reviewer` / `contract-reviewer` / `adr-reviewer` when those documents change.
+- **References**: `TODO-NNN` (todo), `DEBT-NNN` (tech debt), `FLOW-NNN` (flow), `ghNN` (GitHub issue); a pull request stays `#NN` (`docs/workflow.md` § 2).
 - **Task tracking**: `TaskCreate` / `TaskUpdate` for any task of more than one file or step.
 - **Plans** (asked in chat): exact paths, functions and components per layer, gold work with its size, the tests for each clause. Once the human says go, the plan is the authority for the batch.
 

@@ -84,7 +84,7 @@ describe("ManagementFeeEditModalMount (FEE-063)", () => {
     expect(modal).toHaveTextContent("tx-fee-1:1.000:Apple Inc");
   });
 
-  // TD-073 — a figure recorded with more than three decimals fills the form as it is.
+  // DEBT-073 — a figure recorded with more than three decimals fills the form as it is.
   it("fills the form with every recorded decimal", async () => {
     mockUseSearch.mockReturnValue({
       modal: "edit-management-fee",

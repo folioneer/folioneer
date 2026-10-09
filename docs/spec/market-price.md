@@ -406,7 +406,7 @@ The header tells how recent the portfolio's prices are. Prices travel with the s
 
 ### Without an External provider (210–219)
 
-A build may be composed without an External provider ([ADR-020](../adr/020-one-extension-file-per-build.md)); the public build is composed without one since #038, for the reasons recorded in [`external-dependencies.md`](../external-dependencies.md). Prices typed by hand are then the only prices, and the application must read as complete rather than as one with a broken half.
+A build may be composed without an External provider ([ADR-020](../adr/020-one-extension-file-per-build.md)); the public build is composed without one since TODO-038, for the reasons recorded in [`external-dependencies.md`](../external-dependencies.md). Prices typed by hand are then the only prices, and the application must read as complete rather than as one with a broken half.
 
 **MKT-210 — A build may have no External provider (backend)**: The External provider is optional at composition. A build composed without one has no fetch task — no auto-fetch (MKT-121/122), no global refresh (MKT-130), no account refresh (MKT-131/132) — and no price history backfill (MKT-190). Starting any of them is refused before any work is done: nothing is fetched, nothing is written, and no moment of last fetch is recorded (MKT-201). The scheduled fetch follows the same rule (SPF-070).
 

@@ -74,7 +74,7 @@ mod tests {
         );
     }
 
-    // #040 — a release build keeps its data where Tauri puts the installed application's.
+    // TODO-040 — a release build keeps its data where Tauri puts the installed application's.
     #[test]
     fn a_release_build_resolves_the_installed_application_folder() {
         let base = Path::new("/home/someone/.local/share");
@@ -84,7 +84,7 @@ mod tests {
         );
     }
 
-    // #040 — a debug build resolves a folder of its own, neither the installed
+    // TODO-040 — a debug build resolves a folder of its own, neither the installed
     // application's nor nested inside it, so nothing it writes (database, logs) lands there.
     #[test]
     fn a_debug_build_resolves_a_folder_outside_the_installed_application_folder() {
@@ -97,7 +97,7 @@ mod tests {
         assert!(!log_dir_in(&development).starts_with(&installed));
     }
 
-    // #040 — tests run as a debug build: what such a build resolves for itself, data and
+    // TODO-040 — tests run as a debug build: what such a build resolves for itself, data and
     // logs, stays out of the installed application's folder.
     #[test]
     fn a_development_run_keeps_data_and_logs_out_of_the_installed_application_folder() {
@@ -110,7 +110,7 @@ mod tests {
         assert!(!log_dir.starts_with(&installed));
     }
 
-    // #040 — an E2E run keeps its injected data folder, and logs beside the development
+    // TODO-040 — an E2E run keeps its injected data folder, and logs beside the development
     // data rather than beside the installed application's.
     #[test]
     fn an_e2e_run_keeps_its_own_data_folder_and_logs_with_the_development_run() {

@@ -142,7 +142,7 @@ describe("SyncPage — enabled state (SYN-061/063/070/072/073/074/082/084)", () 
     expect(word()).toBe("sync.health.paused");
   });
 
-  // #010 — each other computer says how many changes it has published, or that it has
+  // TODO-010 — each other computer says how many changes it has published, or that it has
   // published nothing yet.
   it("says what each other computer has published", () => {
     render(<SyncPage />);
@@ -155,7 +155,7 @@ describe("SyncPage — enabled state (SYN-061/063/070/072/073/074/082/084)", () 
     );
   });
 
-  // #010 — actions are grouped by consequence: routine ones with the status, the name and
+  // TODO-010 — actions are grouped by consequence: routine ones with the status, the name and
   // the folder under this computer, the two that cannot be undone apart.
   it("groups the actions by consequence", () => {
     render(<SyncPage />);

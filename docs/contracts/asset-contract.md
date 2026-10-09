@@ -371,7 +371,7 @@ struct AssetClassDefault {
 - 2026-10-09 — AST-037–039: new `get_other_listings` and `propose_asset_reference` commands with the `AssetListings` and `OtherListing` shared types; the `ASSET_CREATION_DEFAULTS` constant gains `kinds` and `kind` (what each kind's form asks for).
 - 2026-10-09 — AST-030–032: `Asset.kind`, the `AssetKind` enum, `kind` on the inputs of `add_asset` and `update_asset`, and five codes on both (`IsinRequired`, `IsinNotAllowed`, `ExchangeNotAllowed`, `ClassNotAllowed`, `AssetAlreadyExists`); new `get_assets_to_settle` command with the `AssetToSettle` and `KindProblem` shared types (AST-035).
 - 2026-10-03 — CSH-015: `add_asset` rejects `class = Cash` with `CashAssetNotEditable`.
-- 2026-09-27 — #038: the public build has no External provider; `YahooFinance` is written only by a Yahoo Finance provider (the owner's private build). No wire change.
+- 2026-09-27 — TODO-038: the public build has no External provider; `YahooFinance` is written only by a Yahoo Finance provider (the owner's private build). No wire change.
 - 2026-09-19 — Amended by `market-price` spec (MKT-200–203): new `get_price_freshness` command and `PriceFreshness` shared type. No event added; the header item re-reads on `AssetPriceFetchCompleted`, `AssetPriceUpdated`, `TransactionUpdated` and `SyncCompleted`.
 - 2026-09-19 — SYN-064 amended: applied assets, categories and prices raise no event of their own; `SyncCompleted` is the re-fetch trigger for what a sync applied
 - 2026-08-22 — Amended by `sync-conflict-resolution` spec: `Asset.category` resolves to the default category when the stored category stands removed (CFR-030); `update_asset.CategoryNotFound` and `update_category.DuplicateName` notes (CFR-030/035).

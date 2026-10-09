@@ -325,7 +325,7 @@ describe("accountGateway — fetchAllAssetPrices (MKT-130)", () => {
     expect(result).toBe(unlisten);
   });
 
-  it("subscribeToEvents passes the callback the generated event discriminant, not a bare string (TD-011)", () => {
+  it("subscribeToEvents passes the callback the generated event discriminant, not a bare string (DEBT-011)", () => {
     expectTypeOf(accountGateway.subscribeToEvents)
       .parameter(0)
       .parameter(0)

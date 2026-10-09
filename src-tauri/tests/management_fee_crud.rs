@@ -278,7 +278,7 @@ async fn record_management_fee_performance_neutrality() {
 }
 
 // -------------------------------------------------------------------------
-// FEE-028 / FEE-029 — one-off fee entered by the resulting quantity (#018)
+// FEE-028 / FEE-029 — one-off fee entered by the resulting quantity (TODO-018)
 // -------------------------------------------------------------------------
 
 /// An account with management fees enabled holding `quantity` micro-units of one asset,

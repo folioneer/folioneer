@@ -199,9 +199,9 @@ Record identity per kind follows CFR-012: accounts, categories, assets, transact
 
 ## Changelog
 
-- 2026-10-04 — TD-069 (SYN-063): every status the interface reads carries `health` (`SyncHealth`), computed by the core from one rule; the commands return `SyncStatusView` / `SyncReportView`, the same fields plus `health`.
-- 2026-10-03 — #010 (SYN-063): `RosterEntry.published_changes` added — the manifest's latest sequence. No command, error or event changes.
-- 2026-09-27 — #045 (SYN-063): `last_sync_completed_at` is the end of the last run without a failure, stored on the device; a failed run leaves it unchanged. No shape change.
+- 2026-10-04 — DEBT-069 (SYN-063): every status the interface reads carries `health` (`SyncHealth`), computed by the core from one rule; the commands return `SyncStatusView` / `SyncReportView`, the same fields plus `health`.
+- 2026-10-03 — TODO-010 (SYN-063): `RosterEntry.published_changes` added — the manifest's latest sequence. No command, error or event changes.
+- 2026-09-27 — TODO-045 (SYN-063): `last_sync_completed_at` is the end of the last run without a failure, stored on the device; a failed run leaves it unchanged. No shape change.
 - 2026-09-19 — SYN-037/063 amended: `SyncStatus.app_version` and `RosterEntry.app_version` added. No command, error or event changes; the manifest's new field is ignored by older builds, so the data format version stays 1 (SYN-038 pins the written form).
 - 2026-09-19 — SYN-064 amended (reverses the 2026-09-12 entry): applying a change raises no event of its own; one `SyncCompleted` per run that applied changes or whose failures or paused state changed, raised after the apply commits, and one per join; every view that shows synced data reloads on it
 - 2026-09-12 — Events row amended: applied holding notes and currency pairs now raise `HoldingNoteUpdated` / `CurrencyPairUpdated` (SYN-064), so `SyncCompleted` no longer stands in for them

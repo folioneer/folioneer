@@ -71,9 +71,9 @@ describe("i18n locales — folder problem nesting", () => {
   });
 });
 
-// #004 — the price-age and FX-rate-age labels on the holding row carry the age
+// TODO-004 — the price-age and FX-rate-age labels on the holding row carry the age
 // alone; the same day reads as zero days so every row lines up.
-describe("i18n locales — staleness labels carry the age alone (#004)", () => {
+describe("i18n locales — staleness labels carry the age alone (TODO-004)", () => {
   it.each([
     ["en", en, "0d", "{{days}}d"],
     ["fr", fr, "0 j", "{{days}} j"],

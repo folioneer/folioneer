@@ -1,4 +1,4 @@
-"""Tests for scripts/e2e-scope.py (todo #041) — run with `just test-scripts`."""
+"""Tests for scripts/e2e-scope.py (todo TODO-041) — run with `just test-scripts`."""
 
 import importlib.util
 import unittest
@@ -12,7 +12,7 @@ SPEC.loader.exec_module(e2e_scope)
 
 
 class SuiteMustRun(unittest.TestCase):
-    # #041 — a pull request of records only (Markdown, docs/, the agent tooling, the
+    # TODO-041 — a pull request of records only (Markdown, docs/, the agent tooling, the
     # committed visual proofs) changes nothing the suite can execute.
     def test_records_only_skip_the_suite(self):
         files = [
@@ -25,7 +25,7 @@ class SuiteMustRun(unittest.TestCase):
         ]
         self.assertFalse(e2e_scope.suite_must_run(files))
 
-    # #041 — application code, the tests themselves, the workflow and the test tooling
+    # TODO-041 — application code, the tests themselves, the workflow and the test tooling
     # all run the suite.
     def test_anything_the_suite_can_execute_runs_it(self):
         for path in [
@@ -42,7 +42,7 @@ class SuiteMustRun(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertTrue(e2e_scope.suite_must_run(["docs/todo.md", path]))
 
-    # #041 — no file list means nothing proves the change is records only: run.
+    # TODO-041 — no file list means nothing proves the change is records only: run.
     def test_an_unknown_change_runs_the_suite(self):
         self.assertTrue(e2e_scope.suite_must_run([]))
 

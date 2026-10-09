@@ -763,7 +763,7 @@ async fn fee_catch_up_positions_converge_by_maximum() {
     );
 }
 
-// #020 / SYN-064 — a sync that catches up many records announces itself once, after the
+// TODO-020 / SYN-064 — a sync that catches up many records announces itself once, after the
 // apply commits: the number of events a subscriber sees does not grow with the number of
 // applied records.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -836,7 +836,7 @@ async fn a_catch_up_sync_announces_itself_once_whatever_the_number_of_applied_re
     assert_eq!(
         (seen.len(), seen.last()),
         (1, Some(&Event::SyncCompleted)),
-        "#020: {PRICE_COUNT} applied records must reach subscribers as one SyncCompleted"
+        "TODO-020: {PRICE_COUNT} applied records must reach subscribers as one SyncCompleted"
     );
 }
 

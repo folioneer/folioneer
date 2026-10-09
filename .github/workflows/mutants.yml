@@ -50,7 +50,7 @@ jobs:
         # the shards never save (nothing new to keep, twelve writers otherwise).
         # reviewer-infra FP: this is the commit tag v2.9.1 peels to
         # (`git ls-remote --tags`, 2026-09-13); the older workflows pin another
-        # commit under the same label — TD-021.
+        # commit under the same label — DEBT-021.
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
         with:
           workspaces: src-tauri
@@ -146,7 +146,7 @@ jobs:
               echo "### Ready to file in \`docs/techdebt.md\`"
               echo
               echo '```'
-              echo "## $today — TD-NNN — $missed surviving mutants in the logic code"
+              echo "## $today — DEBT-NNN — $missed surviving mutants in the logic code"
               echo
               echo "- Found by: mutation sweep ($run_url)"
               echo "- Where: the files listed in the sweep issue"

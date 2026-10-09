@@ -82,7 +82,7 @@ pub fn distribution_channel() -> Option<&'static str> {
 mod tests {
     use super::*;
 
-    // #038 — the public build plugs in rates, rate history and asset lookup, and no
+    // TODO-038 — the public build plugs in rates, rate history and asset lookup, and no
     // External provider: prices are entered by hand (MKT-210).
     #[test]
     fn the_public_build_plugs_in_every_external_data_source_but_prices() {
@@ -95,7 +95,7 @@ mod tests {
         assert_eq!(Arc::strong_count(&providers.rate_history), 2);
     }
 
-    // #038 — an E2E run gets an External provider that answers "no data" for every
+    // TODO-038 — an E2E run gets an External provider that answers "no data" for every
     // symbol, latest quote and daily closes alike, without calling anything.
     #[tokio::test]
     async fn an_e2e_run_gets_a_provider_that_answers_no_data() {
@@ -117,7 +117,7 @@ mod tests {
             .is_none());
     }
 
-    // #037 — the public build sends no header of its own and names no endpoint: its
+    // TODO-037 — the public build sends no header of its own and names no endpoint: its
     // updates come from the address in `tauri.conf.json`, anonymously.
     #[cfg(feature = "app")]
     #[test]

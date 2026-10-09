@@ -1,4 +1,4 @@
-/** Measurements of the holdings content area, in CSS pixels (#022). */
+/** Measurements of the holdings content area, in CSS pixels (TODO-022). */
 export interface PinnedScrollbarMeasures {
   /** Visible width of the content area. */
   viewportWidth: number;
@@ -12,7 +12,7 @@ export interface PinnedScrollbarMeasures {
   closedWidth: number | null;
 }
 
-/** Where the holdings scrollbar sits and how far it travels (#022). */
+/** Where the holdings scrollbar sits and how far it travels (TODO-022). */
 export interface PinnedScrollbarGeometry {
   /** The closed section fits the window, so it stays put while the active table scrolls. */
   closedStaysPut: boolean;
@@ -27,7 +27,7 @@ export interface PinnedScrollbarGeometry {
 }
 
 /**
- * #022 — the scrollbar covers only the columns that move. Its track starts after the
+ * TODO-022 — the scrollbar covers only the columns that move. Its track starts after the
  * pinned block of the active table; when the closed table is too wide to stay put it
  * scrolls too, and the track starts after the narrower of the two pinned blocks.
  */

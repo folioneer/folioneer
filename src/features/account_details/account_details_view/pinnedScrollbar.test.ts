@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { computePinnedScrollbar } from "./pinnedScrollbar";
 
-// #022 — the geometry behind the holdings scrollbar: where its track starts, how far it
+// TODO-022 — the geometry behind the holdings scrollbar: where its track starts, how far it
 // travels, and whether the closed positions table can stay put.
-describe("computePinnedScrollbar (#022)", () => {
+describe("computePinnedScrollbar (TODO-022)", () => {
   const wide = {
     viewportWidth: 1100,
     contentWidth: 1900,

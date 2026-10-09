@@ -92,7 +92,7 @@ mod tests {
         assert!(!scheduler.is_registered().await.unwrap());
     }
 
-    // #040 — only a release build owns the host's daily schedule: a development or E2E
+    // TODO-040 — only a release build owns the host's daily schedule: a development or E2E
     // run must neither repoint it at a debug binary nor remove it.
     #[test]
     fn only_a_release_build_touches_the_host_schedule() {
@@ -100,7 +100,7 @@ mod tests {
         assert!(uses_inert_scheduler(true));
     }
 
-    // #040 — tests run as a debug build, so the scheduler they get reports nothing
+    // TODO-040 — tests run as a debug build, so the scheduler they get reports nothing
     // registered even on a computer whose installed application has a daily schedule.
     #[tokio::test]
     async fn a_debug_build_gets_the_inert_scheduler() {
