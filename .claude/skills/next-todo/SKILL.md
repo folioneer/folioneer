@@ -69,14 +69,18 @@ control; i18n for every string; one event per action. Gold layout for new files.
 ## Step 5 — Harness
 
 `just harness` while working; `just harness --coverage` before the first push, so the
-coverage CI judges holds. Fix until green. A coverage floor under its value is fixed with
+coverage CI judges holds. The coverage run holds the foreground: detached on a machine
+with 8 GiB of memory or less it is stopped before it gives a verdict, and the harness
+refuses to start it. A foreground run without a terminal says so:
+`HARNESS_FOREGROUND=1 just harness --coverage`. Fix until green. A coverage floor under its value is fixed with
 tests, never by editing `coverage-gates.json` downward; an architecture violation is
 fixed in code, never by editing `arch-allowlist.json` upward.
 
 ## Step 6 — Reviewers
 
 Launch the reviewer agents that match the diff (`docs/workflow.md` § 7) in one
-batch. Grade every finding by the four questions of `docs/workflow.md` § 7, one row
+batch. `reviewer-arch` is in that batch whenever `reviewer-backend` or
+`reviewer-frontend` is: a `.rs`, `.ts` or `.tsx` change launches both lanes, every time. Grade every finding by the four questions of `docs/workflow.md` § 7, one row
 each, and apply the policy: (a) fix,
 (b) `TD-NNN` entry, (c) one-off inline comment, (c) pattern → edit the reviewer prompt,
 `[DECISION]` → open question on the entry. Re-run the reviewers until no 🔴 remains.

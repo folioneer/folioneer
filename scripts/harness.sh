@@ -21,6 +21,10 @@ esac
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 cd "$PROJECT_ROOT"
 
+if [ "$coverage" = true ]; then
+    bash scripts/coverage-preflight.sh
+fi
+
 if [ -n "${NO_COLOR:-}" ]; then BLUE='' GREEN='' NC=''; else BLUE='\033[0;34m' GREEN='\033[0;32m' NC='\033[0m'; fi
 
 for tool in python3 just; do

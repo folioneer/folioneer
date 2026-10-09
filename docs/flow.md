@@ -94,7 +94,8 @@ sweep found two bugs no reviewer had.
   0.5.0.
 - Verdict: **keep both.** The local run is what makes the first CI round green; CI is
   the one that cannot be skipped. The rule — the architecture lane goes with the backend
-  or frontend lane every time — is written and was not followed twice: see FLOW-021.
+  or frontend lane every time — was not followed twice; the `/next-todo` skill now names
+  the lane in its reviewer step.
 
 ## FLOW-010 — The local machine cannot carry a mutation sweep
 
@@ -131,20 +132,6 @@ sweep found two bugs no reviewer had.
   the round before had a failed check.
 - Costs: about two hours, with tests; one `gh` call per later round at audit time.
   Protects: the decision on a merge queue being taken on a figure.
-
-## FLOW-021 — Two written rules were not followed, and nothing noticed
-
-- Kind: quality + speed
-- Observed: (1) the architecture lane goes with the backend or frontend lane every time
-  (FLOW-008): launched 4 times for 24, and CI refused #124 for it. (2) The coverage
-  harness runs in the foreground on this machine (a note of 2026-09-15): it was started
-  in the background, stopped for lack of memory, and the last entry waited for the
-  owner's word to run it again.
-- Proposal: the rules move from prose to the place that acts — the `/next-todo` skill
-  names the architecture lane in its reviewer step, and `just harness --coverage`
-  refuses to start without a terminal when the machine has 8 GiB of memory or less.
-- Costs: about an hour. Risk: a refusal in a legitimate background run, which the
-  message must explain how to override. Protects: a CI round, and a stalled batch.
 
 ## FLOW-022 — What's next proposes no flow entry and no GitHub issue
 

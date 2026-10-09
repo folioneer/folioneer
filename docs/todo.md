@@ -20,13 +20,12 @@
 
 1. #056
 2. #051
-3. FLOW-021
-4. FLOW-007
-5. FLOW-022
-6. TD-082
-7. TD-078
-8. TD-081
-9. #049
+3. FLOW-007
+4. FLOW-022
+5. TD-082
+6. TD-078
+7. TD-081
+8. #049
 
 ## #009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
