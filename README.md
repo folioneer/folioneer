@@ -143,6 +143,27 @@ folioneer holding buy --help  # one command's options and defaults
   `/mnt/c/Users/<you>/AppData/Local/Folioneer/folioneer-cli.exe holding …`
   (the Linux program run inside WSL keeps a separate portfolio of its own, and refuses while none exists).
 
+## Agents (Model Context Protocol)
+
+An agent — Claude Code, Claude Desktop — can read the portfolio and record opening balances, purchases and sales through the application while it is open (Linux; not on Windows yet). Nothing answers when Folioneer is closed.
+
+1. In Folioneer, **Settings → Allow agents to connect** (off by default).
+2. Tell the agent how to start the bridge, which is the installed program with `--mcp`:
+   - **Claude Code**: `claude mcp add folioneer -- folioneer --mcp` (with the AppImage: `claude mcp add folioneer -- ~/Applications/Folioneer.AppImage --mcp`).
+   - **Claude Desktop**: in `~/.config/Claude/claude_desktop_config.json`, then restart it:
+
+     ```json
+     {
+       "mcpServers": {
+         "folioneer": { "command": "folioneer", "args": ["--mcp"] }
+       }
+     }
+     ```
+
+3. At the agent's first call, Folioneer asks you to allow or refuse the connection. A yes lasts until you click **Disconnect** in the header or close Folioneer.
+
+What an agent recorded is marked in the account journal ("Recorded by"). An agent cannot change or remove a transaction, and reads no file.
+
 ## Documentation
 
 - [Architecture](ARCHITECTURE.md) — system design, bounded contexts, data flow

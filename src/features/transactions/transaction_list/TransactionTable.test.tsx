@@ -168,4 +168,33 @@ describe("TransactionTable", () => {
       "account_details.pnl_placeholder",
     );
   });
+
+  // AGT-045 — the journal says which agent session recorded a row, and nothing for a row
+  // the owner typed; the per-asset list has no such column.
+  it("shows the agent session that recorded a row, in the journal only", () => {
+    const rows = [
+      row({
+        id: "by-agent",
+        recordedBy: { agent: "Claude Code", sessionStartedAt: "2026-10-09T14:32:00" },
+      }),
+      row({ id: "typed" }),
+    ];
+    const { unmount } = render(<TransactionTable rows={rows} {...baseProps} cashStatement />);
+
+    expect(screen.getByText("transaction.column_recorded_by")).toBeInTheDocument();
+    const marked = document.getElementById("txl-recorded-by-by-agent") as HTMLElement;
+    expect(marked).toHaveTextContent("Claude Code");
+    expect(marked).toHaveTextContent("transaction.recorded_by_session");
+    expect(document.getElementById("txl-recorded-by-chip-by-agent")).not.toBeNull();
+    expect(marked.querySelector("[title]")).toHaveAttribute(
+      "title",
+      "transaction.recorded_by_agent",
+    );
+    expect(document.getElementById("txl-recorded-by-typed")).toBeEmptyDOMElement();
+
+    unmount();
+    render(<TransactionTable rows={rows} {...baseProps} />);
+    expect(screen.queryByText("transaction.column_recorded_by")).not.toBeInTheDocument();
+    expect(document.getElementById("txl-recorded-by-by-agent")).toBeNull();
+  });
 });

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO agent_recordings (transaction_id, agent, session, session_started_at)\n               VALUES (?, ?, ?, ?)\n               ON CONFLICT(transaction_id) DO UPDATE SET\n                   agent = excluded.agent,\n                   session = excluded.session,\n                   session_started_at = excluded.session_started_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "9e306c4fdd6233281d8f02d0142c05962246a71f4a13c0a95139bbda77e29d9b"
+}

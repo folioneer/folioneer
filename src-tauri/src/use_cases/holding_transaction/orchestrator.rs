@@ -213,7 +213,7 @@ fn match_asset<'a>(assets: &'a [Asset], typed: &str) -> Result<&'a Asset, NameLo
 /// drive the cross-BC `ensure_cash_asset` step inserted by the cash-tracking spec
 /// (CSH-040 / CSH-050 / CSH-042 / CSH-024).
 pub struct HoldingTransactionUseCase {
-    account_service: Arc<dyn AccountServiceContract>,
+    pub(super) account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,
 }
 

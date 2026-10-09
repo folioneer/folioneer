@@ -19,14 +19,20 @@ pub const CONNECT_WITHIN: std::time::Duration = std::time::Duration::from_secs(3
 /// Who runs a tool for a connected agent.
 #[async_trait::async_trait]
 pub trait ToolRunner: Send + Sync {
-    /// Runs `tool` with `arguments`.
-    async fn run(&self, tool: &str, arguments: &Value) -> Result<Value, Refusal>;
+    /// Runs `tool` with `arguments` for the session `granted`.
+    async fn run(&self, granted: &Granted, tool: &str, arguments: &Value)
+        -> Result<Value, Refusal>;
 }
 
 #[async_trait::async_trait]
 impl ToolRunner for AgentTools {
-    async fn run(&self, tool: &str, arguments: &Value) -> Result<Value, Refusal> {
-        self.call(tool, arguments).await
+    async fn run(
+        &self,
+        granted: &Granted,
+        tool: &str,
+        arguments: &Value,
+    ) -> Result<Value, Refusal> {
+        self.call(granted, tool, arguments).await
     }
 }
 
@@ -93,7 +99,7 @@ pub async fn serve_connection<S>(
             (Request::Call { .. }, None) => refused("NotConnected", "not connected"),
             (Request::Call { tool, arguments }, Some(granted)) => {
                 connections.count_call(granted.session_id);
-                let result = tools.run(&tool, &arguments).await;
+                let result = tools.run(granted, &tool, &arguments).await;
                 // AGT-041 — every call is written to the log with its tool.
                 tracing::info!(target: BACKEND, session = granted.session_id, tool = %tool, refused = result.is_err(), "agent tool called");
                 match result {
@@ -125,7 +131,12 @@ mod tests {
 
     #[async_trait::async_trait]
     impl ToolRunner for Echo {
-        async fn run(&self, tool: &str, arguments: &Value) -> Result<Value, Refusal> {
+        async fn run(
+            &self,
+            _granted: &Granted,
+            tool: &str,
+            arguments: &Value,
+        ) -> Result<Value, Refusal> {
             if tool == "list_accounts" {
                 Ok(json!({ "tool": tool, "arguments": arguments }))
             } else {

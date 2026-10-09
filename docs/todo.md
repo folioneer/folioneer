@@ -2,7 +2,7 @@
 
 <!-- Add new backlog items here. Format: ## #NNN — (domain) — Short title -->
 <!-- #NNN is a permanent reference: never renumbered, never reused. A new entry takes the -->
-<!-- next free number wherever it is placed. Next free: #059. -->
+<!-- next free number wherever it is placed. Next free: #060. -->
 <!-- Every entry ends with four lines: **User value:**, **Done when:**, **Design:** and -->
 <!-- **Open questions:**. Design is `none` until the agent proposes one (it does so before -->
 <!-- touching anything the user sees), then `proposed (screenshots/design/NNN-*.png)`, then -->
@@ -18,8 +18,7 @@
 <!-- takes the first ready one, removes a reference when it closes the entry (order and -->
 <!-- additions are the human's), and stops when the queue is empty. -->
 
-1. #051
-2. #049
+1. #049
 
 ## #009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
@@ -119,32 +118,22 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
 
-## #051 — (fullstack) — An agent works on the portfolio through the open application (MCP)
+## #059 — (fullstack) — An agent rebuilds an old account: more recordings, and a way to undo them
 
-Moved to 0.7.0 by the owner on 2026-10-04 (after #056).
+Split from #051 by the owner on 2026-10-09: 0.7.0 ships the agent connection, the read tools and three marked recordings (opening balance, purchase, sale). This entry holds what the owner decided on 2026-10-04 and was left out.
 
-Requested by the owner on 2026-09-28; the model below was decided with the owner on 2026-10-04. The Model Context Protocol lets an agent (Claude Code, Claude Desktop, others) call an application's tools. An agent reaches the portfolio only through the application the owner has opened: nothing answers when the window is closed.
+The owner's first use. An old account is entered from the start of this year only; the owner holds one statement a year (PDF) for the years before. With an agent reading those statements, the agent enters the first year's position, then derives the movements from one year-end state to the next. The result is an approximation, better than no history, and may be redone when more documents turn up.
 
-How it works. The agent client starts the installed program with `--mcp`. That process is a bridge: it opens no database and holds no data; it passes each request to the running application over a local channel — a socket in the owner's data folder on Linux, a named pipe on Windows, readable by the owner's user only, never a network port — and returns the answer. The running application executes every request with the rules the window uses, so there is one writer and the window shows the result at once. Every tool is a query or a command the core already has.
+What it needs. Four more recordings — a deposit, a withdrawal, a dividend, and a price at a date — each datable years back. An agent may correct or cancel only transactions marked as its own, never one the owner typed: what the agent reads (a statement) is content it did not write, and must not be able to steer it into removing real history. The window offers the owner one action per session, "Remove everything it recorded", in a dialog opened from the header that lists what the session read and recorded. For a transaction the owner typed, the agent may only ask: the window shows the transaction in full (date, asset, quantity, amount) and what would become of it, refusing is the default action, the session's grant never covers it, and there is no "allow all". The position typed at the start of this year is the owner's to remove, in the window or by allowing the agent's request, once the past is rebuilt.
 
-Consent. The channel does not exist unless the owner switches on "allow agents to connect" in the settings (off by default). The bridge's first request is a connection: the application shows a dialog naming the client, and the owner allows or refuses. One grant covers the session — reading and recording — until the application closes or the owner disconnects; nothing is remembered across restarts. While an agent is connected the header says so and offers to disconnect. A future login gates all of it by gating the window.
+The mock-ups of the session dialog and of the ask are the `screenshots/design/059-` images, validated by the owner with #051 on 2026-10-09.
 
-Limits. Only the listed tools exist: no deletion, no correction, nothing that returns a path, a setting or sync material, no tool that takes a path. An unknown account or asset is refused without listing what exists; listing is its own tool. Every recording made through an agent is shown in the window as it happens and written to the log with its tool. The command line keeps its own rule — it records only while the window is closed (#044).
+Also to settle here: the mark of an agent's recording is kept on the computer that recorded it (AGT-045); the owner's other computers do not show "Recorded by". And the Done-when clause of #051 that could not be run by the agent: a recorded Claude Code session that lists and calls the tools against the open application.
 
-The owner's first use (2026-10-04). An old account is entered from the start of this year only; the owner holds one statement a year (PDF) for the years before. With Claude Cowork reading those statements, the agent enters the first year's position, then derives the movements from one year-end state to the next — for instance a sale or a purchase dated 31 December at that day's price. The result is an approximation, better than no history, and may be redone when more documents turn up. What this asks of the tools: recordings dated years back (opening balance, purchase, sale, deposit, withdrawal), a price recorded at a date, the account read as of a date to check a year-end against its statement, and a way to tell reconstructed transactions from real ones and to redo them.
-
-**User value:** With the application open, ask an agent "what is my portfolio worth?" or "record 10 shares of X in my PEA at 52 €" and see it done in the window, through the application's own rules — and know that nothing can reach the portfolio when the application is closed or the connection was not allowed.
-**Done when:** with the setting off, no channel exists; with it on, the program started with `--mcp` and no open application answers that the application is not open; a connection waits for the owner's answer in the window and a refusal gives the agent nothing; once allowed, the read tools (portfolio summary, accounts, holdings of an account, the two lists) answer from the running application; in a second pull request, the three recordings of the command line (opening balance, buy, sell) work, each shown in the window and logged; disconnecting or closing the application ends the grant; the header shows a connected agent; a recorded Claude Code session lists and calls the tools; Claude Desktop's set-up is documented; nothing listens on the network; a test proves another user's process cannot open the channel.
+**User value:** A user rebuilds years of an account's history with an agent from yearly statements, sees what the agent did, and can undo all of it in one action without risk to what they typed themselves.
+**Done when:** the four recordings exist as tools, each through the window's rules, marked and shown in the journal; an agent corrects or cancels a transaction marked as its own and is refused on any other; the session dialog lists what the session read and recorded and removes everything it recorded in one action; a change or a removal of a transaction the owner typed is asked in the window, shown in full, refused by default, one at a time; the marks reach the owner's other computers; a recorded Claude Code session lists and calls the tools.
 **Design:** validated
-**Open questions:**
-
-- [x] Which recordings the agent gets. → An opening balance, a purchase, a sale, a deposit, a withdrawal, a dividend and a price at a date, each datable years back. Creating an asset that does not exist waits for #056. (Owner, 2026-10-04.)
-- [x] Redoing a reconstruction. → Every recording made through an agent is marked as such, with the session that made it. An agent may correct or cancel only transactions marked that way, never one the owner typed: what the agent reads (a statement) is content it did not write, and must not be able to steer it into removing real history. The window offers the owner one action, "remove everything this session recorded". For a transaction the owner typed, the agent may only ask: the window shows the transaction and the change or the removal asked for, and the owner allows or refuses that one request — the session's grant never covers it, and there is no "allow all". The ask is easy to refuse and hard to approve blindly: it shows the transaction in full (date, asset, quantity, amount) and what would become of it, refusing is the default action, and the mock-ups show it for the owner to validate. This replaces "no deletion, no correction" in the limits above. (Owner, 2026-10-04.)
-- [x] The position entered at the start of this year. → The owner's to handle, not the agent's: the agent reads the account as of that date and reports how the reconstructed state differs from the typed one; the owner removes the typed position in the window, or allows the agent's request to (the ask above). It can only be removed once the past is rebuilt — this year's sales rest on it — so it counts twice from that date until then. (Owner, 2026-10-04.)
-- [x] Windows. → Linux first: on Windows the setting says the agent connection is not available yet and nothing listens; the Windows channel, with a Windows compile check on pull requests, is TD-086. (Owner, 2026-10-09.)
-- [x] The terms Agent ("Agent"), Bridge ("Passerelle"), Connection request ("Demande de connexion") and Agent session ("Session"). → Confirmed. (Owner, 2026-10-09.)
-
-Answers kept from the first round (owner, 2026-10-04): read tools first, then the recordings, in two pull requests; Claude Code proves it, Claude Desktop is documented; the same program with `--mcp`. Changed by the discussion: a recording is not confirmed by the client's prompt alone — the owner's one grant in the window, at connection, covers the session; nothing is served without the open application.
+**Open questions:** none
 
 ## #039 — (service) — A hosted price feed the application can subscribe to (deferred)
 

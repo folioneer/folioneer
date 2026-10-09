@@ -2,7 +2,9 @@
 
 use serde_json::json;
 
-use super::orchestrator::{verb, AssetRow, Listing, Outcome, Refusal};
+use crate::use_cases::holding_transaction::{decimal, Refusal};
+
+use super::orchestrator::{verb, AssetRow, Listing, Outcome};
 
 /// A command recorded.
 pub const RECORDED: i32 = 0;
@@ -20,19 +22,6 @@ pub struct Printed {
     pub stderr: Option<String>,
     /// The exit code.
     pub exit_code: i32,
-}
-
-/// A figure in micro-units as a decimal without trailing zeros (`2`, `992.19`, `0.5`).
-pub fn decimal(micros: i64) -> String {
-    let sign = if micros < 0 { "-" } else { "" };
-    let absolute = micros.unsigned_abs();
-    let whole = absolute / 1_000_000;
-    let fraction = absolute % 1_000_000;
-    if fraction == 0 {
-        return format!("{sign}{whole}");
-    }
-    let fraction = format!("{fraction:06}");
-    format!("{sign}{whole}.{}", fraction.trim_end_matches('0'))
 }
 
 /// A money figure in micro-units with two decimals, rounded half away from zero.

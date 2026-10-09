@@ -1,8 +1,8 @@
-import { Pencil, Trash2 } from "lucide-react";
+import { Bot, Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IconButton } from "@/ui/components/button/IconButton";
 import { SortIcon } from "@/ui/components/SortIcon";
-import { formatIsoDateNumeric } from "@/ui/format/date";
+import { formatIsoDateNumeric, formatIsoDateTime } from "@/ui/format/date";
 import type { TransactionRowViewModel } from "../shared/presenter";
 
 interface TransactionTableProps {
@@ -69,6 +69,7 @@ export function TransactionTable({
               <th className="m3-th text-right">{t("transaction.column_total_amount")}</th>
             )}
             <th className="m3-th text-right">{t("transaction.column_realized_pnl")}</th>
+            {cashStatement && <th className="m3-th">{t("transaction.column_recorded_by")}</th>}
             <th className="m3-th">{t("transaction.column_actions")}</th>
           </tr>
         </thead>
@@ -152,6 +153,29 @@ export function TransactionTable({
                     </span>
                   )}
                 </td>
+                {/* AGT-045 — which agent session recorded the row; empty for the owner's own */}
+                {cashStatement && (
+                  <td id={`txl-recorded-by-${row.id}`} className="m3-td">
+                    {row.recordedBy && (
+                      <span
+                        id={`txl-recorded-by-chip-${row.id}`}
+                        title={t("transaction.recorded_by_agent", {
+                          agent: row.recordedBy.agent,
+                          when: formatIsoDateTime(row.recordedBy.sessionStartedAt, i18n.language),
+                        })}
+                        className="inline-flex items-center gap-1.5 max-w-36 px-2.5 py-1 rounded-full border border-m3-outline-variant text-xs text-m3-on-surface-variant"
+                      >
+                        <Bot size={12} aria-hidden="true" className="shrink-0" />
+                        <span className="truncate">{row.recordedBy.agent}</span>
+                        <span className="sr-only">
+                          {t("transaction.recorded_by_session", {
+                            when: formatIsoDateTime(row.recordedBy.sessionStartedAt, i18n.language),
+                          })}
+                        </span>
+                      </span>
+                    )}
+                  </td>
+                )}
                 <td className="m3-td">
                   <div className="flex items-center gap-1">
                     <IconButton

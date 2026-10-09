@@ -145,6 +145,12 @@ export function useAccountJournal() {
             creditMicros: row.cash_in,
             balanceMicros: row.cash_balance,
           }),
+          recordedBy: row.recorded_by
+            ? {
+                agent: row.recorded_by.agent,
+                sessionStartedAt: row.recorded_by.session_started_at,
+              }
+            : null,
         };
       }),
     [journal, assets, accounts],

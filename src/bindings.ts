@@ -1611,6 +1611,22 @@ requests: AgentConnectionRequest[];
  */
 sessions: AgentSession[] }
 /**
+ * The mark of a transaction an agent recorded (AGT-045): which agent, in which session.
+ */
+export type AgentRecording = { 
+/**
+ * The name the agent gave for itself.
+ */
+agent: string; 
+/**
+ * Identifies the session that recorded it.
+ */
+session: string; 
+/**
+ * When that session started, as an RFC 3339 timestamp in the recording computer's time.
+ */
+session_started_at: string }
+/**
  * A connected agent client (AGT-033).
  */
 export type AgentSession = { 
@@ -3347,7 +3363,11 @@ cash_in: number | null;
  * The account's cash balance after it, over every transaction of the account
  * whatever the filter (micro-units).
  */
-cash_balance: number }
+cash_balance: number; 
+/**
+ * The agent session that recorded it; none for a transaction the owner typed (AGT-045).
+ */
+recorded_by: AgentRecording | null }
 /**
  * The rule an asset to settle breaks (AST-035): one of what its kind forbids (AST-031), or
  * being the same as another asset (AST-032).

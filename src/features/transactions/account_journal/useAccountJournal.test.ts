@@ -54,12 +54,18 @@ const JOURNAL: AccountJournal = {
       cash_out: null,
       cash_in: 500 * MICRO,
       cash_balance: 900 * MICRO,
+      recorded_by: {
+        agent: "Claude Code",
+        session: "session-1",
+        session_started_at: "2026-10-09T14:32:00+02:00",
+      },
     },
     {
       transaction: tx({ id: "a", asset_id: "asset-1", date: "2024-01-01" }),
       cash_out: 100 * MICRO,
       cash_in: null,
       cash_balance: 400 * MICRO,
+      recorded_by: null,
     },
   ],
   asset_ids: ["asset-1", "asset-2"],
@@ -121,6 +127,19 @@ describe("useAccountJournal", () => {
     expect(purchase).toEqual(
       expect.objectContaining({ cashOut: microToFormatted(100 * MICRO), cashIn: "" }),
     );
+  });
+
+  // AGT-045 — a row an agent recorded carries its agent and session; the owner's own does not
+  it("shows which agent session recorded a row", async () => {
+    const { result } = renderHook(() => useAccountJournal());
+    await act(async () => {});
+
+    const [sale, purchase] = result.current.filteredSortedRows;
+    expect(sale?.recordedBy).toEqual({
+      agent: "Claude Code",
+      sessionStartedAt: "2026-10-09T14:32:00+02:00",
+    });
+    expect(purchase?.recordedBy).toBeNull();
   });
 
   // TXL-061 — the filter choices are the assets and types the journal lists

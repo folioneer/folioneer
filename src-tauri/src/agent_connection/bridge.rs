@@ -191,7 +191,10 @@ mod tests {
                 "portfolio_summary",
                 "list_accounts",
                 "list_assets",
-                "list_holdings"
+                "list_holdings",
+                "record_opening_balance",
+                "record_purchase",
+                "record_sale"
             ]
         );
         assert_eq!(

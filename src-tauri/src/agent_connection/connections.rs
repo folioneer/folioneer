@@ -1,6 +1,7 @@
 //! Who is connected and who asks to be (AGT-030 to AGT-035): the owner's answers and the
 //! sessions they open, held in memory by the running application and gone when it closes.
 
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use serde::Serialize;
@@ -34,8 +35,32 @@ pub struct AgentSession {
 pub struct Granted {
     /// The session.
     pub session_id: u32,
+    /// The name the agent gave for itself, cleaned (AGT-037).
+    pub client: String,
+    /// Identifies the session in what it records (AGT-045): unlike `session_id`, it is
+    /// never used again by another run of the application.
+    pub key: String,
+    /// When the owner allowed it, as an RFC 3339 timestamp in this computer's time.
+    pub started_at: String,
+    /// How many transactions it recorded (AGT-047).
+    recorded: Arc<AtomicU32>,
     /// Notified when the owner disconnects the session (AGT-034).
     pub ended: Arc<Notify>,
+}
+
+/// AGT-047 — how many transactions one session may record.
+pub const MAX_RECORDINGS: u32 = 500;
+
+impl Granted {
+    /// AGT-047 — whether the session is still under its limit of recordings.
+    pub fn may_record_one_more(&self) -> bool {
+        self.recorded.load(Ordering::SeqCst) < MAX_RECORDINGS
+    }
+
+    /// Counts one transaction the session recorded.
+    pub fn count_recording(&self) {
+        self.recorded.fetch_add(1, Ordering::SeqCst);
+    }
 }
 
 struct Pending {
@@ -163,6 +188,10 @@ impl AgentConnections {
         (self.changed)();
         Some(Granted {
             session_id: request_id,
+            client: client.to_string(),
+            key: uuid::Uuid::new_v4().to_string(),
+            started_at: chrono::Local::now().to_rfc3339(),
+            recorded: Arc::new(AtomicU32::new(0)),
             ended,
         })
     }
@@ -269,7 +298,6 @@ impl AgentConnections {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU32, Ordering};
     use std::time::Duration;
 
     fn counted() -> (Arc<AgentConnections>, Arc<AtomicU32>) {
@@ -372,6 +400,27 @@ mod tests {
         assert!(waiting_one.await.expect("asked").is_none());
         assert!(connections.requests().is_empty());
         connections.end_all();
+    }
+
+    // AGT-047 — a session records up to its limit and no further.
+    #[tokio::test]
+    async fn agt_047_a_session_records_up_to_its_limit() {
+        let (connections, _) = counted();
+        let asking = Arc::clone(&connections);
+        let asked = tokio::spawn(async move { asking.ask("claude-code").await });
+        let request = waiting(&connections).await;
+        connections.answer(request.id, true);
+        let granted = asked.await.expect("asked").expect("granted");
+        assert_eq!(granted.client, "claude-code");
+        assert_eq!(granted.key.len(), 36);
+
+        for _ in 0..MAX_RECORDINGS {
+            assert!(granted.may_record_one_more());
+            granted.count_recording();
+        }
+        assert!(!granted.may_record_one_more());
+        // The count is the session's, shared by every handle on it.
+        assert!(!granted.clone().may_record_one_more());
     }
 
     // AGT-035 / AGT-038 — nobody is asked for while agents are not admitted, nor beyond the

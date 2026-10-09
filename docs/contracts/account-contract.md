@@ -1,7 +1,7 @@
 # Contract — Account
 
 > Domain: `account`
-> Last updated by: `stock-split` spec, `account` spec, `financial-asset-transaction` spec, `sell-transaction` spec, `transaction-list` spec, `account-details` spec, `cash-tracking` spec, `cash-dividend` spec, `free-share-distribution` spec, `management-fee-deduction` spec
+> Last updated by: `stock-split` spec, `account` spec, `financial-asset-transaction` spec, `sell-transaction` spec, `transaction-list` spec, `account-details` spec, `cash-tracking` spec, `cash-dividend` spec, `free-share-distribution` spec, `management-fee-deduction` spec, `agent-connection` spec
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Per-command reachable codes are listed in the "Errors" column of each table below. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic chain preserved server-side via `tracing::error!`).
 >
@@ -544,7 +544,18 @@ struct JournalFilter {                      // deny_unknown_fields; every field 
     amount_max: Option<i64>,                // inclusive
     newest_first: bool,                     // oldest first when false
 }
-struct JournalRow { transaction: Transaction, cash_out: Option<i64>, cash_in: Option<i64>, cash_balance: i64 }
+struct JournalRow {
+    transaction: Transaction,
+    cash_out: Option<i64>,
+    cash_in: Option<i64>,
+    cash_balance: i64,
+    recorded_by: Option<AgentRecording>,    // None when this computer holds no mark: the owner's own, or one an agent recorded on another computer (AGT-045)
+}
+struct AgentRecording {
+    agent: String,              // the agent's name, cleaned (AGT-037)
+    session: String,            // the key of the session that recorded it: a UUID, not `AgentSession.id`
+    session_started_at: String, // RFC 3339, the recording computer's time
+}
 struct AccountJournal {
     rows: Vec<JournalRow>,                  // oldest first (date, then order entered), or newest first
     asset_ids: Vec<String>,                 // first appearance, whole account
@@ -559,12 +570,12 @@ struct AccountJournal {
 
 ### Published
 
-| Event                | Payload | Rule                               |
-| -------------------- | ------- | ---------------------------------- |
-| `AccountUpdated`     | —       | ACC-022                            |
-| `TransactionUpdated` | —       | TRX-037, DIV-026, FSD-026, FEE-026 |
-| `FeeScheduleUpdated` | —       | FEE-064                            |
-| `HoldingNoteUpdated` | —       | HNO-020, HNO-021                   |
+| Event                | Payload | Rule                                                 |
+| -------------------- | ------- | ---------------------------------------------------- |
+| `AccountUpdated`     | —       | ACC-022                                              |
+| `TransactionUpdated` | —       | TRX-037, DIV-026, FSD-026, FEE-026, AGT-044, AGT-045 |
+| `FeeScheduleUpdated` | —       | FEE-064                                              |
+| `HoldingNoteUpdated` | —       | HNO-020, HNO-021                                     |
 
 ### Subscribed (frontend re-fetch triggers)
 
@@ -609,3 +620,4 @@ struct AccountJournal {
 - 2026-09-14 — Amended by `account` spec (ACC-027/028): `get_account_summaries` returns `AccountSummaries` — the rows plus a `PortfolioTotal` in the reference currency, flagged incomplete when an account with no usable rate held a non-zero figure; the accounts list re-fetches on `CurrencyRateUpdated` and `CurrencyPairUpdated` (ACC-033). No new command or error.
 - 2026-09-28 — TXL-060: `get_account_journal(account_id, JournalFilter) -> AccountJournal` — the account's transactions oldest first with `cash_out` / `cash_in` / `cash_balance` from the cash balance rules (interest on the cash line included, INT-023); the filter picks rows (and `newest_first` their order), the balance runs over all.
 - 2026-09-28 — PRF-087: `AccountPerformanceResponse` (returned by `get_account_performance` and `get_global_performance`) gains `lifetime_unavailable: Option<LifetimeUnavailable>` — the earliest zero-cost opening balance in scope, or no invested capital.
+- 2026-10-09 — AGT-045: `JournalRow` gains `recorded_by: Option<AgentRecording>`, the agent session that recorded the transaction.

@@ -1,8 +1,8 @@
 use super::domain::{
-    Account, AccountJournal, AccountRepository, FeeCatchUpPosition, FeeCatchUpRepository,
-    FeeSchedule, FeeScheduleRepository, Holding, HoldingNote, HoldingNoteRepository,
-    HoldingRepository, HoldingSnapshot, JournalFilter, ManagementFeeRemoval, StockSplitPosition,
-    ThresholdDirection, Transaction, TransactionRepository, UpdateFrequency,
+    Account, AccountJournal, AccountRepository, AgentRecording, FeeCatchUpPosition,
+    FeeCatchUpRepository, FeeSchedule, FeeScheduleRepository, Holding, HoldingNote,
+    HoldingNoteRepository, HoldingRepository, HoldingSnapshot, JournalFilter, ManagementFeeRemoval,
+    StockSplitPosition, ThresholdDirection, Transaction, TransactionRepository, UpdateFrequency,
 };
 use super::error::AccountError;
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
@@ -409,7 +409,43 @@ impl AccountService {
         filter: &JournalFilter,
     ) -> StdResult<AccountJournal, AccountError> {
         let transactions = self.get_all_transactions_for_account(account_id).await?;
-        Ok(AccountJournal::from_transactions(transactions, filter))
+        let mut journal = AccountJournal::from_transactions(transactions, filter);
+        if journal.rows.is_empty() {
+            return Ok(journal);
+        }
+        // AGT-045 — each row says which agent session recorded it, if one did.
+        let mut marks: std::collections::HashMap<String, AgentRecording> = self
+            .transaction_repo
+            .agent_recordings_for_account(account_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, account_id = %account_id, err = ?e, "get_account_journal: agent recordings not read");
+                AccountError::DatabaseError
+            })?
+            .into_iter()
+            .collect();
+        for row in &mut journal.rows {
+            row.recorded_by = marks.remove(&row.transaction.id);
+        }
+        Ok(journal)
+    }
+
+    /// AGT-045 — marks a transaction as recorded by an agent session, and tells the window
+    /// the transaction changed.
+    pub async fn mark_agent_recording(
+        &self,
+        transaction_id: &str,
+        recording: &AgentRecording,
+    ) -> StdResult<(), AccountError> {
+        self.transaction_repo
+            .mark_agent_recording(transaction_id, recording)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, transaction_id = %transaction_id, err = ?e, "mark_agent_recording: repository failure");
+                AccountError::DatabaseError
+            })?;
+        self.emit_transaction_updated();
+        Ok(())
     }
 
     /// Returns distinct asset IDs that have transactions for the given account (TXL-013).
@@ -1568,6 +1604,12 @@ pub trait AccountServiceContract: Send + Sync {
     async fn get_all(&self) -> StdResult<Vec<Account>, AccountError>;
     /// Every account ordered by name, case ignored (CLI-018).
     async fn get_all_by_name(&self) -> StdResult<Vec<Account>, AccountError>;
+    /// Marks a transaction as recorded by an agent session (AGT-045).
+    async fn mark_agent_recording(
+        &self,
+        transaction_id: &str,
+        recording: &AgentRecording,
+    ) -> StdResult<(), AccountError>;
     /// Retrieves an account by ID.
     async fn get_by_id(&self, id: &str) -> StdResult<Option<Account>, AccountError>;
     /// Creates a new account.
@@ -1813,6 +1855,14 @@ impl AccountServiceContract for AccountService {
 
     async fn get_all_by_name(&self) -> StdResult<Vec<Account>, AccountError> {
         AccountService::get_all_by_name(self).await
+    }
+
+    async fn mark_agent_recording(
+        &self,
+        transaction_id: &str,
+        recording: &AgentRecording,
+    ) -> StdResult<(), AccountError> {
+        AccountService::mark_agent_recording(self, transaction_id, recording).await
     }
 
     async fn get_by_id(&self, id: &str) -> StdResult<Option<Account>, AccountError> {

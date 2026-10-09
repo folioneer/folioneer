@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT r.transaction_id AS \"transaction_id!: String\", r.agent AS \"agent!: String\",\n                      r.session AS \"session!: String\",\n                      r.session_started_at AS \"session_started_at!: String\"\n               FROM agent_recordings r\n               JOIN transactions t ON t.id = r.transaction_id\n               WHERE t.account_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "transaction_id!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "agent!: String",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "session!: String",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "session_started_at!: String",
+        "ordinal": 3,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1bc768cc44f6b94b0976c7c973aa3442a52bbaa8464aa42133a9a2f6145d8c26"
+}

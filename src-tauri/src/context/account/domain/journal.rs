@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::{Account, Transaction, TransactionType};
+use super::{Account, AgentRecording, Transaction, TransactionType};
 
 /// The cash a transaction moves on the account's cash line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,6 +58,8 @@ pub struct JournalRow {
     /// The account's cash balance after it, over every transaction of the account
     /// whatever the filter (micro-units).
     pub cash_balance: i64,
+    /// The agent session that recorded it; none for a transaction the owner typed (AGT-045).
+    pub recorded_by: Option<AgentRecording>,
 }
 
 /// The account journal of one account, filtered (TXL-060).
@@ -115,6 +117,7 @@ impl AccountJournal {
                 } else {
                     i64::MAX
                 }),
+                recorded_by: None,
             });
         }
         if filter.newest_first {

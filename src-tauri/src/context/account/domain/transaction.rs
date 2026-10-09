@@ -657,6 +657,28 @@ pub trait TransactionRepository: Send + Sync {
     async fn has_transactions_for_asset(&self, asset_id: &str) -> Result<bool>;
     /// Counts all transactions for a given account (ACC-020).
     async fn count_by_account(&self, account_id: &str) -> Result<u32>;
+    /// AGT-045 — marks a transaction as recorded by an agent session.
+    async fn mark_agent_recording(
+        &self,
+        transaction_id: &str,
+        recording: &AgentRecording,
+    ) -> Result<()>;
+    /// AGT-045 — the marks of an account's transactions, by transaction id.
+    async fn agent_recordings_for_account(
+        &self,
+        account_id: &str,
+    ) -> Result<Vec<(String, AgentRecording)>>;
+}
+
+/// The mark of a transaction an agent recorded (AGT-045): which agent, in which session.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct AgentRecording {
+    /// The name the agent gave for itself.
+    pub agent: String,
+    /// Identifies the session that recorded it.
+    pub session: String,
+    /// When that session started, as an RFC 3339 timestamp in the recording computer's time.
+    pub session_started_at: String,
 }
 
 /// What the user entered for a purchase or sale (TRX-062): a unit price, or a typed

@@ -1,11 +1,11 @@
 # Contract — Agent Connection
 
 > Domain: `agent-connection`
-> Last updated by: agent-connection (AGT-022–036)
+> Last updated by: agent-connection (AGT-022–039, AGT-045)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName" }` object. The FE matches on `code`.
 >
-> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037–042) are not Tauri commands: what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
+> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–049) are not Tauri commands: what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
 
 ---
 
@@ -64,6 +64,9 @@ enum AgentConnectionError {
 | ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `AgentConnectionChanged` | —       | the setting is switched; a request arrives, is answered or is withdrawn; a session opens, calls a tool or ends (AGT-036) |
 
+The mark of a transaction an agent recorded (AGT-045) reaches the window in the account journal: `JournalRow.recorded_by` in `account-contract.md`.
+
 ## Changelog
 
-- 2026-10-09 — Created: the four commands, their types and the event (AGT-022–036).
+- 2026-10-09 — Created: the four commands, their types and the event (AGT-022–039).
+- 2026-10-09 — AGT-045: the mark of an agent's recording reaches the window as `JournalRow.recorded_by` (`account-contract.md`); no command added.

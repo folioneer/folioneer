@@ -238,7 +238,7 @@
       "status_skipped": "Last check on {{executedAt}}: prices were already up to date."
     },
     "agents_allowed_label": "Allow agents to connect",
-    "agents_allowed_description": "An agent on this computer (Claude Code, Claude Desktop) may ask to read your portfolio while Folioneer is open. Each connection waits for your answer. Off: nothing can connect.",
+    "agents_allowed_description": "An agent on this computer (Claude Code, Claude Desktop) may ask to read and record in your portfolio while Folioneer is open. Each connection waits for your answer. Off: nothing can connect.",
     "agents_unavailable_description": "Not available on this system yet. Nothing can connect."
   },
   "agent": {
@@ -249,13 +249,14 @@
     "connection_started_by_unknown": "a program of yours, on this computer",
     "connection_asked_at": "Asked at",
     "connection_covers": "If you allow, until you disconnect or close Folioneer, it may:",
-    "connection_covers_read": "read your accounts, assets, holdings and totals.",
-    "connection_never": "It cannot record or change anything, and it never reads a file, a setting or your sync folder.",
+    "connection_covers_read": "read your accounts, assets, holdings and totals;",
+    "connection_never": "It cannot change or remove a transaction, and it never reads a file, a setting or your sync folder.",
     "connection_allow": "Allow for this session",
     "connection_refuse": "Refuse",
     "connected": "{{client}} is connected",
     "disconnect": "Disconnect",
-    "disconnect_client": "Disconnect {{client}}"
+    "disconnect_client": "Disconnect {{client}}",
+    "connection_covers_record": "record opening balances, purchases and sales, each shown here as it happens and marked as recorded by it."
   },
   "sync": {
     "title": "Multi-device sync",
@@ -509,7 +510,10 @@
     "no_transactions": "No transactions recorded for this position.",
     "select_asset_prompt": "Select an asset to view transactions.",
     "back_to_account": "Back to account",
-    "error_load_assets": "Failed to load asset list."
+    "error_load_assets": "Failed to load asset list.",
+    "column_recorded_by": "Recorded by",
+    "recorded_by_agent": "{{agent}} · session of {{when}}",
+    "recorded_by_session": "session of {{when}}"
   },
   "account_details": {
     "title": "Account Details",

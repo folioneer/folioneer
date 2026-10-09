@@ -428,7 +428,7 @@ A third-party HTTP service that returns current asset prices and their daily-clo
 
 > Status: confirmed
 
-A program working for the owner that reads the portfolio through the application's tools, such as Claude Code or Claude Desktop. It reaches the portfolio only through the open application, and only once the owner allowed it. In French: "Agent".
+A program working for the owner that reads the portfolio and records in it through the application's tools, such as Claude Code or Claude Desktop. It reaches the portfolio only through the open application, and only once the owner allowed it. In French: "Agent".
 
 ### Bridge
 
@@ -446,7 +446,13 @@ An agent waiting for the owner's answer in the window. Nothing is served to it u
 
 > Status: confirmed
 
-What one "Allow for this session" opens: the agent's calls are served without another question until the owner disconnects it, it leaves, or the application closes. Nothing of it is remembered afterwards. In French: "Session".
+What one "Allow for this session" opens: the agent's calls are served without another question until the owner disconnects it, it leaves, or the application closes. Nothing of it is remembered afterwards, except on what it recorded: every transaction an agent records is marked with its session. In French: "Session".
+
+### Mark
+
+> Status: confirmed
+
+What a transaction an agent recorded carries: the agent's name and its session. The account journal shows it in the column "Recorded by" ("Enregistré par"); a transaction the owner typed has none. In code: `AgentRecording`, `recorded_by`. In French: "Marque".
 
 ## Multi-Device Sync Concepts (introduced by SYN spec)
 

@@ -53,6 +53,7 @@ describe("AgentConnectionMount", () => {
     expect(dialog).toHaveTextContent("agent.connection_started_by_user(phil)");
     expect(dialog).toHaveTextContent("14:32");
     expect(dialog).toHaveTextContent("agent.connection_covers_read");
+    expect(dialog).toHaveTextContent("agent.connection_covers_record");
     expect(dialog).toHaveTextContent("agent.connection_never");
     expect(document.getElementById("agent-connection-refuse")).toHaveFocus();
   });

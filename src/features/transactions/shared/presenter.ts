@@ -124,6 +124,11 @@ export interface TransactionRowViewModel {
   /** Raw realized P&L in micro-units — used for sign-based color styling (SEL-043). */
   realizedPnlRaw: number | null;
   /**
+   * AGT-045 — the agent session that recorded the row (account-wide journal only); null or
+   * undefined for a transaction the owner typed.
+   */
+  recordedBy?: { agent: string; sessionStartedAt: string } | null;
+  /**
    * Bank-statement cash columns (account-wide journal only; undefined elsewhere).
    * `cashOut`/`cashIn` are the formatted debit/credit for this row (empty string when
    * the type moves no cash); `balance` is the running cash balance after this row.

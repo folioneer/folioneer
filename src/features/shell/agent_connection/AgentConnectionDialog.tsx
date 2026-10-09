@@ -105,6 +105,7 @@ export function AgentConnectionDialog({ request, user, onAnswer }: AgentConnecti
           <p>{t("agent.connection_covers")}</p>
           <ul className="list-disc pl-5">
             <li>{t("agent.connection_covers_read")}</li>
+            <li>{t("agent.connection_covers_record")}</li>
           </ul>
         </div>
         <p>{t("agent.connection_never")}</p>

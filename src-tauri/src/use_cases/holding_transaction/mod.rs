@@ -11,6 +11,7 @@ mod api;
 /// Use-case-owned typed errors (composite + application leaf).
 mod error;
 /// Cross-BC orchestrator (one struct, one method per operation).
+mod named_recording;
 mod orchestrator;
 /// Shared helpers used by the orchestrator.
 mod shared;
@@ -21,6 +22,9 @@ pub use error::{
     DividendError, DividendTask, FreeSharesError, FreeSharesTask, InterestError, InterestTask,
     ManagementFeeError, ManagementFeeTask, NameLookupError, OpenHoldingError, OpenHoldingTask,
     SplitError, SplitTask, TransactionDraftError, TransactionDraftTask,
+};
+pub use named_recording::{
+    code_of, decimal, decimal_to_micro, Recorded, Recording, Refusal, Target, Trade, TradeAmount,
 };
 pub use orchestrator::{
     DraftKind, HoldingTransactionUseCase, NamedTarget, OpeningBalanceDraft, OpeningBalancePreview,

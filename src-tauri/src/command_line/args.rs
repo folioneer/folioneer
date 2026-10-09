@@ -3,57 +3,13 @@
 
 use crate::context::asset::{AssetClass, AssetCreationDefaults, AssetKind, NamedAsset};
 
+use crate::use_cases::holding_transaction::{
+    decimal_to_micro, Recording, Target, Trade, TradeAmount,
+};
+
 use super::help::{closest, commands, HelpTopic};
 
 const MICRO: i64 = 1_000_000;
-
-/// What the user typed to name the account and the asset, and the shared values.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Target {
-    /// The account's name as typed.
-    pub account: String,
-    /// The asset's name or reference as typed.
-    pub asset: String,
-    /// The date, or `None` for today.
-    pub date: Option<String>,
-    /// Quantity in micro-units.
-    pub quantity: i64,
-}
-
-/// A purchase or a sale's money side: a unit price or the broker's all-in total.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TradeAmount {
-    /// Unit price in the asset's currency (micro-units).
-    Price(i64),
-    /// All-in total in the account's currency (micro-units).
-    Total(i64),
-}
-
-/// A purchase or a sale as typed.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Trade {
-    /// Account, asset, date and quantity.
-    pub target: Target,
-    /// Unit price or total.
-    pub amount: TradeAmount,
-    /// Fees in the account's currency (micro-units).
-    pub fees: i64,
-    /// Exchange rate (micro-units).
-    pub rate: i64,
-    /// Optional note.
-    pub note: Option<String>,
-}
-
-/// A command that records a transaction.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Recording {
-    /// An opening balance: quantity and total cost.
-    Open { target: Target, total_cost: i64 },
-    /// A purchase.
-    Buy(Trade),
-    /// A sale.
-    Sell(Trade),
-}
 
 /// A command that lists what the others can name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -410,32 +366,6 @@ fn comma_hint(value: &str) -> Option<String> {
     let dotted = value.replace(',', ".");
     (value.contains(',') && decimal_to_micro(&dotted).is_some())
         .then(|| format!(" — write the decimals after a dot: {dotted}"))
-}
-
-/// A decimal with a dot and at most six decimals, in micro-units; `None` when it is not one.
-/// A leading minus is read, so the core refuses a negative figure with its own reason.
-fn decimal_to_micro(text: &str) -> Option<i64> {
-    let text = text.trim();
-    let (negative, digits) = match text.strip_prefix('-') {
-        Some(rest) => (true, rest),
-        None => (false, text),
-    };
-    let (whole, fraction) = digits.split_once('.').unwrap_or((digits, ""));
-    if whole.is_empty() && fraction.is_empty()
-        || fraction.len() > 6
-        || !whole.chars().all(|c| c.is_ascii_digit())
-        || !fraction.chars().all(|c| c.is_ascii_digit())
-    {
-        return None;
-    }
-    let whole: i64 = if whole.is_empty() {
-        0
-    } else {
-        whole.parse().ok()?
-    };
-    let fraction: i64 = format!("{fraction:0<6}").parse().ok()?;
-    let micros = whole.checked_mul(MICRO)?.checked_add(fraction)?;
-    Some(if negative { -micros } else { micros })
 }
 
 fn is_iso_date(text: &str) -> bool {

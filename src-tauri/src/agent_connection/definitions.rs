@@ -52,5 +52,53 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "additionalProperties": false
             }),
         },
+        ToolDefinition {
+            name: "record_opening_balance",
+            description: "Record what an account already held of an asset on a date: the quantity and its total cost. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "account": { "type": "string", "description": "The account's name, as list_accounts gives it." },
+                    "asset": { "type": "string", "description": "The asset's name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
+                    "quantity": { "type": ["string", "number"], "description": "How many units were held." },
+                    "total_cost": { "type": ["string", "number"], "description": "What they cost in all, in the account's currency." },
+                    "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." }
+                },
+                "required": ["account", "asset", "quantity", "total_cost"],
+                "additionalProperties": false
+            }),
+        },
+        trade_definition(
+            "record_purchase",
+            "Record a purchase of an asset in an account. Give either the unit price, in the asset's currency, or the broker's all-in total, in the account's currency. The cash of the account pays for it. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+        ),
+        trade_definition(
+            "record_sale",
+            "Record a sale of an asset held in an account. Give either the unit price, in the asset's currency, or the broker's all-in total, in the account's currency. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+        ),
     ]
+}
+
+/// A purchase or a sale as an agent is told of it.
+fn trade_definition(name: &'static str, description: &'static str) -> ToolDefinition {
+    ToolDefinition {
+        name,
+        description,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "account": { "type": "string", "description": "The account's name, as list_accounts gives it." },
+                "asset": { "type": "string", "description": "The asset's name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
+                "quantity": { "type": ["string", "number"], "description": "How many units." },
+                "price": { "type": ["string", "number"], "description": "Unit price, in the asset's currency. Not with total." },
+                "total": { "type": ["string", "number"], "description": "The broker's all-in amount, in the account's currency. Not with price." },
+                "fees": { "type": ["string", "number"], "description": "Fees, in the account's currency. Default: 0." },
+                "rate": { "type": ["string", "number"], "description": "Exchange rate from the asset's currency to the account's. Default: 1." },
+                "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." },
+                "note": { "type": "string", "description": "A note kept with the transaction." }
+            },
+            "required": ["account", "asset", "quantity"],
+            "additionalProperties": false
+        }),
+    }
 }

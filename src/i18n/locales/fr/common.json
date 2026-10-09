@@ -238,7 +238,7 @@
       "status_skipped": "Dernière vérification le {{executedAt}} : les prix étaient déjà à jour."
     },
     "agents_allowed_label": "Autoriser les agents à se connecter",
-    "agents_allowed_description": "Un agent sur cet ordinateur (Claude Code, Claude Desktop) peut demander à lire votre portefeuille tant que Folioneer est ouvert. Chaque connexion attend votre réponse. Désactivé : rien ne peut se connecter.",
+    "agents_allowed_description": "Un agent sur cet ordinateur (Claude Code, Claude Desktop) peut demander à lire votre portefeuille et à y enregistrer tant que Folioneer est ouvert. Chaque connexion attend votre réponse. Désactivé : rien ne peut se connecter.",
     "agents_unavailable_description": "Pas encore disponible sur ce système. Rien ne peut se connecter."
   },
   "agent": {
@@ -249,13 +249,14 @@
     "connection_started_by_unknown": "un de vos programmes, sur cet ordinateur",
     "connection_asked_at": "Demandé à",
     "connection_covers": "Si vous autorisez, jusqu'à la déconnexion ou la fermeture de Folioneer, il peut :",
-    "connection_covers_read": "lire vos comptes, vos actifs, vos positions et vos totaux.",
-    "connection_never": "Il ne peut rien enregistrer ni modifier, et ne lit jamais un fichier, un réglage ou votre dossier de synchronisation.",
+    "connection_covers_read": "lire vos comptes, vos actifs, vos positions et vos totaux ;",
+    "connection_never": "Il ne peut ni modifier ni supprimer une transaction, et ne lit jamais un fichier, un réglage ou votre dossier de synchronisation.",
     "connection_allow": "Autoriser pour cette session",
     "connection_refuse": "Refuser",
     "connected": "{{client}} est connecté",
     "disconnect": "Déconnecter",
-    "disconnect_client": "Déconnecter {{client}}"
+    "disconnect_client": "Déconnecter {{client}}",
+    "connection_covers_record": "enregistrer des soldes d'ouverture, des achats et des ventes, chacun affiché ici au fur et à mesure et marqué comme enregistré par lui."
   },
   "sync": {
     "title": "Synchronisation multi-appareils",
@@ -509,7 +510,10 @@
     "no_transactions": "Aucune transaction enregistrée pour cette position.",
     "select_asset_prompt": "Sélectionnez un actif pour voir les transactions.",
     "back_to_account": "Retour au compte",
-    "error_load_assets": "Erreur lors du chargement de la liste des actifs."
+    "error_load_assets": "Erreur lors du chargement de la liste des actifs.",
+    "column_recorded_by": "Enregistré par",
+    "recorded_by_agent": "{{agent}} · session du {{when}}",
+    "recorded_by_session": "session du {{when}}"
   },
   "account_details": {
     "title": "Détails du compte",

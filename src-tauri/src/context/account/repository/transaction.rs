@@ -4,7 +4,9 @@ use sqlx::{Pool, Sqlite};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::context::account::domain::{Transaction, TransactionRepository, TransactionType};
+use crate::context::account::domain::{
+    AgentRecording, Transaction, TransactionRepository, TransactionType,
+};
 use crate::shared::domain::{
     ChangeDraft, LogicalTimestamp, Operation, Origin, RecordIdentity, RecordKind,
 };
@@ -170,6 +172,60 @@ impl TransactionRepository for SqliteTransactionRepository {
         .with_context(|| format!("Failed to fetch asset IDs for account {}", account_id))?;
 
         Ok(rows)
+    }
+
+    async fn mark_agent_recording(
+        &self,
+        transaction_id: &str,
+        recording: &AgentRecording,
+    ) -> Result<()> {
+        sqlx::query!(
+            r#"INSERT INTO agent_recordings (transaction_id, agent, session, session_started_at)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(transaction_id) DO UPDATE SET
+                   agent = excluded.agent,
+                   session = excluded.session,
+                   session_started_at = excluded.session_started_at"#,
+            transaction_id,
+            recording.agent,
+            recording.session,
+            recording.session_started_at
+        )
+        .execute(&self.pool)
+        .await
+        .with_context(|| format!("Failed to mark transaction {transaction_id} as an agent's"))?;
+        Ok(())
+    }
+
+    async fn agent_recordings_for_account(
+        &self,
+        account_id: &str,
+    ) -> Result<Vec<(String, AgentRecording)>> {
+        let rows = sqlx::query!(
+            r#"SELECT r.transaction_id AS "transaction_id!: String", r.agent AS "agent!: String",
+                      r.session AS "session!: String",
+                      r.session_started_at AS "session_started_at!: String"
+               FROM agent_recordings r
+               JOIN transactions t ON t.id = r.transaction_id
+               WHERE t.account_id = ?"#,
+            account_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .with_context(|| format!("Failed to fetch agent recordings for account {account_id}"))?;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                (
+                    row.transaction_id,
+                    AgentRecording {
+                        agent: row.agent,
+                        session: row.session,
+                        session_started_at: row.session_started_at,
+                    },
+                )
+            })
+            .collect())
     }
 
     async fn delete(&self, id: &str) -> Result<()> {

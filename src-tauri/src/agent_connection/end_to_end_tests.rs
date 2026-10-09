@@ -25,6 +25,28 @@ const M: i64 = 1_000_000;
 /// The application running over a portfolio: the account "PEA" with 5,000 EUR of cash and
 /// 10 shares of "Amundi MSCI World" (CW8) bought for 4,000 EUR.
 async fn application(data_dir: &Path) -> Arc<AgentGate> {
+    application_with_accounts(data_dir).await.0
+}
+
+/// The same application, with the database for a test that breaks it.
+async fn application_with_database(
+    data_dir: &Path,
+) -> (
+    Arc<AgentGate>,
+    Arc<crate::context::account::AccountService>,
+    sqlx::SqlitePool,
+) {
+    let (gate, accounts) = application_with_accounts(data_dir).await;
+    let database = Database::new(data_dir.to_path_buf())
+        .await
+        .expect("database");
+    (gate, accounts, database.pool)
+}
+
+/// The same application, with its account service for the test to read what was recorded.
+async fn application_with_accounts(
+    data_dir: &Path,
+) -> (Arc<AgentGate>, Arc<crate::context::account::AccountService>) {
     let database = Database::new(data_dir.to_path_buf())
         .await
         .expect("database");
@@ -64,7 +86,7 @@ async fn application(data_dir: &Path) -> Arc<AgentGate> {
             .await
             .expect("asset");
     }
-    Arc::new(AgentGate::new(
+    let gate = Arc::new(AgentGate::new(
         data_dir.to_path_buf(),
         Arc::new(AgentConnections::new(|| {})),
         Arc::new(AgentTools::new(
@@ -72,7 +94,8 @@ async fn application(data_dir: &Path) -> Arc<AgentGate> {
             assets,
             Arc::clone(&container.currency_service),
         )),
-    ))
+    ));
+    (gate, container.account_service)
 }
 
 fn reaching(data_dir: &Path) -> Connector {
@@ -216,6 +239,191 @@ async fn agt_040_the_read_tools_answer_from_the_running_application() {
     assert_eq!(holdings["total_global_value"], 5_000 * M);
     let before_the_deposit = result(&answered[5]);
     assert_eq!(before_the_deposit["total_global_value"], 0);
+}
+
+// AGT-044 / AGT-045 — the three recordings go through the window's rules, and each is
+// marked with the agent and its session; a transaction the owner typed carries no mark.
+#[tokio::test]
+async fn agt_044_an_agent_records_through_the_rules_and_its_recordings_are_marked() {
+    use crate::context::account::{JournalFilter, TransactionType};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let (gate, accounts) = application_with_accounts(data_dir.path()).await;
+    gate.allow(true).expect("allowed");
+    let owner = owner_answers(&gate, true);
+
+    let answered = answers(
+        data_dir.path(),
+        &[
+            json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize",
+                "params": { "clientInfo": { "name": "claude-code" } } })
+            .to_string(),
+            call(1, "record_opening_balance", json!({ "account": "PEA", "asset": "CW8",
+                "quantity": "10", "total_cost": 4000, "date": "2026-01-05" })),
+            call(2, "record_purchase", json!({ "account": "pea", "asset": "cw8",
+                "quantity": 2, "price": "100.5", "date": "2026-02-01", "note": "from a statement" })),
+            call(3, "record_sale", json!({ "account": "PEA", "asset": "CW8",
+                "quantity": "1", "total": "150", "date": "2026-03-01" })),
+            call(4, "record_sale", json!({ "account": "PEA", "asset": "CW8",
+                "quantity": "500", "price": "1", "date": "2026-03-02" })),
+            call(5, "record_purchase", json!({ "account": "PEA", "asset": "NOPE",
+                "quantity": "1", "price": "1" })),
+            call(6, "record_purchase", json!({ "account": "PEA", "asset": "CW8",
+                "quantity": "1", "price": "1", "total": "1" })),
+            call(7, "record_purchase", json!({ "account": "PEA", "asset": "CW8",
+                "quantity": "1,5", "price": "1" })),
+            call(8, "record_opening_balance", json!({ "account": "PEA", "asset": "CW8",
+                "quantity": "1" })),
+        ],
+    )
+    .await;
+    owner.await.expect("owner");
+
+    let opened = result(&answered[1]);
+    assert_eq!(opened["status"], "recorded");
+    assert_eq!(opened["transaction"]["transaction_type"], "OpeningBalance");
+    assert_eq!(opened["transaction"]["quantity"], 10 * M);
+    assert_eq!(opened["transaction"]["total_amount"], 4_000 * M);
+    assert_eq!(opened["account"], "PEA");
+    let bought = result(&answered[2]);
+    assert_eq!(bought["transaction"]["unit_price"], 100_500_000);
+    assert_eq!(bought["transaction"]["note"], "from a statement");
+    let sold = result(&answered[3]);
+    assert_eq!(sold["transaction"]["transaction_type"], "Sell");
+
+    for (index, said) in [
+        (5, "no asset matches \"NOPE\" by name, reference or ISIN"),
+        (6, "give either price or total, not both"),
+        (
+            7,
+            "quantity is not a decimal with a dot and at most six decimals: \"1,5\"",
+        ),
+        (8, "total_cost is missing"),
+    ] {
+        assert_eq!(answered[index]["result"]["isError"], true, "{index}");
+        assert_eq!(text(&answered[index]), said);
+    }
+    assert_eq!(
+        answered[4]["result"]["isError"], true,
+        "an oversell is refused"
+    );
+
+    let account = accounts.get_all().await.expect("accounts").remove(0);
+    let journal = accounts
+        .get_account_journal(&account.id, &JournalFilter::default())
+        .await
+        .expect("journal");
+    assert_eq!(
+        journal.rows.len(),
+        4,
+        "the deposit and the three recordings"
+    );
+    let mut sessions = std::collections::HashSet::new();
+    for row in &journal.rows {
+        match (&row.transaction.transaction_type, &row.recorded_by) {
+            (TransactionType::Deposit, mark) => assert!(mark.is_none(), "typed by the owner"),
+            (_, Some(mark)) => {
+                assert_eq!(mark.agent, "claude-code");
+                assert!(!mark.session_started_at.is_empty());
+                sessions.insert(mark.session.clone());
+            }
+            (kind, None) => panic!("{kind} is not marked"),
+        }
+    }
+    assert_eq!(sessions.len(), 1, "one session recorded all three");
+
+    // AGT-045 — the mark goes with its transaction: a correction keeps it, a removal
+    // removes it.
+    let sale = journal
+        .rows
+        .iter()
+        .find(|row| row.transaction.transaction_type == TransactionType::Sell)
+        .expect("the sale")
+        .transaction
+        .clone();
+    accounts
+        .correct_transaction(
+            &account.id,
+            &sale.id,
+            sale.date.clone(),
+            sale.quantity,
+            sale.unit_price,
+            sale.exchange_rate,
+            2 * M,
+            None,
+            Some("corrected by the owner".to_string()),
+        )
+        .await
+        .expect("corrected");
+    let marked_after = |journal: &crate::context::account::AccountJournal| -> usize {
+        journal
+            .rows
+            .iter()
+            .filter(|row| row.recorded_by.is_some())
+            .count()
+    };
+    let corrected = accounts
+        .get_account_journal(&account.id, &JournalFilter::default())
+        .await
+        .expect("journal");
+    assert_eq!(marked_after(&corrected), 3, "a correction keeps the mark");
+
+    accounts
+        .cancel_transaction(&account.id, &sale.id)
+        .await
+        .expect("cancelled");
+    let after_removal = accounts
+        .get_account_journal(&account.id, &JournalFilter::default())
+        .await
+        .expect("journal");
+    assert_eq!(after_removal.rows.len(), 3);
+    assert_eq!(marked_after(&after_removal), 2, "the mark went with it");
+}
+
+// AGT-049 — a recording that cannot be marked is undone: when the mark cannot be
+// written the recording is undone, and the agent is told nothing was recorded.
+#[tokio::test]
+async fn agt_045_a_recording_that_cannot_be_marked_is_undone() {
+    use crate::context::account::JournalFilter;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let (gate, accounts, pool) = application_with_database(data_dir.path()).await;
+    sqlx::query("DROP TABLE agent_recordings")
+        .execute(&pool)
+        .await
+        .expect("the marks cannot be written");
+    gate.allow(true).expect("allowed");
+    let owner = owner_answers(&gate, true);
+
+    let answered = answers(
+        data_dir.path(),
+        &[call(
+            1,
+            "record_opening_balance",
+            json!({ "account": "PEA", "asset": "CW8",
+            "quantity": "10", "total_cost": 4000, "date": "2026-01-05" }),
+        )],
+    )
+    .await;
+    owner.await.expect("owner");
+
+    assert_eq!(answered[0]["result"]["isError"], true);
+    assert_eq!(
+        text(&answered[0]),
+        "the recording could not be marked as an agent's, so nothing was recorded: try again"
+    );
+    let account = accounts.get_all().await.expect("accounts").remove(0);
+    // The journal reads the marks too: with their table gone it cannot be read, so the
+    // transactions are counted directly.
+    assert!(accounts
+        .get_account_journal(&account.id, &JournalFilter::default())
+        .await
+        .is_err());
+    let left: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM transactions")
+        .fetch_one(&pool)
+        .await
+        .expect("count");
+    assert_eq!(left, 1, "only the owner's deposit");
 }
 
 // AGT-042 / AGT-043 — a refusal names only what the agent sent: an unknown account is not answered
