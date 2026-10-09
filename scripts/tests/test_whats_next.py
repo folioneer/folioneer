@@ -198,6 +198,30 @@ class DebtThemes(unittest.TestCase):
             "Every E2E file of `…` waits N seconds",
         )
 
+    def test_a_debt_entry_waits_on_its_unticked_questions(self):
+        debt = whats_next.parse_debt(
+            """# Tech Debt
+
+## 2026-10-04 — TD-078 — A promise nothing keeps
+
+- Severity: 🟡
+- Done when: the promise is kept or withdrawn.
+
+**Open questions:**
+
+- [ ] Build it now, or withdraw the promise?
+- [x] Is it both paths? → Yes.
+
+## 2026-10-05 — TD-081 — Another entry
+
+- Done when: fixed.
+"""
+        )
+        self.assertEqual(
+            debt[0]["waits_on"], ["question: Build it now, or withdraw the promise?"]
+        )
+        self.assertEqual(debt[1]["waits_on"], [])
+
     def test_a_debt_entry_without_a_done_when_is_not_ready(self):
         debt = {entry["ref"]: entry for entry in whats_next.parse_debt(DEBT)}
         self.assertEqual(debt["TD-007"]["waits_on"], [])

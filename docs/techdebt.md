@@ -355,11 +355,15 @@ Remove an entry once it has been resolved.
 - User value: None directly — the scenario protects the rate edit again.
 - Done when: the cause is found (in the scenario or in how the rate list refreshes), fixed, and the scenario is re-enabled and passes twenty runs in a row.
 
-## 2026-10-04 — TD-078 — The spec says correcting a purchase unarchives its asset; the code does not
+## 2026-10-04 — TD-078 — The application says a purchase on an archived asset unarchives it; nothing does
 
-- Found by: the main agent, closing TD-063
-- Where: `docs/spec/financial-asset-transaction.md` — TRX-028 ("at the time of transaction creation or modification"), TRX-029 (the confirmation shown before saving), TRX-033 ("the archived asset guard is enforced"); `correct_transaction` in `src-tauri/src/use_cases/holding_transaction/orchestrator.rs`, which never looks at the asset
+- Found by: the main agent, closing TD-063; claim checked against the code on 2026-10-09
+- Where: `docs/spec/financial-asset-transaction.md` — TRX-028 (a purchase recorded or modified on an archived asset unarchives it, atomically), TRX-029 (the confirmation shown before saving), TRX-033; `buy_holding` and `correct_transaction` in `src-tauri/src/use_cases/holding_transaction/orchestrator.rs`, neither of which looks at the asset; the confirmation in the add, buy and edit transaction forms (`transaction.archived_asset_confirm_message`)
 - Severity: 🟡
-- Observation: recording a purchase on an archived asset unarchives it. Correcting one does not: the correction goes to the account alone. The correction form still shows the confirmation "saving will unarchive the asset" (TRX-029), then saves without doing it. Not verified by a test yet: the first step is one that corrects a purchase on an archived asset and reads the asset back.
-- User value: The confirmation shown before saving a correction says what saving does.
-- Done when: a corrected purchase on an archived asset unarchives it, as recording does (owner, 2026-10-09: "yes, unarchive it"), atomically with the correction (TRX-028); a test corrects a purchase on an archived asset and reads the asset back active.
+- Observation: this entry said recording a purchase unarchives the asset and correcting one does not. Neither does: no code outside the asset context calls unarchive, and the account context cannot. All three forms show "Saving this transaction will automatically unarchive it", save, and leave the asset archived. Read in the code, not reproduced in the application. Keeping the promise means the use case unarchives the asset and records the purchase as one operation: two contexts in one transaction is the unit of work ADR-006 accepted and TD-005 has not built, and it must end in one event, not two (B45). Without it, the asset can be unarchived first and archived again when the purchase is refused — two writes, each published to the other devices.
+- User value: The confirmation shown before saving says what saving does.
+- Done when: a purchase recorded or corrected on an archived asset unarchives it, or the rules and the three confirmations stop saying so; one test per path shows which.
+
+**Open questions:**
+
+- [ ] On 2026-10-09 the owner answered "yes, unarchive it" for a correction, believing recording already did. Recording does not either, so the work is both paths and the cross-context write above. Which is wanted: (a) build it now on unarchive-then-compensate; (b) build it with the unit of work, after TD-005; (c) remove the promise — the three confirmations and TRX-028/029/033 — and let the user unarchive by hand?

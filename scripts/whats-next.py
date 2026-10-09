@@ -192,7 +192,8 @@ def _debt_field(body: list[str], name: str) -> str | None:
 
 
 def parse_debt(debt_text: str) -> list[dict]:
-    """Every `## date — TD-NNN — …` entry of the tech-debt file."""
+    """Every `## date — TD-NNN — …` entry of the tech-debt file. An entry waits on its
+    Done when and, like a todo entry, on each unticked item under `**Open questions:**`."""
     entries: list[dict] = []
     for heading, body in _sections(debt_text):
         match = DEBT_HEADING.match(heading)
@@ -206,7 +207,12 @@ def parse_debt(debt_text: str) -> list[dict]:
                 "theme": debt_theme(match.group("title")),
                 "severity": _debt_field(body, "Severity"),
                 "user_value": _debt_field(body, "User value"),
-                "waits_on": [] if _debt_field(body, "Done when") else ["no Done when"],
+                "waits_on": ([] if _debt_field(body, "Done when") else ["no Done when"])
+                + [
+                    f"question: {text}"
+                    for ticked, text in _question_items(body)
+                    if not ticked
+                ],
             }
         )
     return entries

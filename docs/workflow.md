@@ -44,6 +44,8 @@ Four human touchpoints. Everything else is either the agent's job or a machine g
 - An entry is `Found by`, `Where`, `Severity` (🔴 🟡 🔵, omitted when unknown),
   `Observation`, `User value` and `Done when`. Nothing in it is invented: a missing fact
   is left out.
+- A queued entry that needs the owner's answer carries `**Open questions:**` like a todo
+  entry; while a box is unticked it is not ready and the agent skips it.
 
 ### `docs/flow.md` — agent-owned
 
