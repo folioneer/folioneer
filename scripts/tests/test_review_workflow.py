@@ -155,5 +155,16 @@ class NamedCommands(unittest.TestCase):
             self.assertFalse(tool.startswith("Web"), tool)
 
 
+class StopReason(unittest.TestCase):
+    # FLOW-026 — a lane without a report says why it stopped, and the script that reads
+    # the session log comes from the base branch, never from the pull request's checkout.
+    def test_the_stop_reason_script_is_taken_from_the_base_branch(self):
+        text = WORKFLOW.read_text()
+        self.assertIn('git show "origin/$BASE:scripts/review-stop-reason.py" > "$RUNNER_TEMP/review-stop-reason.py"', text)
+        self.assertIn('python3 "$RUNNER_TEMP/review-stop-reason.py" review-session.json', text)
+        self.assertNotIn("python3 scripts/review-stop-reason.py", text)
+        self.assertIn("Why it stopped: %s.", text)
+
+
 if __name__ == "__main__":
     unittest.main()

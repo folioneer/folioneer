@@ -136,20 +136,6 @@ entries already held the matter for.
   Protects: the decision on a merge queue being taken on a figure.
 - 0.7.0: not queued, and the causes were not counted a second time.
 
-## FLOW-026 — A CI reviewer that ends without a report does not say why
-
-- Kind: speed
-- Observed: on #149 and #150 a reviewer lane ended red with no report. The job log said
-  nothing; the cause (the turn limit, DEBT-087) was found by reading the session's log
-  by hand, over several rounds of about 25 minutes. The owner's other project has
-  `scripts/review-stop-reason.py`: one line from the session's log, printed by the
-  workflow before a second try, naming fields only so that nothing of an unreviewed diff
-  is printed.
-- Proposal: bring the script and its tests over; `review.yml` calls it when a lane has
-  written no report.
-- Costs: about an hour; one more script to keep. Protects: a round spent learning that a
-  reviewer stopped at its turn limit.
-
 ## FLOW-027 — The agent writes the watch on a pull request's checks by hand each time
 
 - Kind: speed

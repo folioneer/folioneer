@@ -227,6 +227,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr }}
           REVIEWER: ${{ matrix.reviewer }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BASE: ${{ github.base_ref || 'main' }}
         run: |
           set -euo pipefail
           report=$(ls -t .review/reviewer-"$REVIEWER"-*.md 2>/dev/null | head -n 1 || true)
@@ -247,8 +248,17 @@ jobs:
               heading="no report"
               advice="The reviewer produced no report; the check fails until it does."
             fi
-            body=$(printf '%s\n## reviewer-%s — %s\n\n%s ([run](%s))\n\nSession said:\n\n> %s\n' \
-              "$MARKER" "$REVIEWER" "$heading" "$advice" "$RUN_URL" "${last:-(no final message)}")
+            # Why the session stopped, in one line of named fields (its turn limit
+            # leaves no final message). The script is read from the base branch and
+            # run from outside the checkout: this step holds a token, and a pull
+            # request must not choose what runs beside it (docs/flow.md FLOW-026).
+            stopped="the stop reason could not be read"
+            if git show "origin/$BASE:scripts/review-stop-reason.py" > "$RUNNER_TEMP/review-stop-reason.py" 2>/dev/null; then
+              stopped=$(python3 "$RUNNER_TEMP/review-stop-reason.py" review-session.json || echo "$stopped")
+            fi
+            echo "reviewer-$REVIEWER wrote no report: $stopped"
+            body=$(printf '%s\n## reviewer-%s — %s\n\n%s ([run](%s))\n\nWhy it stopped: %s.\n\nSession said:\n\n> %s\n' \
+              "$MARKER" "$REVIEWER" "$heading" "$advice" "$RUN_URL" "$stopped" "${last:-(no final message)}")
             criticals=1
           else
             # verdict:begin — kept inline: a file in the checkout could be rewritten
