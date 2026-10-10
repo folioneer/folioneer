@@ -135,6 +135,11 @@ jobs:
       # DEBT-NNN, FLOW-NNN, ghNN — and the forms they replaced are refused (TODO-049).
       - name: Reference forms
         run: python3 scripts/reference-forms.py
+      # scripts/contract-check.py: each contract's rows and types are those of the
+      # generated bindings; the gaps known when it arrived are in contract-gaps.json,
+      # which only shrinks (FLOW-024).
+      - name: Contracts against the bindings
+        run: python3 scripts/contract-check.py
 
   licences:
     name: Licences — what the application ships

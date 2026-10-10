@@ -7,7 +7,7 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `DEBT-NNN` reference (never renumbered, never reused; next free:
-DEBT-096) so the human can queue it in `docs/todo.md` § Next like any todo.
+DEBT-097) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -317,6 +317,15 @@ Remove an entry once it has been resolved.
 - Observation: the replay multiplies the quantity by the factor in 128 bits and casts the result back to 64 bits without a check. A factor large enough (far beyond any real split) makes the cast wrap: recording and the split check both then show a quantity that is wrong, or refuse a split for the wrong reason.
 - User value: None in practice — no real split comes near the bound; an absurd factor typed by mistake is refused with a clear reason.
 - Done when: a factor whose rescale cannot be stored is refused when the split is recorded and when it is checked, with one error code, shown by a test on each path.
+
+## 2026-10-10 — DEBT-096 — Six contracts were never read against the code they describe
+
+- Found by: `scripts/contract-check.py`, first run (FLOW-024)
+- Where: `docs/contracts/{asset,scheduled-fetch,sync,currency,update,agent-connection}-contract.md`; `contract-gaps.json`
+- Severity: 🟡
+- Observation: the check finds four gaps outside the account contract: the asset contract names `Exchange` in three rows and defines it nowhere; the scheduled-fetch contract gives `configure_scheduled_fetch` a `ConfigureScheduledFetchArgs` struct where the command takes `enabled` and `trigger_time`. The check compares names, arguments, types and whether an error type can carry a code; which codes each command returns is not in the bindings, and on that half only the account contract was read exhaustively (22 gaps, DEBT-088). The six others were not
+- User value: None directly — the documents the window is written against say what the core does.
+- Done when: each of the six contracts is read once with `/contract`, command by command; `contract-gaps.json` holds no line; one exhaustive pass of `contract-reviewer` on each finds no critical gap.
 
 ## 2026-10-10 — DEBT-095 — WebdriverIO 10 is available; the E2E tools are on 9
 

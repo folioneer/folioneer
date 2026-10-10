@@ -58,7 +58,7 @@ jobs:
           sql=$(has '^src-tauri/migrations/')
           # reviewer-infra FP: the .mjs and the two gate files are in
           # the agent's own `## Files in scope` list.
-          infra=$(has '^(scripts/[^/]*\.(sh|bat|py|mjs)$|\.githooks/|\.github/workflows/.*\.ya?ml$|justfile$|package\.json$|src-tauri/Cargo\.toml$|src-tauri/tauri\.conf\.json$|src-tauri/capabilities/.*\.json$|coverage-gates\.json$|arch-allowlist\.json$|required-checks\.json$)')
+          infra=$(has '^(scripts/[^/]*\.(sh|bat|py|mjs)$|\.githooks/|\.github/workflows/.*\.ya?ml$|justfile$|package\.json$|src-tauri/Cargo\.toml$|src-tauri/tauri\.conf\.json$|src-tauri/capabilities/.*\.json$|coverage-gates\.json$|arch-allowlist\.json$|contract-gaps\.json$|required-checks\.json$)')
           security=$(has '^(src-tauri/src/.*/api\.rs$|src-tauri/capabilities/|src-tauri/src/core/specta_builder\.rs$|src-tauri/src/context/sync/)')
           e2e=$(has '^e2e/.*\.test\.ts$')
           # The two documents the code reviewers read as the truth get a reviewer

@@ -136,34 +136,6 @@ entries already held the matter for.
   Protects: the decision on a merge queue being taken on a figure.
 - 0.7.0: not queued, and the causes were not counted a second time.
 
-## FLOW-024 — Nothing compares a contract with the code it describes
-
-- Kind: quality
-- Observed: a contract is checked by a reviewer that reads the whole file and reports a
-  sample: on #150 it reported a different older gap of `account-contract.md` on each of
-  three runs, and an exhaustive reading then found 22 (DEBT-088). The six other
-  contracts have not been read that way. A count of names finds 3 commands of 93 in no
-  contract (`upsert_holding_note`, `delete_holding_note`, `log_frontend`) and no row
-  naming a command that does not exist: the drift is in the errors and the types of the
-  rows, which nothing counts. The owner on 2026-10-10: "contract seems to have diverged
-  a lot from the real code".
-- Proposal: (a) a script in the gate reads `src/bindings.ts`, which the core generates,
-  and each contract's rows, and refuses a command without a row, a row without a
-  command, and an error code or an input type that one side has and the other lacks;
-  (b) each of the seven contracts is read exhaustively once, DEBT-088 being the first,
-  with the script's first report as its list.
-- Costs: about half a day for the script and its tests, and a fixed format for a
-  contract row; one pull request per contract. Protects: a document the agent and the
-  reviewers read as the truth about a command.
-- From the owner's other project, taken into this entry by the owner on 2026-10-10: it
-  has a `/contract` skill that derives or updates a contract from a validated spec, and
-  its owner decided to regenerate every contract with it and to run `spec-checker` on
-  every spec once, before the next feature work. Here: (c) the skill is brought over and
-  adapted; (b) uses it, the script of (a) then keeping each contract true.
-- Scope (owner, 2026-10-10): this entry is (a), (c) and the account contract (DEBT-088,
-  queued after it). The six other contracts are filed as debt from the script's first
-  report, which the gate holds as a list that may only shrink.
-
 ## FLOW-025 — A reviewer that reads a whole file fails a pull request on what it did not change
 
 - Kind: speed
@@ -173,7 +145,7 @@ entries already held the matter for.
 - Proposal: in CI the contract and spec reviewers judge the lines the pull request
   changes and report older gaps as suggestions, never as a refusal; the exhaustive
   reading belongs to the release checks, where `spec-checker` already runs on every
-  spec the batch touched, and to FLOW-024's script for the contracts. `docs/workflow.md` says "the same gate failing three times": it adds "whatever the three causes".
+  spec the batch touched, and to `scripts/contract-check.py` for the contracts. `docs/workflow.md` says "the same gate failing three times": it adds "whatever the three causes".
 - Costs: an older gap in a file a pull request touches waits for the release checks.
   Protects: about 25 minutes a round, and a mechanical pull request from repairing a
   document it only renamed in.
