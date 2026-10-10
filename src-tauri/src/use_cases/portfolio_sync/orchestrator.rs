@@ -185,7 +185,8 @@ impl PortfolioSyncOrchestrator {
     }
 
     /// Re-enrolls this device as the new origin of the portfolio under a new passphrase,
-    /// clearing the folder first (SYN-071).
+    /// clearing the folder first (SYN-071). A folder written by a newer version is refused
+    /// with `UpdateRequired` and left as it is (SYN-035).
     pub async fn start_sync_over(
         &self,
         folder: String,
@@ -199,10 +200,24 @@ impl PortfolioSyncOrchestrator {
             .check_available()
             .await
             .map_err(|problem| SyncError::FolderUnavailable { problem })?;
+        // SYN-035 — a folder a newer version wrote is not cleared by an older one, and
+        // neither is one whose header this version cannot read a format from: what the
+        // dialog refuses (`inspect_sync_folder`), the core refuses.
+        if let Some(header) = self.folder_store.read_header_bytes().await? {
+            let data_format_version = header_data_format_version(&header);
+            if !data_format_version.is_some_and(|version| version <= DATA_FORMAT_VERSION) {
+                return Err(SyncError::UpdateRequired {
+                    data_format_version: data_format_version.unwrap_or(0),
+                }
+                .into());
+            }
+        }
         for device_id in self.folder_store.list_device_ids().await? {
             self.folder_store.remove_device_area(&device_id).await?;
         }
         self.folder_store.remove_header().await?;
+        // SYN-071 — what this device kept of the discarded history goes with it.
+        self.state_repo.discard_received_history().await?;
         Ok(self
             .first_publish
             .enable_as_first_device(folder, passphrase, device_name)

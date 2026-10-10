@@ -306,7 +306,8 @@
       "step_keep": "Notez ou exportez ce que vous voulez conserver.",
       "step_rename": "Fermez Folioneer et renommez son dossier de données (ci-dessous).",
       "step_join": "Rouvrez Folioneer et rejoignez.",
-      "where": "Linux : ~/.local/share/com.folioneer.desktop\nWindows : %LOCALAPPDATA%\\com.folioneer.desktop"
+      "where": "Linux : ~/.local/share/com.folioneer.desktop\nWindows : %LOCALAPPDATA%\\com.folioneer.desktop",
+      "start_over": "Ou gardez le portefeuille de cet ordinateur et remplacez celui du dossier : repartez de zéro. Tous les fichiers publiés sont supprimés et le portefeuille de cet ordinateur est publié à nouveau, avec une nouvelle phrase secrète."
     },
     "device_name_label": "Cet ordinateur",
     "last_sync_label": "Dernière synchronisation",

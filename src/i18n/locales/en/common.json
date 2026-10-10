@@ -306,7 +306,8 @@
       "step_keep": "Note or export anything you want to keep.",
       "step_rename": "Close Folioneer and rename its data folder (below).",
       "step_join": "Open Folioneer again and join.",
-      "where": "Linux: ~/.local/share/com.folioneer.desktop\nWindows: %LOCALAPPDATA%\\com.folioneer.desktop"
+      "where": "Linux: ~/.local/share/com.folioneer.desktop\nWindows: %LOCALAPPDATA%\\com.folioneer.desktop",
+      "start_over": "Or keep this computer's portfolio and replace the one in the folder: start over. It discards every published file and publishes this computer's portfolio again, under a new passphrase."
     },
     "device_name_label": "This computer",
     "last_sync_label": "Last sync",

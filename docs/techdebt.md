@@ -7,10 +7,19 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `DEBT-NNN` reference (never renumbered, never reused; next free:
-DEBT-106) so the human can queue it in `docs/todo.md` § Next like any todo.
+DEBT-107) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
+
+## 2026-10-10 — DEBT-106 — After "Start over", no fresh installation can join the folder
+
+- Found by: the test DEBT-099 asked for ("under the new passphrase"), run on 2026-10-10: `syn_071_after_starting_over_a_fresh_installation_joins_with_the_new_passphrase` in `src-tauri/tests/sync_first_publish.rs`, kept ignored with this reference
+- Where: `enroll` in `src-tauri/src/context/sync/application/first_publish.rs` (`retire_earlier_changes` marks the device's earlier changes published and keeps them, so `next_sequence` goes on from the last one); `read_device_history` in `src-tauri/src/context/sync/application/join.rs` (a device's segments must cover its sequences from 1 without a gap, SYN-036)
+- Severity: 🔴
+- Observation: a device that starts over keeps its identity (SYN-016) and its change log, so the one segment it publishes into the cleared folder starts where its sequences had got to — `seg-…04-…06` in the test — not at 1. A fresh installation that joins that folder with the new passphrase is refused with `HistoryIncomplete`: the join reads a gap before the first segment. Run: the test above fails that way; the old passphrase is refused with `PassphraseMismatch`, as it should. So the path SYN-053 and SYN-071 give for a forgotten passphrase leaves a folder only its origin can use, where the confirmation says every other computer rejoins from a fresh installation. Not run: whether `change_sync_folder` to an empty folder, which publishes through the same `publish_as_origin`, leaves a folder a fresh installation cannot join either. The portfolio itself is untouched in every case
+- User value: After starting over with a new passphrase, the owner's other computers join the folder again.
+- Done when: a fresh installation joins a folder started over, and the ignored test runs; the same is tested for a folder designated by `change_sync_folder`; the rule says where a device's sequences start in a folder it publishes to as its origin, and a join still refuses a history with a missing segment (SYN-036).
 
 ## 2026-10-10 — DEBT-105 — What the spec check of management fees found after the fee entries
 
@@ -344,22 +353,6 @@ Remove an entry once it has been resolved.
 - Observation: `handleDateSelect` builds an ISO date in four lines where `toIsoLocal`, defined in the same file with the same formula and used by `stepDate`, does it in one; the four lines are covered. Outside the audit's categories: the same file writes the ISO-date pattern inline twice where its constant `ISO_DATE` exists, and the sync hook writes `folderState?.holds_portfolio === true` twice
 - User value: None — less code saying the same thing.
 - Done when: `handleDateSelect` calls `toIsoLocal`; the two patterns use `ISO_DATE`; the sync hook names the expression once; the tests of both files pass unchanged.
-
-## 2026-10-10 — DEBT-099 — Starting sync over: two rules to settle and three clauses without a test
-
-- Found by: `spec-checker` on `docs/spec/multi-device-sync.md`, `main` at c0d7b05 (2026-10-10). SYN-071 and SYN-053 are implemented and tested for the case TODO-066 fixed (the hook and dialog tests, `tests/sync_first_publish.rs`, E2E Step 11, green on pull request 168)
-- Where: `src/features/settings/sync/enable_modal/useEnableSyncModal.ts`, `src/features/settings/sync/SyncPage.tsx`, `src-tauri/src/use_cases/portfolio_sync/orchestrator.rs`, `src-tauri/tests/sync_first_publish.rs`
-- Severity: 🟡
-- Observation: **from TODO-066, known to the main agent who wrote it:** in a folder that holds no portfolio the dialog says so, then still asks the confirmation that every published file will be discarded: nothing says whether that confirmation is wanted there. The dialog alone refuses to start over in a folder of a newer data format (`UpdateRequired`, kept by a TODO-066 test). **The checker's reading, not read again:** the core clears such a folder without reading its header and the contract lists no `UpdateRequired` for `start_sync_over`: no rule says which is right. "Under the new passphrase" has no real test: `sync_first_publish.rs` asserts the header's bytes changed, which fresh derivation parameters cause with the same passphrase too. "Interrupted after clearing, the device may retry" has no test; the clearing removes the device areas, then the header, and nothing tests an interruption between the two. "Start over" is offered only where sync is enabled, where SYN-053 says any device that still holds the portfolio: one that left sync gets the join refusal. Starting over on an enrolled device keeps its cursors, held-back changes and conflict notices (`save_enrolment` rewrites the device row only), so changes held back for the discarded history would keep the status at "needs attention"; no rule, no test
-- User value: A user who forgot the passphrase after leaving sync can still start over; the sync status is clean after starting over.
-- Done when: the owner says whether a newer-format folder may be started over, whether the confirmation is asked in a folder that holds no portfolio, and whether a device that left sync may start over, and the rules, the core and the dialog agree; the new passphrase, the interrupted clearing and the state kept after starting over each have a test, the last with its rule.
-
-**Open questions:**
-
-- [x] May a folder written by a newer version be started over? — No: the core refuses it too, with the same `UpdateRequired` as the dialog, and the contract lists it (owner, 2026-10-10).
-- [x] Starting over in a folder that holds no portfolio: is the confirmation still asked? — Yes, the same one (owner, 2026-10-10).
-- [x] May a computer that left sync and still holds the portfolio start over? — Yes: the refusal shown when enabling sync offers it (owner, 2026-10-10).
-- [x] That refusal changes a screen: its mock-up is shown in the opening block of the batch, to validate before any code. — Validated: `screenshots/design/099-*-refusal.png`, a sentence and an outlined "Start over" under the refusal's steps, opening the "Start over" dialog on the folder chosen (owner, 2026-10-10).
 
 ## 2026-10-10 — DEBT-096 — Six contracts were never read against the code they describe
 

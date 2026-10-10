@@ -36,6 +36,10 @@ export interface UseEnableSyncModalResult {
   setDeviceName: (value: string) => void;
   /** True when joining the portfolio the folder already holds: one passphrase field, join wording (SYN-011). Never when starting over. */
   isJoin: boolean;
+  /** True when the folder's portfolio will be replaced by this computer's (SYN-071): asked for by the caller, or chosen from the join refusal (SYN-053). */
+  isStartOver: boolean;
+  /** SYN-053 — from the join refusal: keep this computer's portfolio and start over in the folder chosen. */
+  startOverInstead: () => void;
   canSubmit: boolean;
   isSubmitting: boolean;
   submitError: I18nMessage | null;
@@ -86,7 +90,7 @@ export function useEnableSyncModal({
   const [submitError, setSubmitError] = useState<I18nMessage | null>(null);
   const [confirmingStartOver, setConfirmingStartOver] = useState(false);
   const inspectSequence = useRef(0);
-  const isStartOver = variant === "start-over";
+  const [isStartOver, setIsStartOver] = useState(variant === "start-over");
 
   const setFolder = useCallback(
     async (value: string) => {
@@ -110,6 +114,13 @@ export function useEnableSyncModal({
     },
     [isStartOver],
   );
+
+  const startOverInstead = useCallback(() => {
+    setIsStartOver(true);
+    if (folderState !== null) {
+      setFolderError(folderStateError(folderState, true));
+    }
+  }, [folderState]);
 
   const handleBrowse = useCallback(async () => {
     const picked = await pickSyncFolder();
@@ -171,6 +182,8 @@ export function useEnableSyncModal({
     folderError,
     folderHoldsPortfolio: folderState?.holds_portfolio === true,
     joinRefused: isJoin && folderState.installation_holds_user_data,
+    isStartOver,
+    startOverInstead,
     canProceedToStep2,
     goToStep2: () => setStep(2),
     passphrase,

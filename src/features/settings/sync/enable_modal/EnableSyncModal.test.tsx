@@ -35,6 +35,8 @@ const makeState = (overrides: Record<string, unknown> = {}) => ({
   deviceName: "",
   setDeviceName: vi.fn(),
   isJoin: false,
+  isStartOver: false,
+  startOverInstead: vi.fn(),
   canSubmit: false,
   isSubmitting: false,
   submitError: null,
@@ -133,6 +135,33 @@ describe("EnableSyncModal — step 2 passphrase (SYN-011/012/014/015/019)", () =
     expect(screen.getByTestId("sync-enable-next")).toBeDisabled();
   });
 
+  // SYN-053 — a computer that holds the portfolio may start over from the join refusal
+  it("offers to start over in the join refusal and hands the choice to the hook (SYN-053)", () => {
+    const startOverInstead = vi.fn();
+    mockUseEnableSyncModal.mockReturnValue(
+      makeState({ isJoin: true, joinRefused: true, startOverInstead }),
+    );
+    render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="enable" />);
+
+    // The offer sits under the alert, not in it: a control is not part of a live region.
+    expect(document.getElementById("sync-enable-join-refused")).not.toContainElement(
+      screen.getByTestId("sync-enable-start-over"),
+    );
+    expect(screen.getByText("sync.join_refused.start_over")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("sync-enable-start-over"));
+
+    expect(startOverInstead).toHaveBeenCalledTimes(1);
+  });
+
+  // SYN-053 — once chosen, the dialog is the Start over one, whatever it was opened as
+  it("becomes the Start over dialog once the hook says so (SYN-053)", () => {
+    mockUseEnableSyncModal.mockReturnValue(makeState({ isStartOver: true, joinRefused: false }));
+    render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="enable" />);
+
+    expect(screen.getByText("sync.enable_modal.title_start_over")).toBeInTheDocument();
+    expect(document.getElementById("sync-enable-join-refused")).toBeNull();
+  });
+
   it("blocks the next step and shows the update message when the format is not readable (SYN-019/035)", () => {
     mockUseEnableSyncModal.mockReturnValue(
       makeState({
@@ -197,7 +226,9 @@ describe("EnableSyncModal — start-over variant (SYN-071)", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("shows its own confirmation before calling startSyncOver", () => {
-    mockUseEnableSyncModal.mockReturnValue(makeState({ step: 2, confirmingStartOver: true }));
+    mockUseEnableSyncModal.mockReturnValue(
+      makeState({ isStartOver: true, step: 2, confirmingStartOver: true }),
+    );
     render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="start-over" />);
 
     expect(screen.getByTestId("sync-start-over-confirm")).toBeInTheDocument();
@@ -206,7 +237,7 @@ describe("EnableSyncModal — start-over variant (SYN-071)", () => {
   it("calls confirmStartOver when the start-over confirmation is accepted", () => {
     const confirmStartOver = vi.fn();
     mockUseEnableSyncModal.mockReturnValue(
-      makeState({ step: 2, confirmingStartOver: true, confirmStartOver }),
+      makeState({ isStartOver: true, step: 2, confirmingStartOver: true, confirmStartOver }),
     );
     render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="start-over" />);
 
@@ -217,7 +248,7 @@ describe("EnableSyncModal — start-over variant (SYN-071)", () => {
 
   it("TODO-066 — says what starting over does at the passphrase step, with two passphrase fields", () => {
     mockUseEnableSyncModal.mockReturnValue(
-      makeState({ step: 2, isJoin: false, folderHoldsPortfolio: true }),
+      makeState({ isStartOver: true, step: 2, isJoin: false, folderHoldsPortfolio: true }),
     );
     render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="start-over" />);
 
@@ -229,7 +260,9 @@ describe("EnableSyncModal — start-over variant (SYN-071)", () => {
   });
 
   it("TODO-066 — the confirmation says every published file is discarded and every other computer rejoins", () => {
-    mockUseEnableSyncModal.mockReturnValue(makeState({ step: 2, confirmingStartOver: true }));
+    mockUseEnableSyncModal.mockReturnValue(
+      makeState({ isStartOver: true, step: 2, confirmingStartOver: true }),
+    );
     render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="start-over" />);
 
     expect(screen.getByText("sync.start_over_confirm_message")).toBeInTheDocument();
@@ -237,7 +270,7 @@ describe("EnableSyncModal — start-over variant (SYN-071)", () => {
 
   it("DEBT-099 — starting over in a folder that holds no portfolio says so", () => {
     mockUseEnableSyncModal.mockReturnValue(
-      makeState({ step: 2, isJoin: false, folderHoldsPortfolio: false }),
+      makeState({ isStartOver: true, step: 2, isJoin: false, folderHoldsPortfolio: false }),
     );
     render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="start-over" />);
 

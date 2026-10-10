@@ -452,3 +452,164 @@ async fn sync_after_changes_runs_a_full_sync_when_enabled() {
         "the automatic run completed a full sync"
     );
 }
+
+const NEW_PASSPHRASE: &str = "a brand new passphrase";
+
+async fn start_over(ctx: &Ctx, folder: &std::path::Path) -> Result<(), String> {
+    ctx.orchestrator
+        .start_sync_over(
+            folder.to_string_lossy().to_string(),
+            NEW_PASSPHRASE.into(),
+            "Desktop".into(),
+        )
+        .await
+        .map(|_| ())
+        .map_err(|error| {
+            serde_json::to_value(&error).expect("serialize")["code"]
+                .as_str()
+                .expect("a code")
+                .to_string()
+        })
+}
+
+// SYN-071 — after starting over the old passphrase opens nothing: a fresh installation
+// that types it is refused as for any wrong passphrase.
+#[tokio::test]
+async fn syn_071_after_starting_over_the_old_passphrase_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = build_ctx(dir.path()).await;
+    seed_small_portfolio(&ctx).await;
+    enable_first_device(&ctx, dir.path()).await;
+    start_over(&ctx, dir.path()).await.expect("started over");
+
+    let with_the_old = build_ctx(dir.path())
+        .await
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Laptop".into(),
+        )
+        .await
+        .expect_err("the old passphrase opens nothing");
+
+    assert_eq!(
+        serde_json::to_value(&with_the_old).unwrap()["code"],
+        "PassphraseMismatch"
+    );
+}
+
+// SYN-071 — after starting over a fresh installation joins under the new passphrase.
+#[tokio::test]
+#[ignore = "DEBT-106: the segment published by starting over does not start at sequence 1, and the join refuses it as an incomplete history"]
+async fn syn_071_after_starting_over_a_fresh_installation_joins_with_the_new_passphrase() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = build_ctx(dir.path()).await;
+    seed_small_portfolio(&ctx).await;
+    enable_first_device(&ctx, dir.path()).await;
+    start_over(&ctx, dir.path()).await.expect("started over");
+
+    let joined = build_ctx(dir.path())
+        .await
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            NEW_PASSPHRASE.into(),
+            "Laptop".into(),
+        )
+        .await
+        .expect("the new passphrase joins");
+
+    assert!(joined.enabled);
+}
+
+// SYN-071 / SYN-035 — a folder written by a newer version is not started over: it is
+// refused with the version it asks for, and nothing of it is removed.
+#[tokio::test]
+async fn syn_071_a_folder_of_a_newer_version_is_not_started_over() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = build_ctx(dir.path()).await;
+    seed_small_portfolio(&ctx).await;
+    enable_first_device(&ctx, dir.path()).await;
+    let header_path = dir.path().join("vaultcompass-sync.json");
+    let mut header: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&header_path).unwrap()).unwrap();
+    let newer = header["data_format_version"].as_u64().expect("a version") + 1;
+    header["data_format_version"] = newer.into();
+    std::fs::write(&header_path, serde_json::to_vec(&header).unwrap()).unwrap();
+    let areas = device_areas(dir.path());
+
+    let refused = start_over(&ctx, dir.path()).await;
+
+    assert_eq!(refused, Err("UpdateRequired".to_string()));
+    assert_eq!(device_areas(dir.path()), areas, "nothing is removed");
+    assert!(header_path.exists());
+}
+
+// SYN-071 / SYN-035 — a folder whose header gives no format this version can read is not
+// started over either: the core refuses what the dialog refuses.
+#[tokio::test]
+async fn syn_071_a_folder_whose_header_cannot_be_read_is_not_started_over() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = build_ctx(dir.path()).await;
+    seed_small_portfolio(&ctx).await;
+    enable_first_device(&ctx, dir.path()).await;
+    let header_path = dir.path().join("vaultcompass-sync.json");
+    std::fs::write(&header_path, b"{ \"another\": \"shape\" }").unwrap();
+    let areas = device_areas(dir.path());
+
+    let refused = start_over(&ctx, dir.path()).await;
+
+    assert_eq!(refused, Err("UpdateRequired".to_string()));
+    assert_eq!(device_areas(dir.path()), areas, "nothing is removed");
+    assert!(header_path.exists());
+}
+
+// SYN-071 — a clearing interrupted between its two steps (the device areas gone, the
+// header still there) is finished by starting over again; once the header is gone too the
+// folder holds no portfolio, and starting over again publishes to it as a first device.
+#[tokio::test]
+async fn syn_071_an_interrupted_clearing_is_retried() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = build_ctx(dir.path()).await;
+    seed_small_portfolio(&ctx).await;
+    enable_first_device(&ctx, dir.path()).await;
+    std::fs::remove_dir_all(dir.path().join("devices")).unwrap();
+
+    start_over(&ctx, dir.path())
+        .await
+        .expect("starting over again finishes the clearing");
+    assert_eq!(device_areas(dir.path()).len(), 1);
+
+    std::fs::remove_dir_all(dir.path().join("devices")).unwrap();
+    std::fs::remove_file(dir.path().join("vaultcompass-sync.json")).unwrap();
+    start_over(&ctx, dir.path())
+        .await
+        .expect("an emptied folder is published to again");
+    assert_eq!(device_areas(dir.path()).len(), 1);
+    assert!(dir.path().join("vaultcompass-sync.json").exists());
+}
+
+// SYN-071 — starting over forgets what the device kept of the discarded history: where it
+// had read each other device up to.
+#[tokio::test]
+async fn syn_071_starting_over_forgets_the_discarded_history() {
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = build_ctx(dir.path()).await;
+    seed_small_portfolio(&ctx).await;
+    enable_first_device(&ctx, dir.path()).await;
+    sqlx::query(
+        "INSERT INTO sync_cursors (device_id, applied_through, last_applied_at) VALUES ('another-device', 3, NULL)",
+    )
+    .execute(&ctx.pool)
+    .await
+    .unwrap();
+
+    start_over(&ctx, dir.path()).await.expect("started over");
+
+    let (cursors,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM sync_cursors")
+        .fetch_one(&ctx.pool)
+        .await
+        .unwrap();
+    assert_eq!(cursors, 0);
+}

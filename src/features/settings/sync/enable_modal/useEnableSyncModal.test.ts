@@ -128,6 +128,77 @@ describe("useEnableSyncModal — folder step (SYN-011/019)", () => {
     expect(result.current.joinRefused).toBe(true);
   });
 
+  // SYN-053 — from the join refusal, a computer that holds the portfolio starts over in the
+  // folder it chose: the refusal lifts and the submit goes to start_sync_over, after its
+  // confirmation
+  it("starts over in the chosen folder from the join refusal (SYN-053)", async () => {
+    vi.mocked(gateway.inspectSyncFolder).mockResolvedValue({
+      status: "ok",
+      data: makeFolderState({ holds_portfolio: true, installation_holds_user_data: true }),
+    });
+    vi.mocked(gateway.startSyncOver).mockResolvedValue({ status: "ok", data: {} as never });
+    const { result } = renderHook(() => useEnableSyncModal({ variant: "enable" }));
+    await act(async () => {
+      await result.current.setFolder("/home/user/sync");
+    });
+    expect(result.current.isStartOver).toBe(false);
+
+    act(() => result.current.startOverInstead());
+
+    expect(result.current.isStartOver).toBe(true);
+    expect(result.current.joinRefused).toBe(false);
+    expect(result.current.isJoin).toBe(false);
+    expect(result.current.folderError).toBeNull();
+    expect(result.current.canProceedToStep2).toBe(true);
+    expect(result.current.folder).toBe("/home/user/sync");
+
+    act(() => {
+      result.current.setPassphrase("a brand new passphrase");
+      result.current.setPassphraseConfirm("a brand new passphrase");
+      result.current.setDeviceName("Desktop");
+    });
+    await act(async () => {
+      await result.current.handleSubmit();
+    });
+    expect(result.current.confirmingStartOver).toBe(true);
+    expect(gateway.startSyncOver).not.toHaveBeenCalled();
+    await act(async () => {
+      await result.current.confirmStartOver();
+    });
+
+    expect(gateway.startSyncOver).toHaveBeenCalledWith(
+      "/home/user/sync",
+      "a brand new passphrase",
+      "Desktop",
+    );
+    expect(gateway.enableSync).not.toHaveBeenCalled();
+  });
+
+  // SYN-035 — a folder a newer version wrote is refused when starting over from the refusal
+  it("keeps refusing a newer folder once starting over is chosen (SYN-035)", async () => {
+    vi.mocked(gateway.inspectSyncFolder).mockResolvedValue({
+      status: "ok",
+      data: makeFolderState({
+        holds_portfolio: true,
+        installation_holds_user_data: true,
+        format_readable: false,
+        data_format_version: 9,
+      }),
+    });
+    const { result } = renderHook(() => useEnableSyncModal({ variant: "enable" }));
+    await act(async () => {
+      await result.current.setFolder("/home/user/sync");
+    });
+
+    act(() => result.current.startOverInstead());
+
+    expect(result.current.folderError).toEqual({
+      key: "sync.errors.UpdateRequired",
+      vars: { dataFormatVersion: 9 },
+    });
+    expect(result.current.canProceedToStep2).toBe(false);
+  });
+
   // TODO-010 — the remedy is shown only for a folder that holds a portfolio this installation
   // cannot join: not for an empty folder, and not for a fresh installation.
   it.each([

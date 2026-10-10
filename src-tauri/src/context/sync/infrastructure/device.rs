@@ -212,6 +212,28 @@ impl SyncStateRepository for SqliteSyncStateRepository {
             .map_err(|error| SyncError::database("discard_device_state: commit failed", error))
     }
 
+    async fn discard_received_history(&self) -> Result<(), SyncError> {
+        let mut transaction = self.pool.begin().await.map_err(|error| {
+            SyncError::database("discard_received_history: begin failed", error)
+        })?;
+        for statement in [
+            "DELETE FROM sync_cursors",
+            "DELETE FROM held_back_changes",
+            "DELETE FROM conflict_notices",
+        ] {
+            sqlx::query(statement)
+                .execute(&mut *transaction)
+                .await
+                .map_err(|error| {
+                    SyncError::database("discard_received_history: delete failed", error)
+                })?;
+        }
+        transaction
+            .commit()
+            .await
+            .map_err(|error| SyncError::database("discard_received_history: commit failed", error))
+    }
+
     async fn get_cursor(&self, device_id: &str) -> Result<Option<SyncCursor>, SyncError> {
         let row = sqlx::query_as!(
             CursorRow,
@@ -503,6 +525,31 @@ mod tests {
                 .unwrap();
         assert_eq!(key, vec![0xAB]);
         assert_eq!(clock, 7);
+    }
+
+    // SYN-071 — forgetting the received history empties the cursors, the held-back changes
+    // and the notices, and keeps the device.
+    #[tokio::test]
+    async fn discard_received_history_keeps_the_device_and_empties_the_rest() {
+        let pool = make_pool().await;
+        let repo = SqliteSyncStateRepository::new(pool.clone());
+        repo.save_device(&sample_device()).await.unwrap();
+        repo.upsert_cursor(&SyncCursor {
+            device_id: "laptop-device".into(),
+            applied_through: 1,
+            last_applied_at: None,
+        })
+        .await
+        .unwrap();
+        repo.insert_held_back(&sample_held_back()).await.unwrap();
+        repo.insert_notice(&sample_notice()).await.unwrap();
+
+        repo.discard_received_history().await.unwrap();
+
+        assert!(repo.get_device().await.unwrap().is_some());
+        assert!(repo.get_cursor("laptop-device").await.unwrap().is_none());
+        assert!(repo.list_held_back().await.unwrap().is_empty());
+        assert!(repo.list_undismissed_notices().await.unwrap().is_empty());
     }
 
     // SYN-082 — discarding the device state empties every sync-owned table.

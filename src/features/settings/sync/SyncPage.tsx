@@ -388,24 +388,29 @@ export function SyncPage() {
 
         <p className="text-xs text-m3-on-surface-variant">{t("sync.local_copy_note")}</p>
 
-        <EnableSyncModal
-          isOpen={state.isEnableModalOpen}
-          onClose={state.closeEnableModal}
-          onSuccess={() => {
-            state.closeEnableModal();
-            void state.refresh();
-          }}
-          variant="enable"
-        />
-        <EnableSyncModal
-          isOpen={state.isStartOverModalOpen}
-          onClose={state.closeStartOverModal}
-          onSuccess={() => {
-            state.closeStartOverModal();
-            void state.refresh();
-          }}
-          variant="start-over"
-        />
+        {/* Mounted only while open: nothing typed, and no choice made in it, outlives a closing. */}
+        {state.isEnableModalOpen && (
+          <EnableSyncModal
+            isOpen
+            onClose={state.closeEnableModal}
+            onSuccess={() => {
+              state.closeEnableModal();
+              void state.refresh();
+            }}
+            variant="enable"
+          />
+        )}
+        {state.isStartOverModalOpen && (
+          <EnableSyncModal
+            isOpen
+            onClose={state.closeStartOverModal}
+            onSuccess={() => {
+              state.closeStartOverModal();
+              void state.refresh();
+            }}
+            variant="start-over"
+          />
+        )}
 
         <ConfirmationDialog
           isOpen={state.confirmingLeave}

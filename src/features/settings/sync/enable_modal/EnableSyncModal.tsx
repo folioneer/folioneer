@@ -9,7 +9,7 @@ interface EnableSyncModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  /** `start-over` re-creates the portfolio in the folder under a new passphrase (SYN-071). */
+  /** `start-over` re-creates the portfolio in the folder under a new passphrase (SYN-071); the join refusal of `enable` offers it too (SYN-053). */
   variant: "enable" | "start-over";
 }
 
@@ -38,7 +38,7 @@ function passphraseWordingKey(
 export function EnableSyncModal({ isOpen, onClose, onSuccess, variant }: EnableSyncModalProps) {
   const { t } = useTranslation();
   const state = useEnableSyncModal({ variant, onSuccess });
-  const isStartOver = variant === "start-over";
+  const isStartOver = state.isStartOver;
 
   const submitLabel = isStartOver
     ? t("sync.enable_modal.submit_start_over")
@@ -131,21 +131,36 @@ export function EnableSyncModal({ isOpen, onClose, onSuccess, variant }: EnableS
                 </Button>
               </div>
               {state.joinRefused && (
-                <div
-                  id="sync-enable-join-refused"
-                  role="alert"
-                  className="flex flex-col gap-2 rounded-2xl border border-m3-error p-3 text-sm"
-                >
-                  <span className="text-m3-error">{t("sync.join_refused.title")}</span>
-                  <span className="text-m3-on-surface">{t("sync.join_refused.why")}</span>
-                  <ol className="list-decimal pl-5 text-m3-on-surface">
-                    <li>{t("sync.join_refused.step_keep")}</li>
-                    <li>{t("sync.join_refused.step_rename")}</li>
-                    <li>{t("sync.join_refused.step_join")}</li>
-                  </ol>
-                  <code className="whitespace-pre-line break-all text-xs text-m3-on-surface-variant">
-                    {t("sync.join_refused.where")}
-                  </code>
+                <div className="flex flex-col gap-2 rounded-2xl border border-m3-error p-3 text-sm">
+                  <div id="sync-enable-join-refused" role="alert" className="flex flex-col gap-2">
+                    <span className="text-m3-error">{t("sync.join_refused.title")}</span>
+                    <span className="text-m3-on-surface">{t("sync.join_refused.why")}</span>
+                    <ol className="list-decimal pl-5 text-m3-on-surface">
+                      <li>{t("sync.join_refused.step_keep")}</li>
+                      <li>{t("sync.join_refused.step_rename")}</li>
+                      <li>{t("sync.join_refused.step_join")}</li>
+                    </ol>
+                    <code className="whitespace-pre-line break-all text-xs text-m3-on-surface-variant">
+                      {t("sync.join_refused.where")}
+                    </code>
+                  </div>
+                  {/* SYN-053 — a computer that holds the portfolio may start over instead */}
+                  <div className="mt-1 flex flex-col items-start gap-2 border-t border-m3-outline-variant pt-3">
+                    <span id="sync-enable-start-over-offer" className="text-m3-on-surface">
+                      {t("sync.join_refused.start_over")}
+                    </span>
+                    <Button
+                      id="sync-enable-start-over"
+                      data-testid="sync-enable-start-over"
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-describedby="sync-enable-start-over-offer"
+                      onClick={state.startOverInstead}
+                    >
+                      {t("sync.start_over")}
+                    </Button>
+                  </div>
                 </div>
               )}
               <p className="text-xs text-m3-on-surface-variant">
