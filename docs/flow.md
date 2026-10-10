@@ -15,35 +15,38 @@ The rules for an entry, set by the owner on 2026-10-03:
    questions come in one block for the batch, with what to look at and what a yes means.
 
 Each entry carries a permanent `FLOW-NNN` reference (never renumbered, never reused; next
-free: FLOW-023) so the owner can queue it in `docs/todo.md` § Next like any other. An
+free: FLOW-026) so the owner can queue it in `docs/todo.md` § Next like any other. An
 entry is removed once it is settled.
 
 ---
 
-## Measured — the 0.6.0 batch (2026-10-03 → 2026-10-05)
+## Measured — the 0.7.0 batch (2026-10-05 → 2026-10-10)
 
-Counted by `scripts/flow-audit.py v0.5.0 v0.6.0 --previous v0.4.0`; "was" is the 0.5.0
-batch counted the same way, which is why its figures differ from those gathered by hand
-a release ago.
+Counted by `scripts/flow-audit.py v0.6.0 v0.7.0 --previous v0.5.0`; "was" is the 0.6.0
+batch counted the same way. The work itself ran on 2026-10-09 and 2026-10-10.
 
-| What                                                    | Figure                                                                                                                                                                                                                                              |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pull requests merged (one closed and redone, each time) | 36 (#95–#131), 9 100 lines added — was 27, 7 476                                                                                                                                                                                                    |
-| By type                                                 | test 10, refactor 8, docs 8, chore 4, fix 4, feat 1, ci 1 — was docs 9, feat 5, refactor 5, ci 3, chore 2, fix 2, test 1                                                                                                                            |
-| Time from opening a pull request to merging             | median 10.9 min, mean 15.4 — was 17.5 and 22.8                                                                                                                                                                                                      |
-| CI rounds                                               | 61 for 37 branches, 24 beyond the first — was 46 for 28, 18 beyond                                                                                                                                                                                  |
-| What caused the 24 extra rounds                         | not counted                                                                                                                                                                                                                                         |
-| Workflow failures on pull requests                      | 8: Review 7, E2E 1 — was 9: Review 6, Quality 2, E2E 1                                                                                                                                                                                              |
-| E2E run / Quality run / Review run (median, green)      | 4.6 / 2.9 / 2.1 min — was 9.6 / 3.5 / 2.0                                                                                                                                                                                                           |
-| Real defects found by reviewers before merge            | at least 5 (a conversion done in the command layer, a reset device read as paused without the spec saying so, a cursor that jumped in a number field, a hint showing a figure that was no number, a list cut short without notice) — was at least 9 |
-| Real defects found by writing the missing tests         | 2 (a corrected deposit was refused before its own balance counted; a failed price write stalled the fetch progress)                                                                                                                                 |
-| Real defects found by challenging or closing an entry   | 1 (DEBT-078: the spec says a corrected purchase unarchives its asset, the code does not) — was 2                                                                                                                                                    |
-| Mutation sweep on `main`                                | 63 changes no test notices out of 1 634 — was 218                                                                                                                                                                                                   |
+| What                                                    | Figure                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pull requests merged (one closed and redone, each time) | 23 (#132–#155), 12 961 lines added — was 36, 9 100                                                                                                                                                                                                                                                                             |
+| By type                                                 | docs 9, feat 5, fix 4, chore 3, ci 2 — was test 10, refactor 8, docs 8, chore 4, fix 4, feat 1, ci 1                                                                                                                                                                                                                           |
+| Time from opening a pull request to merging             | median 7.1 min, mean 30.4 — was 10.9 and 15.4                                                                                                                                                                                                                                                                                  |
+| CI rounds                                               | 48 for 24 branches, 24 beyond the first — was 61 for 37, 24 beyond                                                                                                                                                                                                                                                             |
+| What caused the 24 extra rounds                         | not counted — was not counted                                                                                                                                                                                                                                                                                                  |
+| Workflow failures on pull requests                      | 14: Review 13, Quality 1 — was 8: Review 7, E2E 1                                                                                                                                                                                                                                                                              |
+| E2E run / Quality run / Review run (median, green)      | 4.8 / 3.6 / 1.1 min — was 4.6 / 2.9 / 2.1                                                                                                                                                                                                                                                                                      |
+| Questions put to the owner                              | 17: 7 in the opening block, 10 during the batch, 7 of those 10 answerable at the start — was not counted                                                                                                                                                                                                                       |
+| Real defects found by reviewers before merge            | at least 4 (an agent's recording could stop between its two writes; the consent dialog did not say one answer covers the session; a purchase opened on a holding showed the asset's identifier until the list arrived; a closing application removed another's channel, found by the test a review asked for) — was at least 5 |
+| Real defects found by the spec checks before a release  | 4 (the core did not refuse a sale of an archived asset; the full-page purchase form offered cash; an agent's date sent as a number was read as today; "Start over" on the sync page cannot be completed, TODO-066) — was 0, the checker was never launched                                                                     |
+| Real defects found by challenging or closing an entry   | 1 (DEBT-078 was rewritten: the forms promised an unarchiving nothing does) — was 1                                                                                                                                                                                                                                             |
+| Commands of the core named in no contract               | 3 of 93, by a count of `src/bindings.ts` against `docs/contracts/` — was not counted. Errors and types are not counted by it: an exhaustive reading of one contract of seven found 22 gaps (DEBT-088)                                                                                                                          |
+| Mutation sweep on `main`                                | not run in this batch — was 63 changes no test notices out of 1 634                                                                                                                                                                                                                                                            |
 
-Reading: a pull request merges in two thirds of the time, because the E2E run halved and
-because most of this batch was tests and refactors. Four rounds in ten still come after
-the first, the same share as before, and nobody counted why. The tests written for the
-sweep found two bugs no reviewer had.
+Reading: half the rounds now come after the first, where it was four in ten, and the
+reviewers' workflow failed 13 times where it failed 7, most of them on one pull request
+(#150) whose reviewers ran out of turns or reported an older gap of a whole file, a
+different one each run. The spec checks, launched for the first time, found four defects
+no reviewer had. Ten questions reached the owner during the batch, seven of which the
+entries already held the matter for.
 
 ---
 
@@ -54,9 +57,13 @@ sweep found two bugs no reviewer had.
   not changed, because another had merged first. In 0.6.0, 24 rounds of 61 came after the
   first (39 %; was 18 of 46, 39 %), and what caused them was not counted. `just merge`
   already waives the round when the rebase changes only record files.
-- Verdict: **keep, and count the causes in 0.7.0 (FLOW-020).** A round costs about 5 min
-  where it cost 25, and the median pull request merges in 11 min. A merge queue would
-  cost a rewrite of `just merge` for a saving that is now small.
+  In 0.7.0, 24 rounds of 48 (50 %), the causes not counted again: FLOW-020 was not queued.
+  Two of them are known, #153 and #155 on the release day, each sent round by the other's
+  merge.
+- Verdict: **keep, and count the causes (FLOW-020).** A round costs about 5 min where it
+  cost 25, and the median pull request merges in 7 min. A merge queue would cost a
+  rewrite of `just merge` for a saving that is small. The share rose on the reviewers'
+  failures (FLOW-025), not on the merges.
 
 ## FLOW-006 — An entry whose Done-when is an audit cannot close
 
@@ -69,6 +76,8 @@ sweep found two bugs no reviewer had.
   found, and (b) reads the entry against the spec rules of its domain before coding.
 - Costs: minutes per entry. Protects: a pull request written to a promise the rules
   refuse.
+- 0.7.0: TODO-059 held seven pieces of work and was split into seven entries when the
+  owner read it, after the batch; the challenge step had not split it.
 
 ## FLOW-008 — The same reviewers run locally and in CI
 
@@ -81,7 +90,8 @@ sweep found two bugs no reviewer had.
 - Verdict: **keep both.** The local run is what makes the first CI round green; CI is
   the one that cannot be skipped. The rule — the architecture lane goes with the backend
   or frontend lane every time — was not followed twice; the `/next-todo` skill now names
-  the lane in its reviewer step.
+  the lane in its reviewer step. In 0.7.0 it was launched 9 times for 13 backend and
+  frontend launches and CI's architecture lane refused nothing the local one had passed.
 
 ## FLOW-010 — The local machine cannot carry a mutation sweep
 
@@ -94,6 +104,9 @@ sweep found two bugs no reviewer had.
 - Costs: nothing. Protects: an hour, and a neighbour's build.
 - 0.6.0: the sweep ran in CI (about four hours, no local load). The two lines are still
   to write in `docs/workflow.md`.
+- 0.7.0: no sweep. The same machine carries the backend coverage run only in the
+  foreground (405 s, two build jobs); the owner asked on 2026-10-10 whether another
+  computer could do the work.
 
 ## FLOW-011 — Parts of the harness run only on the day they matter
 
@@ -106,6 +119,9 @@ sweep found two bugs no reviewer had.
   Windows build without publishing.
 - Costs: about 20 runner-minutes a week. Protects: a release day spent on a workflow
   bug.
+- 0.7.0: the Windows-only code of the agent connection was compiled for the first time
+  by the release build, by the owner's choice; it passed. DEBT-086 asks for a Windows
+  compile check on pull requests, which would cover this proposal's case.
 
 ## FLOW-020 — Nobody counts why a pull request goes round again
 
@@ -118,24 +134,80 @@ sweep found two bugs no reviewer had.
   the round before had a failed check.
 - Costs: about two hours, with tests; one `gh` call per later round at audit time.
   Protects: the decision on a merge queue being taken on a figure.
+- 0.7.0: not queued, and the causes were not counted a second time.
 
-## Used and not used — the 0.6.0 batch
+## FLOW-023 — Questions reach the owner during the batch that the entries already held
 
-Counted from the session's transcript, 2026-10-03 → 2026-10-05: what the agent invoked
-itself; "was" is the 0.5.0 batch. Hooks and CI ran their own share on every commit and
-push; that is not counted.
+- Kind: speed
+- Observed: 17 questions in 0.7.0: 7 in the opening block, 10 during the batch. Of the
+  10, 7 could be asked before any code: three on vocabulary (five words for TODO-056 and
+  TODO-051, all named or implied by the entries and their mock-ups), the Windows scope
+  and the technical decision of TODO-051 (ADR-023), the split of TODO-051, the proof
+  DEBT-082 would give. Each one stopped the batch until the owner answered. The 3 others
+  came from what CI found (#150) and could not be known. The owner on 2026-10-10: "it
+  will be better to ask it at start".
+- Proposal: the opening block reads every queued entry for four things and asks them
+  together, before the first branch: the words the entry brings to the screen, the code
+  or the spec that the vocabulary does not hold; a technical choice that will need an
+  ADR; a platform or a part of the Done-when that may be left out; an entry large enough
+  to be split. The challenge of a queued `DEBT-NNN` runs then too, so that its question
+  is in the block. A question asked later says what made it unknowable at the start.
+- Costs: a longer opening block — the agent reads the code each entry touches before
+  starting any of them. Protects: a batch that runs unattended once the block is
+  answered.
 
-| What                  | Used (times)                                                                                                                                                                                                                                  | Not used                                                               |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Skills, invoked       | `/next-todo` 4, `/whats-next` 1, `/design-proposal` 1, `/flow-audit` 1; `/dep-audit` and `/visual-proof` followed without being invoked — was none                                                                                            | `/adr-writer`, `/prune`                                                |
-| Agents, local         | reviewer-backend 16, reviewer-frontend 8, reviewer-infra 4, reviewer-arch 4, spec-reviewer 3, reviewer-security 2, contract-reviewer 2, reviewer-e2e 1 — was 9, 6, 4, 4, 3, 3, 1, 2                                                           | spec-checker, adr-reviewer, reviewer-sql                               |
-| Recipes               | `format` 97, `check` 96, `test-rust` 70, `harness` 64, `merge` 55, `test` 55, `test-scripts` 27, `generate-types` 10, `check-full` 6, `arch-check` 6, `test-unit` 4, `stat` 1, `licence-check` 1 — was `merge` 47 and little else             | `coverage-gate`, `dev`, `dev-seed`, `install`, `worktree`, `next-todo` |
-| Native commands       | `npx prettier` 76, `cargo test` 37, `ruff` 17, `cargo check` 4, `npx biome` 3, `cargo fmt` 3, `cargo clippy` 1 — was `cargo test` 71, `cargo fmt` 53, `npx vitest run` 45, `npx prettier` 44, `npx biome` 42, `npx tsc` 40, `cargo clippy` 35 | —                                                                      |
-| Scripts, run directly | `whats-next.py` 9, `visual-proof-capture.mjs` 3, `flow-audit.py` 3                                                                                                                                                                            | every other script is called by a recipe, a hook, CI or a skill        |
+## FLOW-024 — Nothing compares a contract with the code it describes
 
-Reading: the recipes replaced the native commands, as the 0.5.0 audit asked. What is left
-is `npx prettier` on documents, which `just format` also does, and `cargo test` for the
-loop that sorts one mutant. `spec-checker` is prescribed and was never launched.
+- Kind: quality
+- Observed: a contract is checked by a reviewer that reads the whole file and reports a
+  sample: on #150 it reported a different older gap of `account-contract.md` on each of
+  three runs, and an exhaustive reading then found 22 (DEBT-088). The six other
+  contracts have not been read that way. A count of names finds 3 commands of 93 in no
+  contract (`upsert_holding_note`, `delete_holding_note`, `log_frontend`) and no row
+  naming a command that does not exist: the drift is in the errors and the types of the
+  rows, which nothing counts. The owner on 2026-10-10: "contract seems to have diverged
+  a lot from the real code".
+- Proposal: (a) a script in the gate reads `src/bindings.ts`, which the core generates,
+  and each contract's rows, and refuses a command without a row, a row without a
+  command, and an error code or an input type that one side has and the other lacks;
+  (b) each of the seven contracts is read exhaustively once, DEBT-088 being the first,
+  with the script's first report as its list.
+- Costs: about half a day for the script and its tests, and a fixed format for a
+  contract row; one pull request per contract. Protects: a document the agent and the
+  reviewers read as the truth about a command.
+
+## FLOW-025 — A reviewer that reads a whole file fails a pull request on what it did not change
+
+- Kind: speed
+- Observed: the Review workflow failed 13 times in 0.7.0, was 7. On #150, a rename
+  across the documents, the contract lane went red three times, by more than one cause: no report at the turn limit (DEBT-087), then older gaps of the file. The agent pushed a fourth time past the rule of three reds; the owner confirmed the rule on 2026-10-10: three
+  reds on one lane, stop and ask, whatever the causes.
+- Proposal: in CI the contract and spec reviewers judge the lines the pull request
+  changes and report older gaps as suggestions, never as a refusal; the exhaustive
+  reading belongs to the release checks, where `spec-checker` already runs on every
+  spec the batch touched, and to FLOW-024's script for the contracts. `docs/workflow.md` says "the same gate failing three times": it adds "whatever the three causes".
+- Costs: an older gap in a file a pull request touches waits for the release checks.
+  Protects: about 25 minutes a round, and a mechanical pull request from repairing a
+  document it only renamed in.
+
+## Used and not used — the 0.7.0 batch
+
+Counted from the session's transcript, 2026-10-09 → 2026-10-10: what the agent invoked
+itself, a command counted once for each thing it names; "was" is the 0.6.0 batch. Hooks
+and CI ran their own share on every commit and push; that is not counted.
+
+| What                  | Used (times)                                                                                                                                                                                                                                                                                                                                                          | Not used                                                                    |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Skills, invoked       | `/next-todo` 1, `/design-proposal` 1, `/flow-audit` 1; `/next-todo` for the nine other entries, `/dep-audit`, `/visual-proof` and `/whats-next` followed without being invoked — was `/next-todo` 4, `/whats-next` 1, `/design-proposal` 1, `/flow-audit` 1                                                                                                           | `/adr-writer`, `/prune`                                                     |
+| Agents, local         | spec-reviewer 10, spec-checker 10, reviewer-arch 9, reviewer-backend 7, reviewer-frontend 6, contract-reviewer 5, reviewer-security 3, reviewer-sql 2, reviewer-e2e 2, reviewer-infra 2, adr-reviewer 1 — was 3, 0, 4, 16, 8, 2, 2, 0, 1, 4, 0                                                                                                                        | —                                                                           |
+| Recipes               | `format` 127, `harness` 49, `test-rust` 38, `merge` 29, `check` 24, `coverage-gate` 23, `test` 20, `test-scripts` 18, `generate-types` 13, `coverage-be` 12, `coverage-fe` 11, `prepare-sqlx` 9, `arch-check` 4, `test-unit` 1, `licence-check` 1 — was `format` 97, `check` 96, `test-rust` 70, `harness` 64, `merge` 55, `test` 55                                  | `check-full`, `dev`, `dev-seed`, `install`, `stat`, `worktree`, `next-todo` |
+| Native commands       | `npx tsc` 32, `npx vite` 14 (the preview server of the visual proof), `cargo test` 7, `npx vitest` 2, `npx prettier` 1, `cargo check` 1; for the dependency audit, as its skill writes them: `npm audit` 12, `cargo audit` 4, `cargo outdated` 1 — was `npx prettier` 76, `cargo test` 37, `ruff` 17, `cargo check` 4, `npx biome` 3, `cargo fmt` 3, `cargo clippy` 1 | —                                                                           |
+| Scripts, run directly | `whats-next.py` 31, `visual-proof-capture.mjs` 17, `reference-forms.py` 17, `batch-specs.sh` 10, `flow-audit.py` 1 — was `whats-next.py` 9, `visual-proof-capture.mjs` 3, `flow-audit.py` 3                                                                                                                                                                           | every other script is called by a recipe, a hook, CI or a skill             |
+
+Reading: every prescribed agent was launched, the spec checker ten times where it had
+never been. `npx prettier` and `cargo test` left for the recipes; `npx tsc` came back, 32
+times, where `just check --frontend` exists. The architecture lane went with the backend
+or frontend lane every time.
 
 ## Moved here from the todo and the tech debt
 
