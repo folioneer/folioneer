@@ -112,8 +112,8 @@ harness`) prints that
 11. **Next** entry, or stop (§ 8).
 
 **A batch in chat** — when the human says go to several queued entries, the agent runs
-`/next-todo` for each rather than re-deriving its steps, and the human is asked twice,
-not once per entry:
+`/run-queue`: one task per queued entry, so the queue is seen advancing, then `/next-todo`
+for each rather than re-deriving its steps. The human is asked twice, not once per entry:
 
 - **Opening block**, before the first entry starts: the open questions of every queued
   entry, and the mock-ups (§ 4) of every queued entry that changes what the user sees,

@@ -190,27 +190,6 @@ had been told `main` was ready (FLOW-031).
 - Costs: two sentences and one entry per release at most. Protects: a simplification that
   was found, proven covered, and then forgotten.
 
-## FLOW-033 — No skill runs the queue: a batch is followed from the document
-
-- Kind: speed + quality
-- Observed: `/next-todo` runs one entry and stops. A batch in chat is a rule of
-  `docs/workflow.md` § 3, followed from the document: in 0.7.1 the agent ran ten entries
-  that way without invoking `/next-todo` once (FLOW-030), and tracked them in two tasks,
-  so the owner could not see the queue advance. The owner asked on 2026-10-10 for "a small
-  skill that at least creates a task list to display with all the queue entries and then
-  launches them one by one with the next-todo".
-- Proposal: a skill, `/run-queue`. It reads § Next with `scripts/whats-next.py`; creates
-  one task per queued entry, in order, a blocked one marked with what it waits on; runs
-  the opening block of § 3 (the questions the entries still hold, the mock-ups); then
-  invokes `/next-todo <ref>` for each ready entry in turn, the next one prepared behind
-  the one in review (§ 11), marking each task as it starts and as it merges; when the
-  queue is empty it says so and names the hand-over steps of § 3 (spec checks, dependency
-  audit, prune) without starting a release. It stops, and says where, when an entry
-  stops by `/next-todo`'s own rules.
-- Costs: one skill file of about forty lines and a line in `CLAUDE.md`; nothing new is
-  decided in it, it chains what exists. Protects: a batch whose steps are loaded, not
-  remembered, and a queue the owner can watch.
-
 ## Used and not used — the 0.7.1 batch
 
 Counted from the session's transcript for #160 to #172: what the agent invoked itself;

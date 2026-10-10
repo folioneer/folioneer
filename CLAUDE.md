@@ -48,11 +48,11 @@ What the human is told rests on what was read. A statement that the code does or
 
 ## Where things are
 
-- **Workflow**: `/next-todo` runs one entry end to end (`docs/workflow.md` § 3); `just next-todo` does it headless.
+- **Workflow**: `/next-todo` runs one entry end to end (`docs/workflow.md` § 3); `just next-todo` does it headless; `/run-queue` runs the whole queue in chat, one task per entry.
 - **Before implementing**, read the rules for the layers touched (`.claude/rules/` brings the pointer in when a matching file is read; a new file triggers nothing, so this list is the fallback) — backend (`backend-rules`, `error-model`, `backend-patterns`), frontend (`frontend-rules`, `i18n-rules`, `visual-proof-rules`), E2E (`e2e-rules`), any test (`test-rules`), commits (`commit-rules`). When a rule changes, its doc changes in the same PR.
 - **After completing**, update the source docs in the same PR: the spec rules (+ `spec-reviewer`), the contract (`/contract` + `contract-reviewer`), an ADR only for a technical choice (`/adr-writer` + `adr-reviewer`), `docs/lessons.md` for an empirical failure worth teaching, `ARCHITECTURE.md` when a top-level folder appears.
 - **Vocabulary**: `docs/ubiquitous-language.md` — use confirmed terms in identifiers, comments and logs; never extend a discrepant one; changes need the owner. Give it to every reviewer you launch.
-- **Skills**: `/next-todo`, `/design-proposal NNN`, `/visual-proof`, `/adr-writer`, `/contract`, `/dep-audit`, `/prune`, `/whats-next`, `/flow-audit` (after a release).
+- **Skills**: `/next-todo`, `/run-queue`, `/design-proposal NNN`, `/visual-proof`, `/adr-writer`, `/contract`, `/dep-audit`, `/prune`, `/whats-next`, `/flow-audit` (after a release).
 - **Agents**: the reviewers matched to the diff (locally until no 🔴, and in CI on every push); `reviewer-security` before every release; `spec-checker` before closing an entry with spec rules, and before a release on every spec the batch touched (`bash scripts/batch-specs.sh`); `spec-reviewer` / `contract-reviewer` / `adr-reviewer` when those documents change.
 - **References**: `TODO-NNN` (todo), `DEBT-NNN` (tech debt), `FLOW-NNN` (flow), `ghNN` (GitHub issue); a pull request stays `#NN` (`docs/workflow.md` § 2).
 - **Task tracking**: `TaskCreate` / `TaskUpdate` for any task of more than one file or step.
