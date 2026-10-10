@@ -148,10 +148,11 @@ at the start (what CI found, what an answer of the block opened).
 known vulnerability in what ships blocks the release; the agent fixes it or files it),
 then `spec-checker` once on every spec the batch touched — `bash scripts/batch-specs.sh`
 lists them — and files what it finds as tech debt: a promise the code does not keep is
-not fixed in the release it was found in. It hands over a clean `main`. The release itself is the human's only part: they run
+not fixed in the release it was found in. It hands over a clean `main`, and says so only once the workflow runs of its head commit have ended green, naming them. The release itself is the human's only part: they run
 `just release -y` when they choose. After
 it, `/prune` runs once and `/flow-audit` measures the batch against the release before
-(`docs/flow.md`). The release re-runs the full
+(`docs/flow.md`). The release refuses to start while a workflow run of the head
+commit is unfinished or failed, naming the run; then it re-runs the full
 harness on `main`, computes the version from the merged titles, writes the changelog,
 tags and pushes; CI builds and leaves the draft; the human publishes it. The
 changelog and the git history are the record of what shipped.

@@ -92,6 +92,32 @@ def set_lockfile_version(lockfile: Path, version: str) -> None:
     lockfile.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+RUN_PASSED = {"success", "skipped", "neutral"}
+
+
+def runs_in_the_way(runs: list[dict]) -> list[str]:
+    """FLOW-031 — what stops a tag on a commit, from the workflow runs GitHub lists for
+    it: no run at all, a run that has not ended, or one that did not pass. The newest run
+    of each workflow counts. One line per obstacle, naming the run; empty when every
+    workflow ended green."""
+    newest: dict[str, dict] = {}
+    for run in runs:
+        name = run.get("name") or ""
+        if name not in newest or run.get("id", 0) > newest[name].get("id", 0):
+            newest[name] = run
+    if not newest:
+        return ["no workflow run is listed for this commit yet"]
+    obstacles = []
+    for name in sorted(newest):
+        run = newest[name]
+        where = run.get("html_url") or f"run {run.get('id')}"
+        if run.get("status") != "completed":
+            obstacles.append(f"{name}: not finished ({run.get('status')}) — {where}")
+        elif run.get("conclusion") not in RUN_PASSED:
+            obstacles.append(f"{name}: {run.get('conclusion')} — {where}")
+    return obstacles
+
+
 class ReleaseManager:
     def __init__(
         self,
@@ -491,6 +517,35 @@ class ReleaseManager:
                 print(f"{RED}{detail}{NC}", file=sys.stderr)
             return False
 
+    def head_runs_are_green(self) -> bool:
+        """FLOW-031 — refuse to release a commit whose workflow runs have not all ended
+        green: the checks of the last merge are part of what is released."""
+        if self.mode is Mode.DRY_RUN:
+            print(f"{BLUE}[DRY-RUN] Skipping the workflow runs of the head commit{NC}")
+            return True
+        try:
+            sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.repo_root, capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            listed = subprocess.run(
+                ["gh", "api", f"repos/{{owner}}/{{repo}}/actions/runs?head_sha={sha}&per_page=100"],
+                cwd=self.repo_root, capture_output=True, text=True, check=True,
+            ).stdout
+            runs = json.loads(listed).get("workflow_runs", [])
+        except (subprocess.CalledProcessError, OSError, json.JSONDecodeError) as error:
+            print(f"{RED}❌ The workflow runs of the head commit cannot be read: {error}{NC}")
+            return False
+        obstacles = runs_in_the_way(runs)
+        if obstacles:
+            print(f"{RED}❌ The workflow runs of {sha[:7]} have not all ended green:{NC}")
+            for line in obstacles:
+                print(f"{RED}   {line}{NC}")
+            print(f"{BLUE}   Wait for them (`just watch-pr` knows how), or fix what failed, then release.{NC}")
+            return False
+        print(f"{GREEN}✅ Every workflow run of {sha[:7]} ended green.{NC}")
+        return True
+
     def run_tests(self) -> bool:
         """Run the full test suite via the QualityChecker from check.py.
         Uses strict_mode=True so any stack-marker skip (e.g. accidentally
@@ -542,6 +597,8 @@ class ReleaseManager:
         """Run tests, fetch + analyze commits, compute or force ``new_version``,
         show analysis, and confirm with the user. Returns the resolution that
         ``run()`` should act on (see :class:`_Resolution`)."""
+        if self.mode is not Mode.PREVIEW and not self.head_runs_are_green():
+            return _Resolution.EARLY_FAIL
         if self.mode is not Mode.PREVIEW and not self.run_tests():
             return _Resolution.EARLY_FAIL
 

@@ -160,20 +160,6 @@ had been told `main` was ready (FLOW-031).
 - Costs: one sentence in `docs/workflow.md` § 3, one line in the audit. Protects: a batch
   that follows a step it rewrote an hour before.
 
-## FLOW-031 — "`main` is ready" is said before the checks of `main` have ended
-
-- Kind: quality
-- Observed: in 0.7.1 the agent told the owner that `main` was ready for the release as
-  soon as pull request 171 merged. The E2E run of that push then failed (DEBT-019, an
-  intermittent failure of the assets spec), and the owner had already started the
-  release. `just release` validates locally and does not look at the runs of the head
-  commit; the tag landed on the next commit, whose own runs were green.
-- Proposal: `scripts/release.py` refuses to tag while a workflow run of the head commit
-  is unfinished or failed, naming the run; the agent's hand-over line names the runs it
-  saw end green. `just watch-pr` already knows how to wait for runs.
-- Costs: about an hour with tests; a release waits for the runs of the last merge, at
-  most a quarter of an hour. Protects: a tag on a commit whose checks nobody saw end.
-
 ## FLOW-032 — What `/prune` finds is written where git does not look
 
 - Kind: quality
