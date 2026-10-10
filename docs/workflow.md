@@ -153,8 +153,10 @@ then `spec-checker` once on every spec the batch touched — `bash scripts/batch
 lists them — and files what it finds as tech debt: a promise the code does not keep is
 not fixed in the release it was found in. It hands over a clean `main`, and says so only once the workflow runs of its head commit have ended green, naming them. The release itself is the human's only part: they run
 `just release -y` when they choose. After
-it, `/prune` runs once and `/flow-audit` measures the batch against the release before
-(`docs/flow.md`). The release refuses to start while a workflow run of the head
+it, `/prune` runs once on the production files the release changed — a full scan is
+asked for by name — and what it recommends is filed as one tech-debt entry, like what the
+spec checks find; an audit with no finding files nothing. Then `/flow-audit` measures the
+batch against the release before (`docs/flow.md`). The release refuses to start while a workflow run of the head
 commit is unfinished or failed, naming the run; then it re-runs the full
 harness on `main`, computes the version from the merged titles, writes the changelog,
 tags and pushes; CI builds and leaves the draft; the human publishes it. The

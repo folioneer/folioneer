@@ -145,22 +145,6 @@ had been told `main` was ready (FLOW-031).
 - 0.7.1: one later round in eighteen. While the entries are stacked there is little to
   sort; the figure argues for waiting until the share rises again.
 
-## FLOW-032 — What `/prune` finds is written where git does not look
-
-- Kind: quality
-- Observed: `/prune` runs once after a release (`docs/workflow.md` § 3) and saves its
-  report under `tmp/`, which git ignores: a finding nobody applies in the same session is
-  lost. It was not run after 0.6.0 or 0.7.0. After 0.7.1 it ran on the three production
-  files the release changed and found one mechanical simplification; the owner asked on
-  2026-10-10 whether such findings are kept anywhere, and they were not (DEBT-101 holds
-  this one, filed by hand).
-- Proposal: `docs/workflow.md` § 3 and the skill say it: what `/prune` recommends is filed
-  as one tech-debt entry in the hand-over, like what the spec checks find; an audit with no
-  finding files nothing. The skill's scope after a release is the production files the
-  release changed, which is what was run; a full scan is asked for by name.
-- Costs: two sentences and one entry per release at most. Protects: a simplification that
-  was found, proven covered, and then forgotten.
-
 ## Used and not used — the 0.7.1 batch
 
 Counted from the session's transcript for #160 to #172: what the agent invoked itself;

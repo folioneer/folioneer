@@ -21,7 +21,7 @@ Audit the project for code that can be removed or collapsed without changing arc
 /prune [path]
 ```
 
-`[path]` is optional. When provided, limits the scan to that directory (e.g. `/prune src/features/auth`). When omitted, scans all source files.
+`[path]` is optional. When provided, limits the scan to that directory (e.g. `/prune src/features/auth`). When omitted, scans all source files. After a release (`docs/workflow.md` § 3) the scope is the production files that release changed, given as paths; a full scan is asked for by name.
 
 ---
 
@@ -200,6 +200,8 @@ Mark each finding:
 ### Step 5 — Output, save, confirm
 
 Print findings to the conversation, save to `REPORT_PATH` with Write, then reply: `Report saved to {REPORT_PATH}.`
+
+The report's folder is not tracked by git. What the report recommends is therefore filed by the caller as one entry of `docs/techdebt.md` — the recommendations only, each with its place and its coverage — in the hand-over that follows a release; a report that recommends nothing files nothing.
 
 ---
 
