@@ -52,7 +52,7 @@ Run `bash scripts/branch.sh files` and filter to the in-scope paths listed in `#
 
 Deleted files are out of scope.
 
-Whether a path exists is read from the commit under review, never from the working tree: in CI the `.claude/` folder may hold the base branch's copy. Before reporting that a changed or deleted file is still referenced, confirm the referring file exists with `git cat-file -e HEAD:<path>`; a reference from a file this diff deletes is no finding.
+Whether a path exists, and what a file under `.claude/` or `CLAUDE.md` says, is read from the commit under review (`git show HEAD:<path>`), never from the working tree: in CI the `.claude/` folder and `CLAUDE.md` may hold the base branch's copy, so a mismatch between them and a changed file is checked against the commit before it is reported. Before reporting that a changed or deleted file is still referenced, confirm the referring file exists with `git cat-file -e HEAD:<path>`; a reference from a file this diff deletes is no finding.
 
 ### Step 2 — Load conventions
 
