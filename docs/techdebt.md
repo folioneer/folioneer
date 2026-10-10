@@ -7,7 +7,7 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `DEBT-NNN` reference (never renumbered, never reused; next free:
-DEBT-093) so the human can queue it in `docs/todo.md` § Next like any todo.
+DEBT-096) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -318,14 +318,41 @@ Remove an entry once it has been resolved.
 - User value: None in practice — no real split comes near the bound; an absurd factor typed by mistake is refused with a clear reason.
 - Done when: a factor whose rescale cannot be stored is refused when the split is recorded and when it is checked, with one error code, shown by a test on each path.
 
+## 2026-10-10 — DEBT-095 — WebdriverIO 10 is available; the E2E tools are on 9
+
+- Found by: the dependency audit before the 0.7.0 release
+- Where: `package.json` — `webdriverio`, `@wdio/cli`, `@wdio/globals`, `@wdio/local-runner`, `@wdio/mocha-framework`, `@wdio/spec-reporter` (9.31 installed, 10.0.2 published on 2026-10-08, three days after 10.0.0); `wdio.conf.ts`; `e2e/`
+- Severity: 🟡
+- Observation: the advisories left on the test tools (DEBT-092) sit on packages this chain brings, and `npm audit` clears them only with 10. The E2E suite does not run on this computer (`docs/lessons.md` L-011): CI is the only proof of the upgrade, about a quarter of an hour per attempt. 10 asks for Node 22.19 or later; the workflows ask for Node 22 without a minor, so the version they resolve is to check
+- User value: None directly — the tool that drives the application in the E2E suite carries no known advisory.
+- Done when: the six packages are at 10; the E2E suite is green in CI with no test skipped for the upgrade; `npm audit` no longer reports the advisories DEBT-092 names on this chain.
+
+## 2026-10-10 — DEBT-094 — Vitest 5 is available; the tests run on 4
+
+- Found by: the dependency audit before the 0.7.0 release
+- Where: `package.json` — `vitest`, `@vitest/coverage-v8` (4.1.11 installed, 5.0.3 published on 2026-09-30); `vitest.config.ts`
+- Severity: 🔵
+- Observation: the two packages move together. The coverage figure the gate reads (`coverage-gates.json`, frontend) comes from `@vitest/coverage-v8`: a major can count lines differently, so the figure is to compare before and after on the same commit. Vitest 5 accepts the Vite in use (8). Vite itself has no major waiting (8.0.16 → 8.3.4, a minor)
+- User value: None directly — the frontend tests and their coverage figure run on a supported version.
+- Done when: both packages are at 5; every frontend test passes; the frontend coverage figure before and after is written in the pull request, and a move of the figure is explained, the floor never lowered.
+
+## 2026-10-10 — DEBT-093 — TypeScript 7 is available; the frontend is checked with 6
+
+- Found by: the dependency audit before the 0.7.0 release
+- Where: `package.json` — `typescript` (6.0.3 installed, 7.0.2 published on 2026-07-08); `tsconfig.json`, `tsconfig.node.json`; the `build` script (`tsc && vite build`)
+- Severity: 🔵
+- Observation: `tsc` is the type check of `src/` in the gate and the first step of the build. The E2E specs are not in its scope. The tools that read TypeScript beside it (Vite's React plug-in, Vitest, oxlint, Biome, the generated `src/bindings.ts`) are each to check against 7 before the move
+- User value: None directly — the type check that guards the frontend runs on the current compiler.
+- Done when: `typescript` is at 7; `just check --frontend` and the build pass with no rule of `tsconfig.json` loosened and no error silenced; the generated bindings compile unchanged.
+
 ## 2026-10-10 — DEBT-092 — The test tools carry about twenty high advisories; six majors are available
 
 - Found by: the dependency audit before the 0.7.0 release
 - Where: `package-lock.json` — packages reached only through `devDependencies` (the WebdriverIO chain: `basic-ftp`, `extract-zip`, `braces`, `brace-expansion`, `ip-address`, `undici`, `serialize-javascript`, `diff`); `src-tauri/Cargo.toml`
 - Severity: 🟡
-- Observation: `npm audit --omit=dev` reports nothing: none of these packages ships. `npm audit` reports about twenty high advisories on the tools that run the E2E suite and the tests, on the developer's computer and on the CI runner. `npm audit fix` rewrites about 1,200 lines of the lock file and leaves twenty; the rest asks for WebdriverIO 10. Majors available, read from the registries on 2026-10-10: WebdriverIO 9 → 10, Vitest 4 → 5, TypeScript 6 → 7, `@testing-library/jest-dom` 6 → 7; `sqlx` 0.8 → 0.9, `argon2` 0.5 → 0.6 with `password-hash` 0.6, `sha2` 0.10 → 0.11, `dirs` 6 → 7, `iso_currency` 0.5 → 0.7, `strum` 0.27 → 0.28. `cargo audit` reports no vulnerability; nine warnings on crates brought by others (unmaintained `paste`, `proc-macro-error`, `unic-*`; unsound `glib` 0.18; yanked `spin` 0.9.8)
+- Observation: `npm audit --omit=dev` reports nothing: none of these packages ships. `npm audit` reports about twenty high advisories on the tools that run the E2E suite and the tests, on the developer's computer and on the CI runner. `npm audit fix` rewrites about 1,200 lines of the lock file and leaves twenty; the rest asks for WebdriverIO 10. Majors available, read from the registries on 2026-10-10: WebdriverIO 10 (DEBT-095), Vitest 5 (DEBT-094), TypeScript 7 (DEBT-093), each with its own entry; here, `@testing-library/jest-dom` 6 → 7; `sqlx` 0.8 → 0.9, `argon2` 0.5 → 0.6 with `password-hash` 0.6, `sha2` 0.10 → 0.11, `dirs` 6 → 7, `iso_currency` 0.5 → 0.7, `strum` 0.27 → 0.28. `cargo audit` reports no vulnerability; nine warnings on crates brought by others (unmaintained `paste`, `proc-macro-error`, `unic-*`; unsound `glib` 0.18; yanked `spin` 0.9.8)
 - User value: None directly — the tools that prove the application carry no known advisory.
-- Done when: `npm audit` reports no high or critical advisory, or each one left is named with the reason it cannot be reached; WebdriverIO is at 10 and the E2E suite is green in CI; each other major is taken or has a line saying what holds it.
+- Done when: `npm audit` reports no high or critical advisory, or each one left is named with the reason it cannot be reached; each major named here is taken or has a line saying what holds it.
 
 ## 2026-10-10 — DEBT-091 — Three commands granted to the CI reviewers can write or run a program
 
