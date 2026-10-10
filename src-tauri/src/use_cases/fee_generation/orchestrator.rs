@@ -95,16 +95,29 @@ impl FeeGenerationOrchestrator {
                 management_fees_enabled_by_account.insert(schedule.account_id.clone(), enabled);
             }
         }
+        // FEE-049 — a schedule that cannot be saved stops nothing: it is logged and
+        // generation goes on to the next schedule.
+        let mut first_failure = None;
         for schedule in schedules {
             let enabled = management_fees_enabled_by_account
                 .get(&schedule.account_id)
                 .copied()
                 .unwrap_or(false);
-            if enabled {
-                self.apply_schedule(&schedule, today).await?;
+            if !enabled {
+                continue;
+            }
+            if let Err(error) = self.apply_schedule(&schedule, today).await {
+                tracing::error!(
+                    target: BACKEND,
+                    account_id = %schedule.account_id,
+                    asset_id = %schedule.asset_id,
+                    err = ?error,
+                    "fee generation: schedule not applied, left for the next run"
+                );
+                first_failure.get_or_insert(error);
             }
         }
-        Ok(())
+        first_failure.map_or(Ok(()), Err)
     }
 
     /// Generates the due deductions for one active schedule up to `today` (FEE-040–047).
@@ -132,6 +145,7 @@ impl FeeGenerationOrchestrator {
             return Ok(()); // unrepresentable boundary date — skip defensively
         };
         let mut last_processed: Option<NaiveDate> = None;
+        let mut failure: Option<AccountError> = None;
         // FEE-040 — only completed periods (boundary ≤ today, never future-dated).
         while boundary <= today {
             // FEE-045 — stop once the period boundary passes end_date.
@@ -175,7 +189,25 @@ impl FeeGenerationOrchestrator {
                                 "fee generation: period skipped, the user's removal outranks the regeneration"
                             );
                         }
-                        Err(other) => return Err(other.into()),
+                        // FEE-049 — the deduction could not be saved: the schedule stops
+                        // here, and this period is generated at the next run.
+                        Err(AccountError::DatabaseError) => {
+                            failure = Some(AccountError::DatabaseError);
+                            break;
+                        }
+                        // FEE-047 — any other refusal of the rules (a date they do not
+                        // take, a later split left without a position): the period is
+                        // skipped and said, and generation goes on.
+                        Err(refusal) => {
+                            tracing::warn!(
+                                target: BACKEND,
+                                account_id = %schedule.account_id,
+                                asset_id = %schedule.asset_id,
+                                period = %boundary,
+                                err = ?refusal,
+                                "fee generation: period skipped, the rules refuse its deduction"
+                            );
+                        }
                     }
                 }
                 // FEE-043 — cursor advances for every processed period, skipped or not.
@@ -196,7 +228,8 @@ impl FeeGenerationOrchestrator {
                 )
                 .await?;
         }
-        Ok(())
+        // FEE-049 — the cursor stands at the last period generated before the failure.
+        failure.map_or(Ok(()), |error| Err(error.into()))
     }
 }
 
@@ -993,6 +1026,163 @@ mod tests {
             after.last_applied_period.as_deref(),
             Some("2024-05-31"),
             "cursor advances past skipped oversell periods (FEE-043/047)"
+        );
+    }
+
+    // FEE-047 — a period whose deduction the rules refuse for another reason than an
+    // oversell (here a date before 1900) is skipped too: the cursor passes it and the
+    // later periods generate.
+    #[tokio::test]
+    async fn fee_047_a_period_the_rules_refuse_is_skipped_and_generation_continues() {
+        let pool = setup_pool().await;
+        let account_svc = make_account_service(&pool);
+        let asset_svc = make_asset_service(&pool);
+        let stock_id = seed_stock(&asset_svc).await;
+        let account = account_svc
+            .create(
+                "FEE-047-refused".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .unwrap();
+        let account = enable_management_fees(&account_svc, &account).await;
+        seed_cash(&pool, &account_svc, &account.id).await;
+        account_svc
+            .buy_holding(
+                &account.id,
+                stock_id.clone(),
+                "1899-06-01".to_string(),
+                micro(100),
+                micro(50),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .expect_err("the rules take no date before 1900");
+        account_svc
+            .buy_holding(
+                &account.id,
+                stock_id.clone(),
+                "2024-01-01".to_string(),
+                micro(100),
+                micro(50),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        account_svc
+            .create_fee_schedule(
+                &account.id,
+                stock_id.clone(),
+                12_000_000,
+                crate::context::account::FeeFrequency::Annually,
+                "1899-06-01".to_string(),
+                None,
+            )
+            .await
+            .unwrap();
+        let schedule = account_svc
+            .get_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap()
+            .expect("schedule must exist");
+        let uc = FeeGenerationOrchestrator::new(account_svc.clone());
+        let today = chrono::NaiveDate::from_ymd_opt(2025, 6, 15).expect("valid date");
+
+        uc.apply_schedule(&schedule, today)
+            .await
+            .expect("a refused period stops nothing");
+
+        let txs = account_svc
+            .get_all_transactions_for_account(&account.id)
+            .await
+            .unwrap();
+        let fees: Vec<_> = txs
+            .iter()
+            .filter(|t| t.transaction_type == TransactionType::ManagementFee)
+            .map(|t| (t.date.as_str(), t.quantity))
+            .collect();
+        assert_eq!(fees, vec![("2024-12-31", micro(12))]);
+        let after = account_svc
+            .get_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap()
+            .expect("schedule must still exist");
+        assert_eq!(after.last_applied_period.as_deref(), Some("2024-12-31"));
+    }
+
+    // FEE-049 — a schedule whose deduction cannot be saved does not stop the others: the
+    // next schedule is applied, and the failure is what the run answers.
+    #[tokio::test]
+    async fn fee_049_a_schedule_that_fails_does_not_stop_the_next() {
+        use crate::context::account::MockAccountServiceContract;
+        let schedule = |asset: &str| {
+            FeeSchedule::new(
+                "account-1".to_string(),
+                asset.to_string(),
+                12_000_000,
+                FeeFrequency::Annually,
+                "2020-01-01".to_string(),
+                None,
+            )
+            .expect("schedule")
+        };
+        let schedules = vec![schedule("asset-failing"), schedule("asset-next")];
+        let mut account_service = MockAccountServiceContract::new();
+        account_service
+            .expect_list_active_fee_schedules()
+            .returning(move || Ok(schedules.clone()));
+        account_service.expect_get_by_id().returning(|_| {
+            let mut account = Account::new(
+                "A".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                true,
+            )
+            .expect("account");
+            account.id = "account-1".to_string();
+            Ok(Some(account))
+        });
+        account_service
+            .expect_record_generated_management_fee()
+            .returning(|_, asset_id, date, _, _| {
+                // The failing schedule gets through its first period, then cannot be saved.
+                if asset_id == "asset-failing" && date != "2020-12-31" {
+                    Err(AccountError::DatabaseError)
+                } else {
+                    Err(AccountError::QuantityNotPositive)
+                }
+            });
+        // The cursor of the failing schedule stops at the period before the failure.
+        account_service
+            .expect_advance_fee_schedule_cursor()
+            .withf(|_, asset_id, period| asset_id == "asset-failing" && period == "2020-12-31")
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+        account_service
+            .expect_advance_fee_schedule_cursor()
+            .withf(|_, asset_id, _| asset_id == "asset-next")
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+        let uc = FeeGenerationOrchestrator::new(Arc::new(account_service));
+
+        let answered = uc.apply_due_fee_deductions().await;
+
+        assert!(
+            matches!(
+                answered,
+                Err(FeeGenerationError::Account(AccountError::DatabaseError))
+            ),
+            "{answered:?}"
         );
     }
 

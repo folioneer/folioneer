@@ -40,6 +40,15 @@ impl AccountCreationUseCase {
         update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
     ) -> StdResult<Account, AccountError> {
+        // ACC-002 / TRX-021 — the account's own fields are checked before anything is
+        // seeded for it: a name or a currency it refuses is answered with its own code.
+        Account::new(
+            name.clone(),
+            bank_name.clone(),
+            currency.clone(),
+            update_frequency,
+            management_fees_enabled,
+        )?;
         // CSH-010 — the Cash Asset must exist before the Cash Holding references it (FK).
         self.asset_service
             .seed_cash_asset(&currency)
@@ -104,6 +113,35 @@ mod tests {
             Box::new(SqliteAssetPriceRepository::new(pool.clone())),
         ));
         AccountCreationUseCase::new(account_svc, asset_svc)
+    }
+
+    // TRX-021 — a currency that is none is refused with its own code, and nothing is
+    // seeded for the account that was not created.
+    #[tokio::test]
+    async fn trx_021_an_invalid_currency_is_refused_before_anything_is_seeded() {
+        let pool = setup_pool().await;
+        let uc = make_uc(&pool);
+
+        let refused = uc
+            .create(
+                "Brokerage".to_string(),
+                String::new(),
+                "EURO".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .expect_err("refused");
+
+        assert!(
+            matches!(&refused, AccountError::InvalidCurrency { currency } if currency == "EURO"),
+            "{refused:?}"
+        );
+        let seeded: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM assets")
+            .fetch_one(&pool)
+            .await
+            .expect("count");
+        assert_eq!(seeded.0, 0, "no Cash Asset is seeded");
     }
 
     // ACC-025 / CSH-010 / CSH-012 — create seeds the Cash Asset and a 0-balance Cash Holding.

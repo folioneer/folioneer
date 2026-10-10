@@ -4784,6 +4784,151 @@ mod tests {
         );
     }
 
+    /// An account with management fees enabled, cash, and `quantity` of the asset bought
+    /// on 2024-01-01.
+    async fn account_holding(
+        pool: &sqlx::Pool<sqlx::Sqlite>,
+        svc: &AccountService,
+        asset_id: &str,
+        name: &str,
+        quantity: i64,
+    ) -> Account {
+        let account = svc
+            .create(
+                name.to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .unwrap();
+        let account = enable_management_fees(svc, &account).await;
+        seed_cash_for_account(pool, svc, &account.id, "EUR").await;
+        svc.buy_holding(
+            &account.id,
+            asset_id.to_string(),
+            "2024-01-01".to_string(),
+            quantity,
+            micro(50),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        account
+    }
+
+    // SPL-012 — a one-off fee that removes the whole position before a later split leaves
+    // that split nothing to rescale: the fee is refused with the split's own code.
+    #[tokio::test]
+    async fn spl_012_a_fee_that_empties_the_position_before_a_split_is_refused() {
+        let pool = make_pool().await;
+        let (svc, asset_id) = setup(&pool).await;
+        let account = account_holding(&pool, &svc, &asset_id, "SPL-012-fee", micro(100)).await;
+        svc.record_split(
+            &account.id,
+            asset_id.clone(),
+            "2024-03-01".to_string(),
+            2_000_000,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let err = svc
+            .record_management_fee(
+                &account.id,
+                asset_id.clone(),
+                "2024-02-01".to_string(),
+                100_000_000,
+                None,
+            )
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, AccountError::ClosedPosition), "{err:?}");
+    }
+
+    // SPL-021 — a one-off fee, or a back-dated sale, that leaves a later reverse split a
+    // position it floors to nothing is refused with the split's own code.
+    #[tokio::test]
+    async fn spl_021_a_fee_or_a_sale_before_a_split_that_then_collapses_is_refused() {
+        let pool = make_pool().await;
+        let (svc, asset_id) = setup(&pool).await;
+        let account = account_holding(&pool, &svc, &asset_id, "SPL-021-fee", 3).await;
+        svc.record_split(
+            &account.id,
+            asset_id.clone(),
+            "2024-03-01".to_string(),
+            400_000,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let fee = svc
+            .record_management_fee_by_resulting_quantity(
+                &account.id,
+                asset_id.clone(),
+                "2024-02-01".to_string(),
+                1,
+                None,
+            )
+            .await
+            .unwrap_err();
+        let sale = svc
+            .sell_holding(
+                &account.id,
+                asset_id.clone(),
+                "2024-02-01".to_string(),
+                1,
+                micro(60),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap_err();
+
+        assert!(
+            matches!(fee, AccountError::SplitCollapsesPosition),
+            "{fee:?}"
+        );
+        assert!(
+            matches!(sale, AccountError::SplitCollapsesPosition),
+            "{sale:?}"
+        );
+    }
+
+    // DIV-021 — a dividend whose amount, converted, floors to nothing is refused.
+    #[tokio::test]
+    async fn div_021_a_dividend_that_converts_to_nothing_is_refused() {
+        let pool = make_pool().await;
+        let (svc, asset_id) = setup(&pool).await;
+        let account = account_holding(&pool, &svc, &asset_id, "DIV-021", micro(100)).await;
+
+        let err = svc
+            .record_dividend(
+                &account.id,
+                asset_id.clone(),
+                "2024-02-01".to_string(),
+                1,
+                500_000,
+                None,
+            )
+            .await
+            .unwrap_err();
+
+        assert!(
+            matches!(err, AccountError::TotalAmountNotPositive),
+            "{err:?}"
+        );
+    }
+
     // -------------------------------------------------------------------------
     // INT-021/022/023/024 — record_interest service method
     // -------------------------------------------------------------------------

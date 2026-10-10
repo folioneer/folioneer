@@ -1358,6 +1358,11 @@ impl Account {
                 // is unchanged, so the average price concentrates to cost_basis / new_quantity.
                 // No cash effect (the type never enters `replay_cash_holding`).
                 TransactionType::ManagementFee => {
+                    // FEE-027 — a fee that finds fewer shares than it removes is a
+                    // downstream oversell, like a sale that does.
+                    if enforced && t.quantity as i128 > total_quantity {
+                        return Err(AccountError::CascadingOversell.into());
+                    }
                     total_quantity -= t.quantity as i128;
                 }
                 // INT-024 — interest adds quantity at zero cost exactly like FreeShares:
@@ -5736,6 +5741,79 @@ mod tests {
                 Some(AccountError::CascadingOversell)
             ),
             "expected CascadingOversell when cancelling free shares that a later sell requires, got: {err}"
+        );
+    }
+
+    // FEE-027 — a replay that reaches a management fee with fewer shares than it removes is
+    // refused as a downstream oversell, whatever was changed before it: buy 100, a fee
+    // removes 10, cancelling the purchase leaves the fee nothing to remove.
+    #[test]
+    fn fee_027_a_fee_left_without_its_shares_is_a_cascading_oversell() {
+        let mut acc = cash_seeded_account();
+        let purchase_id = acc
+            .buy_holding(
+                "asset-xyz".to_string(),
+                "2024-01-01".to_string(),
+                micro(100),
+                micro(1),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .unwrap()
+            .id
+            .clone();
+        let fee = Transaction::management_fee(
+            acc.id.clone(),
+            "asset-xyz".to_string(),
+            "2024-06-01".to_string(),
+            micro(10),
+            None,
+        )
+        .unwrap();
+        acc.apply_management_fee(fee).unwrap();
+
+        let err = acc.cancel_transaction(&purchase_id).unwrap_err();
+
+        assert!(
+            matches!(
+                err.downcast_ref::<AccountError>(),
+                Some(AccountError::CascadingOversell)
+            ),
+            "expected CascadingOversell, got: {err}"
+        );
+    }
+
+    // CFR-042 — on a ledger a merge left overdrawn, a recording that only credits cash is
+    // still refused: its replay meets the withdrawal the balance cannot cover.
+    #[test]
+    fn cfr_042_a_dividend_on_an_overdrawn_ledger_is_refused_by_the_replay() {
+        let mut acc = base_account();
+        let withdrawal = Transaction::new_withdrawal(
+            acc.id.clone(),
+            "system-cash-eur".to_string(),
+            "2024-01-01".to_string(),
+            micro(100),
+            None,
+        )
+        .unwrap();
+        acc.apply_synced_transaction(withdrawal);
+        let dividend = Transaction::new_dividend(
+            acc.id.clone(),
+            "asset-xyz".to_string(),
+            "2024-02-01".to_string(),
+            micro(10),
+            micro(1),
+            None,
+        )
+        .unwrap();
+
+        let err = acc.apply_dividend(dividend).unwrap_err();
+
+        assert!(
+            matches!(err, AccountError::InsufficientCash { .. }),
+            "{err:?}"
         );
     }
 

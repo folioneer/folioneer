@@ -363,6 +363,19 @@ impl HoldingTransactionUseCase {
             )?;
             None
         } else {
+            // SPL-062 — an account that does not exist is said as such, before its
+            // position is asked for.
+            if self
+                .account_service
+                .get_by_id(&draft.account_id)
+                .await?
+                .is_none()
+            {
+                return Err(AccountError::AccountNotFound {
+                    account_id: draft.account_id.clone(),
+                }
+                .into());
+            }
             // SPL-012 — a position closed today cannot be split, whatever it held then.
             if !self.holds(&draft.account_id, &draft.asset_id).await? {
                 return Err(AccountError::ClosedPosition.into());
@@ -3061,6 +3074,27 @@ mod draft_tests {
     /// A use case whose account holds the asset today and previews a split as `position`
     /// (read `reads` times), and whose asset has `price` on 2026-01-01, and a later one
     /// on the draft's own date that must not be used.
+    /// An account the mocked service does not know.
+    const UNKNOWN_ACCOUNT: &str = "no-such-account";
+
+    /// Every account exists for the mocked service, `UNKNOWN_ACCOUNT` apart.
+    fn expect_known_accounts(account: &mut MockAccountServiceContract) {
+        account.expect_get_by_id().returning(|account_id| {
+            Ok((account_id != UNKNOWN_ACCOUNT).then(|| {
+                let mut account = crate::context::account::Account::new(
+                    "Account".into(),
+                    String::new(),
+                    "EUR".into(),
+                    crate::context::account::UpdateFrequency::ManualMonth,
+                    false,
+                )
+                .expect("account");
+                account.id = account_id.into();
+                account
+            }))
+        });
+    }
+
     fn split_use_case(
         position: Result<StockSplitPosition, AccountError>,
         reads: usize,
@@ -3077,6 +3111,7 @@ mod draft_tests {
         price: Option<i64>,
     ) -> HoldingTransactionUseCase {
         let mut account = MockAccountServiceContract::new();
+        expect_known_accounts(&mut account);
         account
             .expect_get_holding_by_account_asset()
             .returning(move |account_id, asset_id| {
@@ -3192,6 +3227,13 @@ mod draft_tests {
             .validate_stock_split_draft(split_draft(SplitSize::Factor { factor: 1 }))
             .await;
         assert_eq!(code_of(refused), "SplitCollapsesPosition");
+        // An account that does not exist is said before its position is asked for.
+        let mut elsewhere = split_draft(SplitSize::Factor { factor: 2 * M });
+        elsewhere.account_id = UNKNOWN_ACCOUNT.into();
+        assert_eq!(
+            code_of(unread().validate_stock_split_draft(elsewhere).await),
+            "AccountNotFound"
+        );
     }
 
     // DIV-011, FSD-011, SPL-012, FEE-011, INT-011 — an asset is held when its holding has
@@ -3220,6 +3262,7 @@ mod draft_tests {
         }
 
         let mut account = MockAccountServiceContract::new();
+        expect_known_accounts(&mut account);
         account
             .expect_get_holding_by_account_asset()
             .returning(|account_id, asset_id| {
