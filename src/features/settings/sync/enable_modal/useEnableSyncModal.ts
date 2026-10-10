@@ -20,6 +20,8 @@ export interface UseEnableSyncModalResult {
   handleBrowse: () => Promise<void>;
   /** Why the folder cannot be used, from `inspect_sync_folder` (SYN-014/019/035). */
   folderError: I18nMessage | null;
+  /** Whether the inspected folder holds a portfolio; false until a folder was inspected. */
+  folderHoldsPortfolio: boolean;
   /** SYN-014 — the folder holds a portfolio this installation cannot join: it holds data. */
   joinRefused: boolean;
   canProceedToStep2: boolean;
@@ -67,7 +69,7 @@ function folderStateError(state: SyncFolderState, isStartOver: boolean): I18nMes
 /**
  * SYN-011/012/014/015/018/019/071 — two-step enable flow: the folder is inspected
  * on every change and decides the wording of step 2 (first device vs join);
- * the passphrase is typed twice only for a first device.
+ * the passphrase is typed twice unless the device joins a portfolio.
  */
 export function useEnableSyncModal({
   variant,
@@ -167,6 +169,7 @@ export function useEnableSyncModal({
     setFolder,
     handleBrowse,
     folderError,
+    folderHoldsPortfolio: folderState?.holds_portfolio === true,
     joinRefused: isJoin && folderState.installation_holds_user_data,
     canProceedToStep2,
     goToStep2: () => setStep(2),

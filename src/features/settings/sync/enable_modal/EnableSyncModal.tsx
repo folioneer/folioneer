@@ -20,16 +20,20 @@ function strengthKey(passphrase: string): string {
   return "sync.enable_modal.strength_strong";
 }
 
-/** SYN-011/071 — what the passphrase step says the passphrase is for. */
-function passphraseWordingKey(isStartOver: boolean, isJoin: boolean): string {
-  if (isStartOver) return "sync.enable_modal.start_over_wording";
+/** SYN-011/071 — what the passphrase step says of the folder and of the passphrase. */
+function passphraseWordingKey(
+  isStartOver: boolean,
+  isJoin: boolean,
+  folderHoldsPortfolio: boolean,
+): string {
+  if (isStartOver && folderHoldsPortfolio) return "sync.enable_modal.start_over_wording";
   return isJoin ? "sync.enable_modal.join_wording" : "sync.enable_modal.first_device_wording";
 }
 
 /**
  * SYN-011/012/014/015/017/019/053/054/071 — two-step enable modal: the folder
- * (typed or browsed, validated on change), then the passphrase — twice for a
- * first device, once to join — with the device name and the honesty statements.
+ * (typed or browsed, validated on change), then the passphrase — once to join,
+ * twice otherwise — with the device name and the honesty statements.
  */
 export function EnableSyncModal({ isOpen, onClose, onSuccess, variant }: EnableSyncModalProps) {
   const { t } = useTranslation();
@@ -154,7 +158,7 @@ export function EnableSyncModal({ isOpen, onClose, onSuccess, variant }: EnableS
                 {t("sync.enable_modal.step_passphrase")}
               </span>
               <p className="text-sm text-m3-on-surface">
-                {t(passphraseWordingKey(isStartOver, state.isJoin))}
+                {t(passphraseWordingKey(isStartOver, state.isJoin, state.folderHoldsPortfolio))}
               </p>
               <TextField
                 id="sync-enable-passphrase"

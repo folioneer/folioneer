@@ -22,6 +22,7 @@ const makeState = (overrides: Record<string, unknown> = {}) => ({
   setFolder: vi.fn(),
   handleBrowse: vi.fn(),
   folderError: null,
+  folderHoldsPortfolio: false,
   joinRefused: false,
   canProceedToStep2: false,
   goToStep2: vi.fn(),
@@ -215,7 +216,9 @@ describe("EnableSyncModal — start-over variant (SYN-071)", () => {
   });
 
   it("TODO-066 — says what starting over does at the passphrase step, with two passphrase fields", () => {
-    mockUseEnableSyncModal.mockReturnValue(makeState({ step: 2, isJoin: false }));
+    mockUseEnableSyncModal.mockReturnValue(
+      makeState({ step: 2, isJoin: false, folderHoldsPortfolio: true }),
+    );
     render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="start-over" />);
 
     expect(screen.getByText("sync.enable_modal.start_over_wording")).toBeInTheDocument();
@@ -230,5 +233,16 @@ describe("EnableSyncModal — start-over variant (SYN-071)", () => {
     render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="start-over" />);
 
     expect(screen.getByText("sync.start_over_confirm_message")).toBeInTheDocument();
+  });
+
+  it("DEBT-099 — starting over in a folder that holds no portfolio says so", () => {
+    mockUseEnableSyncModal.mockReturnValue(
+      makeState({ step: 2, isJoin: false, folderHoldsPortfolio: false }),
+    );
+    render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="start-over" />);
+
+    expect(screen.getByText("sync.enable_modal.first_device_wording")).toBeInTheDocument();
+    expect(screen.queryByText("sync.enable_modal.start_over_wording")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sync-enable-passphrase-confirm")).toBeInTheDocument();
   });
 });

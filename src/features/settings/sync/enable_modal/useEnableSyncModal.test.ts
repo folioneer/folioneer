@@ -428,4 +428,22 @@ describe("useEnableSyncModal — start-over variant (SYN-071)", () => {
     expect(result.current.folderError?.key).toBe("sync.errors.UpdateRequired");
     expect(result.current.canProceedToStep2).toBe(false);
   });
+
+  it("DEBT-099 — tells whether the folder holds a portfolio, so that the dialog says what is true", async () => {
+    const { result } = renderHook(() => useEnableSyncModal({ variant: "start-over" }));
+    await act(async () => {
+      await result.current.setFolder("/home/user/empty");
+    });
+    expect(result.current.folderHoldsPortfolio).toBe(false);
+    expect(result.current.canProceedToStep2).toBe(true);
+
+    vi.mocked(gateway.inspectSyncFolder).mockResolvedValue({
+      status: "ok",
+      data: makeFolderState({ holds_portfolio: true, installation_holds_user_data: true }),
+    });
+    await act(async () => {
+      await result.current.setFolder("/home/user/sync");
+    });
+    expect(result.current.folderHoldsPortfolio).toBe(true);
+  });
 });
