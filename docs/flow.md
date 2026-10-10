@@ -15,7 +15,7 @@ The rules for an entry, set by the owner on 2026-10-03:
    questions come in one block for the batch, with what to look at and what a yes means.
 
 Each entry carries a permanent `FLOW-NNN` reference (never renumbered, never reused; next
-free: FLOW-032) so the owner can queue it in `docs/todo.md` § Next like any other. An
+free: FLOW-033) so the owner can queue it in `docs/todo.md` § Next like any other. An
 entry is removed once it is settled.
 
 ---
@@ -176,6 +176,22 @@ had been told `main` was ready (FLOW-031).
   saw end green. `just watch-pr` already knows how to wait for runs.
 - Costs: about an hour with tests; a release waits for the runs of the last merge, at
   most a quarter of an hour. Protects: a tag on a commit whose checks nobody saw end.
+
+## FLOW-032 — What `/prune` finds is written where git does not look
+
+- Kind: quality
+- Observed: `/prune` runs once after a release (`docs/workflow.md` § 3) and saves its
+  report under `tmp/`, which git ignores: a finding nobody applies in the same session is
+  lost. It was not run after 0.6.0 or 0.7.0. After 0.7.1 it ran on the three production
+  files the release changed and found one mechanical simplification; the owner asked on
+  2026-10-10 whether such findings are kept anywhere, and they were not (DEBT-101 holds
+  this one, filed by hand).
+- Proposal: `docs/workflow.md` § 3 and the skill say it: what `/prune` recommends is filed
+  as one tech-debt entry in the hand-over, like what the spec checks find; an audit with no
+  finding files nothing. The skill's scope after a release is the production files the
+  release changed, which is what was run; a full scan is asked for by name.
+- Costs: two sentences and one entry per release at most. Protects: a simplification that
+  was found, proven covered, and then forgotten.
 
 ## Used and not used — the 0.7.1 batch
 

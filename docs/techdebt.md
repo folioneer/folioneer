@@ -7,7 +7,7 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `DEBT-NNN` reference (never renumbered, never reused; next free:
-DEBT-101) so the human can queue it in `docs/todo.md` § Next like any todo.
+DEBT-102) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -299,6 +299,15 @@ Remove an entry once it has been resolved.
 - Observation: the replay multiplies the quantity by the factor in 128 bits and casts the result back to 64 bits without a check. A factor large enough (far beyond any real split) makes the cast wrap: recording and the split check both then show a quantity that is wrong, or refuse a split for the wrong reason.
 - User value: None in practice — no real split comes near the bound; an absurd factor typed by mistake is refused with a clear reason.
 - Done when: a factor whose rescale cannot be stored is refused when the split is recorded and when it is checked, with one error code, shown by a test on each path.
+
+## 2026-10-10 — DEBT-101 — What the prune audit found in the files 0.7.1 changed
+
+- Found by: `/prune` after v0.7.1 (2026-10-10), on `EnableSyncModal.tsx`, `useEnableSyncModal.ts` and `useDateField.ts`, with `coverage/frontend/lcov.info` of the same day
+- Where: `src/ui/components/field/useDateField.ts` — `handleDateSelect` (lines 174–177), and lines 83 and 134; `src/features/settings/sync/enable_modal/useEnableSyncModal.ts` (lines 121 and 172)
+- Severity: 🔵
+- Observation: `handleDateSelect` builds an ISO date in four lines where `toIsoLocal`, defined in the same file with the same formula and used by `stepDate`, does it in one; the four lines are covered. Outside the audit's categories: the same file writes the ISO-date pattern inline twice where its constant `ISO_DATE` exists, and the sync hook writes `folderState?.holds_portfolio === true` twice
+- User value: None — less code saying the same thing.
+- Done when: `handleDateSelect` calls `toIsoLocal`; the two patterns use `ISO_DATE`; the sync hook names the expression once; the tests of both files pass unchanged.
 
 ## 2026-10-10 — DEBT-100 — What the spec check of management fees found after the 0.8.0 batch
 
