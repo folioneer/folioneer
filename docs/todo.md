@@ -19,18 +19,19 @@
 <!-- additions are the human's), and stops when the queue is empty. -->
 
 1. DEBT-086
-2. FLOW-031
-3. FLOW-030
-4. FLOW-032
-5. DEBT-019
-6. DEBT-098
-7. DEBT-100
-8. DEBT-097
-9. DEBT-099
-10. DEBT-083
-11. TODO-059
-12. TODO-060
-13. DEBT-096
+2. FLOW-033
+3. FLOW-031
+4. FLOW-030
+5. FLOW-032
+6. DEBT-019
+7. DEBT-098
+8. DEBT-100
+9. DEBT-097
+10. DEBT-099
+11. DEBT-083
+12. TODO-059
+13. TODO-060
+14. DEBT-096
 
 ## TODO-009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
