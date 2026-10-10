@@ -668,6 +668,20 @@ pub trait TransactionRepository: Send + Sync {
         &self,
         account_id: &str,
     ) -> Result<Vec<(String, AgentRecording)>>;
+    /// AGT-050 — the mark of one transaction, when an agent recorded it.
+    async fn agent_recording_of(&self, transaction_id: &str) -> Result<Option<AgentRecording>>;
+    /// AGT-053 — the transactions a session recorded and that still exist, the last recorded first:
+    /// each with its account.
+    async fn recorded_in_session(&self, session: &str) -> Result<Vec<SessionRecording>>;
+}
+
+/// A transaction a session recorded (AGT-053), by what cancelling it needs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionRecording {
+    /// The transaction.
+    pub transaction_id: String,
+    /// The account it belongs to.
+    pub account_id: String,
 }
 
 /// The mark of a transaction an agent recorded (AGT-045): which agent, in which session.

@@ -194,7 +194,9 @@ mod tests {
                 "list_holdings",
                 "record_opening_balance",
                 "record_purchase",
-                "record_sale"
+                "record_sale",
+                "correct_recording",
+                "cancel_recording"
             ]
         );
         assert_eq!(

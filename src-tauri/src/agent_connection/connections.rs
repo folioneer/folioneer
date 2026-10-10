@@ -8,6 +8,8 @@ use serde::Serialize;
 use specta::Type;
 use tokio::sync::{oneshot, Notify};
 
+use crate::context::account::TransactionType;
+
 /// An agent client waiting for the owner's answer (AGT-030).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct AgentConnectionRequest {
@@ -19,7 +21,7 @@ pub struct AgentConnectionRequest {
     pub asked_at: String,
 }
 
-/// A connected agent client (AGT-033).
+/// A connected agent client (AGT-033), with what its session did (AGT-052).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct AgentSession {
     /// Identifies the session when the owner disconnects it.
@@ -28,6 +30,43 @@ pub struct AgentSession {
     pub client: String,
     /// How many tool calls it made.
     pub calls: u32,
+    /// When the owner allowed it, as an RFC 3339 timestamp in this computer's time.
+    pub started_at: String,
+    /// How many of its calls read the portfolio and were answered.
+    pub reads: u32,
+    /// How many transactions it recorded that still exist: its own to remove.
+    pub recordings: u32,
+    /// The one it recorded last among them.
+    pub last_recording: Option<LastRecording>,
+}
+
+/// The last transaction a session recorded, as the window names it (AGT-052).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct LastRecording {
+    /// What kind of transaction.
+    pub kind: TransactionType,
+    /// The asset's reference.
+    pub asset: String,
+    /// The transaction's date.
+    pub date: String,
+}
+
+/// What a session did, shared by the connection that serves it and by what the window is
+/// told of it.
+#[derive(Debug, Default)]
+struct Facts {
+    reads: AtomicU32,
+    /// How many of its recordings still exist, and the last of them: read from the
+    /// portfolio after each change, so the two always agree.
+    recordings: Mutex<(u32, Option<LastRecording>)>,
+}
+
+impl Facts {
+    fn recordings(&self) -> MutexGuard<'_, (u32, Option<LastRecording>)> {
+        self.recordings
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
 }
 
 /// A session the owner allowed, as the connection serving it holds it.
@@ -44,6 +83,8 @@ pub struct Granted {
     pub started_at: String,
     /// How many transactions it recorded (AGT-047).
     recorded: Arc<AtomicU32>,
+    /// What it did, as the window is told (AGT-052).
+    facts: Arc<Facts>,
     /// Notified when the owner disconnects the session (AGT-034).
     pub ended: Arc<Notify>,
 }
@@ -61,6 +102,17 @@ impl Granted {
     pub fn count_recording(&self) {
         self.recorded.fetch_add(1, Ordering::SeqCst);
     }
+
+    /// AGT-052 — one call that read the portfolio was answered.
+    pub fn count_read(&self) {
+        self.facts.reads.fetch_add(1, Ordering::SeqCst);
+    }
+
+    /// AGT-052 — what the session recorded and that still exists, as the portfolio has it
+    /// now: how many, and the last of them.
+    pub fn recordings_are(&self, count: u32, last: Option<LastRecording>) {
+        *self.facts.recordings() = (count, last);
+    }
 }
 
 struct Pending {
@@ -71,6 +123,22 @@ struct Pending {
 struct Open {
     session: AgentSession,
     ended: Arc<Notify>,
+    /// Identifies the session in what it recorded (AGT-045).
+    key: String,
+    facts: Arc<Facts>,
+}
+
+impl Open {
+    /// The session with what it did so far.
+    fn told(&self) -> AgentSession {
+        let (recordings, last_recording) = self.facts.recordings().clone();
+        AgentSession {
+            reads: self.facts.reads.load(Ordering::SeqCst),
+            recordings,
+            last_recording,
+            ..self.session.clone()
+        }
+    }
 }
 
 /// AGT-038 — how many agents may wait for the owner's answer at once.
@@ -170,6 +238,9 @@ impl AgentConnections {
             return None;
         }
         let ended = Arc::new(Notify::new());
+        let key = uuid::Uuid::new_v4().to_string();
+        let started_at = chrono::Local::now().to_rfc3339();
+        let facts = Arc::new(Facts::default());
         {
             let mut state = self.state();
             // AGT-035 — the setting went off between the answer and here: no session.
@@ -181,17 +252,24 @@ impl AgentConnections {
                     id: request_id,
                     client: client.to_string(),
                     calls: 0,
+                    started_at: started_at.clone(),
+                    reads: 0,
+                    recordings: 0,
+                    last_recording: None,
                 },
                 ended: Arc::clone(&ended),
+                key: key.clone(),
+                facts: Arc::clone(&facts),
             });
         }
         (self.changed)();
         Some(Granted {
             session_id: request_id,
             client: client.to_string(),
-            key: uuid::Uuid::new_v4().to_string(),
-            started_at: chrono::Local::now().to_rfc3339(),
+            key,
+            started_at,
             recorded: Arc::new(AtomicU32::new(0)),
+            facts,
             ended,
         })
     }
@@ -285,13 +363,35 @@ impl AgentConnections {
             .collect()
     }
 
-    /// The sessions open, oldest first.
+    /// The sessions open, oldest first, each with what it did so far (AGT-052).
     pub fn sessions(&self) -> Vec<AgentSession> {
+        self.state().open.iter().map(Open::told).collect()
+    }
+
+    /// AGT-053 — what identifies an open session in what it recorded; `None` once it ended.
+    pub fn key_of(&self, session_id: u32) -> Option<String> {
         self.state()
             .open
             .iter()
-            .map(|open| open.session.clone())
-            .collect()
+            .find(|open| open.session.id == session_id)
+            .map(|open| open.key.clone())
+    }
+
+    /// AGT-053 — the owner removed what an open session recorded: what is left of its
+    /// recordings, as the portfolio has it now. The window is told.
+    pub fn recordings_are(&self, session_id: u32, count: u32, last: Option<LastRecording>) {
+        let found = {
+            let state = self.state();
+            state
+                .open
+                .iter()
+                .find(|open| open.session.id == session_id)
+                .map(|open| *open.facts.recordings() = (count, last))
+                .is_some()
+        };
+        if found {
+            (self.changed)();
+        }
     }
 }
 
@@ -340,7 +440,11 @@ mod tests {
             vec![AgentSession {
                 id: granted.session_id,
                 client: "claude-code".to_string(),
-                calls: 0
+                calls: 0,
+                started_at: granted.started_at.clone(),
+                reads: 0,
+                recordings: 0,
+                last_recording: None,
             }]
         );
         assert!(connections.requests().is_empty());

@@ -5,7 +5,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::context::account::domain::{
-    AgentRecording, Transaction, TransactionRepository, TransactionType,
+    AgentRecording, SessionRecording, Transaction, TransactionRepository, TransactionType,
 };
 use crate::shared::domain::{
     ChangeDraft, LogicalTimestamp, Operation, Origin, RecordIdentity, RecordKind,
@@ -226,6 +226,48 @@ impl TransactionRepository for SqliteTransactionRepository {
                 )
             })
             .collect())
+    }
+
+    async fn agent_recording_of(&self, transaction_id: &str) -> Result<Option<AgentRecording>> {
+        use sqlx::Row;
+        let row = sqlx::query(
+            "SELECT agent, session, session_started_at FROM agent_recordings WHERE transaction_id = ?",
+        )
+        .bind(transaction_id)
+        .fetch_optional(&self.pool)
+        .await
+        .with_context(|| format!("Failed to fetch the mark of transaction {transaction_id}"))?;
+        row.map(|row| {
+            Ok(AgentRecording {
+                agent: row.try_get("agent")?,
+                session: row.try_get("session")?,
+                session_started_at: row.try_get("session_started_at")?,
+            })
+        })
+        .transpose()
+    }
+
+    async fn recorded_in_session(&self, session: &str) -> Result<Vec<SessionRecording>> {
+        use sqlx::Row;
+        let rows = sqlx::query(
+            "SELECT t.id AS transaction_id, t.account_id AS account_id
+             FROM agent_recordings r
+             JOIN transactions t ON t.id = r.transaction_id
+             WHERE r.session = ?
+             ORDER BY t.created_at DESC, t.date DESC, t.id",
+        )
+        .bind(session)
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch what a session recorded")?;
+        rows.into_iter()
+            .map(|row| {
+                Ok(SessionRecording {
+                    transaction_id: row.try_get("transaction_id")?,
+                    account_id: row.try_get("account_id")?,
+                })
+            })
+            .collect()
     }
 
     async fn delete(&self, id: &str) -> Result<()> {

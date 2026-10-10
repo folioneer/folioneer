@@ -2,7 +2,8 @@ use super::domain::{
     Account, AccountJournal, AccountRepository, AgentRecording, FeeCatchUpPosition,
     FeeCatchUpRepository, FeeSchedule, FeeScheduleRepository, Holding, HoldingNote,
     HoldingNoteRepository, HoldingRepository, HoldingSnapshot, JournalFilter, ManagementFeeRemoval,
-    StockSplitPosition, ThresholdDirection, Transaction, TransactionRepository, UpdateFrequency,
+    SessionRecording, StockSplitPosition, ThresholdDirection, Transaction, TransactionRepository,
+    UpdateFrequency,
 };
 use super::error::AccountError;
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
@@ -428,6 +429,34 @@ impl AccountService {
             row.recorded_by = marks.remove(&row.transaction.id);
         }
         Ok(journal)
+    }
+
+    /// AGT-050 — the mark of a transaction, when an agent recorded it.
+    pub async fn agent_recording_of(
+        &self,
+        transaction_id: &str,
+    ) -> StdResult<Option<AgentRecording>, AccountError> {
+        self.transaction_repo
+            .agent_recording_of(transaction_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, transaction_id = %transaction_id, err = ?e, "agent_recording_of: repository failure");
+                AccountError::DatabaseError
+            })
+    }
+
+    /// AGT-053 — the transactions a session recorded and that still exist, the last recorded first.
+    pub async fn recorded_in_session(
+        &self,
+        session: &str,
+    ) -> StdResult<Vec<SessionRecording>, AccountError> {
+        self.transaction_repo
+            .recorded_in_session(session)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, err = ?e, "recorded_in_session: repository failure");
+                AccountError::DatabaseError
+            })
     }
 
     /// AGT-045 — marks a transaction as recorded by an agent session, and tells the window
@@ -1671,6 +1700,19 @@ pub trait AccountServiceContract: Send + Sync {
         transaction_id: &str,
         recording: &AgentRecording,
     ) -> StdResult<(), AccountError>;
+    /// The mark of a transaction, when an agent recorded it (AGT-050).
+    async fn agent_recording_of(
+        &self,
+        transaction_id: &str,
+    ) -> StdResult<Option<AgentRecording>, AccountError>;
+    /// The transactions a session recorded and that still exist, the last recorded first (AGT-053).
+    async fn recorded_in_session(
+        &self,
+        session: &str,
+    ) -> StdResult<Vec<SessionRecording>, AccountError>;
+    /// Retrieves a transaction by ID.
+    async fn get_transaction_by_id(&self, id: &str)
+        -> StdResult<Option<Transaction>, AccountError>;
     /// Retrieves an account by ID.
     async fn get_by_id(&self, id: &str) -> StdResult<Option<Account>, AccountError>;
     /// Creates a new account.
@@ -1925,6 +1967,27 @@ impl AccountServiceContract for AccountService {
         recording: &AgentRecording,
     ) -> StdResult<(), AccountError> {
         AccountService::mark_agent_recording(self, transaction_id, recording).await
+    }
+
+    async fn agent_recording_of(
+        &self,
+        transaction_id: &str,
+    ) -> StdResult<Option<AgentRecording>, AccountError> {
+        AccountService::agent_recording_of(self, transaction_id).await
+    }
+
+    async fn recorded_in_session(
+        &self,
+        session: &str,
+    ) -> StdResult<Vec<SessionRecording>, AccountError> {
+        AccountService::recorded_in_session(self, session).await
+    }
+
+    async fn get_transaction_by_id(
+        &self,
+        id: &str,
+    ) -> StdResult<Option<Transaction>, AccountError> {
+        AccountService::get_transaction_by_id(self, id).await
     }
 
     async fn get_by_id(&self, id: &str) -> StdResult<Option<Account>, AccountError> {

@@ -12,10 +12,10 @@ use crate::core::BACKEND;
 use crate::use_cases::account_details::AccountDetailsUseCase;
 use crate::use_cases::account_summary::AccountSummaryUseCase;
 use crate::use_cases::holding_transaction::{
-    decimal_to_micro, HoldingTransactionUseCase, Recording, Target, Trade, TradeAmount,
+    decimal_to_micro, Correction, HoldingTransactionUseCase, Recording, Target, Trade, TradeAmount,
 };
 
-use super::connections::{Granted, MAX_RECORDINGS};
+use super::connections::{Granted, LastRecording, MAX_RECORDINGS};
 
 /// Why a tool call is refused: a stable code and a reason for the agent to read.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,6 +61,25 @@ impl From<Asset> for AssetRow {
     }
 }
 
+/// AGT-052 — a session's last recording as the window names it.
+pub fn last_recording(
+    (transaction, asset): (crate::context::account::Transaction, String),
+) -> LastRecording {
+    LastRecording {
+        kind: transaction.transaction_type,
+        asset,
+        date: transaction.date,
+    }
+}
+
+/// AGT-040 — the tools that read the portfolio.
+const READ_TOOLS: [&str; 4] = [
+    "portfolio_summary",
+    "list_accounts",
+    "list_assets",
+    "list_holdings",
+];
+
 /// Runs the tools in the running application, through the queries the window uses.
 pub struct AgentTools {
     recorder: Arc<HoldingTransactionUseCase>,
@@ -105,7 +124,23 @@ impl AgentTools {
         tool: &str,
         arguments: &Value,
     ) -> Result<Value, Refusal> {
+        let result = self.run(granted, tool, arguments).await;
+        // AGT-052 — a read that was answered counts as one.
+        if result.is_ok() && READ_TOOLS.contains(&tool) {
+            granted.count_read();
+        }
+        result
+    }
+
+    async fn run(
+        &self,
+        granted: &Granted,
+        tool: &str,
+        arguments: &Value,
+    ) -> Result<Value, Refusal> {
         match tool {
+            "correct_recording" => self.correct(granted, arguments).await,
+            "cancel_recording" => self.cancel(granted, arguments).await,
             "record_opening_balance" => {
                 let recording = Recording::Open {
                     target: target(arguments)?,
@@ -228,6 +263,7 @@ impl AgentTools {
             }
         })?;
         granted.count_recording();
+        self.tell_recordings(granted).await;
         tracing::info!(target: BACKEND, session = granted.session_id, transaction = %recorded.transaction.id, kind = %recorded.transaction.transaction_type, "agent recording");
         as_json(&serde_json::json!({
             "status": "recorded",
@@ -237,6 +273,91 @@ impl AgentTools {
             "asset": recorded.asset_reference,
             "zero_cost": recorded.zero_cost,
         }))
+    }
+
+    /// AGT-052 — reads what the session recorded and that still exists, for the window. A
+    /// read that fails leaves what the window was last told.
+    async fn tell_recordings(&self, granted: &Granted) {
+        match self.recorder.recorded_in_session(&granted.key).await {
+            Ok(recordings) => {
+                granted.recordings_are(recordings.count, recordings.last.map(last_recording));
+            }
+            Err(error) => {
+                tracing::warn!(target: BACKEND, session = granted.session_id, err = ?error, "agent session: its recordings could not be counted");
+            }
+        }
+    }
+
+    /// AGT-050 — the session cancels a transaction it recorded itself.
+    async fn cancel(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
+        let transaction_id = text(arguments, "transaction")?.to_string();
+        let recorder = Arc::clone(&self.recorder);
+        let session = granted.key.clone();
+        // As a recording (AGT-049): once started, the cancelling runs to its end.
+        let cancelled = tokio::spawn(async move {
+            recorder
+                .cancel_recorded_by_agent(&transaction_id, &session)
+                .await
+        })
+        .await
+        .map_err(|error| {
+            tracing::error!(target: BACKEND, err = ?error, "agent cancelling: the task ended early");
+            portfolio_unreadable()
+        })?
+        .map_err(|refusal| Refusal {
+            code: refusal.code,
+            message: refusal.message,
+        })?;
+        self.tell_recordings(granted).await;
+        tracing::info!(target: BACKEND, session = granted.session_id, transaction = %cancelled.id, "agent cancelled its recording");
+        as_json(&serde_json::json!({ "status": "cancelled", "transaction": cancelled.id }))
+    }
+
+    /// AGT-050 — the session corrects a transaction it recorded itself.
+    async fn correct(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
+        let transaction_id = text(arguments, "transaction")?.to_string();
+        let price = figure(arguments, "price")?;
+        let total = figure(arguments, "total")?;
+        if price.is_some() && total.is_some() {
+            return Err(Refusal {
+                code: "InvalidArguments".to_string(),
+                message: "give either price or total, not both".to_string(),
+            });
+        }
+        let correction = Correction {
+            date: optional_text(arguments, "date")?,
+            quantity: figure(arguments, "quantity")?,
+            price,
+            total,
+            fees: figure(arguments, "fees")?,
+            rate: figure(arguments, "rate")?,
+            note: note(arguments)?,
+        };
+        if correction == Correction::default() {
+            return Err(Refusal {
+                code: "MissingArgument".to_string(),
+                message: "nothing to correct: give what changes".to_string(),
+            });
+        }
+        let recorder = Arc::clone(&self.recorder);
+        let session = granted.key.clone();
+        let corrected = tokio::spawn(async move {
+            recorder
+                .correct_recorded_by_agent(&transaction_id, &session, correction)
+                .await
+        })
+        .await
+        .map_err(|error| {
+            tracing::error!(target: BACKEND, err = ?error, "agent correcting: the task ended early");
+            portfolio_unreadable()
+        })?
+        .map_err(|refusal| Refusal {
+            code: refusal.code,
+            message: refusal.message,
+        })?;
+        self.tell_recordings(granted).await;
+        tracing::info!(target: BACKEND, session = granted.session_id, transaction = %corrected.id, "agent corrected its recording");
+        as_json(&serde_json::json!({ "status": "corrected", "transaction": corrected }))
     }
 
     /// AGT-043 — the one account with this name, case ignored; the refusal names only what

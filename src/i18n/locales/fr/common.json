@@ -250,7 +250,7 @@
     "connection_asked_at": "Demandé à",
     "connection_covers": "Si vous autorisez, jusqu'à la déconnexion ou la fermeture de Folioneer, il peut :",
     "connection_covers_read": "lire vos comptes, vos actifs, vos positions et vos totaux ;",
-    "connection_never": "Votre réponse vaut pour toute la session. Il ne peut ni modifier, ni supprimer, ni annuler une transaction — pas même une qu'il a enregistrée — et ne lit jamais un fichier, un réglage ou votre dossier de synchronisation.",
+    "connection_never": "Votre réponse vaut pour toute la session. Il ne peut corriger ou annuler que ce qu'il a enregistré pendant cette session — jamais une transaction que vous avez saisie — et ne lit jamais un fichier, un réglage ou votre dossier de synchronisation.",
     "connection_allow": "Autoriser pour cette session",
     "connection_refuse": "Refuser",
     "connected": "{{client}} est connecté",

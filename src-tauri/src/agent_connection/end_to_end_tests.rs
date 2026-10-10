@@ -611,3 +611,361 @@ async fn a_bridge_reaches_no_application_in_an_empty_folder() {
     let channel: Option<Box<dyn Channel>> = channel::reach(data_dir.path()).await;
     assert!(channel.is_none());
 }
+
+/// The tools over the portfolio of `data_dir`, with what the tests read and the owner uses.
+struct Workbench {
+    tools: AgentTools,
+    connections: Arc<AgentConnections>,
+    accounts: Arc<crate::context::account::AccountService>,
+    recorder: crate::use_cases::holding_transaction::HoldingTransactionUseCase,
+}
+
+async fn workbench(data_dir: &Path) -> Workbench {
+    // Seeds the account, its cash and the asset.
+    drop(application_with_accounts(data_dir).await);
+    let database = Database::new(data_dir.to_path_buf())
+        .await
+        .expect("database");
+    let container = AppContainer::for_headless_writes(database.pool);
+    let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&container.account_service) as _;
+    let assets: Arc<dyn AssetServiceContract> = Arc::clone(&container.asset_service) as _;
+    let connections = Arc::new(AgentConnections::new(|| {}));
+    connections.admit();
+    Workbench {
+        tools: AgentTools::new(
+            Arc::clone(&accounts),
+            Arc::clone(&assets),
+            Arc::clone(&container.currency_service),
+        ),
+        connections,
+        accounts: container.account_service,
+        recorder: crate::use_cases::holding_transaction::HoldingTransactionUseCase::new(
+            accounts, assets,
+        ),
+    }
+}
+
+/// A session the owner allowed.
+async fn session(connections: &Arc<AgentConnections>) -> super::connections::Granted {
+    let asking = Arc::clone(connections);
+    let asked = tokio::spawn(async move { asking.ask("claude-code").await });
+    let request = loop {
+        if let Some(request) = connections.requests().first().cloned() {
+            break request;
+        }
+        tokio::task::yield_now().await;
+    };
+    assert!(connections.answer(request.id, true));
+    asked.await.expect("asked").expect("granted")
+}
+
+/// The id of the transaction a recording returned.
+fn recorded_id(recorded: &Value) -> String {
+    recorded["transaction"]["id"]
+        .as_str()
+        .expect("an id")
+        .to_string()
+}
+
+// AGT-050 / AGT-052 — a session corrects and cancels what it recorded itself, through the
+// rules of the window, and the window is told what the session did.
+#[tokio::test]
+async fn agt_050_a_session_corrects_and_cancels_what_it_recorded() {
+    use crate::context::account::TransactionType;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+
+    call("list_accounts", json!({})).await.expect("listed");
+    let purchase = call(
+        "record_purchase",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 2, "price": 100, "date": "2026-02-01" }),
+    )
+    .await
+    .expect("recorded");
+    let id = recorded_id(&purchase);
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!((told.reads, told.recordings), (1, 1));
+    let last = told.last_recording.expect("a last recording");
+    assert_eq!(last.kind, TransactionType::Purchase);
+    assert_eq!(
+        (last.asset.as_str(), last.date.as_str()),
+        ("CW8", "2026-02-01")
+    );
+    assert_eq!(told.started_at, granted.started_at);
+
+    // A new quantity makes the total follow the unit price.
+    let more = call(
+        "correct_recording",
+        json!({ "transaction": id, "quantity": 3 }),
+    )
+    .await
+    .expect("corrected");
+    assert_eq!(more["status"], "corrected");
+    assert_eq!(more["transaction"]["quantity"], 3 * M);
+    assert_eq!(more["transaction"]["total_amount"], 300 * M);
+    // A new date alone keeps everything else.
+    let moved = call(
+        "correct_recording",
+        json!({ "transaction": id, "date": "2026-02-03", "note": "the right day" }),
+    )
+    .await
+    .expect("corrected");
+    assert_eq!(moved["transaction"]["date"], "2026-02-03");
+    assert_eq!(moved["transaction"]["quantity"], 3 * M);
+    assert_eq!(moved["transaction"]["total_amount"], 300 * M);
+    assert_eq!(moved["transaction"]["note"], "the right day");
+    // A new total is taken as typed.
+    let priced = call(
+        "correct_recording",
+        json!({ "transaction": id, "total": "330" }),
+    )
+    .await
+    .expect("corrected");
+    assert_eq!(priced["transaction"]["total_amount"], 330 * M);
+    assert_eq!(priced["transaction"]["unit_price"], 110 * M);
+
+    for (arguments, code) in [
+        (json!({ "transaction": id }), "MissingArgument"),
+        (
+            json!({ "transaction": id, "price": 1, "total": 1 }),
+            "InvalidArguments",
+        ),
+        (json!({ "quantity": 1 }), "MissingArgument"),
+        (
+            json!({ "transaction": id, "quantity": 0 }),
+            "QuantityNotPositive",
+        ),
+    ] {
+        let refused = call("correct_recording", arguments)
+            .await
+            .expect_err("refused");
+        assert_eq!(refused.code, code);
+    }
+
+    // An opening balance takes a quantity, a total and a date only; its cost stays when its
+    // quantity changes.
+    let opening = recorded_id(
+        &call(
+            "record_opening_balance",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 10, "total_cost": 1000, "date": "2026-01-05" }),
+        )
+        .await
+        .expect("recorded"),
+    );
+    let refused = call(
+        "correct_recording",
+        json!({ "transaction": opening, "price": 5 }),
+    )
+    .await
+    .expect_err("refused");
+    assert_eq!(refused.code, "InvalidArguments");
+    let fewer = call(
+        "correct_recording",
+        json!({ "transaction": opening, "quantity": 8 }),
+    )
+    .await
+    .expect("corrected");
+    assert_eq!(fewer["transaction"]["quantity"], 8 * M);
+    assert_eq!(fewer["transaction"]["total_amount"], 1000 * M);
+    call("cancel_recording", json!({ "transaction": opening }))
+        .await
+        .expect("cancelled");
+
+    let cancelled = call("cancel_recording", json!({ "transaction": id }))
+        .await
+        .expect("cancelled");
+    assert_eq!(cancelled["status"], "cancelled");
+    assert_eq!(cancelled["transaction"], id);
+    assert!(bench
+        .accounts
+        .get_transaction_by_id(&id)
+        .await
+        .expect("read")
+        .is_none());
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.recordings, 0);
+    assert_eq!(told.last_recording, None);
+}
+
+// AGT-051 — a transaction the owner typed, one another session recorded and one that does
+// not exist are refused alike, in the same words: nothing is said of what exists.
+#[tokio::test]
+async fn agt_051_a_session_touches_nothing_it_did_not_record() {
+    use crate::context::account::JournalFilter;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let first = session(&bench.connections).await;
+    let second = session(&bench.connections).await;
+    let of_the_first = recorded_id(
+        &bench
+            .tools
+            .call(
+                &first,
+                "record_purchase",
+                &json!({ "account": "PEA", "asset": "CW8", "quantity": 2, "price": 100, "date": "2026-02-01" }),
+            )
+            .await
+            .expect("recorded"),
+    );
+    let account = bench.accounts.get_all().await.expect("accounts").remove(0);
+    let journal = bench
+        .accounts
+        .get_account_journal(&account.id, &JournalFilter::default())
+        .await
+        .expect("journal");
+    let typed_by_the_owner = journal
+        .rows
+        .iter()
+        .find(|row| row.recorded_by.is_none())
+        .expect("the owner's deposit")
+        .transaction
+        .id
+        .clone();
+
+    let mut said = std::collections::HashSet::new();
+    for transaction in [
+        typed_by_the_owner.as_str(),
+        of_the_first.as_str(),
+        "no-such-transaction",
+    ] {
+        for (tool, arguments) in [
+            ("cancel_recording", json!({ "transaction": transaction })),
+            (
+                "correct_recording",
+                json!({ "transaction": transaction, "quantity": 1 }),
+            ),
+        ] {
+            let refused = bench
+                .tools
+                .call(&second, tool, &arguments)
+                .await
+                .expect_err("refused");
+            assert_eq!(refused.code, "NotYourRecording", "{tool} {transaction}");
+            said.insert(refused.message);
+        }
+    }
+    assert_eq!(said.len(), 1, "one sentence for every case");
+    let after = bench
+        .accounts
+        .get_account_journal(&account.id, &JournalFilter::default())
+        .await
+        .expect("journal");
+    assert_eq!(after.rows.len(), journal.rows.len(), "nothing was touched");
+    assert_eq!(bench.connections.sessions()[0].recordings, 1);
+}
+
+// AGT-053 — the owner removes everything a session recorded, in an order its own
+// recordings allow, and nothing the owner typed; a recording a later transaction of the
+// owner depends on is kept and counted.
+#[tokio::test]
+async fn agt_053_the_owner_removes_everything_a_session_recorded() {
+    use crate::context::account::JournalFilter;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let account = bench.accounts.get_all().await.expect("accounts").remove(0);
+    let rows = || async {
+        bench
+            .accounts
+            .get_account_journal(&account.id, &JournalFilter::default())
+            .await
+            .expect("journal")
+            .rows
+    };
+    let typed = rows().await.len();
+    for (tool, arguments) in [
+        (
+            "record_opening_balance",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 10, "total_cost": 1000, "date": "2026-01-05" }),
+        ),
+        (
+            "record_sale",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 10, "price": 120, "date": "2026-02-01" }),
+        ),
+        (
+            "record_purchase",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 4, "price": 100, "date": "2026-03-01" }),
+        ),
+    ] {
+        bench
+            .tools
+            .call(&granted, tool, &arguments)
+            .await
+            .expect("recorded");
+    }
+    let key = bench
+        .connections
+        .key_of(granted.session_id)
+        .expect("an open session");
+    assert_eq!(key, granted.key);
+    // The owner sells part of what the session's last purchase brought.
+    let asset_id = rows()
+        .await
+        .iter()
+        .find(|row| row.recorded_by.is_some())
+        .expect("a recording")
+        .transaction
+        .asset_id
+        .clone();
+    bench
+        .accounts
+        .sell_holding(
+            &account.id,
+            asset_id,
+            "2026-04-01".to_string(),
+            2 * M,
+            130 * M,
+            M,
+            0,
+            None,
+            None,
+        )
+        .await
+        .expect("the owner's sale");
+
+    let removal = bench
+        .recorder
+        .remove_recorded_in_session(&key)
+        .await
+        .expect("removed");
+
+    assert_eq!((removal.removed, removal.kept), (2, 1));
+    let left = rows().await;
+    assert_eq!(
+        left.len(),
+        typed + 2,
+        "what the owner typed, and the purchase kept"
+    );
+    assert_eq!(
+        left.iter().filter(|row| row.recorded_by.is_some()).count(),
+        1,
+        "the purchase the owner's sale depends on"
+    );
+    let left_of_it = bench
+        .recorder
+        .recorded_in_session(&key)
+        .await
+        .expect("counted");
+    assert_eq!(left_of_it.count, 1);
+    bench.connections.recordings_are(
+        granted.session_id,
+        left_of_it.count,
+        left_of_it.last.map(super::tools::last_recording),
+    );
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.recordings, 1);
+    assert_eq!(
+        told.last_recording.map(|last| last.date),
+        Some("2026-03-01".to_string()),
+        "the last recording named is one that is left"
+    );
+    assert_eq!(bench.connections.key_of(granted.session_id + 100), None);
+}

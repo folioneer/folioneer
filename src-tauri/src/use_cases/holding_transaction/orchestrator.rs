@@ -213,7 +213,7 @@ fn match_asset<'a>(assets: &'a [Asset], typed: &str) -> Result<&'a Asset, NameLo
 /// SEL-037) and seeds the system Cash Asset before a cash-affecting operation (CSH-010).
 pub struct HoldingTransactionUseCase {
     pub(super) account_service: Arc<dyn AccountServiceContract>,
-    asset_service: Arc<dyn AssetServiceContract>,
+    pub(super) asset_service: Arc<dyn AssetServiceContract>,
 }
 
 impl HoldingTransactionUseCase {

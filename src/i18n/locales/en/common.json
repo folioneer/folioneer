@@ -250,7 +250,7 @@
     "connection_asked_at": "Asked at",
     "connection_covers": "If you allow, until you disconnect or close Folioneer, it may:",
     "connection_covers_read": "read your accounts, assets, holdings and totals;",
-    "connection_never": "Your answer covers the whole session. It cannot change, remove or undo a transaction — not even one it recorded — and it never reads a file, a setting or your sync folder.",
+    "connection_never": "Your answer covers the whole session. It can correct or cancel only what it recorded in this session — never a transaction you typed — and it never reads a file, a setting or your sync folder.",
     "connection_allow": "Allow for this session",
     "connection_refuse": "Refuse",
     "connected": "{{client}} is connected",

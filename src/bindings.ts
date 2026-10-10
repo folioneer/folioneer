@@ -1084,6 +1084,18 @@ async disconnectAgent(sessionId: number) : Promise<Result<null, AgentConnectionE
 }
 },
 /**
+ * AGT-053 — the owner removes everything a connected agent's session recorded, and
+ * nothing else. A recording a later transaction depends on is kept and counted.
+ */
+async removeAgentRecordings(sessionId: number) : Promise<Result<SessionRemoval, AgentConnectionError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_agent_recordings", { sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Tauri command allowing the frontend to emit structured log entries
  * into the backend tracing system (visible in app logs and collect-logs output).
  */
@@ -1572,7 +1584,11 @@ export type AgentConnectionError =
 /**
  * The session already ended.
  */
-{ code: "SessionAlreadyEnded" }
+{ code: "SessionAlreadyEnded" } | 
+/**
+ * What the session recorded could not be read or removed; the cause is in the log.
+ */
+{ code: "DatabaseError" }
 /**
  * An agent client waiting for the owner's answer (AGT-030).
  */
@@ -1631,7 +1647,7 @@ session: string;
  */
 session_started_at: string }
 /**
- * A connected agent client (AGT-033).
+ * A connected agent client (AGT-033), with what its session did (AGT-052).
  */
 export type AgentSession = { 
 /**
@@ -1645,7 +1661,23 @@ client: string;
 /**
  * How many tool calls it made.
  */
-calls: number }
+calls: number; 
+/**
+ * When the owner allowed it, as an RFC 3339 timestamp in this computer's time.
+ */
+started_at: string; 
+/**
+ * How many of its calls read the portfolio and were answered.
+ */
+reads: number; 
+/**
+ * How many transactions it recorded that still exist: its own to remove.
+ */
+recordings: number; 
+/**
+ * The one it recorded last among them.
+ */
+last_recording: LastRecording | null }
 /**
  * Use-case composite for the **archive asset** failure surface — the single
  * command `archive_asset` (OQ-6) and its full chain of rejections.
@@ -3398,6 +3430,22 @@ export type KindProblem =
  */
 { code: "SameAsAnother"; other_id: string; other_name: string }
 /**
+ * The last transaction a session recorded, as the window names it (AGT-052).
+ */
+export type LastRecording = { 
+/**
+ * What kind of transaction.
+ */
+kind: TransactionType; 
+/**
+ * The asset's reference.
+ */
+asset: string; 
+/**
+ * The transaction's date.
+ */
+date: string }
+/**
  * PRF-087 — why the lifetime metrics (since-inception %, annualized yield) cannot be
  * computed: the Simple Dietz denominator over the lifetime span is not positive (PRF-032).
  */
@@ -4245,6 +4293,18 @@ total_amount: number | null;
  * Optional user note.
  */
 note: string | null }
+/**
+ * What removing everything a session recorded did (AGT-053).
+ */
+export type SessionRemoval = { 
+/**
+ * How many transactions were removed.
+ */
+removed: number; 
+/**
+ * How many could not be: a transaction recorded since depends on each of them.
+ */
+kept: number }
 /**
  * Use-case composite for the **record split** failure surface.
  * 

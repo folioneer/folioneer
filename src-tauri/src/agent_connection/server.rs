@@ -100,6 +100,8 @@ pub async fn serve_connection<S>(
             (Request::Call { tool, arguments }, Some(granted)) => {
                 connections.count_call(granted.session_id);
                 let result = tools.run(granted, &tool, &arguments).await;
+                // AGT-052 — what the call read or recorded shows in the window.
+                connections.notify();
                 // AGT-041 — every call is written to the log with its tool.
                 tracing::info!(target: BACKEND, session = granted.session_id, tool = %tool, refused = result.is_err(), "agent tool called");
                 match result {

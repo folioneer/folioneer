@@ -24,7 +24,8 @@ pub use error::{
     SplitError, SplitTask, TransactionDraftError, TransactionDraftTask,
 };
 pub use named_recording::{
-    code_of, decimal, decimal_to_micro, Recorded, Recording, Refusal, Target, Trade, TradeAmount,
+    code_of, decimal, decimal_to_micro, Correction, Recorded, Recording, Refusal,
+    SessionRecordings, SessionRemoval, Target, Trade, TradeAmount,
 };
 pub use orchestrator::{
     DraftKind, HoldingTransactionUseCase, NamedTarget, OpeningBalanceDraft, OpeningBalancePreview,

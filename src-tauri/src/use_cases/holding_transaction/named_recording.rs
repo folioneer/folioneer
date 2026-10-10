@@ -5,13 +5,16 @@
 
 use serde::Serialize;
 
-use crate::context::account::{AccountError, AgentRecording, Transaction};
+use crate::context::account::{AccountError, AgentRecording, Transaction, TransactionType};
 use crate::core::BACKEND;
 
 use super::error::{NameLookupError, OpenHoldingError, OpenHoldingTask};
 use super::orchestrator::{HoldingTransactionUseCase, OpeningBalanceDraft};
 
 const MICRO: i64 = 1_000_000;
+/// The longest id a transaction carries: a generated deduction's (`fee-` and 32 digits) and
+/// a uuid are both shorter.
+const TRANSACTION_ID_LENGTH: usize = 64;
 
 /// What the user typed to name the account and the asset, and the shared values.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,7 +93,216 @@ pub struct Recorded {
     pub zero_cost: bool,
 }
 
+/// What an agent changes of a transaction it recorded (AGT-050): what is given replaces what
+/// was recorded, the rest stays as it was.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Correction {
+    /// The new date.
+    pub date: Option<String>,
+    /// The new quantity (micro-units).
+    pub quantity: Option<i64>,
+    /// The new unit price in the asset's currency (micro-units); never with `total`.
+    pub price: Option<i64>,
+    /// The new all-in total in the account's currency — for an opening balance, its total
+    /// cost (micro-units); never with `price`.
+    pub total: Option<i64>,
+    /// The new fees (micro-units).
+    pub fees: Option<i64>,
+    /// The new exchange rate (micro-units).
+    pub rate: Option<i64>,
+    /// The new note.
+    pub note: Option<String>,
+}
+
+/// What removing everything a session recorded did (AGT-053).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+pub struct SessionRemoval {
+    /// How many transactions were removed.
+    pub removed: u32,
+    /// How many could not be: a transaction recorded since depends on each of them.
+    pub kept: u32,
+}
+
+/// What a session recorded and that still exists (AGT-052).
+#[derive(Debug, Clone)]
+pub struct SessionRecordings {
+    /// How many transactions.
+    pub count: u32,
+    /// The one recorded last, with its asset's reference.
+    pub last: Option<(Transaction, String)>,
+}
+
+/// AGT-051 — what an agent reads for a transaction it may not touch. One sentence for a
+/// transaction that does not exist, one the owner typed and one another session recorded:
+/// the refusal says nothing of what exists (AGT-042).
+fn not_its_recording() -> Refusal {
+    Refusal {
+        code: "NotYourRecording".to_string(),
+        message: "this transaction was not recorded in this session: an agent changes only what it recorded itself".to_string(),
+    }
+}
+
 impl HoldingTransactionUseCase {
+    /// AGT-050 / AGT-051 — the transaction `transaction_id` when the session `session`
+    /// recorded it; a refusal otherwise.
+    async fn recorded_by(
+        &self,
+        transaction_id: &str,
+        session: &str,
+    ) -> Result<Transaction, Refusal> {
+        // An id is a uuid: anything longer is no transaction, and is not looked up.
+        if transaction_id.len() > TRANSACTION_ID_LENGTH {
+            return Err(not_its_recording());
+        }
+        let mark = self
+            .account_service
+            .agent_recording_of(transaction_id)
+            .await
+            .map_err(|error| refusal_from_account(&error))?;
+        if !mark.is_some_and(|mark| mark.session == session) {
+            return Err(not_its_recording());
+        }
+        self.account_service
+            .get_transaction_by_id(transaction_id)
+            .await
+            .map_err(|error| refusal_from_account(&error))?
+            .ok_or_else(not_its_recording)
+    }
+
+    /// AGT-050 — an agent cancels a transaction its session recorded, through the rules of
+    /// the window.
+    pub async fn cancel_recorded_by_agent(
+        &self,
+        transaction_id: &str,
+        session: &str,
+    ) -> Result<Transaction, Refusal> {
+        let transaction = self.recorded_by(transaction_id, session).await?;
+        self.cancel_transaction(&transaction.account_id, &transaction.id)
+            .await
+            .map_err(|error| refusal_from_account(&error))?;
+        Ok(transaction)
+    }
+
+    /// AGT-050 — an agent corrects a transaction its session recorded, through the rules of
+    /// the window: what `correction` gives replaces what was recorded. A total that was
+    /// recorded is kept while nothing it is made of changes; a quantity, fees or a rate
+    /// that changes without a new price or total makes the total follow the unit price —
+    /// except for an opening balance, whose total cost only a new total changes.
+    pub async fn correct_recorded_by_agent(
+        &self,
+        transaction_id: &str,
+        session: &str,
+        correction: Correction,
+    ) -> Result<Transaction, Refusal> {
+        let recorded = self.recorded_by(transaction_id, session).await?;
+        // TRX-047 — an opening balance has a quantity, a total cost and a date, nothing else.
+        if recorded.transaction_type == TransactionType::OpeningBalance
+            && (correction.price.is_some()
+                || correction.fees.is_some()
+                || correction.rate.is_some())
+        {
+            return Err(Refusal {
+                code: "InvalidArguments".to_string(),
+                message: "an opening balance has no price, fees or rate: give its quantity, its total or its date".to_string(),
+            });
+        }
+        let follows_the_price = (correction.quantity.is_some()
+            || correction.fees.is_some()
+            || correction.rate.is_some())
+            && recorded.transaction_type != TransactionType::OpeningBalance;
+        let (unit_price, total) = match (correction.price, correction.total) {
+            (Some(price), _) => (price, None),
+            (None, Some(total)) => (recorded.unit_price, Some(total)),
+            (None, None) if follows_the_price => (recorded.unit_price, None),
+            (None, None) => (recorded.unit_price, Some(recorded.total_amount)),
+        };
+        self.correct_transaction(
+            &recorded.account_id,
+            &recorded.id,
+            correction.date.unwrap_or(recorded.date),
+            correction.quantity.unwrap_or(recorded.quantity),
+            unit_price,
+            correction.rate.unwrap_or(recorded.exchange_rate),
+            correction.fees.unwrap_or(recorded.fees),
+            total,
+            correction.note.or(recorded.note),
+        )
+        .await
+        .map_err(|error| refusal_from_account(&error))
+    }
+
+    /// AGT-052 — what the session `session` recorded and that still exists: how many
+    /// transactions, and the one it recorded last.
+    pub async fn recorded_in_session(
+        &self,
+        session: &str,
+    ) -> Result<SessionRecordings, AccountError> {
+        let recordings = self.account_service.recorded_in_session(session).await?;
+        let count = u32::try_from(recordings.len()).unwrap_or(u32::MAX);
+        let Some(newest) = recordings.first() else {
+            return Ok(SessionRecordings { count, last: None });
+        };
+        let last = match self
+            .account_service
+            .get_transaction_by_id(&newest.transaction_id)
+            .await?
+        {
+            None => None,
+            Some(transaction) => {
+                let reference = match self
+                    .asset_service
+                    .get_asset_by_id(&transaction.asset_id)
+                    .await
+                {
+                    Ok(Some(asset)) => asset.reference,
+                    Ok(None) | Err(_) => transaction.asset_id.clone(),
+                };
+                Some((transaction, reference))
+            }
+        };
+        Ok(SessionRecordings { count, last })
+    }
+
+    /// AGT-053 — removes every transaction the session `session` recorded and that still
+    /// exists, the last recorded first. One that a later transaction depends on is tried again once the
+    /// others are gone, and kept when it still cannot go.
+    pub async fn remove_recorded_in_session(
+        &self,
+        session: &str,
+    ) -> Result<SessionRemoval, AccountError> {
+        let mut left = self.account_service.recorded_in_session(session).await?;
+        let mut removed = 0u32;
+        loop {
+            let before = left.len();
+            let mut kept = Vec::new();
+            for recording in left {
+                match self
+                    .cancel_transaction(&recording.account_id, &recording.transaction_id)
+                    .await
+                {
+                    Ok(()) => removed += 1,
+                    // Removed meanwhile, by the agent or by the owner: it is gone already.
+                    Err(AccountError::TransactionNotFound) => {}
+                    Err(AccountError::DatabaseError) => return Err(AccountError::DatabaseError),
+                    Err(refusal) => {
+                        tracing::info!(target: BACKEND, transaction = %recording.transaction_id, err = ?refusal, "agent recordings: one kept for now");
+                        kept.push(recording);
+                    }
+                }
+            }
+            left = kept;
+            // A pass that removed nothing will not do better: what is left depends on
+            // transactions the session did not record.
+            if left.is_empty() || left.len() == before {
+                break;
+            }
+        }
+        Ok(SessionRemoval {
+            removed,
+            kept: u32::try_from(left.len()).unwrap_or(u32::MAX),
+        })
+    }
+
     /// CLI-011 / CLI-012 — records what a person named: the account and the asset found by
     /// what was typed, then the transaction through the rules of the window. `today` is the
     /// date used when the recording gives none.

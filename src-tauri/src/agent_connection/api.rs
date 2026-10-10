@@ -1,8 +1,9 @@
 // Allow unreachable lint as tauri::command and specta::specta macros generate false positives
 #![allow(clippy::unreachable)]
 
-//! The window's commands over the agent connection (AGT-022, AGT-032 to AGT-036): the
-//! owner's setting, the answer to a connection request, and the disconnect.
+//! The window's commands over the agent connection (AGT-022, AGT-032 to AGT-036, AGT-053):
+//! the owner's setting, the answer to a connection request, the disconnect, and the removal
+//! of what a session recorded.
 
 use std::sync::Arc;
 
@@ -13,6 +14,8 @@ use tauri::State;
 use super::channel;
 use super::connections::{AgentConnectionRequest, AgentSession};
 use super::gate::{AgentGate, GateError};
+use crate::core::BACKEND;
+use crate::use_cases::holding_transaction::{HoldingTransactionUseCase, SessionRemoval};
 
 /// Failures of the agent connection commands.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Type)]
@@ -30,6 +33,9 @@ pub enum AgentConnectionError {
     /// The session already ended.
     #[error("No such agent session")]
     SessionAlreadyEnded,
+    /// What the session recorded could not be read or removed; the cause is in the log.
+    #[error("The portfolio could not be read or written")]
+    DatabaseError,
 }
 
 impl From<GateError> for AgentConnectionError {
@@ -117,6 +123,37 @@ pub fn disconnect_agent(
     } else {
         Err(AgentConnectionError::SessionAlreadyEnded)
     }
+}
+
+/// AGT-053 — the owner removes everything a connected agent's session recorded, and
+/// nothing else. A recording a later transaction depends on is kept and counted.
+#[tauri::command]
+#[specta::specta]
+pub async fn remove_agent_recordings(
+    gate: State<'_, Arc<AgentGate>>,
+    recorder: State<'_, HoldingTransactionUseCase>,
+    session_id: u32,
+) -> Result<SessionRemoval, AgentConnectionError> {
+    let session = gate
+        .connections()
+        .key_of(session_id)
+        .ok_or(AgentConnectionError::SessionAlreadyEnded)?;
+    let removal = recorder.remove_recorded_in_session(&session).await;
+    // Whatever became of the removal, the window is told what is left.
+    match recorder.recorded_in_session(&session).await {
+        Ok(left) => gate.connections().recordings_are(
+            session_id,
+            left.count,
+            left.last.map(super::tools::last_recording),
+        ),
+        Err(error) => {
+            tracing::error!(target: BACKEND, session = session_id, err = ?error, "remove_agent_recordings: what is left could not be counted");
+        }
+    }
+    removal.map_err(|error| {
+        tracing::error!(target: BACKEND, session = session_id, err = ?error, "remove_agent_recordings: the removal failed");
+        AgentConnectionError::DatabaseError
+    })
 }
 
 #[cfg(test)]

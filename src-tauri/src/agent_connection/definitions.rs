@@ -76,6 +76,37 @@ pub fn definitions() -> Vec<ToolDefinition> {
             "record_sale",
             "Record a sale of an asset held in an account. Give either the unit price, in the asset's currency, or the broker's all-in total, in the account's currency. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
         ),
+        ToolDefinition {
+            name: "correct_recording",
+            description: "Correct a transaction this session recorded: give its id, as the recording returned it, and only what changes. A transaction the owner typed, or one another session recorded, is refused. Figures are decimals with a dot (12.5), not millionths.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "transaction": { "type": "string", "description": "The transaction's id, as the recording returned it." },
+                    "quantity": { "type": ["string", "number"], "description": "The right quantity." },
+                    "price": { "type": ["string", "number"], "description": "The right unit price, in the asset's currency. Not with total." },
+                    "total": { "type": ["string", "number"], "description": "The right all-in amount, in the account's currency; for an opening balance, its total cost. Not with price." },
+                    "fees": { "type": ["string", "number"], "description": "The right fees, in the account's currency." },
+                    "rate": { "type": ["string", "number"], "description": "The right exchange rate from the asset's currency to the account's." },
+                    "date": { "type": "string", "description": "The right date, YYYY-MM-DD, today or earlier." },
+                    "note": { "type": "string", "description": "The right note." }
+                },
+                "required": ["transaction"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "cancel_recording",
+            description: "Cancel a transaction this session recorded: give its id, as the recording returned it. A transaction the owner typed, or one another session recorded, is refused.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "transaction": { "type": "string", "description": "The transaction's id, as the recording returned it." }
+                },
+                "required": ["transaction"],
+                "additionalProperties": false
+            }),
+        },
     ]
 }
 
