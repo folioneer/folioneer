@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-10-10
+
+### Added
+
+- an agent can record purchases and sales, marked as its own
+- an agent can read the portfolio through the open application
+- the command line adds an asset of each kind and finds it by ISIN
+- a new asset starts with its kind: listed, crypto or custom
+- an asset created twice by mistake is refused
+
+### Fixed
+
+- a recording an agent started completes even if you disconnect
+- a date an agent sends as a number is refused, not read as today
+- the full-page purchase form no longer offers cash as an asset
+- an archived asset can no longer be sold by a command or an agent
+- a purchase on an archived asset no longer promises to unarchive
+- just after midnight, a date of today is no longer refused
+- joining a folder from a newer version says to update the app
+
 ## [0.6.0] - 2026-10-05
 
 ### Added
