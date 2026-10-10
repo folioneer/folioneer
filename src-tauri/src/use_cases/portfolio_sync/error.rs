@@ -204,6 +204,7 @@ mod tests {
                 "NameEmpty",
                 "AccountNotFound",
                 "AmountNotPositive",
+                "ArchivedAssetSell",
                 "CascadingOversell",
                 "ClosedPosition",
                 "DatabaseError",

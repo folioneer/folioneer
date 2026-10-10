@@ -209,9 +209,8 @@ fn match_asset<'a>(assets: &'a [Asset], typed: &str) -> Result<&'a Asset, NameLo
 /// opening balance, buy, sell, correct, cancel.
 ///
 /// Injects `Arc<AccountService>` + `Arc<AssetService>` and shares them across all five methods.
-/// `asset_service` is used today by `open_holding` for the archived-asset guard, and will also
-/// drive the cross-BC `ensure_cash_asset` step inserted by the cash-tracking spec
-/// (CSH-040 / CSH-050 / CSH-042 / CSH-024).
+/// `asset_service` gives `open_holding` and `sell_holding` their archived-asset guards (TRX-050,
+/// SEL-037) and seeds the system Cash Asset before a cash-affecting operation (CSH-010).
 pub struct HoldingTransactionUseCase {
     pub(super) account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,
@@ -545,6 +544,19 @@ impl HoldingTransactionUseCase {
         total_amount: Option<i64>,
         note: Option<String>,
     ) -> Result<Transaction, AccountError> {
+        // SEL-037 — an archived asset is not sold: it is unarchived first (AST-018). An
+        // asset that does not exist is left to the recording's own refusal.
+        let asset = self
+            .asset_service
+            .get_asset_by_id(&asset_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "sell_holding: get_asset_by_id failed");
+                AccountError::DatabaseError
+            })?;
+        if asset.is_some_and(|asset| asset.is_archived) {
+            return Err(AccountError::ArchivedAssetSell);
+        }
         self.ensure_cash_for(account_id, "sell_holding").await?;
         self.account_service
             .sell_holding(
@@ -1162,6 +1174,84 @@ mod tests {
             ),
             "expected UseCase(ArchivedAsset), got: {err:?}"
         );
+    }
+
+    // TRX-028 / SEL-037 — a purchase on an archived asset is saved and the asset stays
+    // archived; a sale of it is refused until it is unarchived, and then goes through.
+    #[tokio::test]
+    async fn an_archived_asset_is_bought_and_stays_archived_and_is_not_sold() {
+        let pool = setup_pool().await;
+        let (account_svc, asset_svc) = make_services(&pool);
+        let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
+        let account = account_svc
+            .create(
+                "Acc".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .unwrap();
+        let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc.clone());
+        uc.ensure_cash_for(&account.id, "test").await.unwrap();
+        account_svc
+            .record_deposit(&account.id, "2024-01-01".to_string(), micro(10_000), None)
+            .await
+            .unwrap();
+        asset_svc.archive_asset(&asset.id).await.unwrap();
+
+        let bought = uc
+            .buy_holding(
+                &account.id,
+                asset.id.clone(),
+                "2024-01-02".to_string(),
+                micro(10),
+                micro(100),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .expect("a purchase on an archived asset is saved");
+        assert_eq!(bought.quantity, micro(10));
+        let still = asset_svc.get_asset_by_id(&asset.id).await.unwrap().unwrap();
+        assert!(still.is_archived, "the purchase unarchives nothing");
+
+        let refused = uc
+            .sell_holding(
+                &account.id,
+                asset.id.clone(),
+                "2024-01-03".to_string(),
+                micro(1),
+                micro(100),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(refused, AccountError::ArchivedAssetSell),
+            "expected ArchivedAssetSell, got: {refused:?}"
+        );
+
+        asset_svc.unarchive_asset(&asset.id).await.unwrap();
+        uc.sell_holding(
+            &account.id,
+            asset.id.clone(),
+            "2024-01-03".to_string(),
+            micro(1),
+            micro(100),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .expect("sold once unarchived");
     }
 
     // CSH-061 — open_holding rejects an OpeningBalance against a Cash Asset

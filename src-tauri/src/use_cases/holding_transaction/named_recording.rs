@@ -313,6 +313,9 @@ fn refusal_from_open(error: &OpenHoldingError) -> Refusal {
 /// variant is named, so a new one fails to compile until it has a sentence.
 fn refusal_from_account(error: &AccountError) -> Refusal {
     let message = match error {
+        AccountError::ArchivedAssetSell => {
+            "the asset is archived: unarchive it to sell".to_string()
+        }
         AccountError::Oversell {
             available,
             requested,

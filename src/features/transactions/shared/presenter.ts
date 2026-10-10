@@ -56,6 +56,7 @@ export function transactionMutationErrorToI18n(err: AccountError | OpenHoldingEr
     case "ArchivedAsset":
     case "OpeningBalanceOnCashAsset":
     case "TradeOnCashAsset":
+    case "ArchivedAssetSell":
     case "InvalidTotalCost":
       return { key: `error.${err.code}` };
     default:

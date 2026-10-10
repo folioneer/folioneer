@@ -245,6 +245,17 @@ describe("HoldingRow — double-click opens Edit Asset modal", () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
+  // SEL-010 / SEL-037 — the Sell action is disabled on an archived asset; the purchase is not.
+  it("disables Sell, and not Buy, when the asset is archived", () => {
+    useAppStore.setState({
+      assets: [{ id: "asset-1", is_archived: true, currency: "USD" }] as unknown as Asset[],
+      accounts: [],
+    });
+    renderInTable(baseRow);
+    expect(screen.getByRole("button", { name: "transaction.action_sell" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "transaction.action_buy" })).toBeEnabled();
+  });
+
   it("pressing Enter on a holding row opens the edit-asset modal", () => {
     renderInTable(baseRow);
     const row = screen.getByText("Apple Inc").closest("tr");

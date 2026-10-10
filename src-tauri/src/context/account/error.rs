@@ -40,6 +40,9 @@ pub enum AccountError {
     /// moves by a Deposit or a Withdrawal.
     #[error("A purchase or a sale cannot target the cash line")]
     TradeOnCashAsset,
+    /// A sale cannot target an archived asset (SEL-037): it is unarchived first.
+    #[error("An archived asset cannot be sold")]
+    ArchivedAssetSell,
 
     // --- Account aggregate operations (buy/sell/correct/cancel/cash) ---
     /// Attempt to sell an asset with no open position (quantity = 0).
@@ -248,6 +251,10 @@ mod tests {
         assert_eq!(
             to_value(AccountError::OpeningBalanceOnCashAsset).unwrap(),
             json!({ "code": "OpeningBalanceOnCashAsset" })
+        );
+        assert_eq!(
+            to_value(AccountError::ArchivedAssetSell).unwrap(),
+            json!({ "code": "ArchivedAssetSell" })
         );
         assert_eq!(
             to_value(AccountError::TradeOnCashAsset).unwrap(),

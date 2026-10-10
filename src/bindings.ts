@@ -1252,6 +1252,10 @@ export type AccountError =
  */
 { code: "TradeOnCashAsset" } | 
 /**
+ * A sale cannot target an archived asset (SEL-037): it is unarchived first.
+ */
+{ code: "ArchivedAssetSell" } | 
+/**
  * Attempt to sell an asset with no open position (quantity = 0).
  */
 { code: "ClosedPosition" } | 
