@@ -419,7 +419,7 @@ Remove an entry once it has been resolved.
 
 ## 2026-10-09 — DEBT-086 — The agent connection does not exist on Windows
 
-For 0.8.0 (owner, 2026-10-09): the next version has the agent connection working on Windows.
+For 0.8.0 (owner, 2026-10-09): the next version has the agent connection working on Windows. Queued by the owner on 2026-10-10, after v0.7.1.
 
 - Found by: the owner's decision of 2026-10-09 while building TODO-051 (Linux first)
 - Where: `src-tauri/src/agent_connection/channel.rs` (the channel is a Unix socket; `AVAILABLE` is false elsewhere); `.github/workflows/` — no job compiles for Windows on a pull request, only `release.yml` does
@@ -427,6 +427,11 @@ For 0.8.0 (owner, 2026-10-09): the next version has the agent connection working
 - Observation: on Windows the setting "Allow agents to connect" is disabled and says the agent connection is not available on this system yet (AGT-023). The Windows channel is a named pipe restricted to the owner's user, which needs Windows-only code that no pull request compiles today: written blind, its first compilation would be the release
 - User value: A Windows user lets an agent read the portfolio through the open application, as on Linux.
 - Done when: a pull request that touches the Rust code is compiled for Windows before it merges; the channel exists on Windows as a named pipe only the owner's user can open, refusing remote clients; AGT-021 and AGT-023 say so, and the tests that can run on Windows run there.
+
+**Open questions:**
+
+- [x] How wide is the Windows job on pull requests? — On pull requests that touch Rust: compile the application for Windows and run the agent-connection tests there; not the whole Rust suite (owner, 2026-10-10).
+- [x] The agent cannot run the application on Windows: does the entry wait for a trial on a real machine? — No: it closes on green CI; the owner tries it when next on Windows (owner, 2026-10-10).
 
 ## 2026-10-09 — DEBT-085 — The assets to settle are reported by the core and shown nowhere
 
