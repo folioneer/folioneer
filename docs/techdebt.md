@@ -7,10 +7,19 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `DEBT-NNN` reference (never renumbered, never reused; next free:
-DEBT-111) so the human can queue it in `docs/todo.md` § Next like any todo.
+DEBT-112) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
+
+## 2026-10-10 — DEBT-111 — A dividend that converts to nothing is refused as an unknown error
+
+- Found by: `spec-checker` on the rules amended since v0.7.1 (DIV-022, SPL-062, FXR-014, CFR-044), at the hand-over of the batch (2026-10-10); the mapping was read again in `presenter.ts`
+- Where: `dividendErrorToI18n` in `src/features/account_details/shared/presenter.ts` and its test; `src-tauri/src/context/account/service.rs` (`div_021_a_dividend_that_converts_to_nothing_is_refused`); `spl_062_a_split_draft_reports_its_first_problem` in `src-tauri/src/use_cases/holding_transaction/orchestrator.rs`; `src-tauri/src/context/sync/application/join.rs`; `src-tauri/tests/sync_two_devices.rs`
+- Severity: 🟡
+- Observation: **the window.** DIV-022 refuses a dividend whose amount converts to zero in the account's currency with `TotalAmountNotPositive`; the mapping of dividend errors does not list the code, so recording or correcting such a dividend says "unknown error" though the message exists. **A clause without a test.** DIV-022: the one test is named after DIV-021, and correcting a dividend to such an amount has none. SPL-062: the test of the order gives the unknown account a holding, so it passes with the two checks in either order; no case has a wrong ratio with an unknown account. FXR-014 / SYN-083: no test joins from an installation that holds a pair and shows the pair replaced. CFR-044 is implemented and tested.
+- User value: A dividend too small to count in the account's currency is refused with the reason.
+- Done when: the mapping lists the code, with its test; each clause above has a test that fails when the order or the replacement is wrong.
 
 ## 2026-10-10 — DEBT-110 — What the spec check of the agent connection found after TODO-060
 
@@ -18,6 +27,7 @@ Remove an entry once it has been resolved.
 - Where: `src-tauri/src/use_cases/holding_transaction/named_recording.rs` (`remove_recorded_in_session`); `src-tauri/src/agent_connection/` (`api.rs`, `tools.rs`, `server.rs`, `connections.rs`, `end_to_end_tests.rs`); `src/features/shell/agent_connection/`; `agent.session_remove_note` and `agent.session_confirm_message` in `src/i18n/locales/{en,fr}/common.json`
 - Severity: 🟡
 - Observation: **code short of its rule.** AGT-053: a deletion refused for any reason other than a failure of the database or a transaction already gone counts as "kept", so the owner is told "a transaction recorded since depends on it" for a refusal that is something else. AGT-054: the sentence of the dialog says "nothing you typed" and not that a correction the owner made to one of the recordings goes with it; "connected since" shows a time without its day. **A clause without a test.** AGT-050: a cancellation the window's deletion would refuse; a corrected total of an opening balance, a sale, new fees or a new rate; the opening balance's refusal of fees and rate; the limit's count untouched; the write that runs to its end. AGT-052 / AGT-036: the window told after every call and after the removal; a deletion in the journal seen at the next recording; a refused read left uncounted. AGT-053: the command `remove_agent_recordings` itself (a test replays its body), its two refusals, `DatabaseError` in the serialization test, a retry that succeeds, a recording made while the removal runs. AGT-054: the confirmation closing with its session; the figures following the state; the state read again after a refusal. AGT-034: a disconnection ahead of what the agent already sent. AGT-047: `SessionLimitReached` on a recording. AGT-049: `RecordedNotMarked` and its count.
+- Also, from `reviewer-security` before the release (2026-10-10, no critical, no warning): on Windows, an agent's connection is dropped without a log line when the channel cannot prepare its next instance (`Listener::accept` in `channel/windows.rs`); the comment of `same_user` should say that the pipe's access list is the gate and the check a second line.
 - User value: What the window says after removing an agent's recordings is what happened.
 - Done when: a deletion refused for another reason is said as what it is; the dialog's sentence and its date say what AGT-054 says, or the rule says what the dialog does; each clause above has a test.
 
