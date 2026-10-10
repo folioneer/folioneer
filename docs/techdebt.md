@@ -7,7 +7,7 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `DEBT-NNN` reference (never renumbered, never reused; next free:
-DEBT-092) so the human can queue it in `docs/todo.md` § Next like any todo.
+DEBT-093) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
@@ -317,6 +317,15 @@ Remove an entry once it has been resolved.
 - Observation: the replay multiplies the quantity by the factor in 128 bits and casts the result back to 64 bits without a check. A factor large enough (far beyond any real split) makes the cast wrap: recording and the split check both then show a quantity that is wrong, or refuse a split for the wrong reason.
 - User value: None in practice — no real split comes near the bound; an absurd factor typed by mistake is refused with a clear reason.
 - Done when: a factor whose rescale cannot be stored is refused when the split is recorded and when it is checked, with one error code, shown by a test on each path.
+
+## 2026-10-10 — DEBT-092 — The test tools carry about twenty high advisories; six majors are available
+
+- Found by: the dependency audit before the 0.7.0 release
+- Where: `package-lock.json` — packages reached only through `devDependencies` (the WebdriverIO chain: `basic-ftp`, `extract-zip`, `braces`, `brace-expansion`, `ip-address`, `undici`, `serialize-javascript`, `diff`); `src-tauri/Cargo.toml`
+- Severity: 🟡
+- Observation: `npm audit --omit=dev` reports nothing: none of these packages ships. `npm audit` reports about twenty high advisories on the tools that run the E2E suite and the tests, on the developer's computer and on the CI runner. `npm audit fix` rewrites about 1,200 lines of the lock file and leaves twenty; the rest asks for WebdriverIO 10. Majors available, read from the registries on 2026-10-10: WebdriverIO 9 → 10, Vitest 4 → 5, TypeScript 6 → 7, `@testing-library/jest-dom` 6 → 7; `sqlx` 0.8 → 0.9, `argon2` 0.5 → 0.6 with `password-hash` 0.6, `sha2` 0.10 → 0.11, `dirs` 6 → 7, `iso_currency` 0.5 → 0.7, `strum` 0.27 → 0.28. `cargo audit` reports no vulnerability; nine warnings on crates brought by others (unmaintained `paste`, `proc-macro-error`, `unic-*`; unsound `glib` 0.18; yanked `spin` 0.9.8)
+- User value: None directly — the tools that prove the application carry no known advisory.
+- Done when: `npm audit` reports no high or critical advisory, or each one left is named with the reason it cannot be reached; WebdriverIO is at 10 and the E2E suite is green in CI; each other major is taken or has a line saying what holds it.
 
 ## 2026-10-10 — DEBT-091 — Three commands granted to the CI reviewers can write or run a program
 
