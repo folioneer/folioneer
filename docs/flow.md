@@ -63,7 +63,7 @@ entries already held the matter for.
 - Verdict: **keep, and count the causes (FLOW-020).** A round costs about 5 min where it
   cost 25, and the median pull request merges in 7 min. A merge queue would cost a
   rewrite of `just merge` for a saving that is small. The share rose on the reviewers'
-  failures (FLOW-025), not on the merges.
+  failures, not on the merges.
 
 ## FLOW-006 — An entry whose Done-when is an audit cannot close
 
@@ -135,28 +135,6 @@ entries already held the matter for.
 - Costs: about two hours, with tests; one `gh` call per later round at audit time.
   Protects: the decision on a merge queue being taken on a figure.
 - 0.7.0: not queued, and the causes were not counted a second time.
-
-## FLOW-025 — A reviewer that reads a whole file fails a pull request on what it did not change
-
-- Kind: speed
-- Observed: the Review workflow failed 13 times in 0.7.0, was 7. On #150, a rename
-  across the documents, the contract lane went red three times, by more than one cause: no report at the turn limit (DEBT-087), then older gaps of the file. The agent pushed a fourth time past the rule of three reds; the owner confirmed the rule on 2026-10-10: three
-  reds on one lane, stop and ask, whatever the causes.
-- Proposal: in CI the contract and spec reviewers judge the lines the pull request
-  changes and report older gaps as suggestions, never as a refusal; the exhaustive
-  reading belongs to the release checks, where `spec-checker` already runs on every
-  spec the batch touched, and to `scripts/contract-check.py` for the contracts. `docs/workflow.md` says "the same gate failing three times": it adds "whatever the three causes".
-- Costs: an older gap in a file a pull request touches waits for the release checks.
-  Protects: about 25 minutes a round, and a mechanical pull request from repairing a
-  document it only renamed in.
-- From the owner's other project, taken into this entry by the owner on 2026-10-10: its
-  reviewers are 30 to 75 lines each beside one shared protocol file; here they are 190
-  to 480 lines each and repeat the protocol. The shared file holds the two modes this
-  entry asks for — the changed lines by default, with older findings listed without a
-  severity, and a release sweep where every file of the lane is judged — and, for every
-  lane, the rule that in CI `.claude/` on disk is the base branch's (written here for
-  the infrastructure lane only, in #151). The entry brings that file over and cuts each
-  reviewer down to its lane; a shorter prompt also leaves more turns (DEBT-087).
 
 ## FLOW-026 — A CI reviewer that ends without a report does not say why
 

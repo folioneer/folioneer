@@ -112,7 +112,7 @@ repos/{owner}/{repo}/issues/<n>/comments`), grade every finding with
   with the failure text and the run's link to find out why, and continue; the fix that
   re-enables it closes the entry. Any other red: fix, commit with `git commit --fixup <sha>` (the entry lands as one
   commit — `just merge` folds it), push, watch again. The same gate red
-  three times: open question on the entry, leave the PR open, stop.
+  three times, whatever the three causes: open question on the entry, leave the PR open, stop.
 - All green: `just merge`.
 
 ## Step 9 — Closure

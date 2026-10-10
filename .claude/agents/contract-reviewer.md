@@ -33,6 +33,15 @@ sound enough to anchor test stubs and a TypeScript API.
 
 ---
 
+## Modes
+
+The two modes and the rules every reviewer keeps are in `.claude/agents/review-protocol.md`; read it first.
+
+- **Changed lines** — when the invoking prompt names a pull request or a branch (CI does): read the whole contract, since a check needs it all, then `bash scripts/branch.sh diff <path>`. A finding carries a severity only when it is about a row or type this branch added or changed, or about something the change made false elsewhere in the file. Every other finding was there before: it goes under `### ℹ️ Older, not introduced by this branch`, one line each, without a severity, and never refuses the pull request.
+- **Whole file** — when asked for the contract itself, locally or with `release-sweep`: every finding carries its severity, and the reading is exhaustive: every row or type, not a sample.
+
+---
+
 ## Input
 
 The user passes a contract path (e.g. `docs/contracts/user-contract.md`).

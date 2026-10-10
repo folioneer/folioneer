@@ -18,13 +18,12 @@
 <!-- takes the first ready one, removes a reference when it closes the entry (order and -->
 <!-- additions are the human's), and stops when the queue is empty. -->
 
-1. FLOW-025
-2. FLOW-026
-3. FLOW-027
-4. FLOW-028
-5. FLOW-029
-6. TODO-066
-7. DEBT-088
+1. FLOW-026
+2. FLOW-027
+3. FLOW-028
+4. FLOW-029
+5. TODO-066
+6. DEBT-088
 
 ## TODO-009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 

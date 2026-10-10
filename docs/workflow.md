@@ -229,6 +229,12 @@ change (the checks `reviewer-spec` and `reviewer-contract` in CI), `adr-reviewer
 ADR changes and `spec-checker` before closing an entry that carries spec rules — these
 two locally only.
 
+What every reviewer does is in `.claude/agents/review-protocol.md`; a reviewer's own file
+is its lane. A reviewer judges the lines the branch changed and lists what was there
+before without a severity — the two document reviewers included, though they read the
+whole file. The exhaustive reading is a release sweep (`release-sweep` in the prompt),
+`spec-checker` before a release, and `scripts/contract-check.py` on every pull request.
+
 Every finding, local or from a lane's CI comment, is graded and the outcome recorded
 in the PR body. The grade comes from four questions, in order; the one that settles it
 is the row's reason:
@@ -264,7 +270,8 @@ treated as a new open question on the entry.
 
 - One entry, one run, a wall-clock budget of three hours. Over budget → open question
   "larger than estimated: split?", move on.
-- The same gate failing three times on one entry → open question, move on.
+- The same gate failing three times on one entry, whatever the three causes → open
+  question, move on.
 - A test fails for a reason the change cannot explain → it is flaky, and is never
   accepted by re-running it: that one test is skipped in its own pull request and a
   `DEBT-NNN` is filed with the failure text and the run's link, to find out why; the fix

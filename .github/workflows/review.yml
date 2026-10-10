@@ -105,11 +105,11 @@ jobs:
           # reviewers read the diff, the two document reviewers the changed documents.
           case "$REVIEWER" in
             spec) echo "agent=spec-reviewer" >> "$GITHUB_OUTPUT"
-                  echo "target=on each file under docs/spec/ that the pull request changed, one after the other" >> "$GITHUB_OUTPUT" ;;
+                  echo "target=on each file under docs/spec/ that the pull request changed, one after the other, in its changed-lines mode (what the pull request did not change is listed without a severity)" >> "$GITHUB_OUTPUT" ;;
             contract) echo "agent=contract-reviewer" >> "$GITHUB_OUTPUT"
-                  echo "target=on each file under docs/contracts/ that the pull request changed, one after the other, against its spec" >> "$GITHUB_OUTPUT" ;;
+                  echo "target=on each file under docs/contracts/ that the pull request changed, one after the other, against its spec, in its changed-lines mode (what the pull request did not change is listed without a severity)" >> "$GITHUB_OUTPUT" ;;
             *) echo "agent=reviewer-$REVIEWER" >> "$GITHUB_OUTPUT"
-               echo "target=in its default diff-scoped mode" >> "$GITHUB_OUTPUT" ;;
+               echo "target=in its default changed-lines mode" >> "$GITHUB_OUTPUT" ;;
           esac
           if [[ "$(jq -r --arg r "$REVIEWER" '.[$r]' <<<"$LANES")" == "true" ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
