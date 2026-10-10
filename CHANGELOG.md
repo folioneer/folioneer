@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-10-10
+
+### Added
+
+- what a connected agent did, and one action to remove it
+- an agent corrects or cancels what its own session recorded
+- a computer that left sync can start over from the join refusal
+- agents connect to the open application on Windows
+
+### Fixed
+
+- a computer that only declared a currency pair can join
+- a fee schedule at exactly 100 % a year is refused
+- a paused fee schedule is not charged for its pause
+- cancelling around a management fee is refused with its reason
+
 ## [0.7.1] - 2026-10-10
 
 ### Fixed
