@@ -99,6 +99,17 @@ describe("shellGateway — the agent connection (AGT-032, AGT-034, AGT-036)", ()
     });
   });
 
+  // AGT-053 — the owner's removal of what a session recorded.
+  it("removeAgentRecordings sends the session and returns what was removed", async () => {
+    mockInvoke.mockResolvedValue({ removed: 3, kept: 1 });
+
+    expect(await shellGateway.removeAgentRecordings(2)).toEqual({
+      status: "ok",
+      data: { removed: 3, kept: 1 },
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("remove_agent_recordings", { sessionId: 2 });
+  });
+
   it("disconnectAgent passes through SessionAlreadyEnded", async () => {
     mockInvoke.mockRejectedValue({ code: "SessionAlreadyEnded" });
 

@@ -19,8 +19,7 @@
 <!-- additions are the human's), and stops when the queue is empty. -->
 
 1. TODO-059
-2. TODO-060
-3. DEBT-096
+2. DEBT-096
 
 ## TODO-009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
@@ -136,17 +135,6 @@ Four more recordings as tools, each datable years back, through the rules of the
 - [x] The recorded Claude Code session of the Done when cannot be run by the agent: how does the entry close? — The owner records it once, from a script the agent leaves; the entry stays open until then (owner, 2026-10-10).
 - [x] A price is not a transaction and never shows in the account journal: how is a price an agent recorded marked? — Through its source: it is stored with the source "Agent", shown where the price history shows a source, counts against the session's limit, never replaces a price already at that date, and "Remove everything it recorded" (TODO-060) removes it; the Mark is widened to a transaction or a price (owner, 2026-10-10).
 - [ ] The source of a price is part of what sync writes: `AssetPriceSource` ("Manual", "YahooFinance") is pinned in the written form of the data format (`src-tauri/tests/sync_format/v2.json`, SYN-038), so a third value "Agent" is a new data format version — every one of the owner's computers must run the new version before it syncs again (SYN-035). Is that accepted for this mark, or is a recorded price marked on this computer only, as a recorded transaction is (AGT-045: stored as "Manual" for the other computers, the mark kept in its own table here and shown in the price history here)? Asked during the batch, not at its start: the opening reading looked at the `source` column and not at the sync format's snapshot, which would have shown it. Until it is answered the entry is skipped; the three transaction recordings (deposit, withdrawal, dividend) do not depend on it.
-
-## TODO-060 — (fullstack) — What an agent recorded can be undone, by it or by the owner
-
-Split from TODO-059 on 2026-10-10. An agent may correct or cancel only transactions marked as its own, never one the owner typed: what the agent reads (a statement) is content it did not write, and must not be able to steer it into removing real history. The header opens a dialog on the session that lists what it read and recorded and offers the owner one action, "Remove everything it recorded".
-
-The mock-up of the session dialog is `screenshots/design/060-*-session.png`, validated by the owner with TODO-051 on 2026-10-09.
-
-**User value:** A reconstruction that went wrong is removed in one action, and an agent can fix its own mistakes without ever touching what the owner typed.
-**Done when:** an agent corrects or cancels a transaction marked as its own and is refused on any other; the session dialog opens from the header, lists what the session read and recorded, and removes everything it recorded in one action after a confirmation that refuses by default.
-**Design:** validated
-**Open questions:** none
 
 ## TODO-061 — (fullstack) — An agent asks before touching a transaction the owner typed
 

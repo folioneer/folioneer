@@ -18,12 +18,24 @@ import { AgentIndicator } from "./AgentIndicator";
 
 const answer = vi.fn();
 const disconnect = vi.fn();
+const removeRecordings = vi.fn();
 const state = (overrides = {}) => ({
   request: null,
   sessions: [],
   user: "phil",
   answer,
   disconnect,
+  removeRecordings,
+  ...overrides,
+});
+const session = (overrides = {}) => ({
+  id: 1,
+  client: "Claude Code",
+  calls: 39,
+  started_at: "2026-10-09T14:32:00",
+  reads: 27,
+  recordings: 12,
+  last_recording: { kind: "Purchase", asset: "CW8", date: "2019-12-31" },
   ...overrides,
 });
 const request = { id: 4, client: "Claude Code", asked_at: "2026-10-09T14:32:00" };
@@ -135,10 +147,7 @@ describe("AgentIndicator", () => {
   it("names each connected agent and disconnects the one asked", () => {
     hook.mockReturnValue(
       state({
-        sessions: [
-          { id: 1, client: "Claude Code", calls: 0 },
-          { id: 2, client: "Claude Desktop", calls: 3 },
-        ],
+        sessions: [session(), session({ id: 2, client: "Claude Desktop" })],
       }),
     );
     render(<AgentIndicator />);
@@ -156,5 +165,99 @@ describe("AgentIndicator", () => {
 
     fireEvent.click(second);
     expect(disconnect).toHaveBeenCalledWith(2);
+  });
+
+  // AGT-052 — the header's agent opens what its session did: since when, how much it
+  // read and recorded, and its last recording.
+  it("opens what the session did from the agent's name", () => {
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    render(<AgentIndicator />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const opener = document.getElementById("agent-connected-1") as HTMLElement;
+    expect(opener).toHaveAccessibleName("agent.session_open(Claude Code)");
+
+    fireEvent.click(opener);
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("id", "agent-session-dialog");
+    expect(dialog).toHaveTextContent("agent.connected(Claude Code)");
+    expect(dialog).toHaveTextContent("14:32");
+    expect(dialog).toHaveTextContent("agent.session_read_count(27)");
+    expect(dialog).toHaveTextContent("agent.session_recorded_count(12)");
+    expect(dialog).toHaveTextContent("transaction.type_purchase · CW8 · 31/12/2019");
+    expect(document.getElementById("agent-session-note")).toHaveTextContent(
+      "agent.session_remove_note(12)",
+    );
+
+    fireEvent.click(document.getElementById("agent-session-close") as HTMLElement);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  // AGT-053 — removing everything asks to confirm, keeping is the action in focus, and
+  // only the confirmation removes.
+  it("removes everything the session recorded only after a confirmation that keeps by default", () => {
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    render(<AgentIndicator />);
+    fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
+
+    fireEvent.click(document.getElementById("agent-session-remove") as HTMLElement);
+    const confirmation = screen.getByRole("dialog");
+    expect(confirmation).toHaveAttribute("id", "agent-session-remove-dialog");
+    expect(confirmation).toHaveTextContent("agent.session_confirm_title(Claude Code)");
+    expect(confirmation).toHaveTextContent("agent.session_confirm_message(12)");
+    expect(document.getElementById("agent-session-remove-keep")).toHaveFocus();
+
+    fireEvent.click(document.getElementById("agent-session-remove-keep") as HTMLElement);
+    expect(removeRecordings).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toHaveAttribute("id", "agent-session-dialog");
+
+    fireEvent.click(document.getElementById("agent-session-remove") as HTMLElement);
+    fireEvent.click(document.getElementById("agent-session-remove-confirm") as HTMLElement);
+    expect(removeRecordings).toHaveBeenCalledWith(1);
+    expect(screen.getByRole("dialog")).toHaveAttribute("id", "agent-session-dialog");
+  });
+
+  // AGT-053 — a session with nothing left to remove offers no removal.
+  it("offers no removal when the session has no recording left", () => {
+    hook.mockReturnValue(state({ sessions: [session({ recordings: 0, last_recording: null })] }));
+    render(<AgentIndicator />);
+    fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
+
+    expect(document.getElementById("agent-session-remove")).toBeDisabled();
+    expect(document.getElementById("agent-session-note")).toHaveTextContent(
+      "agent.session_nothing",
+    );
+    expect(screen.getByRole("dialog")).toHaveTextContent("agent.session_none");
+  });
+
+  // AGT-032 / AGT-054 — an agent that asks to connect comes first: the session dialog gives
+  // way until the request is answered.
+  it("gives way to a connection request and comes back once it is answered", () => {
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    const { rerender } = render(<AgentIndicator />);
+    fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
+    expect(document.getElementById("agent-session-dialog")).not.toBeNull();
+
+    hook.mockReturnValue(state({ sessions: [session()], request }));
+    rerender(<AgentIndicator />);
+    expect(document.getElementById("agent-session-dialog")).toBeNull();
+
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    rerender(<AgentIndicator />);
+    expect(document.getElementById("agent-session-dialog")).not.toBeNull();
+  });
+
+  // AGT-034 — the dialog disconnects its agent, and closes once the session is gone.
+  it("disconnects from the dialog, which closes with its session", () => {
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    const { rerender } = render(<AgentIndicator />);
+    fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
+
+    fireEvent.click(document.getElementById("agent-session-disconnect") as HTMLElement);
+    expect(disconnect).toHaveBeenCalledWith(1);
+
+    hook.mockReturnValue(state());
+    rerender(<AgentIndicator />);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

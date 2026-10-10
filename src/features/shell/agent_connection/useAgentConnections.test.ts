@@ -7,6 +7,7 @@ vi.mock("../gateway", () => ({
   getAgentConnectionState: vi.fn(),
   answerAgentConnection: vi.fn(),
   disconnectAgent: vi.fn(),
+  removeAgentRecordings: vi.fn(),
   onAgentConnectionChanged: vi.fn((callback: () => void) => {
     changed = callback;
     return Promise.resolve(unlisten);
@@ -15,7 +16,12 @@ vi.mock("../gateway", () => ({
 
 const showSnackbar = vi.fn();
 vi.mock("@/ui/components/snackbar/snackbarStore", () => ({ useSnackbar: () => showSnackbar }));
-vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string, vars?: Record<string, number>) =>
+      vars ? `${key}(${Object.values(vars).join(",")})` : key,
+  }),
+}));
 vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 
 import * as gateway from "../gateway";
@@ -109,6 +115,62 @@ describe("useAgentConnections", () => {
       expect(showSnackbar).toHaveBeenCalledWith("error.ConnectionRequestGone", "error"),
     );
     act(() => result.current.disconnect(3));
+    await waitFor(() => expect(showSnackbar).toHaveBeenCalledWith("error.Unknown", "error"));
+  });
+
+  // AGT-053 — the owner's removal goes to the core; what it answers is said, and the state
+  // is read again.
+  it("removes what a session recorded and says how much went", async () => {
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(state());
+    vi.mocked(gateway.removeAgentRecordings).mockResolvedValue({
+      status: "ok",
+      data: { removed: 12, kept: 0 },
+    });
+    const { result } = renderHook(() => useAgentConnections());
+    await waitFor(() => expect(gateway.getAgentConnectionState).toHaveBeenCalledTimes(1));
+
+    act(() => result.current.removeRecordings(3));
+
+    await waitFor(() => expect(gateway.getAgentConnectionState).toHaveBeenCalledTimes(2));
+    expect(gateway.removeAgentRecordings).toHaveBeenCalledWith(3);
+    expect(showSnackbar).toHaveBeenCalledWith("agent.session_removed(12)", "success");
+  });
+
+  // AGT-053 — what could not be removed is said, as an error.
+  it("says how many recordings were kept", async () => {
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(state());
+    vi.mocked(gateway.removeAgentRecordings).mockResolvedValue({
+      status: "ok",
+      data: { removed: 10, kept: 2 },
+    });
+    const { result } = renderHook(() => useAgentConnections());
+
+    act(() => result.current.removeRecordings(3));
+
+    await waitFor(() =>
+      expect(showSnackbar).toHaveBeenCalledWith(
+        "agent.session_removed(10) agent.session_kept(2)",
+        "error",
+      ),
+    );
+  });
+
+  // AGT-039 / AGT-053 — a removal the core refuses, or that fails, is said too.
+  it("says why a removal was refused or failed", async () => {
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(state());
+    vi.mocked(gateway.removeAgentRecordings).mockResolvedValue({
+      status: "error",
+      error: { code: "SessionAlreadyEnded" },
+    });
+    const { result } = renderHook(() => useAgentConnections());
+
+    act(() => result.current.removeRecordings(3));
+    await waitFor(() =>
+      expect(showSnackbar).toHaveBeenCalledWith("error.SessionAlreadyEnded", "error"),
+    );
+
+    vi.mocked(gateway.removeAgentRecordings).mockRejectedValue(new Error("no core"));
+    act(() => result.current.removeRecordings(3));
     await waitFor(() => expect(showSnackbar).toHaveBeenCalledWith("error.Unknown", "error"));
   });
 });

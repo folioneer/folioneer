@@ -114,6 +114,8 @@ Two things are kept on the computer across restarts, and neither is synced to th
 
 **AGT-053 — The owner removes everything a session recorded (backend)**: For a session that is still connected the owner can remove, in one action, every transaction it recorded and that exists when the action starts, and nothing else: each goes through the deletion of the window (TRX-034), the last recorded first, and one the deletion refuses is tried again once the others are gone. What the deletion still refuses — a recording that a transaction recorded since depends on, the owner's or another session's — is kept and counted, and the action answers how many were removed and how many kept; a recording the session makes while the action runs stays, and counts in what the window is told afterwards. For a session that has ended, or that never was, the action is refused with `SessionAlreadyEnded` and nothing is removed (AGT-039). When the portfolio cannot be read or written the action fails with `DatabaseError`; what it removed before stays removed, and the window is told what is left. Once the session has ended its recordings stay marked in the journal (AGT-045) and are removed one by one there.
 
+**AGT-054 — The session dialog (frontend)**: In the header, "{agent} is connected" (AGT-033) opens a dialog on that session, over the whole window. It shows since when the agent is connected, how many of its calls of a read tool were answered — shown as requests — how many transactions it recorded that still exist, and its last recording — its kind, the asset's reference and its date — or that there is none (AGT-052); the figures follow the state as it changes (AGT-036). Its three actions are "Remove everything it recorded", "Close" and "Disconnect" (AGT-034); a sentence says what the first removes — the session's recordings as they stand, a correction the owner made to one of them included, and no transaction the owner recorded — and that it asks to confirm. With no recording left the removal is inactive and the sentence says so. Removing asks in a second dialog, which names the agent and the number of transactions as it stands then: keeping them is the filled action and has the focus, and only "Remove" there removes (AGT-053). The removal runs behind the session dialog, whose actions stay active. What it did is said in a snackbar: how many transactions were removed and, when some were kept, how many, because a transaction recorded since depends on them. A refusal (`SessionAlreadyEnded`) or a failure (`DatabaseError`) is said in a snackbar too, and the state is read again: after a failure the dialog's figures show what is left. Both dialogs close when the session ends. A connection request that arrives meanwhile takes their place until it is answered (AGT-032).
+
 ---
 
 ## Workflow
@@ -145,7 +147,8 @@ header: "{agent} is connected" · Disconnect (AGT-033, AGT-034)
 - **Setting off**: nothing listens; the checkbox says what switching it on allows.
 - **Not available on this system**: the checkbox is disabled and says so (AGT-023).
 - **An agent asks**: the connection dialog, refusing in focus (AGT-032).
-- **Connected**: the header names the agent and offers to disconnect (AGT-033).
+- **Connected**: the header names the agent and offers to disconnect (AGT-033); the name opens the session dialog (AGT-054).
+- **Session**: what the agent read and recorded, its last recording, and the removal of everything it recorded, confirmed in a second dialog where keeping is in focus; the outcome is said in a snackbar (AGT-054).
 - **Too late**: a request already withdrawn or a session already ended is said in a snackbar, and the state is read again (AGT-039).
 
 ---

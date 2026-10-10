@@ -8,6 +8,7 @@ import {
   disconnectAgent,
   getAgentConnectionState,
   onAgentConnectionChanged,
+  removeAgentRecordings,
 } from "../gateway";
 
 export interface UseAgentConnectionsResult {
@@ -19,6 +20,8 @@ export interface UseAgentConnectionsResult {
   user: string | null;
   answer: (requestId: number, allow: boolean) => void;
   disconnect: (sessionId: number) => void;
+  /** AGT-053 — removes everything the session recorded, and says how much went. */
+  removeRecordings: (sessionId: number) => void;
 }
 
 /**
@@ -85,5 +88,29 @@ export function useAgentConnections(): UseAgentConnectionsResult {
     [settle],
   );
 
-  return { request: requests[0] ?? null, sessions, user, answer, disconnect };
+  const removeRecordings = useCallback(
+    (sessionId: number) => {
+      removeAgentRecordings(sessionId)
+        .then((result) => {
+          if (result.status === "error") {
+            showSnackbar(t(`error.${result.error.code}`), "error");
+            return;
+          }
+          const { removed, kept } = result.data;
+          const went = t("agent.session_removed", { count: removed });
+          showSnackbar(
+            kept > 0 ? `${went} ${t("agent.session_kept", { count: kept })}` : went,
+            kept > 0 ? "error" : "success",
+          );
+        })
+        .catch((e) => {
+          logger.error("[useAgentConnections] removal failed", { error: e });
+          showSnackbar(t("error.Unknown"), "error");
+        })
+        .finally(() => void refresh());
+    },
+    [refresh, showSnackbar, t],
+  );
+
+  return { request: requests[0] ?? null, sessions, user, answer, disconnect, removeRecordings };
 }

@@ -9,6 +9,7 @@ import type {
   PriceFreshness,
   PriceFreshnessError,
   Result,
+  SessionRemoval,
   SyncStatusView,
 } from "@/bindings";
 import { commands, events } from "@/bindings";
@@ -50,6 +51,13 @@ export function disconnectAgent(sessionId: number): Promise<Result<null, AgentCo
   return commands.disconnectAgent(sessionId);
 }
 
+// AGT-053 — the owner removes everything a connected agent's session recorded.
+export function removeAgentRecordings(
+  sessionId: number,
+): Promise<Result<SessionRemoval, AgentConnectionError>> {
+  return commands.removeAgentRecordings(sessionId);
+}
+
 // AGT-036 — the agent connection changed: a request, a session, the setting.
 export function onAgentConnectionChanged(callback: () => void): Promise<UnlistenFn> {
   return events.event.listen((event) => {
@@ -84,6 +92,7 @@ export const shellGateway = {
   getAgentConnectionState,
   answerAgentConnection,
   disconnectAgent,
+  removeAgentRecordings,
   onAgentConnectionChanged,
   getPriceFreshness,
   subscribeToEvents,
