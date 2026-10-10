@@ -19,6 +19,17 @@
 <!-- additions are the human's), and stops when the queue is empty. -->
 
 1. DEBT-086
+2. FLOW-031
+3. FLOW-030
+4. DEBT-019
+5. DEBT-098
+6. DEBT-100
+7. DEBT-097
+8. DEBT-099
+9. DEBT-083
+10. TODO-059
+11. TODO-060
+12. DEBT-096
 
 ## TODO-009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
@@ -129,7 +140,9 @@ Four more recordings as tools, each datable years back, through the rules of the
 **User value:** An agent enters a whole year of an old account from its statement — the cash that came in and went out, the dividends, the year-end prices — not only the purchases and the sales.
 **Done when:** the four recordings exist as tools and as commands of the command line, through one recorder; each is marked with its session and shows in the journal's "Recorded by"; a recorded Claude Code session against the open application lists the tools and calls a read tool and a recording (the clause of TODO-051 that could not be run by the agent).
 **Design:** none
-**Open questions:** none
+**Open questions:**
+
+- [x] The recorded Claude Code session of the Done when cannot be run by the agent: how does the entry close? — The owner records it once, from a script the agent leaves; the entry stays open until then (owner, 2026-10-10).
 
 ## TODO-060 — (fullstack) — What an agent recorded can be undone, by it or by the owner
 

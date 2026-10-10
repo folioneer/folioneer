@@ -309,6 +309,11 @@ Remove an entry once it has been resolved.
 - User value: A user who pauses a fee schedule and resumes it later is not charged for the pause; a small recurring rate removes what its formula says.
 - Done when: FEE-061 and FEE-041 hold in the code, each with a test that fails today, or the owner amends the rule; the skipped periods are logged; the five rules of the second group say what the window does, the owner deciding where the window should change instead; each clause of the third group has a test; the three tests carry the rule they prove.
 
+**Open questions:**
+
+- [x] FEE-041: once a removal is floored once, what of the deductions already generated? — They stay as they are; the fix applies to deductions generated from then on (owner, 2026-10-10).
+- [x] FEE-010, FEE-020, FEE-025/021, FEE-055, FEE-022 (c)/FEE-028: the rule or the window? — The window is right in all five; the rules are amended to it (owner, 2026-10-10).
+
 ## 2026-10-10 — DEBT-099 — Starting sync over: two rules to settle and three clauses without a test
 
 - Found by: `spec-checker` on `docs/spec/multi-device-sync.md`, `main` at c0d7b05 (2026-10-10). SYN-071 and SYN-053 are implemented and tested for the case TODO-066 fixed (the hook and dialog tests, `tests/sync_first_publish.rs`, E2E Step 11, green on pull request 168)
@@ -317,6 +322,13 @@ Remove an entry once it has been resolved.
 - Observation: **from TODO-066, known to the main agent who wrote it:** in a folder that holds no portfolio the dialog says so, then still asks the confirmation that every published file will be discarded: nothing says whether that confirmation is wanted there. The dialog alone refuses to start over in a folder of a newer data format (`UpdateRequired`, kept by a TODO-066 test). **The checker's reading, not read again:** the core clears such a folder without reading its header and the contract lists no `UpdateRequired` for `start_sync_over`: no rule says which is right. "Under the new passphrase" has no real test: `sync_first_publish.rs` asserts the header's bytes changed, which fresh derivation parameters cause with the same passphrase too. "Interrupted after clearing, the device may retry" has no test; the clearing removes the device areas, then the header, and nothing tests an interruption between the two. "Start over" is offered only where sync is enabled, where SYN-053 says any device that still holds the portfolio: one that left sync gets the join refusal. Starting over on an enrolled device keeps its cursors, held-back changes and conflict notices (`save_enrolment` rewrites the device row only), so changes held back for the discarded history would keep the status at "needs attention"; no rule, no test
 - User value: A user who forgot the passphrase after leaving sync can still start over; the sync status is clean after starting over.
 - Done when: the owner says whether a newer-format folder may be started over, whether the confirmation is asked in a folder that holds no portfolio, and whether a device that left sync may start over, and the rules, the core and the dialog agree; the new passphrase, the interrupted clearing and the state kept after starting over each have a test, the last with its rule.
+
+**Open questions:**
+
+- [x] May a folder written by a newer version be started over? — No: the core refuses it too, with the same `UpdateRequired` as the dialog, and the contract lists it (owner, 2026-10-10).
+- [x] Starting over in a folder that holds no portfolio: is the confirmation still asked? — Yes, the same one (owner, 2026-10-10).
+- [x] May a computer that left sync and still holds the portfolio start over? — Yes: the refusal shown when enabling sync offers it (owner, 2026-10-10).
+- [ ] That refusal changes a screen: its mock-up is shown in the opening block of the batch, to validate before any code.
 
 ## 2026-10-10 — DEBT-098 — Account commands return codes their contract rows do not list
 
@@ -335,6 +347,10 @@ Remove an entry once it has been resolved.
 - Observation: a schedule is accepted at exactly 100% a year (`RateAboveHundred` is raised above 100_000_000 only), where FEE-032 says below 100% and FEE-070 relies on it to keep every removal below the quantity held. A schedule is accepted on any asset and with dates of any form, and no rule says what generation does with a schedule on a Cash Asset, on an asset that does not exist, or whose start date is no date. FEE-011 puts "Manage fee" on every holding row without excluding the cash row. Not read: what generation does in each case
 - User value: None known — a schedule the form cannot produce is not created by a user of the window; an agent or the command line could.
 - Done when: the rate bound is the same in FEE-032, FEE-070 and the code; each of the three cases has a rule saying what generation does, and a test; FEE-011 says whether the cash row offers the action.
+
+**Open questions:**
+
+- [x] A schedule at exactly 100% a year: refused, or allowed with FEE-070 rewritten? — Refused, like anything above; the rules stay as written (owner, 2026-10-10).
 
 ## 2026-10-10 — DEBT-096 — Six contracts were never read against the code they describe
 
@@ -463,6 +479,10 @@ For 0.8.0 (owner, 2026-10-09): the next version has the agent connection working
 - Observation: an installation whose only record is a declared currency pair is refused as "holding user data" when it joins, while SYN-014 does not list pairs and SYN-083 treats them as observations the rebuild replaces. Either the spec is missing a line (a pair the user declared is the user's) or the code refuses too much. No test covers that branch, so that either reading can be made true without one failing.
 - User value: A fresh installation that only declared a currency pair either joins, or is told why it cannot, as the rules say.
 - Done when: the owner says whether a declared currency pair is user data; SYN-014 and the code agree, and a test holds the answer.
+
+**Open questions:**
+
+- [x] Is a currency pair the user declared user data when joining? — No: an installation holding only declared pairs may join and its pairs are replaced by the portfolio's; a manual rate still counts (owner, 2026-10-10).
 
 ## 2026-10-04 — DEBT-080 — The E2E tooling carries 22 known advisories
 
