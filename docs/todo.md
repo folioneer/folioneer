@@ -2,7 +2,7 @@
 
 <!-- Add new backlog items here. Format: ## TODO-NNN — (domain) — Short title -->
 <!-- TODO-NNN is a permanent reference: never renumbered, never reused. A new entry takes the -->
-<!-- next free number wherever it is placed. Next free: TODO-060. -->
+<!-- next free number wherever it is placed. Next free: TODO-067. -->
 <!-- Every entry ends with four lines: **User value:**, **Done when:**, **Design:** and -->
 <!-- **Open questions:**. Design is `none` until the agent proposes one (it does so before -->
 <!-- touching anything the user sees), then `proposed (screenshots/design/NNN-*.png)`, then -->
@@ -116,21 +116,91 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
 
-## TODO-059 — (fullstack) — An agent rebuilds an old account: more recordings, and a way to undo them
+## TODO-066 — (frontend) — "Start over" on the sync page cannot be completed
 
-Split from TODO-051 by the owner on 2026-10-09: 0.7.0 ships the agent connection, the read tools and three marked recordings (opening balance, purchase, sale). This entry holds what the owner decided on 2026-10-04 and was left out.
+Found on 2026-10-10 by the spec check of multi-device sync before the 0.7.0 release, and confirmed by reading the dialog's code; not run. "Start over" (SYN-071) re-creates the portfolio in the sync folder under a new passphrase: it is the way to change a passphrase and the way out of a forgotten one (SYN-053). Its dialog reuses the "enable sync" dialog, whose folder check refuses a folder that holds a portfolio when this computer holds data (`folderStateError` in `src/features/settings/sync/enable_modal/useEnableSyncModal.ts` does not look at which of the two it is opened for). Starting over is exactly that case, so "Next" stays disabled and the confirmation is never reached. The core does it correctly when asked (`tests/sync_first_publish.rs`). The tests of the dialog only cover a folder that holds no portfolio, and the E2E suite skips starting over. Older than the 0.7.0 batch.
 
-The owner's first use. An old account is entered from the start of this year only; the owner holds one statement a year (PDF) for the years before. With an agent reading those statements, the agent enters the first year's position, then derives the movements from one year-end state to the next. The result is an approximation, better than no history, and may be redone when more documents turn up.
+**User value:** A user changes the sync passphrase, or recovers from a forgotten one, from the sync page.
+**Done when:** opened to start over, the dialog accepts the folder that holds the portfolio, asks for the new passphrase twice, and reaches the confirmation that says every published file will be discarded and every other computer will have to rejoin; a test covers that path on a computer that holds data; the E2E suite starts over once.
+**Design:** none
+**Open questions:** none
 
-What it needs. Four more recordings — a deposit, a withdrawal, a dividend, and a price at a date — each datable years back. An agent may correct or cancel only transactions marked as its own, never one the owner typed: what the agent reads (a statement) is content it did not write, and must not be able to steer it into removing real history. The window offers the owner one action per session, "Remove everything it recorded", in a dialog opened from the header that lists what the session read and recorded. For a transaction the owner typed, the agent may only ask: the window shows the transaction in full (date, asset, quantity, amount) and what would become of it, refusing is the default action, the session's grant never covers it, and there is no "allow all". The position typed at the start of this year is the owner's to remove, in the window or by allowing the agent's request, once the past is rebuilt.
+## TODO-059 — (backend) — An agent records the rest of an account's past: deposits, withdrawals, dividends, prices
 
-The mock-ups of the session dialog and of the ask are the `screenshots/design/059-` images, validated by the owner with TODO-051 on 2026-10-09.
+First of seven entries split by the owner on 2026-10-10 from the work left out of 0.7.0 (the agent connection shipped with the read tools and three marked recordings: opening balance, purchase, sale).
 
-Also to settle here: the mark of an agent's recording is kept on the computer that recorded it (AGT-045); the owner's other computers do not show "Recorded by". And the Done-when clause of TODO-051 that could not be run by the agent: a recorded Claude Code session that lists and calls the tools against the open application.
+The owner's first use. An old account is entered from the start of this year only; the owner holds one statement a year (PDF) for the years before. With an agent reading those statements, the agent enters the first year's position, then derives the movements from one year-end state to the next. The result is an approximation, better than no history, and may be redone when more documents turn up. With this entry and TODO-060 that use is possible end to end.
 
-**User value:** A user rebuilds years of an account's history with an agent from yearly statements, sees what the agent did, and can undo all of it in one action without risk to what they typed themselves.
-**Done when:** the four recordings exist as tools, each through the window's rules, marked and shown in the journal; an agent corrects or cancels a transaction marked as its own and is refused on any other; the session dialog lists what the session read and recorded and removes everything it recorded in one action; a change or a removal of a transaction the owner typed is asked in the window, shown in full, refused by default, one at a time; the marks reach the owner's other computers; a recorded Claude Code session lists and calls the tools.
+Four more recordings as tools, each datable years back, through the rules of the window, marked and shown in the journal like the three that exist: a deposit, a withdrawal, a dividend, and a price at a date. The command line gets the same four through the same recorder, so the two interfaces do not drift (TODO-064).
+
+**User value:** An agent enters a whole year of an old account from its statement — the cash that came in and went out, the dividends, the year-end prices — not only the purchases and the sales.
+**Done when:** the four recordings exist as tools and as commands of the command line, through one recorder; each is marked with its session and shows in the journal's "Recorded by"; a recorded Claude Code session against the open application lists the tools and calls a read tool and a recording (the clause of TODO-051 that could not be run by the agent).
+**Design:** none
+**Open questions:** none
+
+## TODO-060 — (fullstack) — What an agent recorded can be undone, by it or by the owner
+
+Split from TODO-059 on 2026-10-10. An agent may correct or cancel only transactions marked as its own, never one the owner typed: what the agent reads (a statement) is content it did not write, and must not be able to steer it into removing real history. The header opens a dialog on the session that lists what it read and recorded and offers the owner one action, "Remove everything it recorded".
+
+The mock-up of the session dialog is `screenshots/design/060-*-session.png`, validated by the owner with TODO-051 on 2026-10-09.
+
+**User value:** A reconstruction that went wrong is removed in one action, and an agent can fix its own mistakes without ever touching what the owner typed.
+**Done when:** an agent corrects or cancels a transaction marked as its own and is refused on any other; the session dialog opens from the header, lists what the session read and recorded, and removes everything it recorded in one action after a confirmation that refuses by default.
 **Design:** validated
+**Open questions:** none
+
+## TODO-061 — (fullstack) — An agent asks before touching a transaction the owner typed
+
+Split from TODO-059 on 2026-10-10; after TODO-060. For a transaction the owner typed, the agent may only ask: the window shows the transaction in full (date, asset, quantity, amount) and what would become of it, refusing is the default action, the session's grant never covers it, and there is no "allow all". The position typed at the start of this year is the owner's to remove, in the window or by allowing the agent's request, once the past is rebuilt.
+
+The mock-up of the ask is `screenshots/design/061-*-ask.png`, validated by the owner with TODO-051 on 2026-10-09.
+
+**User value:** The owner lets an agent replace a typed position by the rebuilt history, one transaction at a time, seeing exactly what changes.
+**Done when:** a change or a removal of a transaction the owner typed is asked in the window, shown in full with what would become of it, refused by default, one at a time; a refusal gives the agent nothing; nothing of an answer is remembered for the next ask.
+**Design:** validated
+**Open questions:** none
+
+## TODO-062 — (backend) — "Recorded by" shows on every computer of the sync
+
+Split from TODO-059 on 2026-10-10. The mark of an agent's recording is kept on the computer that recorded it (AGT-045): the owner's other computers show the transaction without its "Recorded by", and "Remove everything it recorded" (TODO-060) would work on one computer only. The mark becomes part of what sync carries, so the data format version moves (SYN-038).
+
+**User value:** Whichever computer the owner opens, the journal says what an agent recorded, and removing a session's recordings removes them everywhere.
+**Done when:** a mark written on one computer reaches the others with its transaction and goes with it when the transaction is removed; a computer on the previous format is told to update, as SYN-035 says; the two-device test covers a marked transaction.
+**Design:** none
+**Open questions:** none
+
+## TODO-063 — (backend) — An agent adds an asset the portfolio does not have
+
+Raised on 2026-10-10 while comparing the three interfaces: the command line adds an asset (CLI-026), an agent cannot. Rebuilding an old account stops at the first instrument the owner no longer holds and never entered.
+
+**User value:** An agent reading an old statement adds the instruments it names — a listed one by its ISIN, a custom one by its name — instead of stopping to ask the owner to create each.
+**Done when:** a tool adds an asset of each kind through the rules of the window and of the command line (AST-031, AST-032), refusing the same asset twice; what an agent added is told to the owner in the window; the capabilities table says so (TODO-064).
+**Design:** none
+**Open questions:**
+
+- [ ] An asset has no mark today. Should the assets table say which assets an agent added, as the journal does for transactions? (It adds a column or a badge: a design to validate.)
+
+## TODO-064 — (fullstack) — One table says what the window, the command line and an agent can each do
+
+Raised on 2026-10-10. The three interfaces share their rules — one recorder, one core — and not their capabilities: the window does everything; the command line records three transactions, adds an asset and lists accounts and assets; an agent reads the summary and the holdings, which the command line cannot, and cannot add an asset, which the command line can. Nothing says which gap is a choice and which an accident.
+
+One document lists each capability and which interface offers it. A check fails when a tool or a command is added without its line. The same table ships with the application and is shown in it, as the page that says what this version can do through each interface (owner, 2026-10-10).
+
+**User value:** The owner reads in the application what an agent and the command line can do in this version, and a new capability never appears in one interface by accident.
+**Done when:** the table exists in the docs, one line per capability, one column per interface; a check fails on a tool or a command with no line, seen red; the application shows the table on a page of its own, in both languages, from the same source as the docs.
+**Design:** none
+**Open questions:**
+
+- [ ] Where does the page live in the application: under Settings beside "Allow agents to connect", or in About?
+- [ ] Should the command line read what an agent reads (the portfolio summary, the holdings of an account)? The table makes the gap visible; this decides whether to close it.
+
+## TODO-065 — (fullstack) — The window says when an agent acts, and an agent client knows a read from a recording
+
+Raised on 2026-10-10 by an audit of the agent connection against the protocol's practices (the part of DEBT-089 a user would notice). A recording made by an agent shows only if the journal is open. A call the agent gave up on leaves its connection dialog on screen until the agent's process ends. No tool says whether it only reads or changes something, so an agent client cannot ask its user before a recording and skip the question for a read.
+
+**User value:** The owner sees each recording an agent makes as it happens, whatever view is open; a dialog never asks about a connection nobody waits for; Claude asks before recording and not before reading.
+**Done when:** the window shows a notice naming the agent and what it recorded, on every view; a cancelled call (`notifications/cancelled`) withdraws its connection request; each tool carries a title and says whether it only reads (`readOnlyHint`), and a test holds that every recording says it does not.
+**Design:** none
 **Open questions:** none
 
 ## TODO-039 — (service) — A hosted price feed the application can subscribe to (deferred)
