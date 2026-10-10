@@ -26,7 +26,7 @@ Decisions inherited and applied without re-asking:
 
 ### CurrencyPair
 
-Represents a directed currency pair the system follows for valuation. A durable record: created on first demand or by manual declaration, and retained thereafter regardless of whether any holding currently needs it.
+Represents a directed currency pair the system follows for valuation. A durable record: created on first demand or by manual declaration, and retained thereafter regardless of whether any holding currently needs it — until the device joins a shared portfolio, whose pairs replace its own (SYN-083).
 
 | Field           | Business meaning                                                                             |
 | --------------- | -------------------------------------------------------------------------------------------- |
@@ -71,7 +71,7 @@ This feature does not add fields to `HoldingDetail`; it changes the **conditions
 
 **FXR-013 — Auto-follow a pair from a foreign holding (backend)**: When an active (`quantity > 0`), non-cash holding exists whose `asset_currency` differs from its account currency, the directed pair `(asset_currency → account_currency)` (FXR-010) is ensured to exist as a persisted `CurrencyPair`. Ensuring a pair is idempotent — a pair already present is left untouched, and no duplicate is created. Recording the first foreign-currency buy in an account therefore makes the system start following that pair. Same-currency holdings (FXR-011) and system cash assets never create a pair.
 
-**FXR-014 — Pairs persist once created (backend)**: A `CurrencyPair` is retained once created, whether it arose by auto-follow (FXR-013) or manual declaration (FXR-012). It is **not** removed when the holdings that demanded it close (`quantity → 0`) or are deleted; the pair and its recorded rates remain available. V1 provides no removal or archive of a pair; an archive affordance is deferred to a later iteration.
+**FXR-014 — Pairs persist once created (backend)**: A `CurrencyPair` is retained once created, whether it arose by auto-follow (FXR-013) or manual declaration (FXR-012). It is **not** removed when the holdings that demanded it close (`quantity → 0`) or are deleted; the pair and its recorded rates remain available. V1 provides no removal or archive of a pair; an archive affordance is deferred to a later iteration. The one removal is not the user's: a device joining a shared portfolio has its pairs replaced by the portfolio's (SYN-083).
 
 ### Recording a Rate Manually (020–029)
 
@@ -284,7 +284,7 @@ The Currency Rates view (a page), structured like the Asset catalog: a list of d
 ### Deferred
 
 - **Direct currency management** — V1 scopes currency rates strictly as a side-effect of valuing foreign holdings. Valuing foreign-currency cash balances, treating FX as a tradeable position, and standalone currency tracking are out of scope; a future iteration may promote currency to a first-class managed subject.
-- **Pair archive / removal** — V1 persists every pair and never removes one (FXR-014). When the pair list grows unwieldy or a pair is no longer wanted, an explicit archive (or delete) affordance can be added — analogous to asset archival (AST). The `CurrencyPair` record can gain an `is_archived` flag at that point without a model change.
+- **Pair archive / removal** — V1 persists every pair and never removes one on the user's initiative (FXR-014; a device joining a shared portfolio has its pairs replaced, SYN-083). When the pair list grows unwieldy or a pair is no longer wanted, an explicit archive (or delete) affordance can be added — analogous to asset archival (AST). The `CurrencyPair` record can gain an `is_archived` flag at that point without a model change.
 - **No-rate vs no-price disambiguation (FXR-091)** — distinguishing "no FX rate" from "no market price" in the holding row is deferred until a user-pain signal warrants the extra typed diagnostic state, consistent with MKT-032's own deferral.
 
 None — all questions have been resolved.

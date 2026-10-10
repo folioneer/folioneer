@@ -590,6 +590,33 @@ async fn syn_071_an_interrupted_clearing_is_retried() {
     assert!(dir.path().join("vaultcompass-sync.json").exists());
 }
 
+// SYN-053 / SYN-071 — a device where sync is not enabled, holding its own portfolio, starts
+// over in a folder that holds one: the folder's is discarded and the device publishes its
+// own under a new identity.
+#[tokio::test]
+async fn syn_053_a_device_where_sync_is_not_enabled_starts_over_in_a_folder_that_holds_a_portfolio()
+{
+    let dir = tempfile::tempdir().unwrap();
+    let first = build_ctx(dir.path()).await;
+    seed_small_portfolio(&first).await;
+    enable_first_device(&first, dir.path()).await;
+    let first_area = device_areas(dir.path()).remove(0);
+    let other = build_ctx(dir.path()).await;
+    seed_small_portfolio(&other).await;
+
+    start_over(&other, dir.path())
+        .await
+        .expect("started over from a device that is not enrolled");
+
+    let areas = device_areas(dir.path());
+    assert_eq!(areas.len(), 1, "the folder's earlier portfolio is gone");
+    assert_ne!(
+        areas[0], first_area,
+        "the device takes an identity of its own"
+    );
+    assert!(areas[0].join("manifest.bin").exists());
+}
+
 // SYN-071 — starting over forgets what the device kept of the discarded history: where it
 // had read each other device up to.
 #[tokio::test]

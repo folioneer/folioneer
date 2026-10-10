@@ -7,10 +7,19 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `DEBT-NNN` reference (never renumbered, never reused; next free:
-DEBT-107) so the human can queue it in `docs/todo.md` § Next like any todo.
+DEBT-108) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
+
+## 2026-10-10 — DEBT-107 — What the spec check of sync found after DEBT-099 and DEBT-083
+
+- Found by: `spec-checker` on `docs/spec/multi-device-sync.md`, closing DEBT-083 (2026-10-10): the amended clauses of SYN-014, SYN-053, SYN-071, SYN-083 and SYN-066 are all implemented; it ran the sync tests (green). Nothing below was read again by the main agent
+- Where: `src-tauri/tests/sync_two_devices.rs`, `src-tauri/tests/sync_first_publish.rs`, `e2e/sync/sync.test.ts`, `installation_holds_user_data` in `src-tauri/src/use_cases/portfolio_sync/orchestrator.rs`
+- Severity: 🔵
+- Observation: **a clause without a test of its own.** SYN-014 / SYN-083: no test joins, up to the rebuild, from an installation that holds a declared pair or fetched observations — the gate and the discarding are each tested alone. SYN-071: no test makes a removal fail while clearing and reads the device afterwards ("leaves the device as it was"); none starts over with a conflict notice present and reads the status (SYN-066). No E2E scenario shows the join refusal or starts over from it: the one sync scenario starts over from the sync page. **Read by `reviewer-security`, not checked:** the guard never looks at manually recorded asset prices, which SYN-014 names; a price needs a non-cash asset, which the guard already refuses — whether a Cash Asset can take a manual price was not read
+- User value: None directly — the promises of joining and starting over are each held end to end.
+- Done when: each clause above has a test; the E2E scenario of sync shows the refusal and starts over from it; SYN-014 and the guard agree on manual prices.
 
 ## 2026-10-10 — DEBT-106 — After "Start over", no fresh installation can join the folder
 
@@ -456,19 +465,6 @@ Remove an entry once it has been resolved.
 - Observation: a failed first load shows "No assets" instead of the error and Retry; a refused archive is told outside the dialog that asked; the page header shows no count of active assets. All three are older than TODO-056, and none has a test
 - User value: A user whose assets cannot be read is told so and can retry; a refused archive is explained where it was asked.
 - Done when: each of the three is fixed with a test, or its rule is rewritten to what the screen does and the unused count removed.
-
-## 2026-10-09 — DEBT-083 — A currency pair alone stops a device from joining; the spec does not say so
-
-- Found by: `spec-checker`, closing DEBT-064
-- Where: `installation_holds_user_data` in `src-tauri/src/use_cases/portfolio_sync/orchestrator.rs` (its last test: any currency pair); `docs/spec/multi-device-sync.md` — SYN-014 (what counts as user data: accounts, user-created assets and categories, transactions, manual prices and rates) and SYN-083 (pairs fetched before joining are discarded by the rebuild)
-- Severity: 🟡
-- Observation: an installation whose only record is a declared currency pair is refused as "holding user data" when it joins, while SYN-014 does not list pairs and SYN-083 treats them as observations the rebuild replaces. Either the spec is missing a line (a pair the user declared is the user's) or the code refuses too much. No test covers that branch, so that either reading can be made true without one failing.
-- User value: A fresh installation that only declared a currency pair either joins, or is told why it cannot, as the rules say.
-- Done when: the owner says whether a declared currency pair is user data; SYN-014 and the code agree, and a test holds the answer.
-
-**Open questions:**
-
-- [x] Is a currency pair the user declared user data when joining? — No: an installation holding only declared pairs may join and its pairs are replaced by the portfolio's; a manual rate still counts (owner, 2026-10-10).
 
 ## 2026-10-04 — DEBT-080 — The E2E tooling carries 22 known advisories
 

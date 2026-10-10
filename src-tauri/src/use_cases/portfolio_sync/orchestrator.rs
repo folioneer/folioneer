@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::context::account::AccountService;
 use crate::context::asset::{AssetService, SYSTEM_CATEGORY_IDS};
-use crate::context::currency::CurrencyService;
+use crate::context::currency::{CurrencyRateSource, CurrencyService};
 use crate::context::sync::{
     ensure_device_name, ensure_passphrase_length, header_data_format_version, FirstPublish,
     FolderStore, InconsistentHolding, JoinError, SyncError, SyncFailure, SyncFolderState,
@@ -128,7 +128,8 @@ impl PortfolioSyncOrchestrator {
     }
 
     /// Whether this installation holds user-entered records (SYN-014): any account, any
-    /// user-created asset or category, any currency pair. System-seeded records (SYN-027)
+    /// user-created asset or category, any currency rate the user typed. System-seeded
+    /// records (SYN-027), declared currency pairs and fetched rates (SYN-083)
     /// do not count.
     async fn installation_holds_user_data(&self) -> Result<bool, PortfolioSyncError> {
         if !self.account_service.get_all().await?.is_empty() {
@@ -145,11 +146,21 @@ impl PortfolioSyncOrchestrator {
         {
             return Ok(true);
         }
-        Ok(!self
-            .currency_service
-            .list_currency_pairs()
-            .await?
-            .is_empty())
+        // A declared pair alone is no user data: the rebuild replaces it (SYN-083). A rate
+        // the user typed is.
+        for pair in self.currency_service.list_currency_pairs().await? {
+            let rates = self
+                .currency_service
+                .list_currency_rates(pair.from_currency, pair.to_currency)
+                .await?;
+            if rates
+                .iter()
+                .any(|rate| rate.source == CurrencyRateSource::Manual)
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// Enables sync (SYN-011). The first-device branch (no header yet) delegates to
@@ -216,13 +227,14 @@ impl PortfolioSyncOrchestrator {
             self.folder_store.remove_device_area(&device_id).await?;
         }
         self.folder_store.remove_header().await?;
-        // SYN-071 — what this device kept of the discarded history goes with it.
-        self.state_repo.discard_received_history().await?;
-        Ok(self
+        let status = self
             .first_publish
             .enable_as_first_device(folder, passphrase, device_name)
-            .await?
-            .into())
+            .await?;
+        // SYN-071 — once it has started over, the device forgets what it kept of the
+        // discarded history.
+        self.state_repo.discard_received_history().await?;
+        Ok(status.into())
     }
 
     /// Designates a different folder for an already-enrolled device (SYN-074): the same
@@ -561,6 +573,62 @@ mod tests {
             .expect("inspect_sync_folder never rejects");
 
         assert!(state.installation_holds_user_data);
+    }
+
+    // SYN-014 / SYN-083 — a currency pair the user declared is no user data on its own: the
+    // installation may join, and the rebuild replaces the pair. A rate the user typed is.
+    #[tokio::test]
+    async fn syn_014_a_declared_currency_pair_alone_is_no_user_data_a_typed_rate_is() {
+        let pool = make_pool().await;
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = build_ctx_with_state_repo(
+            &pool,
+            Arc::new(SqliteSyncStateRepository::new(pool.clone())),
+            Arc::new(crate::context::sync::FsFolderStore::new(dir.path())),
+        );
+        let holds_user_data = || async {
+            ctx.orchestrator
+                .inspect_sync_folder(dir.path().to_string_lossy().to_string())
+                .await
+                .expect("inspect_sync_folder never rejects")
+                .installation_holds_user_data
+        };
+
+        ctx.orchestrator
+            .currency_service
+            .declare_currency_pair("USD".to_string(), "EUR".to_string())
+            .await
+            .unwrap();
+        assert!(
+            !holds_user_data().await,
+            "a declared pair alone lets the installation join"
+        );
+
+        sqlx::query(
+            "INSERT INTO currency_rates (from_currency, to_currency, date, rate, source) VALUES ('USD', 'EUR', '2024-01-01', 910000, 'Frankfurter')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(
+            !holds_user_data().await,
+            "a fetched rate is an observation, not user data"
+        );
+
+        ctx.orchestrator
+            .currency_service
+            .record_currency_rate(
+                "USD".to_string(),
+                "EUR".to_string(),
+                "2024-01-02".to_string(),
+                920_000,
+            )
+            .await
+            .unwrap();
+        assert!(
+            holds_user_data().await,
+            "a rate the user typed is user data"
+        );
     }
 
     // SYN-019 — a fresh installation and a missing folder: the problem is reported, never
@@ -1355,6 +1423,13 @@ mod tests {
             .orchestrator
             .currency_service
             .list_currency_pairs()
+            .await
+            .unwrap()
+            .is_empty());
+        assert!(ctx
+            .orchestrator
+            .currency_service
+            .list_currency_rates("USD".into(), "EUR".into())
             .await
             .unwrap()
             .is_empty());
