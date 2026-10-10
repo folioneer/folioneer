@@ -145,6 +145,7 @@ Four more recordings as tools, each datable years back, through the rules of the
 **Open questions:**
 
 - [x] The recorded Claude Code session of the Done when cannot be run by the agent: how does the entry close? — The owner records it once, from a script the agent leaves; the entry stays open until then (owner, 2026-10-10).
+- [x] A price is not a transaction and never shows in the account journal: how is a price an agent recorded marked? — Through its source: it is stored with the source "Agent", shown where the price history shows a source, counts against the session's limit, never replaces a price already at that date, and "Remove everything it recorded" (TODO-060) removes it; the Mark is widened to a transaction or a price (owner, 2026-10-10).
 
 ## TODO-060 — (fullstack) — What an agent recorded can be undone, by it or by the owner
 

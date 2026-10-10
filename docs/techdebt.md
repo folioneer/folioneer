@@ -337,7 +337,7 @@ Remove an entry once it has been resolved.
 - [x] May a folder written by a newer version be started over? — No: the core refuses it too, with the same `UpdateRequired` as the dialog, and the contract lists it (owner, 2026-10-10).
 - [x] Starting over in a folder that holds no portfolio: is the confirmation still asked? — Yes, the same one (owner, 2026-10-10).
 - [x] May a computer that left sync and still holds the portfolio start over? — Yes: the refusal shown when enabling sync offers it (owner, 2026-10-10).
-- [ ] That refusal changes a screen: its mock-up is shown in the opening block of the batch, to validate before any code.
+- [x] That refusal changes a screen: its mock-up is shown in the opening block of the batch, to validate before any code. — Validated: `screenshots/design/099-*-refusal.png`, a sentence and an outlined "Start over" under the refusal's steps, opening the "Start over" dialog on the folder chosen (owner, 2026-10-10).
 
 ## 2026-10-10 — DEBT-098 — Account commands return codes their contract rows do not list
 
