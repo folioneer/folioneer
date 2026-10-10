@@ -1,6 +1,7 @@
 use crate::context::account::error::AccountError;
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::{Datelike, NaiveDate};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use uuid::Uuid;
@@ -25,6 +26,49 @@ impl FeeFrequency {
             FeeFrequency::Annually => 1,
         }
     }
+
+    /// The boundary of the period that contains `date`: the last day of its month, its
+    /// quarter or its year (FEE-042). `None` only at the ceiling of representable dates.
+    pub fn period_end_containing(self, date: NaiveDate) -> Option<NaiveDate> {
+        match self {
+            FeeFrequency::Monthly => last_day_of_month(date.year(), date.month()),
+            FeeFrequency::Quarterly => {
+                let quarter_end_month = ((date.month() - 1) / 3) * 3 + 3; // 3, 6, 9, or 12
+                last_day_of_month(date.year(), quarter_end_month)
+            }
+            FeeFrequency::Annually => last_day_of_month(date.year(), 12),
+        }
+    }
+
+    /// The boundary of the period immediately following the one ending at `boundary`.
+    pub fn next_period_end(self, boundary: NaiveDate) -> Option<NaiveDate> {
+        self.period_end_containing(boundary.succ_opt()?)
+    }
+
+    /// The boundary of the last period completed on `today` (FEE-040): today's own when
+    /// today ends a period, otherwise the one before.
+    pub fn last_completed_period_end(self, today: NaiveDate) -> Option<NaiveDate> {
+        let current = self.period_end_containing(today)?;
+        if current <= today {
+            return Some(current);
+        }
+        let first_month = match self {
+            FeeFrequency::Monthly => today.month(),
+            FeeFrequency::Quarterly => ((today.month() - 1) / 3) * 3 + 1,
+            FeeFrequency::Annually => 1,
+        };
+        NaiveDate::from_ymd_opt(today.year(), first_month, 1)?.pred_opt()
+    }
+}
+
+/// Last calendar day of `year`/`month`. `None` only at the ceiling of representable dates.
+fn last_day_of_month(year: i32, month: u32) -> Option<NaiveDate> {
+    let (next_year, next_month) = if month == 12 {
+        (year + 1, 1)
+    } else {
+        (year, month + 1)
+    };
+    NaiveDate::from_ymd_opt(next_year, next_month, 1)?.pred_opt()
 }
 
 impl std::fmt::Display for FeeFrequency {
@@ -232,6 +276,29 @@ pub trait FeeCatchUpRepository: Send + Sync {
 #[cfg(test)]
 mod rate_bound_tests {
     use super::*;
+
+    // FEE-040 / FEE-061 — the last period completed on a day: its own when the day ends a
+    // period, otherwise the one before, across a year's start.
+    #[test]
+    fn fee_040_the_last_completed_period_ends_on_or_before_the_day() {
+        let day = |y, m, d| chrono::NaiveDate::from_ymd_opt(y, m, d).expect("date");
+        for (frequency, today, expected) in [
+            (FeeFrequency::Monthly, day(2025, 3, 15), day(2025, 2, 28)),
+            (FeeFrequency::Monthly, day(2025, 3, 31), day(2025, 3, 31)),
+            (FeeFrequency::Monthly, day(2025, 1, 1), day(2024, 12, 31)),
+            (FeeFrequency::Quarterly, day(2025, 5, 20), day(2025, 3, 31)),
+            (FeeFrequency::Quarterly, day(2025, 2, 1), day(2024, 12, 31)),
+            (FeeFrequency::Quarterly, day(2025, 6, 30), day(2025, 6, 30)),
+            (FeeFrequency::Annually, day(2025, 7, 4), day(2024, 12, 31)),
+            (FeeFrequency::Annually, day(2025, 12, 31), day(2025, 12, 31)),
+        ] {
+            assert_eq!(
+                frequency.last_completed_period_end(today),
+                Some(expected),
+                "{frequency} on {today}"
+            );
+        }
+    }
 
     // FEE-032 — a rate of exactly 100 % is the highest accepted; anything above is refused.
     #[test]

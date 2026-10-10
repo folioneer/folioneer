@@ -833,27 +833,38 @@ impl AccountService {
         note: Option<String>,
     ) -> Result<Transaction, AccountError> {
         info!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, percent_micros = percent_micros, "record_management_fee");
-        self.apply_management_fee_deduction(account_id, asset_id, date, percent_micros, note, None)
-            .await
-    }
-
-    /// Records a generated management fee deduction (FEE-040) under the deterministic
-    /// identity FEE-048 assigns it (`deduction_id`); otherwise identical to a one-off
-    /// deduction without a note.
-    pub async fn record_generated_management_fee(
-        &self,
-        account_id: &str,
-        asset_id: String,
-        date: String,
-        percent_micros: i64,
-        deduction_id: String,
-    ) -> Result<Transaction, AccountError> {
-        info!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, percent_micros = percent_micros, deduction_id = %deduction_id, "record_generated_management_fee");
         self.apply_management_fee_deduction(
             account_id,
             asset_id,
             date,
             percent_micros,
+            1,
+            note,
+            None,
+        )
+        .await
+    }
+
+    /// Records a generated management fee deduction (FEE-040) under the deterministic
+    /// identity FEE-048 assigns it (`deduction_id`). It removes one period's share of the
+    /// annual rate, `floor(held × annual_rate ÷ periods_per_year)`, floored once (FEE-041);
+    /// otherwise identical to a one-off deduction without a note.
+    pub async fn record_generated_management_fee(
+        &self,
+        account_id: &str,
+        asset_id: String,
+        date: String,
+        annual_rate_percent_micros: i64,
+        periods_per_year: i64,
+        deduction_id: String,
+    ) -> Result<Transaction, AccountError> {
+        info!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, annual_rate_percent_micros = annual_rate_percent_micros, periods_per_year = periods_per_year, deduction_id = %deduction_id, "record_generated_management_fee");
+        self.apply_management_fee_deduction(
+            account_id,
+            asset_id,
+            date,
+            annual_rate_percent_micros,
+            periods_per_year,
             None,
             Some(deduction_id),
         )
@@ -935,12 +946,16 @@ impl AccountService {
         account.management_fee_removal(asset_id, date, resulting_quantity)
     }
 
+    // One recording for the one-off fee and the generated one: what differs between them
+    // is passed in, not branched on by the callers.
+    #[allow(clippy::too_many_arguments)]
     async fn apply_management_fee_deduction(
         &self,
         account_id: &str,
         asset_id: String,
         date: String,
         percent_micros: i64,
+        periods: i64,
         note: Option<String>,
         deduction_id: Option<String>,
     ) -> Result<Transaction, AccountError> {
@@ -954,9 +969,11 @@ impl AccountService {
         let mut account = load_account(&*self.account_repo, account_id).await?;
         // FEE-077 — the % fee mechanism must be enabled on the account.
         account.ensure_management_fees_enabled()?;
-        // FEE-022a — removed qty = floor(holding_qty_as_of(date) × percent / 100%).
+        // FEE-022a / FEE-041 — removed qty = floor(holding_qty_as_of(date) × percent /
+        // 100% ÷ periods): one division, so one flooring. A one-off fee is one period.
         let quantity_as_of = account.holding_quantity_as_of(&asset_id, &date);
-        let removed = (quantity_as_of as i128 * percent_micros as i128 / 100_000_000) as i64;
+        let removed = (quantity_as_of as i128 * percent_micros as i128
+            / (100_000_000 * periods.max(1) as i128)) as i64;
         // CFR-016 — a generated deduction is the application's own write; a one-off
         // deduction is the user's.
         let tx = match deduction_id {
@@ -1120,17 +1137,61 @@ impl AccountService {
         end_date: Option<String>,
         active: bool,
     ) -> Result<FeeSchedule, AccountError> {
+        let today = chrono::Local::now().date_naive();
+        self.update_fee_schedule_on(
+            account_id,
+            asset_id,
+            annual_rate_percent_micros,
+            end_date,
+            active,
+            today,
+        )
+        .await
+    }
+
+    /// `update_fee_schedule` on a given day: the day a reactivation resumes from (FEE-061).
+    pub(crate) async fn update_fee_schedule_on(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        annual_rate_percent_micros: i64,
+        end_date: Option<String>,
+        active: bool,
+        today: chrono::NaiveDate,
+    ) -> Result<FeeSchedule, AccountError> {
         info!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, "update_fee_schedule");
         let repo = self.fee_schedule_repo()?;
-        let schedule = repo
+        let existing = repo
             .get_by_account_asset(account_id, asset_id)
             .await
             .map_err(|e| {
                 tracing::error!(target: BACKEND, err = ?e, "update_fee_schedule: lookup failed");
                 AccountError::DatabaseError
             })?
-            .ok_or(AccountError::ScheduleNotFound)?
-            .update_from(annual_rate_percent_micros, end_date, active)?;
+            .ok_or(AccountError::ScheduleNotFound)?;
+        let reactivated = !existing.active && active;
+        let mut schedule = existing.update_from(annual_rate_percent_micros, end_date, active)?;
+        if reactivated {
+            // FEE-061 — the pause is not charged: generation resumes from the current
+            // period, so the cursor passes every period completed while paused. It moves
+            // before the schedule is saved as active: a failure between the two writes
+            // leaves a paused schedule, never an active one that would charge the pause.
+            let resumed = schedule
+                .frequency
+                .last_completed_period_end(today)
+                .map(|boundary| boundary.format("%Y-%m-%d").to_string())
+                .filter(|boundary| {
+                    schedule
+                        .last_applied_period
+                        .as_deref()
+                        .is_none_or(|cursor| cursor < boundary.as_str())
+                });
+            if let Some(boundary) = resumed {
+                self.advance_fee_schedule_cursor(account_id, asset_id, boundary.clone())
+                    .await?;
+                schedule.last_applied_period = Some(boundary);
+            }
+        }
         repo.update(&schedule).await.map_err(|e| {
             tracing::error!(target: BACKEND, err = ?e, "update_fee_schedule: persist failed");
             AccountError::DatabaseError
@@ -1791,7 +1852,8 @@ pub trait AccountServiceContract: Send + Sync {
         account_id: &str,
         asset_id: String,
         date: String,
-        percent_micros: i64,
+        annual_rate_percent_micros: i64,
+        periods_per_year: i64,
         deduction_id: String,
     ) -> StdResult<Transaction, AccountError>;
     /// Records an Interest credit on a held asset or the account's cash line
@@ -2152,7 +2214,8 @@ impl AccountServiceContract for AccountService {
         account_id: &str,
         asset_id: String,
         date: String,
-        percent_micros: i64,
+        annual_rate_percent_micros: i64,
+        periods_per_year: i64,
         deduction_id: String,
     ) -> StdResult<Transaction, AccountError> {
         AccountService::record_generated_management_fee(
@@ -2160,7 +2223,8 @@ impl AccountServiceContract for AccountService {
             account_id,
             asset_id,
             date,
-            percent_micros,
+            annual_rate_percent_micros,
+            periods_per_year,
             deduction_id,
         )
         .await

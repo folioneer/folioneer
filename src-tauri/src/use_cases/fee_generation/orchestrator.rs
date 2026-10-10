@@ -1,39 +1,11 @@
 use super::error::FeeGenerationError;
-use crate::context::account::{AccountError, AccountServiceContract, FeeFrequency, FeeSchedule};
+use crate::context::account::{AccountError, AccountServiceContract, FeeSchedule};
 use crate::core::logger::BACKEND;
 use async_trait::async_trait;
-use chrono::{Datelike, NaiveDate};
+use chrono::NaiveDate;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
-
-/// Last calendar day of `year`/`month` (the period boundary, FEE-042). `None` only at
-/// chrono's representable ceiling — far beyond any real schedule date; callers skip.
-fn last_day_of_month(year: i32, month: u32) -> Option<NaiveDate> {
-    let (next_year, next_month) = if month == 12 {
-        (year + 1, 1)
-    } else {
-        (year, month + 1)
-    };
-    NaiveDate::from_ymd_opt(next_year, next_month, 1)?.pred_opt()
-}
-
-/// The period-boundary date (per `freq`) of the period that contains `date` (FEE-042).
-fn period_end_containing(freq: FeeFrequency, date: NaiveDate) -> Option<NaiveDate> {
-    match freq {
-        FeeFrequency::Monthly => last_day_of_month(date.year(), date.month()),
-        FeeFrequency::Quarterly => {
-            let quarter_end_month = ((date.month() - 1) / 3) * 3 + 3; // 3, 6, 9, or 12
-            last_day_of_month(date.year(), quarter_end_month)
-        }
-        FeeFrequency::Annually => last_day_of_month(date.year(), 12),
-    }
-}
-
-/// The boundary of the period immediately following the one ending at `boundary`.
-fn next_period_end(freq: FeeFrequency, boundary: NaiveDate) -> Option<NaiveDate> {
-    period_end_containing(freq, boundary.succ_opt()?)
-}
 
 /// The sync surface `apply_due_fee_deductions` runs once before generation (SYN-060, D9):
 /// an injected trait object over the sync service — never the sibling
@@ -71,9 +43,9 @@ impl FeeGenerationOrchestrator {
     }
 
     /// Applies all due management fee deductions across every active fee schedule
-    /// (FEE-040/041/042/043/044/045/047). Reuses `AccountService::record_management_fee`
-    /// per due period — the per-period rate is `annual_rate ÷ periods_per_year`, which
-    /// gives the sequential per-period reduction and the oversell guard for free.
+    /// (FEE-040/041/042/043/044/045/047). Each due period is recorded through
+    /// `AccountService::record_generated_management_fee`, which gives the sequential
+    /// per-period reduction and the oversell guard.
     pub async fn apply_due_fee_deductions(&self) -> Result<(), FeeGenerationError> {
         // SYN-060 — one sync before any generation, so generation sees the merged ledger.
         if let Some(launch_sync) = &self.launch_sync {
@@ -137,11 +109,7 @@ impl FeeGenerationOrchestrator {
             .end_date
             .as_deref()
             .and_then(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok());
-        // FEE-041 — per-period rate is the annual rate scaled to the cadence.
-        let per_period_percent =
-            schedule.annual_rate_percent_micros / schedule.frequency.periods_per_year();
-
-        let Some(mut boundary) = period_end_containing(schedule.frequency, start) else {
+        let Some(mut boundary) = schedule.frequency.period_end_containing(start) else {
             return Ok(()); // unrepresentable boundary date — skip defensively
         };
         let mut last_processed: Option<NaiveDate> = None;
@@ -156,64 +124,76 @@ impl FeeGenerationOrchestrator {
             }
             let after_cursor = cursor.is_none_or(|c| boundary > c);
             if boundary >= start && after_cursor {
-                if per_period_percent > 0 {
-                    let dated = boundary.format("%Y-%m-%d").to_string();
-                    let deduction_id = deterministic_deduction_id(
+                let dated = boundary.format("%Y-%m-%d").to_string();
+                let deduction_id =
+                    deterministic_deduction_id(&schedule.account_id, &schedule.asset_id, &dated);
+                let result = self
+                    .account_service
+                    .record_generated_management_fee(
                         &schedule.account_id,
-                        &schedule.asset_id,
-                        &dated,
-                    );
-                    let result = self
-                        .account_service
-                        .record_generated_management_fee(
-                            &schedule.account_id,
-                            schedule.asset_id.clone(),
-                            dated,
-                            per_period_percent,
-                            deduction_id,
-                        )
-                        .await;
-                    match result {
-                        Ok(_) => {}
-                        // FEE-047 — holding qty is 0 or the removal rounds to 0: skip.
-                        Err(AccountError::QuantityNotPositive) => {}
-                        // FEE-044/047 — a backfilled deduction that would oversell: skip.
-                        Err(AccountError::CascadingOversell) => {}
-                        // CFR-016/FEE-047 — the user removed this deduction on some device;
-                        // the regeneration is outranked and the period stands skipped.
-                        Err(AccountError::ApplicationWriteOutranked) => {
-                            tracing::info!(
-                                target: BACKEND,
-                                account_id = %schedule.account_id,
-                                asset_id = %schedule.asset_id,
-                                "fee generation: period skipped, the user's removal outranks the regeneration"
-                            );
-                        }
-                        // FEE-049 — the deduction could not be saved: the schedule stops
-                        // here, and this period is generated at the next run.
-                        Err(AccountError::DatabaseError) => {
-                            failure = Some(AccountError::DatabaseError);
-                            break;
-                        }
-                        // FEE-047 — any other refusal of the rules (a date they do not
-                        // take, a later split left without a position): the period is
-                        // skipped and said, and generation goes on.
-                        Err(refusal) => {
-                            tracing::warn!(
-                                target: BACKEND,
-                                account_id = %schedule.account_id,
-                                asset_id = %schedule.asset_id,
-                                period = %boundary,
-                                err = ?refusal,
-                                "fee generation: period skipped, the rules refuse its deduction"
-                            );
-                        }
+                        schedule.asset_id.clone(),
+                        dated,
+                        schedule.annual_rate_percent_micros,
+                        schedule.frequency.periods_per_year(),
+                        deduction_id,
+                    )
+                    .await;
+                match result {
+                    Ok(_) => {}
+                    // FEE-070 — nothing is held, or the removal rounds to nothing: skip.
+                    Err(AccountError::QuantityNotPositive) => {
+                        tracing::info!(
+                            target: BACKEND,
+                            account_id = %schedule.account_id,
+                            asset_id = %schedule.asset_id,
+                            period = %boundary,
+                            "fee generation: period skipped, nothing to remove"
+                        );
+                    }
+                    // FEE-044/047 — a backfilled deduction that would oversell: skip.
+                    Err(AccountError::CascadingOversell) => {
+                        tracing::info!(
+                            target: BACKEND,
+                            account_id = %schedule.account_id,
+                            asset_id = %schedule.asset_id,
+                            period = %boundary,
+                            "fee generation: period skipped, its deduction would oversell a later transaction"
+                        );
+                    }
+                    // CFR-016/FEE-047 — the user removed this deduction on some device;
+                    // the regeneration is outranked and the period stands skipped.
+                    Err(AccountError::ApplicationWriteOutranked) => {
+                        tracing::info!(
+                            target: BACKEND,
+                            account_id = %schedule.account_id,
+                            asset_id = %schedule.asset_id,
+                            "fee generation: period skipped, the user's removal outranks the regeneration"
+                        );
+                    }
+                    // FEE-049 — the deduction could not be saved: the schedule stops
+                    // here, and this period is generated at the next run.
+                    Err(AccountError::DatabaseError) => {
+                        failure = Some(AccountError::DatabaseError);
+                        break;
+                    }
+                    // FEE-047 — any other refusal of the rules (a date they do not
+                    // take, a later split left without a position): the period is
+                    // skipped and said, and generation goes on.
+                    Err(refusal) => {
+                        tracing::warn!(
+                            target: BACKEND,
+                            account_id = %schedule.account_id,
+                            asset_id = %schedule.asset_id,
+                            period = %boundary,
+                            err = ?refusal,
+                            "fee generation: period skipped, the rules refuse its deduction"
+                        );
                     }
                 }
                 // FEE-043 — cursor advances for every processed period, skipped or not.
                 last_processed = Some(boundary);
             }
-            let Some(next) = next_period_end(schedule.frequency, boundary) else {
+            let Some(next) = schedule.frequency.next_period_end(boundary) else {
                 break; // unrepresentable next boundary — stop iterating
             };
             boundary = next;
@@ -247,6 +227,7 @@ fn deterministic_deduction_id(account_id: &str, asset_id: &str, period_boundary:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context::account::FeeFrequency;
     use crate::context::account::{
         Account, AccountService, SqliteAccountRepository, SqliteFeeCatchUpRepository,
         SqliteFeeScheduleRepository, SqliteHoldingRepository, SqliteTransactionRepository,
@@ -440,7 +421,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 1_000_000, // 1% annual
-                crate::context::account::FeeFrequency::Monthly,
+                FeeFrequency::Monthly,
                 "2024-01-01".to_string(),
                 None,
             )
@@ -463,6 +444,82 @@ mod tests {
             !fee_txs.is_empty(),
             "at least one ManagementFee transaction must be created for completed periods"
         );
+    }
+
+    /// The quantities a monthly schedule at `annual_rate` removes from 1000 shares bought
+    /// on 2024-01-01, generated up to mid-February 2024.
+    async fn monthly_removals_from_a_thousand_shares(annual_rate: i64) -> Vec<i64> {
+        let pool = setup_pool().await;
+        let account_svc = make_account_service(&pool);
+        let asset_svc = make_asset_service(&pool);
+        let stock_id = seed_stock(&asset_svc).await;
+        let account = account_svc
+            .create(
+                "FEE-041-floor".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .unwrap();
+        let account = enable_management_fees(&account_svc, &account).await;
+        seed_cash(&pool, &account_svc, &account.id).await;
+        account_svc
+            .buy_holding(
+                &account.id,
+                stock_id.clone(),
+                "2024-01-01".to_string(),
+                micro(1000),
+                micro(1),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        account_svc
+            .create_fee_schedule(
+                &account.id,
+                stock_id.clone(),
+                annual_rate,
+                FeeFrequency::Monthly,
+                "2024-01-01".to_string(),
+                None,
+            )
+            .await
+            .unwrap();
+        let schedule = account_svc
+            .get_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap()
+            .expect("schedule must exist");
+        let today = chrono::NaiveDate::from_ymd_opt(2024, 2, 15).expect("valid date");
+        FeeGenerationOrchestrator::new(account_svc.clone())
+            .apply_schedule(&schedule, today)
+            .await
+            .unwrap();
+        account_svc
+            .get_all_transactions_for_account(&account.id)
+            .await
+            .unwrap()
+            .iter()
+            .filter(|t| t.transaction_type == TransactionType::ManagementFee)
+            .map(|t| t.quantity)
+            .collect()
+    }
+
+    // FEE-041 — a removal is `floor(held × annual rate ÷ periods)`, floored once: 0.20 % a
+    // year, monthly, on 1000 shares removes 0.166666 of a share, and a rate smaller than
+    // its number of periods still removes its share.
+    #[tokio::test]
+    async fn fee_041_a_removal_is_floored_once() {
+        assert_eq!(
+            monthly_removals_from_a_thousand_shares(200_000).await,
+            vec![166_666]
+        );
+        assert_eq!(monthly_removals_from_a_thousand_shares(11).await, vec![9]);
     }
 
     // FEE-043 — last_applied_period advances even when a period is skipped.
@@ -490,7 +547,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 1_000_000,
-                crate::context::account::FeeFrequency::Monthly,
+                FeeFrequency::Monthly,
                 "2024-01-01".to_string(),
                 None,
             )
@@ -537,7 +594,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 1_000_000,
-                crate::context::account::FeeFrequency::Monthly,
+                FeeFrequency::Monthly,
                 "2024-01-01".to_string(),
                 None,
             )
@@ -601,7 +658,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 1_000_000,
-                crate::context::account::FeeFrequency::Monthly,
+                FeeFrequency::Monthly,
                 "2024-01-01".to_string(),
                 None,
             )
@@ -679,7 +736,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 12_000_000,
-                crate::context::account::FeeFrequency::Monthly,
+                FeeFrequency::Monthly,
                 "2024-01-01".to_string(),
                 None,
             )
@@ -779,7 +836,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 12_000_000,
-                crate::context::account::FeeFrequency::Monthly,
+                FeeFrequency::Monthly,
                 "2024-01-01".to_string(),
                 Some("2024-02-15".to_string()),
             )
@@ -866,7 +923,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 12_000_000,
-                crate::context::account::FeeFrequency::Monthly,
+                FeeFrequency::Monthly,
                 "2024-01-01".to_string(),
                 None,
             )
@@ -976,7 +1033,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 12_000_000,
-                crate::context::account::FeeFrequency::Monthly,
+                FeeFrequency::Monthly,
                 "2024-01-01".to_string(),
                 None,
             )
@@ -1083,7 +1140,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 12_000_000,
-                crate::context::account::FeeFrequency::Annually,
+                FeeFrequency::Annually,
                 "1899-06-01".to_string(),
                 None,
             )
@@ -1154,7 +1211,7 @@ mod tests {
         });
         account_service
             .expect_record_generated_management_fee()
-            .returning(|_, asset_id, date, _, _| {
+            .returning(|_, asset_id, date, _, _, _| {
                 // The failing schedule gets through its first period, then cannot be saved.
                 if asset_id == "asset-failing" && date != "2020-12-31" {
                     Err(AccountError::DatabaseError)
@@ -1183,6 +1240,100 @@ mod tests {
                 Err(FeeGenerationError::Account(AccountError::DatabaseError))
             ),
             "{answered:?}"
+        );
+    }
+
+    // FEE-061 — a schedule paused then reactivated is not charged for the pause: its cursor
+    // passes every period completed before the reactivation, and generation resumes with
+    // the period that ends next.
+    #[tokio::test]
+    async fn fee_061_reactivating_a_schedule_generates_nothing_for_the_pause() {
+        let pool = setup_pool().await;
+        let account_svc = make_account_service(&pool);
+        let asset_svc = make_asset_service(&pool);
+        let stock_id = seed_stock(&asset_svc).await;
+        let account = account_svc
+            .create(
+                "FEE-061".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .unwrap();
+        let account = enable_management_fees(&account_svc, &account).await;
+        seed_cash(&pool, &account_svc, &account.id).await;
+        account_svc
+            .buy_holding(
+                &account.id,
+                stock_id.clone(),
+                "2024-01-01".to_string(),
+                micro(100),
+                micro(50),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        account_svc
+            .create_fee_schedule(
+                &account.id,
+                stock_id.clone(),
+                12_000_000,
+                FeeFrequency::Monthly,
+                "2024-01-01".to_string(),
+                None,
+            )
+            .await
+            .unwrap();
+        account_svc
+            .update_fee_schedule(&account.id, &stock_id, 12_000_000, None, false)
+            .await
+            .unwrap();
+        let day = |y, m, d| chrono::NaiveDate::from_ymd_opt(y, m, d).expect("valid date");
+
+        let reactivated = account_svc
+            .update_fee_schedule_on(
+                &account.id,
+                &stock_id,
+                12_000_000,
+                None,
+                true,
+                day(2024, 6, 15),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            reactivated.last_applied_period.as_deref(),
+            Some("2024-05-31")
+        );
+        let schedule = account_svc
+            .get_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap()
+            .expect("schedule");
+        FeeGenerationOrchestrator::new(account_svc.clone())
+            .apply_schedule(&schedule, day(2024, 8, 10))
+            .await
+            .unwrap();
+        let fees: Vec<String> = account_svc
+            .get_all_transactions_for_account(&account.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|t| t.transaction_type == TransactionType::ManagementFee)
+            .map(|t| t.date)
+            .collect();
+        let mut fees = fees;
+        fees.sort();
+        assert_eq!(
+            fees,
+            vec!["2024-06-30", "2024-07-31"],
+            "January to May are not charged"
         );
     }
 
@@ -1298,34 +1449,34 @@ mod tests {
         for (month, quarter_end) in (1..=12).zip(quarter_end_of_month) {
             let last_day = if matches!(quarter_end, 6 | 9) { 30 } else { 31 };
             assert_eq!(
-                period_end_containing(FeeFrequency::Quarterly, day(2025, month, 15).unwrap()),
+                FeeFrequency::Quarterly.period_end_containing(day(2025, month, 15).unwrap()),
                 day(2025, quarter_end, last_day),
                 "month {month}"
             );
         }
         // The last day of a quarter is in it; the next day is in the next.
         assert_eq!(
-            period_end_containing(FeeFrequency::Quarterly, day(2025, 3, 31).unwrap()),
+            FeeFrequency::Quarterly.period_end_containing(day(2025, 3, 31).unwrap()),
             day(2025, 3, 31)
         );
         assert_eq!(
-            period_end_containing(FeeFrequency::Quarterly, day(2025, 4, 1).unwrap()),
+            FeeFrequency::Quarterly.period_end_containing(day(2025, 4, 1).unwrap()),
             day(2025, 6, 30)
         );
         assert_eq!(
-            period_end_containing(FeeFrequency::Monthly, day(2024, 2, 10).unwrap()),
+            FeeFrequency::Monthly.period_end_containing(day(2024, 2, 10).unwrap()),
             day(2024, 2, 29)
         );
         assert_eq!(
-            period_end_containing(FeeFrequency::Monthly, day(2025, 12, 31).unwrap()),
+            FeeFrequency::Monthly.period_end_containing(day(2025, 12, 31).unwrap()),
             day(2025, 12, 31)
         );
         assert_eq!(
-            period_end_containing(FeeFrequency::Annually, day(2025, 5, 1).unwrap()),
+            FeeFrequency::Annually.period_end_containing(day(2025, 5, 1).unwrap()),
             day(2025, 12, 31)
         );
         assert_eq!(
-            next_period_end(FeeFrequency::Quarterly, day(2025, 12, 31).unwrap()),
+            FeeFrequency::Quarterly.next_period_end(day(2025, 12, 31).unwrap()),
             day(2026, 3, 31)
         );
     }
@@ -1430,7 +1581,7 @@ mod tests {
                 &account.id,
                 stock_id,
                 1_000_000,
-                crate::context::account::FeeFrequency::Monthly,
+                FeeFrequency::Monthly,
                 "2024-01-01".to_string(),
                 None,
             )
@@ -1533,7 +1684,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 12_000_000,
-                crate::context::account::FeeFrequency::Monthly,
+                FeeFrequency::Monthly,
                 "2024-01-01".to_string(),
                 Some("2024-01-31".to_string()),
             )
