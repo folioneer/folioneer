@@ -113,7 +113,10 @@ harness`) prints that
 
 **A batch in chat** — when the human says go to several queued entries, the agent runs
 `/run-queue`: one task per queued entry, so the queue is seen advancing, then `/next-todo`
-for each rather than re-deriving its steps. The human is asked twice, not once per entry:
+for each rather than re-deriving its steps. A skill is loaded with the `Skill` tool at the
+first entry of the batch and again after any pull request of the batch that changes it,
+never followed from memory; `/flow-audit` counts the loads beside the entries. The human
+is asked twice, not once per entry:
 
 - **Opening block**, before the first entry starts: the open questions of every queued
   entry, and the mock-ups (§ 4) of every queued entry that changes what the user sees,

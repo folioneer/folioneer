@@ -145,21 +145,6 @@ had been told `main` was ready (FLOW-031).
 - 0.7.1: one later round in eighteen. While the entries are stacked there is little to
   sort; the figure argues for waiting until the share rises again.
 
-## FLOW-030 — Two skills are followed by hand, never invoked
-
-- Kind: quality
-- Observed: `docs/workflow.md` § 3 says that in a batch "the agent runs `/next-todo` for
-  each" entry. In 0.7.0 it was invoked for 1 entry of 10; in 0.7.1 for none of 10, and
-  `/visual-proof` for none of 2: the agent read each skill once and followed it from
-  memory. Nothing visible was lost in 0.7.1 (one round in eighteen came after the first),
-  but a step of a skill that changes during a batch is not re-read: `/next-todo` Step 8
-  changed in #165 and the agent went on running the script it names directly.
-- Proposal: the rule says what is done and is checkable: a skill is loaded at the first
-  entry of a batch and again after any pull request of the batch that changes it;
-  `/flow-audit` counts the loads beside the entries.
-- Costs: one sentence in `docs/workflow.md` § 3, one line in the audit. Protects: a batch
-  that follows a step it rewrote an hour before.
-
 ## FLOW-032 — What `/prune` finds is written where git does not look
 
 - Kind: quality

@@ -63,6 +63,9 @@ From the session's transcript and memory notes, for the batch only:
   caught — each named in a few words;
 - what the agent invoked itself: skills, local agents, recipes, native commands where a
   recipe exists, scripts run directly;
+- how many times `/next-todo` and `/visual-proof` were loaded with the `Skill` tool,
+  beside the entries that needed them, and whether each was loaded again after a pull
+  request of the batch that changed it (`docs/workflow.md` § 3);
 - what exists and was not used: skills, agents, recipes, scripts.
 
 State a count only when it was counted; otherwise write "not counted".
