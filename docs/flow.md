@@ -206,19 +206,6 @@ The multi-device sync E2E covers the single-device critical path only (plan § H
 - Mutation survivors: the 2026-09-14 sweep (issue #137) found 301 logic changes no test notices — `context/account/domain/account.rs` 52, `use_cases/shared/valuation.rs` 33, `context/sync/domain/resolution.rs` 24, `use_cases/global_performance/orchestrator.rs` 21; each names an assertion that is missing or too weak.
 - Done when: the backend floor in `coverage-gates.json` reads 90.0 and the gate passes on `main`.
 
-## 2026-09-13 — DEBT-019 — The assets spec's before-each hook can hit a stale element
-
-- Found by: manual (an E2E run, attempt 1, on a pull request that touched no app code)
-- Seen again: a `main` push run, attempt 1 (2026-09-15, after a change that touched no E2E or assets code) — same `before each` hook, same stale node handle on an `element` call; attempt 2 green.
-- Seen again: PR #18, a records-only pull request, attempt 1 (2026-09-27); attempt 2 green.
-- Seen again: the `main` push of pull request 171 (2026-10-10, run 38043257182), a change to the sync dialog; the same tree was green on the pull request, and the release commit after it was green. Not re-run, and not skipped either: the hook guards every scenario of the assets spec, so skipping it is skipping the spec.
-- Where: e2e/assets/assets.test.ts (`beforeEach`), e2e/helpers/modal.ts (`dismissLeftoverModal`), e2e/helpers/navigation.ts (`navigateToAssets`)
-- Severity: 🟡
-- Observation: The hook failed with `stale element reference` while creating a node handle for an `element` call — an element located by one step had been replaced by a re-render before the next step used it. It is the second distinct once-only E2E failure in two days (DEBT-016 is the first); both sit in setup or navigation code shared by many specs, so each has many chances to fire per run. With E2E as a required check, every such failure costs a re-run before a green PR can merge.
-- User value: None — suite reliability.
-- Cause not found yet (2026-09-27): the F29 fix for DEBT-039 does not reach this hook — the assets spec's navigation and modal helpers depend on none of the hooks it changed. Next step: capture which element the `element` call was locating when it went stale (the failure screenshot and the hook's last command), then fix the component that replaces it.
-- Done when: the hook re-locates elements after each navigation step instead of reusing handles across renders, or the shared helpers wait for the route to settle before returning; a month of pull-request runs shows no before-each failure.
-
 ## 2026-09-13 — DEBT-021 — The rust-cache pin is labelled with the wrong tag in three workflows
 
 - Found by: reviewer-infra (phase 12 review, `.review/reviewer-infra-2026-09-13-10.md`)
