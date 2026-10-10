@@ -58,6 +58,9 @@ From the session's transcript and memory notes, for the batch only:
   review or a failed check, the usage limit;
 - real defects found by the reviewers before merge, and by challenging an entry before
   starting it — each named in a few words;
+- the questions put to the owner: how many in the opening block, how many during the
+  batch, and of those which the opening reading (`docs/workflow.md` § 3) should have
+  caught — each named in a few words;
 - what the agent invoked itself: skills, local agents, recipes, native commands where a
   recipe exists, scripts run directly;
 - what exists and was not used: skills, agents, recipes, scripts.

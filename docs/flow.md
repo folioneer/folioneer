@@ -136,35 +136,6 @@ entries already held the matter for.
   Protects: the decision on a merge queue being taken on a figure.
 - 0.7.0: not queued, and the causes were not counted a second time.
 
-## FLOW-023 — Questions reach the owner during the batch that the entries already held
-
-- Kind: speed
-- Observed: 17 questions in 0.7.0: 7 in the opening block, 10 during the batch. Of the
-  10, 7 could be asked before any code: three on vocabulary (five words for TODO-056 and
-  TODO-051, all named or implied by the entries and their mock-ups), the Windows scope
-  and the technical decision of TODO-051 (ADR-023), the split of TODO-051, the proof
-  DEBT-082 would give. Each one stopped the batch until the owner answered. The 3 others
-  came from what CI found (#150) and could not be known. The owner on 2026-10-10: "it
-  will be better to ask it at start".
-- Proposal: the opening block reads every queued entry for four things and asks them
-  together, before the first branch: the words the entry brings to the screen, the code
-  or the spec that the vocabulary does not hold; a technical choice that will need an
-  ADR; a platform or a part of the Done-when that may be left out; an entry large enough
-  to be split. The challenge of a queued `DEBT-NNN` runs then too, so that its question
-  is in the block. A question asked later says what made it unknowable at the start.
-- Costs: a longer opening block — the agent reads the code each entry touches before
-  starting any of them. Protects: a batch that runs unattended once the block is
-  answered.
-- From the owner's other project, which met the same thing (nine questions in the middle
-  of an entry) and decided how on 2026-10-06; taken into this entry by the owner on
-  2026-10-10: `/whats-next` runs the same reading on what it proposes, so an entry enters
-  the queue with its questions answered; a question is asked once at its widest ("the
-  term for every aggregate edited from a form", not one aggregate at a time); a choice
-  with a standing answer is not asked again, the answer being written where the rule
-  lives; in the middle of an entry a question stays right for what the reading could not
-  show, and the audit after a release counts the questions and says which the reading
-  should have caught.
-
 ## FLOW-024 — Nothing compares a contract with the code it describes
 
 - Kind: quality

@@ -124,8 +124,25 @@ not once per entry:
   reviewer findings declined and why, the debt filed, and the screenshots of what
   shipped. It blocks nothing; it is what the human reads to disagree.
 
+The opening block is built by reading, before the first branch, every queued entry and
+the code it touches for four things, asked together:
+
+- the words the entry brings to a screen, the code or a spec that
+  `docs/ubiquitous-language.md` does not hold;
+- a technical choice that will need an ADR;
+- a platform, or a part of the Done when, that may be left out;
+- an entry large enough to be split.
+
+A queued `DEBT-NNN` is challenged against the current code in the same reading, so that
+what the challenge asks is in the block. A question is asked once, at its widest ("the
+term for every aggregate edited from a form", not one aggregate at a time). A choice
+that has a standing answer is not asked again: the answer is written where its rule
+lives, and read there.
+
 A question that only appears mid-batch is written on its entry, the entry is skipped,
-and the question joins the closing block — unless nothing else in the queue can run.
+and the question joins the closing block — unless nothing else in the queue can run. It
+is right only for what the reading could not show, and it says what made it unknowable
+at the start (what CI found, what an answer of the block opened).
 
 **Release** — when the queue empties the agent runs `/dep-audit` without being asked (a
 known vulnerability in what ships blocks the release; the agent fixes it or files it),

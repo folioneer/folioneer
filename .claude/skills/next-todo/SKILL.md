@@ -24,7 +24,9 @@ rules are `docs/workflow.md`; this file is the checklist.
   Headless: skip entries that are not ready; if none is ready, print which questions
   block which entries and stop. Chat: ask the open questions before anything else,
   one at a time, each with the context needed to answer it; write the answers into the
-  entry (they land in the same PR as the change), then continue.
+  entry (they land in the same PR as the change), then continue. In a batch the
+  questions were asked in its opening block (`docs/workflow.md` § 3): one that appears
+  now is written on the entry with what made it unknowable then.
 
 ## Step 1 — Opening brief, branch and task list
 

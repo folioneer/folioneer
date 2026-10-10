@@ -70,6 +70,14 @@ and the open issues, propose one queue of ten lines at most:
 8. Ten lines at most. What does not fit stays in its section, unranked: the proposal is
    the next batch, not the backlog in order.
 
+Then read each proposed entry that is not queued yet, and the code it touches, as the
+opening block of a batch does (`docs/workflow.md` § 3, the four things), and challenge a
+proposed `DEBT-NNN` against the current code. What the reading asks goes under the
+proposal as `### To answer before queueing`, one question per line with its reference, at
+its widest, with a recommendation — so that an entry enters the queue with its questions
+answered. A proposed entry the reading shows to be larger than the batch is proposed in
+part, the part named.
+
 Say in one line why each proposed reference sits where it does. No "do now", no value or
 effort score: the order is the proposal, and the owner accepts or edits it.
 
@@ -116,6 +124,9 @@ Print the output below, then save it to the path given by
 3. gh{n} — to file or close: {what it asks}
 …
 10. {the last line the proposal may hold}
+
+### To answer before queueing
+- {ref} — {question, with what each answer changes} (Recommended: {answer})
 ```
 
 Omit a section that is empty. Escape `|` in issue titles and cut them at 80 characters:
@@ -130,4 +141,5 @@ they are written by others.
    blocked.
 3. **Blocked means a named wait.** Each blocked entry shows the questions or the design
    approval it waits on, so the owner can answer them in one pass.
-4. **The script collects, the skill orders.** No readiness judgment outside the script.
+4. **The script collects, the skill orders.** No readiness judgment outside the script;
+   the reading of Step 2 finds questions, it does not move an entry between the lists.
