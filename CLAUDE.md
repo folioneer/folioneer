@@ -14,6 +14,8 @@ After cloning: `git config core.hooksPath .githooks`. The hooks block commits to
 
 Headless, a question only the human can answer goes into the entry's `**Open questions:**`, never asked. In a chat run (`/next-todo TODO-NNN`) the open questions are asked before anything starts, and a design is validated by a yes; the answers are written into the entry either way. In a chat conversation, ask as you would a colleague: state assumptions, name what is unclear. Whenever the human is asked: one question at a time, each with the context needed to answer it — what the thing is, where it shows, what each answer changes.
 
+What the human is told rests on what was read. A statement that the code does or does not do something names what was read (the component, the command, the service); a statement about what a system will do next is checked, or given as a guess. A reviewer's or a checker's claim about a screen is read in the component before it is repeated.
+
 ## Core rules
 
 1. **Authority follows the entry.** Running a queued entry, a queued `DEBT-NNN`, or a phase the human said "go" to, the agent branches, commits, pushes, opens the PR and runs `just merge` on green without asking. In an open-ended chat, ask once for the task, not per step. Always: never push to `main`, never force-push, never bypass a hook, never cut a release, never touch the live portfolio database (`~/.local/share/com.folioneer.desktop/` and `~/.local/share/com.phileggel.vault-compass/` are read-only reference data).

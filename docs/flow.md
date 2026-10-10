@@ -136,21 +136,6 @@ entries already held the matter for.
   Protects: the decision on a merge queue being taken on a figure.
 - 0.7.0: not queued, and the causes were not counted a second time.
 
-## FLOW-029 — A statement to the owner that rests on nothing the agent read
-
-- Kind: quality
-- Observed: in 0.7.0 the agent told the owner that the full-page form could sell an
-  archived asset, repeating a checker's report; the form only buys. It was corrected to
-  the owner and in the commit title before the push. The owner's other project counted
-  four such statements in one batch and decided two sentences on 2026-10-06.
-- Proposal: `CLAUDE.md` § Who decides what gains them: a statement that the code does or
-  does not do something names what was read (the component, the command, the service);
-  a statement about what a system will do next is checked, or given as a guess. A
-  reviewer's or a checker's claim about a screen is read in the component before it is
-  repeated.
-- Costs: two sentences, and a read before a status line. Protects: the owner's trust in
-  a status line, which is what an autonomous batch runs on.
-
 ## Used and not used — the 0.7.0 batch
 
 Counted from the session's transcript, 2026-10-09 → 2026-10-10: what the agent invoked
