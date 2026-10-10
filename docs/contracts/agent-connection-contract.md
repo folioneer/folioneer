@@ -1,11 +1,11 @@
 # Contract — Agent Connection
 
 > Domain: `agent-connection`
-> Last updated by: agent-connection (AGT-022–039, AGT-045, AGT-052, AGT-053)
+> Last updated by: agent-connection (AGT-022–036, AGT-039, AGT-045, AGT-052, AGT-053)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName" }` object. The FE matches on `code`.
 >
-> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–051) are not Tauri commands: what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
+> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051) are not Tauri commands: what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
 
 ---
 
@@ -58,7 +58,7 @@ struct AgentSession {
 // AGT-052 — the last transaction a session recorded.
 struct LastRecording {
     kind: TransactionType, // account-contract.md
-    asset: String,         // the asset's reference
+    asset: String,         // the asset's reference; its identifier when the asset cannot be read
     date: String,          // YYYY-MM-DD
 }
 

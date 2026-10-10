@@ -1,9 +1,4 @@
 {
-  "about": "Where a contract and the generated bindings differed when scripts/contract-check.py arrived (FLOW-024). The check fails on a gap outside this list and on a line that is no longer a gap, so the list only shrinks (`python3 scripts/contract-check.py --shrink`). The lines left are DEBT-096.",
-  "gaps": [
-    "asset: `add_asset` names `Exchange`, which no contract defines",
-    "asset: `get_supported_exchanges` names `Exchange`, which no contract defines",
-    "asset: `update_asset` names `Exchange`, which no contract defines",
-    "scheduled-fetch: `configure_scheduled_fetch` takes (enabled, trigger_time); the row gives (ConfigureScheduledFetchArgs { enabled: bool, trigger_time: String })"
-  ]
+  "about": "Where a contract and the generated bindings differed when scripts/contract-check.py arrived (FLOW-024). The check fails on a gap outside this list and on a line that is no longer a gap, so the list only shrinks (`python3 scripts/contract-check.py --shrink`). It is empty: every gap is a failure.",
+  "gaps": []
 }

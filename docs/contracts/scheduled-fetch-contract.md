@@ -9,14 +9,14 @@
 
 ## Commands
 
-| Command                      | Args                                                                  | Return                 | Errors                                                                                       |
-| ---------------------------- | --------------------------------------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------- |
-| `configure_scheduled_fetch`  | `ConfigureScheduledFetchArgs { enabled: bool, trigger_time: String }` | `()`                   | `InvalidTriggerTime`, `ScheduleRegistrationFailed`, `ScheduleRemovalFailed`, `DatabaseError` |
-| `get_scheduled_fetch_status` | —                                                                     | `ScheduledFetchStatus` | `DatabaseError`                                                                              |
+| Command                      | Args                                  | Return                 | Errors                                                                                                                     |
+| ---------------------------- | ------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `configure_scheduled_fetch`  | `enabled: bool, trigger_time: String` | `()`                   | `InvalidTriggerTime` (SPF-019), `ScheduleRegistrationFailed` (SPF-013), `ScheduleRemovalFailed` (SPF-013), `DatabaseError` |
+| `get_scheduled_fetch_status` | —                                     | `ScheduledFetchStatus` | `DatabaseError`                                                                                                            |
 
-Traceability: `configure_scheduled_fetch` ← SPF-010, SPF-011, SPF-012, SPF-013 (`InvalidTriggerTime` guards a malformed time; `ScheduleRegistrationFailed` / `ScheduleRemovalFailed` carry the SPF-013 OS-schedule failure, per direction). `get_scheduled_fetch_status` ← SPF-010 (section render), SPF-052 (last-run status line).
+Traceability: `configure_scheduled_fetch` ← SPF-010, SPF-011, SPF-012, SPF-013, SPF-019 (`InvalidTriggerTime` refuses a malformed time, SPF-019; `ScheduleRegistrationFailed` / `ScheduleRemovalFailed` carry the SPF-013 OS-schedule failure, per direction). `get_scheduled_fetch_status` ← SPF-010 (section render), SPF-052 (last-run status line).
 
-The scheduled run itself, the once-per-day guard, catch-up, backfill, and start-time self-heal (SPF-015, SPF-020–SPF-033, SPF-040–SPF-053) are internal-only — no frontend caller, so no commands.
+The scheduled run itself, the once-per-day guard, catch-up, backfill, and start-time self-heal (SPF-015–017, SPF-020–023, SPF-030–042, SPF-050, SPF-051, SPF-053, SPF-070, SPF-072) are internal-only — no frontend caller, so no commands.
 
 In a build without an External provider (MKT-210) both commands are refused before any work is done (SPF-073): nothing is registered, removed or written, and the refusal carries no typed code, since no orchestrator exists to answer. The interface never calls them there — it shows no scheduled fetch section (SPF-071).
 
@@ -64,3 +64,4 @@ None — SPF-024: the scheduled run never live-notifies a running app (separate 
 - 2026-07-12 — contract-reviewer fix: `ScheduledFetchStatus.last_run` → `Option<ScheduledFetchRun>` (fresh-install state)
 - 2026-07-12 — SPF-017: all three desktop platforms ship adapters; no platform-support flag needed on the wire
 - 2026-09-23 — SPF-070–073: in a build without an External provider both commands are refused before any work, untyped; no new command, type or error.
+- 2026-10-10 — DEBT-096: `configure_scheduled_fetch` takes its two arguments as the command does (`enabled`, `trigger_time`), not as a struct; each of its codes names its rule.

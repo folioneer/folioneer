@@ -7,10 +7,37 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `DEBT-NNN` reference (never renumbered, never reused; next free:
-DEBT-108) so the human can queue it in `docs/todo.md` § Next like any todo.
+DEBT-111) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
+
+## 2026-10-10 — DEBT-110 — What the spec check of the agent connection found after TODO-060
+
+- Found by: `spec-checker` on `docs/spec/agent-connection.md`, at the hand-over of the batch (2026-10-10): every rule AGT-010 to AGT-054 has code; it ran `just test-rust agent_connection` and `just test src/features/shell`, both green; the E2E suite was not run
+- Where: `src-tauri/src/use_cases/holding_transaction/named_recording.rs` (`remove_recorded_in_session`); `src-tauri/src/agent_connection/` (`api.rs`, `tools.rs`, `server.rs`, `connections.rs`, `end_to_end_tests.rs`); `src/features/shell/agent_connection/`; `agent.session_remove_note` and `agent.session_confirm_message` in `src/i18n/locales/{en,fr}/common.json`
+- Severity: 🟡
+- Observation: **code short of its rule.** AGT-053: a deletion refused for any reason other than a failure of the database or a transaction already gone counts as "kept", so the owner is told "a transaction recorded since depends on it" for a refusal that is something else. AGT-054: the sentence of the dialog says "nothing you typed" and not that a correction the owner made to one of the recordings goes with it; "connected since" shows a time without its day. **A clause without a test.** AGT-050: a cancellation the window's deletion would refuse; a corrected total of an opening balance, a sale, new fees or a new rate; the opening balance's refusal of fees and rate; the limit's count untouched; the write that runs to its end. AGT-052 / AGT-036: the window told after every call and after the removal; a deletion in the journal seen at the next recording; a refused read left uncounted. AGT-053: the command `remove_agent_recordings` itself (a test replays its body), its two refusals, `DatabaseError` in the serialization test, a retry that succeeds, a recording made while the removal runs. AGT-054: the confirmation closing with its session; the figures following the state; the state read again after a refusal. AGT-034: a disconnection ahead of what the agent already sent. AGT-047: `SessionLimitReached` on a recording. AGT-049: `RecordedNotMarked` and its count.
+- User value: What the window says after removing an agent's recordings is what happened.
+- Done when: a deletion refused for another reason is said as what it is; the dialog's sentence and its date say what AGT-054 says, or the rule says what the dialog does; each clause above has a test.
+
+## 2026-10-10 — DEBT-109 — What the reading of the asset contract found in the asset specs and the code
+
+- Found by: `contract-reviewer` on `docs/contracts/asset-contract.md`, closing DEBT-096 (2026-10-10)
+- Where: `docs/spec/asset.md`; `docs/spec/market-price.md` (MKT-083, MKT-090); `docs/spec/cash-tracking.md` (CSH-016); `src-tauri/src/use_cases/archive_asset/orchestrator.rs`; `src-tauri/src/use_cases/delete_asset/orchestrator.rs`
+- Severity: 🟡
+- Observation: **no rule.** No rule says an asset an account still holds cannot be archived (`ActiveHoldings`), nor that an asset a transaction names cannot be deleted (`ExistingTransactions`); the asset spec lists hard delete under its future features while the window calls `delete_asset`. **Order.** Both use cases ask the account context before they look at the asset, so a Cash Asset that is held answers `ActiveHoldings` / `ExistingTransactions` where CSH-016 promises `CashAssetNotEditable`. **Stale names.** MKT-083 and MKT-090 name `NotFound` / `Unknown` where the code answers `PriceNotFound` / `DatabaseError`; CSH-016 names four `…CommandError` types that no longer exist.
+- User value: None directly — archiving and deleting an asset refuse what their rules say, in the order they say.
+- Done when: the asset spec has the two rules and the contract rows name them; the Cash Asset refusal comes first, with a test, or CSH-016 says otherwise; the three rules name the codes the code returns.
+
+## 2026-10-10 — DEBT-108 — Two error codes no code builds, and a comment that says too much
+
+- Found by: reading the six contracts against the code (DEBT-096)
+- Where: `FetchPriceTask::UnknownError` in `src-tauri/src/use_cases/asset_price_fetch/error.rs`; `PortfolioSyncTask::UnknownError` in `src-tauri/src/use_cases/portfolio_sync/error.rs`; `error.UnknownError` in `src/i18n/locales/{en,fr}/common.json`; `src/features/account_details/gateway.test.ts`; the comment of `Event::CurrencyPairUpdated` in `src-tauri/src/core/event_bus/event.rs`
+- Severity: 🔵
+- Observation: no code builds either `UnknownError`: each is named only by its own serialization test, and on the window's side by a string and a gateway test. The asset contract no longer promises it. The comment of `CurrencyPairUpdated`, which reaches the bindings, says the event is also raised when a pair is applied from another computer; only `declare_currency_pair` publishes it (SYN-064).
+- User value: None directly — the error types say what can happen.
+- Done when: the two variants, their string and the tests that only name them are gone, the comment says what the code does, the bindings regenerated.
 
 ## 2026-10-10 — DEBT-107 — What the spec check of sync found after DEBT-099 and DEBT-083
 
@@ -18,6 +45,7 @@ Remove an entry once it has been resolved.
 - Where: `src-tauri/tests/sync_two_devices.rs`, `src-tauri/tests/sync_first_publish.rs`, `e2e/sync/sync.test.ts`, `installation_holds_user_data` in `src-tauri/src/use_cases/portfolio_sync/orchestrator.rs`
 - Severity: 🔵
 - Observation: **a clause without a test of its own.** SYN-014 / SYN-083: no test joins, up to the rebuild, from an installation that holds a declared pair or fetched observations — the gate and the discarding are each tested alone. SYN-071: no test makes a removal fail while clearing and reads the device afterwards ("leaves the device as it was"); none starts over with a conflict notice present and reads the status (SYN-066). No E2E scenario shows the join refusal or starts over from it: the one sync scenario starts over from the sync page. **Read by `reviewer-security`, not checked:** the guard never looks at manually recorded asset prices, which SYN-014 names; a price needs a non-cash asset, which the guard already refuses — whether a Cash Asset can take a manual price was not read
+- Also, from `contract-reviewer` on the sync contract (DEBT-096, 2026-10-10): joining a folder whose header states no format this version reads answers `DatabaseError` (`join` falls through to `decode_header`), where starting over answers `UpdateRequired`. Unconfirmed, the launch path was not read: the failures and the roster of the status come from the last run kept in memory, so after a restart a device paused for a reset may no longer list `PortfolioReset` until a run happens, while SYN-063 says it stays listed.
 - User value: None directly — the promises of joining and starting over are each held end to end.
 - Done when: each clause above has a test; the E2E scenario of sync shows the refusal and starts over from it; SYN-014 and the guard agree on manual prices.
 
@@ -362,15 +390,6 @@ Remove an entry once it has been resolved.
 - Observation: `handleDateSelect` builds an ISO date in four lines where `toIsoLocal`, defined in the same file with the same formula and used by `stepDate`, does it in one; the four lines are covered. Outside the audit's categories: the same file writes the ISO-date pattern inline twice where its constant `ISO_DATE` exists, and the sync hook writes `folderState?.holds_portfolio === true` twice
 - User value: None — less code saying the same thing.
 - Done when: `handleDateSelect` calls `toIsoLocal`; the two patterns use `ISO_DATE`; the sync hook names the expression once; the tests of both files pass unchanged.
-
-## 2026-10-10 — DEBT-096 — Six contracts were never read against the code they describe
-
-- Found by: `scripts/contract-check.py`, first run (FLOW-024)
-- Where: `docs/contracts/{asset,scheduled-fetch,sync,currency,update,agent-connection}-contract.md`; `contract-gaps.json`
-- Severity: 🟡
-- Observation: the check finds four gaps outside the account contract: the asset contract names `Exchange` in three rows and defines it nowhere; the scheduled-fetch contract gives `configure_scheduled_fetch` a `ConfigureScheduledFetchArgs` struct where the command takes `enabled` and `trigger_time`. The check compares names, arguments, types and whether an error type can carry a code; which codes each command returns is not in the bindings, and on that half only the account contract was read exhaustively (22 gaps, since fixed). The six others were not
-- User value: None directly — the documents the window is written against say what the core does.
-- Done when: each of the six contracts is read once with `/contract`, command by command; `contract-gaps.json` holds no line; one exhaustive pass of `contract-reviewer` on each finds no critical gap.
 
 ## 2026-10-10 — DEBT-095 — WebdriverIO 10 is available; the E2E tools are on 9
 
