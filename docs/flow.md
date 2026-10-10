@@ -136,20 +136,6 @@ entries already held the matter for.
   Protects: the decision on a merge queue being taken on a figure.
 - 0.7.0: not queued, and the causes were not counted a second time.
 
-## FLOW-028 — Two pull requests opened side by side send each other round
-
-- Kind: speed
-- Observed: on the release day #153 and #155 were each green, then rebased by `just
-merge` because the other had merged, and waited for a second run. The owner's other
-  project wrote its way through on 2026-10-06: a branch that is not pushed yet sits on
-  the branch in review, is checked and reviewed there, and is rebased onto `main` and
-  pushed only once the one below has merged — a local rebase, never a force-push. Three
-  pull requests merged there within 27 minutes of each other.
-- Proposal: `docs/workflow.md` § 11 allows it and says how; the reviewers are given the
-  last commit, not the branch.
-- Costs: a reviewer prompt that names a commit. Protects: one CI round for each pull
-  request that waits behind another.
-
 ## FLOW-029 — A statement to the owner that rests on nothing the agent read
 
 - Kind: quality

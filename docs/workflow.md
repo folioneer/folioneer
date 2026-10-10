@@ -327,3 +327,14 @@ exceeds about 20 files or 500 lines, in this order: spec, contract, migration, b
 generated bindings (mergeable alone — the bindings are unused); then gateway, hooks, presenter,
 components and strings, branched off the merged backend; then E2E and closure. Each diff stays
 one story and CI signs each off on its own.
+
+**A branch behind one in review.** Two pull requests opened side by side send each other
+round: each is green, then rebased by `just merge` because the other merged, and waits
+for a second run. So while a pull request is in CI, the next entry is not pushed: its
+branch is cut from the branch in review, worked, checked by the harness and reviewed
+there — the reviewers are given its last commit, not the branch
+(`.claude/agents/review-protocol.md`). Once the one below has merged it is rebased onto
+`main` — a local rebase of commits nobody has, never a force-push — pushed, and gets its
+one CI round. Entries on disjoint files may still be open side by side, from a worktree
+(`just worktree`); the records they both close (`docs/todo.md` § Next) are edited last,
+after the rebase.
