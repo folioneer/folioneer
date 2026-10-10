@@ -99,7 +99,15 @@ impl FeeGenerationOrchestrator {
         today: NaiveDate,
     ) -> Result<(), FeeGenerationError> {
         let Ok(start) = NaiveDate::parse_from_str(&schedule.start_date, "%Y-%m-%d") else {
-            return Ok(()); // malformed start_date — skip defensively
+            // FEE-079 — a start date that is no date: nothing can be due.
+            tracing::warn!(
+                target: BACKEND,
+                account_id = %schedule.account_id,
+                asset_id = %schedule.asset_id,
+                start_date = %schedule.start_date,
+                "fee generation: schedule not run, its start date is no date"
+            );
+            return Ok(());
         };
         let cursor = schedule
             .last_applied_period
@@ -359,10 +367,7 @@ mod tests {
             .unwrap();
 
         let uc = FeeGenerationOrchestrator::new(account_svc.clone());
-        // Expect todo!() panic for now — this is the red baseline.
         let result = uc.apply_due_fee_deductions().await;
-        // Once implemented: no schedules → no error.
-        // Until then, the todo!() panic IS the red signal.
         assert!(
             result.is_ok(),
             "with no schedules, apply_due_fee_deductions must succeed: {:?}",
@@ -1715,6 +1720,120 @@ mod tests {
             .await
             .unwrap();
         heard("a creation");
+    }
+
+    // FEE-079 — a schedule on the cash line charges nothing: each of its periods is
+    // skipped, and its cursor passes them.
+    #[tokio::test]
+    async fn fee_079_a_schedule_on_the_cash_line_charges_nothing() {
+        let pool = setup_pool().await;
+        let (account_svc, account, _) = scheduled_account(&pool, "FEE-079-cash").await;
+        account_svc
+            .create_fee_schedule(
+                &account.id,
+                "system-cash-eur".to_string(),
+                12_000_000,
+                FeeFrequency::Monthly,
+                "2024-01-01".to_string(),
+                None,
+            )
+            .await
+            .expect("accepted");
+
+        generate(&account_svc, &account, "system-cash-eur", (2024, 3, 15)).await;
+
+        assert!(deductions(&account_svc, &account).await.is_empty());
+        let schedule = account_svc
+            .get_fee_schedule(&account.id, "system-cash-eur")
+            .await
+            .unwrap()
+            .expect("schedule");
+        assert_eq!(schedule.last_applied_period.as_deref(), Some("2024-02-29"));
+    }
+
+    // FEE-079 — a schedule for an asset that does not exist is not kept.
+    #[tokio::test]
+    async fn fee_079_a_schedule_for_an_asset_that_does_not_exist_is_not_kept() {
+        let pool = setup_pool().await;
+        let (account_svc, account, _) = scheduled_account(&pool, "FEE-079-unknown").await;
+
+        let refused = account_svc
+            .create_fee_schedule(
+                &account.id,
+                "no-such-asset".to_string(),
+                12_000_000,
+                FeeFrequency::Monthly,
+                "2024-01-01".to_string(),
+                None,
+            )
+            .await
+            .expect_err("not kept");
+
+        assert!(
+            matches!(refused, AccountError::DatabaseError),
+            "{refused:?}"
+        );
+        assert!(account_svc
+            .get_fee_schedule(&account.id, "no-such-asset")
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    // FEE-079 — a schedule whose start date is no date is kept and never generates: its
+    // cursor stays unset.
+    #[tokio::test]
+    async fn fee_079_a_schedule_whose_start_date_is_no_date_generates_nothing() {
+        let pool = setup_pool().await;
+        let (account_svc, account, stock_id) = scheduled_account(&pool, "FEE-079-date").await;
+        account_svc
+            .delete_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap();
+        account_svc
+            .create_fee_schedule(
+                &account.id,
+                stock_id.clone(),
+                12_000_000,
+                FeeFrequency::Monthly,
+                "soon".to_string(),
+                None,
+            )
+            .await
+            .expect("accepted");
+
+        generate(&account_svc, &account, &stock_id, (2024, 3, 15)).await;
+
+        assert!(deductions(&account_svc, &account).await.is_empty());
+        let schedule = account_svc
+            .get_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap()
+            .expect("schedule");
+        assert_eq!(schedule.last_applied_period, None);
+        assert!(schedule.active);
+    }
+
+    // FEE-079 — an end date that is no date is ignored: the schedule runs as one without
+    // an end.
+    #[tokio::test]
+    async fn fee_079_an_end_date_that_is_no_date_is_ignored() {
+        let pool = setup_pool().await;
+        let (account_svc, account, stock_id) = scheduled_account(&pool, "FEE-079-end").await;
+        account_svc
+            .update_fee_schedule(
+                &account.id,
+                &stock_id,
+                12_000_000,
+                Some("sometime".to_string()),
+                true,
+            )
+            .await
+            .expect("accepted: the dates are compared as text");
+
+        generate(&account_svc, &account, &stock_id, (2024, 3, 15)).await;
+
+        assert_eq!(deductions(&account_svc, &account).await.len(), 2);
     }
 
     // FEE-078 — schedules of a disabled account are paused (skipped, cursor

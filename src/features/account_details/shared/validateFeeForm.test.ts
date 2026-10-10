@@ -39,6 +39,14 @@ describe("validateFeeSchedule (FEE-032/045)", () => {
     expect(validateFeeSchedule({ ...valid, endDate: "2025-01-01" })).toBeNull();
   });
 
+  // FEE-032 — a schedule's rate stays strictly below 100 % a year
+  it("refuses a rate of 100 % and accepts one just below", () => {
+    expect(validateFeeSchedule({ ...valid, ratePercent: "100" })).toEqual({
+      key: "error.RateAboveHundred",
+    });
+    expect(validateFeeSchedule({ ...valid, ratePercent: "99.999999" })).toBeNull();
+  });
+
   it("surfaces the rate error first", () => {
     expect(validateFeeSchedule({ ...valid, ratePercent: "0" })).toEqual({
       key: "validation.percentage_not_positive",

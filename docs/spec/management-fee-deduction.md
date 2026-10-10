@@ -49,7 +49,7 @@ A recurring rule that generates fee deductions for one (account, asset) holding 
 
 **FEE-010 — One-off entry point (frontend)**: The one-off fee flow is initiated from a "Management fee" button of the Account Details header, one of the header's record actions (DIV-012 lists them), which opens the one-off fee modal (FEE-020). The charged asset is chosen inside the modal.
 
-**FEE-011 — Schedule entry point (frontend)**: A recurring Fee Schedule is created and managed from a per-holding-row "Manage fee" action on the Account Details holdings table, with the charged asset pre-selected from that row.
+**FEE-011 — Schedule entry point (frontend)**: A recurring Fee Schedule is created and managed from a per-holding-row "Manage fee" action on the Account Details holdings table, with the charged asset pre-selected from that row. The cash row does not offer it.
 
 **FEE-012 — Eligibility (backend)**: A fee deduction — one-off or generated — may apply only to an `(account, asset)` pair with an active holding (`quantity > 0`) that is not a Cash Asset. The action is rejected with a specific error when the account is unknown, the asset is unknown, the asset is not currently held in that account, or the asset is a Cash Asset.
 
@@ -81,7 +81,7 @@ A recurring rule that generates fee deductions for one (account, asset) holding 
 
 **FEE-031 — One schedule per holding (backend)**: At most one Fee Schedule may exist per `(account, asset)` pair. Creating a second is rejected with a specific error; the existing schedule is edited instead (FEE-060). <!-- AI-Decision: single schedule per holding — duplicate rejected -->
 
-**FEE-032 — Schedule validation (frontend + backend)**: `annual_rate` must be strictly positive and below a sane cap (`< 100%` per year); `end_date`, if present, must be after `start_date`. Creating or editing a schedule is rejected with a specific error when the rate is not positive, when it is above the cap, or when the end date is not after the start date; creating one is also rejected when the account is unknown. A schedule is accepted whatever its asset and whatever the form of its dates: neither is checked, and the two dates are compared as text.
+**FEE-032 — Schedule validation (frontend + backend)**: `annual_rate` must be strictly positive and strictly below `100%` per year — `100%` itself is refused, like anything above (owner, 2026-10-10); `end_date`, if present, must be after `start_date`. Creating or editing a schedule is rejected with a specific error when the rate is not positive, when it is at or above `100%`, or when the end date is not after the start date; creating one is also rejected when the account is unknown. Neither the asset nor the form of the dates is checked at creation, and the two dates are compared as text (FEE-079 says what follows for a schedule the form cannot produce).
 
 **FEE-033 — Schedule persistence (backend)**: Creating a schedule persists it but does **not** itself remove shares — deductions are produced only by generation (FEE-04x).
 
@@ -157,6 +157,8 @@ A recurring rule that generates fee deductions for one (account, asset) holding 
 
 **FEE-078 — Catch-up pause (backend)**: the startup catch-up (FEE-040) skips every schedule whose account has the parameter disabled, without advancing the `last_applied_period` cursor. Re-enabling the parameter resumes generation with a backfill of the paused periods on the next catch-up run (the schedule models fees the fund charges regardless of app configuration), subject to the FEE-044/047 oversell and zero-quantity guards.
 
+**FEE-079 — A schedule the form cannot produce (backend)**: The window only creates a schedule on a held, non-cash asset, with dates it picked. One created on this computer outside the window — the command line, an agent — is treated so (a schedule arriving from another device follows CFR-031): on a **Cash Asset** it is kept and charges nothing — each of its periods is skipped and its cursor passes it (FEE-047); for an **asset that does not exist** it is not kept, and its creation is answered `DatabaseError`; with a **`start_date` that is no date** it is kept, stays active and never generates — each run says so in the log and leaves its cursor as it is, a reactivation moving it as for any schedule (FEE-061); an **`end_date` that is no date** is ignored: the schedule runs as one without an end.
+
 ---
 
 ## Workflow
@@ -201,7 +203,7 @@ App open → for each active schedule (FEE-040):
 ### Entry Point
 
 - **One-off**: a "Management fee" button of the Account Details header (FEE-010), in its row of record actions with New position, Dividend, and Free shares.
-- **Schedule**: a "Manage fee" action on each holding row (FEE-011), opening the schedule modal with the asset pre-selected.
+- **Schedule**: a "Manage fee" action on each non-cash holding row (FEE-011), opening the schedule modal with the asset pre-selected.
 
 ### Main Component
 
@@ -242,6 +244,8 @@ Interview decisions (all resolved):
 - [x] **One-off entries retained** alongside recurring schedules (for irregular, non-recurring charges).
 
 - [x] **One flooring (FEE-041)**: a generated removal is floored once; the deductions generated before the change keep their quantity and are never recomputed (owner, 2026-10-10).
+- [x] **Rate bound (FEE-032)**: a schedule at exactly 100 % a year is refused, like anything above (owner, 2026-10-10).
+- [x] **No creation check (FEE-079)**: a schedule on the cash line, for an asset that does not exist or with a date that is none is not refused by a check of its own; FEE-079 states what becomes of it (owner, 2026-10-10).
 
 Resolved in the spec-reviewer round:
 

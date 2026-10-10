@@ -1076,8 +1076,8 @@ impl AccountService {
     /// Creates a new fee schedule for the (account, asset) pair (FEE-030).
     ///
     /// FEE-031 — rejects if a schedule already exists for the pair.
-    /// FEE-032 — validates rate > 0 (`RateNotPositive`), rate ≤ 100% micro-percent
-    /// (`RateAboveHundred`), end_date > start_date (`EndBeforeStart`).
+    /// FEE-032 — validates rate > 0 (`RateNotPositive`), rate < 100 % (`RateAboveHundred`),
+    /// end_date > start_date (`EndBeforeStart`).
     pub async fn create_fee_schedule(
         &self,
         account_id: &str,
@@ -1107,7 +1107,7 @@ impl AccountService {
         if existing.is_some() {
             return Err(AccountError::ScheduleAlreadyExists);
         }
-        // FEE-032 — validates rate (>0, ≤100%) and end_date > start_date.
+        // FEE-032 — validates rate (> 0, < 100 %) and end_date > start_date.
         let schedule = FeeSchedule::new(
             account_id.to_string(),
             asset_id,

@@ -97,7 +97,7 @@ impl std::str::FromStr for FeeFrequency {
 /// A recurring management fee schedule for an (account, asset) pair (FEE-030).
 ///
 /// `annual_rate_percent_micros` is in micro-percent: 1% = 1_000_000,
-/// 100% = 100_000_000. Must be strictly positive and ≤ 100_000_000.
+/// 100% = 100_000_000. Must be strictly positive and strictly below 100_000_000.
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct FeeSchedule {
     /// Unique identifier.
@@ -126,7 +126,7 @@ impl FeeSchedule {
     /// Creates a new FeeSchedule with a generated ID.
     ///
     /// FEE-032 — validates: rate > 0 (`RateNotPositive`),
-    /// rate ≤ 100_000_000 (`RateAboveHundred`), end_date > start_date (`EndBeforeStart`).
+    /// rate < 100_000_000 (`RateAboveHundred`: 100 % itself is refused), end_date > start_date (`EndBeforeStart`).
     pub fn new(
         account_id: String,
         asset_id: String,
@@ -138,7 +138,7 @@ impl FeeSchedule {
         if annual_rate_percent_micros <= 0 {
             return Err(AccountError::RateNotPositive);
         }
-        if annual_rate_percent_micros > 100_000_000 {
+        if annual_rate_percent_micros >= 100_000_000 {
             return Err(AccountError::RateAboveHundred);
         }
         if let Some(ref end) = end_date {
@@ -163,7 +163,7 @@ impl FeeSchedule {
     /// aggregate to persist. `frequency` and `start_date` are immutable after creation.
     ///
     /// FEE-032 — validates: rate > 0 (`RateNotPositive`),
-    /// rate ≤ 100_000_000 (`RateAboveHundred`), end_date > start_date (`EndBeforeStart`).
+    /// rate < 100_000_000 (`RateAboveHundred`: 100 % itself is refused), end_date > start_date (`EndBeforeStart`).
     pub fn update_from(
         mut self,
         annual_rate_percent_micros: i64,
@@ -173,7 +173,7 @@ impl FeeSchedule {
         if annual_rate_percent_micros <= 0 {
             return Err(AccountError::RateNotPositive);
         }
-        if annual_rate_percent_micros > 100_000_000 {
+        if annual_rate_percent_micros >= 100_000_000 {
             return Err(AccountError::RateAboveHundred);
         }
         if let Some(ref end) = end_date {
@@ -300,24 +300,30 @@ mod rate_bound_tests {
         }
     }
 
-    // FEE-032 — a rate of exactly 100 % is the highest accepted; anything above is refused.
+    // FEE-032 — a rate is accepted strictly below 100 % a year: 100 % itself is refused,
+    // like anything above, on creation and on edit.
     #[test]
-    fn fee_032_a_rate_of_a_hundred_percent_is_the_highest_accepted() {
-        let schedule = || {
+    fn fee_032_a_rate_of_a_hundred_percent_is_refused_like_anything_above() {
+        let schedule = |rate| {
             FeeSchedule::new(
                 "acc".to_string(),
                 "asset".to_string(),
-                1_000_000,
+                rate,
                 FeeFrequency::Annually,
                 "2024-01-01".to_string(),
                 None,
             )
-            .expect("schedule")
         };
-        assert!(schedule().update_from(100_000_000, None, true).is_ok());
-        for above in [100_000_001, 150_000_000] {
+        let existing = || schedule(1_000_000).expect("schedule");
+        assert!(schedule(99_999_999).is_ok());
+        assert!(existing().update_from(99_999_999, None, true).is_ok());
+        for refused in [100_000_000, 100_000_001, 150_000_000] {
             assert!(matches!(
-                schedule().update_from(above, None, true),
+                schedule(refused),
+                Err(AccountError::RateAboveHundred)
+            ));
+            assert!(matches!(
+                existing().update_from(refused, None, true),
                 Err(AccountError::RateAboveHundred)
             ));
         }

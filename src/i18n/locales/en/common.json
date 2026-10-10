@@ -977,7 +977,7 @@
     "ResultingQuantityNotBelowHeld": "Must be lower than the quantity held on that date ({{held}}).",
     "InterestNotEligible": "This asset is not interest-bearing. Enable the flag on the asset to credit interest.",
     "RateNotPositive": "Fee rate must be greater than 0.",
-    "RateAboveHundred": "Fee rate cannot exceed 100%.",
+    "RateAboveHundred": "Fee rate must be below 100%.",
     "EndBeforeStart": "End date must be after the start date.",
     "ScheduleAlreadyExists": "A fee schedule already exists for this asset.",
     "ManagementFeesDisabled": "Management fees are disabled on this account.",

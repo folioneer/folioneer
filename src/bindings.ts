@@ -1372,7 +1372,7 @@ export type AccountError =
  */
 { code: "RateNotPositive" } | 
 /**
- * The annual rate exceeds 100% in micro-percent (FEE-032).
+ * The annual rate is at or above 100% (FEE-032).
  */
 { code: "RateAboveHundred" } | 
 /**
@@ -2782,7 +2782,7 @@ AccountError
  * A recurring management fee schedule for an (account, asset) pair (FEE-030).
  * 
  * `annual_rate_percent_micros` is in micro-percent: 1% = 1_000_000,
- * 100% = 100_000_000. Must be strictly positive and ≤ 100_000_000.
+ * 100% = 100_000_000. Must be strictly positive and strictly below 100_000_000.
  */
 export type FeeSchedule = { 
 /**

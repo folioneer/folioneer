@@ -155,8 +155,8 @@ pub enum AccountError {
     /// The annual rate is zero or negative (FEE-032).
     #[error("Annual rate must be strictly positive")]
     RateNotPositive,
-    /// The annual rate exceeds 100% in micro-percent (FEE-032).
-    #[error("Annual rate cannot exceed 100%")]
+    /// The annual rate is at or above 100% (FEE-032).
+    #[error("Annual rate must be below 100%")]
     RateAboveHundred,
     /// The schedule end_date is not strictly after start_date (FEE-032).
     #[error("End date must be after start date")]

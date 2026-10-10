@@ -7,10 +7,19 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `DEBT-NNN` reference (never renumbered, never reused; next free:
-DEBT-105) so the human can queue it in `docs/todo.md` § Next like any todo.
+DEBT-106) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
+
+## 2026-10-10 — DEBT-105 — What the spec check of management fees found after the fee entries
+
+- Found by: `spec-checker` on `docs/spec/management-fee-deduction.md`, closing DEBT-097 (branch at 6a35e7f, 2026-10-10): 58 rules of 60 implemented and tested; it ran the fee tests (green) and read the rest. Nothing below was read again by the main agent
+- Where: `src-tauri/src/use_cases/fee_generation/orchestrator.rs` (`apply_schedule`), `src-tauri/src/context/account/repository/account.rs` (`insert_transaction`), `src-tauri/src/context/account/service.rs` (`delete_fee_schedule`, `update_fee_schedule`), `src-tauri/src/context/account/domain/fee_schedule.rs` (`restore`), `src/features/account_details/management_fee_transaction/useManagementFee.ts`, `src/features/transactions/transaction_list/TransactionTable.tsx`
+- Severity: 🟡
+- Observation: **the code does not do what the rule says.** FEE-049: when the cursor cannot be saved after deductions were, the cursor stays behind them; the next run generates those periods again under the same identity (FEE-048), the insert is refused by the primary key, and the schedule answers `DatabaseError` at that period on every run. FEE-021/025: the one-off form's hook sets a message of its own for a local refusal, held by a test, where the rules say a local refusal only keeps submit disabled; the path cannot be reached through the disabled button. **No rule says it.** A schedule stored at exactly 100 % before the bound moved still generates and removes the whole holding, and no edit that keeps its rate is accepted, so it can be neither paused nor ended. Deleting a schedule leaves its cursor: one created again on the same holding starts from the old cursor, with no backfill before it. **A clause without a test.** FEE-027 (recording or correcting another transaction that starves a fee: only the deletion is tested), FEE-047 (that a skip is logged; a split refusal or an inconsistent ledger met through generation), FEE-049 (the log, the cursor-failure branch), FEE-061 ("unless it is already further"; the account's parameter off), FEE-079 (the reactivation of a schedule whose start date is no date, its log line), FEE-011 (the cash row offers no "Manage fee"), FEE-055 (the type label, the unsigned quantity), FEE-021 (`validateResultingQuantity`; a date out of bounds keeps the one-off submit disabled), FEE-048 (a second generation of a period whose deduction exists). Two comments cite the wrong rule or an old screen: `src-tauri/src/use_cases/fee_generation/api.rs` (FEE-047 for a zero quantity, FEE-044 for an oversell), `src/features/account_details/account_details_view/useAccountDetailsView.ts` (a header "Record" menu)
+- User value: A schedule whose cursor could not be saved once is not stuck for good; a schedule at 100 % from before the bound can be paused.
+- Done when: a period whose deduction already exists is settled, not an error, with a test; the owner says what becomes of a schedule stored at 100 % and whether a schedule created again starts from the old cursor, and the rules say it; the hook's unreachable message is removed or the rule says it; each clause of the third group has a test; the two comments say what is.
 
 ## 2026-10-10 — DEBT-104 — Four specs still describe a "Record" dropdown the header no longer has
 
@@ -351,19 +360,6 @@ Remove an entry once it has been resolved.
 - [x] Starting over in a folder that holds no portfolio: is the confirmation still asked? — Yes, the same one (owner, 2026-10-10).
 - [x] May a computer that left sync and still holds the portfolio start over? — Yes: the refusal shown when enabling sync offers it (owner, 2026-10-10).
 - [x] That refusal changes a screen: its mock-up is shown in the opening block of the batch, to validate before any code. — Validated: `screenshots/design/099-*-refusal.png`, a sentence and an outlined "Start over" under the refusal's steps, opening the "Start over" dialog on the folder chosen (owner, 2026-10-10).
-
-## 2026-10-10 — DEBT-097 — A fee schedule accepts what its generation has no rule for
-
-- Found by: `spec-reviewer` on FEE-032, amended to the code by DEBT-088 (owner's decision of 2026-10-10: the missing checks are not added)
-- Where: `FeeSchedule::new` and `update_from` in `src-tauri/src/context/account/domain/fee_schedule.rs`; `src-tauri/src/use_cases/fee_generation/orchestrator.rs`; `docs/spec/management-fee-deduction.md` — FEE-011, FEE-032, FEE-040, FEE-070
-- Severity: 🟡
-- Observation: a schedule is accepted at exactly 100% a year (`RateAboveHundred` is raised above 100_000_000 only), where FEE-032 says below 100% and FEE-070 relies on it to keep every removal below the quantity held. A schedule is accepted on any asset and with dates of any form, and no rule says what generation does with a schedule on a Cash Asset, on an asset that does not exist, or whose start date is no date. FEE-011 puts "Manage fee" on every holding row without excluding the cash row. Not read: what generation does in each case
-- User value: None known — a schedule the form cannot produce is not created by a user of the window; an agent or the command line could.
-- Done when: the rate bound is the same in FEE-032, FEE-070 and the code; each of the three cases has a rule saying what generation does, and a test; FEE-011 says whether the cash row offers the action.
-
-**Open questions:**
-
-- [x] A schedule at exactly 100% a year: refused, or allowed with FEE-070 rewritten? — Refused, like anything above; the rules stay as written (owner, 2026-10-10).
 
 ## 2026-10-10 — DEBT-096 — Six contracts were never read against the code they describe
 

@@ -977,7 +977,7 @@
     "ResultingQuantityNotBelowHeld": "Doit être inférieure à la quantité détenue à cette date ({{held}}).",
     "InterestNotEligible": "Cet actif ne porte pas d'intérêts. Activez l'option sur l'actif pour créditer des intérêts.",
     "RateNotPositive": "Le taux des frais doit être supérieur à 0.",
-    "RateAboveHundred": "Le taux des frais ne peut pas dépasser 100 %.",
+    "RateAboveHundred": "Le taux des frais doit être inférieur à 100 %.",
     "EndBeforeStart": "La date de fin doit être postérieure à la date de début.",
     "ScheduleAlreadyExists": "Une planification de frais existe déjà pour cet actif.",
     "ManagementFeesDisabled": "Les frais de gestion sont désactivés sur ce compte.",
