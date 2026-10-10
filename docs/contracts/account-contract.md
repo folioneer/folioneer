@@ -1,11 +1,13 @@
 # Contract — Account
 
 > Domain: `account`
-> Last updated by: `stock-split` spec, `account` spec, `financial-asset-transaction` spec, `sell-transaction` spec, `transaction-list` spec, `account-details` spec, `cash-tracking` spec, `cash-dividend` spec, `free-share-distribution` spec, `management-fee-deduction` spec, `agent-connection` spec
+> Last updated by: `account` spec, `financial-asset-transaction` spec, `sell-transaction` spec, `transaction-list` spec, `account-details` spec, `cash-tracking` spec, `cash-dividend` spec, `free-share-distribution` spec, `management-fee-deduction` spec, `interest-credit` spec, `stock-split` spec, `holding-note` spec, `account-performance` spec, `global-performance` spec, `foreign-exchange-rate` spec, `market-price` spec, `trade-dialog-insights` spec, `multi-device-sync` spec, `sync-conflict-resolution` spec, `agent-connection` spec
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Per-command reachable codes are listed in the "Errors" column of each table below. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic chain preserved server-side via `tracing::error!`).
 >
 > Rust-internal type organization (per-BC enums, use-case composites, serde tagging) is out of scope for this contract — it documents the BE↔FE frontier, not Rust internals.
+>
+> **Known gaps between the rows and the code (DEBT-098)**: the rows list the codes the rules ask for. An exhaustive reading on 2026-10-10 found commands that can return others — chiefly `NegativeQuantity`, when a replay crosses a management fee that takes the position below zero — and `add_account`, where an invalid currency surfaces as `DatabaseError`. A command that replays a ledger a multi-device merge left inconsistent (CFR-042) can also return `InsufficientCash`, `CascadingOversell` or `NegativeQuantity` where its row does not list them.
 
 ---
 
@@ -13,22 +15,22 @@
 
 ### Account CRUD
 
-| Command                        | Args                                                                                                 | Return                   | Errors                                                                                                                                                                                                                                       |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_accounts`                 | —                                                                                                    | `Vec<Account>`           | `DatabaseError`                                                                                                                                                                                                                              |
-| `add_account`                  | `CreateAccountDTO { name: String, currency: String, update_frequency: UpdateFrequency }`             | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set, CFR-035), `InvalidCurrency { currency }` (TRX-021), `DatabaseError`                                                                                          |
-| `update_account`               | `UpdateAccountDTO { id: String, name: String, currency: String, update_frequency: UpdateFrequency }` | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set; editing other fields of an account whose name already clashes after a merge is accepted, CFR-035), `InvalidCurrency { currency }` (TRX-021), `DatabaseError` |
-| `delete_account`               | `id: String`                                                                                         | `()`                     | `DatabaseError` _(ACC-005, ACC-006 — plain DELETE, silent on missing row)_                                                                                                                                                                   |
-| `get_account_deletion_summary` | `account_id: String`                                                                                 | `AccountDeletionSummary` | `DatabaseError` _(read-only; counts are 0 if account has no data — no NotFound raised)_                                                                                                                                                      |
+| Command                        | Args                 | Return                   | Errors                                                                                                                                                                                                                                       |
+| ------------------------------ | -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_accounts`                 | —                    | `Vec<Account>`           | `DatabaseError`                                                                                                                                                                                                                              |
+| `add_account`                  | `CreateAccountDTO`   | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set, CFR-035), `InvalidCurrency { currency }` (TRX-021), `DatabaseError`                                                                                          |
+| `update_account`               | `UpdateAccountDTO`   | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set; editing other fields of an account whose name already clashes after a merge is accepted, CFR-035), `InvalidCurrency { currency }` (TRX-021), `DatabaseError` |
+| `delete_account`               | `id: String`         | `()`                     | `DatabaseError` _(ACC-005, ACC-006 — plain DELETE, silent on missing row)_                                                                                                                                                                   |
+| `get_account_deletion_summary` | `account_id: String` | `AccountDeletionSummary` | `DatabaseError` _(read-only; counts are 0 if account has no data — no NotFound raised)_                                                                                                                                                      |
 
 ### Account Details
 
 > `get_account_details` is implemented in `use_cases/account_details/` — it reads from both the
 > account and asset BCs but mutates neither; owned here as the account aggregate is the primary subject.
 
-| Command               | Args                                                                                                                                | Return                   | Errors                                                                                                                            |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `get_account_details` | `account_id: String, as_of_date: Option<String>` — `None` = live view (today); `Some("YYYY-MM-DD")` = read-only past reconstruction | `AccountDetailsResponse` | `AccountNotFound { account_id }` (ACD-012), `DatabaseError` (ACD-038); price lookup failures silently degrade to `None` (MKT-031) |
+| Command               | Args                                                                                                                | Return                   | Errors                                                                                                                                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `get_account_details` | `account_id: String, as_of_date: Option<String>` — none = live view (today); a date = read-only past reconstruction | `AccountDetailsResponse` | `AccountNotFound { account_id }` (ACD-012), `InvalidDate` _(no rule — an as-of date that is no ISO date)_, `DateInFuture` _(no rule — an as-of date after today)_, `DatabaseError` (ACD-038) _(a price lookup failure degrades the figure to None, MKT-031)_ |
 
 ### Account Summaries
 
@@ -50,6 +52,16 @@
 | ------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `get_account_performance` | `account_id: String, asset_id: Option<String>` — `Some` scopes the series to one asset's position (PRF-080) | `AccountPerformanceResponse` | `AccountNotFound { account_id }` (PRF-016), `DatabaseError` (PRF-027); price-lookup failures silently contribute 0 (PRF-022) |
 
+### Global Performance
+
+> `get_global_performance` is implemented in `use_cases/global_performance/`. With an `account_id` it is the
+> single-account series of `get_account_performance`; without one, every account — or every position of the
+> scoped asset — is aggregated in the reference currency (GPF-011–041). Nothing is persisted.
+
+| Command                  | Args                                                   | Return                       | Errors                                                                                                |
+| ------------------------ | ------------------------------------------------------ | ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `get_global_performance` | `account_id: Option<String>, asset_id: Option<String>` | `AccountPerformanceResponse` | `AccountNotFound { account_id }` (GPF-010 — an `account_id` that matches no account), `DatabaseError` |
+
 ### Holdings & Transactions
 
 > Read paths (`get_asset_ids_for_account`, `get_transactions`, `get_account_journal`) and mutation paths (`buy_holding`,
@@ -58,20 +70,20 @@
 > (cash-asset seeding, archived-asset guards, etc.). `validate_transaction_draft` checks a
 > transaction draft without writing (TRX-062).
 
-| Command                          | Args                                                 | Return                  | Errors                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| -------------------------------- | ---------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_asset_ids_for_account`      | `account_id: String`                                 | `Vec<String>`           | `DatabaseError` (TXL-054) — returns empty list for unknown or empty account, never NotFound (TXL-013)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `get_transactions`               | `account_id: String, asset_id: String`               | `Vec<Transaction>`      | `DatabaseError` (TXL-020)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `get_account_journal`            | `account_id: String, filter: JournalFilter`          | `AccountJournal`        | `DatabaseError` (TXL-060) — an unknown account has an empty journal, never `AccountNotFound`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `get_holding_snapshot_as_of`     | `account_id: String, asset_id: String, date: String` | `HoldingSnapshot`       | `InvalidDate` (TDI-012), `DatabaseError` — unknown account/asset yields an empty snapshot `{ quantity: 0, average_price: 0 }`, never NotFound (TDI-010)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `buy_holding`                    | `BuyHoldingDTO`                                      | `Transaction`           | `AccountNotFound { account_id }` (TRX-020), `InvalidDate` (TRX-020), `DateInFuture` (TRX-020), `DateTooOld` (TRX-020), `QuantityNotPositive` (TRX-020), `UnitPriceNegative` (TRX-020), `ExchangeRateNotPositive` (TRX-020), `FeesNegative` (TRX-020), `TotalAmountNotPositive` (TRX-020), `InsufficientCash { current_balance_micros, currency }` (CSH-041), `TradeOnCashAsset` (CSH-062), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `sell_holding`                   | `SellHoldingDTO`                                     | `Transaction`           | `AccountNotFound { account_id }` (TRX-020), `InvalidDate` (TRX-020), `DateInFuture` (TRX-020), `DateTooOld` (TRX-020), `QuantityNotPositive` (TRX-020), `UnitPriceNegative` (TRX-020), `ExchangeRateNotPositive` (TRX-020), `FeesNegative` (SEL-020), `TotalAmountNotPositive` (TRX-020), `ClosedPosition` (SEL-012), `Oversell { available, requested }` (SEL-021), `TradeOnCashAsset` (CSH-062), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `validate_transaction_draft`     | `TransactionDraft`                                   | `TransactionPreview`    | `TransactionDraftTask` — `AccountMissing`, `AssetMissing`, `DateMissing`; `AccountError` — the recording codes (`InvalidDate`, `DateInFuture`, `DateTooOld`, `QuantityNotPositive`, `UnitPriceNegative`, `ExchangeRateNotPositive`, `FeesNegative`, `TotalAmountNotPositive`, `TotalAmountBelowFees` (purchase only — a sale has no fee floor, SEL-050), `UnitPriceOutOfRange`, `TradeOnCashAsset` (CSH-062)), `Oversell { available, requested }` for a new sale, `DatabaseError` (TRX-062)                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `validate_opening_balance_draft` | `OpeningBalanceDraft`                                | `OpeningBalancePreview` | `TransactionDraftTask` — `AccountMissing`, `AssetMissing`, `DateMissing`, `TotalCostMissing`; `AccountError` — `OpeningBalanceOnCashAsset` (CSH-061), `QuantityNotPositive` (TRX-044), `InvalidTotalCost` (TRX-045), `InvalidDate`, `DateInFuture`, `DateTooOld` (TRX-046) (TRX-066)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `validate_stock_split_draft`     | `StockSplitDraft`                                    | `StockSplitPreview`     | (SPL-062/063) `TransactionDraftTask` — `DateMissing`; `AccountError` — `SplitFactorNotPositive`, `SplitFactorIsOne` (SPL-011), `InvalidDate`, `DateInFuture`, `DateTooOld`; for a new split only (`correcting` absent): `ClosedPosition` (SPL-012 — not held today, unknown asset, or nothing held on the date), `AccountNotFound { account_id }`, `SplitOnCashAsset` (SPL-012), `SplitCollapsesPosition` (SPL-021), `CascadingOversell` (SPL-022), `DatabaseError`. A corrected split's position-dependent refusals stay with `correct_transaction` (SPL-063)                                                                                                                                                                                                                                                                                                                                          |
-| `correct_transaction`            | `CorrectTransactionDTO`                              | `Transaction`           | `TransactionNotFound` (TRX-031), `AccountNotFound { account_id }` (TRX-031), `InvalidDate` (TRX-033), `DateInFuture` (TRX-033), `DateTooOld` (TRX-033), `QuantityNotPositive` (TRX-033), `UnitPriceNegative` (TRX-033), `ExchangeRateNotPositive` (TRX-033), `FeesNegative` (TRX-033), `TotalAmountNotPositive` (TRX-033), `InvalidTotalCost` (TRX-051 — negative total cost on an opening balance), `ClosedPosition`, `SplitCollapsesPosition` (SPL-030 — a corrected split, or a correction replayed across one re-runs the SPL-012 and SPL-021 guards), `CascadingOversell` (SEL-032 / FSD-040 — shrinking a free-share distribution can leave a later sell oversold on replay; FEE-063 — increasing a management-fee removal likewise), `InsufficientCash { current_balance_micros, currency }` (CSH-042 / CSH-051 / DIV-040 — dividend edit re-applies the cash credit on replay), `DatabaseError` |
-| `cancel_transaction`             | `CancelTransactionDTO`                               | `()`                    | `TransactionNotFound` (TRX-034), `AccountNotFound { account_id }` (TRX-034), `ClosedPosition`, `SplitCollapsesPosition` (SPL-030 — a deletion replayed across a split re-runs the SPL-012 and SPL-021 guards), `CascadingOversell` (SEL-033 / FSD-041 — replay after cancel can leave a later sell oversold, incl. removing a free-share distribution), `InsufficientCash { current_balance_micros, currency }` (CSH-024 / CSH-051 / DIV-041 — deleting a dividend removes a cash credit, which can underflow a later debit on replay), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                 |
-| `open_holding`                   | `OpenHoldingDTO`                                     | `Transaction`           | `AccountNotFound { account_id }` (TRX-056), `AssetNotFound` (TRX-056), `ArchivedAsset` (TRX-050), `OpeningBalanceOnCashAsset` (CSH-061), `QuantityNotPositive` (TRX-044), `InvalidTotalCost` (TRX-045), `InvalidDate` (TRX-046), `DateInFuture` (TRX-046), `DateTooOld` (TRX-046), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Command                          | Args                                                 | Return                  | Errors                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------- | ---------------------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_asset_ids_for_account`      | `account_id: String`                                 | `Vec<String>`           | `DatabaseError` (TXL-054) — returns empty list for unknown or empty account, never NotFound (TXL-013)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `get_transactions`               | `account_id: String, asset_id: String`               | `Vec<Transaction>`      | `DatabaseError` (TXL-020)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `get_account_journal`            | `account_id: String, filter: JournalFilter`          | `AccountJournal`        | `DatabaseError` (TXL-060) — an unknown account has an empty journal, never `AccountNotFound`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `get_holding_snapshot_as_of`     | `account_id: String, asset_id: String, date: String` | `HoldingSnapshot`       | `InvalidDate` (TDI-012), `DatabaseError` — unknown account/asset yields an empty snapshot `{ quantity: 0, average_price: 0 }`, never NotFound (TDI-010)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `buy_holding`                    | `BuyHoldingDTO`                                      | `Transaction`           | `AccountNotFound { account_id }` (TRX-020), `InvalidDate` (TRX-020), `DateInFuture` (TRX-020), `DateTooOld` (TRX-020), `QuantityNotPositive` (TRX-020), `UnitPriceNegative` (TRX-020), `ExchangeRateNotPositive` (TRX-020), `FeesNegative` (TRX-020), `TotalAmountNotPositive` (TRX-020), `TotalAmountBelowFees` (TRX-060 — a typed total that does not cover the fees), `UnitPriceOutOfRange` (TRX-060 — the unit price derived from a typed total does not fit), `InsufficientCash { current_balance_micros, currency }` (CSH-041), `TradeOnCashAsset` (CSH-062), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `sell_holding`                   | `SellHoldingDTO`                                     | `Transaction`           | `AccountNotFound { account_id }` (TRX-020), `InvalidDate` (TRX-020), `DateInFuture` (TRX-020), `DateTooOld` (TRX-020), `QuantityNotPositive` (TRX-020), `UnitPriceNegative` (TRX-020), `ExchangeRateNotPositive` (TRX-020), `FeesNegative` (SEL-020), `TotalAmountNotPositive` (TRX-020), `UnitPriceOutOfRange` (SEL-050 — the unit price derived from typed proceeds does not fit), `ClosedPosition` (SEL-012), `Oversell { available, requested }` (SEL-021), `CascadingOversell` (SEL-021 — a back-dated sale that leaves a later sale oversold on replay), `ArchivedAssetSell` (SEL-037), `TradeOnCashAsset` (CSH-062), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `validate_transaction_draft`     | `TransactionDraft`                                   | `TransactionPreview`    | `TransactionDraftTask` — `AccountMissing`, `AssetMissing`, `DateMissing`; `AccountError` — the recording codes (`InvalidDate`, `DateInFuture`, `DateTooOld`, `QuantityNotPositive`, `UnitPriceNegative`, `ExchangeRateNotPositive`, `FeesNegative`, `TotalAmountNotPositive`, `TotalAmountBelowFees` (purchase only — a sale has no fee floor, SEL-050), `UnitPriceOutOfRange`, `TradeOnCashAsset` (CSH-062)), `Oversell { available, requested }` for a new sale, `DatabaseError` (TRX-062)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `validate_opening_balance_draft` | `OpeningBalanceDraft`                                | `OpeningBalancePreview` | `TransactionDraftTask` — `AccountMissing`, `AssetMissing`, `DateMissing`, `TotalCostMissing`; `AccountError` — `OpeningBalanceOnCashAsset` (CSH-061), `QuantityNotPositive` (TRX-044), `InvalidTotalCost` (TRX-045), `InvalidDate`, `DateInFuture`, `DateTooOld` (TRX-046) (TRX-066)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `validate_stock_split_draft`     | `StockSplitDraft`                                    | `StockSplitPreview`     | (SPL-062/063) `TransactionDraftTask` — `DateMissing`; `AccountError` — `SplitFactorNotPositive`, `SplitFactorIsOne` (SPL-011), `InvalidDate`, `DateInFuture`, `DateTooOld`; for a new split only (`correcting` absent): `ClosedPosition` (SPL-012 — not held today, unknown asset, or nothing held on the date), `AccountNotFound { account_id }`, `SplitOnCashAsset` (SPL-012), `SplitCollapsesPosition` (SPL-021), `CascadingOversell` (SPL-022), `DatabaseError`. A corrected split's position-dependent refusals stay with `correct_transaction` (SPL-063)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `correct_transaction`            | `CorrectTransactionDTO`                              | `Transaction`           | `TransactionNotFound` (TRX-031), `AccountNotFound { account_id }` (TRX-031), `InvalidDate` (TRX-033), `DateInFuture` (TRX-033), `DateTooOld` (TRX-033), `QuantityNotPositive` (TRX-033), `UnitPriceNegative` (TRX-033), `ExchangeRateNotPositive` (TRX-033), `FeesNegative` (TRX-033), `TotalAmountNotPositive` (TRX-033), `TotalAmountBelowFees` (TRX-061), `UnitPriceOutOfRange` (TRX-061), `SplitFactorNotPositive` (SPL-030 — a corrected split), `SplitFactorIsOne` (SPL-030), `InvalidTotalCost` (TRX-051 — negative total cost on an opening balance), `ClosedPosition`, `SplitCollapsesPosition` (SPL-030 — a corrected split, or a correction replayed across one re-runs the SPL-012 and SPL-021 guards), `CascadingOversell` (SEL-032 / FSD-040 — shrinking a free-share distribution can leave a later sell oversold on replay; FEE-063 — increasing a management-fee removal likewise), `InsufficientCash { current_balance_micros, currency }` (CSH-042 / CSH-051 / DIV-040 — dividend edit re-applies the cash credit on replay), `DatabaseError` |
+| `cancel_transaction`             | `CancelTransactionDTO`                               | `()`                    | `TransactionNotFound` (TRX-034), `AccountNotFound { account_id }` (TRX-034), `ClosedPosition`, `SplitCollapsesPosition` (SPL-030 — a deletion replayed across a split re-runs the SPL-012 and SPL-021 guards), `CascadingOversell` (SEL-033 / FSD-041 — replay after cancel can leave a later sell oversold, incl. removing a free-share distribution), `InsufficientCash { current_balance_micros, currency }` (CSH-024 / CSH-051 / DIV-041 — deleting a dividend removes a cash credit, which can underflow a later debit on replay), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `open_holding`                   | `OpenHoldingDTO`                                     | `Transaction`           | `AccountNotFound { account_id }` (TRX-056), `AssetNotFound` (TRX-056), `ArchivedAsset` (TRX-050), `OpeningBalanceOnCashAsset` (CSH-061), `QuantityNotPositive` (TRX-044), `InvalidTotalCost` (TRX-045), `InvalidDate` (TRX-046), `DateInFuture` (TRX-046), `DateTooOld` (TRX-046), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ### Cash Transactions
 
@@ -133,9 +145,9 @@
 > `quantity_micros` (INT-021). Edit / delete reuse `correct_transaction` / `cancel_transaction`
 > (INT-040/041) — a correction that shrinks the credit can surface `CascadingOversell` on replay.
 
-| Command           | Args                | Return        | Errors                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ----------------- | ------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `record_interest` | `RecordInterestDTO` | `Transaction` | `AccountNotFound { account_id }` (INT-011), `AssetNotFound` (INT-011), `AssetNotHeld` (INT-011 — non-cash asset with no active holding; the Cash Asset is exempt), `InterestAmountInvalid` (INT-021 — both or neither of percent/quantity), `PercentageNotPositive` / `PercentageAboveHundred` (INT-021), `QuantityNotPositive` (INT-021/022), `InvalidDate` / `DateInFuture` / `DateTooOld` (INT-021), `DatabaseError` |
+| Command           | Args                | Return        | Errors                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------- | ------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `record_interest` | `RecordInterestDTO` | `Transaction` | `AccountNotFound { account_id }` (INT-011), `AssetNotFound` (INT-011), `AssetNotHeld` (INT-011 — non-cash asset with no active holding; the Cash Asset is exempt), `InterestNotEligible` (INT-012), `InterestAmountInvalid` (INT-021 — both or neither of percent/quantity), `PercentageNotPositive` / `PercentageAboveHundred` (INT-021), `QuantityNotPositive` (INT-021/022), `InvalidDate` / `DateInFuture` / `DateTooOld` (INT-021), `DatabaseError` |
 
 ### Management Fee
 
@@ -161,13 +173,23 @@
 | -------------------------- | ------------------------------------------------------------------------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `record_management_fee`    | `ManagementFeeDTO`                                                                   | `Transaction`          | `AccountNotFound { account_id }` (FEE-012), `AssetNotFound` (FEE-012), `AssetNotHeld` (FEE-012), `ManagementFeeOnCashAsset` (FEE-012), `ManagementFeeAmountInvalid` (FEE-021 — both or neither of percent / resulting quantity), `PercentageNotPositive` (FEE-021), `PercentageAboveHundred` (FEE-021), `ResultingQuantityNegative` (FEE-021), `ResultingQuantityNotBelowHeld { held_quantity }` (FEE-028), `QuantityNotPositive` (FEE-022 — a percentage that floors to a zero removal), `ManagementFeesDisabled` (FEE-077), `InvalidDate` (FEE-021), `DateInFuture` (FEE-021), `DateTooOld` (FEE-021), `CascadingOversell` (FEE-027), `DatabaseError` |
 | `preview_management_fee`   | `account_id: String, asset_id: String, date: String, resulting_quantity_micros: i64` | `ManagementFeeRemoval` | `AccountNotFound { account_id }` (FEE-012), `AssetNotFound` (FEE-012), `AssetNotHeld` (FEE-012), `ManagementFeeOnCashAsset` (FEE-012), `ManagementFeesDisabled` (FEE-077), `InvalidDate` / `DateInFuture` / `DateTooOld` (FEE-021), `ResultingQuantityNegative` (FEE-021), `ResultingQuantityNotBelowHeld { held_quantity }` (FEE-028), `DatabaseError` (FEE-029 — no `CascadingOversell`: the replay-integrity guard stays with the recording)                                                                                                                                                                                                         |
-| `create_fee_schedule`      | `CreateFeeScheduleDTO`                                                               | `FeeSchedule`          | `AccountNotFound { account_id }` (FEE-012), `AssetNotFound` (FEE-012), `AssetNotHeld` (FEE-012), `ManagementFeeOnCashAsset` (FEE-012), `ManagementFeesDisabled` (FEE-077), `RateNotPositive` (FEE-032), `RateAboveHundred` (FEE-032), `InvalidDate` (FEE-032), `EndBeforeStart` (FEE-032), `ScheduleAlreadyExists` (FEE-031), `DatabaseError`                                                                                                                                                                                                                                                                                                           |
-| `update_fee_schedule`      | `UpdateFeeScheduleDTO`                                                               | `FeeSchedule`          | `ScheduleNotFound` (FEE-060), `RateNotPositive` (FEE-032), `RateAboveHundred` (FEE-032), `InvalidDate` (FEE-032), `EndBeforeStart` (FEE-032), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `create_fee_schedule`      | `CreateFeeScheduleDTO`                                                               | `FeeSchedule`          | `AccountNotFound { account_id }` (FEE-032), `ManagementFeesDisabled` (FEE-077), `RateNotPositive` (FEE-032), `RateAboveHundred` (FEE-032), `EndBeforeStart` (FEE-032), `ScheduleAlreadyExists` (FEE-031), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `update_fee_schedule`      | `UpdateFeeScheduleDTO`                                                               | `FeeSchedule`          | `ScheduleNotFound` (FEE-060), `RateNotPositive` (FEE-032), `RateAboveHundred` (FEE-032), `EndBeforeStart` (FEE-032), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `delete_fee_schedule`      | `account_id: String, asset_id: String`                                               | `()`                   | `DatabaseError` (FEE-062 — silent on missing schedule, mirrors `delete_account`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `get_fee_schedule`         | `account_id: String, asset_id: String`                                               | `Option<FeeSchedule>`  | `DatabaseError` (FEE-030 — returns `None` when no schedule exists for the pair)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `apply_due_fee_deductions` | —                                                                                    | `()`                   | `DatabaseError` (FEE-040/044/047 — frontend-triggered on app startup; when multi-device sync is enabled and not paused the launch sync runs first inside this command, SYN-060, so generation sees the merged ledger; then generates due completed periods for every active schedule, skipping any that would oversell)                                                                                                                                                                                                                                                                                                                                 |
+| `apply_due_fee_deductions` | —                                                                                    | `()`                   | `DatabaseError` (FEE-040/044/047 — frontend-triggered on app startup; a schedule whose account has management fees disabled is skipped without moving its cursor, FEE-078; when multi-device sync is enabled and not paused the launch sync runs first inside this command, SYN-060, so generation sees the merged ledger; then generates due completed periods for every active schedule, skipping any that would oversell)                                                                                                                                                                                                                            |
 
 ---
+
+### Holding Notes
+
+> One note per (account, asset) pair, with an optional price alarm (HNO-010). The note is read back on
+> `HoldingDetail` (`note_*` fields, HNO-040); there is no read command of its own.
+
+| Command               | Args                   | Return        | Errors                                                                                                                                                                                                                                                                                                                             |
+| --------------------- | ---------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `upsert_holding_note` | `UpsertHoldingNoteDTO` | `HoldingNote` | `AccountNotFound { account_id }` (HNO-011), `NoteOnCashAsset` (HNO-011), `NoteOnUnheldAsset` (HNO-011 — the pair has no transaction), `NoteTextEmpty` (HNO-011), `NoteTextTooLong` (HNO-011), `ThresholdNotPositive` (HNO-011), `ThresholdIncomplete` (HNO-011 — a threshold without a direction, or the reverse), `DatabaseError` |
+| `delete_holding_note` | `DeleteHoldingNoteDTO` | `()`          | `DatabaseError` _(HNO-021 — deleting a note that does not exist succeeds)_                                                                                                                                                                                                                                                         |
 
 ## Shared Types
 
@@ -175,8 +197,27 @@
 struct Account {
     id: String,                          // unique identifier
     name: String,                        // user-defined display name (normalised; unique among names set on this device — after a multi-device merge two accounts may share a name until the user renames one, CFR-035)
+    bank_name: String,                   // bank brand name, free text; empty when unset (ACC-026)
     currency: String,                    // ISO 4217 currency code (TRX-021)
     update_frequency: UpdateFrequency,   // how often the user plans to update data
+    management_fees_enabled: bool,       // whether one-off fees and fee schedules are available on this account (FEE-075); a new account starts disabled
+}
+
+struct CreateAccountDTO {
+    name: String,
+    bank_name: String,                   // empty when unset (ACC-026)
+    currency: String,
+    update_frequency: UpdateFrequency,
+    management_fees_enabled: bool,       // FEE-075
+}
+
+struct UpdateAccountDTO {
+    id: String,
+    name: String,
+    bank_name: String,
+    currency: String,
+    update_frequency: UpdateFrequency,
+    management_fees_enabled: bool,
 }
 
 enum UpdateFrequency {
@@ -208,6 +249,7 @@ struct BuyHoldingDTO {
     unit_price: i64,        // micro-units, asset currency; zero or positive (TRX-020)
     exchange_rate: i64,     // micro-units; strictly positive (TRX-020)
     fees: i64,              // micro-units, account currency; zero or positive (TRX-020)
+    total_amount: Option<i64>, // micro-units, account currency: the all-in total debited, fees included; when given it is stored as typed and the unit price is derived from it (TRX-060)
     note: Option<String>,
 }
 
@@ -220,22 +262,31 @@ struct SellHoldingDTO {
     unit_price: i64,
     exchange_rate: i64,
     fees: i64,              // micro-units, account currency; zero or positive (SEL-020)
+    total_amount: Option<i64>, // micro-units, account currency: the net proceeds credited, after fees; when given it is stored as typed and the unit price is derived from it (SEL-050)
     note: Option<String>,
 }
 
-// Correction: no account_id / asset_id / type — those are immutable on an existing transaction
+// Correction: the transaction is named by its account and its id; its asset and its type cannot change
 struct CorrectTransactionDTO {
+    account_id: String,
+    transaction_id: String,
     date: String,
     quantity: i64,
     unit_price: i64,
     exchange_rate: i64,
     fees: i64,
+    total_amount: Option<i64>, // the all-in total typed by the user; on a purchase, a sale or an opening balance the unit price is derived from it (TRX-061, SEL-051, TRX-051)
     note: Option<String>,
+}
+
+struct CancelTransactionDTO {
+    account_id: String,
+    transaction_id: String,
 }
 ```
 
-> `total_amount` intentionally absent from input DTOs — computed by backend (TRX-026, SEL-023).
-> `realized_pnl` intentionally absent — computed by backend (SEL-024).
+> Without a `total_amount` the backend computes the total from the unit price (TRX-026, SEL-023).
+> `realized_pnl` is never an input — computed by backend (SEL-024).
 
 ```rust
 // Opening balance: total_cost set directly by user; no fees, no exchange_rate (TRX-047); no note (TRX-043)
@@ -244,7 +295,7 @@ struct OpenHoldingDTO {
     asset_id: String,
     date: String,       // ISO date YYYY-MM-DD; must not be future or before 1900-01-01 (TRX-046)
     quantity: i64,      // micro-units; strictly positive (TRX-044)
-    total_cost: i64,    // micro-units, account currency; strictly positive (TRX-045)
+    total_cost: i64,    // micro-units, account currency; zero or positive — zero declares a position with no invested amount (TRX-045)
 }
 
 // Cash inflow from outside the application (CSH-020/022). Backend resolves the Cash Asset
@@ -300,6 +351,7 @@ enum TransactionType {
     FreeShares,      // FSD-022 — zero-cost quantity event; attributed to the distributing asset, no cash leg
     ManagementFee,   // FEE-022 — quantity-reducing fee; attributed to the charged asset, no cash leg
     Split,           // SPL-010 — rescales the position; the micro-scaled factor rides in quantity, no money moves
+    Interest,        // INT-024 — interest credited at zero cost: quantity rises, cost basis unchanged; on the cash line it credits the balance (INT-023)
 }
 
 // Returned by buy_holding, sell_holding, correct_transaction, open_holding, record_deposit,
@@ -354,6 +406,24 @@ struct HoldingDetail {
     current_value: Option<i64>,         // micros, asset currency; current_price × quantity; None when no price (MKT-143)
     weight_pct: Option<i64>,            // micro-percent; market_value × 100 / total_global_value; None when market_value is None or the Global Value is not positive (ACD-052)
     inconsistency: Option<HoldingInconsistency>, // derived on read; Some when the merged ledger oversells the position or overdraws cash (SYN-040, CFR-042); None otherwise — see sync-contract.md
+    current_price_source: Option<AssetPriceSource>, // where current_price comes from (asset contract); None when there is no price (MKT-142)
+    fx_rate_date: Option<String>,       // ISO date of the rate that converted a foreign holding; None for a same-currency holding, cash, or when no rate is usable (FXR-090)
+    fee_rate_percent_micros: Option<i64>, // annual rate of the active fee schedule of this pair, micro-percent; None without one, and always in the as-of view (FEE-074)
+    period_performance: HoldingPeriodPerformance, // windowed position returns ending today (ACD-054–057)
+    note_text: Option<String>,          // the holding note of this pair; None without one, and always in the as-of view (HNO-040)
+    note_threshold_price: Option<i64>,  // the note's alarm threshold, micros, asset currency (HNO-031)
+    note_threshold_direction: Option<ThresholdDirection>, // HNO-030
+    note_alarm_triggered: bool,         // computed from current_price on every live read; false without a note, an alarm or a price (HNO-030)
+}
+
+// Simple Dietz returns of one position over standard windows ending today, micro-percent; every
+// field None for the cash row and in the as-of view (ACD-054–057)
+struct HoldingPeriodPerformance {
+    ytd: Option<i64>,         // since the prior 31 December
+    one_year: Option<i64>,
+    two_years: Option<i64>,
+    five_years: Option<i64>,
+    ten_years: Option<i64>,
 }
 
 // Closed position — quantity = 0 (ACD-044)
@@ -362,6 +432,7 @@ struct ClosedHoldingDetail {
     asset_name: String,
     asset_reference: String,
     realized_pnl: i64,      // micros, total gain/loss for this position (ACD-045)
+    dividends_received: i64, // micros, dividends received over the life of the position (DIV-073)
     last_sold_date: String, // ISO date "YYYY-MM-DD"; non-optional in this DTO (ACD-043)
 }
 
@@ -377,6 +448,7 @@ struct AccountDetailsResponse {
     total_global_value: i64,                   // micros, account currency: cash_holding.quantity + Σ_h (h.quantity × latest_price(h)) over non-cash active holdings; unpriced non-cash holdings contribute 0 (CSH-094)
     total_dividends_received: i64,             // micros, account currency: sum of dividend cash across all the account's dividend transactions; 0 when none (DIV-073)
     total_management_fees: i64,                // micros, account currency: sum of per-holding management_fees across the account; 0 when none (FEE-053)
+    total_net_cash_input: i64,                 // micros, account currency: deposits minus withdrawals since inception; negative when more was withdrawn (ACD-053)
 }
 
 // Row returned by get_account_summaries (ACC-021)
@@ -410,7 +482,7 @@ struct PortfolioTotal {
 // Net-of-flows performance for one period; Simple Dietz percentage (PRF-031, PRF-032)
 struct PerformanceMetric {
     gain: i64,          // micros, account currency
-    pct: Option<i64>,   // micro-percent (8.00% = 8_000_000); None when the Dietz denominator is 0 (PRF-032)
+    pct: Option<i64>,   // micro-percent (8.00% = 8_000_000); None when the Dietz denominator is not positive (PRF-032)
 }
 
 // One calendar period row — a month or a year (PRF-020, PRF-040)
@@ -418,9 +490,15 @@ struct PerformancePeriod {
     year: i32,
     month: Option<u8>,                              // Some(1..=12) for month rows; None for year rows (PRF-011)
     end_value: i64,                                 // micros, account currency; Global Value at period end (PRF-020)
+    previous_value: i64,                            // Global Value at the previous period end; 0 for the first period (PRF-074)
+    cash_flow: i64,                                 // deposits minus withdrawals within the period (PRF-070)
+    asset_flow: i64,                                // contributions in kind within the period: opening balances at cost, zero-cost credits at market value (PRF-071)
+    dividends: i64,                                 // dividend income within the period (PRF-072)
+    pnl: i64,                                       // realized gains and price movement: end_value − previous_value − the three flows (PRF-073)
     period_over_period: Option<PerformanceMetric>,  // None when no preceding period exists (PRF-033, PRF-042)
     year_to_date: Option<PerformanceMetric>,        // None for year rows (PRF-037); always Some for month rows — inception-year months use baseline 0, equal to since-inception (PRF-034)
     since_inception: Option<PerformanceMetric>,     // measured from net invested; inception baseline value 0 (PRF-035)
+    annualized_yield: Option<PerformanceMetric>,    // year rows only: the since-inception return per year; None for month rows
 }
 
 // Top-level response for get_account_performance — recomputed on read (ADR-013)
@@ -474,15 +552,56 @@ struct FeeSchedule {
     id: String,
     account_id: String,
     asset_id: String,
-    annual_rate_percent_micros: i64,     // micro-percent per year (0.20% = 200_000); strictly positive, < 100_000_000 (FEE-032)
+    annual_rate_percent_micros: i64,     // micro-percent per year (0.20% = 200_000); strictly positive; the code accepts up to 100_000_000 included, where FEE-032 asks for less
     frequency: FeeFrequency,
-    start_date: String,                  // ISO date YYYY-MM-DD; immutable after first generation (FEE-060)
-    end_date: Option<String>,            // ISO date; None = open-ended (FEE-045)
+    start_date: String,                  // as sent, its form is not checked (FEE-032); immutable after creation (FEE-060)
+    end_date: Option<String>,            // as sent, its form is not checked (FEE-032); None = open-ended (FEE-045)
     active: bool,                        // false while paused — no deductions generated (FEE-061)
     last_applied_period: Option<String>, // ISO date of last generated period boundary; None initially (FEE-043). Between devices this is its own synced record identified by (account_id, asset_id), merged by maximum (CFR-044); exposed here as a derived read field
 }
 
+// Interest credited at zero cost (INT-020). `asset_id` is a held non-cash asset that bears interest,
+// or the account's Cash Asset (INT-011/012/023). Exactly one of the two amounts (INT-021).
+struct RecordInterestDTO {
+    account_id: String,
+    asset_id: String,
+    date: String,                    // ISO date YYYY-MM-DD (INT-021)
+    percent_micros: Option<i64>,     // micro-percent of the holding; strictly positive, at most 100_000_000 (INT-021/022)
+    quantity_micros: Option<i64>,    // credited quantity, micro-units; strictly positive (INT-021)
+    note: Option<String>,
+}
+
+// The note of one (account, asset) pair, with its optional price alarm (HNO-010).
+struct HoldingNote {
+    account_id: String,
+    asset_id: String,
+    text: String,                                  // trimmed, 1 to 500 characters (HNO-011)
+    threshold_price: Option<i64>,                  // micros, asset currency: a nominal share price (HNO-031)
+    threshold_direction: Option<ThresholdDirection>, // both alarm fields or neither (HNO-011)
+}
+
+// Which side of the threshold triggers the alarm (HNO-030).
+enum ThresholdDirection {
+    Below,
+    Above,
+}
+
+// Create or fully replace the note of a pair (HNO-020).
+struct UpsertHoldingNoteDTO {
+    account_id: String,
+    asset_id: String,
+    text: String,
+    threshold_price: Option<i64>,
+    threshold_direction: Option<ThresholdDirection>,
+}
+
+struct DeleteHoldingNoteDTO {
+    account_id: String,
+    asset_id: String,
+}
+
 // Create a fee schedule (FEE-030). At most one per (account, asset) — ScheduleAlreadyExists otherwise.
+// The asset and the start date are taken as sent: neither is checked (FEE-032).
 struct CreateFeeScheduleDTO {
     account_id: String,
     asset_id: String,
@@ -595,15 +714,16 @@ struct AccountJournal {
 
 ## Changelog
 
-- 2026-10-04 — TD-067 (TRX-066): `validate_opening_balance_draft` is also called for a corrected opening balance; its shape is unchanged.
+- 2026-10-10 — DEBT-088: the contract brought to the code. Rows added: `upsert_holding_note`, `delete_holding_note` (HNO-020/021), `get_global_performance` (GPF-010). Codes added where the code returns them: `TotalAmountBelowFees`, `UnitPriceOutOfRange` (`buy_holding`, `sell_holding`, `correct_transaction`), `CascadingOversell`, `ArchivedAssetSell` (`sell_holding`), `SplitFactorNotPositive`, `SplitFactorIsOne` (`correct_transaction`), `InterestNotEligible` (`record_interest`), `InvalidDate`, `DateInFuture` (`get_account_details`). Codes struck, never returned: `AssetNotFound`, `AssetNotHeld`, `ManagementFeeOnCashAsset`, `InvalidDate` on `create_fee_schedule`, `InvalidDate` on `update_fee_schedule` (FEE-032 amended). Types completed from the bindings: `Account` and its two inputs, the buy, sell and correct inputs, `TransactionType`, `HoldingDetail`, `ClosedHoldingDetail`, `AccountDetailsResponse`, `PerformancePeriod`; types defined: `CancelTransactionDTO`, `RecordInterestDTO`, `HoldingNote` and its inputs, `HoldingPeriodPerformance`.
+- 2026-10-04 — DEBT-067 (TRX-066): `validate_opening_balance_draft` is also called for a corrected opening balance; its shape is unchanged.
 - 2026-10-04 — names: `SplitDraft` → `StockSplitDraft`, `SplitDraftPreview` → `StockSplitPreview`, `SplitPositionPreview` → `StockSplitPosition`, `validate_split_draft` → `validate_stock_split_draft`, `TransactionDraftPreview` → `TransactionPreview`, `OpeningBalanceDraftPreview` → `OpeningBalancePreview`. Shapes unchanged.
-- 2026-10-04 — TD-071 (SPL-062/063): `validate_split_draft(SplitDraft) -> SplitDraftPreview { factor, position, price_after_split }` checks a split being entered without writing; `record_split` (SPL-010) and `TransactionType::Split` documented.
-- 2026-10-04 — TD-070 (TDI-030/031): `TransactionDraftPreview.realized_pnl` added — the draft check of a new sale returns the gain it would realize.
+- 2026-10-04 — DEBT-071 (SPL-062/063): `validate_split_draft(SplitDraft) -> SplitDraftPreview { factor, position, price_after_split }` checks a split being entered without writing; `record_split` (SPL-010) and `TransactionType::Split` documented.
+- 2026-10-04 — DEBT-070 (TDI-030/031): `TransactionDraftPreview.realized_pnl` added — the draft check of a new sale returns the gain it would realize.
 - 2026-10-03 — DIV-040: `DraftKind` gains `Dividend`; `validate_transaction_draft` returns a corrected dividend's total (amount × exchange rate, rounded down).
 - 2026-10-03 — TRX-066: `validate_opening_balance_draft(OpeningBalanceDraft) -> OpeningBalanceDraftPreview { zero_cost }` checks an opening balance draft without writing; `TransactionDraftTask` gains `TotalCostMissing`.
 - 2026-10-03 — CSH-062: `buy_holding`, `sell_holding` and `validate_transaction_draft` return `TradeOnCashAsset` for a Cash Asset.
 - 2026-09-28 — TRX-062: `validate_transaction_draft(TransactionDraft) -> TransactionDraftPreview { unit_price, total_amount }` checks a transaction draft without writing. `TransactionDraft { kind: Purchase | Sell, account_id, asset_id, date, quantity, entered: EnteredAmount, correcting: Option<transaction_id> }`; `EnteredAmount = UnitPrice { unit_price, exchange_rate, fees } | Total { total, exchange_rate, fees }` (tag `mode`). Only three new codes (`TransactionDraftTask`); every figure rejection (from `InvalidDate` on) reuses the recording command's `AccountError` code.
-- 2026-09-27 — TD-033: `HoldingDetail.current_value` (MKT-143) and `.weight_pct` (ACD-052) computed by the backend; `market_value` listed. `correct_transaction` on an `OpeningBalance` takes the total cost as `total_amount` and derives the unit price (TRX-051); the caller's `unit_price` is ignored.
+- 2026-09-27 — DEBT-033: `HoldingDetail.current_value` (MKT-143) and `.weight_pct` (ACD-052) computed by the backend; `market_value` listed. `correct_transaction` on an `OpeningBalance` takes the total cost as `total_amount` and derives the unit price (TRX-051); the caller's `unit_price` is ignored.
 - 2026-09-19 — FEE-028/029: `ManagementFeeDTO.percent_micros` becomes optional beside the new `resulting_quantity_micros` (exactly one); `preview_management_fee` + `ManagementFeeRemoval { held_quantity, removed_quantity, percent_micros }` added; errors `ManagementFeeAmountInvalid`, `ResultingQuantityNegative`, `ResultingQuantityNotBelowHeld { held_quantity }`; `ManagementFeesDisabled` (FEE-077) and `QuantityNotPositive` now listed where the code already raised them
 - 2026-09-19 — SYN-064 amended: applied changes raise no event of their own (`HoldingNoteUpdated` is published by local note writes only); every account view subscribes to `SyncCompleted` and re-fetches once per sync
 - 2026-09-12 — `HoldingNoteUpdated` event (HNO-043): published by note upsert / delete and by `apply_holding_note` (SYN-064); Account Details subscribes to it instead of the bare `SyncCompleted` marker

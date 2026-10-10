@@ -7,8 +7,7 @@ entry, which reads like a pull request number; the two-letter prefix for tech de
 hash after `gh` for an issue — are refused in every file git tracks.
 
 Left as they are: `CHANGELOG.md`, which keeps what was released under the old forms,
-this check, its tests and the queue script's tests, which have to name what they refuse,
-and the account contract until it is brought up to date (DEBT-088).
+this check, its tests and the queue script's tests, which have to name what they refuse.
 
 Use: python3 scripts/reference-forms.py [file ...]   (every tracked file when none)
 """
@@ -40,8 +39,6 @@ KEPT = {
     "scripts/reference-forms.py",
     "scripts/tests/test_reference_forms.py",
     "scripts/tests/test_next_todo.py",
-    # Out of date against the code (DEBT-088): its references are renamed with that work.
-    "docs/contracts/account-contract.md",
 }
 NOT_TEXT = (".png", ".ico", ".icns", ".woff", ".woff2", ".lock", "package-lock.json")
 GENERATED = ("src-tauri/.sqlx/", "screenshots/")

@@ -81,7 +81,7 @@ A recurring rule that generates fee deductions for one (account, asset) holding 
 
 **FEE-031 — One schedule per holding (backend)**: At most one Fee Schedule may exist per `(account, asset)` pair. Creating a second is rejected with a specific error; the existing schedule is edited instead (FEE-060). <!-- AI-Decision: single schedule per holding — duplicate rejected -->
 
-**FEE-032 — Schedule validation (frontend + backend)**: `annual_rate` must be strictly positive and below a sane cap (`< 100%` per year); `start_date` must be a well-formed ISO date; `end_date`, if present, must be on or after `start_date`; the asset must be held and non-cash (FEE-012).
+**FEE-032 — Schedule validation (frontend + backend)**: `annual_rate` must be strictly positive and below a sane cap (`< 100%` per year); `end_date`, if present, must be after `start_date`. Creating or editing a schedule is rejected with a specific error when the rate is not positive, when it is above the cap, or when the end date is not after the start date; creating one is also rejected when the account is unknown. A schedule is accepted whatever its asset and whatever the form of its dates: neither is checked, and the two dates are compared as text.
 
 **FEE-033 — Schedule persistence (backend)**: Creating a schedule persists it but does **not** itself remove shares — deductions are produced only by generation (FEE-04x).
 
