@@ -250,13 +250,13 @@
     "connection_asked_at": "Asked at",
     "connection_covers": "If you allow, until you disconnect or close Folioneer, it may:",
     "connection_covers_read": "read your accounts, assets, holdings and totals;",
-    "connection_never": "It cannot change or remove a transaction, and it never reads a file, a setting or your sync folder.",
+    "connection_never": "Your answer covers the whole session. It cannot change, remove or undo a transaction — not even one it recorded — and it never reads a file, a setting or your sync folder.",
     "connection_allow": "Allow for this session",
     "connection_refuse": "Refuse",
     "connected": "{{client}} is connected",
     "disconnect": "Disconnect",
     "disconnect_client": "Disconnect {{client}}",
-    "connection_covers_record": "record opening balances, purchases and sales, each shown here as it happens and marked as recorded by it."
+    "connection_covers_record": "record opening balances, purchases and sales — up to 500 in a session — each shown here as it happens and marked as recorded by it."
   },
   "sync": {
     "title": "Multi-device sync",

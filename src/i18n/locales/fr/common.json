@@ -250,13 +250,13 @@
     "connection_asked_at": "Demandé à",
     "connection_covers": "Si vous autorisez, jusqu'à la déconnexion ou la fermeture de Folioneer, il peut :",
     "connection_covers_read": "lire vos comptes, vos actifs, vos positions et vos totaux ;",
-    "connection_never": "Il ne peut ni modifier ni supprimer une transaction, et ne lit jamais un fichier, un réglage ou votre dossier de synchronisation.",
+    "connection_never": "Votre réponse vaut pour toute la session. Il ne peut ni modifier, ni supprimer, ni annuler une transaction — pas même une qu'il a enregistrée — et ne lit jamais un fichier, un réglage ou votre dossier de synchronisation.",
     "connection_allow": "Autoriser pour cette session",
     "connection_refuse": "Refuser",
     "connected": "{{client}} est connecté",
     "disconnect": "Déconnecter",
     "disconnect_client": "Déconnecter {{client}}",
-    "connection_covers_record": "enregistrer des soldes d'ouverture, des achats et des ventes, chacun affiché ici au fur et à mesure et marqué comme enregistré par lui."
+    "connection_covers_record": "enregistrer des soldes d'ouverture, des achats et des ventes — jusqu'à 500 par session — chacun affiché ici au fur et à mesure et marqué comme enregistré par lui."
   },
   "sync": {
     "title": "Synchronisation multi-appareils",

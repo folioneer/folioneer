@@ -63,7 +63,7 @@ impl From<Asset> for AssetRow {
 
 /// Runs the tools in the running application, through the queries the window uses.
 pub struct AgentTools {
-    recorder: HoldingTransactionUseCase,
+    recorder: Arc<HoldingTransactionUseCase>,
     account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,
     summaries: AccountSummaryUseCase,
@@ -78,10 +78,10 @@ impl AgentTools {
         currency_service: Arc<CurrencyService>,
     ) -> Self {
         Self {
-            recorder: HoldingTransactionUseCase::new(
+            recorder: Arc::new(HoldingTransactionUseCase::new(
                 Arc::clone(&account_service),
                 Arc::clone(&asset_service),
-            ),
+            )),
             summaries: AccountSummaryUseCase::new(
                 Arc::clone(&account_service),
                 Arc::clone(&asset_service),
@@ -202,14 +202,31 @@ impl AgentTools {
             session: granted.key.clone(),
             session_started_at: granted.started_at.clone(),
         };
-        let recorded = self
-            .recorder
-            .record_named_by_agent(recording, &today, &mark)
-            .await
-            .map_err(|refusal| Refusal {
+        // AGT-049 — once started, the recording and its mark run to their end, whatever
+        // becomes of the connection that asked: a disconnect or a closing application
+        // never leaves a transaction between its two writes.
+        let recorder = Arc::clone(&self.recorder);
+        let outcome = tokio::spawn(async move {
+            recorder
+                .record_named_by_agent(recording, &today, &mark)
+                .await
+        })
+        .await
+        .map_err(|error| {
+            tracing::error!(target: BACKEND, err = ?error, "agent recording: the task ended early");
+            portfolio_unreadable()
+        })?;
+        let recorded = outcome.map_err(|refusal| {
+            // A transaction that stayed without its mark was recorded all the same: it
+            // counts against the session's limit (AGT-047).
+            if refusal.code == "RecordedNotMarked" {
+                granted.count_recording();
+            }
+            Refusal {
                 code: refusal.code,
                 message: refusal.message,
-            })?;
+            }
+        })?;
         granted.count_recording();
         tracing::info!(target: BACKEND, session = granted.session_id, transaction = %recorded.transaction.id, kind = %recorded.transaction.transaction_type, "agent recording");
         as_json(&serde_json::json!({
