@@ -2,7 +2,7 @@
 
 <!-- Add new backlog items here. Format: ## TODO-NNN — (domain) — Short title -->
 <!-- TODO-NNN is a permanent reference: never renumbered, never reused. A new entry takes the -->
-<!-- next free number wherever it is placed. Next free: TODO-067. -->
+<!-- next free number wherever it is placed. Next free: TODO-068. -->
 <!-- Every entry ends with four lines: **User value:**, **Done when:**, **Design:** and -->
 <!-- **Open questions:**. Design is `none` until the agent proposes one (it does so before -->
 <!-- touching anything the user sees), then `proposed (screenshots/design/NNN-*.png)`, then -->
@@ -179,6 +179,18 @@ One document lists each capability and which interface offers it. A check fails 
 
 - [ ] Where does the page live in the application: under Settings beside "Allow agents to connect", or in About?
 - [ ] Should the command line read what an agent reads (the portfolio summary, the holdings of an account)? The table makes the gap visible; this decides whether to close it.
+
+## TODO-067 — (frontend) — The application says how to connect an agent once the setting is on
+
+Raised by the owner on 2026-10-11, at the 0.8.0 release: he switches "Allow agents to connect" on and the application tells him nothing more. How to plug an agent in — the `claude mcp add` command, the entry of Claude Desktop's configuration file with the installed program's full path — is written only in `README.md`, and for Windows without a block ready to paste. The application has no help page of any kind.
+
+**User value:** The owner connects Claude Code or Claude Desktop from what the application shows him, without leaving it to look for a document.
+**Done when:** with the setting on, the application shows what to give each agent client, with the path of the program as installed on this computer and a way to copy it; the same text is right on Linux (package and AppImage) and on Windows; `README.md` has the Windows block for Claude Desktop.
+**Design:** none
+**Open questions:**
+
+- [ ] Where does it show: beside the checkbox on the settings page, or in a help menu of the application, which does not exist yet and would hold more than this?
+- [ ] Which clients are named: Claude Code and Claude Desktop only, or a general form for any client as well?
 
 ## TODO-065 — (fullstack) — The window says when an agent acts, and an agent client knows a read from a recording
 
