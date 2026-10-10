@@ -446,6 +446,11 @@ async fn agt_042_a_refusal_names_only_what_was_sent() {
                 json!({ "account": "PEA", "as_of": "tomorrow" }),
             ),
             call(4, "delete_everything", json!({})),
+            call(
+                5,
+                "list_holdings",
+                json!({ "account": "PEA", "as_of": 20260105 }),
+            ),
         ],
     )
     .await;
@@ -460,6 +465,12 @@ async fn agt_042_a_refusal_names_only_what_was_sent() {
         "as_of is not a past date written YYYY-MM-DD"
     );
     assert!(answered[3]["error"]["code"].is_i64());
+    // A date sent as a number is refused, never read as today.
+    assert_eq!(answered[4]["result"]["isError"], true);
+    assert_eq!(
+        text(&answered[4]),
+        "as_of is not a past date written YYYY-MM-DD"
+    );
     // AGT-034 — the bridge left with its client: its session ends.
     for _ in 0..400 {
         if gate.connections().sessions().is_empty() {

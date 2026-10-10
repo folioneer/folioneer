@@ -157,10 +157,14 @@ impl AgentTools {
             }
             "list_holdings" => {
                 let account = text(arguments, "account")?;
-                let as_of = arguments.get("as_of").and_then(Value::as_str);
+                // AGT-043 — a date that is not text is refused, never read as today.
+                let as_of = optional_text(arguments, "as_of").map_err(|_| Refusal {
+                    code: "InvalidDate".to_string(),
+                    message: "as_of is not a past date written YYYY-MM-DD".to_string(),
+                })?;
                 let account_id = self.account_named(account).await?;
                 self.details
-                    .get_account_details(&account_id, as_of)
+                    .get_account_details(&account_id, as_of.as_deref())
                     .await
                     .map_err(|error| match error {
                         AccountError::InvalidDate | AccountError::DateInFuture => Refusal {
