@@ -100,6 +100,10 @@ merge:
     @[ -f scripts/merge.py ] || { echo "❌ scripts/merge.py not found — restore it from git history"; exit 1; }
     python3 scripts/merge.py
 
+# Wait for the checks of a pull request (the current branch's, or a number) and end with the verdict: 0 green, 1 failed, 2 GitHub unreachable, 3 timed out, 4 not open
+watch-pr *ARGS:
+    @python3 scripts/watch-pr.py "$@"
+
 # Run one ready entry of docs/todo.md § Next headless (docs/workflow.md § 9)
 next-todo:
     @[ -f scripts/next-todo.sh ] || { echo "❌ scripts/next-todo.sh not found — restore it from git history"; exit 1; }

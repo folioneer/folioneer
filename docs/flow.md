@@ -136,21 +136,6 @@ entries already held the matter for.
   Protects: the decision on a merge queue being taken on a figure.
 - 0.7.0: not queued, and the causes were not counted a second time.
 
-## FLOW-027 — The agent writes the watch on a pull request's checks by hand each time
-
-- Kind: speed
-- Observed: in 0.7.0 the agent wrote a polling loop on `gh api …/check-runs` for each
-  pull request, about ten times on the release day alone, each with its own end
-  condition. The owner's other project has `just watch-pr [number]`: it waits for every
-  check named in `required-checks.json`, follows a push to the new head, retries a
-  failed poll, and ends with a verdict by exit code (green, failed, unreachable, timed
-  out, not open).
-- Proposal: bring `scripts/watch-pr.py`, its tests and the recipe over; `/next-todo`
-  Step 8 names the recipe in place of the hand-written watch.
-- Costs: about an hour: `required-checks.json`, which the script reads, exists here and
-  `scripts/merge.py` already reads it. Protects: a watch that ends too early or never, and a
-  screen of shell for the owner to approve on each pull request.
-
 ## FLOW-028 — Two pull requests opened side by side send each other round
 
 - Kind: speed

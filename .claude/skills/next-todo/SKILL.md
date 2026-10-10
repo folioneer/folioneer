@@ -99,9 +99,9 @@ for `feat`/`fix`), body ≤ 2 lines with the ref.
 - Commit, push, `gh pr create`. Body under 20 lines: the entry ref and title, each
   Done when clause with the test that proves it, findings that changed something,
   techdebt filed, the visual proofs. Nothing else.
-- Watch the checks with a `Monitor` on
-  `gh api repos/{owner}/{repo}/commits/<sha>/check-runs` (one line per completed
-  run, exit when all are completed) until every run completes.
+- Watch the checks with `just watch-pr` under a `Monitor` (30 minutes; re-arm on
+  expiry): it prints a failure when it lands and ends with the verdict, by exit code —
+  green, failed, GitHub unreachable, timed out, not open. No hand-written polling loop.
 - A red `reviewer-<lane>` check: read its sticky comment on the PR (`gh api
 repos/{owner}/{repo}/issues/<n>/comments`), grade every finding with
   the four questions of `docs/workflow.md` § 7 and apply the policy — (a) fix, (b) `DEBT-NNN` entry, (c)
