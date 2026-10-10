@@ -83,6 +83,19 @@ describe("DateField", () => {
     expect(screen.getByTestId("iso")).toBeEmptyDOMElement();
   });
 
+  it("leaves no timer running once the field is gone", () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = render(<Harness initial="2026-06-21" />);
+      fireEvent.blur(screen.getByRole("textbox"));
+      expect(vi.getTimerCount()).toBe(1);
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("renders a prefilled ISO value in locale (fr) format", () => {
     render(<Harness initial="2026-06-20" />);
     expect(screen.getByLabelText("Date")).toHaveValue("20/06/2026");

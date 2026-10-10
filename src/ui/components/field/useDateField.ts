@@ -31,6 +31,10 @@ export function useDateField(
   // from it would clobber in-progress typing (a partial date emits "" and would wipe
   // the field). We only re-sync the display on a genuinely external change.
   const lastEmittedIso = useRef<string | undefined>(undefined);
+  const closingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // The delayed close never outlives the field.
+  useEffect(() => () => clearTimeout(closingTimer.current), []);
 
   // Format ISO date (YYYY-MM-DD) to locale string (e.g., DD/MM/YYYY for fr-FR)
   const formatDateForDisplay = useCallback(
@@ -109,7 +113,8 @@ export function useDateField(
     // an external reset to "" that the echo-skip guard can't distinguish — is resolved
     // to the authoritative value instead of lingering.
     setDisplayValue(formatDateForDisplay(lastEmittedIso.current));
-    setTimeout(() => setShowCalendar(false), 200);
+    clearTimeout(closingTimer.current);
+    closingTimer.current = setTimeout(() => setShowCalendar(false), 200);
   };
 
   const clearDate = () => {
