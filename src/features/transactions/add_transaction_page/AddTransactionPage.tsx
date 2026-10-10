@@ -11,6 +11,7 @@ import { SelectField } from "@/ui/components/field/SelectField";
 import { TextareaField } from "@/ui/components/field/TextareaField";
 import { TextField } from "@/ui/components/field/TextField";
 import { useAddTransaction } from "../add_transaction/useAddTransaction";
+import { useNonCashAssets } from "../shared/useNonCashAssets";
 
 export function AddTransactionPage() {
   const { t } = useTranslation();
@@ -23,7 +24,8 @@ export function AddTransactionPage() {
     logger.info("[AddTransactionPage] mounted");
   }, []);
 
-  const assets = useAppStore((s) => s.assets);
+  // TRX-064 / CSH-018 — a purchase is recorded on any asset but cash: the core's list.
+  const assets = useNonCashAssets();
   const accounts = useAppStore((s) => s.accounts);
 
   const handleBack = useCallback(() => {
@@ -54,7 +56,12 @@ export function AddTransactionPage() {
     onSubmitSuccess: handleBack,
   });
 
-  const selectedAsset = assets.find((a) => a.id === formData.assetId);
+  // The asset chosen is named from the store until the core's list arrives, so a purchase
+  // opened on a holding shows its asset at once.
+  const knownAssets = useAppStore((s) => s.assets);
+  const selectedAsset =
+    assets.find((a) => a.id === formData.assetId) ??
+    knownAssets.find((a) => a.id === formData.assetId);
   const selectedAccount = accounts.find((a) => a.id === formData.accountId);
   const showExchangeRate = !!selectedAsset && !!selectedAccount && selectedAsset.currency !== "EUR";
 
