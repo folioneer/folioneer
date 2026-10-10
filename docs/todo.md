@@ -25,6 +25,8 @@
 5. FLOW-027
 6. FLOW-028
 7. FLOW-029
+8. TODO-066
+9. DEBT-088
 
 ## TODO-009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
@@ -131,7 +133,9 @@ Found on 2026-10-10 by the spec check of multi-device sync before the 0.7.0 rele
 **User value:** A user changes the sync passphrase, or recovers from a forgotten one, from the sync page.
 **Done when:** opened to start over, the dialog accepts the folder that holds the portfolio, asks for the new passphrase twice, and reaches the confirmation that says every published file will be discarded and every other computer will have to rejoin; a test covers that path on a computer that holds data; the E2E suite starts over once.
 **Design:** none
-**Open questions:** none
+**Open questions:**
+
+- [x] Which sentence opens the passphrase step when starting over? The two that exist are both false there. — A new one (owner, 2026-10-10): "This folder already holds a portfolio. Choose a new sync passphrase: the published copy will be replaced by this computer's portfolio." / « Ce dossier contient déjà un portefeuille. Choisissez une nouvelle phrase secrète de synchronisation : la copie publiée sera remplacée par le portefeuille de cet ordinateur. » (the French follows the words the dialog already uses for the passphrase).
 
 ## TODO-059 — (backend) — An agent records the rest of an account's past: deposits, withdrawals, dividends, prices
 

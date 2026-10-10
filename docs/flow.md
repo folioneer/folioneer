@@ -189,6 +189,9 @@ entries already held the matter for.
   its owner decided to regenerate every contract with it and to run `spec-checker` on
   every spec once, before the next feature work. Here: (c) the skill is brought over and
   adapted; (b) uses it, the script of (a) then keeping each contract true.
+- Scope (owner, 2026-10-10): this entry is (a), (c) and the account contract (DEBT-088,
+  queued after it). The six other contracts are filed as debt from the script's first
+  report, which the gate holds as a list that may only shrink.
 
 ## FLOW-025 — A reviewer that reads a whole file fails a pull request on what it did not change
 
