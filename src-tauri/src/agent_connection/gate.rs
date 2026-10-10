@@ -32,7 +32,7 @@ pub struct AgentGate {
     data_dir: PathBuf,
     connections: Arc<AgentConnections>,
     // Read where a channel exists (AGT-023).
-    #[cfg_attr(not(unix), allow(dead_code))]
+    #[cfg_attr(not(any(unix, windows)), allow(dead_code))]
     tools: Arc<dyn ToolRunner>,
     listening: Mutex<Option<JoinHandle<()>>>,
 }
@@ -122,7 +122,7 @@ impl AgentGate {
         }
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     fn open(&self) -> Result<(), GateError> {
         let mut listening = self
             .listening
@@ -146,7 +146,7 @@ impl AgentGate {
         Ok(())
     }
 
-    #[cfg(not(unix))]
+    #[cfg(not(any(unix, windows)))]
     fn open(&self) -> Result<(), GateError> {
         Err(GateError::Unavailable)
     }
@@ -161,9 +161,9 @@ impl Drop for AgentGate {
 /// Serves each bridge that connects, as long as it runs as the owner's user (AGT-021) and
 /// no more than `MAX_CONNECTIONS` are served (AGT-038). The connections live and end with
 /// this task: closing the gate drops them all (AGT-035).
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 async fn accept(
-    listener: tokio::net::UnixListener,
+    mut listener: channel::Listener,
     data_dir: PathBuf,
     connections: Arc<AgentConnections>,
     tools: Arc<dyn ToolRunner>,
@@ -176,7 +176,7 @@ async fn accept(
             Some(_) = served.join_next(), if !served.is_empty() => continue,
         };
         let stream = match accepted {
-            Ok((stream, _)) => {
+            Ok(stream) => {
                 failing = false;
                 stream
             }

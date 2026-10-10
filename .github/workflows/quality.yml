@@ -327,3 +327,69 @@ jobs:
           files: ./coverage/backend/lcov.info
           flags: backend
           fail_ci_if_error: false
+
+  windows:
+    name: Windows — the application compiles
+    # The release is not the first compilation of the Windows-only code (DEBT-086): a pull
+    # request that touches the Rust code is compiled for Windows, and the tests of the
+    # agent connection — its channel is a named pipe there — run on Windows.
+    runs-on: windows-latest
+    # 45: a Cargo.lock change misses the Rust cache and the cold build is the slow path.
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: "0"
+      RUSTFLAGS: "-C debuginfo=0"
+      SQLX_OFFLINE: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # The scope step diffs against the base branch.
+          fetch-depth: 0
+      - name: Whether the change touches the Rust code
+        # The same rule as the backend job: a pull request that leaves `src-tauri/`
+        # alone compiles nothing here; a push to main always does, and warms the cache.
+        id: scope
+        shell: bash
+        env:
+          BASE: ${{ github.base_ref }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == "pull_request" ]]; then
+            scope=$(git diff --name-only --diff-filter=ACMRD "origin/$BASE...HEAD" | bash scripts/changed-scope.sh)
+          else
+            scope=both
+          fi
+          echo "scope=$scope"
+          echo "backend=$([[ "$scope" == backend || "$scope" == both ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - name: Setup Rust
+        # The version and its components: rust-toolchain.toml.
+        if: steps.scope.outputs.backend == 'true'
+        shell: bash
+        run: rustup toolchain install
+      - name: Cache Rust
+        if: steps.scope.outputs.backend == 'true'
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2.9.1
+        with:
+          workspaces: src-tauri
+          prefix-key: windows-check
+      - name: A placeholder for the console program
+        # Tauri's build step only asks that the console program it bundles on Windows
+        # exists (tauri.windows.conf.json); the check below compiles the real one.
+        if: steps.scope.outputs.backend == 'true'
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          touch src-tauri/binaries/folioneer-cli-x86_64-pc-windows-msvc.exe
+      - name: The application compiles for Windows
+        if: steps.scope.outputs.backend == 'true'
+        working-directory: src-tauri
+        shell: bash
+        run: cargo check --all-targets
+      - name: The agent connection's tests
+        # Without the Tauri shell: the channel and what it serves are the core's.
+        if: steps.scope.outputs.backend == 'true'
+        working-directory: src-tauri
+        shell: bash
+        run: cargo test --lib --no-default-features agent_connection

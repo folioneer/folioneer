@@ -145,12 +145,12 @@ folioneer holding buy --help  # one command's options and defaults
 
 ## Agents (Model Context Protocol)
 
-An agent — Claude Code, Claude Desktop — can read the portfolio and record opening balances, purchases and sales through the application while it is open (Linux; not on Windows yet). Nothing answers when Folioneer is closed.
+An agent — Claude Code, Claude Desktop — can read the portfolio and record opening balances, purchases and sales through the application while it is open, on Linux and on Windows. Nothing answers when Folioneer is closed.
 
 1. In Folioneer, **Settings → Allow agents to connect** (off by default).
 2. Tell the agent how to start the bridge, which is the installed program with `--mcp`:
-   - **Claude Code**: `claude mcp add folioneer -- folioneer --mcp` (with the AppImage: `claude mcp add folioneer -- ~/Applications/Folioneer.AppImage --mcp`).
-   - **Claude Desktop**: in `~/.config/Claude/claude_desktop_config.json`, then restart it:
+   - **Claude Code**: `claude mcp add folioneer -- folioneer --mcp` (with the AppImage: `claude mcp add folioneer -- ~/Applications/Folioneer.AppImage --mcp`; on Windows, from PowerShell: `claude mcp add folioneer -- "$env:LOCALAPPDATA\Folioneer\folioneer.exe" --mcp`).
+   - **Claude Desktop**: in `~/.config/Claude/claude_desktop_config.json` (on Windows `%APPDATA%\Claude\claude_desktop_config.json`, with the program's full path as the command), then restart it:
 
      ```json
      {

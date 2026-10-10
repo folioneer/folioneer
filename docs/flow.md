@@ -126,12 +126,9 @@ had been told `main` was ready (FLOW-031).
   Windows build without publishing.
 - Costs: about 20 runner-minutes a week. Protects: a release day spent on a workflow
   bug.
-- 0.7.0: the Windows-only code of the agent connection was compiled for the first time
-  by the release build, by the owner's choice; it passed. DEBT-086 asks for a Windows
-  compile check on pull requests, which would cover this proposal's case.
-- 0.7.1: DEBT-086 is queued, with a Windows job on the pull requests that touch Rust
-  (owner, 2026-10-10). Once it is merged, what is left of this proposal is the release
-  workflow's own steps.
+- Since the 0.8.0 batch a pull request that touches the Rust code is compiled for Windows
+  and runs the agent connection's tests there (Quality `windows`). What is left of this
+  proposal is the release workflow's own steps: packaging and publishing.
 
 ## FLOW-020 — Nobody counts why a pull request goes round again
 

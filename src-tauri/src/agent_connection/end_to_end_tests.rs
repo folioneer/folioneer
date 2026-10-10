@@ -163,7 +163,7 @@ async fn agt_022_no_channel_exists_unless_the_owner_allows_agents() {
 
     assert!(!gate.is_allowed());
     gate.open_if_allowed();
-    assert!(!channel::socket_path(data_dir.path()).exists());
+    assert!(!channel::entry_path(data_dir.path()).exists());
     assert_eq!(text(&answers(data_dir.path(), &listing).await[0]), NOT_OPEN);
 
     assert_eq!(gate.allow(true), Ok(()));
@@ -173,22 +173,22 @@ async fn agt_022_no_channel_exists_unless_the_owner_allows_agents() {
     let second = application(data_dir.path()).await;
     assert_eq!(second.allow(true), Err(GateError::Failed));
     drop(second);
-    assert!(channel::socket_path(data_dir.path()).exists());
+    assert!(channel::entry_path(data_dir.path()).exists());
     assert!(channel::reach(data_dir.path()).await.is_some());
     assert!(gate.is_allowed());
-    assert!(channel::socket_path(data_dir.path()).exists());
+    assert!(channel::entry_path(data_dir.path()).exists());
 
     drop(gate);
-    assert!(!channel::socket_path(data_dir.path()).exists());
+    assert!(!channel::entry_path(data_dir.path()).exists());
     let restarted = application(data_dir.path()).await;
     assert!(restarted.is_allowed());
     restarted.open_if_allowed();
-    assert!(channel::socket_path(data_dir.path()).exists());
+    assert!(channel::entry_path(data_dir.path()).exists());
 
     assert_eq!(restarted.allow(false), Ok(()));
     assert_eq!(restarted.allow(false), Ok(()));
     assert!(!restarted.is_allowed());
-    assert!(!channel::socket_path(data_dir.path()).exists());
+    assert!(!channel::entry_path(data_dir.path()).exists());
     assert_eq!(text(&answers(data_dir.path(), &listing).await[0]), NOT_OPEN);
 }
 
@@ -515,10 +515,20 @@ async fn agt_032_a_refused_agent_is_given_nothing() {
 // neither the database nor a service.
 #[test]
 fn adr_023_the_agent_connection_opens_no_network_socket() {
-    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/agent_connection");
+    let mut folders = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("src/agent_connection")];
+    let mut sources = Vec::new();
+    while let Some(folder) = folders.pop() {
+        for entry in std::fs::read_dir(&folder).expect("a folder of the module") {
+            let path = entry.expect("entry").path();
+            if path.is_dir() {
+                folders.push(path);
+            } else {
+                sources.push(path);
+            }
+        }
+    }
     let mut scanned = 0;
-    for entry in std::fs::read_dir(&folder).expect("the module's folder") {
-        let path = entry.expect("entry").path();
+    for path in sources {
         let file = path
             .file_name()
             .expect("name")
@@ -544,7 +554,7 @@ fn adr_023_the_agent_connection_opens_no_network_socket() {
         }
         scanned += 1;
     }
-    assert!(scanned >= 10, "every file of the module is scanned");
+    assert!(scanned >= 12, "every file of the module is scanned");
 }
 
 // ADR-023 — the bridge is made of files that hold no data and reach none: it uses nothing

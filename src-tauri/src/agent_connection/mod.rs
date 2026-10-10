@@ -4,9 +4,9 @@
 //! application asks its owner before serving a connection, and runs every tool through the
 //! queries the window uses.
 
-// Only the Unix channel serves connections today (AGT-023): on a system without a channel
-// the application's side of it compiles and is not called.
-#![cfg_attr(not(unix), allow(dead_code))]
+// On a system without a channel (AGT-023) the application's side of it compiles and is not
+// called.
+#![cfg_attr(not(any(unix, windows)), allow(dead_code))]
 
 #[cfg(feature = "app")]
 pub mod api;
@@ -20,5 +20,5 @@ pub mod server;
 pub mod tools;
 mod wire;
 
-#[cfg(all(test, unix))]
+#[cfg(all(test, any(unix, windows)))]
 mod end_to_end_tests;

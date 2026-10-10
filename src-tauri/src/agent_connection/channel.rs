@@ -1,28 +1,33 @@
 //! The local channel between the bridge and the running application (ADR-023, AGT-020): on
 //! Linux and other Unix systems, a socket in a folder of the application's data folder that
-//! only the owner's user may enter. Never a network port. A system without such a channel
-//! has no agent connection.
+//! only the owner's user may enter; on Windows, a named pipe only the owner's user may
+//! open, named in a file of that folder. Never a network port. A system without such a
+//! channel has no agent connection.
 
 use std::path::{Path, PathBuf};
 
 /// Whether this system has a channel.
-pub const AVAILABLE: bool = cfg!(unix);
+pub const AVAILABLE: bool = cfg!(any(unix, windows));
 
 const CHANNEL_DIR: &str = "agent";
-const SOCKET_FILE: &str = "channel.sock";
+#[cfg(not(windows))]
+const ENTRY_FILE: &str = "channel.sock";
+#[cfg(windows)]
+const ENTRY_FILE: &str = "channel.name";
 
 fn channel_dir(data_dir: &Path) -> PathBuf {
     data_dir.join(CHANNEL_DIR)
 }
 
-/// Where the channel's socket is, in `data_dir`.
-pub fn socket_path(data_dir: &Path) -> PathBuf {
-    channel_dir(data_dir).join(SOCKET_FILE)
+/// What a bridge opens in `data_dir` to reach the channel: the socket itself on Unix, the
+/// file that names the pipe on Windows.
+pub fn entry_path(data_dir: &Path) -> PathBuf {
+    channel_dir(data_dir).join(ENTRY_FILE)
 }
 
 /// AGT-022 — removes the channel: nothing is left for a bridge to reach.
 pub fn close(data_dir: &Path) {
-    let _ = std::fs::remove_file(socket_path(data_dir));
+    let _ = std::fs::remove_file(entry_path(data_dir));
     let _ = std::fs::remove_dir(channel_dir(data_dir));
 }
 
@@ -34,13 +39,27 @@ mod unix {
 
     use tokio::net::{UnixListener, UnixStream};
 
-    use super::{channel_dir, socket_path};
+    use super::{channel_dir, entry_path};
+
+    /// The application's end of a connection.
+    pub type Stream = UnixStream;
+
+    /// The application's end of the channel.
+    #[derive(Debug)]
+    pub struct Listener(UnixListener);
+
+    impl Listener {
+        /// The next bridge that connects.
+        pub async fn accept(&mut self) -> io::Result<Stream> {
+            self.0.accept().await.map(|(stream, _)| stream)
+        }
+    }
 
     /// AGT-021 — opens the channel in `data_dir`: a socket in a folder created for the
     /// owner's user alone, so no other user can reach the socket. A folder that is a
     /// symbolic link is refused; a socket left by an earlier run is replaced, one a running
     /// application still answers on is not.
-    pub fn listen(data_dir: &Path) -> io::Result<UnixListener> {
+    pub fn listen(data_dir: &Path) -> io::Result<Listener> {
         let dir = channel_dir(data_dir);
         match std::fs::symlink_metadata(&dir) {
             Ok(metadata) if !metadata.is_dir() || metadata.file_type().is_symlink() => {
@@ -53,7 +72,7 @@ mod unix {
             Err(_) => std::fs::DirBuilder::new().mode(0o700).create(&dir)?,
         }
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))?;
-        let path = socket_path(data_dir);
+        let path = entry_path(data_dir);
         if std::fs::symlink_metadata(&path).is_ok() {
             // A socket that answers belongs to an application still running: it keeps it.
             if std::os::unix::net::UnixStream::connect(&path).is_ok() {
@@ -67,12 +86,12 @@ mod unix {
         let listener = std::os::unix::net::UnixListener::bind(&path)?;
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
         listener.set_nonblocking(true)?;
-        UnixListener::from_std(listener)
+        UnixListener::from_std(listener).map(Listener)
     }
 
     /// AGT-021 — whether the program at the other end of `stream` runs as the user who
     /// owns the channel in `data_dir`.
-    pub fn same_user(stream: &UnixStream, data_dir: &Path) -> bool {
+    pub fn same_user(stream: &Stream, data_dir: &Path) -> bool {
         let owner = std::fs::metadata(channel_dir(data_dir)).map(|metadata| metadata.uid());
         let peer = stream.peer_cred().map(|credentials| credentials.uid());
         matches!((owner, peer), (Ok(owner), Ok(peer)) if is_owner(owner, peer))
@@ -86,22 +105,27 @@ mod unix {
     /// The bridge's end: connects to the channel in `data_dir`; `None` when there is none
     /// or no application answers on it.
     pub async fn connect(data_dir: &Path) -> Option<UnixStream> {
-        UnixStream::connect(socket_path(data_dir)).await.ok()
+        UnixStream::connect(entry_path(data_dir)).await.ok()
     }
 }
 
+#[cfg(windows)]
+mod windows;
+
 #[cfg(unix)]
-pub use unix::{connect, listen, same_user};
+pub use unix::{connect, listen, same_user, Listener};
+#[cfg(windows)]
+pub use windows::{connect, listen, same_user, Listener};
 
 /// The bridge's end of the channel to the application running over `data_dir`; `None`
 /// when none answers, or on a system without a channel (AGT-023).
 pub async fn reach(data_dir: &Path) -> Option<Box<dyn super::bridge::Channel>> {
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     {
         let stream = connect(data_dir).await?;
         Some(Box::new(stream) as Box<dyn super::bridge::Channel>)
     }
-    #[cfg(not(unix))]
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = data_dir;
         None
@@ -130,12 +154,12 @@ mod tests {
         std::fs::set_permissions(data_dir.path(), std::fs::Permissions::from_mode(0o755))
             .expect("open data folder");
 
-        let listener = listen(data_dir.path()).expect("listening");
+        let mut listener = listen(data_dir.path()).expect("listening");
 
         assert_eq!(mode(&data_dir.path().join("agent")), 0o700);
-        assert_eq!(mode(&socket_path(data_dir.path())), 0o600);
+        assert_eq!(mode(&entry_path(data_dir.path())), 0o600);
         let bridge = connect(data_dir.path()).await.expect("connected");
-        let (application_end, _) = listener.accept().await.expect("accepted");
+        let application_end = listener.accept().await.expect("accepted");
         assert!(same_user(&application_end, data_dir.path()));
         drop(bridge);
     }
@@ -179,7 +203,7 @@ mod tests {
         assert!(connect(data_dir.path()).await.is_some());
 
         close(data_dir.path());
-        assert!(!socket_path(data_dir.path()).exists());
+        assert!(!entry_path(data_dir.path()).exists());
         assert!(!data_dir.path().join("agent").exists());
         assert!(connect(data_dir.path()).await.is_none());
 

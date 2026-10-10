@@ -7,10 +7,19 @@ during work that don't warrant immediate action. The entry format is in
 Entries are observations, not commitments, and this file is the agent's: it
 files here what it notices and what it did not fix. Each entry carries a
 permanent `DEBT-NNN` reference (never renumbered, never reused; next free:
-DEBT-102) so the human can queue it in `docs/todo.md` § Next like any todo.
+DEBT-103) so the human can queue it in `docs/todo.md` § Next like any todo.
 Remove an entry once it has been resolved.
 
 ---
+
+## 2026-10-10 — DEBT-102 — The Windows channel's refusals are proven by no test
+
+- Found by: `spec-checker` on `docs/spec/agent-connection.md`, closing DEBT-086, from reading the code; nothing was run on Windows
+- Where: `src-tauri/src/agent_connection/channel/windows.rs`; `src-tauri/src/agent_connection/gate.rs`; `docs/adr/023-agents-reach-the-portfolio-through-the-running-application.md` (its guard names `agt_021_another_users_process_cannot_open_the_channel`, a test of the Unix channel only)
+- Severity: 🟡
+- Observation: on Windows the tests prove what a program of the owner's user is given, and nothing of what another user's is refused: the pipe's access list is never read back, no pipe is answered by another user (the bridge's refusal, the name replaced at opening), no client's user is unreadable. Those need a second account, which the CI job does not have. Without one: no test opens the channel in a folder that is a link or a junction, none opens it twice at the same moment (the lock on the name file), none reads a name file longer than its limit. On both systems: no test makes the folder, the socket or the pipe impossible to create and reads the setting left off (AGT-024), none starts with the setting on and a channel that fails, none holds a connection that has not asked across a switch-off (AGT-035), and none drives a refusal of another user through the gate. The vocabulary holds no "channel"; the code names what a bridge opens `entry_path`, a word the spec does not use
+- User value: None directly — the promise that only the owner's user reaches the agent connection on Windows is held by a test.
+- Done when: the clauses that need no second account each have a test; the owner says whether a second account in CI is worth its cost, and the guard of ADR-023 names what holds on Windows; "channel" is in the vocabulary or the owner declines it.
 
 ## 2026-08-23 — DEBT-001 — Local writes do not take the sync gate
 
@@ -441,22 +450,6 @@ Remove an entry once it has been resolved.
 - Observation: on a diff of many files a reviewer reached its 40 turns before or just after writing its report, and the job failed: once with no report (backend), twice with a clean one (infrastructure, contract). 7 to 12 turns of each run went into commands the grant refuses, which the reviewer then retried another way; one reviewer started helper sessions and ended while waiting for them. The limit is raised to 80, which hides the waste without removing it
 - User value: None directly — a pull request is not held back by a review that found nothing.
 - Done when: a run's refused commands are listed and each is either granted by name or removed from the prompts; a reviewer cannot start helper sessions in CI; a reviewer that writes its report within the limit never fails its job; the limit is set from the measured turns of a wide pull request, with a test of the workflow that holds it.
-
-## 2026-10-09 — DEBT-086 — The agent connection does not exist on Windows
-
-For 0.8.0 (owner, 2026-10-09): the next version has the agent connection working on Windows. Queued by the owner on 2026-10-10, after v0.7.1.
-
-- Found by: the owner's decision of 2026-10-09 while building TODO-051 (Linux first)
-- Where: `src-tauri/src/agent_connection/channel.rs` (the channel is a Unix socket; `AVAILABLE` is false elsewhere); `.github/workflows/` — no job compiles for Windows on a pull request, only `release.yml` does
-- Severity: 🟡
-- Observation: on Windows the setting "Allow agents to connect" is disabled and says the agent connection is not available on this system yet (AGT-023). The Windows channel is a named pipe restricted to the owner's user, which needs Windows-only code that no pull request compiles today: written blind, its first compilation would be the release
-- User value: A Windows user lets an agent read the portfolio through the open application, as on Linux.
-- Done when: a pull request that touches the Rust code is compiled for Windows before it merges; the channel exists on Windows as a named pipe only the owner's user can open, refusing remote clients; AGT-021 and AGT-023 say so, and the tests that can run on Windows run there.
-
-**Open questions:**
-
-- [x] How wide is the Windows job on pull requests? — On pull requests that touch Rust: compile the application for Windows and run the agent-connection tests there; not the whole Rust suite (owner, 2026-10-10).
-- [x] The agent cannot run the application on Windows: does the entry wait for a trial on a real machine? — No: it closes on green CI; the owner tries it when next on Windows (owner, 2026-10-10).
 
 ## 2026-10-09 — DEBT-085 — The assets to settle are reported by the core and shown nowhere
 
