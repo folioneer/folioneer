@@ -15,7 +15,7 @@ The rules for an entry, set by the owner on 2026-10-03:
    questions come in one block for the batch, with what to look at and what a yes means.
 
 Each entry carries a permanent `FLOW-NNN` reference (never renumbered, never reused; next
-free: FLOW-026) so the owner can queue it in `docs/todo.md` § Next like any other. An
+free: FLOW-030) so the owner can queue it in `docs/todo.md` § Next like any other. An
 entry is removed once it is settled.
 
 ---
@@ -155,6 +155,15 @@ entries already held the matter for.
 - Costs: a longer opening block — the agent reads the code each entry touches before
   starting any of them. Protects: a batch that runs unattended once the block is
   answered.
+- From the owner's other project, which met the same thing (nine questions in the middle
+  of an entry) and decided how on 2026-10-06; taken into this entry by the owner on
+  2026-10-10: `/whats-next` runs the same reading on what it proposes, so an entry enters
+  the queue with its questions answered; a question is asked once at its widest ("the
+  term for every aggregate edited from a form", not one aggregate at a time); a choice
+  with a standing answer is not asked again, the answer being written where the rule
+  lives; in the middle of an entry a question stays right for what the reading could not
+  show, and the audit after a release counts the questions and says which the reading
+  should have caught.
 
 ## FLOW-024 — Nothing compares a contract with the code it describes
 
@@ -175,6 +184,11 @@ entries already held the matter for.
 - Costs: about half a day for the script and its tests, and a fixed format for a
   contract row; one pull request per contract. Protects: a document the agent and the
   reviewers read as the truth about a command.
+- From the owner's other project, taken into this entry by the owner on 2026-10-10: it
+  has a `/contract` skill that derives or updates a contract from a validated spec, and
+  its owner decided to regenerate every contract with it and to run `spec-checker` on
+  every spec once, before the next feature work. Here: (c) the skill is brought over and
+  adapted; (b) uses it, the script of (a) then keeping each contract true.
 
 ## FLOW-025 — A reviewer that reads a whole file fails a pull request on what it did not change
 
@@ -189,6 +203,72 @@ entries already held the matter for.
 - Costs: an older gap in a file a pull request touches waits for the release checks.
   Protects: about 25 minutes a round, and a mechanical pull request from repairing a
   document it only renamed in.
+- From the owner's other project, taken into this entry by the owner on 2026-10-10: its
+  reviewers are 30 to 75 lines each beside one shared protocol file; here they are 190
+  to 480 lines each and repeat the protocol. The shared file holds the two modes this
+  entry asks for — the changed lines by default, with older findings listed without a
+  severity, and a release sweep where every file of the lane is judged — and, for every
+  lane, the rule that in CI `.claude/` on disk is the base branch's (written here for
+  the infrastructure lane only, in #151). The entry brings that file over and cuts each
+  reviewer down to its lane; a shorter prompt also leaves more turns (DEBT-087).
+
+## FLOW-026 — A CI reviewer that ends without a report does not say why
+
+- Kind: speed
+- Observed: on #149 and #150 a reviewer lane ended red with no report. The job log said
+  nothing; the cause (the turn limit, DEBT-087) was found by reading the session's log
+  by hand, over several rounds of about 25 minutes. The owner's other project has
+  `scripts/review-stop-reason.py`: one line from the session's log, printed by the
+  workflow before a second try, naming fields only so that nothing of an unreviewed diff
+  is printed.
+- Proposal: bring the script and its tests over; `review.yml` calls it when a lane has
+  written no report.
+- Costs: about an hour; one more script to keep. Protects: a round spent learning that a
+  reviewer stopped at its turn limit.
+
+## FLOW-027 — The agent writes the watch on a pull request's checks by hand each time
+
+- Kind: speed
+- Observed: in 0.7.0 the agent wrote a polling loop on `gh api …/check-runs` for each
+  pull request, about ten times on the release day alone, each with its own end
+  condition. The owner's other project has `just watch-pr [number]`: it waits for every
+  check named in `required-checks.json`, follows a push to the new head, retries a
+  failed poll, and ends with a verdict by exit code (green, failed, unreachable, timed
+  out, not open).
+- Proposal: bring `scripts/watch-pr.py`, its tests and the recipe over; `/next-todo`
+  Step 8 names the recipe in place of the hand-written watch.
+- Costs: about an hour: `required-checks.json`, which the script reads, exists here and
+  `scripts/merge.py` already reads it. Protects: a watch that ends too early or never, and a
+  screen of shell for the owner to approve on each pull request.
+
+## FLOW-028 — Two pull requests opened side by side send each other round
+
+- Kind: speed
+- Observed: on the release day #153 and #155 were each green, then rebased by `just
+merge` because the other had merged, and waited for a second run. The owner's other
+  project wrote its way through on 2026-10-06: a branch that is not pushed yet sits on
+  the branch in review, is checked and reviewed there, and is rebased onto `main` and
+  pushed only once the one below has merged — a local rebase, never a force-push. Three
+  pull requests merged there within 27 minutes of each other.
+- Proposal: `docs/workflow.md` § 11 allows it and says how; the reviewers are given the
+  last commit, not the branch.
+- Costs: a reviewer prompt that names a commit. Protects: one CI round for each pull
+  request that waits behind another.
+
+## FLOW-029 — A statement to the owner that rests on nothing the agent read
+
+- Kind: quality
+- Observed: in 0.7.0 the agent told the owner that the full-page form could sell an
+  archived asset, repeating a checker's report; the form only buys. It was corrected to
+  the owner and in the commit title before the push. The owner's other project counted
+  four such statements in one batch and decided two sentences on 2026-10-06.
+- Proposal: `CLAUDE.md` § Who decides what gains them: a statement that the code does or
+  does not do something names what was read (the component, the command, the service);
+  a statement about what a system will do next is checked, or given as a guess. A
+  reviewer's or a checker's claim about a screen is read in the component before it is
+  repeated.
+- Costs: two sentences, and a read before a status line. Protects: the owner's trust in
+  a status line, which is what an autonomous batch runs on.
 
 ## Used and not used — the 0.7.0 batch
 

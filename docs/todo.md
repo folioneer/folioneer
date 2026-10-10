@@ -21,6 +21,10 @@
 1. FLOW-023
 2. FLOW-024
 3. FLOW-025
+4. FLOW-026
+5. FLOW-027
+6. FLOW-028
+7. FLOW-029
 
 ## TODO-009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
