@@ -16,6 +16,8 @@
  *   SYN-063 — sync status assembly: device name, folder, roster/failure/held-back
  *     surfaces render from the real `SyncStatus` the backend returns
  *   SYN-070 — pause on this device
+ *   SYN-071 — start over: on a computer that holds data, the dialog accepts the folder
+ *     that holds the portfolio and re-creates it under a new passphrase (SYN-053)
  *   SYN-072 — rename device; the manifest is republished (asserted indirectly — the new
  *     name reads back from `get_sync_status`, not local state)
  *   SYN-073 — resume: a paused device resumes without re-entering the passphrase
@@ -41,11 +43,8 @@
  *     `RebuildInterrupted`) — H1: `wdio.conf.ts` launches exactly one app instance with
  *     one `FOLIONEER_E2E_DATA_DIR`; there is no second-device/second-profile E2E
  *     helper. Covered by `src-tauri/tests/sync_two_devices.rs` (Tier 3).
- *   - "Start over" (SYN-071/053) and folder-picker (`#sync-enable-browse`) — H2: the
- *     Browse button opens a native GTK dialog WebDriver cannot drive; the folder is
- *     always typed directly in this file. Start-over reuses the same enable-modal code
- *     path already exercised here and is otherwise a destructive, rarely-taken branch —
- *     left to its own component tests (`EnableSyncModal.test.tsx`).
+ *   - The folder picker (`#sync-enable-browse`) — H2: the Browse button opens a native
+ *     GTK dialog WebDriver cannot drive; the folder is always typed directly in this file.
  *   - `change_sync_folder` (SYN-074) and conflict notices (SYN-066) — no scenario in the
  *     single-device chain naturally produces a second folder or a conflict; both are
  *     fully covered by BE Tier 1/2 and the FE `useSyncPage.test.ts` /
@@ -104,6 +103,8 @@ const TOO_SHORT_PASSPHRASE = "shortpass1"; // 10 chars — below the SYN-012 min
 const PASSPHRASE = "correct horse battery staple 2020"; // well above the 12-char minimum
 const FIRST_DEVICE_NAME = "Desktop";
 const RENAMED_DEVICE_NAME = "Laptop";
+const NEW_PASSPHRASE = "another horse battery staple 2026"; // SYN-071 — the passphrase start-over sets
+const START_OVER_DEVICE_NAME = "Origin";
 
 describe("sync", () => {
   let syncFolder: string;
@@ -128,14 +129,14 @@ describe("sync", () => {
   });
 
   // -------------------------------------------------------------------------
-  // SYN-010/011/012/018/061/063/070/072/073/082 — critical path:
+  // SYN-010/011/012/018/061/063/070/071/072/073/082 — critical path:
   //   fresh install (disabled) → open the enable modal → folder step (real
   //   inspect_sync_folder round trip) → passphrase step (SYN-012/018 gates) →
   //   submit reaches the real enable_sync and writes the encrypted folder on
   //   disk → status block renders → "Sync now" → pause → resume → rename →
-  //   leave (folder area survives, singleton left disabled for later files).
+  //   start over → leave (folder area survives, singleton left disabled for later files).
   // -------------------------------------------------------------------------
-  it("SYN-010/011/012/018/061/063/070/072/073/082: enable as the first device round-trips through the real backend", async () => {
+  it("SYN-010/011/012/018/061/063/070/071/072/073/082: enable as the first device round-trips through the real backend", async () => {
     await navigateToSync();
 
     // -----------------------------------------------------------------
@@ -367,7 +368,73 @@ describe("sync", () => {
     );
 
     // -----------------------------------------------------------------
-    // Step 11 — Leave (SYN-082): confirmation dialog, then the section
+    // Step 11 — Start over (SYN-071/053, TODO-066): on a computer that
+    // holds data, the dialog accepts the folder that holds the portfolio,
+    // asks the new passphrase twice, confirms, and reaches the real
+    // start_sync_over: the folder is cleared and published again by this
+    // device alone.
+    // -----------------------------------------------------------------
+    const startOverBtn = await $("#sync-start-over");
+    await startOverBtn.waitForClickable({ timeout: 8000 });
+    await startOverBtn.click();
+    await (await $("#sync-enable-modal")).waitForExist({ timeout: 8000 });
+    await setReactInputValue("sync-enable-folder", syncFolder);
+    const startOverNextBtn = await $("#sync-enable-next");
+    await startOverNextBtn.waitForEnabled({
+      timeout: 8000,
+      timeoutMsg:
+        "TODO-066 — starting over must accept the folder that already holds the portfolio",
+    });
+    await startOverNextBtn.click();
+
+    await (await $("#sync-enable-passphrase-confirm")).waitForExist({
+      timeout: 8000,
+      timeoutMsg: "TODO-066 — starting over must ask the new passphrase twice",
+    });
+    await setReactInputValue("sync-enable-device-name", START_OVER_DEVICE_NAME);
+    await setReactInputValue("sync-enable-passphrase", NEW_PASSPHRASE);
+    await setReactInputValue("sync-enable-passphrase-confirm", NEW_PASSPHRASE);
+    const startOverSubmitBtn = await $("#sync-enable-submit");
+    await startOverSubmitBtn.waitForEnabled({ timeout: 5000 });
+    await startOverSubmitBtn.click();
+
+    const startOverConfirmBtn = await $("#sync-start-over-confirm");
+    await startOverConfirmBtn.waitForExist({ timeout: 8000 });
+    await startOverConfirmBtn.click();
+    await (await $("#sync-enable-modal")).waitForExist({ timeout: 20000, reverse: true });
+
+    await browser.waitUntil(
+      async () =>
+        (await (await $("#sync-status-device-name")).getText()).trim() === START_OVER_DEVICE_NAME,
+      {
+        timeout: 10000,
+        timeoutMsg:
+          "SYN-071 — the name given when starting over must read back from get_sync_status",
+      },
+    );
+    // Real filesystem proof: the folder was cleared and holds this device's area alone,
+    // published again as a first device (SYN-013).
+    const publishedAreas = () =>
+      readdirSync(devicesDir).filter((area) => {
+        const segments = join(devicesDir, area, "segments");
+        return (
+          existsSync(segments) && readdirSync(segments).some((name) => name.startsWith("seg-"))
+        );
+      });
+    await browser.waitUntil(async () => publishedAreas().length === 1, {
+      timeout: 10000,
+      timeoutMsg:
+        "SYN-071 — after starting over the folder must hold this computer's portfolio, published again",
+    });
+    assert.strictEqual(
+      readdirSync(devicesDir).length,
+      1,
+      "SYN-071 — after starting over the folder must hold exactly one device area",
+    );
+    const [areaAfterStartOver] = publishedAreas();
+
+    // -----------------------------------------------------------------
+    // Step 12 — Leave (SYN-082): confirmation dialog, then the section
     // returns to the disabled state; the device's folder area (its
     // segment) is kept, only the manifest is removed.
     // -----------------------------------------------------------------
@@ -384,13 +451,13 @@ describe("sync", () => {
     // device's segment file (SYN-037/082) — the shared history the folder
     // holds is never abandoned by a device that leaves.
     await browser.waitUntil(
-      async () => !existsSync(join(devicesDir, deviceDirName, "manifest.bin")),
+      async () => !existsSync(join(devicesDir, areaAfterStartOver, "manifest.bin")),
       {
         timeout: 10000,
         timeoutMsg: "SYN-082 — leave_sync must remove this device's manifest from the real folder",
       },
     );
-    const segmentFilesAfterLeave = readdirSync(join(devicesDir, deviceDirName, "segments"));
+    const segmentFilesAfterLeave = readdirSync(join(devicesDir, areaAfterStartOver, "segments"));
     assert.ok(
       segmentFilesAfterLeave.some((name) => name.startsWith("seg-")),
       "SYN-037/082 — leave_sync must keep the device's segment file; its area stays in the folder",

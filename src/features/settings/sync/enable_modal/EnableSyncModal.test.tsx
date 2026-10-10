@@ -213,4 +213,22 @@ describe("EnableSyncModal — start-over variant (SYN-071)", () => {
 
     expect(confirmStartOver).toHaveBeenCalled();
   });
+
+  it("TODO-066 — says what starting over does at the passphrase step, with two passphrase fields", () => {
+    mockUseEnableSyncModal.mockReturnValue(makeState({ step: 2, isJoin: false }));
+    render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="start-over" />);
+
+    expect(screen.getByText("sync.enable_modal.start_over_wording")).toBeInTheDocument();
+    expect(screen.queryByText("sync.enable_modal.first_device_wording")).not.toBeInTheDocument();
+    expect(screen.queryByText("sync.enable_modal.join_wording")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sync-enable-passphrase")).toBeInTheDocument();
+    expect(screen.getByTestId("sync-enable-passphrase-confirm")).toBeInTheDocument();
+  });
+
+  it("TODO-066 — the confirmation says every published file is discarded and every other computer rejoins", () => {
+    mockUseEnableSyncModal.mockReturnValue(makeState({ step: 2, confirmingStartOver: true }));
+    render(<EnableSyncModal isOpen onClose={vi.fn()} onSuccess={vi.fn()} variant="start-over" />);
+
+    expect(screen.getByText("sync.start_over_confirm_message")).toBeInTheDocument();
+  });
 });

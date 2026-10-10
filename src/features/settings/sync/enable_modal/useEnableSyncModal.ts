@@ -32,7 +32,7 @@ export interface UseEnableSyncModalResult {
   passphraseTooShort: boolean;
   deviceName: string;
   setDeviceName: (value: string) => void;
-  /** True when the folder already holds a portfolio: one passphrase field, join wording (SYN-011). */
+  /** True when joining the portfolio the folder already holds: one passphrase field, join wording (SYN-011). Never when starting over. */
   isJoin: boolean;
   canSubmit: boolean;
   isSubmitting: boolean;
@@ -43,8 +43,12 @@ export interface UseEnableSyncModalResult {
   cancelStartOver: () => void;
 }
 
-/** SYN-014/019/035 — the first reason the inspected folder cannot be used, if any. */
-function folderStateError(state: SyncFolderState): I18nMessage | null {
+/**
+ * SYN-014/019/035 — the first reason the inspected folder cannot be used, if any.
+ * Starting over replaces the folder's portfolio by this computer's (SYN-071), so the
+ * join refusal does not apply to it.
+ */
+function folderStateError(state: SyncFolderState, isStartOver: boolean): I18nMessage | null {
   if (state.problem !== null) {
     return folderProblemToI18n(state.problem);
   }
@@ -54,7 +58,7 @@ function folderStateError(state: SyncFolderState): I18nMessage | null {
       vars: { dataFormatVersion: state.data_format_version ?? 0 },
     };
   }
-  if (state.holds_portfolio && state.installation_holds_user_data) {
+  if (!isStartOver && state.holds_portfolio && state.installation_holds_user_data) {
     return { key: "sync.errors.InstallationHoldsUserData" };
   }
   return null;
@@ -80,26 +84,30 @@ export function useEnableSyncModal({
   const [submitError, setSubmitError] = useState<I18nMessage | null>(null);
   const [confirmingStartOver, setConfirmingStartOver] = useState(false);
   const inspectSequence = useRef(0);
+  const isStartOver = variant === "start-over";
 
-  const setFolder = useCallback(async (value: string) => {
-    setFolderValue(value);
-    setFolderState(null);
-    const sequence = ++inspectSequence.current;
-    if (value.trim() === "") {
-      setFolderError(null);
-      return;
-    }
-    const result = await inspectSyncFolder(value);
-    if (sequence !== inspectSequence.current) {
-      return;
-    }
-    if (result.status === "ok") {
-      setFolderState(result.data);
-      setFolderError(folderStateError(result.data));
-    } else {
-      setFolderError(syncErrorToI18n(result.error));
-    }
-  }, []);
+  const setFolder = useCallback(
+    async (value: string) => {
+      setFolderValue(value);
+      setFolderState(null);
+      const sequence = ++inspectSequence.current;
+      if (value.trim() === "") {
+        setFolderError(null);
+        return;
+      }
+      const result = await inspectSyncFolder(value);
+      if (sequence !== inspectSequence.current) {
+        return;
+      }
+      if (result.status === "ok") {
+        setFolderState(result.data);
+        setFolderError(folderStateError(result.data, isStartOver));
+      } else {
+        setFolderError(syncErrorToI18n(result.error));
+      }
+    },
+    [isStartOver],
+  );
 
   const handleBrowse = useCallback(async () => {
     const picked = await pickSyncFolder();
@@ -108,7 +116,7 @@ export function useEnableSyncModal({
     }
   }, [setFolder]);
 
-  const isJoin = folderState?.holds_portfolio === true;
+  const isJoin = !isStartOver && folderState?.holds_portfolio === true;
   const canProceedToStep2 = folderState !== null && folderError === null;
   const passphraseTooShort = passphrase.length > 0 && passphrase.length < PASSPHRASE_MINIMUM_LENGTH;
   const passphraseMismatch =
@@ -123,7 +131,7 @@ export function useEnableSyncModal({
   const run = useCallback(async () => {
     setIsSubmitting(true);
     setSubmitError(null);
-    const call = variant === "start-over" ? startSyncOver : enableSync;
+    const call = isStartOver ? startSyncOver : enableSync;
     const result = await call(folder, passphrase, deviceName.trim());
     if (result.status === "ok") {
       onSuccess?.();
@@ -131,7 +139,7 @@ export function useEnableSyncModal({
       setSubmitError(syncErrorToI18n(result.error));
     }
     setIsSubmitting(false);
-  }, [variant, folder, passphrase, deviceName, onSuccess]);
+  }, [isStartOver, folder, passphrase, deviceName, onSuccess]);
 
   const handleSubmit = useCallback(
     async (event?: { preventDefault: () => void }) => {
@@ -139,13 +147,13 @@ export function useEnableSyncModal({
       if (!canSubmit) {
         return;
       }
-      if (variant === "start-over") {
+      if (isStartOver) {
         setConfirmingStartOver(true);
         return;
       }
       await run();
     },
-    [canSubmit, variant, run],
+    [canSubmit, isStartOver, run],
   );
 
   const confirmStartOver = useCallback(async () => {
@@ -159,7 +167,7 @@ export function useEnableSyncModal({
     setFolder,
     handleBrowse,
     folderError,
-    joinRefused: folderState?.holds_portfolio === true && folderState.installation_holds_user_data,
+    joinRefused: isJoin && folderState.installation_holds_user_data,
     canProceedToStep2,
     goToStep2: () => setStep(2),
     passphrase,

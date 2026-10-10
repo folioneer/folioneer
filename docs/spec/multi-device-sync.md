@@ -288,7 +288,7 @@ Sync has its own page (`/sync`); the settings keep one line — not enabled, ena
 
 ### Main Component
 
-Enable-sync modal in two steps: folder picker (validated, SYN-019), then passphrase with the SYN-017/053/054 statements. If the folder already holds a portfolio the modal switches to the join wording (single passphrase entry, fresh-installation requirement). Confirmation dialog for start-over (SYN-071).
+Enable-sync modal in two steps: folder picker (validated, SYN-019), then passphrase with the SYN-017/053/054 statements. If the folder already holds a portfolio the modal switches to the join wording (single passphrase entry, fresh-installation requirement). Opened to start over (SYN-071), the same modal accepts a folder that holds a portfolio on a device that holds data, says that the published copy will be replaced, asks the new passphrase twice, and ends with a confirmation dialog.
 
 ### States
 

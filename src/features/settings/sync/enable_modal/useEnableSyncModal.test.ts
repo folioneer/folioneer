@@ -365,4 +365,67 @@ describe("useEnableSyncModal — start-over variant (SYN-071)", () => {
       "Desktop",
     );
   });
+
+  it("TODO-066 — accepts the folder that holds the portfolio on a computer that holds data, and asks the new passphrase twice", async () => {
+    vi.mocked(gateway.inspectSyncFolder).mockResolvedValue({
+      status: "ok",
+      data: makeFolderState({ holds_portfolio: true, installation_holds_user_data: true }),
+    });
+    vi.mocked(gateway.startSyncOver).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
+
+    const { result } = renderHook(() => useEnableSyncModal({ variant: "start-over" }));
+    await act(async () => {
+      await result.current.setFolder("/home/user/sync");
+    });
+
+    expect(result.current.folderError).toBeNull();
+    expect(result.current.joinRefused).toBe(false);
+    expect(result.current.canProceedToStep2).toBe(true);
+    expect(result.current.isJoin).toBe(false);
+
+    act(() => {
+      result.current.setPassphrase("correct horse battery");
+      result.current.setDeviceName("Desktop");
+    });
+    expect(result.current.canSubmit).toBe(false);
+
+    act(() => result.current.setPassphraseConfirm("another horse battery"));
+    expect(result.current.passphraseMismatch).toBe(true);
+    expect(result.current.canSubmit).toBe(false);
+
+    act(() => result.current.setPassphraseConfirm("correct horse battery"));
+    await act(async () => {
+      await result.current.handleSubmit();
+    });
+    expect(result.current.confirmingStartOver).toBe(true);
+
+    await act(async () => {
+      await result.current.confirmStartOver();
+    });
+    expect(gateway.startSyncOver).toHaveBeenCalledWith(
+      "/home/user/sync",
+      "correct horse battery",
+      "Desktop",
+    );
+  });
+
+  it("TODO-066 — still refuses a folder whose format this build cannot read", async () => {
+    vi.mocked(gateway.inspectSyncFolder).mockResolvedValue({
+      status: "ok",
+      data: makeFolderState({
+        holds_portfolio: true,
+        format_readable: false,
+        data_format_version: 9,
+        installation_holds_user_data: true,
+      }),
+    });
+
+    const { result } = renderHook(() => useEnableSyncModal({ variant: "start-over" }));
+    await act(async () => {
+      await result.current.setFolder("/home/user/sync");
+    });
+
+    expect(result.current.folderError?.key).toBe("sync.errors.UpdateRequired");
+    expect(result.current.canProceedToStep2).toBe(false);
+  });
 });

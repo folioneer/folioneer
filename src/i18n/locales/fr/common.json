@@ -338,6 +338,7 @@
       "folder_hint": "Un dossier synchronisé par votre client cloud (Dropbox, Drive, Syncthing…) ou sur une clé USB que vous transportez entre vos ordinateurs. L'application ne se connecte jamais à internet.",
       "first_device_wording": "Ce dossier ne contient pas encore de portefeuille. Choisissez une phrase secrète : les autres ordinateurs en auront besoin pour rejoindre.",
       "join_wording": "Ce dossier contient déjà un portefeuille. Saisissez sa phrase secrète pour le rejoindre depuis cette installation vierge.",
+      "start_over_wording": "Ce dossier contient déjà un portefeuille. Choisissez une nouvelle phrase secrète de synchronisation : la copie publiée sera remplacée par le portefeuille de cet ordinateur.",
       "passphrase_label": "Phrase secrète de synchronisation",
       "passphrase_confirm_label": "Confirmer la phrase secrète",
       "passphrase_too_short": "Au moins 12 caractères.",

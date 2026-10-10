@@ -338,6 +338,7 @@
       "folder_hint": "A folder synchronised by your cloud client (Dropbox, Drive, Syncthing…) or on a USB key you carry between computers. The application never connects to the internet.",
       "first_device_wording": "This folder holds no portfolio yet. Choose a sync passphrase: other computers will need it to join.",
       "join_wording": "This folder already holds a portfolio. Enter its sync passphrase to join from this fresh installation.",
+      "start_over_wording": "This folder already holds a portfolio. Choose a new sync passphrase: the published copy will be replaced by this computer's portfolio.",
       "passphrase_label": "Sync passphrase",
       "passphrase_confirm_label": "Confirm passphrase",
       "passphrase_too_short": "At least 12 characters.",

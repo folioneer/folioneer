@@ -18,8 +18,7 @@
 <!-- takes the first ready one, removes a reference when it closes the entry (order and -->
 <!-- additions are the human's), and stops when the queue is empty. -->
 
-1. TODO-066
-2. DEBT-088
+1. DEBT-088
 
 ## TODO-009 — (fullstack) — A per-account analysis view: target price, horizon and reasoning on each holding
 
@@ -118,17 +117,6 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 - [ ] Are management fees part of this report, or a separate one? (Recommended: part of it — income without the cost of holding tells half the story, and the data is already there.)
 - [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
 - [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
-
-## TODO-066 — (frontend) — "Start over" on the sync page cannot be completed
-
-Found on 2026-10-10 by the spec check of multi-device sync before the 0.7.0 release, and confirmed by reading the dialog's code; not run. "Start over" (SYN-071) re-creates the portfolio in the sync folder under a new passphrase: it is the way to change a passphrase and the way out of a forgotten one (SYN-053). Its dialog reuses the "enable sync" dialog, whose folder check refuses a folder that holds a portfolio when this computer holds data (`folderStateError` in `src/features/settings/sync/enable_modal/useEnableSyncModal.ts` does not look at which of the two it is opened for). Starting over is exactly that case, so "Next" stays disabled and the confirmation is never reached. The core does it correctly when asked (`tests/sync_first_publish.rs`). The tests of the dialog only cover a folder that holds no portfolio, and the E2E suite skips starting over. Older than the 0.7.0 batch.
-
-**User value:** A user changes the sync passphrase, or recovers from a forgotten one, from the sync page.
-**Done when:** opened to start over, the dialog accepts the folder that holds the portfolio, asks for the new passphrase twice, and reaches the confirmation that says every published file will be discarded and every other computer will have to rejoin; a test covers that path on a computer that holds data; the E2E suite starts over once.
-**Design:** none
-**Open questions:**
-
-- [x] Which sentence opens the passphrase step when starting over? The two that exist are both false there. — A new one (owner, 2026-10-10): "This folder already holds a portfolio. Choose a new sync passphrase: the published copy will be replaced by this computer's portfolio." / « Ce dossier contient déjà un portefeuille. Choisissez une nouvelle phrase secrète de synchronisation : la copie publiée sera remplacée par le portefeuille de cet ordinateur. » (the French follows the words the dialog already uses for the passphrase).
 
 ## TODO-059 — (backend) — An agent records the rest of an account's past: deposits, withdrawals, dividends, prices
 
