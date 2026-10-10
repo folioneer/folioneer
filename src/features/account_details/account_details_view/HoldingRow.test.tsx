@@ -120,6 +120,30 @@ describe("HoldingRow — price cell (MKT-030, MKT-140, MKT-142)", () => {
     expect(container.querySelector("#holding-fee-rate-asset-1")).toBeNull();
   });
 
+  // FEE-011 — the row offers "Manage fee" only when it is given a handler (the view gives
+  // none when the account's parameter is off, FEE-076: AccountDetailsView.test.tsx)
+  it("offers the Manage fee action only when a handler is given", () => {
+    const row = (onManageFee?: () => void) => (
+      <table>
+        <tbody>
+          <HoldingRow
+            row={baseRow}
+            accountId="account-1"
+            onBuy={vi.fn()}
+            onSell={vi.fn()}
+            onPriceHistory={vi.fn()}
+            onManageFee={onManageFee}
+          />
+        </tbody>
+      </table>
+    );
+    const off = render(row());
+    expect(off.container.querySelector("#action-manage-fee-asset-1")).toBeNull();
+    off.unmount();
+    const on = render(row(vi.fn()));
+    expect(on.container.querySelector("#action-manage-fee-asset-1")).not.toBeNull();
+  });
+
   // FEE-076 — the fees cell is absent when the account has the mechanism disabled
   it("omits the management fees cell when showManagementFees is false", () => {
     const { container } = render(

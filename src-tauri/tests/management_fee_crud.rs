@@ -523,3 +523,281 @@ async fn fee_029_preview_reports_held_removed_and_percentage_without_writing() {
         "FEE-029: a preview writes nothing"
     );
 }
+
+fn code<E: serde::Serialize>(error: &E) -> String {
+    serde_json::to_value(error).unwrap()["code"]
+        .as_str()
+        .expect("a code")
+        .to_string()
+}
+
+/// FEE-012 — a fee on an asset or an account that does not exist is refused with the
+/// code that says which.
+#[tokio::test]
+async fn fee_012_an_unknown_asset_or_account_is_refused() {
+    let ctx = build_ctx().await;
+    let (account, asset_id) = account_holding(&ctx, micro(25)).await;
+
+    let unknown_asset = ctx
+        .use_case
+        .record_management_fee(
+            &account.id,
+            "no-such-asset".to_string(),
+            "2024-06-15".to_string(),
+            micro(1),
+            None,
+        )
+        .await
+        .expect_err("an unknown asset");
+    let unknown_account = ctx
+        .use_case
+        .record_management_fee(
+            "no-such-account",
+            asset_id,
+            "2024-06-15".to_string(),
+            micro(1),
+            None,
+        )
+        .await
+        .expect_err("an unknown account");
+
+    assert_eq!(code(&unknown_asset), "AssetNotFound");
+    assert_eq!(code(&unknown_account), "AccountNotFound");
+}
+
+/// FEE-021 — a date in the future, before the lower bound, or that is no date is refused
+/// on recording, and the lower bound is refused by the preview too.
+#[tokio::test]
+async fn fee_021_a_date_outside_its_bounds_is_refused() {
+    let ctx = build_ctx().await;
+    let (account, asset_id) = account_holding(&ctx, micro(25)).await;
+
+    for (date, expected) in [
+        ("2999-01-01", "DateInFuture"),
+        ("1899-12-31", "DateTooOld"),
+        ("not-a-date", "InvalidDate"),
+    ] {
+        let error = ctx
+            .use_case
+            .record_management_fee(
+                &account.id,
+                asset_id.clone(),
+                date.to_string(),
+                micro(1),
+                None,
+            )
+            .await
+            .expect_err("a date outside the bounds");
+        assert_eq!(code(&error), expected, "{date}");
+    }
+    let previewed = ctx
+        .use_case
+        .preview_management_fee(&account.id, asset_id, "1899-12-31".to_string(), 0)
+        .await
+        .expect_err("a date before the lower bound");
+    assert_eq!(code(&previewed), "DateTooOld");
+}
+
+/// FEE-022 (a) — a percentage whose removal floors to nothing is refused, and removes
+/// nothing.
+#[tokio::test]
+async fn fee_022_a_percentage_that_removes_nothing_is_refused() {
+    let ctx = build_ctx().await;
+    // 25 micro-units: 1 % of them floors to zero.
+    let (account, asset_id) = account_holding(&ctx, 25).await;
+
+    let error = ctx
+        .use_case
+        .record_management_fee(
+            &account.id,
+            asset_id.clone(),
+            "2024-06-15".to_string(),
+            micro(1),
+            None,
+        )
+        .await
+        .expect_err("a removal of zero");
+
+    assert_eq!(code(&error), "QuantityNotPositive");
+    let holding = ctx
+        .account_service
+        .get_holding_by_account_asset(&account.id, &asset_id)
+        .await
+        .unwrap()
+        .expect("the holding exists");
+    assert_eq!(holding.quantity, 25);
+}
+
+/// FEE-029 — the preview refuses what the recording refuses: an unknown account or
+/// asset, an asset that is not held, the cash line, and an account whose parameter is off.
+#[tokio::test]
+async fn fee_029_the_preview_refuses_what_the_recording_refuses() {
+    let ctx = build_ctx().await;
+    let (account, asset_id) = account_holding(&ctx, micro(25)).await;
+    let not_held = ctx
+        .asset_service
+        .create_asset(stocks_asset_dto("OTHER", "OTHER", "USD"))
+        .await
+        .unwrap();
+    let preview = |account_id: String, asset: String| {
+        let use_case = &ctx.use_case;
+        async move {
+            let refused = use_case
+                .preview_management_fee(&account_id, asset, "2024-06-15".to_string(), 0)
+                .await
+                .expect_err("refused");
+            code(&refused)
+        }
+    };
+
+    assert_eq!(
+        preview("no-such-account".to_string(), asset_id.clone()).await,
+        "AccountNotFound"
+    );
+    assert_eq!(
+        preview(account.id.clone(), "no-such-asset".to_string()).await,
+        "AssetNotFound"
+    );
+    assert_eq!(
+        preview(account.id.clone(), not_held.id.clone()).await,
+        "AssetNotHeld"
+    );
+    assert_eq!(
+        preview(account.id.clone(), "system-cash-usd".to_string()).await,
+        "ManagementFeeOnCashAsset"
+    );
+
+    ctx.account_service
+        .update(
+            account.id.clone(),
+            account.name.clone(),
+            String::new(),
+            account.currency.clone(),
+            account.update_frequency,
+            false,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        preview(account.id.clone(), asset_id).await,
+        "ManagementFeesDisabled"
+    );
+}
+
+/// FEE-063 — a recorded deduction is edited and deleted through the replay: its date and
+/// note change and its quantity stays; an edit that would starve a later sale is refused;
+/// deleting it gives the shares back.
+#[tokio::test]
+async fn fee_063_a_deduction_is_edited_and_deleted_through_the_replay() {
+    let ctx = build_ctx().await;
+    let (account, asset_id) = account_holding(&ctx, micro(25)).await;
+    // 10 % of 25 removes 2.5; the sale then takes the 22.5 that are left.
+    let fee = ctx
+        .use_case
+        .record_management_fee(
+            &account.id,
+            asset_id.clone(),
+            "2024-06-15".to_string(),
+            micro(10),
+            None,
+        )
+        .await
+        .unwrap();
+    ctx.use_case
+        .sell_holding(
+            &account.id,
+            asset_id.clone(),
+            "2024-09-01".to_string(),
+            22_500_000,
+            micro(60),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+    let edited = ctx
+        .account_service
+        .correct_transaction(
+            &account.id,
+            &fee.id,
+            "2024-07-01".to_string(),
+            fee.quantity,
+            0,
+            micro(1),
+            0,
+            None,
+            Some("TER".to_string()),
+        )
+        .await
+        .expect("a date and a note are edited");
+    assert_eq!(edited.date, "2024-07-01");
+    assert_eq!(edited.note.as_deref(), Some("TER"));
+    assert_eq!(edited.quantity, 2_500_000);
+    assert_eq!(edited.asset_id, asset_id);
+
+    let refused = ctx
+        .account_service
+        .correct_transaction(
+            &account.id,
+            &fee.id,
+            "2024-07-01".to_string(),
+            micro(3),
+            0,
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .expect_err("removing more starves the sale");
+    assert_eq!(code(&refused), "CascadingOversell");
+
+    ctx.account_service
+        .cancel_transaction(&account.id, &fee.id)
+        .await
+        .expect("a deletion is always replay-safe");
+    let holding = ctx
+        .account_service
+        .get_holding_by_account_asset(&account.id, &asset_id)
+        .await
+        .unwrap()
+        .expect("the holding exists");
+    assert_eq!(holding.quantity, 2_500_000, "the removed shares are back");
+}
+
+/// FEE-075 — an account that existed before the parameter keeps its fees: what is checked
+/// is the value the migration gives a row written without the column. A new account
+/// starts with them off.
+#[tokio::test]
+async fn fee_075_an_account_from_before_the_parameter_keeps_its_fees() {
+    let ctx = build_ctx().await;
+    let pool = make_pool().await;
+    sqlx::query(
+        "INSERT INTO accounts (id, name, update_frequency, currency) VALUES ('old', 'Old', 'ManualMonth', 'EUR')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (enabled,): (bool,) =
+        sqlx::query_as("SELECT management_fees_enabled FROM accounts WHERE id = 'old'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(enabled);
+
+    let created = ctx
+        .account_service
+        .create(
+            "New".to_string(),
+            String::new(),
+            "EUR".to_string(),
+            UpdateFrequency::ManualMonth,
+            false,
+        )
+        .await
+        .unwrap();
+    assert!(!created.management_fees_enabled);
+}

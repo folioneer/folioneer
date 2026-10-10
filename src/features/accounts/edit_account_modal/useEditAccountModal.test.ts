@@ -132,3 +132,30 @@ describe("useEditAccountModal — bank name (ACC-026)", () => {
     );
   });
 });
+
+describe("useEditAccountModal — management fees parameter (FEE-075)", () => {
+  beforeEach(() => {
+    mockUpdateAccount.mockReset();
+  });
+
+  it("prefills the parameter from the account and sends its new value on submit", async () => {
+    const withFees: Account = { ...mockAccount, management_fees_enabled: true };
+    mockUpdateAccount.mockResolvedValue({ data: withFees, error: null });
+    const onClose = vi.fn();
+    const { result } = renderHook(() => useEditAccountModal({ account: withFees, onClose }));
+    expect(result.current.formData.management_fees_enabled).toBe(true);
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: "management_fees_enabled", type: "checkbox", checked: false, value: "on" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+
+    expect(mockUpdateAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "account-1", management_fees_enabled: false }),
+    );
+  });
+});

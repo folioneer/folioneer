@@ -568,6 +568,22 @@ describe("AccountDetailsView — management fees (FEE-010/011/053)", () => {
     expect(screen.queryByText("account_details.column_management_fees")).toBeNull();
   });
 
+  // FEE-076 — the rows get the "Manage fee" handler only when the account has fees enabled
+  it("gives the rows a Manage fee handler only for an account with fees enabled (FEE-076)", () => {
+    const holdings = [{ assetId: "a1" }];
+    rowProps.length = 0;
+    mockUseAccountDetailsView.mockReturnValue(makeView({ holdings }));
+    render(<AccountDetailsView />);
+    expect(rowProps.length).toBeGreaterThan(0);
+    expect(rowProps.every((props) => typeof props.onManageFee === "function")).toBe(true);
+
+    rowProps.length = 0;
+    mockUseAccountDetailsView.mockReturnValue(makeView({ holdings, managementFeesEnabled: false }));
+    render(<AccountDetailsView />);
+    expect(rowProps.length).toBeGreaterThan(0);
+    expect(rowProps.every((props) => props.onManageFee === undefined)).toBe(true);
+  });
+
   // FEE-076 — an enabled account keeps the fee column header
   it("shows the Management Fees column header when the account has fees enabled (FEE-076)", () => {
     render(<AccountDetailsView />);

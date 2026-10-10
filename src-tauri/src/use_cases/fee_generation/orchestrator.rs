@@ -380,9 +380,9 @@ mod tests {
         );
     }
 
-    // FEE-041 — apply_due_fee_deductions generates one deduction per completed period.
+    // FEE-040 — at launch, the completed periods of an active schedule are generated.
     #[tokio::test]
-    async fn fee_041_generates_one_deduction_per_completed_period() {
+    async fn fee_040_completed_periods_are_generated_at_launch() {
         let pool = setup_pool().await;
         let account_svc = make_account_service(&pool);
         let asset_svc = make_asset_service(&pool);
@@ -439,7 +439,7 @@ mod tests {
             .iter()
             .filter(|t| t.transaction_type == TransactionType::ManagementFee)
             .collect();
-        // FEE-041 — one deduction per completed period.
+        // FEE-040 — the periods completed since the schedule started are generated.
         assert!(
             !fee_txs.is_empty(),
             "at least one ManagementFee transaction must be created for completed periods"
@@ -569,9 +569,9 @@ mod tests {
         );
     }
 
-    // FEE-047 — period where holding qty is 0 is skipped (not an error).
+    // FEE-070 — a period with nothing held is skipped (not an error).
     #[tokio::test]
-    async fn fee_047_zero_holding_quantity_skips_period() {
+    async fn fee_070_a_period_with_nothing_held_is_skipped() {
         let pool = setup_pool().await;
         let account_svc = make_account_service(&pool);
         let asset_svc = make_asset_service(&pool);
@@ -619,10 +619,10 @@ mod tests {
         );
     }
 
-    // FEE-070 — apply_due_fee_deductions is idempotent: re-running on the same
+    // FEE-043 — apply_due_fee_deductions is idempotent: re-running on the same
     // state produces no additional transactions.
     #[tokio::test]
-    async fn fee_070_apply_due_fee_deductions_is_idempotent() {
+    async fn fee_043_a_second_run_generates_nothing_more() {
         let pool = setup_pool().await;
         let account_svc = make_account_service(&pool);
         let asset_svc = make_asset_service(&pool);
@@ -1335,6 +1335,386 @@ mod tests {
             vec!["2024-06-30", "2024-07-31"],
             "January to May are not charged"
         );
+    }
+
+    /// An account with management fees on, cash, 100 shares bought on 2024-01-01 and a
+    /// monthly schedule of 12 % a year from that day.
+    async fn scheduled_account(
+        pool: &sqlx::Pool<sqlx::Sqlite>,
+        name: &str,
+    ) -> (Arc<AccountService>, Account, String) {
+        let account_svc = make_account_service(pool);
+        let asset_svc = make_asset_service(pool);
+        let stock_id = seed_stock(&asset_svc).await;
+        let account = account_svc
+            .create(
+                name.to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .unwrap();
+        let account = enable_management_fees(&account_svc, &account).await;
+        seed_cash(pool, &account_svc, &account.id).await;
+        account_svc
+            .buy_holding(
+                &account.id,
+                stock_id.clone(),
+                "2024-01-01".to_string(),
+                micro(100),
+                micro(50),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        account_svc
+            .create_fee_schedule(
+                &account.id,
+                stock_id.clone(),
+                12_000_000,
+                FeeFrequency::Monthly,
+                "2024-01-01".to_string(),
+                None,
+            )
+            .await
+            .unwrap();
+        (account_svc, account, stock_id)
+    }
+
+    /// Generates the schedule's due periods as of `today`.
+    async fn generate(
+        account_svc: &Arc<AccountService>,
+        account: &Account,
+        stock_id: &str,
+        today: (i32, u32, u32),
+    ) {
+        let schedule = account_svc
+            .get_fee_schedule(&account.id, stock_id)
+            .await
+            .unwrap()
+            .expect("schedule");
+        let today = chrono::NaiveDate::from_ymd_opt(today.0, today.1, today.2).expect("valid date");
+        FeeGenerationOrchestrator::new(account_svc.clone())
+            .apply_schedule(&schedule, today)
+            .await
+            .unwrap();
+    }
+
+    /// The fee deductions of the account, oldest first.
+    async fn deductions(
+        account_svc: &AccountService,
+        account: &Account,
+    ) -> Vec<crate::context::account::Transaction> {
+        let mut fees: Vec<_> = account_svc
+            .get_all_transactions_for_account(&account.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|t| t.transaction_type == TransactionType::ManagementFee)
+            .collect();
+        fees.sort_by(|a, b| a.date.cmp(&b.date));
+        fees
+    }
+
+    // FEE-043 / FEE-063 — a generated deduction the user edits or deletes is not generated
+    // again: the cursor stays where it was.
+    #[tokio::test]
+    async fn fee_043_a_deleted_or_edited_generated_deduction_is_not_generated_again() {
+        let pool = setup_pool().await;
+        let (account_svc, account, stock_id) = scheduled_account(&pool, "FEE-043-deleted").await;
+        generate(&account_svc, &account, &stock_id, (2024, 3, 15)).await;
+        let generated = deductions(&account_svc, &account).await;
+        assert_eq!(
+            generated
+                .iter()
+                .map(|t| t.date.as_str())
+                .collect::<Vec<_>>(),
+            vec!["2024-01-31", "2024-02-29"]
+        );
+
+        account_svc
+            .cancel_transaction(&account.id, &generated[0].id)
+            .await
+            .unwrap();
+        account_svc
+            .correct_transaction(
+                &account.id,
+                &generated[1].id,
+                "2024-02-28".to_string(),
+                generated[1].quantity,
+                0,
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        generate(&account_svc, &account, &stock_id, (2024, 3, 15)).await;
+
+        assert_eq!(
+            deductions(&account_svc, &account)
+                .await
+                .iter()
+                .map(|t| t.date.as_str())
+                .collect::<Vec<_>>(),
+            vec!["2024-02-28"],
+            "nothing is generated again"
+        );
+        let schedule = account_svc
+            .get_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap()
+            .expect("schedule");
+        assert_eq!(schedule.last_applied_period.as_deref(), Some("2024-02-29"));
+    }
+
+    // FEE-062 — deleting a schedule stops generation and leaves what it generated.
+    #[tokio::test]
+    async fn fee_062_generated_deductions_remain_after_the_schedule_is_deleted() {
+        let pool = setup_pool().await;
+        let (account_svc, account, stock_id) = scheduled_account(&pool, "FEE-062").await;
+        generate(&account_svc, &account, &stock_id, (2024, 3, 15)).await;
+
+        account_svc
+            .delete_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap();
+
+        assert_eq!(deductions(&account_svc, &account).await.len(), 2);
+        assert!(account_svc
+            .get_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap()
+            .is_none());
+        assert!(account_svc
+            .list_active_fee_schedules()
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    // FEE-070 — while nothing is held the schedule charges nothing and stays active; it
+    // resumes by itself once the asset is held again.
+    #[tokio::test]
+    async fn fee_070_the_schedule_stays_active_and_resumes_when_the_asset_is_held_again() {
+        let pool = setup_pool().await;
+        let (account_svc, account, stock_id) = scheduled_account(&pool, "FEE-070-resumes").await;
+        account_svc
+            .sell_holding(
+                &account.id,
+                stock_id.clone(),
+                "2024-01-20".to_string(),
+                micro(100),
+                micro(60),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        generate(&account_svc, &account, &stock_id, (2024, 3, 15)).await;
+        assert!(deductions(&account_svc, &account).await.is_empty());
+        let schedule = account_svc
+            .get_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap()
+            .expect("schedule");
+        assert!(schedule.active);
+
+        account_svc
+            .buy_holding(
+                &account.id,
+                stock_id.clone(),
+                "2024-03-20".to_string(),
+                micro(100),
+                micro(50),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        generate(&account_svc, &account, &stock_id, (2024, 4, 15)).await;
+
+        assert_eq!(
+            deductions(&account_svc, &account)
+                .await
+                .iter()
+                .map(|t| (t.date.as_str(), t.quantity))
+                .collect::<Vec<_>>(),
+            vec![("2024-03-31", micro(1))]
+        );
+    }
+
+    // FEE-077 — with the account's parameter off, a schedule that exists stays readable,
+    // editable and deletable; only creating one is refused.
+    #[tokio::test]
+    async fn fee_077_a_schedule_stays_editable_and_deletable_with_the_parameter_off() {
+        let pool = setup_pool().await;
+        let (account_svc, account, stock_id) = scheduled_account(&pool, "FEE-077-off").await;
+        account_svc
+            .update(
+                account.id.clone(),
+                account.name.clone(),
+                String::new(),
+                account.currency.clone(),
+                account.update_frequency,
+                false,
+            )
+            .await
+            .unwrap();
+
+        let edited = account_svc
+            .update_fee_schedule(&account.id, &stock_id, 6_000_000, None, true)
+            .await
+            .expect("editable");
+        assert_eq!(edited.annual_rate_percent_micros, 6_000_000);
+        assert!(account_svc
+            .get_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap()
+            .is_some());
+        account_svc
+            .delete_fee_schedule(&account.id, &stock_id)
+            .await
+            .expect("deletable");
+        let refused = account_svc
+            .create_fee_schedule(
+                &account.id,
+                stock_id.clone(),
+                12_000_000,
+                FeeFrequency::Monthly,
+                "2024-01-01".to_string(),
+                None,
+            )
+            .await
+            .expect_err("creating is refused");
+        assert!(
+            matches!(refused, AccountError::ManagementFeesDisabled),
+            "{refused:?}"
+        );
+    }
+
+    // FEE-032 — an edit is refused for a rate that is not positive or an end date not
+    // after the start; a schedule is refused for an unknown account, and accepted whatever
+    // its asset is — here the cash line, which is never charged.
+    #[tokio::test]
+    async fn fee_032_what_a_schedule_refuses_on_edit_and_on_creation() {
+        let pool = setup_pool().await;
+        let (account_svc, account, stock_id) = scheduled_account(&pool, "FEE-032").await;
+
+        let rate = account_svc
+            .update_fee_schedule(&account.id, &stock_id, 0, None, true)
+            .await
+            .expect_err("a rate of zero");
+        let end = account_svc
+            .update_fee_schedule(
+                &account.id,
+                &stock_id,
+                12_000_000,
+                Some("2024-01-01".to_string()),
+                true,
+            )
+            .await
+            .expect_err("an end date on the start date");
+        let unknown_account = account_svc
+            .create_fee_schedule(
+                "no-such-account",
+                stock_id.clone(),
+                12_000_000,
+                FeeFrequency::Monthly,
+                "2024-01-01".to_string(),
+                None,
+            )
+            .await
+            .expect_err("an unknown account");
+        let any_asset = account_svc
+            .create_fee_schedule(
+                &account.id,
+                "system-cash-eur".to_string(),
+                12_000_000,
+                FeeFrequency::Monthly,
+                "2024-01-01".to_string(),
+                None,
+            )
+            .await;
+
+        assert!(matches!(rate, AccountError::RateNotPositive), "{rate:?}");
+        assert!(matches!(end, AccountError::EndBeforeStart), "{end:?}");
+        assert!(
+            matches!(unknown_account, AccountError::AccountNotFound { .. }),
+            "{unknown_account:?}"
+        );
+        assert!(any_asset.is_ok(), "{any_asset:?}");
+    }
+
+    // FEE-064 — creating, editing, pausing, reactivating and deleting a schedule each
+    // announce that the fee schedules changed.
+    #[tokio::test]
+    async fn fee_064_every_change_of_a_schedule_is_announced() {
+        use crate::core::{Event, SideEffectEventBus};
+        let pool = setup_pool().await;
+        let (_, account, stock_id) = scheduled_account(&pool, "FEE-064").await;
+        let bus = Arc::new(SideEffectEventBus::new());
+        let account_svc = AccountService::new(
+            Box::new(SqliteAccountRepository::new(pool.clone())),
+            Box::new(SqliteHoldingRepository::new(pool.clone())),
+            Box::new(SqliteTransactionRepository::new(pool.clone())),
+        )
+        .with_fee_schedule_repo(Box::new(SqliteFeeScheduleRepository::new(pool.clone())))
+        .with_fee_catch_up_repo(Box::new(SqliteFeeCatchUpRepository::new(pool.clone())))
+        .with_event_bus(Arc::clone(&bus));
+        let mut announced = bus.subscribe();
+        let mut heard = |what: &'static str| {
+            let changed = announced.has_changed().expect("the bus lives");
+            assert!(changed, "{what} is not announced");
+            assert_eq!(
+                *announced.borrow_and_update(),
+                Event::FeeScheduleUpdated,
+                "{what}"
+            );
+        };
+
+        account_svc
+            .update_fee_schedule(&account.id, &stock_id, 6_000_000, None, true)
+            .await
+            .unwrap();
+        heard("an edit");
+        account_svc
+            .update_fee_schedule(&account.id, &stock_id, 6_000_000, None, false)
+            .await
+            .unwrap();
+        heard("a pause");
+        account_svc
+            .update_fee_schedule(&account.id, &stock_id, 6_000_000, None, true)
+            .await
+            .unwrap();
+        heard("a reactivation");
+        account_svc
+            .delete_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap();
+        heard("a deletion");
+        account_svc
+            .create_fee_schedule(
+                &account.id,
+                stock_id.clone(),
+                12_000_000,
+                FeeFrequency::Monthly,
+                "2024-01-01".to_string(),
+                None,
+            )
+            .await
+            .unwrap();
+        heard("a creation");
     }
 
     // FEE-078 — schedules of a disabled account are paused (skipped, cursor
