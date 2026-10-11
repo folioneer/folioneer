@@ -140,7 +140,20 @@ mod tests {
 
     const M: i64 = 1_000_000;
 
+    /// An empty folder of its own for one test. The tests run side by side in one process:
+    /// a name taken twice would have one test empty the folder under the other, so it is
+    /// refused here, every time, rather than failing one run in many.
     fn fresh_dir(name: &str) -> PathBuf {
+        static TAKEN: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+        let mut taken = TAKEN
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        assert!(
+            !taken.iter().any(|seen| seen == name),
+            "two tests share the folder \"{name}\": give each its own name"
+        );
+        taken.push(name.to_string());
+        drop(taken);
         let dir = std::env::temp_dir().join(format!("folioneer-cli-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("temp dir");
@@ -322,7 +335,7 @@ mod tests {
     // are refused with the window's codes, and nothing is written.
     #[tokio::test]
     async fn cli_027_records_cash_and_a_dividend_through_the_window_rules() {
-        let dir = portfolio("cash").await;
+        let dir = portfolio("cash-and-dividend").await;
 
         let deposited = run_line(
             &dir,
