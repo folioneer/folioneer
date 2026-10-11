@@ -11,9 +11,9 @@ SCRIPT = Path(__file__).resolve().parents[1] / "coverage-preflight.sh"
 GIB = 1024 * 1024
 
 
-def preflight(total_kib, foreground=None, meminfo_text=None):
+def preflight(total_kib, foreground=None, meminfo_text=None, numeric_locale=None):
     """Runs the preflight with no terminal attached (its output is captured) on a
-    machine whose memory is `total_kib`."""
+    machine whose memory is `total_kib`, under `numeric_locale` when one is given."""
     with tempfile.NamedTemporaryFile("w", suffix="-meminfo", delete=False) as meminfo:
         meminfo.write(
             meminfo_text
@@ -24,6 +24,9 @@ def preflight(total_kib, foreground=None, meminfo_text=None):
     env["HARNESS_MEMINFO"] = meminfo.name
     if foreground is not None:
         env["HARNESS_FOREGROUND"] = foreground
+    if numeric_locale is not None:
+        env.pop("LC_ALL", None)
+        env["LC_NUMERIC"] = numeric_locale
     try:
         return subprocess.run(
             ["bash", str(SCRIPT)], env=env, capture_output=True, text=True, check=False
@@ -43,6 +46,10 @@ class CoveragePreflight(unittest.TestCase):
 
     def test_the_message_states_the_memory_it_read(self):
         self.assertIn("7.0 GiB of memory", preflight(7302520).stderr)
+
+    def test_the_figure_reads_the_same_where_the_decimal_mark_is_a_comma(self):
+        refused = preflight(7302520, numeric_locale="fr_FR.UTF-8")
+        self.assertIn("7.0 GiB of memory", refused.stderr)
 
     def test_a_foreground_run_without_a_terminal_says_so_and_goes(self):
         allowed = preflight(7302520, foreground="1")

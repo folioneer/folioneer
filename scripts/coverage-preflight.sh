@@ -25,7 +25,8 @@ case "$total_kib" in
 esac
 [ "$total_kib" -gt "$limit_kib" ] && exit 0
 
-total_gib=$(awk -v kib="$total_kib" 'BEGIN { printf "%.1f", kib / 1024 / 1024 }')
+# The C locale: the decimal mark is a dot whatever the machine's number format.
+total_gib=$(LC_ALL=C awk -v kib="$total_kib" 'BEGIN { printf "%.1f", kib / 1024 / 1024 }')
 cat >&2 <<MESSAGE
 harness --coverage: refused — no terminal is attached and this machine has $total_gib GiB of memory.
 Detached, the coverage build is stopped for lack of memory before it gives a verdict.
