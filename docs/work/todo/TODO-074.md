@@ -8,4 +8,6 @@ A read tool, `list_transactions`: an account, and optionally an asset, a range o
 **User value:** An agent does not record a transaction twice, and finds the id to correct or cancel without asking the owner.
 **Done when:** the tool lists an account's transactions with those filters, oldest first, in pages; each says who recorded it, read from the mark (AGT-045); it counts as a read, never as a recording, and says it only reads once tools say so (TODO-065); the program started with `--mcp` lists it.
 **Design:** none
-**Open questions:** none
+**Open questions:**
+
+- [x] The connection dialog says what a yes lets an agent read — "read your accounts, assets, holdings and totals;": what does it say once an agent lists transactions? — It names them: "read your accounts, assets, holdings, transactions, prices and totals;" ("lire vos comptes, vos actifs, vos positions, vos transactions, vos prix et vos totaux ;"). This entry adds "transactions" ("vos transactions") to the line, to AGT-032 and to the README; TODO-075 adds "prices" (owner, 2026-10-11).

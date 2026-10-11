@@ -8,4 +8,6 @@ A read tool, `get_price`: an asset and a date; the price at that date or the clo
 **User value:** An agent compares the application's valuation with a statement and sees a missing or a doubtful price before relying on it.
 **Done when:** the tool answers the price at the date or the closest earlier one, with its date and its source; it says plainly when the asset has no price up to that date; it counts as a read and says it only reads once tools say so (TODO-065); the program started with `--mcp` lists it.
 **Design:** none
-**Open questions:** none
+**Open questions:**
+
+- [x] The connection dialog says what a yes lets an agent read — "read your accounts, assets, holdings and totals;": what does it say once an agent reads prices? — It names them: "read your accounts, assets, holdings, transactions, prices and totals;" ("lire vos comptes, vos actifs, vos positions, vos transactions, vos prix et vos totaux ;"). This entry adds "prices" ("vos prix") to the line, to AGT-032 and to the README; TODO-074 adds "transactions" (owner, 2026-10-11).
