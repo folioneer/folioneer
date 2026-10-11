@@ -21,3 +21,9 @@
   random (two tests sharing a temporary folder), and a binary on disk older than the code
   listed 12 tools of 13. Three things in one day that the daily harness and CI passed and
   that only the release, or a run of the built program, showed.
+- Decided (owner, 2026-10-11): the release's full validation runs at every hand-over of a
+  batch, before `main` is called ready. A recipe runs exactly what `just release`
+  validates — every test, the build, the full query check — and the hand-over of
+  `docs/workflow.md` § 3 and `/run-queue` step 4 run it; about four minutes a batch on
+  this machine. The weekly run in CI of the release workflow's own steps, the first
+  proposal above, is not taken for now.
