@@ -1,6 +1,7 @@
 # FLOW-036 — A release nobody audits afterwards leaves no figures
 
 - Kind: quality
+- Size: S — one pull request: a check of the queue script with its test.
 - Observed: 0.8.0 was released at the end of 2026-10-10 and no session followed it:
   `/prune` and `/flow-audit`, which `docs/workflow.md` § 3 asks for after a release, never
   ran. The 0.9.0 audit shows the 0.8.0 batch through the script only; every figure a

@@ -1,6 +1,7 @@
 # FLOW-037 — The opening reading missed what the entry puts on a screen and what an ADR says
 
 - Kind: quality + speed
+- Size: S — one pull request: the workflow, two skills and their tests.
 - Observed: in the 0.9.0 batch three questions reached the owner in mid-batch, all three
   of the kind the opening block exists to ask (`docs/workflow.md` § 3): the consent
   dialog named three kinds of recording where TODO-059 added four; "an agent's price

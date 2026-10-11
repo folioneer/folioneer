@@ -61,6 +61,11 @@ under them.
   entry is queued.
 - Order and additions are the human's. No pull request that ships an entry edits it, so
   two closures never meet in the file.
+- It is written in `/plan-queue` (owner, 2026-10-11): the proposal is refined with the
+  owner in conversation — the open questions answered, a design or a choice of code
+  aside; each entry sized; an entry too large split, what leaves staying ready for the
+  next queue — and, once the owner says it is decided, one pull request holds the
+  answers, the sizes, the entries split or filed, and the queue.
 - A queued reference whose entry file is gone has shipped, and a flow entry that is a
   verdict with no proposal is nothing to run: `just queue remaining` prints what is left. The agent takes the first remaining reference that is **ready**.
 - **Ready** means: queued, has a Done when, `Open questions: none`, and `Design` is

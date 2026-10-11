@@ -1,6 +1,7 @@
 # FLOW-038 — A queue is written without knowing how much it holds
 
 - Kind: speed + quality
+- Size: S — one pull request: the queue script, the entry check, two skills.
 - Observed: on 2026-10-11 the next queue was written with eleven entries and no figure
   for what they hold; asked whether each was sized, the agent had only an impression
   (small, medium, large). Counted afterwards by the rule of the owner's other repository,
@@ -24,9 +25,7 @@
   for the queue or enters it, so that the queue is not overloaded; `just rule-homes`
   requires a size on a queued entry only. That is a transition: once every entry carries
   a size, the check requires it of all, as in the other repository.
-- Sizes proposed for the queue as it stands, to write when this ships: FLOW-037 S,
-  TODO-071 M, DEBT-106 M, FLOW-011 S, FLOW-036 S, this entry M, TODO-074 M, TODO-075 M,
-  TODO-065 L, TODO-076 L, TODO-061 L, DEBT-113 M.
+- The entries of the queue written on 2026-10-11 carry their size already, set while the queue was refined with the owner; this entry was first called M, by its pieces, and is S by the rule — one pull request, one lane, nothing from the owner.
 - Costs: about two hours, with the tests of the sum and of the check; a line per entry
   when it is queued. Protects: a queue larger than a batch being found out halfway, and
   a release that waits on it.

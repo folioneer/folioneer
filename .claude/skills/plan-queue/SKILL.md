@@ -1,13 +1,14 @@
 ---
 name: plan-queue
-description: Shows the owner's queue, the entries ready to queue, the entries waiting on the owner's answers, the open pull requests with their CI state and the tech debt by theme, then proposes a queue order for the owner to accept or edit. Use at session start, or when the queue runs empty.
+description: Shows the owner's queue, the entries ready to queue, the entries waiting on the owner's answers, the open pull requests with their CI state and the tech debt by theme, proposes a queue order, refines it with the owner — answers, sizes, splits — and writes the queue the owner validated in one pull request. Use at session start, or when the queue runs empty.
 ---
 
 # Skill — `plan-queue`
 
 The owner sets the queue (`docs/work/queue.md`); the agent runs it (`/run-entry`). This
 skill shows what the owner needs to set it: what is queued, what could be, what waits on
-them — and proposes an order. It decides nothing and never edits the queue.
+them — proposes an order, refines it with them, and writes the queue they validated. It
+decides nothing: every line of the queue is the owner's word.
 
 ---
 
@@ -89,6 +90,30 @@ effort score: the order is the proposal, and the owner accepts or edits it.
 Print the output below, then save it to the path given by
 `bash scripts/report-path.sh plan-queue` with the Write tool.
 
+### Step 4 — Refine with the owner
+
+The proposal is a draft: it becomes the queue by being worked through with the owner, in
+the conversation, with no file edited meanwhile (owner, 2026-10-11).
+
+- **The questions**, one at a time, each with its context — what the thing is, where it
+  shows, what each answer changes — and a recommendation: those of
+  `### To answer before queueing`, and the open questions of an entry the owner wants in.
+  Not a design to validate, nor a choice of code: a design goes through its gate
+  (`docs/workflow.md` § 4) and keeps its entry out of this queue until it has.
+- **The sizes**, by the rule of `docs/workflow.md` § 2 — by facts, not by effort — for
+  every entry proposed, read in the entry and the code it touches; their sum in pull
+  requests beside what the last batches merged (`docs/work/audits.md`). Say when the
+  queue holds more than a batch.
+- **The splits**: an entry whose Done when holds clauses that ship apart, or two pull
+  requests of which one can wait, is proposed in parts — each part an entry with its own
+  Done when and size — and what leaves this queue stays ready for the next.
+
+### Step 5 — Write the queue
+
+When the owner says the queue is decided, and not before: one pull request holds all of
+it — the answers on their entries, the sizes, the entries split or filed, and
+`docs/work/queue.md` in the order validated. Docs only, merged on green.
+
 ---
 
 ## Output format
@@ -140,7 +165,8 @@ they are written by others.
 
 ## Rules
 
-1. **The owner sets the queue.** Never edit the queue; never start an entry from here.
+1. **The owner sets the queue.** It is written once, in Step 5, in the order the owner
+   validated, and never before they say it is decided; never start an entry from here.
 2. **Three lists, one proposal.** Every entry appears in exactly one of queued, ready or
    blocked.
 3. **Blocked means a named wait.** Each blocked entry shows the questions or the design

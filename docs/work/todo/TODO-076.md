@@ -4,6 +4,7 @@ From gh207 (owner, 2026-10-11). A recording dated in the past changes the cash a
 
 An option on every recording tool, `dry_run`: every check of the real recording runs, nothing is written, nothing is taken of the session's limit. The answer is the transaction as it would be recorded, or the refusal it would get, and the account's holdings and cash after it. Part of it exists: the core checks a purchase, a sale, an opening balance and a split without writing (`validate_draft`, `validate_opening_balance_draft`, `validate_stock_split_draft`); it has no such check for a deposit, a withdrawal, a dividend or a price, and none answers the holdings and the cash that would result.
 
+**Size:** L — two pull requests: the account as of a date with a recording in, computed without writing; then the option on every recording tool.
 **User value:** Claude shows the owner the exact result of a recording, or why it would be refused, before asking to go ahead.
 **Done when:** each recording tool takes `dry_run` and with it changes nothing — a test reads the portfolio before and after; a preview gives the refusal the real call gives; the answer holds the account's holdings and cash as of the recording's date, the recording in.
 **Design:** none

@@ -1,6 +1,7 @@
 # FLOW-011 — Parts of the harness run only on the day they matter
 
 - Kind: quality
+- Size: S — one pull request: a recipe and the hand-over's two rule lines.
 - Observed: CI floated on the latest Rust until a new lint broke `main` (DEBT-059, fixed);
   the visual reference went stale when the month changed (DEBT-060, fixed); the release
   workflow's Windows steps run only at a release; the golden portfolio had never been
