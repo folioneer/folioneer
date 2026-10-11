@@ -63,6 +63,10 @@ test-scripts:
 arch-check *ARGS:
     python3 scripts/arch-check.py {{ARGS}}
 
+# Rule homes and the agentic setup: every rule ID defined once, every skill, agent prompt, script and hook with its line in docs/agentic-setup.md
+rule-homes:
+    python3 scripts/rule-homes.py
+
 # The merge gate, locally, scoped to what moved (scripts/harness.sh): architecture rules always; lint, build and tests for the layers the diff touches; --coverage adds coverage and its floors
 harness *ARGS:
     bash scripts/harness.sh {{ARGS}}
@@ -105,9 +109,9 @@ watch-pr *ARGS:
     @python3 scripts/watch-pr.py "$@"
 
 # Run one ready entry of docs/todo.md § Next headless (docs/workflow.md § 9)
-next-todo:
-    @[ -f scripts/next-todo.sh ] || { echo "❌ scripts/next-todo.sh not found — restore it from git history"; exit 1; }
-    bash scripts/next-todo.sh
+run-entry:
+    @[ -f scripts/run-entry.sh ] || { echo "❌ scripts/run-entry.sh not found — restore it from git history"; exit 1; }
+    bash scripts/run-entry.sh
 
 # SQLX_OFFLINE=false forces online mode so `prepare` hits the dev DB even
 # though .cargo/config.toml sets SQLX_OFFLINE=true globally.

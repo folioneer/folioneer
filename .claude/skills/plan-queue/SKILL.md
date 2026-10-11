@@ -1,11 +1,11 @@
 ---
-name: whats-next
+name: plan-queue
 description: Shows the owner's queue, the entries ready to queue, the entries waiting on the owner's answers, the open pull requests with their CI state and the tech debt by theme, then proposes a queue order for the owner to accept or edit. Use at session start, or when the queue runs empty.
 ---
 
-# Skill — `whats-next`
+# Skill — `plan-queue`
 
-The owner sets the queue (`docs/todo.md` § Next); the agent runs it (`/next-todo`). This
+The owner sets the queue (`docs/todo.md` § Next); the agent runs it (`/run-entry`). This
 skill shows what the owner needs to set it: what is queued, what could be, what waits on
 them — and proposes an order. It decides nothing and never edits § Next.
 
@@ -30,7 +30,7 @@ them — and proposes an order. It decides nothing and never edits § Next.
 ### Step 1 — Collect
 
 ```bash
-python3 scripts/whats-next.py
+python3 scripts/work-queue.py
 ```
 
 One JSON document:
@@ -84,7 +84,7 @@ effort score: the order is the proposal, and the owner accepts or edits it.
 ### Step 3 — Output and save
 
 Print the output below, then save it to the path given by
-`bash scripts/report-path.sh whats-next` with the Write tool.
+`bash scripts/report-path.sh plan-queue` with the Write tool.
 
 ---
 

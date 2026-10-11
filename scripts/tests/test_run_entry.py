@@ -1,11 +1,11 @@
-"""Tests for scripts/next-todo.sh (TODO-049) — run with `just test-scripts`."""
+"""Tests for scripts/run-entry.sh (TODO-049) — run with `just test-scripts`."""
 
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[1] / "next-todo.sh"
+SCRIPT = Path(__file__).resolve().parents[1] / "run-entry.sh"
 
 TODO = """# TODO
 

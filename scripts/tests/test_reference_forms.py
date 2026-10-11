@@ -56,7 +56,7 @@ class ReferenceForms(unittest.TestCase):
         for path in (
             "docs/todo.md",
             "src-tauri/src/lib.rs",
-            "scripts/whats-next.py",
+            "scripts/work-queue.py",
             "licence-allowlist.json",
         ):
             self.assertTrue(reference_forms.checked(path), path)

@@ -1,10 +1,10 @@
 ---
-name: next-todo
+name: run-entry
 description: Runs the first ready entry of the human's Next queue in docs/todo.md end to end under the project workflow — branch, design gate, acceptance tests, implementation, harness, reviewers, PR, merge on green, closure — without asking the human anything; questions go into the entry. Use to advance the backlog autonomously, one entry per invocation.
 argument-hint: "[TODO-NNN | DEBT-NNN]"
 ---
 
-# Skill — `next-todo`
+# Skill — `run-entry`
 
 One invocation, one entry, from `docs/todo.md` § Next to a merged pull request. The
 rules are `docs/workflow.md`; this file is the checklist.
@@ -13,7 +13,7 @@ rules are `docs/workflow.md`; this file is the checklist.
 
 - `git status --short` is empty and the branch is `main`, fresh (`git pull --ff-only`).
   Otherwise stop and report; never work on a dirty tree.
-- With an argument (`/next-todo TODO-NNN` or `/next-todo DEBT-NNN`): that entry, and the
+- With an argument (`/run-entry TODO-NNN` or `/run-entry DEBT-NNN`): that entry, and the
   human is in the chat — **chat mode**. Without one: read `docs/todo.md` § Next and
   take references in order — **headless mode**, nobody to ask. Load the entry
   (`## TODO-NNN` in `docs/todo.md`, `## … — DEBT-NNN — …` in `docs/techdebt.md`, or

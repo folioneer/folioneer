@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# next-todo.sh — run one ready entry of docs/todo.md § Next headless.
+# run-entry.sh — run one ready entry of docs/todo.md § Next headless.
 #
 # The local form of the scheduled runner (docs/workflow.md § 9): one entry per
 # run, three hours of wall clock, nothing asked of a human. Edits are accepted
@@ -7,16 +7,16 @@
 # prompt, so a command outside .claude/settings.json's allow list is denied and
 # the run fails instead of waiting.
 #
-# Use:  just next-todo          (or from a timer: bash scripts/next-todo.sh)
+# Use:  just run-entry          (or from a timer: bash scripts/run-entry.sh)
 # Exit: 0 done or nothing to do · 1 preconditions · 2 the run failed or timed out
 set -euo pipefail
 
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 cd "$PROJECT_ROOT"
-LOG_DIR="$PROJECT_ROOT/logs/next-todo"
+LOG_DIR="$PROJECT_ROOT/logs/run-entry"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/$(date -u +%Y%m%dT%H%M%SZ).log"
-BUDGET="${NEXT_TODO_BUDGET:-3h}"
+BUDGET="${RUN_ENTRY_BUDGET:-3h}"
 
 log() { printf '%s %s\n' "$(date -u +%H:%M:%S)" "$*" | tee -a "$LOG"; }
 
@@ -52,7 +52,7 @@ log "queued: $(tr '\n' ' ' <<<"$queued")"
 log "run starts (budget $BUDGET, log $LOG)"
 set +e
 timeout --signal=INT --kill-after=60 "$BUDGET" \
-    claude -p "/next-todo" --permission-mode acceptEdits --output-format text >>"$LOG" 2>&1
+    claude -p "/run-entry" --permission-mode acceptEdits --output-format text >>"$LOG" 2>&1
 status=$?
 set -e
 case "$status" in

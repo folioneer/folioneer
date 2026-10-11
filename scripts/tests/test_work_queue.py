@@ -1,14 +1,14 @@
-"""Tests for scripts/whats-next.py (todo TODO-052) — run with `just test-scripts`."""
+"""Tests for scripts/work-queue.py (todo TODO-052) — run with `just test-scripts`."""
 
 import importlib.util
 import unittest
 from pathlib import Path
 
 SPEC = importlib.util.spec_from_file_location(
-    "whats_next", Path(__file__).resolve().parents[1] / "whats-next.py"
+    "work_queue", Path(__file__).resolve().parents[1] / "work-queue.py"
 )
-whats_next = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(whats_next)
+work_queue = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(work_queue)
 
 TODO = """# TODO
 
@@ -90,7 +90,7 @@ def refs(entries):
 
 class Readiness(unittest.TestCase):
     def setUp(self):
-        self.entries = {entry["ref"]: entry for entry in whats_next.parse_entries(TODO)}
+        self.entries = {entry["ref"]: entry for entry in work_queue.parse_entries(TODO)}
 
     # TODO-052 — ready: a Done when, no unticked question, a design none or validated.
     def test_an_entry_with_nothing_pending_is_ready(self):
@@ -120,11 +120,11 @@ class Readiness(unittest.TestCase):
         base = ["**Done when:** x", "**Design:** none", "**Open questions:** none"]
 
         def waits(replaced: str, by: list[str]) -> list[str]:
-            return whats_next.readiness(
+            return work_queue.readiness(
                 [line for line in base if not line.startswith(replaced)] + by
             )
 
-        self.assertEqual(whats_next.readiness(base), [])
+        self.assertEqual(work_queue.readiness(base), [])
         self.assertEqual(waits("**Open", []), ["no Open questions line"])
         self.assertEqual(
             waits("**Open", ["**Open questions:**"]), ["no Open questions line"]
@@ -152,17 +152,17 @@ class Queue(unittest.TestCase):
     # TODO-052 — the queue is read in the owner's order, comments and prose ignored.
     def test_the_queue_keeps_the_owners_order(self):
         self.assertEqual(
-            whats_next.parse_queue(TODO), ["DEBT-007", "TODO-003", "TODO-001", "TODO-099"]
+            work_queue.parse_queue(TODO), ["DEBT-007", "TODO-003", "TODO-001", "TODO-099"]
         )
 
     def test_a_file_without_a_queue_has_an_empty_one(self):
-        self.assertEqual(whats_next.parse_queue("# TODO\n\n## TODO-001 — (x) — y\n"), [])
+        self.assertEqual(work_queue.parse_queue("# TODO\n\n## TODO-001 — (x) — y\n"), [])
 
 
 class ThreeLists(unittest.TestCase):
     def setUp(self):
-        entries = whats_next.parse_entries(TODO) + whats_next.parse_debt(DEBT)
-        self.lists = whats_next.classify(whats_next.parse_queue(TODO), entries)
+        entries = work_queue.parse_entries(TODO) + work_queue.parse_debt(DEBT)
+        self.lists = work_queue.classify(work_queue.parse_queue(TODO), entries)
 
     # TODO-052 — queued, in order, each with its state; a reference whose entry is gone
     # is reported closed rather than dropped.
@@ -186,7 +186,7 @@ class ThreeLists(unittest.TestCase):
 class DebtThemes(unittest.TestCase):
     # TODO-052 — entries that differ only by a name or a count are one theme.
     def test_entries_differing_by_a_name_or_a_count_share_a_theme(self):
-        groups = whats_next.group_debt(whats_next.parse_debt(DEBT))
+        groups = work_queue.group_debt(work_queue.parse_debt(DEBT))
         self.assertEqual(
             [group["refs"] for group in groups], [["DEBT-007", "DEBT-008"], ["DEBT-009"]]
         )
@@ -194,12 +194,12 @@ class DebtThemes(unittest.TestCase):
     # TODO-052 — a figure inside a word (E2E) is part of the title, not a count.
     def test_a_figure_inside_a_word_is_kept(self):
         self.assertEqual(
-            whats_next.debt_theme("Every E2E file of `x` waits 30 seconds"),
+            work_queue.debt_theme("Every E2E file of `x` waits 30 seconds"),
             "Every E2E file of `…` waits N seconds",
         )
 
     def test_a_debt_entry_waits_on_its_unticked_questions(self):
-        debt = whats_next.parse_debt(
+        debt = work_queue.parse_debt(
             """# Tech Debt
 
 ## 2026-10-04 — DEBT-078 — A promise nothing keeps
@@ -223,7 +223,7 @@ class DebtThemes(unittest.TestCase):
         self.assertEqual(debt[1]["waits_on"], [])
 
     def test_a_debt_entry_without_a_done_when_is_not_ready(self):
-        debt = {entry["ref"]: entry for entry in whats_next.parse_debt(DEBT)}
+        debt = {entry["ref"]: entry for entry in work_queue.parse_debt(DEBT)}
         self.assertEqual(debt["DEBT-007"]["waits_on"], [])
         self.assertEqual(debt["DEBT-009"]["waits_on"], ["no Done when"])
 
@@ -264,7 +264,7 @@ class FlowEntries(unittest.TestCase):
     # The flow file's own entries: a proposal is work, a verdict is a record, and one
     # that needs the owner waits on that decision.
     def test_a_proposal_is_work_and_a_verdict_is_not(self):
-        flow = {entry["ref"]: entry for entry in whats_next.parse_flow(FLOW)}
+        flow = {entry["ref"]: entry for entry in work_queue.parse_flow(FLOW)}
         self.assertEqual(sorted(flow), ["FLOW-001", "FLOW-003"])
         self.assertEqual(flow["FLOW-001"]["waits_on"], [])
         self.assertEqual(flow["FLOW-003"]["waits_on"], ["the owner's decision"])
@@ -277,27 +277,27 @@ class FlowEntries(unittest.TestCase):
             "## FLOW-010 — No decision needed\n\n- Proposal: x.\n- Needs the owner: no\n"
         )
         flow = {
-            entry["ref"]: entry["waits_on"] for entry in whats_next.parse_flow(text)
+            entry["ref"]: entry["waits_on"] for entry in work_queue.parse_flow(text)
         }
         self.assertEqual(flow, {"FLOW-009": ["the owner's decision"], "FLOW-010": []})
 
     # A queued reference to a verdict — nothing to run — reads as closed, to remove.
     def test_a_queued_verdict_reads_as_closed(self):
-        lists = whats_next.classify(["FLOW-002"], whats_next.parse_flow(FLOW))
+        lists = work_queue.classify(["FLOW-002"], work_queue.parse_flow(FLOW))
         self.assertEqual(lists["queued"], [{"ref": "FLOW-002", "state": "closed"}])
 
     # An entry moved to the flow file keeps its reference and its readiness rule.
     def test_entries_moved_to_the_flow_file_keep_their_reference(self):
-        self.assertEqual(refs(whats_next.parse_debt(FLOW)), ["DEBT-015"])
-        self.assertEqual(refs(whats_next.parse_entries(FLOW)), ["TODO-049"])
+        self.assertEqual(refs(work_queue.parse_debt(FLOW)), ["DEBT-015"])
+        self.assertEqual(refs(work_queue.parse_entries(FLOW)), ["TODO-049"])
 
     # A flow reference can be queued like any other.
     def test_a_flow_reference_can_be_queued(self):
-        queue = whats_next.parse_queue("## Next\n\n1. FLOW-001\n2. DEBT-015\n")
+        queue = work_queue.parse_queue("## Next\n\n1. FLOW-001\n2. DEBT-015\n")
         self.assertEqual(queue, ["FLOW-001", "DEBT-015"])
-        entries = whats_next.parse_flow(FLOW) + whats_next.parse_debt(FLOW)
+        entries = work_queue.parse_flow(FLOW) + work_queue.parse_debt(FLOW)
         states = [
-            entry["state"] for entry in whats_next.classify(queue, entries)["queued"]
+            entry["state"] for entry in work_queue.classify(queue, entries)["queued"]
         ]
         self.assertEqual(states, ["ready", "ready"])
 
@@ -309,18 +309,18 @@ class CiState(unittest.TestCase):
         running = {"conclusion": "", "status": "IN_PROGRESS"}
         failure = {"conclusion": "FAILURE", "status": "COMPLETED"}
         skipped = {"conclusion": "SKIPPED", "status": "COMPLETED"}
-        self.assertEqual(whats_next.ci_state([]), "none")
-        self.assertEqual(whats_next.ci_state([success, skipped]), "green")
-        self.assertEqual(whats_next.ci_state([success, running]), "running")
-        self.assertEqual(whats_next.ci_state([running, failure]), "failing")
+        self.assertEqual(work_queue.ci_state([]), "none")
+        self.assertEqual(work_queue.ci_state([success, skipped]), "green")
+        self.assertEqual(work_queue.ci_state([success, running]), "running")
+        self.assertEqual(work_queue.ci_state([running, failure]), "failing")
         self.assertEqual(
-            whats_next.ci_state([{"state": "SUCCESS"}, {"conclusion": "NEUTRAL"}]),
+            work_queue.ci_state([{"state": "SUCCESS"}, {"conclusion": "NEUTRAL"}]),
             "green",
         )
-        self.assertEqual(whats_next.ci_state([{"state": "PENDING"}]), "running")
+        self.assertEqual(work_queue.ci_state([{"state": "PENDING"}]), "running")
         for conclusion in ("ACTION_REQUIRED", "STARTUP_FAILURE", "STALE", "TIMED_OUT"):
             self.assertEqual(
-                whats_next.ci_state([success, {"conclusion": conclusion}]), "failing"
+                work_queue.ci_state([success, {"conclusion": conclusion}]), "failing"
             )
 
 
@@ -356,18 +356,18 @@ Asked in gh79 and again in https://github.com/o/r/issues/12.
 
 class IssuesAndTheirEntries(unittest.TestCase):
     def test_an_issue_is_found_under_each_way_of_naming_it(self):
-        self.assertEqual(whats_next.entries_naming(79, ISSUE_DOCS), ["TODO-003", "FLOW-020"])
-        self.assertEqual(whats_next.entries_naming(12, ISSUE_DOCS), ["TODO-003"])
-        self.assertEqual(whats_next.entries_naming(65, ISSUE_DOCS), ["DEBT-077"])
+        self.assertEqual(work_queue.entries_naming(79, ISSUE_DOCS), ["TODO-003", "FLOW-020"])
+        self.assertEqual(work_queue.entries_naming(12, ISSUE_DOCS), ["TODO-003"])
+        self.assertEqual(work_queue.entries_naming(65, ISSUE_DOCS), ["DEBT-077"])
 
     def test_another_number_that_starts_or_ends_the_same_is_not_the_issue(self):
-        self.assertEqual(whats_next.entries_naming(7, ISSUE_DOCS), ["DEBT-079"])
-        self.assertEqual(whats_next.entries_naming(6, ISSUE_DOCS), [])
-        self.assertEqual(whats_next.entries_naming(790, ISSUE_DOCS), [])
+        self.assertEqual(work_queue.entries_naming(7, ISSUE_DOCS), ["DEBT-079"])
+        self.assertEqual(work_queue.entries_naming(6, ISSUE_DOCS), [])
+        self.assertEqual(work_queue.entries_naming(790, ISSUE_DOCS), [])
 
     def test_an_issue_no_entry_names_has_none(self):
-        self.assertEqual(whats_next.entries_naming(42, ISSUE_DOCS), [])
-        self.assertEqual(whats_next.entries_naming(79, []), [])
+        self.assertEqual(work_queue.entries_naming(42, ISSUE_DOCS), [])
+        self.assertEqual(work_queue.entries_naming(79, []), [])
 
 
 class SkillProposal(unittest.TestCase):
@@ -375,7 +375,7 @@ class SkillProposal(unittest.TestCase):
     propose."""
 
     SKILL = (
-        Path(__file__).resolve().parents[2] / ".claude" / "skills" / "whats-next" / "SKILL.md"
+        Path(__file__).resolve().parents[2] / ".claude" / "skills" / "plan-queue" / "SKILL.md"
     ).read_text()
 
     def proposal_example(self):

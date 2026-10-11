@@ -12,7 +12,7 @@ After cloning: `git config core.hooksPath .githooks`. The hooks block commits to
 - The **agent** owns `docs/techdebt.md`, does the task end to end and merges on green. No pull request is validated by a human.
 - The **harness** (`just harness` locally, `--coverage` before a first push; required checks in CI) proves the code.
 
-Headless, a question only the human can answer goes into the entry's `**Open questions:**`, never asked. In a chat run (`/next-todo TODO-NNN`) the open questions are asked before anything starts, and a design is validated by a yes; the answers are written into the entry either way. In a chat conversation, ask as you would a colleague: state assumptions, name what is unclear. Whenever the human is asked: one question at a time, each with the context needed to answer it — what the thing is, where it shows, what each answer changes.
+Headless, a question only the human can answer goes into the entry's `**Open questions:**`, never asked. In a chat run (`/run-entry TODO-NNN`) the open questions are asked before anything starts, and a design is validated by a yes; the answers are written into the entry either way. In a chat conversation, ask as you would a colleague: state assumptions, name what is unclear. Whenever the human is asked: one question at a time, each with the context needed to answer it — what the thing is, where it shows, what each answer changes.
 
 What the human is told rests on what was read. A statement that the code does or does not do something names what was read (the component, the command, the service); a statement about what a system will do next is checked, or given as a guess. A reviewer's or a checker's claim about a screen is read in the component before it is repeated.
 
@@ -48,11 +48,12 @@ What the human is told rests on what was read. A statement that the code does or
 
 ## Where things are
 
-- **Workflow**: `/next-todo` runs one entry end to end (`docs/workflow.md` § 3); `just next-todo` does it headless; `/run-queue` runs the whole queue in chat, one task per entry.
+- **Workflow**: `/run-entry` runs one entry end to end (`docs/workflow.md` § 3); `just run-entry` does it headless; `/run-queue` runs the whole queue in chat, one task per entry.
 - **Before implementing**, read the rules for the layers touched (`.claude/rules/` brings the pointer in when a matching file is read; a new file triggers nothing, so this list is the fallback) — backend (`backend-rules`, `error-model`, `backend-patterns`), frontend (`frontend-rules`, `i18n-rules`, `visual-proof-rules`), E2E (`e2e-rules`), any test (`test-rules`), commits (`commit-rules`). When a rule changes, its doc changes in the same PR.
 - **After completing**, update the source docs in the same PR: the spec rules (+ `spec-reviewer`), the contract (`/contract` + `contract-reviewer`), an ADR only for a technical choice (`/adr-writer` + `adr-reviewer`), `docs/lessons.md` for an empirical failure worth teaching, `ARCHITECTURE.md` when a top-level folder appears.
 - **Vocabulary**: `docs/ubiquitous-language.md` — use confirmed terms in identifiers, comments and logs; never extend a discrepant one; changes need the owner. Give it to every reviewer you launch.
-- **Skills**: `/next-todo`, `/run-queue`, `/design-proposal NNN`, `/visual-proof`, `/adr-writer`, `/contract`, `/dep-audit`, `/prune`, `/whats-next`, `/flow-audit` (after a release).
+- **Skills, agents, scripts and hooks**: [`docs/agentic-setup.md`](docs/agentic-setup.md) says what each one is for and what it must never do; a new one gets its line there in the same PR.
+- **Skills**: `/run-entry`, `/run-queue`, `/design-proposal NNN`, `/visual-proof`, `/adr-writer`, `/contract`, `/dep-audit`, `/prune`, `/plan-queue`, `/flow-audit` (after a release).
 - **Agents**: the reviewers matched to the diff (locally until no 🔴, and in CI on every push); `reviewer-security` before every release; `spec-checker` before closing an entry with spec rules, and before a release on every spec the batch touched (`bash scripts/batch-specs.sh`); `spec-reviewer` / `contract-reviewer` / `adr-reviewer` when those documents change.
 - **References**: `TODO-NNN` (todo), `DEBT-NNN` (tech debt), `FLOW-NNN` (flow), `ghNN` (GitHub issue); a pull request stays `#NN` (`docs/workflow.md` § 2).
 - **Task tracking**: `TaskCreate` / `TaskUpdate` for any task of more than one file or step.
@@ -62,7 +63,7 @@ What the human is told rests on what was read. A statement that the code does or
 
 - `just dev` (a debug build uses its own data folder and never touches the daily fetch; `--reset-db` resets only that database) · `just dev-seed [--replace]` (a detached copy of the installed database).
 - `just test [paths]` · `just test-rust [filter]` (a part of a suite while working; two build jobs) · `just test-unit`. The E2E suite has no recipe: CI runs it (`npm run test:e2e:ci`) and is its gate; the local run is broken on this machine (`docs/lessons.md` L-011).
-- `just quiet <recipe> [args]` (one line: the verdict by exit code; the output in `tmp/<recipe>.log`) · `just harness [--coverage]` (the coverage run holds the foreground; without a terminal, `HARNESS_FOREGROUND=1`) · `just check [--frontend|--backend]` · `just check-full` · `just format` · `just arch-check` (`--write-allowlist` only lowers the frozen debt) · `just coverage-gate` · `just generate-types` · `just watch-pr [number]` (waits for a pull request's checks; the verdict by exit code) · `just merge`.
+- `just quiet <recipe> [args]` (one line: the verdict by exit code; the output in `tmp/<recipe>.log`) · `just harness [--coverage]` (the coverage run holds the foreground; without a terminal, `HARNESS_FOREGROUND=1`) · `just check [--frontend|--backend]` · `just check-full` · `just format` · `just arch-check` (`--write-allowlist` only lowers the frozen debt) · `just rule-homes` · `just coverage-gate` · `just generate-types` · `just watch-pr [number]` (waits for a pull request's checks; the verdict by exit code) · `just merge`.
 - `just install` · `just stat` · `just worktree <branch>`. A recipe exists because CI, a hook, a skill, an agent or a script calls it, or because it is listed here; otherwise it goes.
 - Release (human): `/dep-audit` → `just release [--preview] [-y]`; the workflow builds Windows then Linux and leaves a draft — publish with `gh release edit vX.Y.Z --draft=false` once both attached their assets.
 

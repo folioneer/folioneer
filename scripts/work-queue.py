@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic data collection for the /whats-next skill.
+"""Deterministic data collection for the /plan-queue skill.
 
 Emits one JSON document on stdout: the owner's queue (`docs/todo.md` § Next) with the
 state of each reference, the entries ready to queue, the entries blocked with what
@@ -7,8 +7,8 @@ each waits on, the tech debt grouped by theme, the flow entries, the open pull r
 state, the local git state, the roadmap and the open GitHub issues.
 
 Usage:
-    python3 scripts/whats-next.py            # JSON to stdout
-    python3 scripts/whats-next.py --pretty   # indented JSON for inspection
+    python3 scripts/work-queue.py            # JSON to stdout
+    python3 scripts/work-queue.py --pretty   # indented JSON for inspection
 
 The skill turns this into three lists and a proposed queue order for the owner to
 accept or edit. This script has no judgment — only collection and the readiness rule

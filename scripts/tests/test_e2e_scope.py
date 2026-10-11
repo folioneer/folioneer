@@ -20,7 +20,7 @@ class SuiteMustRun(unittest.TestCase):
             "CHANGELOG.md",
             "README.md",
             "docs/adr/021-withdraw-the-keyless-price-source.md",
-            ".claude/skills/next-todo/SKILL.md",
+            ".claude/skills/run-entry/SKILL.md",
             "screenshots/CurrencyRatesView-light-idle.png",
         ]
         self.assertFalse(e2e_scope.suite_must_run(files))

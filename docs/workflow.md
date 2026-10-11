@@ -65,7 +65,7 @@ under them.
 ## 3. The loop — one run, one entry
 
 1. **Pick** — headless: the first ready entry in Next. In chat: the entry the human
-   names (`/next-todo TODO-NNN`); the sentence is the queue, and open questions are asked
+   names (`/run-entry TODO-NNN`); the sentence is the queue, and open questions are asked
    before anything starts — one at a time, each with its context — their answers
    written into the entry.
    Branch `<type>/todo-NNN-slug` (or `<type>/debt-NNN-slug`, `<type>/flow-NNN-slug`) off fresh `main`, where `<type>` is
@@ -112,7 +112,7 @@ harness`) prints that
 11. **Next** entry, or stop (§ 8).
 
 **A batch in chat** — when the human says go to several queued entries, the agent runs
-`/run-queue`: one task per queued entry, so the queue is seen advancing, then `/next-todo`
+`/run-queue`: one task per queued entry, so the queue is seen advancing, then `/run-entry`
 for each rather than re-deriving its steps. A skill is loaded with the `Skill` tool at the
 first entry of the batch and again after any pull request of the batch that changes it,
 never followed from memory; `/flow-audit` counts the loads beside the entries. The human
@@ -292,22 +292,22 @@ The chat session is for writing entries together, design conversations and answe
 open questions. The loop runs headless, one entry per run, never asks, and keeps its
 state in git and the two files.
 
-- **Cloud routine** `next-todo` on claude.ai/code, created disabled: weekdays at 05:37
-  UTC, the repository's environment, the `/next-todo` prompt. E2E and screenshots
+- **Cloud routine** `run-entry` on claude.ai/code, created disabled: weekdays at 05:37
+  UTC, the repository's environment, the `/run-entry` prompt. E2E and screenshots
   come from CI, so the sandbox needs no display. The human switches it on.
-- **Laptop**: `just next-todo` (`scripts/next-todo.sh`): one run at a time, a clean
+- **Laptop**: `just run-entry` (`scripts/run-entry.sh`): one run at a time, a clean
   and fresh `main`, a non-empty Next queue, three hours of wall clock
-  (`NEXT_TODO_BUDGET`), the log under `logs/next-todo/`. It runs
-  `claude -p "/next-todo" --permission-mode acceptEdits`: nobody answers a prompt in a
+  (`RUN_ENTRY_BUDGET`), the log under `logs/run-entry/`. It runs
+  `claude -p "/run-entry" --permission-mode acceptEdits`: nobody answers a prompt in a
   print-mode run, so a command outside the allow list in `.claude/settings.json` is
   denied and the run fails instead of waiting. The allow list scopes the flow, it is
   not a sandbox; the deny list refuses the usual spellings of the absolute rules (push
   to `main`, force push, hook bypass, release, tag, `gh pr merge`, editing the list
   itself) as a reminder, not a proof. What is enforced is the harness and the merge
   guard. The run shares the plan's session limit with any open session. A crontab
-  line: `37 7 * * 1-5 cd ~/project/folioneer && just next-todo`.
+  line: `37 7 * * 1-5 cd ~/project/folioneer && just run-entry`.
 
-Until a runner is switched on, a human types `/next-todo` in a session and the same
+Until a runner is switched on, a human types `/run-entry` in a session and the same
 rules apply.
 
 ## 10. Gold layouts, bit by bit

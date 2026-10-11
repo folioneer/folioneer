@@ -38,7 +38,7 @@ KEPT = {
     "CHANGELOG.md",
     "scripts/reference-forms.py",
     "scripts/tests/test_reference_forms.py",
-    "scripts/tests/test_next_todo.py",
+    "scripts/tests/test_run_entry.py",
 }
 NOT_TEXT = (".png", ".ico", ".icns", ".woff", ".woff2", ".lock", "package-lock.json")
 GENERATED = ("src-tauri/.sqlx/", "screenshots/")
