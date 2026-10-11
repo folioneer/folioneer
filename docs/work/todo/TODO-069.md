@@ -2,7 +2,7 @@
 
 Raised by the owner on 2026-10-11, with TODO-059. A price keeps no earlier value: once replaced, what was there is gone, and "Remove everything it recorded" can delete what an agent session recorded but cannot bring back what it replaced. A journal keeps what each change replaced, so that the portfolio can be taken back to an earlier point when needed.
 
-Not urgent. To be written when scheduled: what the journal holds (prices only, or every record), how far back, and what "rewind" means beside multi-device sync, which already keeps a log of changes per device (ADR-019).
+It reads the record of TODO-070 — every change with who made it — and adds what each change replaced; it comes after that entry. Not urgent. To be written when scheduled: what the journal holds (prices only, or every record), how far back, and what "rewind" means beside multi-device sync, which already keeps a log of changes per device (ADR-019).
 
 **User value:** The owner takes the portfolio back to how it stood before a change that turned out wrong — an agent's session, an import, a mistaken edit.
 **Done when:** to be written with the entry's specification.
