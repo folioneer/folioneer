@@ -17,6 +17,7 @@ use crate::use_cases::holding_transaction::{
 };
 
 use super::connections::{Granted, LastRecording, MAX_RECORDINGS};
+use super::definitions;
 
 /// Why a tool call is refused: a stable code and a reason for the agent to read.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,14 +74,6 @@ pub fn last_recording(
     }
 }
 
-/// AGT-040 — the tools that read the portfolio.
-const READ_TOOLS: [&str; 4] = [
-    "portfolio_summary",
-    "list_accounts",
-    "list_assets",
-    "list_holdings",
-];
-
 /// Runs the tools in the running application, through the queries the window uses.
 pub struct AgentTools {
     recorder: Arc<HoldingTransactionUseCase>,
@@ -127,7 +120,7 @@ impl AgentTools {
     ) -> Result<Value, Refusal> {
         let result = self.run(granted, tool, arguments).await;
         // AGT-052 — a read that was answered counts as one.
-        if result.is_ok() && READ_TOOLS.contains(&tool) {
+        if result.is_ok() && definitions::only_reads(tool) {
             granted.count_read();
         }
         result

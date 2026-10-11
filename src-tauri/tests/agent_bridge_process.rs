@@ -94,6 +94,50 @@ fn agt_010_the_program_started_with_mcp_lists_its_tools() {
     }
 }
 
+// AGT-013 — the program started with `--mcp` gives each tool a title and says whether it
+// only reads: the four read tools do, and everything that records, corrects or cancels
+// says it does not — so an agent client asks its user before a recording and not before a
+// read.
+#[test]
+fn agt_013_every_tool_listed_says_whether_it_only_reads() {
+    let answers = answers_of_the_bridge(&[
+        json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {
+            "protocolVersion": "2025-06-18", "capabilities": {},
+            "clientInfo": { "name": "claude-code", "version": "test" } } }),
+        json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }),
+    ]);
+    let tools = answers[1]["result"]["tools"].as_array().expect("tools");
+    assert!(!tools.is_empty());
+
+    let mut reading = Vec::new();
+    let mut titles = std::collections::BTreeSet::new();
+    for tool in tools {
+        let name = tool["name"].as_str().expect("a name");
+        let title = tool["title"].as_str().unwrap_or_default();
+        assert!(!title.is_empty(), "{name} has a title");
+        assert!(titles.insert(title), "{name} shares its title \"{title}\"");
+        let only_reads = tool["annotations"]["readOnlyHint"]
+            .as_bool()
+            .unwrap_or_else(|| panic!("{name} says whether it only reads"));
+        let records = name.starts_with("record_")
+            || name == "correct_recording"
+            || name == "cancel_recording";
+        assert_eq!(only_reads, !records, "{name}");
+        if only_reads {
+            reading.push(name);
+        }
+    }
+    assert_eq!(
+        reading,
+        [
+            "portfolio_summary",
+            "list_accounts",
+            "list_assets",
+            "list_holdings"
+        ]
+    );
+}
+
 // AGT-011 — with no application open over its data folder, a tool call is answered that
 // Folioneer is not open, an unknown tool is an error, and nothing is written.
 #[test]

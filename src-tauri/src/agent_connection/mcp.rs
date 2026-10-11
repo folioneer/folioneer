@@ -86,8 +86,10 @@ impl Conversation {
                         .iter()
                         .map(|tool| json!({
                             "name": tool.name,
+                            "title": tool.title,
                             "description": tool.description,
                             "inputSchema": tool.input_schema,
+                            "annotations": { "readOnlyHint": tool.only_reads },
                         }))
                         .collect::<Vec<_>>(),
                 }),
@@ -159,6 +161,8 @@ mod tests {
     fn conversation() -> Conversation {
         Conversation::new(vec![ToolDefinition {
             name: "list_accounts",
+            title: "List accounts",
+            only_reads: true,
             description: "The accounts.",
             input_schema: json!({ "type": "object" }),
         }])
@@ -202,7 +206,7 @@ mod tests {
             .expect("answer");
         assert_eq!(
             listed["result"]["tools"],
-            json!([{ "name": "list_accounts", "description": "The accounts.", "inputSchema": { "type": "object" } }])
+            json!([{ "name": "list_accounts", "title": "List accounts", "description": "The accounts.", "inputSchema": { "type": "object" }, "annotations": { "readOnlyHint": true } }])
         );
         assert!(host.0.is_empty());
     }

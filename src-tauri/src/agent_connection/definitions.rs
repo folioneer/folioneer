@@ -8,6 +8,11 @@ use serde_json::{json, Value};
 pub struct ToolDefinition {
     /// The tool's name.
     pub name: &'static str,
+    /// A few words a person reads in the agent client (AGT-013).
+    pub title: &'static str,
+    /// Whether it only reads the portfolio: what the client is told as `readOnlyHint`,
+    /// and what counts as a read of the session (AGT-013, AGT-052).
+    pub only_reads: bool,
     /// What the tool does, for the agent to read.
     pub description: &'static str,
     /// The JSON schema of its arguments.
@@ -20,16 +25,22 @@ pub fn definitions() -> Vec<ToolDefinition> {
     vec![
         ToolDefinition {
             name: "portfolio_summary",
+            title: "Portfolio summary",
+            only_reads: true,
             description: "The value of the portfolio: each account with its total value, its unrealized gain and its performance this year, and the total over the accounts. Amounts and quantities are whole numbers of millionths: 1500000 is 1.5.",
             input_schema: nothing(),
         },
         ToolDefinition {
             name: "list_accounts",
+            title: "List accounts",
+            only_reads: true,
             description: "The accounts, by name, each with its currency. An account is named by its name in the other tools.",
             input_schema: nothing(),
         },
         ToolDefinition {
             name: "list_assets",
+            title: "List assets",
+            only_reads: true,
             description: "The assets a holding can be of, by name: reference, kind, class, currency, ISIN and exchange code. Cash is not listed.",
             input_schema: json!({
                 "type": "object",
@@ -41,6 +52,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "list_holdings",
+            title: "List an account's holdings",
+            only_reads: true,
             description: "The holdings of one account, with their quantities, costs, latest prices and gains, and the account's totals; as they stood on a past date when `as_of` is given. Amounts and quantities are whole numbers of millionths: 1500000 is 1.5.",
             input_schema: json!({
                 "type": "object",
@@ -54,6 +67,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "record_opening_balance",
+            title: "Record an opening balance",
+            only_reads: false,
             description: "Record what an account already held of an asset on a date: the quantity and its total cost. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
             input_schema: json!({
                 "type": "object",
@@ -70,22 +85,28 @@ pub fn definitions() -> Vec<ToolDefinition> {
         },
         trade_definition(
             "record_purchase",
+            "Record a purchase",
             "Record a purchase of an asset in an account. Give either the unit price, in the asset's currency, or the broker's all-in total, in the account's currency. The cash of the account pays for it. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
         ),
         trade_definition(
             "record_sale",
+            "Record a sale",
             "Record a sale of an asset held in an account. Give either the unit price, in the asset's currency, or the broker's all-in total, in the account's currency. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
         ),
         cash_definition(
             "record_deposit",
+            "Record a deposit",
             "Record cash paid into an account from outside. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
         ),
         cash_definition(
             "record_withdrawal",
+            "Record a withdrawal",
             "Record cash taken out of an account. The account must hold that cash on the date. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
         ),
         ToolDefinition {
             name: "record_dividend",
+            title: "Record a dividend",
+            only_reads: false,
             description: "Record a dividend an asset held in an account paid: the cash of the account receives it, the holding is unchanged. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
             input_schema: json!({
                 "type": "object",
@@ -103,6 +124,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "record_split",
+            title: "Record a split",
+            only_reads: false,
             description: "Record a stock split, or a reverse split, of an asset held in an account: `new` shares for every `old` shares held (2 and 1 for a 2-for-1 split, 1 and 10 for a 1-for-10 reverse split). The quantity held is rescaled from that date, its cost is unchanged and no cash moves. It records no price: record the price after the split with record_price, or the price from before it values the new quantity. The recording follows the application's rules and is marked as recorded by this agent.",
             input_schema: json!({
                 "type": "object",
@@ -120,6 +143,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "record_free_shares",
+            title: "Record free shares",
+            only_reads: false,
             description: "Record shares of an asset held in an account received at no cost — a bonus issue, a dividend paid in shares: the quantity held rises, its cost is unchanged and no cash moves. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
             input_schema: json!({
                 "type": "object",
@@ -136,6 +161,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "record_price",
+            title: "Record a price",
+            only_reads: false,
             description: "Record the price of one unit of an asset on a date, in the asset's currency — a year-end price from a statement, for instance. It is stored as recorded by an agent and replaces the price the asset already has on that date, if any. Figures are decimals with a dot (12.5), not millionths.",
             input_schema: json!({
                 "type": "object",
@@ -150,6 +177,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "correct_recording",
+            title: "Correct a recording",
+            only_reads: false,
             description: "Correct a transaction this session recorded: give its id, as the recording returned it, and only what changes. A transaction the owner typed, or one another session recorded, is refused. Figures are decimals with a dot (12.5), not millionths.",
             input_schema: json!({
                 "type": "object",
@@ -169,6 +198,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "cancel_recording",
+            title: "Cancel a recording",
+            only_reads: false,
             description: "Cancel a transaction this session recorded: give its id, as the recording returned it. A transaction the owner typed, or one another session recorded, is refused.",
             input_schema: json!({
                 "type": "object",
@@ -183,9 +214,15 @@ pub fn definitions() -> Vec<ToolDefinition> {
 }
 
 /// A deposit or a withdrawal as an agent is told of it.
-fn cash_definition(name: &'static str, description: &'static str) -> ToolDefinition {
+fn cash_definition(
+    name: &'static str,
+    title: &'static str,
+    description: &'static str,
+) -> ToolDefinition {
     ToolDefinition {
         name,
+        title,
+        only_reads: false,
         description,
         input_schema: json!({
             "type": "object",
@@ -202,9 +239,15 @@ fn cash_definition(name: &'static str, description: &'static str) -> ToolDefinit
 }
 
 /// A purchase or a sale as an agent is told of it.
-fn trade_definition(name: &'static str, description: &'static str) -> ToolDefinition {
+fn trade_definition(
+    name: &'static str,
+    title: &'static str,
+    description: &'static str,
+) -> ToolDefinition {
     ToolDefinition {
         name,
+        title,
+        only_reads: false,
         description,
         input_schema: json!({
             "type": "object",
@@ -223,4 +266,11 @@ fn trade_definition(name: &'static str, description: &'static str) -> ToolDefini
             "additionalProperties": false
         }),
     }
+}
+
+/// AGT-052 — whether `tool` is one that only reads, as its definition says.
+pub fn only_reads(tool: &str) -> bool {
+    definitions()
+        .iter()
+        .any(|definition| definition.name == tool && definition.only_reads)
 }
