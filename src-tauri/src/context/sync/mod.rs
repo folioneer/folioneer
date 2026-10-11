@@ -22,7 +22,9 @@ pub mod infrastructure;
 
 #[cfg(feature = "app")]
 pub use api::*;
-pub use application::{FirstPublish, JoinError, Publisher, SyncGate, SyncRun, SyncService};
+pub use application::{
+    FirstPublish, FolderChange, JoinError, Publisher, SyncGate, SyncRun, SyncService,
+};
 pub use domain::{
     cascade_child_tombstones, collision_notice, duplicate_name_notice, ensure_device_name,
     local_write_allowed, notice_for, reference_outcome, resolve, resolve_observation,

@@ -81,9 +81,10 @@ pub trait ChangeLogRepository: Send + Sync {
         logical_clock: i64,
     ) -> Result<(), SyncError>;
 
-    /// Marks every change `device_id` recorded before this enrolment published, on `conn` —
-    /// the first segment replays the whole portfolio instead (SYN-026).
-    async fn retire_earlier_changes(
+    /// Drops every change `device_id` recorded before this enrolment, on `conn`: the first
+    /// segment replays the whole portfolio instead (SYN-026), as a history numbered from 1
+    /// (SYN-025).
+    async fn discard_earlier_changes(
         &self,
         conn: &mut SqliteConnection,
         device_id: &str,

@@ -30,6 +30,17 @@ use crate::context::sync::infrastructure::crypto::{
 use crate::core::logger::BACKEND;
 use crate::shared::domain::{LogicalTimestamp, Operation, Origin, Rank};
 
+/// What designating a folder came to (SYN-074).
+#[derive(Debug)]
+pub enum FolderChange {
+    /// The device now syncs in that folder.
+    Designated(Box<SyncStatus>),
+    /// The folder holds the portfolio as another device moved it there — a history of its
+    /// own, which a device holding the portfolio joins only from a fresh installation.
+    /// Nothing was changed.
+    AnotherBeginning,
+}
+
 /// Enrolls this installation as the origin of a shared portfolio.
 pub struct FirstPublish {
     change_log: Arc<dyn ChangeLogRepository>,
@@ -78,16 +89,18 @@ impl FirstPublish {
             .await
     }
 
-    /// Designates a different folder for an enrolled device (SYN-074): one holding the same
-    /// portfolio (its passphrase check matches the kept key) is adopted as is; an empty one
-    /// receives this device's current portfolio as a first device, under the kept key and
-    /// the current folder's derivation parameters. Any other folder is
-    /// `FolderHoldsOtherPortfolio`.
+    /// Designates a different folder for an enrolled device (SYN-074): one holding the
+    /// portfolio this device follows (its passphrase check matches the kept key, its
+    /// creation mark is the one followed) is adopted as is; one where another device moved
+    /// the portfolio is `FolderChange::AnotherBeginning`; an empty one receives this device's
+    /// current portfolio as a first device, under the kept key and the current folder's
+    /// derivation parameters, and the device forgets what it kept of the history it leaves.
+    /// Any other folder is `FolderHoldsOtherPortfolio`.
     pub async fn change_folder(
         &self,
         device: SyncDevice,
         folder: String,
-    ) -> Result<SyncStatus, SyncError> {
+    ) -> Result<FolderChange, SyncError> {
         let Some(key) = kept_key(self.change_log.as_ref()).await? else {
             tracing::error!(target: BACKEND, "change_folder: the kept key is unusable");
             return Err(SyncError::DatabaseError);
@@ -110,19 +123,31 @@ impl FirstPublish {
                 if !verify_check(&key, &header.passphrase_check) {
                     return Err(SyncError::FolderHoldsOtherPortfolio);
                 }
+                // The portfolio was moved there by another device, as a history of its
+                // own: this device's cursors and its own area belong to the one it follows.
+                if header.created_at != device.portfolio_created_at {
+                    self.folder_store.retarget(&device.folder);
+                    return Ok(FolderChange::AnotherBeginning);
+                }
                 let moved = device.designate_folder(folder);
                 self.state_repo.save_device(&moved).await?;
-                Ok(SyncStatus::for_device(&moved, None, vec![]))
+                Ok(FolderChange::Designated(Box::new(SyncStatus::for_device(
+                    &moved,
+                    None,
+                    vec![],
+                ))))
             }
             None => {
                 let derivation_parameters = self.derivation_parameters_of(&device.folder).await?;
-                self.publish_as_origin(
-                    folder,
-                    device.device_name.clone(),
-                    key,
-                    derivation_parameters,
-                )
-                .await
+                let status = self
+                    .publish_as_origin(
+                        folder,
+                        device.device_name.clone(),
+                        key,
+                        derivation_parameters,
+                    )
+                    .await?;
+                Ok(FolderChange::Designated(Box::new(status)))
             }
         }
     }
@@ -148,7 +173,8 @@ impl FirstPublish {
     }
 
     /// Publishes this device's whole portfolio into `folder` as its origin (SYN-013): header,
-    /// first segment, manifest, device row — or nothing at all.
+    /// first segment, manifest, device row — or nothing at all. Once published, the device
+    /// forgets its cursors, its held-back changes and its conflict notices (SYN-071).
     async fn publish_as_origin(
         &self,
         folder: String,
@@ -193,7 +219,12 @@ impl FirstPublish {
             .enroll(&device, &key, logical_clock, &timestamp, records)
             .await
         {
-            Ok(()) => Ok(SyncStatus::for_device(&device, None, vec![])),
+            Ok(()) => {
+                // SYN-071 / SYN-074 — an origin begins a history: what the device kept of
+                // the one it leaves is forgotten. A publish that fails keeps it.
+                self.state_repo.discard_received_history().await?;
+                Ok(SyncStatus::for_device(&device, None, vec![]))
+            }
             Err(error) => {
                 self.roll_back_folder(&device.device_id).await;
                 Err(error)
@@ -216,7 +247,7 @@ impl FirstPublish {
             .save_enrolment(&mut transaction, device, key.as_bytes(), logical_clock)
             .await?;
         self.change_log
-            .retire_earlier_changes(&mut transaction, &device.device_id)
+            .discard_earlier_changes(&mut transaction, &device.device_id)
             .await?;
         let first_sequence = self
             .change_log

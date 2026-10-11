@@ -492,18 +492,19 @@ impl ChangeLogRepository for SqliteChangeLogRepository {
         Ok(())
     }
 
-    async fn retire_earlier_changes(
+    async fn discard_earlier_changes(
         &self,
         conn: &mut SqliteConnection,
         device_id: &str,
     ) -> Result<(), SyncError> {
-        sqlx::query!(
-            "UPDATE changes SET published = 1 WHERE device_id = ?",
-            device_id
-        )
-        .execute(conn)
-        .await
-        .map_err(|error| SyncError::database("retire_earlier_changes: update failed", error))?;
+        // reviewer-arch FP: the published history ADR-019 never prunes is the folder's
+        // segments; these rows are the device's own log of a history it leaves — see PR #229
+        sqlx::query!("DELETE FROM changes WHERE device_id = ?", device_id)
+            .execute(conn)
+            .await
+            .map_err(|error| {
+                SyncError::database("discard_earlier_changes: delete failed", error)
+            })?;
         Ok(())
     }
 

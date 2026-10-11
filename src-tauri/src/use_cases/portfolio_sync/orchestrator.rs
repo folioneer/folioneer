@@ -11,8 +11,9 @@ use crate::context::asset::{AssetService, SYSTEM_CATEGORY_IDS};
 use crate::context::currency::{CurrencyRateSource, CurrencyService};
 use crate::context::sync::{
     ensure_device_name, ensure_passphrase_length, header_data_format_version, FirstPublish,
-    FolderStore, InconsistentHolding, JoinError, SyncError, SyncFailure, SyncFolderState,
-    SyncReportView, SyncRun, SyncService, SyncStateRepository, SyncStatusView, DATA_FORMAT_VERSION,
+    FolderChange, FolderStore, InconsistentHolding, JoinError, SyncError, SyncFailure,
+    SyncFolderState, SyncReportView, SyncRun, SyncService, SyncStateRepository, SyncStatusView,
+    DATA_FORMAT_VERSION,
 };
 use crate::core::cash::is_cash_asset;
 use crate::core::BACKEND;
@@ -227,18 +228,19 @@ impl PortfolioSyncOrchestrator {
             self.folder_store.remove_device_area(&device_id).await?;
         }
         self.folder_store.remove_header().await?;
+        // SYN-071 — once it has published as the new origin, the device forgets what it kept
+        // of the discarded history (`FirstPublish`).
         let status = self
             .first_publish
             .enable_as_first_device(folder, passphrase, device_name)
             .await?;
-        // SYN-071 — once it has started over, the device forgets what it kept of the
-        // discarded history.
-        self.state_repo.discard_received_history().await?;
         Ok(status.into())
     }
 
     /// Designates a different folder for an already-enrolled device (SYN-074): the same
-    /// portfolio, or an empty folder (first-device path).
+    /// portfolio, or an empty folder (first-device path). A folder another device moved the
+    /// portfolio to is refused as a join is on an installation that holds data
+    /// (`InstallationHoldsUserData`).
     pub async fn change_sync_folder(
         &self,
         folder: String,
@@ -248,11 +250,12 @@ impl PortfolioSyncOrchestrator {
             .get_device()
             .await?
             .ok_or(SyncError::SyncDisabled)?;
-        Ok(self
-            .first_publish
-            .change_folder(device, folder)
-            .await?
-            .into())
+        match self.first_publish.change_folder(device, folder).await? {
+            FolderChange::Designated(status) => Ok((*status).into()),
+            FolderChange::AnotherBeginning => {
+                Err(PortfolioSyncTask::InstallationHoldsUserData.into())
+            }
+        }
     }
 
     /// Runs a full sync immediately (SYN-061): publish, then apply the other devices'

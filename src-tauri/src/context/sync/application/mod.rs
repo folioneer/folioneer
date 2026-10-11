@@ -17,7 +17,7 @@ pub mod run;
 /// `SyncService` — device lifecycle, status assembly, notice dismissal.
 pub mod service;
 
-pub use first_publish::FirstPublish;
+pub use first_publish::{FirstPublish, FolderChange};
 pub use join::JoinError;
 pub use publisher::Publisher;
 pub use run::{SyncGate, SyncRun};

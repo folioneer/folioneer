@@ -1267,6 +1267,56 @@ async fn syn_035_a_folder_in_a_newer_data_format_is_not_joined() {
     );
 }
 
+// SYN-074 — moving the portfolio to an empty folder is a new beginning: the device that
+// moves it forgets what it kept of the others' history, and another enrolled computer that
+// designates that folder is refused as a join is — it holds data — and stays where it was.
+#[tokio::test]
+async fn syn_074_another_computer_does_not_follow_into_a_moved_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    let (desktop, laptop, account_id, _area) = two_devices_sharing(dir.path()).await;
+    laptop
+        .account_service
+        .record_deposit(&account_id, "2026-02-01".into(), 100_000_000, None)
+        .await
+        .unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    let cursors = |pool: sqlx::Pool<sqlx::Sqlite>| async move {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sync_cursors")
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+    assert_eq!(cursors(desktop.pool.clone()).await, 1);
+
+    desktop
+        .orchestrator
+        .change_sync_folder(elsewhere.path().to_string_lossy().to_string())
+        .await
+        .expect("moved to the empty folder");
+    assert_eq!(
+        cursors(desktop.pool.clone()).await,
+        0,
+        "the cursors of the history left behind are forgotten"
+    );
+
+    let refused = laptop
+        .orchestrator
+        .change_sync_folder(elsewhere.path().to_string_lossy().to_string())
+        .await
+        .expect_err("another computer does not follow by changing folder");
+    assert_eq!(
+        serde_json::to_value(&refused).unwrap()["code"],
+        "InstallationHoldsUserData"
+    );
+    let status = laptop.orchestrator.get_sync_status().await.unwrap();
+    assert_eq!(
+        status.folder.as_deref(),
+        Some(dir.path().to_string_lossy().as_ref())
+    );
+}
+
 // SYN-033/037 — a run applies what another device published since the last one, counts
 // it, and applies nothing twice.
 #[tokio::test]

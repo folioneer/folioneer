@@ -346,6 +346,34 @@ async fn change_sync_folder_to_an_empty_folder_republishes_there() {
     );
 }
 
+// SYN-074 / SYN-036 — a portfolio moved to an empty folder is published there as a history
+// numbered from 1: a fresh installation joins it under the kept passphrase.
+#[tokio::test]
+async fn syn_074_a_fresh_installation_joins_a_folder_the_portfolio_was_moved_to() {
+    let first = tempfile::tempdir().unwrap();
+    let second = tempfile::tempdir().unwrap();
+    let ctx = build_ctx(first.path()).await;
+    seed_small_portfolio(&ctx).await;
+    enable_first_device(&ctx, first.path()).await;
+    ctx.orchestrator
+        .change_sync_folder(second.path().to_string_lossy().to_string())
+        .await
+        .expect("moved to the empty folder");
+
+    let joined = build_ctx(second.path())
+        .await
+        .orchestrator
+        .enable_sync(
+            second.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Laptop".into(),
+        )
+        .await
+        .expect("a fresh installation joins the moved portfolio");
+
+    assert!(joined.enabled);
+}
+
 // SYN-074 — a folder holding a portfolio under another passphrase is refused, and the
 // device keeps its current folder.
 #[tokio::test]
@@ -501,7 +529,6 @@ async fn syn_071_after_starting_over_the_old_passphrase_is_refused() {
 
 // SYN-071 — after starting over a fresh installation joins under the new passphrase.
 #[tokio::test]
-#[ignore = "DEBT-106: the segment published by starting over does not start at sequence 1, and the join refuses it as an incomplete history"]
 async fn syn_071_after_starting_over_a_fresh_installation_joins_with_the_new_passphrase() {
     let dir = tempfile::tempdir().unwrap();
     let ctx = build_ctx(dir.path()).await;
