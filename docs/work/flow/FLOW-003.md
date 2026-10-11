@@ -14,3 +14,6 @@
   cost 25, and the median pull request merges in 7 min. A merge queue would cost a
   rewrite of `just merge` for a saving that is small. The share rose on the reviewers'
   failures, not on the merges.
+  In 0.9.0, 4 rounds of 22 (18 %; 0.8.0: 11 of 30, 37 %): one counted, a fix after a
+  review; none known to be a pull request sent round by another's merge — the entries
+  were stacked again. The verdict stands.

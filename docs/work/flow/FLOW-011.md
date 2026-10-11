@@ -17,3 +17,7 @@
   demands and 0.8.6 in CI does not (`docs/lessons.md`, 2026-05-22). Only a release runs
   that check locally, so nothing had shown it. `scripts/check.py` now gives the address;
   the tool's version on the machine is still not the one CI pins.
+- 0.9.0, the same day: the release then stopped a second time, on a test that fails at
+  random (two tests sharing a temporary folder), and a binary on disk older than the code
+  listed 12 tools of 13. Three things in one day that the daily harness and CI passed and
+  that only the release, or a run of the built program, showed.

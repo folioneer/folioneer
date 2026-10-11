@@ -12,3 +12,5 @@
 - 0.7.0: not queued, and the causes were not counted a second time.
 - 0.7.1: one later round in eighteen. While the entries are stacked there is little to
   sort; the figure argues for waiting until the share rises again.
+- 0.9.0: 4 later rounds in 22; one cause counted by hand, three not. The share stays
+  low while entries are stacked; the figure still argues for waiting.

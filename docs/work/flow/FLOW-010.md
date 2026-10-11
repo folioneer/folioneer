@@ -12,3 +12,4 @@
 - 0.7.0: no sweep. The same machine carries the backend coverage run only in the
   foreground (405 s, two build jobs); the owner asked on 2026-10-10 whether another
   computer could do the work.
+- 0.9.0: no sweep. The two lines are still to write in `docs/workflow.md`.

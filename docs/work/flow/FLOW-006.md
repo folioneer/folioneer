@@ -11,3 +11,8 @@
   refuse.
 - 0.7.0: TODO-059 held seven pieces of work and was split into seven entries when the
   owner read it, after the batch; the challenge step had not split it.
+- 0.9.0: TODO-059's last clause — a session only the owner could record — kept the entry
+  open after its code had merged, until the owner said he is not the QA. The rule is now
+  in `docs/workflow.md` § 1 and in `/run-entry`: such a clause becomes a test or a debt
+  entry, and the entry closes. What is left of this proposal is its first half, the
+  entry whose Done-when is a survey.

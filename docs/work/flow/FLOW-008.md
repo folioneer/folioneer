@@ -12,3 +12,7 @@
   the lane in its reviewer step. In 0.7.0 it was launched 9 times for 13 backend and
   frontend launches and CI's architecture lane refused nothing the local one had passed.
   In 0.7.1 it went with each of the 2 frontend launches; no backend code moved.
+  In 0.9.0 it went with each of the 2 backend launches, and CI's architecture lane refused
+  #200 all the same: the local run had graded the write-time check against ADR-012 as a
+  warning with a decision for the owner, CI's as a critical. The same finding, two
+  grades: one round, and the decision the owner then took.
