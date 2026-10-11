@@ -121,7 +121,8 @@ under them.
    same commit). A feature in a domain without a spec starts one (`docs/spec/<feature>.md`,
    its trigram registered in `docs/spec-index.md`). A new or changed command updates the
    domain's contract (`docs/contracts/<domain>-contract.md`, created with the domain's
-   first command) in the same commit, with `/contract`. Confirm red.
+   first command) in the same commit, with `/contract`. Confirm red, before the code: the pull request's body
+   says per clause whether its test was seen red.
 4. **Implement** to green, the right way (§ 6). Logic that lands in the frontend is a
    harness failure, not a style remark.
 5. **Self-check** — while working, the recipes take a scope: `just test <paths>`,
@@ -171,6 +172,16 @@ the code it touches for four things, asked together:
 - a technical choice that will need an ADR;
 - a platform, or a part of the Done when, that may be left out;
 - an entry large enough to be split.
+
+Two steps of that reading are named, because the code an entry changes shows neither:
+
+- **The sentences that list** — for every entry that adds or changes what an interface
+  can do (a tool, a command, a setting, an action), search the locales
+  (`src/i18n/locales/`), the specs and the `README.md` for the sentences that list what
+  it can do: a consent dialog, a description, a help page. A sentence that would say
+  less than what is allowed is a question of the block.
+- **The ADRs of the records** — for every record the entry writes, read the ADRs that
+  name it (`docs/adr/`). A Done when that stands against one is a question of the block.
 
 A queued `DEBT-NNN` is challenged against the current code in the same reading, so that
 what the challenge asks is in the block. A question is asked once, at its widest ("the

@@ -28,7 +28,16 @@ An empty queue: say so, name the hand-over steps (Step 4) and stop.
 ## Step 2 — The opening block
 
 As `docs/workflow.md` § 3 says: read every queued entry and the code it touches, challenge
-each `DEBT-NNN` against the code, draw the mock-ups (`/design-proposal`) of the entries
+each `DEBT-NNN` against the code. Two steps of the reading are named there and done for
+every entry, since the code it changes shows neither:
+
+- **The sentences that list**: for an entry that adds or changes what an interface can
+  do, search the locales, the specs and the `README.md` for the sentences that list what
+  it can do.
+- **The ADRs of the records**: for every record the entry writes, read the ADRs that
+  name it.
+
+Then draw the mock-ups (`/design-proposal`) of the entries
 that change what the user sees, then ask — one question at a time, each with its context
 — and write every answer on its entry. One docs pull request, merged on green. What is
 assumed without asking is said to the owner and written in that pull request's body.

@@ -59,7 +59,9 @@ which renders the mocks and flips the line to `proposed (…)`.
 - A new or changed Tauri command updates `docs/contracts/<domain>-contract.md` (created
   with the domain's first command) in the same commit; `spec-reviewer` and
   `contract-reviewer` run on those files in Step 6.
-- Run the suites; confirm the new tests are red. If a clause cannot become a test
+- Run the suites; confirm the new tests are red, before the code that makes them green
+  is written. The pull request's body says so per Done-when clause (Step 8): the test,
+  and `seen red` — or why it could not be (a clause that only removes, a record). If a clause cannot become a test
   because it needs a decision, write it as an open question on the entry, commit that, and
   stop; if it only needs someone at the screen, it is never left to the owner: file the
   missing test as a `DEBT-NNN` entry and go on (`docs/workflow.md` § 1).
@@ -98,7 +100,8 @@ for `feat`/`fix`), body ≤ 2 lines with the ref.
 ## Step 8 — Pull request and merge
 
 - Commit, push, `gh pr create`. Body under 20 lines: the entry ref and title, each
-  Done when clause with the test that proves it, findings that changed something,
+  Done when clause with the test that proves it and whether it was seen red (Step 3),
+  findings that changed something,
   techdebt filed, the visual proofs. Nothing else.
 - Watch the checks with `just watch-pr` under a `Monitor` (30 minutes; re-arm on
   expiry): it prints a failure when it lands and ends with the verdict, by exit code —
