@@ -119,6 +119,47 @@ def setup_problems(pieces: list[str], listed: list[str], exists) -> list[str]:
     return problems
 
 
+QUEUE = "docs/work/queue.md"
+# The queue's lines and an entry's size as `scripts/work-queue.py` reads them (`QUEUE_LINE`,
+# `_field`, `_debt_field`): what `just queue` takes as queued and sized is what is checked.
+QUEUED = re.compile(r"^\s*(?:-|\d+\.)\s+((?:TODO|DEBT|FLOW)-\d+)\b", re.MULTILINE)
+SIZE = re.compile(r"^(?:\*\*Size:\*\*|\s*- Size:)\s*(XL|S|M|L)\b", re.MULTILINE)
+
+
+def unsized_queued(queue_text: str, entry_text) -> list[str]:
+    """A queued entry carries a size, and a programme is sliced before it is queued
+    (`docs/workflow.md` § 2). `entry_text(ref)` is the entry's file, or None once it has
+    shipped: nothing is asked of that one."""
+    problems = []
+    for ref in QUEUED.findall(re.sub(r"<!--.*?-->", "", queue_text, flags=re.DOTALL)):
+        text = entry_text(ref)
+        if text is None:
+            continue
+        size = SIZE.search(text)
+        if size is None:
+            problems.append(
+                f"{QUEUE}: {ref} is queued without a size (S, M or L) — docs/workflow.md § 2"
+            )
+        elif size.group(1) == "XL":
+            problems.append(
+                f"{QUEUE}: {ref} is queued as XL — a programme is sliced before it is queued"
+            )
+    return problems
+
+
+def queue_problems() -> list[str]:
+    """`unsized_queued` on this repository's queue and entry files."""
+    queue = ROOT / QUEUE
+    if not queue.exists():
+        return []
+
+    def entry_text(ref: str) -> str | None:
+        path = ROOT / "docs" / "work" / ref.split("-")[0].lower() / f"{ref}.md"
+        return path.read_text(encoding="utf-8") if path.exists() else None
+
+    return unsized_queued(queue.read_text(encoding="utf-8"), entry_text)
+
+
 def tracked(*patterns: str) -> list[str]:
     out = subprocess.run(
         ["git", "ls-files", *patterns],
@@ -154,6 +195,7 @@ def main() -> int:
     problems += setup_problems(
         pieces, listed, exists=lambda path: (ROOT / path).exists()
     )
+    problems += queue_problems()
 
     if problems:
         print(f"❌ rule homes: {len(problems)} problem(s)")

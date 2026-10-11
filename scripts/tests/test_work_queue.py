@@ -496,5 +496,71 @@ Figures.
         self.assertIsNone(work_queue.audits_owed("nightly", self.AUDITS))
 
 
+class Sizes(unittest.TestCase):
+    """FLOW-038 — an entry carries a size, and a queue adds up to pull requests."""
+
+    TODO = (
+        "# TODO-001 — (backend) — Small\n\n**Size:** S — one pull request, one layer.\n"
+        "**Done when:** a test.\n**Design:** none\n**Open questions:** none\n\n"
+        "# TODO-002 — (fullstack) — Large\n\n**Size:** L — two or three pull requests.\n"
+        "**Done when:** a test.\n**Design:** none\n**Open questions:** none\n\n"
+        "# TODO-003 — (backend) — Not sized\n\n"
+        "**Done when:** a test.\n**Design:** none\n**Open questions:** none\n\n"
+        "# TODO-004 — (fullstack) — A programme\n\n**Size:** XL — to slice.\n"
+        "**Done when:** a test.\n**Design:** none\n**Open questions:** none\n"
+    )
+    DEBT = (
+        "# 2026-10-11 — DEBT-007 — Medium\n\n- Size: M — one pull request: two lanes.\n"
+        "- Done when: it is.\n\n"
+        "# 2026-10-11 — DEBT-008 — A word that is no size\n\n- Size: medium\n"
+        "- Done when: it is.\n"
+    )
+    FLOW = "# FLOW-001 — Small\n\n- Size: S — one pull request.\n- Proposal: x.\n"
+
+    def entries(self):
+        return (
+            work_queue.parse_entries(self.TODO)
+            + work_queue.parse_debt(self.DEBT)
+            + work_queue.parse_flow(self.FLOW)
+        )
+
+    def test_each_kind_of_entry_says_its_size(self):
+        sizes = {entry["ref"]: entry["size"] for entry in self.entries()}
+        self.assertEqual(
+            sizes,
+            {
+                "TODO-001": "S",
+                "TODO-002": "L",
+                "TODO-003": None,
+                "TODO-004": "XL",
+                "DEBT-007": "M",
+                "DEBT-008": None,
+                "FLOW-001": "S",
+            },
+        )
+
+    def queued(self, queue):
+        return work_queue.classify(work_queue.parse_queue(queue), self.entries())["queued"]
+
+    # S and M count one pull request, L two to three; what has shipped counts nothing.
+    def test_a_queue_adds_up_to_pull_requests(self):
+        size = work_queue.queue_size(
+            self.queued("- TODO-001\n- DEBT-007\n- TODO-002\n- FLOW-001\n- TODO-099\n")
+        )
+        self.assertEqual(size["pull_requests"], {"at_least": 5, "at_most": 6})
+        self.assertEqual(size["unsized"], [])
+        self.assertEqual(size["to_slice"], [])
+
+    # An entry with no size, or a programme, is named and not counted: the sum says what
+    # it leaves out.
+    def test_what_cannot_be_counted_is_named(self):
+        size = work_queue.queue_size(
+            self.queued("- TODO-001\n- TODO-003\n- DEBT-008\n- TODO-004\n")
+        )
+        self.assertEqual(size["pull_requests"], {"at_least": 1, "at_most": 1})
+        self.assertEqual(size["unsized"], ["TODO-003", "DEBT-008"])
+        self.assertEqual(size["to_slice"], ["TODO-004"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -64,6 +64,11 @@ From the session's transcript and memory notes, for the batch only:
   review or a failed check, the usage limit;
 - real defects found by the reviewers before merge, and by challenging an entry before
   starting it — each named in a few words;
+- for each entry the batch shipped, its size beside what it took: the `Size` line of the
+  entry's file as it stood before the pull request that deleted it
+  (`git show <commit>^:docs/work/<kind>/<REF>.md`), and the pull requests that name the
+  entry. An S or an M that took two, an L that took one, and an entry that shipped with
+  no size are said as such (`docs/workflow.md` § 2);
 - the questions put to the owner: how many in the opening block, how many during the
   batch, and of those which the opening reading (`docs/workflow.md` § 3) should have
   caught — each named in a few words;

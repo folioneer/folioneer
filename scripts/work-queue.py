@@ -176,6 +176,31 @@ def readiness(body: list[str]) -> list[str]:
     return waits
 
 
+# The pull requests a size stands for (`docs/workflow.md` § 2); XL is sliced, never counted.
+SIZE_PULL_REQUESTS = {"S": (1, 1), "M": (1, 1), "L": (2, 3)}
+
+
+def size_of(line: str | None) -> str | None:
+    """The size an entry's `Size` line opens with — S, M, L or XL — or None."""
+    match = re.match(r"(XL|S|M|L)\b", (line or "").strip())
+    return match.group(1) if match else None
+
+
+def queue_size(queued: list[dict]) -> dict:
+    """What the queued entries still to work add up to, in pull requests, with the
+    entries the sum leaves out: those without a size, and those to slice (XL)."""
+    left = [entry for entry in queued if entry["state"] not in ("closed", "unknown")]
+    counted = [SIZE_PULL_REQUESTS[entry["size"]] for entry in left if entry.get("size") in SIZE_PULL_REQUESTS]
+    return {
+        "pull_requests": {
+            "at_least": sum(low for low, _ in counted),
+            "at_most": sum(high for _, high in counted),
+        },
+        "unsized": [entry["ref"] for entry in left if entry.get("size") is None],
+        "to_slice": [entry["ref"] for entry in left if entry.get("size") == "XL"],
+    }
+
+
 def parse_entries(todo_text: str) -> list[dict]:
     """Every `# TODO-NNN — …` entry of the todo files, with what it waits on."""
     entries: list[dict] = []
@@ -187,6 +212,7 @@ def parse_entries(todo_text: str) -> list[dict]:
             {
                 "ref": f"TODO-{match.group('number')}",
                 "title": match.group("title"),
+                "size": size_of(_field(body, "Size")),
                 "user_value": _field(body, "User value"),
                 "waits_on": readiness(body),
             }
@@ -223,6 +249,7 @@ def parse_debt(debt_text: str) -> list[dict]:
                 "title": match.group("title"),
                 "theme": debt_theme(match.group("title")),
                 "severity": _debt_field(body, "Severity"),
+                "size": size_of(_debt_field(body, "Size")),
                 "user_value": _debt_field(body, "User value"),
                 "waits_on": ([] if _debt_field(body, "Done when") else ["no Done when"])
                 + [
@@ -256,6 +283,7 @@ def parse_flow(flow_text: str) -> list[dict]:
                 "ref": match.group("ref"),
                 "title": match.group("title"),
                 "kind": _debt_field(body, "Kind"),
+                "size": size_of(_debt_field(body, "Size")),
                 "waits_on": ["the owner's decision"] if needs_owner else [],
             }
         )
@@ -617,9 +645,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    work = collect_work()
     out = {
-        "version": 5,
-        **collect_work(),
+        "version": 6,
+        **work,
+        "queue_size": queue_size(work["queued"]),
         "pull_requests": collect_pull_requests(),
         "in_flight": collect_in_flight(),
         "roadmap": collect_roadmap(),

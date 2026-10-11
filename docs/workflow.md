@@ -40,6 +40,19 @@ under them.
   next free one, counting the entries already deleted. Two branches that take the same
   id conflict at the merge; the later one takes the next id.
 - The overview is `just queue`: one JSON document, every entry by kind.
+- An entry carries a `Size` line (owner, 2026-10-11), by facts and not by effort:
+  **S** — one pull request, one layer, nothing from the owner; **M** — any other single
+  pull request: several lanes, a spec or a contract, an answer from the owner; **L** —
+  two or three pull requests, or mock-ups or a spec interview with the owner; **XL** — a
+  programme, sliced before it is queued. The line opens with the letter and says why
+  (`**Size:** M — one pull request: a read tool and a rule of the spec.`; `- Size: …` on
+  a debt or a flow entry). The agent sets it on a debt or a flow entry; on a todo entry
+  `/plan-queue` proposes it and the owner confirms it. An entry gets its size when it is
+  proposed for the queue or enters it: `just rule-homes` fails on a queued entry without
+  one, or queued as XL, and asks nothing of the others.
+- `just queue` adds the queued entries still to work up to pull requests (`queue_size`:
+  S and M count one, L two to three) and names those the sum leaves out; `/plan-queue`
+  shows it beside what the last batches merged (`docs/work/audits.md`).
 
 ### Todo entries — human-owned
 

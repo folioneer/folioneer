@@ -188,5 +188,43 @@ class AgenticSetup(unittest.TestCase):
         )
 
 
+class QueuedSizes(unittest.TestCase):
+    """FLOW-038 — an entry enters the queue with its size."""
+
+    QUEUE = "# Queue\n\n<!-- - TODO-009 -->\n\n- TODO-001\n- DEBT-002\n- FLOW-003\n- TODO-004\n- TODO-005\n"
+    ENTRIES = {
+        "TODO-001": "# TODO-001 — (backend) — Sized\n\n**Size:** M — one pull request.\n",
+        "DEBT-002": "# 2026-10-11 — DEBT-002 — Sized\n\n- Size: S — one pull request.\n",
+        "FLOW-003": "# FLOW-003 — Not sized\n\n- Kind: speed\n",
+        "TODO-004": "# TODO-004 — (fullstack) — A programme\n\n**Size:** XL — to slice.\n",
+    }
+
+    def test_a_queued_entry_without_a_size_and_a_programme_are_reported(self):
+        self.assertEqual(
+            rule_homes.unsized_queued(self.QUEUE, self.ENTRIES.get),
+            [
+                "docs/work/queue.md: FLOW-003 is queued without a size (S, M or L) — docs/workflow.md § 2",
+                "docs/work/queue.md: TODO-004 is queued as XL — a programme is sliced before it is queued",
+            ],
+        )
+
+    # TODO-005 has shipped: its file is gone, and nothing is asked of it. A reference in a
+    # comment queues nothing.
+    def test_what_has_shipped_and_what_is_not_queued_owe_nothing(self):
+        sized = "- TODO-001\n- DEBT-002\n- TODO-005\n<!-- - FLOW-003 -->\n"
+        self.assertEqual(rule_homes.unsized_queued(sized, self.ENTRIES.get), [])
+
+    # The queue is read as `just queue` reads it: a numbered item, an indented one and one
+    # with words after its reference are queued all the same.
+    def test_a_line_the_queue_script_reads_is_checked(self):
+        queue = "1. FLOW-003\n  - FLOW-003 — a note\n"
+        self.assertEqual(len(rule_homes.unsized_queued(queue, self.ENTRIES.get)), 2)
+        indented = {"DEBT-002": "# 2026-10-11 — DEBT-002 — Sized\n\n  - Size: S — one.\n"}
+        self.assertEqual(rule_homes.unsized_queued("- DEBT-002\n", indented.get), [])
+
+    def test_this_repository_queues_only_sized_entries(self):
+        self.assertEqual(rule_homes.queue_problems(), [])
+
+
 if __name__ == "__main__":
     unittest.main()

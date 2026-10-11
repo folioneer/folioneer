@@ -42,6 +42,10 @@ One JSON document:
 - `ready` — todo entries not queued that the agent could run today.
 - `blocked` — todo entries not queued, each with `waits_on`: the unticked open
   questions, a design to validate, or a missing Done when.
+- `queue_size` — what the queued entries still to work add up to: `pull_requests`
+  (`at_least`, `at_most`: S and M count one, L two to three — `docs/workflow.md` § 2),
+  `unsized` (queued without a size) and `to_slice` (queued as XL). Every entry still
+  to work — in `queued`, `ready` or `blocked` — carries its `size`, or `null`.
 - `techdebt_not_queued` — tech-debt entries not queued, grouped by theme (`refs`).
 - `flow_not_queued` — the flow entries not queued that propose a change (`FLOW-NNN`;
   `waits_on` the owner's decision for some).
@@ -75,6 +79,10 @@ and the open issues, propose one queue of ten lines at most:
    or to close it. Once an entry names it, the entry is what is proposed.
 8. Ten lines at most. What does not fit stays in its section, unranked: the proposal is
    the next batch, not the backlog in order.
+9. The proposal stops at a batch. Add up the sizes of what is proposed, in pull requests
+   (`queue_size` for what is queued; an entry without a size is sized first, Step 4), and
+   put the sum beside what the last two batches merged (`docs/work/audits.md`): a line
+   that takes the sum past them is left in its section, and the proposal says so.
 
 Then read each proposed entry that is not queued yet, and the code it touches, as the
 opening block of a batch does (`docs/workflow.md` § 3, the four things), and challenge a
@@ -150,9 +158,9 @@ it — the answers on their entries, the sizes, the entries split or filed, and
 ### GitHub issues
 - gh{n} — {title} — {the entries that name it | no entry}
 
-### Proposed queue
-1. {ref} — {why here}
-2. FLOW-{NNN} — {the figure that moved}
+### Proposed queue — {N to M} pull requests; the last batches merged {A} and {B}
+1. {ref} — {size} — {why here}
+2. FLOW-{NNN} — {size} — {the figure that moved}
 …
 10. {the last line the proposal may hold}
 
