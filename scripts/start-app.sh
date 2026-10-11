@@ -2,6 +2,7 @@
 # Start Folioneer in development mode
 # Usage: ./start-app.sh [--reset-db] [--log-level LEVEL]
 set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/usage-log.sh"
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RESET_DB=false

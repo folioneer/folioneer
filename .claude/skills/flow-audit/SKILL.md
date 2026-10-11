@@ -42,6 +42,11 @@ For the batch that led to `v0.6.0`: `python3 scripts/flow-audit.py v0.5.0 v0.6.0
   added, mean and median minutes from opening to merging, the count by commit type.
 - `ci` — rounds (one pushed commit of a branch), branches, rounds beyond the first,
   failures by workflow, the median duration of each workflow's green runs.
+- `usage` (current window only) — what `logs/usage.log` saw: `runs` and `failed` by
+  tool (a script, or a recipe that runs none), `never_run` for the known tools it never
+  saw, `first_line` for the moment the log starts. The log is local and not written in
+  CI: a tool only CI runs is in `never_run`, and a `first_line` later than the window's
+  start means the figures cover part of it — say so beside them.
 - `truncated` — what GitHub's lists cut short. When it names anything, the oldest figures
   are incomplete: say so beside them, or raise the limits in the script first.
 
@@ -62,12 +67,13 @@ From the session's transcript and memory notes, for the batch only:
 - the questions put to the owner: how many in the opening block, how many during the
   batch, and of those which the opening reading (`docs/workflow.md` § 3) should have
   caught — each named in a few words;
-- what the agent invoked itself: skills, local agents, recipes, native commands where a
-  recipe exists, scripts run directly;
+- what the agent invoked itself that the usage log does not hold: skills, local agents,
+  native commands where a recipe exists;
 - how many times `/run-entry` and `/visual-proof` were loaded with the `Skill` tool,
   beside the entries that needed them, and whether each was loaded again after a pull
   request of the batch that changed it (`docs/workflow.md` § 3);
-- what exists and was not used: skills, agents, recipes, scripts;
+- what exists and was not used: skills and agents (recipes and scripts are the
+  script's `never_run`);
 - each generic piece of `docs/agentic-setup.md` read against its line: those that no
   longer do what the line says, or do what it says never.
 
@@ -78,7 +84,9 @@ State a count only when it was counted; otherwise write "not counted".
 In `docs/work/audits.md`, replace `## Measured — the <previous> batch` and `## Used and not
 used — the <previous> batch` with this batch's, same tables, each figure beside the
 previous one (`33, was 27`). Keep the "Reading" paragraph to three sentences: what the
-figures say, not what was done.
+figures say, not what was done. The recipes and scripts of "Used and not used" are the
+script's `usage` figures. Once the section is written, empty `logs/usage.log` (local,
+never committed): its figures are recorded.
 
 ### Step 4 — Re-read the open entries
 

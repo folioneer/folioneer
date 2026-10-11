@@ -10,6 +10,7 @@
 #
 # Use: bash scripts/sync-format-check.sh [base-ref]   (default: merge-base with origin/main)
 set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/usage-log.sh"
 
 cd "$(git rev-parse --show-toplevel)"
 

@@ -21,11 +21,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import statistics
 import subprocess
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
 
 PULL_REQUEST_FIELDS = (
     "number,title,state,createdAt,mergedAt,closedAt,additions,headRefName"
@@ -47,6 +51,8 @@ COMMIT_TYPES = {
     "perf",
     "build",
 }
+# The two halves of the usage log itself: they log the others and never themselves.
+LOGGERS = ("usage_log.py", "usage-log.sh")
 PULL_REQUEST_LIMIT = 500
 RUN_LIMIT = 1000
 
@@ -176,17 +182,65 @@ def measure(
     }
 
 
+def measure_usage(
+    log_lines: list[str], since: datetime, until: datetime, tools: list[str]
+) -> dict:
+    """What the usage log saw in the window: runs and failures by tool, and the tools it never saw.
+
+    The log is local and written outside CI only: a tool that only CI runs is never
+    seen, and a log that starts after `since` covers part of the window. A recipe
+    without a script is logged when it starts: its failures are not known.
+    """
+    runs: dict[str, int] = {}
+    failed: dict[str, int] = {}
+    stamps = []
+    for line in log_lines:
+        parts = line.rstrip("\n").split("\t")
+        if len(parts) != 4 or not _within(parts[0], since, until):
+            continue
+        stamp, tool, _, outcome = parts
+        stamps.append(stamp)
+        runs[tool] = runs.get(tool, 0) + 1
+        if outcome not in ("ok", "started"):
+            failed[tool] = failed.get(tool, 0) + 1
+    return {
+        "first_line": min(stamps) if stamps else None,
+        "runs": dict(sorted(runs.items())),
+        "failed": dict(sorted(failed.items())),
+        "never_run": sorted(set(tools) - set(runs)),
+    }
+
+
+def known_tools() -> list[str]:
+    """Every tool the usage log can name: the scripts that log themselves — one that only
+    CI runs does not — and the recipes that run none."""
+    scripts = [
+        path.name
+        for path in (ROOT / "scripts").iterdir()
+        if path.suffix in (".py", ".sh")
+        and path.name not in LOGGERS
+        and re.search(r"usage_log\.start\(\)|usage-log\.sh", path.read_text(encoding="utf-8"))
+    ]
+    recipes = re.findall(
+        r'_used "([^"]+)"', (ROOT / "justfile").read_text(encoding="utf-8")
+    )
+    return sorted({*scripts, *recipes})
+
+
+def read_usage_log() -> list[str]:
+    log = ROOT / "logs" / "usage.log"
+    return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+
+
 def _gh_json(*args: str) -> object:
     if not shutil.which("gh"):
-        raise SystemExit("flow-audit: the GitHub command line (gh) is not installed")
+        sys.exit("flow-audit: the GitHub command line (gh) is not installed")
     try:
         result = subprocess.run(
             ["gh", *args], check=True, capture_output=True, text=True, timeout=120
         )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
-        raise SystemExit(
-            f"flow-audit: gh {' '.join(args[:2])} failed: {error}"
-        ) from error
+        sys.exit(f"flow-audit: gh {' '.join(args[:2])} failed: {error}")
     return json.loads(result.stdout or "null")
 
 
@@ -195,7 +249,7 @@ def release_moment(tag: str) -> datetime:
     release = _gh_json("release", "view", tag, "--json", "publishedAt")
     published = release.get("publishedAt") if isinstance(release, dict) else None
     if not published:
-        raise SystemExit(f"flow-audit: release {tag} has no publication date")
+        sys.exit(f"flow-audit: release {tag} has no publication date")
     return parse_moment(published)
 
 
@@ -249,6 +303,9 @@ def main(argv: list[str] | None = None) -> int:
     until = release_moment(args.until) if args.until else datetime.now(timezone.utc)
     pull_requests, runs = collect()
     report = {"current": measure(pull_requests, runs, since, until)}
+    report["current"]["usage"] = measure_usage(
+        read_usage_log(), since, until, known_tools()
+    )
     earliest = since
     if args.previous:
         earliest = release_moment(args.previous)
@@ -266,4 +323,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    import usage_log
+
+    usage_log.start()
     sys.exit(main())

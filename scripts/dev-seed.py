@@ -117,4 +117,7 @@ def main():
 
 
 if __name__ == "__main__":
+    import usage_log
+
+    usage_log.start()
     sys.exit(main())

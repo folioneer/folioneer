@@ -821,6 +821,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 if __name__ == "__main__":
+    import usage_log
+
+    usage_log.start()
     args = _parse_args()
     checker = QualityChecker(
         fast_mode=args.fast,

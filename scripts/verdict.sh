@@ -13,6 +13,7 @@
 #
 # No `set -e`: the command's exit code is what this script is for.
 set -uo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/usage-log.sh"
 
 if [[ $# -lt 2 ]]; then
     echo "usage: verdict.sh <name> <command> [args…]" >&2

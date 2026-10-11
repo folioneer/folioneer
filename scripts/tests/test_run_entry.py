@@ -41,7 +41,8 @@ def queued(queue: str) -> list[str]:
     with tempfile.TemporaryDirectory() as folder:
         root = Path(folder)
         (root / "scripts").mkdir()
-        shutil.copy(SCRIPTS / "work-queue.py", root / "scripts" / "work-queue.py")
+        for script in ("work-queue.py", "usage_log.py"):
+            shutil.copy(SCRIPTS / script, root / "scripts" / script)
         for name, text in ENTRIES.items():
             (root / "docs" / "work" / name).parent.mkdir(parents=True, exist_ok=True)
             (root / "docs" / "work" / name).write_text(text, encoding="utf-8")

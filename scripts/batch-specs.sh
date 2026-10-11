@@ -8,6 +8,7 @@
 #
 # Use: bash scripts/batch-specs.sh [<since>]   (<since> defaults to the last `v*` tag)
 set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/usage-log.sh"
 
 cd "$(git rev-parse --show-toplevel)"
 

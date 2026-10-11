@@ -361,7 +361,7 @@ class ReleaseManager:
                 f"`git checkout -- package.json package-lock.json src-tauri/Cargo.toml src-tauri/tauri.conf.json` to revert.{NC}",
                 file=sys.stderr,
             )
-            raise SystemExit(1) from e
+            sys.exit(1)
         print("  ✓ src-tauri/Cargo.lock updated")
 
     def _build_changelog_entry(self) -> str:
@@ -752,6 +752,9 @@ def _semver_str(value: str) -> str:
 
 
 if __name__ == "__main__":
+    import usage_log
+
+    usage_log.start()
     parser = argparse.ArgumentParser(description="Release manager.")
     # --dry-run and --preview are mutually exclusive: they're two distinct
     # modes (DRY_RUN edits files locally but skips push; PREVIEW is fully

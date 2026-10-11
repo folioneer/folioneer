@@ -10,6 +10,7 @@
 # Use:  just run-entry          (or from a timer: bash scripts/run-entry.sh)
 # Exit: 0 done or nothing to do · 1 preconditions · 2 the run failed or timed out
 set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/usage-log.sh"
 
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 cd "$PROJECT_ROOT"

@@ -11,6 +11,7 @@
 # Use: bash scripts/coverage-preflight.sh   (exit 0: go; exit 3: refused, reason on stderr)
 # HARNESS_MEMINFO names the file read instead of /proc/meminfo (the tests' own).
 set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/usage-log.sh"
 
 limit_kib=$((8 * 1024 * 1024))
 meminfo="${HARNESS_MEMINFO:-/proc/meminfo}"

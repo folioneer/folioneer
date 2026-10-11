@@ -249,5 +249,51 @@ class TruncatedTest(unittest.TestCase):
         self.assertEqual(flow_audit.truncated([], short, SINCE), [])
 
 
+class Usage(unittest.TestCase):
+    """FLOW-035 — what the usage log saw in the window."""
+
+    LOG = [
+        "2026-10-03T21:00:00Z\tcheck.py\t3.0s\tok",  # before the window
+        "2026-10-04T08:00:00Z\tcheck.py\t3.0s\tok",
+        "2026-10-04T09:00:00Z\tcheck.py\t2.0s\texit 1",
+        "2026-10-04T10:00:00Z\tformat\t-\tstarted",
+        "not a line of the log",
+        "2026-10-06T00:00:00Z\tmerge.py\t9.0s\tok",  # after the window
+    ]
+
+    def measure(self, lines=None):
+        return flow_audit.measure_usage(
+            self.LOG if lines is None else lines,
+            SINCE,
+            UNTIL,
+            ["check.py", "format", "merge.py"],
+        )
+
+    def test_flow_035_runs_are_counted_by_tool_within_the_window(self):
+        self.assertEqual(self.measure()["runs"], {"check.py": 2, "format": 1})
+
+    def test_flow_035_a_run_that_did_not_end_ok_is_counted_as_failed(self):
+        # A recipe without a script is logged as started: its end is not known, and it
+        # is not a failure.
+        self.assertEqual(self.measure()["failed"], {"check.py": 1})
+
+    def test_flow_035_a_known_tool_the_log_never_saw_is_named(self):
+        self.assertEqual(self.measure()["never_run"], ["merge.py"])
+
+    def test_flow_035_the_first_line_says_how_much_of_the_window_is_covered(self):
+        self.assertEqual(self.measure()["first_line"], "2026-10-04T08:00:00Z")
+        self.assertIsNone(self.measure([])["first_line"])
+
+    def test_flow_035_every_script_and_logged_recipe_is_a_known_tool(self):
+        tools = flow_audit.known_tools()
+        self.assertIn("flow-audit.py", tools)
+        self.assertIn("harness.sh", tools)
+        self.assertIn("format", tools)
+        self.assertNotIn("usage_log.py", tools)
+        self.assertNotIn("usage-log.sh", tools)
+        # Only CI runs it, from a copy outside the checkout: it does not log.
+        self.assertNotIn("review-stop-reason.py", tools)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -89,4 +89,7 @@ def main(paths: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    import usage_log
+
+    usage_log.start()
     sys.exit(main(sys.argv[1:]))

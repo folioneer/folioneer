@@ -237,6 +237,17 @@ and nothing else.
 The `main-protection` ruleset lists the same checks; the owner's laptop bypasses it for
 `just release`, so the guard in `just merge` is the enforced gate.
 
+**The usage log.** The audit after a release reads `logs/usage.log`: one line per run of
+a script or a recipe (time, tool, duration, result), written by `scripts/usage_log.py`.
+The file is local, never committed, capped at 5 000 lines, and emptied once its figures
+are in `docs/work/audits.md`. A new Python or shell script logs itself
+(`usage_log.start()` first thing in its `__main__` block, `. scripts/usage-log.sh` after
+its `set` line); a recipe that runs no script depends on `(_used "<recipe>")`. Nothing
+is logged in CI, nor by the script tests (`USAGE_LOG=off`). A script that only CI
+runs does not log. A script that runs another logs both (`harness.sh` and each check it
+calls), and a worktree keeps its own file: the audit reads the main checkout's. Skills and agents are
+counted from the session's transcript.
+
 ## 6. The right way to code
 
 - **Logic in Rust, dumb frontend** (`docs/frontend-rules.md` F32, guarded by A12).

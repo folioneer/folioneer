@@ -10,6 +10,7 @@
 #
 # Use: just harness [--coverage]   (or: bash scripts/harness.sh [--coverage])
 set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/usage-log.sh"
 
 coverage=false
 case "$#:${1:-}" in
@@ -47,7 +48,7 @@ python3 scripts/rule-homes.py
 python3 scripts/reference-forms.py
 python3 scripts/contract-check.py
 bash scripts/sync-format-check.sh "$base"
-python3 -m unittest discover -s scripts/tests -p "test_*.py"
+USAGE_LOG=off python3 -m unittest discover -s scripts/tests -p "test_*.py"
 python3 scripts/licence-check.py
 
 if [ "$scope" = none ] || [ "$scope" = docs ]; then

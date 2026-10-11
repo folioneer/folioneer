@@ -18,6 +18,7 @@
 # writer will clobber the first. Callers MUST serialize reviewer invocations
 # within a batch (the standard reviewer-batch pattern already does this).
 set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/usage-log.sh"
 
 if [[ $# -ne 1 ]]; then
     echo "Usage: $0 <reviewer-slug>" >&2

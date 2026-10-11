@@ -107,6 +107,10 @@ Written to read the same in every repository that works this way.
   for the owner. Never: run by the agent.
 - `scripts/flow-audit.py` — the figures of a batch, as one document. Never: reads
   them.
+- `scripts/usage_log.py` — writes one line per run of a tool, locally. Never: in CI,
+  nor anything about the data handled.
+- `scripts/usage-log.sh` — the same line for a shell script. Never: changes the
+  script's exit code.
 
 ### Git hooks
 

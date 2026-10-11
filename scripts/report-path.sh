@@ -3,6 +3,7 @@
 # Usage: bash scripts/report-path.sh <slug>
 # Output: tmp/<slug>-YYYY-MM-DD-NN.md  (NN is zero-padded, auto-incremented)
 set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/usage-log.sh"
 
 if [[ $# -ne 1 ]]; then
     echo "Usage: $0 <slug>" >&2

@@ -52,7 +52,7 @@ class Verdict(unittest.TestCase):
                 cwd=folder,
                 capture_output=True,
                 text=True,
-                env={"PATH": "/usr/bin:/bin", "VERDICT_TAIL": "3"},
+                env={"PATH": "/usr/bin:/bin", "VERDICT_TAIL": "3", "USAGE_LOG": "off"},
             )
         self.assertEqual(result.stdout.splitlines()[2:], ["48", "49", "50"])
 

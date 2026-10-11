@@ -13,6 +13,7 @@
 # Use:
 #   git diff --cached --name-only --diff-filter=ACMR | bash scripts/changed-scope.sh
 set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/usage-log.sh"
 
 frontend=0
 backend=0
