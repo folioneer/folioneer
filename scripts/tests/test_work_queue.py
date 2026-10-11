@@ -454,6 +454,47 @@ class SkillProposal(unittest.TestCase):
         issues = self.SKILL.split("### GitHub issues", 1)[1].split("###", 1)[0]
         self.assertIn("no entry", issues)
 
+    def test_the_in_flight_section_says_the_audits_a_release_is_owed(self):
+        in_flight = self.SKILL.split("### In flight", 1)[1].split("###", 1)[0]
+        self.assertIn("audits_owed", self.SKILL)
+        self.assertIn("/prune", in_flight)
+        self.assertIn("/flow-audit", in_flight)
+
+
+class AuditsOwed(unittest.TestCase):
+    """FLOW-036 — a published release later than the last batch `docs/work/audits.md`
+    measured is owed its two audits."""
+
+    AUDITS = """# Flow audits
+
+## Measured — the 0.9.0 batch (2026-10-11)
+
+Figures.
+
+## Used and not used — the 0.9.0 batch
+
+## Measured — the 0.8.0 batch (2026-10-10)
+"""
+
+    def test_a_release_the_audits_measured_owes_nothing(self):
+        self.assertIsNone(work_queue.audits_owed("v0.9.0", self.AUDITS))
+
+    def test_a_release_later_than_the_last_measured_batch_is_owed(self):
+        self.assertEqual(work_queue.audits_owed("v0.10.0", self.AUDITS), "v0.10.0")
+        self.assertEqual(work_queue.audits_owed("v1.0.0", self.AUDITS), "v1.0.0")
+
+    def test_an_earlier_release_owes_nothing(self):
+        self.assertIsNone(work_queue.audits_owed("v0.8.0", self.AUDITS))
+
+    def test_a_release_is_owed_when_nothing_was_ever_measured(self):
+        self.assertEqual(work_queue.audits_owed("v0.9.0", "# Flow audits\n"), "v0.9.0")
+        self.assertEqual(work_queue.audits_owed("v0.9.0", None), "v0.9.0")
+
+    def test_no_release_known_owes_nothing(self):
+        # gh absent or offline: nothing is claimed.
+        self.assertIsNone(work_queue.audits_owed(None, self.AUDITS))
+        self.assertIsNone(work_queue.audits_owed("nightly", self.AUDITS))
+
 
 if __name__ == "__main__":
     unittest.main()

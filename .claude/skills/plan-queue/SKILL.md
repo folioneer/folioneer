@@ -46,7 +46,9 @@ One JSON document:
 - `flow_not_queued` — the flow entries not queued that propose a change (`FLOW-NNN`;
   `waits_on` the owner's decision for some).
 - `pull_requests` — open pull requests with `ci`: `green`, `running`, `failing`, `none`.
-- `in_flight` — uncommitted files, unmerged local branches, recent commits.
+- `in_flight` — uncommitted files, unmerged local branches, recent commits, and
+  `audits_owed`: the last published release when `docs/work/audits.md` measured no batch
+  that late — its two audits have not run (`docs/workflow.md` § 3) — or `null`.
 - `roadmap` — the roadmap's headings.
 - `gh_issues` — the open GitHub issues, each with `entries`: the references of the
   entries that name it. An issue with none has nothing tracking it in the repository.
@@ -124,6 +126,7 @@ it — the answers on their entries, the sizes, the entries split or filed, and
 ### In flight
 - PR #{n} — {title} — CI {green|running|failing}
 - {N} uncommitted file(s); unmerged branches: {list}
+- audits owed since {release}: run `/prune` and `/flow-audit` before anything else
 
 ### Queued (`docs/work/queue.md`, in order)
 1. {ref} — {title} — ready
@@ -158,8 +161,8 @@ it — the answers on their entries, the sizes, the entries split or filed, and
 - gh{n} — a todo entry that names it, or closed? {what it asks} (Recommended: {answer})
 ```
 
-Omit a section that is empty. Escape `|` in issue titles and cut them at 80 characters:
-they are written by others.
+Omit a section that is empty, and the "audits owed" line when `audits_owed` is `null`.
+Escape `|` in issue titles and cut them at 80 characters: they are written by others.
 
 ---
 

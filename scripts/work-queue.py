@@ -452,8 +452,40 @@ def names_ever(kind: str) -> list[str]:
     return names + log.stdout.split()
 
 
+MEASURED = re.compile(r"^## Measured — the (\d+(?:\.\d+)+) batch", re.MULTILINE)
+
+
+def _version(text: str) -> tuple[int, ...] | None:
+    """`v0.9.0` or `0.9.0` as numbers to compare, or None for anything else."""
+    match = re.fullmatch(r"v?(\d+(?:\.\d+)+)", text.strip())
+    return tuple(int(part) for part in match.group(1).split(".")) if match else None
+
+
+def audits_owed(latest_release: str | None, audits_text: str | None) -> str | None:
+    """The last published release when it is later than every batch `docs/work/audits.md`
+    measured: `/prune` and `/flow-audit` have not run since it (`docs/workflow.md` § 3).
+    None when they have, or when no release is known."""
+    released = _version(latest_release or "")
+    if released is None:
+        return None
+    measured = [_version(batch) for batch in MEASURED.findall(audits_text or "")]
+    if any(batch is not None and batch >= released for batch in measured):
+        return None
+    return latest_release
+
+
+def latest_published_release() -> str | None:
+    """The tag of the last release that was published — a draft is not one — or None when
+    gh cannot say."""
+    releases = _gh_json(
+        "release", "list", "--exclude-drafts", "--limit", "1", "--json", "tagName"
+    )
+    return releases[0].get("tagName") if releases else None
+
+
 def collect_in_flight() -> dict:
-    """Uncommitted changes, unmerged branches, recent commits."""
+    """Uncommitted changes, unmerged branches, recent commits, and the release whose audits
+    are owed."""
     porcelain = _git("status", "--porcelain")
     uncommitted_files = []
     for line in porcelain.splitlines():
@@ -479,6 +511,10 @@ def collect_in_flight() -> dict:
         "uncommitted_files": uncommitted_files,
         "unmerged_branches": unmerged,
         "recent_commits": recent_commits,
+        "audits_owed": audits_owed(
+            latest_published_release(),
+            _read(ROOT / "docs" / "work" / "audits.md"),
+        ),
     }
 
 
