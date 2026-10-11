@@ -18,6 +18,8 @@ on 2026-09-12; this document is the rule set, the git history records how it was
 
 Four human touchpoints. Everything else is either the agent's job or a machine gate.
 
+The human is not the QA (owner, 2026-10-11): no entry waits for the owner to check by hand that what was built works. A Done-when clause the agent cannot run becomes a test of the harness — an E2E scenario when it needs the real window — or, when that test is larger than the entry, a `DEBT-NNN` entry that asks for it, and the entry closes on what the harness proves. What the owner notices while using the application is welcome and is no gate.
+
 ## 2. Ids, entries and the queue
 
 A reference says what it points at: a todo entry is `TODO-NNN`, a tech-debt entry

@@ -59,8 +59,10 @@ which renders the mocks and flips the line to `proposed (…)`.
 - A new or changed Tauri command updates `docs/contracts/<domain>-contract.md` (created
   with the domain's first command) in the same commit; `spec-reviewer` and
   `contract-reviewer` run on those files in Step 6.
-- Run the suites; confirm the new tests are red. If a clause cannot become a test,
-  write it as an open question on the entry, commit that, and stop.
+- Run the suites; confirm the new tests are red. If a clause cannot become a test
+  because it needs a decision, write it as an open question on the entry, commit that, and
+  stop; if it only needs someone at the screen, it is never left to the owner: file the
+  missing test as a `DEBT-NNN` entry and go on (`docs/workflow.md` § 1).
 
 ## Step 4 — Implement
 
