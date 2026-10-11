@@ -198,7 +198,7 @@ at the start (what CI found, what an answer of the block opened).
 known vulnerability in what ships blocks the release; the agent fixes it or files it),
 then `spec-checker` once on every spec the batch touched — `bash scripts/batch-specs.sh`
 lists them — and files what it finds as tech debt: a promise the code does not keep is
-not fixed in the release it was found in. It hands over a clean `main`, and says so only once the workflow runs of its head commit have ended green, naming them. The release itself is the human's only part: they run
+not fixed in the release it was found in. Then `just release-check` runs on `main` what the release itself validates before it versions anything — every test, the build, the full query check, a few minutes — so that what would stop the release stops the hand-over; a failure is fixed in a pull request of its own, or filed when it is not the batch's. It hands over a clean `main`, and says so only once the workflow runs of its head commit have ended green, naming them. The release itself is the human's only part: they run
 `just release -y` when they choose. After
 it, `/prune` runs once on the production files the release changed — a full scan is
 asked for by name — and what it recommends is filed as one tech-debt entry, like what the

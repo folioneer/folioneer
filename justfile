@@ -92,6 +92,11 @@ check-full:
     @[ -f scripts/check.py ] || { echo "❌ scripts/check.py not found — restore it from git history"; exit 1; }
     python3 scripts/check.py
 
+# What a release validates before it versions anything — every test, the build, the full query check — run at the hand-over of a batch (docs/workflow.md § 3)
+release-check:
+    @[ -f scripts/check.py ] || { echo "❌ scripts/check.py not found — restore it from git history"; exit 1; }
+    python3 scripts/check.py --release
+
 # Release new version (interactive)
 release *ARGS:
     @[ -f scripts/release.py ] || { echo "❌ scripts/release.py not found — restore it from git history"; exit 1; }

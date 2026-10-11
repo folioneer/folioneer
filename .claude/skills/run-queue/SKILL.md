@@ -64,9 +64,10 @@ For each task, in order:
 
 When every task is completed or stopped: say which entries merged and which stopped, then
 run the hand-over of `docs/workflow.md` § 3 — `/dep-audit`, `spec-checker` on every spec
-the batch touched (`bash scripts/batch-specs.sh`), what they find filed as debt — and the
-closing block. Say that `main` is ready only once the runs of its head commit have ended
-green, naming them.
+the batch touched (`bash scripts/batch-specs.sh`), what they find filed as debt, then
+`just release-check` on `main`, the release's own validation — and the closing block.
+Say that `main` is ready only once the runs of its head commit have ended green, naming
+them.
 
 ## Rules
 

@@ -34,7 +34,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
-from check import QualityChecker
+from check import release_validation
 
 # ANSI colors (respect NO_COLOR=1)
 if os.environ.get("NO_COLOR"):
@@ -547,17 +547,17 @@ class ReleaseManager:
         return True
 
     def run_tests(self) -> bool:
-        """Run the full test suite via the QualityChecker from check.py.
-        Uses strict_mode=True so any stack-marker skip (e.g. accidentally
-        deleted .sqlx/ when migrations exist) blocks the release instead of
-        being silently tolerated."""
+        """Run the release's validation (`check.release_validation`): the full suite,
+        strict, so any stack-marker skip (e.g. accidentally deleted .sqlx/ when
+        migrations exist) blocks the release instead of being silently tolerated.
+        `just release-check` runs the same at the hand-over of a batch."""
         print(f"{BLUE}🚀 Running full quality validation (--strict)...{NC}")
 
         if self.mode is Mode.DRY_RUN:
             print(f"{BLUE}[DRY-RUN] Simulating test suite (check.py){NC}")
             return True
 
-        checker = QualityChecker(fast_mode=False, strict_mode=True)
+        checker = release_validation()
 
         # run_all() streams output directly to the terminal
         success = checker.run_all()

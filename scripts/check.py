@@ -779,6 +779,13 @@ class QualityChecker:
             print(f"\n{SUCCESS}✨ ALL CHECKS PASSED{RESET}\n")
 
 
+def release_validation() -> "QualityChecker":
+    """What a release validates before it versions anything, and what the hand-over of a
+    batch runs before `main` is called ready (`just release-check`): everything, with a
+    missing part of the stack a failure."""
+    return QualityChecker(fast_mode=False, strict_mode=True)
+
+
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Kit quality check — runs lint, format, tests, and build.",
@@ -819,6 +826,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Used by release.py to catch accidentally-deleted markers."
         ),
     )
+    parser.add_argument(
+        "--release",
+        action="store_true",
+        help="The validation of a release, whatever else is given (just release-check)",
+    )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "--frontend",
@@ -838,15 +850,19 @@ if __name__ == "__main__":
 
     usage_log.start()
     args = _parse_args()
-    checker = QualityChecker(
-        fast_mode=args.fast,
-        verbose=args.verbose,
-        sequential=args.sequential,
-        frontend_only=args.frontend,
-        backend_only=args.backend,
-        format_only=args.format_only,
-        skip_tests=args.skip_tests,
-        strict_mode=args.strict_mode,
+    checker = (
+        release_validation()
+        if args.release
+        else QualityChecker(
+            fast_mode=args.fast,
+            verbose=args.verbose,
+            sequential=args.sequential,
+            frontend_only=args.frontend,
+            backend_only=args.backend,
+            format_only=args.format_only,
+            skip_tests=args.skip_tests,
+            strict_mode=args.strict_mode,
+        )
     )
     if not checker.run_all():
         sys.exit(1)

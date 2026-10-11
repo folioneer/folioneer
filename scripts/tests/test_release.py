@@ -124,5 +124,26 @@ class HeadRuns(unittest.TestCase):
         self.assertEqual(called, [])
 
 
+class Validation(unittest.TestCase):
+    # FLOW-011 — a release and the hand-over's `just release-check` run one validation,
+    # defined once: everything, with a missing part of the stack a failure.
+    def test_a_release_runs_the_validation_the_hand_over_runs(self):
+        checker = mock.Mock()
+        checker.run_all.return_value = True
+        manager = release.ReleaseManager.__new__(release.ReleaseManager)
+        manager.mode = release.Mode.REAL
+        with mock.patch.object(
+            release, "release_validation", return_value=checker
+        ) as validation:
+            self.assertTrue(manager.run_tests())
+        validation.assert_called_once_with()
+        checker.run_all.assert_called_once_with()
+
+    def test_the_validation_skips_nothing(self):
+        checker = release.release_validation()
+        self.assertFalse(checker.fast_mode)
+        self.assertTrue(checker.strict_mode)
+
+
 if __name__ == "__main__":
     unittest.main()

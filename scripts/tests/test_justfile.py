@@ -64,6 +64,10 @@ class ScopedRecipes(unittest.TestCase):
         )
         self.assertNotIn("\nSPLIT", result.stdout)
 
+    # FLOW-011 — the hand-over runs the release's own validation through one recipe.
+    def test_the_release_check_recipe_runs_the_validation_of_a_release(self):
+        self.assertIn("python3 scripts/check.py --release", dry_run("release-check"))
+
 
 if __name__ == "__main__":
     unittest.main()
