@@ -201,7 +201,7 @@ Mark each finding:
 
 Print findings to the conversation, save to `REPORT_PATH` with Write, then reply: `Report saved to {REPORT_PATH}.`
 
-The report's folder is not tracked by git. What the report recommends is therefore filed by the caller as one entry of `docs/techdebt.md` — the recommendations only, each with its place and its coverage — in the hand-over that follows a release; a report that recommends nothing files nothing.
+The report's folder is not tracked by git. What the report recommends is therefore filed by the caller as one entry of `docs/work/debt/` — the recommendations only, each with its place and its coverage — in the hand-over that follows a release; a report that recommends nothing files nothing.
 
 ---
 

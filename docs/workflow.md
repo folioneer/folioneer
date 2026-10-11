@@ -1,24 +1,24 @@
 # Workflow — the human sets expectations, the harness holds the line
 
-The operating manual for how work moves from `docs/todo.md` to a release. Decided
+The operating manual for how work moves from an entry of `docs/work/` to a release. Decided
 on 2026-09-12; this document is the rule set, the git history records how it was built.
 
 ## 1. Who owns what
 
-| Who     | Owns                                                                                             |
-| ------- | ------------------------------------------------------------------------------------------------ |
-| Human   | `docs/todo.md`: what is worth doing, its user value, its done-when, and the **Next** queue.      |
-| Human   | Validating a **design** before anything the user sees changes.                                   |
-| Human   | Cutting a **release**. Several merged branches may wait for one.                                 |
-| Agent   | `docs/techdebt.md`: every observation, smell and proposal. The human queues from it.             |
-| Agent   | `docs/flow.md`: what the workflow itself owes. The human queues from it.                         |
-| Agent   | The task, end to end: tests, code, review, merge. **No pull request is validated by a human.**   |
-| Agent   | Coding the right way: logic in Rust, dumb frontend, gold layouts, typed errors, stable ids.      |
-| Harness | Proving it, mechanically, on every pull request. Nothing merges that the harness has not passed. |
+| Who     | Owns                                                                                                        |
+| ------- | ----------------------------------------------------------------------------------------------------------- |
+| Human   | `docs/work/todo/`: what is worth doing, its user value, its done-when; and the queue, `docs/work/queue.md`. |
+| Human   | Validating a **design** before anything the user sees changes.                                              |
+| Human   | Cutting a **release**. Several merged branches may wait for one.                                            |
+| Agent   | `docs/work/debt/`: every observation, smell and proposal. The human queues from it.                         |
+| Agent   | `docs/work/flow/`: what the workflow itself owes. The human queues from it.                                 |
+| Agent   | The task, end to end: tests, code, review, merge. **No pull request is validated by a human.**              |
+| Agent   | Coding the right way: logic in Rust, dumb frontend, gold layouts, typed errors, stable ids.                 |
+| Harness | Proving it, mechanically, on every pull request. Nothing merges that the harness has not passed.            |
 
 Four human touchpoints. Everything else is either the agent's job or a machine gate.
 
-## 2. The two files
+## 2. Ids, entries and the queue
 
 A reference says what it points at: a todo entry is `TODO-NNN`, a tech-debt entry
 `DEBT-NNN`, a flow entry `FLOW-NNN`, a GitHub issue `ghNN`. A pull request keeps GitHub's
@@ -26,45 +26,74 @@ own `#NN`. The forms these replaced are refused in every tracked file by
 `scripts/reference-forms.py` (harness and CI); `CHANGELOG.md` keeps what was released
 under them.
 
-### `docs/todo.md` — human-owned
+### Entries — one file each (owner, 2026-10-11)
 
-- `## Next` at the top holds the queue: `TODO-NNN` and `DEBT-NNN` references in the order to
-  work them. The agent takes the first **ready** one. Order and additions are the
-  human's; the agent only removes a reference, when it closes the entry.
-- Every entry ends with `**User value:**`, `**Done when:**`, `**Design:**` and
-  `**Open questions:**`.
+- An entry is one file named by its id, in the folder of its kind:
+  `docs/work/todo/TODO-NNN.md`, `docs/work/debt/DEBT-NNN.md`,
+  `docs/work/flow/FLOW-NNN.md`. Its first line is its heading; `just rule-homes` fails
+  when the name, the folder and the heading do not say the same id.
+- An entry that ships is deleted (`just queue close <id>`), so two pull requests never
+  meet in a file when each closes or files an entry.
+- Ids are permanent and never reused: `just queue next-id <TODO|DEBT|FLOW>` prints the
+  next free one, counting the entries already deleted. Two branches that take the same
+  id conflict at the merge; the later one takes the next id.
+- The overview is `just queue`: one JSON document, every entry by kind.
+
+### Todo entries — human-owned
+
+- Every entry is `# TODO-NNN — (domain) — title` and ends with `**User value:**`,
+  `**Done when:**`, `**Design:**` and `**Open questions:**`. Design is `none` until the
+  agent proposes one, then `proposed (screenshots/design/NNN-*.png)`, then `validated`
+  once the human has looked. Open questions are `none` or a `- [ ]` list; either side
+  may add one, and the human answers by editing the entry.
+- The agent writes to an entry in two places only: it flips `Design` to `proposed (…)`,
+  and it adds open questions. It deletes the entry in the pull request that ships it. It
+  never creates or renumbers one.
+
+### The queue — `docs/work/queue.md`, human-owned
+
+- The file is the queue of one batch: `TODO-NNN`, `DEBT-NNN` and `FLOW-NNN` references
+  in the order to work them, one per line as a plain list (`- TODO-NNN`). Empty, or
+  absent, nothing is queued.
+- Order and additions are the human's. No pull request that ships an entry edits it, so
+  two closures never meet in the file.
+- A queued reference whose entry file is gone has shipped, and a flow entry that is a
+  verdict with no proposal is nothing to run: `just queue remaining` prints what is left. The agent takes the first remaining reference that is **ready**.
 - **Ready** means: queued, has a Done when, `Open questions: none`, and `Design` is
   `none` (no proposal needed yet) or `validated`.
-- The agent writes to this file in four places only: it flips `Design` to
-  `proposed (…)`, it adds open questions, and in the closure commit of the pull request
-  that merges an entry it removes the entry, and its reference in Next. It never creates
-  or reorders entries.
 
-### `docs/techdebt.md` — agent-owned
+### Debt entries — agent-owned
 
-- Every entry carries a permanent `DEBT-NNN` reference (`## YYYY-MM-DD — DEBT-NNN — title`).
+- Every entry is `# YYYY-MM-DD — DEBT-NNN — title`.
 - The agent files here: reviewer findings it did not fix, smells met on the way,
   proposals for new work, surviving mutants, coverage holes, frozen architecture debt.
 - Entries are observations, not commitments: an entry says what is odd, not what to do.
-  The human promotes one by queuing its reference in Next.
+  The human promotes one by queuing its reference.
 - An entry is `Found by`, `Where`, `Severity` (🔴 🟡 🔵, omitted when unknown),
   `Observation`, `User value` and `Done when`. Nothing in it is invented: a missing fact
   is left out.
 - A queued entry that needs the owner's answer carries `**Open questions:**` like a todo
   entry; while a box is unticked it is not ready and the agent skips it.
 
-### `docs/flow.md` — agent-owned
+### Flow entries — agent-owned
 
 - What the workflow itself owes: observations about the harness, the checks, the waits
   and the human's part, each with its figure, what is proposed (or the verdict to keep
-  things as they are), what it costs and what it protects. Reference `FLOW-NNN`.
-- It also holds the todo and tech-debt entries that are about how work moves; each keeps
-  the reference it was filed under.
-- The human promotes one by queuing its reference in Next, like any other.
+  things as they are), what it costs and what it protects. Every entry is
+  `# FLOW-NNN — title`.
+- The rules for an entry (owner, 2026-10-03): quality and speed are weighed together — a
+  change that buys speed says what it risks, a change that buys safety says what it
+  costs; where no change is needed, none is proposed, and "keep" is a verdict; human
+  review is a last resort and never forgotten — when only the owner can judge, the
+  questions come in one block for the batch, with what to look at and what a yes means.
+- The human promotes one by queuing its reference, like any other. An entry is removed
+  once it is settled.
+- What each batch measured is in `docs/work/audits.md`, written by `/flow-audit` after a
+  release.
 
 ## 3. The loop — one run, one entry
 
-1. **Pick** — headless: the first ready entry in Next. In chat: the entry the human
+1. **Pick** — headless: the first ready entry left in the queue. In chat: the entry the human
    names (`/run-entry TODO-NNN`); the sentence is the queue, and open questions are asked
    before anything starts — one at a time, each with its context — their answers
    written into the entry.
@@ -105,10 +134,8 @@ harness`) prints that
    each Done when clause with the test that proves it, findings that changed
    something, techdebt filed, screenshots. The commit title is the changelog line.
 9. **Merge**: `just merge`, which refuses until every check on the pull request is green.
-10. **Closure** in the same PR: the entry removed from the file it lives in
-    (`docs/todo.md`, `docs/techdebt.md` or `docs/flow.md`), and its reference from Next;
-    techdebt
-    updated; `ARCHITECTURE.md` if a module appeared; the spec if a rule changed.
+10. **Closure** in the same PR: the entry's file deleted (`just queue close <id>`), the
+    queue left as written; the debt entries the work resolved deleted too; `ARCHITECTURE.md` if a module appeared; the spec if a rule changed.
 11. **Next** entry, or stop (§ 8).
 
 **A batch in chat** — when the human says go to several queued entries, the agent runs
@@ -156,7 +183,7 @@ not fixed in the release it was found in. It hands over a clean `main`, and says
 it, `/prune` runs once on the production files the release changed — a full scan is
 asked for by name — and what it recommends is filed as one tech-debt entry, like what the
 spec checks find; an audit with no finding files nothing. Then `/flow-audit` measures the
-batch against the release before (`docs/flow.md`). The release refuses to start while a workflow run of the head
+batch against the release before (`docs/work/audits.md`). The release refuses to start while a workflow run of the head
 commit is unfinished or failed, naming the run; then it re-runs the full
 harness on `main`, computes the version from the merged titles, writes the changelog,
 tags and pushes; CI builds and leaves the draft; the human publishes it. The
@@ -188,24 +215,24 @@ rebuild the crate, and the local offline build already fails on a query missing 
 run only the fast checks for the same scope; a Markdown-only change costs Prettier
 and nothing else.
 
-| Check                     | Where                                                                                         | Gate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Lint, format, type-check  | `scripts/check.py`, Quality                                                                   | any error                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Architecture rules A1–A11 | `scripts/arch-check.py`, Quality                                                              | any violation; frozen debt may only shrink (`arch-allowlist.json`)                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Unit and integration      | Vitest, cargo test, Quality                                                                   | any failure                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Windows build             | Quality `windows`, a pull request that touches `src-tauri/`                                   | the application does not compile for Windows, or a test of the agent connection fails there                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Coverage floors           | `scripts/coverage-gate.py`, Quality                                                           | frontend features < 80 %, backend logic < floor (`coverage-gates.json`, ratchets to 90 %); the backend report comes from `cargo llvm-cov` with inline test modules stripped (`scripts/coverage-strip-tests.py`)                                                                                                                                                                                                                                                                                                          |
-| Golden portfolio          | `src-tauri/tests/golden_portfolio.rs`, Quality                                                | any drift in a pinned figure (`tests/golden/expected.json`); a change that moves one names it in its entry's Done when and regenerates with `GOLDEN_UPDATE=1`                                                                                                                                                                                                                                                                                                                                                            |
-| Sync written form         | `src-tauri/tests/sync_two_devices.rs` (`syn_038_*`) + `scripts/sync-format-check.sh`, Quality | what this build writes for any synced record, enum, folder header, manifest or segment differs from `tests/sync_format/v{DATA_FORMAT_VERSION}.json`, or a diff edits a snapshot already on main — a new written form arrives as a bumped version with its own snapshot (SYN-038)                                                                                                                                                                                                                                         |
-| Contracts and bindings    | `scripts/contract-check.py` + `contract-gaps.json`, Quality                                   | a command of `src/bindings.ts` without a row in a contract, a row without a command, arguments, a return type, a struct or an enum that are not the generated ones, or a row promising an error code its command's error type cannot carry; the gaps known when the check arrived are listed and the list only shrinks. Which codes a command returns is not in the bindings: that half is read (`/contract`, `contract-reviewer`)                                                                                       |
-| Dependency licences       | `scripts/licence-check.py` + `licence-allowlist.json`, Quality                                | a crate reached without a dev-dependency, or an npm package not flagged dev, carries a licence outside the allow-list and is not accepted there by name under that exact licence; an exception nothing uses any more fails too                                                                                                                                                                                                                                                                                           |
-| E2E on the real app       | `.github/workflows/e2e.yml`, every PR (records-only PRs skip it, `scripts/e2e-scope.py`)      | any failure; screenshots linked                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Reviewer prompts          | `.github/workflows/review.yml`, every PR                                                      | any 🔴 in a lane the diff touches; the report is a sticky PR comment; fails closed without the `CLAUDE_CODE_OAUTH_TOKEN` subscription secret                                                                                                                                                                                                                                                                                                                                                                             |
-| Visual regression         | `.github/workflows/e2e.yml`, every PR                                                         | a screen differing from main's last green run beyond 0.3 % of pixels while the PR touched no frontend file; expected differences are listed in the PR comment                                                                                                                                                                                                                                                                                                                                                            |
-| Commit hygiene            | Quality `pr-checks`                                                                           | title > 72, wrong type, trailer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Merge guard               | `scripts/merge.py`, `required-checks.json`                                                    | `just merge` refuses unless the branch is the head of an open pull request with every check green and every required check present; a rebase that moves the commits pushes them and stops until CI has run on them, unless the rebase left the tested tree as it was, record files (todo, techdebt, lessons, plans, ADRs) aside, so a branch stacked on merged commits lands without one; the rebase folds `fixup!` commits into the commits they name, so an entry lands as one commit whatever was pushed after review |
-| Security audit            | `security-audit.yml`                                                                          | new advisory                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Mutation sweep            | `.github/workflows/mutants.yml`, monthly                                                      | none; cargo-mutants on the logic code (`src-tauri/.cargo/mutants.toml`), survivors listed in the sticky issue "Mutation sweep — surviving mutants" in the techdebt entry format, `mutants.out` kept 90 days                                                                                                                                                                                                                                                                                                              |
+| Check                     | Where                                                                                         | Gate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lint, format, type-check  | `scripts/check.py`, Quality                                                                   | any error                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Architecture rules A1–A11 | `scripts/arch-check.py`, Quality                                                              | any violation; frozen debt may only shrink (`arch-allowlist.json`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Unit and integration      | Vitest, cargo test, Quality                                                                   | any failure                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Windows build             | Quality `windows`, a pull request that touches `src-tauri/`                                   | the application does not compile for Windows, or a test of the agent connection fails there                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Coverage floors           | `scripts/coverage-gate.py`, Quality                                                           | frontend features < 80 %, backend logic < floor (`coverage-gates.json`, ratchets to 90 %); the backend report comes from `cargo llvm-cov` with inline test modules stripped (`scripts/coverage-strip-tests.py`)                                                                                                                                                                                                                                                                                                                     |
+| Golden portfolio          | `src-tauri/tests/golden_portfolio.rs`, Quality                                                | any drift in a pinned figure (`tests/golden/expected.json`); a change that moves one names it in its entry's Done when and regenerates with `GOLDEN_UPDATE=1`                                                                                                                                                                                                                                                                                                                                                                       |
+| Sync written form         | `src-tauri/tests/sync_two_devices.rs` (`syn_038_*`) + `scripts/sync-format-check.sh`, Quality | what this build writes for any synced record, enum, folder header, manifest or segment differs from `tests/sync_format/v{DATA_FORMAT_VERSION}.json`, or a diff edits a snapshot already on main — a new written form arrives as a bumped version with its own snapshot (SYN-038)                                                                                                                                                                                                                                                    |
+| Contracts and bindings    | `scripts/contract-check.py` + `contract-gaps.json`, Quality                                   | a command of `src/bindings.ts` without a row in a contract, a row without a command, arguments, a return type, a struct or an enum that are not the generated ones, or a row promising an error code its command's error type cannot carry; the gaps known when the check arrived are listed and the list only shrinks. Which codes a command returns is not in the bindings: that half is read (`/contract`, `contract-reviewer`)                                                                                                  |
+| Dependency licences       | `scripts/licence-check.py` + `licence-allowlist.json`, Quality                                | a crate reached without a dev-dependency, or an npm package not flagged dev, carries a licence outside the allow-list and is not accepted there by name under that exact licence; an exception nothing uses any more fails too                                                                                                                                                                                                                                                                                                      |
+| E2E on the real app       | `.github/workflows/e2e.yml`, every PR (records-only PRs skip it, `scripts/e2e-scope.py`)      | any failure; screenshots linked                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Reviewer prompts          | `.github/workflows/review.yml`, every PR                                                      | any 🔴 in a lane the diff touches; the report is a sticky PR comment; fails closed without the `CLAUDE_CODE_OAUTH_TOKEN` subscription secret                                                                                                                                                                                                                                                                                                                                                                                        |
+| Visual regression         | `.github/workflows/e2e.yml`, every PR                                                         | a screen differing from main's last green run beyond 0.3 % of pixels while the PR touched no frontend file; expected differences are listed in the PR comment                                                                                                                                                                                                                                                                                                                                                                       |
+| Commit hygiene            | Quality `pr-checks`                                                                           | title > 72, wrong type, trailer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Merge guard               | `scripts/merge.py`, `required-checks.json`                                                    | `just merge` refuses unless the branch is the head of an open pull request with every check green and every required check present; a rebase that moves the commits pushes them and stops until CI has run on them, unless the rebase left the tested tree as it was, record files (the entries and the queue, lessons, plans, ADRs) aside, so a branch stacked on merged commits lands without one; the rebase folds `fixup!` commits into the commits they name, so an entry lands as one commit whatever was pushed after review |
+| Security audit            | `security-audit.yml`                                                                          | new advisory                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Mutation sweep            | `.github/workflows/mutants.yml`, monthly                                                      | none; cargo-mutants on the logic code (`src-tauri/.cargo/mutants.toml`), survivors listed in the sticky issue "Mutation sweep — surviving mutants" in the techdebt entry format, `mutants.out` kept 90 days                                                                                                                                                                                                                                                                                                                         |
 
 The `main-protection` ruleset lists the same checks; the owner's laptop bypasses it for
 `just release`, so the guard in `just merge` is the enforced gate.
@@ -265,7 +292,7 @@ waits for the reset rather than spend a round on it.
 | Grade        | Action                                                            |
 | ------------ | ----------------------------------------------------------------- |
 | (a)          | Fix in the PR                                                     |
-| (b)          | `DEBT-NNN` entry in `docs/techdebt.md`, linked from the PR body   |
+| (b)          | `DEBT-NNN` entry in `docs/work/debt/`, linked from the PR body    |
 | (c) one-off  | Inline comment `// <reviewer> FP: <reason> — see PR #NN`          |
 | (c) pattern  | Edit the reviewer prompt in the same PR; note it in the PR body   |
 | `[DECISION]` | Open question on the entry; the PR stays open; the agent moves on |
@@ -284,7 +311,7 @@ treated as a new open question on the entry.
   `DEBT-NNN` is filed with the failure text and the run's link, to find out why; the fix
   that re-enables it closes the entry. The run continues.
 - Never touch the live portfolio database, never force-push, never bypass a hook,
-  never edit a released changelog line, never reorder Next, never cut a release.
+  never edit a released changelog line, never reorder the queue, never cut a release.
 
 ## 9. Where the loop runs
 
@@ -296,7 +323,7 @@ state in git and the two files.
   UTC, the repository's environment, the `/run-entry` prompt. E2E and screenshots
   come from CI, so the sandbox needs no display. The human switches it on.
 - **Laptop**: `just run-entry` (`scripts/run-entry.sh`): one run at a time, a clean
-  and fresh `main`, a non-empty Next queue, three hours of wall clock
+  and fresh `main`, a queue with something left, three hours of wall clock
   (`RUN_ENTRY_BUDGET`), the log under `logs/run-entry/`. It runs
   `claude -p "/run-entry" --permission-mode acceptEdits`: nobody answers a prompt in a
   print-mode run, so a command outside the allow list in `.claude/settings.json` is
@@ -325,7 +352,7 @@ in the same pull request only when all three hold — otherwise it keeps the sta
 The "two stories" check overrides the number: a pull request that tells the feature and a layout
 migration tells two stories, and the migration waits. A mixed-standard codebase is acceptable; a
 half-done migration that leaves neither standard intact is not. The larger migrations are
-tracked in `docs/techdebt.md` (DEBT-008, DEBT-009) and run when queued.
+tracked in `docs/work/debt/` (DEBT-008, DEBT-009) and run when queued.
 
 ## 11. Splitting a feature by layer
 
@@ -343,5 +370,4 @@ there — the reviewers are given its last commit, not the branch
 (`.claude/agents/review-protocol.md`). Once the one below has merged it is rebased onto
 `main` — a local rebase of commits nobody has, never a force-push — pushed, and gets its
 one CI round. Entries on disjoint files may still be open side by side, from a worktree
-(`just worktree`); the records they both close (`docs/todo.md` § Next) are edited last,
-after the rebase.
+(`just worktree`); each closes its own entry file, so their records never meet.

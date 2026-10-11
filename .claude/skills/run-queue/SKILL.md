@@ -1,6 +1,6 @@
 ---
 name: run-queue
-description: Runs the owner's whole Next queue in a chat session — one task per queued entry so the owner sees it advance, the opening block of questions and mock-ups once, then `/run-entry` for each ready entry in turn, the next one prepared behind the one in review. Use when the owner says go to the queue. It decides nothing new: it chains what `docs/workflow.md` § 3 and `/run-entry` already say, and never starts a release.
+description: Runs the owner's whole queue in a chat session — one task per queued entry so the owner sees it advance, the opening block of questions and mock-ups once, then `/run-entry` for each ready entry in turn, the next one prepared behind the one in review. Use when the owner says go to the queue. It decides nothing new: it chains what `docs/workflow.md` § 3 and `/run-entry` already say, and never starts a release.
 ---
 
 # Skill — `run-queue`
@@ -15,7 +15,7 @@ Otherwise stop and say why.
 
 ## Step 1 — The queue as tasks
 
-`python3 scripts/work-queue.py`; read its `queued` list — each reference with its title,
+`just queue`; read its `queued` list — each reference with its title,
 its `state` and what it `waits_on`. `TaskCreate`, in the queue's order:
 
 - one task "Opening block";
@@ -61,7 +61,7 @@ green, naming them.
 
 ## Rules
 
-1. Never start a release, never add to or reorder Next.
+1. Never start a release, never add to or reorder the queue.
 2. The owner is asked in the opening block and nowhere else; a question that appears
    later is written on its entry (`docs/workflow.md` § 3).
 3. One task per entry: the task list is how the owner watches the queue.

@@ -1,12 +1,12 @@
 ---
 name: run-entry
-description: Runs the first ready entry of the human's Next queue in docs/todo.md end to end under the project workflow — branch, design gate, acceptance tests, implementation, harness, reviewers, PR, merge on green, closure — without asking the human anything; questions go into the entry. Use to advance the backlog autonomously, one entry per invocation.
+description: Runs the first ready entry left in the human's queue (docs/work/queue.md) end to end under the project workflow — branch, design gate, acceptance tests, implementation, harness, reviewers, PR, merge on green, closure — without asking the human anything; questions go into the entry. Use to advance the backlog autonomously, one entry per invocation.
 argument-hint: "[TODO-NNN | DEBT-NNN]"
 ---
 
 # Skill — `run-entry`
 
-One invocation, one entry, from `docs/todo.md` § Next to a merged pull request. The
+One invocation, one entry, from `docs/work/queue.md` to a merged pull request. The
 rules are `docs/workflow.md`; this file is the checklist.
 
 ## Step 0 — Preconditions
@@ -14,11 +14,10 @@ rules are `docs/workflow.md`; this file is the checklist.
 - `git status --short` is empty and the branch is `main`, fresh (`git pull --ff-only`).
   Otherwise stop and report; never work on a dirty tree.
 - With an argument (`/run-entry TODO-NNN` or `/run-entry DEBT-NNN`): that entry, and the
-  human is in the chat — **chat mode**. Without one: read `docs/todo.md` § Next and
-  take references in order — **headless mode**, nobody to ask. Load the entry
-  (`## TODO-NNN` in `docs/todo.md`, `## … — DEBT-NNN — …` in `docs/techdebt.md`, or
-  `## FLOW-NNN — …` in `docs/flow.md`, which also holds the `TODO-NNN` and `DEBT-NNN` entries
-  that are about the flow).
+  human is in the chat — **chat mode**. Without one: `just queue remaining` and
+  take references in order — **headless mode**, nobody to ask. Load the entry's file
+  (`docs/work/todo/TODO-NNN.md`, `docs/work/debt/DEBT-NNN.md` or
+  `docs/work/flow/FLOW-NNN.md`).
 - **Ready** = has a `**Done when:**`, `**Open questions:** none` (or every box ticked
   with its answer written after it), and `**Design:**` is `none` or `validated`.
   Headless: skip entries that are not ready; if none is ready, print which questions
@@ -118,7 +117,7 @@ repos/{owner}/{repo}/issues/<n>/comments`), grade every finding with
 ## Step 9 — Closure
 
 On the same branch before the merge, or as a follow-up docs PR if forgotten: the
-entry is removed from the file it lives in (`docs/todo.md`, `docs/techdebt.md` or `docs/flow.md`), and its reference from § Next; techdebt entries the work resolved are removed; `ARCHITECTURE.md` if a
+entry's file is deleted (`just queue close <id>`) and the queue is left as written; the debt entries the work resolved are deleted the same way; `ARCHITECTURE.md` if a
 module appeared; design proposal images deleted. Then the closing brief (CLAUDE.md §
 Opening and closing a piece of work): what changed for the user, what the project
 accumulated; the PR number and where anything still owed was filed.
@@ -127,6 +126,6 @@ accumulated; the PR number and where anything still owed was filed.
 
 1. Never ask the human. Questions are lines in the entry.
 2. Never lower a floor, never raise an allowlist, never bypass a hook, never
-   force-push, never touch the live database, never cut a release, never add to or reorder Next.
+   force-push, never touch the live database, never cut a release, never edit the queue.
 3. One entry per invocation. Stop after Step 9.
 4. Three hours wall-clock per entry; over that, open question and stop.

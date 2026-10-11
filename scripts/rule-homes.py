@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Every rule has one home, every piece of the agentic setup one line.
 
-Two checks against drift:
+Three checks against drift:
 
-1. Rule homes (todo TODO-050). A rule is defined where its ID opens a line followed
-   by an em dash: `**B24** — …` and `## E11 — …` in the rules docs, `**MKT-143 — …**`
-   in a spec. Anywhere else an ID is a mention. The check lists every definition in
+1. Rule homes (todo TODO-050). A rule or an entry is defined where its ID opens a line
+   followed by an em dash: `**B24** — …` and `## E11 — …` in the rules docs,
+   `**MKT-143 — …**` in a spec, `# TODO-003 — …`, `# 2026-09-27 — DEBT-008 — …` and
+   `# FLOW-001 — …` in an entry. Anywhere else an ID is a mention. The check lists every definition in
    the documents agents read (`docs/`, `CLAUDE.md`, `ARCHITECTURE.md`, `.claude/`) and
    fails when one ID is defined in two places — the copy is removed and the other
    document links to the home instead.
-2. The agentic setup. `docs/agentic-setup.md` gives one list item to each piece,
+2. Entry files. A todo, debt or flow entry is one file under `docs/work/`, named by
+   the one ID it defines (`docs/work/debt/DEBT-008.md`), in the folder of its kind.
+3. The agentic setup. `docs/agentic-setup.md` gives one list item to each piece,
    opened by its backticked path. Every script, skill, agent prompt and git hook
    that exists is listed once, and everything listed exists.
 
@@ -23,8 +26,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFINITION = re.compile(
-    r"^(?:\*\*([A-Z]{1,3}\d+)\*\* —|#{2,3} ([A-Z]{1,3}\d+) —|\*\*([A-Z]{3}-\d{3}) —)"
+    r"^(?:\*\*([A-Z]{1,3}\d+)\*\* —"
+    r"|#{2,3} ([A-Z]{1,3}\d+) —"
+    r"|\*\*([A-Z]{3}-\d{3}) —"
+    r"|# ((?:TODO|FLOW)-\d{3}) —"
+    r"|# \d{4}-\d{2}-\d{2} — (DEBT-\d{3}) —)"
 )
+ENTRY_FILE = re.compile(r"docs/work/(todo|debt|flow)/(.+)\.md")
 SETUP = "docs/agentic-setup.md"
 PIECE = re.compile(r"^- `([^`\s]+)`")
 SKILL = re.compile(r"(\.claude/skills/[^/]+/).+")
@@ -47,6 +55,25 @@ def duplicates(found: dict[str, list[str]]) -> dict[str, list[str]]:
         for rule_id in ids:
             homes.setdefault(rule_id, []).append(path)
     return {rule_id: sorted(paths) for rule_id, paths in homes.items() if len(paths) > 1}
+
+
+def misnamed(found: dict[str, list[str]]) -> list[str]:
+    """Entry files whose name, folder and heading do not say the same ID."""
+    problems = []
+    for path, ids in sorted(found.items()):
+        entry = ENTRY_FILE.fullmatch(path)
+        if not entry:
+            continue
+        folder, name = entry.groups()
+        if not re.fullmatch(rf"{folder.upper()}-\d{{3}}", name):
+            problems.append(
+                f"{path}: an entry of {folder}/ is named {folder.upper()}-NNN.md"
+            )
+        elif ids != [name]:
+            problems.append(
+                f"{path}: defines {', '.join(ids) or 'no ID'}, not the one ID {name} it is named after"
+            )
+    return problems
 
 
 def listed_pieces(setup_text: str) -> list[str]:
@@ -120,6 +147,7 @@ def main() -> int:
         f"{rule_id}: defined in {', '.join(paths)}"
         for rule_id, paths in sorted(twice.items())
     ]
+    problems += misnamed(found)
 
     listed = listed_pieces((ROOT / SETUP).read_text(encoding="utf-8"))
     pieces = setup_pieces(tracked("scripts", ".claude", ".githooks"))

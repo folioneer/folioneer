@@ -1,0 +1,16 @@
+# TODO-059 — (backend) — An agent records the rest of an account's past: deposits, withdrawals, dividends, prices
+
+First of seven entries split by the owner on 2026-10-10 from the work left out of 0.7.0 (the agent connection shipped with the read tools and three marked recordings: opening balance, purchase, sale).
+
+The owner's first use. An old account is entered from the start of this year only; the owner holds one statement a year (PDF) for the years before. With an agent reading those statements, the agent enters the first year's position, then derives the movements from one year-end state to the next. The result is an approximation, better than no history, and may be redone when more documents turn up. With this entry and TODO-060 that use is possible end to end.
+
+Four more recordings as tools, each datable years back, through the rules of the window, marked and shown in the journal like the three that exist: a deposit, a withdrawal, a dividend, and a price at a date. The command line gets the same four through the same recorder, so the two interfaces do not drift (TODO-064).
+
+**User value:** An agent enters a whole year of an old account from its statement — the cash that came in and went out, the dividends, the year-end prices — not only the purchases and the sales.
+**Done when:** the four recordings exist as tools and as commands of the command line, through one recorder; each is marked with its session and shows in the journal's "Recorded by"; a recorded Claude Code session against the open application lists the tools and calls a read tool and a recording (the clause of TODO-051 that could not be run by the agent).
+**Design:** none
+**Open questions:**
+
+- [x] The recorded Claude Code session of the Done when cannot be run by the agent: how does the entry close? — The owner records it once, from a script the agent leaves; the entry stays open until then (owner, 2026-10-10).
+- [x] A price is not a transaction and never shows in the account journal: how is a price an agent recorded marked? — Through its source: it is stored with the source "Agent", shown where the price history shows a source, counts against the session's limit, never replaces a price already at that date, and "Remove everything it recorded" (TODO-060) removes it; the Mark is widened to a transaction or a price (owner, 2026-10-10).
+- [ ] The source of a price is part of what sync writes: `AssetPriceSource` ("Manual", "YahooFinance") is pinned in the written form of the data format (`src-tauri/tests/sync_format/v2.json`, SYN-038), so a third value "Agent" is a new data format version — every one of the owner's computers must run the new version before it syncs again (SYN-035). Is that accepted for this mark, or is a recorded price marked on this computer only, as a recorded transaction is (AGT-045: stored as "Manual" for the other computers, the mark kept in its own table here and shown in the price history here)? Asked during the batch, not at its start: the opening reading looked at the `source` column and not at the sync format's snapshot, which would have shown it. Until it is answered the entry is skipped; the three transaction recordings (deposit, withdrawal, dividend) do not depend on it.

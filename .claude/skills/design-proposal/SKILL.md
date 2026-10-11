@@ -13,7 +13,7 @@ target state with the real components and tokens, so what they approve is what s
 
 ## Step 1 — Read the entry
 
-Load `## TODO-NNN` from `docs/todo.md`. From its text and Done when, list the screens and
+Load `docs/work/todo/TODO-NNN.md`. From its text and Done when, list the screens and
 states that change. One state per distinct thing the human must see (the row with the
 new column, the dialog with the moved buttons, the empty case if it changes).
 
@@ -48,9 +48,9 @@ removed, what stays the same, one open point if any.
 
 ## Step 5 — Flip the entry
 
-In `docs/todo.md`, the entry's line becomes
+In the entry's file, the line becomes
 `**Design:** proposed (screenshots/design/NNN-*.png)`. Commit the images, the note and
-the todo edit as one `docs:` commit, open the PR, merge on green. Report the image
+the entry edit as one `docs:` commit, open the PR, merge on green. Report the image
 paths in one line. The human validates by editing the line to `validated`, or adds an
 open question.
 

@@ -45,7 +45,7 @@ In CI the invoking prompt asks for a saved report, because the workflow builds t
 
 ## Rules for every reviewer
 
-1. **Read-only.** Never edit a reviewed file, a doc or `docs/todo.md`; what was there before is reported, not filed.
+1. **Read-only.** Never edit a reviewed file, a doc or an entry of `docs/work/`; what was there before is reported, not filed.
 2. **One pass.** Review every file in scope in one reply; never ask for a second turn, never start a helper session.
 3. **Stay in the lane.** A finding owned by another lane is left to it.
 4. **External claims need a source.** A version, a deprecation or a "current best practice" cites a link, or is softened ("as of training cutoff — verify with …", naming the command or `/dep-audit`) and capped at 🟡. The caller verifies; a reviewer does not.

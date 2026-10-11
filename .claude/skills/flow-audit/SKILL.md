@@ -1,11 +1,12 @@
 ---
 name: flow-audit
-description: After a release, measures how the batch moved (pull requests, time to merge, CI rounds and failures, what the agent used) against the release before, rewrites the measured sections of docs/flow.md, and proposes flow entries only where a figure moved or a rule was not followed. Use once per release, right after it is published.
+description: After a release, measures how the batch moved (pull requests, time to merge, CI rounds and failures, what the agent used) against the release before, rewrites the measured sections of docs/work/audits.md, and proposes flow entries only where a figure moved or a rule was not followed. Use once per release, right after it is published.
 ---
 
 # Skill — `flow-audit`
 
-`docs/flow.md` says what the workflow owes the two people who run it. Its figures are
+`docs/work/flow/` holds what the workflow owes the two people who run it, and
+`docs/work/audits.md` what each batch measured. The figures are
 gathered here, the same way after every release, so the flow is improved on figures and
 not on impressions. The script counts; the skill judges. It decides nothing for the
 owner: it proposes entries, which the owner queues or declines.
@@ -74,16 +75,16 @@ State a count only when it was counted; otherwise write "not counted".
 
 ### Step 3 — Rewrite the two measured sections
 
-In `docs/flow.md`, replace `## Measured — the <previous> batch` and `## Used and not
+In `docs/work/audits.md`, replace `## Measured — the <previous> batch` and `## Used and not
 used — the <previous> batch` with this batch's, same tables, each figure beside the
 previous one (`33, was 27`). Keep the "Reading" paragraph to three sentences: what the
 figures say, not what was done.
 
 ### Step 4 — Re-read the open entries
 
-For every `FLOW-NNN` and every todo or tech-debt entry the file holds:
+For every entry of `docs/work/flow/`:
 
-- **settled** by a change of the batch → remove the entry;
+- **settled** by a change of the batch → delete it (`just queue close FLOW-NNN`);
 - a **"keep, and re-measure"** verdict → state the new figure in it, and keep or change
   the verdict on that figure;
 - a **proposal** neither queued nor declined → leave it, unless a figure now argues
@@ -91,10 +92,11 @@ For every `FLOW-NNN` and every todo or tech-debt entry the file holds:
 
 ### Step 5 — Propose entries
 
-Add a `FLOW-NNN` entry (next free number, stated at the top of the file) only where a
+Add a `FLOW-NNN` entry (`docs/work/flow/FLOW-NNN.md`, its number from
+`just queue next-id FLOW`) only where a
 figure moved the wrong way, a rule of `docs/workflow.md` or `CLAUDE.md` was not
-followed, or the owner corrected the flow during the batch. Each entry in the file's
-format: Kind, Observed (with its figure), Proposal or Verdict, Costs and what it
+followed, or the owner corrected the flow during the batch. Each entry in the format of
+`docs/workflow.md` § 2: Kind, Observed (with its figure), Proposal or Verdict, Costs and what it
 protects. "Keep" is a verdict; where nothing needs changing, propose nothing.
 
 ### Step 6 — Hand over
@@ -112,5 +114,5 @@ entries proposed, for the owner to queue or decline in the next batch's opening 
    the one before.
 3. **Quality and speed together.** An entry that buys speed says what it risks; one that
    buys safety says what it costs.
-4. **The owner decides.** Never edit § Next; never apply a proposal in the audit's own
+4. **The owner decides.** Never edit the queue; never apply a proposal in the audit's own
    pull request.

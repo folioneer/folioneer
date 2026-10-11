@@ -24,12 +24,9 @@ Written to read the same in every repository that works this way.
 - `docs/ubiquitous-language.md` — what the domain words mean, validated by the owner.
   Never: extended by the agent without a question.
 - `docs/lessons.md` — failures worth teaching, one per entry. Never: a rule's home.
-- `docs/todo.md` — what is owed to the user and, under Next, the batch, written by the
-  owner. Never: queued or reordered by the agent.
-- `docs/techdebt.md` — what the code owes itself, filed by the agent. Never: a
-  commitment before the owner queues it.
-- `docs/flow.md` — what the workflow owes the people who run it, and the measured
-  section of the last two batches. Never: a figure nothing counted.
+- `docs/work/queue.md` — the batch, written by the owner. Never: edited by the agent.
+- `docs/work/audits.md` — the measured section of the last two batches. Never: a figure
+  nothing counted.
 - `ARCHITECTURE.md` — where code lives. Never: why a choice was made (an ADR does).
 - `.claude/rules/` — loads the rules document of a layer when one of its files is
   read. Never: states the rule itself.
@@ -81,7 +78,7 @@ Written to read the same in every repository that works this way.
 ### Scripts
 
 - `scripts/work-queue.py` — classifies the entries, the queue and the open pull
-  requests. Never: ranks or recommends.
+  requests; closes an entry; gives the next id. Never: ranks or recommends.
 - `scripts/run-entry.sh` — runs one ready entry with nobody to ask. Never: a second
   entry, nor past its time budget.
 - `scripts/branch.sh` — where the branch left the main branch, and its diff, log and
@@ -96,7 +93,7 @@ Written to read the same in every repository that works this way.
   drops under its floor. Never: lowers a floor.
 - `scripts/arch-check.py` — enforces the architecture rules a machine can check.
   Never: lets the allowlist grow.
-- `scripts/rule-homes.py` — one home per rule, one line here per piece. Never: judges
+- `scripts/rule-homes.py` — one home per rule, one file per entry, one line here per piece. Never: judges
   what a document says.
 - `scripts/review-path.sh` — where a reviewer writes its report. Never: writes it.
 - `scripts/review-stop-reason.py` — says in one line why a reviewer session stopped in

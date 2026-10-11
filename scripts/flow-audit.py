@@ -13,7 +13,7 @@ Usage:
     python3 scripts/flow-audit.py v0.5.0 --pretty
 
 A release is named by its tag; its moment is when it was published on GitHub. The skill
-turns the figures into the "Measured" section of `docs/flow.md`. This script has no
+turns the figures into the "Measured" section of `docs/work/audits.md`. This script has no
 judgment — only counting.
 """
 

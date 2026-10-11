@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
-"""Deterministic data collection for the /plan-queue skill.
+"""The state of the work queue, for the /plan-queue skill and `just queue`.
 
-Emits one JSON document on stdout: the owner's queue (`docs/todo.md` § Next) with the
+Emits one JSON document on stdout: the owner's queue (`docs/work/queue.md`) with the
 state of each reference, the entries ready to queue, the entries blocked with what
 each waits on, the tech debt grouped by theme, the flow entries, the open pull requests with their CI
 state, the local git state, the roadmap and the open GitHub issues.
 
-Usage:
-    python3 scripts/work-queue.py            # JSON to stdout
-    python3 scripts/work-queue.py --pretty   # indented JSON for inspection
+An entry is one file under `docs/work/`, named by its id. The queue is written once
+per batch and no closure edits it: a queued reference whose entry file is gone has
+shipped, and reads as `closed`.
 
-The skill turns this into three lists and a proposed queue order for the owner to
-accept or edit. This script has no judgment — only collection and the readiness rule
+Usage:
+    python3 scripts/work-queue.py                # JSON to stdout
+    python3 scripts/work-queue.py --pretty       # indented JSON for inspection
+    python3 scripts/work-queue.py remaining      # the queued references not shipped yet
+    python3 scripts/work-queue.py close <id>...  # the closure of a task: deletes each entry's file
+    python3 scripts/work-queue.py next-id <TODO|DEBT|FLOW>   # the next free id of a kind
+
+The skill turns the document into three lists and a proposed queue order for the owner
+to accept or edit. This script has no judgment — only collection and the readiness rule
 of `docs/workflow.md`.
 """
 
@@ -64,36 +71,46 @@ def _git(*args: str) -> str:
             check=False,
             capture_output=True,
             text=True,
+            cwd=ROOT,
         ).stdout.rstrip("\n")
     except FileNotFoundError:
         return ""
 
 
-ENTRY_HEADING = re.compile(r"^##\s+TODO-(?P<number>\d+)\s+—\s+(?P<title>.+?)\s*$")
+QUEUE_HOME = "docs/work/queue.md"
+# An entry is one file named by its id, so two closures never touch the same file.
+ENTRY_DIRS = {"TODO": "docs/work/todo", "DEBT": "docs/work/debt", "FLOW": "docs/work/flow"}
+ENTRY_ID = re.compile(r"(TODO|DEBT|FLOW)-(\d{3})")
+# The highest id each kind had given when the entries moved to one file each
+# (2026-10-11): the ids of entries closed before the move are in no folder's history.
+ID_FLOORS = {"TODO": 67, "DEBT": 111, "FLOW": 33}
+
+ENTRY_HEADING = re.compile(r"^#\s+TODO-(?P<number>\d+)\s+—\s+(?P<title>.+?)\s*$")
 DEBT_HEADING = re.compile(
-    r"^##\s+(?P<date>\d{4}-\d{2}-\d{2})\s+—\s+(?P<ref>DEBT-\d+)\s+—\s+(?P<title>.+?)\s*$"
+    r"^#\s+(?P<date>\d{4}-\d{2}-\d{2})\s+—\s+(?P<ref>DEBT-\d+)\s+—\s+(?P<title>.+?)\s*$"
 )
-FLOW_HEADING = re.compile(r"^##\s+(?P<ref>FLOW-\d+)\s+—\s+(?P<title>.+?)\s*$")
-QUEUE_LINE = re.compile(r"^\s*\d+\.\s+(?P<ref>TODO-\d+|DEBT-\d+|FLOW-\d+)\b")
+FLOW_HEADING = re.compile(r"^#\s+(?P<ref>FLOW-\d+)\s+—\s+(?P<title>.+?)\s*$")
+# One reference per line, as a plain list item. A numbered item is still read, so a
+# hand-edited queue is never silently empty.
+QUEUE_LINE = re.compile(
+    r"^\s*(?:-|\d+\.)\s+(?P<ref>TODO-\d+|DEBT-\d+|FLOW-\d+)\b", re.MULTILINE
+)
 
 
 def _sections(text: str) -> list[tuple[str, list[str]]]:
-    """Split a Markdown file into (`## ` heading line, body lines)."""
+    """Split entry files read one after the other into (`# ` heading line, body lines)."""
     sections: list[tuple[str, list[str]]] = []
     for line in text.splitlines():
-        if line.startswith("## "):
+        if line.startswith("# "):
             sections.append((line, []))
         elif sections:
             sections[-1][1].append(line)
     return sections
 
 
-def parse_queue(todo_text: str) -> list[str]:
-    """The references of `## Next`, in the owner's order."""
-    for heading, body in _sections(todo_text):
-        if heading.strip() == "## Next":
-            return [m.group("ref") for m in map(QUEUE_LINE.match, body) if m]
-    return []
+def parse_queue(queue_text: str) -> list[str]:
+    """The references of the queue file, in the owner's order; a comment queues nothing."""
+    return QUEUE_LINE.findall(re.sub(r"<!--.*?-->", "", queue_text, flags=re.DOTALL))
 
 
 def _field(body: list[str], name: str) -> str | None:
@@ -116,7 +133,7 @@ def _question_items(body: list[str]) -> list[tuple[bool, str]]:
             continue
         if not listing:
             continue
-        if line.startswith("**") or line.startswith("## "):
+        if line.startswith("**") or line.startswith("# "):
             break
         item = re.match(
             r"^\s*(?:[-*]|\d+\.)\s+(?:\[(?P<box>[ xX])\]\s+)?(?P<text>.+)$", line
@@ -160,7 +177,7 @@ def readiness(body: list[str]) -> list[str]:
 
 
 def parse_entries(todo_text: str) -> list[dict]:
-    """Every `## TODO-NNN — …` entry of the todo file, with what it waits on."""
+    """Every `# TODO-NNN — …` entry of the todo files, with what it waits on."""
     entries: list[dict] = []
     for heading, body in _sections(todo_text):
         match = ENTRY_HEADING.match(heading)
@@ -192,7 +209,7 @@ def _debt_field(body: list[str], name: str) -> str | None:
 
 
 def parse_debt(debt_text: str) -> list[dict]:
-    """Every `## date — DEBT-NNN — …` entry of the tech-debt file. An entry waits on its
+    """Every `# date — DEBT-NNN — …` entry of the tech-debt files. An entry waits on its
     Done when and, like a todo entry, on each unticked item under `**Open questions:**`."""
     entries: list[dict] = []
     for heading, body in _sections(debt_text):
@@ -219,7 +236,7 @@ def parse_debt(debt_text: str) -> list[dict]:
 
 
 def parse_flow(flow_text: str) -> list[dict]:
-    """Every `## FLOW-NNN — …` entry of the flow file that proposes a change. An entry
+    """Every `# FLOW-NNN — …` entry of the flow files that proposes a change. An entry
     with a verdict and no proposal is a record, not work: it is left out, and a queued
     reference to it reads as closed. An entry carrying both is work. One whose
     `Needs the owner:` line starts with yes waits on that decision."""
@@ -263,14 +280,15 @@ def group_debt(entries: list[dict]) -> list[dict]:
 def classify(queue: list[str], entries: list[dict]) -> dict:
     """The three lists: queued (in the owner's order), ready but not queued, blocked.
 
-    A queued reference with no entry left is reported as `closed`: its work merged
-    and the owner has not yet removed it from the queue.
+    A queued reference with no entry left is reported as `closed`: its work has
+    shipped, and the queue is left as the owner wrote it. One that is not an id at all
+    (`TODO-0599`) is `unknown`: a slip of the hand is never read as shipped.
     """
     by_ref = {entry["ref"]: entry for entry in entries}
     queued = [
         by_ref[ref] | {"state": "blocked" if by_ref[ref]["waits_on"] else "ready"}
         if ref in by_ref
-        else {"ref": ref, "state": "closed"}
+        else {"ref": ref, "state": "closed" if ENTRY_ID.fullmatch(ref) else "unknown"}
         for ref in queue
     ]
     in_queue = set(queue)
@@ -346,19 +364,21 @@ def collect_pull_requests() -> list[dict]:
     ]
 
 
-def collect_work() -> dict:
-    """The queue, the todo entries, the tech debt and the flow entries, classified.
+def kind_text(kind: str) -> str:
+    """The entries of `kind`, one file after the other; debt newest first."""
+    folder = ROOT / ENTRY_DIRS[kind]
+    files = sorted(folder.glob(f"{kind}-*.md"), reverse=kind == "DEBT") if folder.is_dir() else []
+    return "\n".join(path.read_text(encoding="utf-8") for path in files)
 
-    `docs/flow.md` holds its own `FLOW-NNN` entries and the todo and tech-debt entries
-    that are about the flow; the latter keep their reference and are read as what they
-    are."""
-    todo_text = _read(ROOT / "docs" / "todo.md") or ""
-    flow_text = _read(ROOT / "docs" / "flow.md") or ""
-    debt = parse_debt(_read(ROOT / "docs" / "techdebt.md") or "")
-    flow = parse_flow(flow_text) + parse_entries(flow_text) + parse_debt(flow_text)
-    lists = classify(parse_queue(todo_text), parse_entries(todo_text) + debt + flow)
+
+def collect_work() -> dict:
+    """The queue, the todo entries, the tech debt and the flow entries, classified."""
+    todo = parse_entries(kind_text("TODO"))
+    debt = parse_debt(kind_text("DEBT"))
+    flow = parse_flow(kind_text("FLOW"))
+    lists = classify(parse_queue(_read(ROOT / QUEUE_HOME) or ""), todo + debt + flow)
     queued = {entry["ref"] for entry in lists["queued"]}
-    in_todo = {entry["ref"] for entry in parse_entries(todo_text)}
+    in_todo = {entry["ref"] for entry in todo}
     for name in ("ready", "blocked"):
         lists[name] = [entry for entry in lists[name] if entry["ref"] in in_todo]
     lists["techdebt_not_queued"] = group_debt(
@@ -366,6 +386,70 @@ def collect_work() -> dict:
     )
     lists["flow_not_queued"] = [entry for entry in flow if entry["ref"] not in queued]
     return lists
+
+
+def remaining(queued: list[dict]) -> list[str]:
+    """The queued references still to work, in order: those whose entry has not shipped."""
+    return [entry["ref"] for entry in queued if entry["state"] != "closed"]
+
+
+class NoSuchEntry(Exception):
+    """A reference given to `close` that names no entry file."""
+
+
+def entry_path(ref: str) -> str | None:
+    """The file of the entry `ref`; None when `ref` is not an entry id."""
+    match = ENTRY_ID.fullmatch(ref)
+    return f"{ENTRY_DIRS[match.group(1)]}/{ref}.md" if match else None
+
+
+def close(refs: list[str], exists) -> list[str]:
+    """The files closing `refs` deletes (docs/workflow.md § 3, closure); the queue is left as written.
+
+    Raises before anything is decided unless every reference names an entry.
+    """
+    gone: list[str] = []
+    for ref in refs:
+        path = entry_path(ref)
+        if path is None:
+            raise NoSuchEntry(f"{ref}: not an entry id (TODO-NNN, DEBT-NNN or FLOW-NNN)")
+        if path in gone or not exists(path):
+            raise NoSuchEntry(f"{ref}: no such entry ({path})")
+        gone.append(path)
+    return gone
+
+
+def next_id(kind: str, names: list[str]) -> str:
+    """The next free id of `kind`, given every file name the kind has had: ids are never reused."""
+    given = [int(m.group(2)) for m in map(ENTRY_ID.search, names) if m and m.group(1) == kind]
+    return f"{kind}-{max([ID_FLOORS[kind], *given]) + 1:03d}"
+
+
+class HistoryUnread(Exception):
+    """The git history that says which ids were given could not be read whole."""
+
+
+def names_ever(kind: str) -> list[str]:
+    """Every file the folder of `kind` holds or has held, from the working tree and the git
+    history of every branch, so an id taken on a branch not merged yet is never given twice.
+
+    Raises when the history is not all there: a shallow clone has forgotten the entries
+    already deleted, and their ids would be given again.
+    """
+    folder = ROOT / ENTRY_DIRS[kind]
+    names = [path.name for path in folder.glob("*.md")] if folder.is_dir() else []
+    if _git("rev-parse", "--is-shallow-repository") != "false":
+        raise HistoryUnread("the git history is shallow or cannot be read")
+    log = subprocess.run(
+        ["git", "log", "--all", "--diff-filter=A", "--name-only", "--format=", "--", ENTRY_DIRS[kind]],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=ROOT,
+    )
+    if log.returncode != 0:
+        raise HistoryUnread(log.stderr.strip() or "git log failed")
+    return names + log.stdout.split()
 
 
 def collect_in_flight() -> dict:
@@ -442,9 +526,7 @@ def entries_naming(number: int, texts: list[str]) -> list[str]:
 
 def collect_gh_issues() -> list[dict]:
     """Open GitHub issues, each with the entries that name it (`entries`)."""
-    texts = [
-        _read(ROOT / "docs" / name) or "" for name in ("todo.md", "techdebt.md", "flow.md")
-    ]
+    texts = [kind_text(kind) for kind in ENTRY_DIRS]
     return [
         {**issue, "entries": entries_naming(issue["number"], texts)}
         for issue in _open_gh_issues()
@@ -464,15 +546,43 @@ def _open_gh_issues() -> list[dict]:
     )
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["close"]:
+        if len(argv) < 2:
+            print("usage: work-queue.py close <TODO-NNN | DEBT-NNN | FLOW-NNN>...", file=sys.stderr)
+            return 2
+        try:
+            gone = close(argv[1:], lambda path: (ROOT / path).is_file())
+        except NoSuchEntry as error:
+            print(f"❌ {error} — nothing was changed", file=sys.stderr)
+            return 1
+        for path in gone:
+            (ROOT / path).unlink()
+            print(f"{path} deleted")
+        return 0
+    if argv[:1] == ["next-id"]:
+        if len(argv) != 2 or argv[1] not in ENTRY_DIRS:
+            print("usage: work-queue.py next-id <TODO | DEBT | FLOW>", file=sys.stderr)
+            return 2
+        try:
+            print(next_id(argv[1], names_ever(argv[1])))
+        except HistoryUnread as error:
+            print(f"❌ no id given: {error}", file=sys.stderr)
+            return 1
+        return 0
+    if argv == ["remaining"]:
+        print("\n".join(remaining(collect_work()["queued"])))
+        return 0
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--pretty", action="store_true", help="indent JSON for human inspection"
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     out = {
-        "version": 4,
+        "version": 5,
         **collect_work(),
         "pull_requests": collect_pull_requests(),
         "in_flight": collect_in_flight(),

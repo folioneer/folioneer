@@ -8,8 +8,8 @@ After cloning: `git config core.hooksPath .githooks`. The hooks block commits to
 
 ## Who decides what
 
-- The **human** writes `docs/todo.md` (user value, done-when) and its **Next** queue, validates a **design** before anything the user sees changes, validates the vocabulary, and cuts **releases**.
-- The **agent** owns `docs/techdebt.md`, does the task end to end and merges on green. No pull request is validated by a human.
+- The **human** writes the todo entries (`docs/work/todo/`: user value, done-when) and the queue (`docs/work/queue.md`), validates a **design** before anything the user sees changes, validates the vocabulary, and cuts **releases**.
+- The **agent** owns the debt entries (`docs/work/debt/`), does the task end to end and merges on green. No pull request is validated by a human.
 - The **harness** (`just harness` locally, `--coverage` before a first push; required checks in CI) proves the code.
 
 Headless, a question only the human can answer goes into the entry's `**Open questions:**`, never asked. In a chat run (`/run-entry TODO-NNN`) the open questions are asked before anything starts, and a design is validated by a yes; the answers are written into the entry either way. In a chat conversation, ask as you would a colleague: state assumptions, name what is unclear. Whenever the human is asked: one question at a time, each with the context needed to answer it — what the thing is, where it shows, what each answer changes.
@@ -41,7 +41,7 @@ What the human is told rests on what was read. A statement that the code does or
     **Design**   — none, validated, or needed (then the mocks come before anything else)
     **Touching** — the paths, so the reviewer lanes are known before the diff exists
 
-**Closing brief** — the last message (and the PR body's first lines), two parts, nothing else; what is still owed goes in `docs/techdebt.md` or an open question:
+**Closing brief** — the last message (and the PR body's first lines), two parts, nothing else; what is still owed goes in a `DEBT-NNN` entry or an open question:
 
 1. **What changed for whoever reads this next.** For `feat` / `fix`: what a user notices, or "nothing — internal". Otherwise: what can now be done or trusted that could not before.
 2. **What the project accumulated.** Tests added and the coverage or golden figure that moved; for harness work, the guarantee and how you know it can fail (you watched it go red).
@@ -55,7 +55,7 @@ What the human is told rests on what was read. A statement that the code does or
 - **Skills, agents, scripts and hooks**: [`docs/agentic-setup.md`](docs/agentic-setup.md) says what each one is for and what it must never do; a new one gets its line there in the same PR.
 - **Skills**: `/run-entry`, `/run-queue`, `/design-proposal NNN`, `/visual-proof`, `/adr-writer`, `/contract`, `/dep-audit`, `/prune`, `/plan-queue`, `/flow-audit` (after a release).
 - **Agents**: the reviewers matched to the diff (locally until no 🔴, and in CI on every push); `reviewer-security` before every release; `spec-checker` before closing an entry with spec rules, and before a release on every spec the batch touched (`bash scripts/batch-specs.sh`); `spec-reviewer` / `contract-reviewer` / `adr-reviewer` when those documents change.
-- **References**: `TODO-NNN` (todo), `DEBT-NNN` (tech debt), `FLOW-NNN` (flow), `ghNN` (GitHub issue); a pull request stays `#NN` (`docs/workflow.md` § 2).
+- **References**: `TODO-NNN` (todo), `DEBT-NNN` (tech debt), `FLOW-NNN` (flow) — one file each under `docs/work/` —, `ghNN` (GitHub issue); a pull request stays `#NN` (`docs/workflow.md` § 2).
 - **Task tracking**: `TaskCreate` / `TaskUpdate` for any task of more than one file or step.
 - **Plans** (asked in chat): exact paths, functions and components per layer, gold work with its size, the tests for each clause. Once the human says go, the plan is the authority for the batch.
 
@@ -63,7 +63,7 @@ What the human is told rests on what was read. A statement that the code does or
 
 - `just dev` (a debug build uses its own data folder and never touches the daily fetch; `--reset-db` resets only that database) · `just dev-seed [--replace]` (a detached copy of the installed database).
 - `just test [paths]` · `just test-rust [filter]` (a part of a suite while working; two build jobs) · `just test-unit`. The E2E suite has no recipe: CI runs it (`npm run test:e2e:ci`) and is its gate; the local run is broken on this machine (`docs/lessons.md` L-011).
-- `just quiet <recipe> [args]` (one line: the verdict by exit code; the output in `tmp/<recipe>.log`) · `just harness [--coverage]` (the coverage run holds the foreground; without a terminal, `HARNESS_FOREGROUND=1`) · `just check [--frontend|--backend]` · `just check-full` · `just format` · `just arch-check` (`--write-allowlist` only lowers the frozen debt) · `just rule-homes` · `just coverage-gate` · `just generate-types` · `just watch-pr [number]` (waits for a pull request's checks; the verdict by exit code) · `just merge`.
+- `just quiet <recipe> [args]` (one line: the verdict by exit code; the output in `tmp/<recipe>.log`) · `just harness [--coverage]` (the coverage run holds the foreground; without a terminal, `HARNESS_FOREGROUND=1`) · `just check [--frontend|--backend]` · `just check-full` · `just format` · `just arch-check` (`--write-allowlist` only lowers the frozen debt) · `just rule-homes` · `just coverage-gate` · `just generate-types` · `just queue` (where the queue stands; `close <id>` deletes a shipped entry's file, `next-id <TODO|DEBT|FLOW>` gives the next free id, `remaining` what is left) · `just watch-pr [number]` (waits for a pull request's checks; the verdict by exit code) · `just merge`.
 - `just install` · `just stat` · `just worktree <branch>`. A recipe exists because CI, a hook, a skill, an agent or a script calls it, or because it is listed here; otherwise it goes.
 - Release (human): `/dep-audit` → `just release [--preview] [-y]`; the workflow builds Windows then Linux and leaves a draft — publish with `gh release edit vX.Y.Z --draft=false` once both attached their assets.
 

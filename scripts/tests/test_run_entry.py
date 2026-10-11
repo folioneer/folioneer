@@ -1,26 +1,30 @@
 """Tests for scripts/run-entry.sh (TODO-049) — run with `just test-scripts`."""
 
+import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[1] / "run-entry.sh"
+SCRIPTS = Path(__file__).resolve().parents[1]
+SCRIPT = SCRIPTS / "run-entry.sh"
 
-TODO = """# TODO
+QUEUE = """# Queue
 
-## Next
+<!-- The human's queue: one reference per line. -->
 
-<!-- The human's queue: references (TODO-NNN or DEBT-NNN) in the order to work them. -->
-
-1. TODO-051
-2. DEBT-064
-3. FLOW-021
-
-## TODO-009 — (fullstack) — Not queued
-
-Mentions DEBT-001 and TODO-051 outside the queue.
+- TODO-051
+- DEBT-064
+- FLOW-021
+- TODO-009
 """
+
+ENTRIES = {
+    "todo/TODO-051.md": "# TODO-051 — (tooling) — Queued\n\nMentions DEBT-001 outside the queue.\n",
+    "debt/DEBT-064.md": "# 2026-10-01 — DEBT-064 — Queued\n\n- Done when: it is.\n",
+    "flow/FLOW-021.md": "# FLOW-021 — Queued\n\n- Proposal: one.\n",
+    "todo/TODO-010.md": "# TODO-010 — (fullstack) — Not queued\n",
+}
 
 
 def queue_line() -> str:
@@ -32,13 +36,18 @@ def queue_line() -> str:
     return lines[0]
 
 
-def queued(todo: str) -> list[str]:
-    """What the script reads as queued from a todo file."""
+def queued(queue: str) -> list[str]:
+    """What the script reads as left to work, in a folder holding `queue` and ENTRIES."""
     with tempfile.TemporaryDirectory() as folder:
-        (Path(folder) / "docs").mkdir()
-        (Path(folder) / "docs" / "todo.md").write_text(todo, encoding="utf-8")
+        root = Path(folder)
+        (root / "scripts").mkdir()
+        shutil.copy(SCRIPTS / "work-queue.py", root / "scripts" / "work-queue.py")
+        for name, text in ENTRIES.items():
+            (root / "docs" / "work" / name).parent.mkdir(parents=True, exist_ok=True)
+            (root / "docs" / "work" / name).write_text(text, encoding="utf-8")
+        (root / "docs" / "work" / "queue.md").write_text(queue, encoding="utf-8")
         printed = subprocess.run(
-            ["bash", "-c", f'{queue_line()}\nprintf "%s" "$queued"'],
+            ["bash", "-c", f'log() {{ :; }}\n{queue_line()}\nprintf "%s" "$queued"'],
             cwd=folder,
             check=True,
             capture_output=True,
@@ -49,13 +58,14 @@ def queued(todo: str) -> list[str]:
 
 class Queue(unittest.TestCase):
     # TODO-049 — the queue is read in the three forms a reference takes, in the owner's
-    # order, and only from § Next: the comment and the entries below are not the queue.
-    def test_the_queue_is_read_in_the_new_forms_and_only_under_next(self):
-        self.assertEqual(queued(TODO), ["TODO-051", "DEBT-064", "FLOW-021"])
+    # order, and only from the queue file: the comment and the entries are not the queue.
+    # A queued reference whose entry file is gone has shipped: it is not run again.
+    def test_what_is_left_of_the_queue_is_read_in_the_owners_order(self):
+        self.assertEqual(queued(QUEUE), ["TODO-051", "DEBT-064", "FLOW-021"])
 
     # TODO-049 — a reference in a form that was replaced queues nothing.
     def test_a_replaced_form_queues_nothing(self):
-        old = TODO.replace("1. TODO-051", "1. #051").replace("2. DEBT-064", "2. TD-064")
+        old = QUEUE.replace("- TODO-051", "- #051").replace("- DEBT-064", "- TD-064")
         self.assertEqual(queued(old), ["FLOW-021"])
 
 

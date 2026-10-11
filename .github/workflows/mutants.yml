@@ -143,10 +143,10 @@ jobs:
               merged missed.txt | awk 'NR <= 150 { print "- " $0 }'
               [[ "$missed" -gt 150 ]] && echo "- … $((missed - 150)) more in the artifacts"
               echo
-              echo "### Ready to file in \`docs/techdebt.md\`"
+              echo "### Ready to file in \`docs/work/debt/\`"
               echo
               echo '```'
-              echo "## $today — DEBT-NNN — $missed surviving mutants in the logic code"
+              echo "# $today — DEBT-NNN — $missed surviving mutants in the logic code"
               echo
               echo "- Found by: mutation sweep ($run_url)"
               echo "- Where: the files listed in the sweep issue"

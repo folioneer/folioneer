@@ -10,7 +10,7 @@ The merge guard: the branch must be the head of an open pull request whose
 every check run is green, and every check named in `required-checks.json`
 must be among them. When the rebase moved the commits (the target advanced),
 the rebased branch is pushed and the merge stops until CI has run on it, unless
-the rebase changed record files only (todo, techdebt, flow, lessons, plans, ADRs) or
+the rebase changed record files only (the entries and the queue of docs/work/, lessons, plans, ADRs) or
 nothing at all.
 
 One entry lands as one commit: a fix pushed after the first push is a
@@ -121,12 +121,13 @@ def _check_runs(sha: str) -> dict[str, tuple[str, str]]:
     return {name: (status, conclusion) for name, (_, status, conclusion) in latest.items()}
 
 
-# The record files: what closure commits and queue edits move. None is read by
-# a check or a reviewer, so a move of `main` made only of them cannot change what
-# the checks proved. Everything else — code, workflows, convention docs, prompts —
+# The record files: what closure commits and queue edits move. A move of `main`
+# made only of them cannot change what the checks proved: no reviewer reads them, and
+# the one check that does (rule-homes, one id per entry file) cannot be broken by a
+# rebase, since two entries of the same id are the same path and conflict in git. Everything else — code, workflows, convention docs, prompts —
 # re-runs the checks.
-RECORD_FILES = {"docs/todo.md", "docs/techdebt.md", "docs/flow.md", "docs/lessons.md"}
-RECORD_DIRS = ("docs/plan/", "docs/adr/")
+RECORD_FILES = {"docs/lessons.md"}
+RECORD_DIRS = ("docs/work/", "docs/plan/", "docs/adr/")
 
 
 def _record_files_only(files: list[str]) -> bool:

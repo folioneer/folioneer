@@ -54,7 +54,7 @@ class ReferenceForms(unittest.TestCase):
         ):
             self.assertFalse(reference_forms.checked(path), path)
         for path in (
-            "docs/todo.md",
+            "docs/work/todo/TODO-001.md",
             "src-tauri/src/lib.rs",
             "scripts/work-queue.py",
             "licence-allowlist.json",

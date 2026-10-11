@@ -1,0 +1,8 @@
+# 2026-10-10 — DEBT-111 — A dividend that converts to nothing is refused as an unknown error
+
+- Found by: `spec-checker` on the rules amended since v0.7.1 (DIV-022, SPL-062, FXR-014, CFR-044), at the hand-over of the batch (2026-10-10); the mapping was read again in `presenter.ts`
+- Where: `dividendErrorToI18n` in `src/features/account_details/shared/presenter.ts` and its test; `src-tauri/src/context/account/service.rs` (`div_021_a_dividend_that_converts_to_nothing_is_refused`); `spl_062_a_split_draft_reports_its_first_problem` in `src-tauri/src/use_cases/holding_transaction/orchestrator.rs`; `src-tauri/src/context/sync/application/join.rs`; `src-tauri/tests/sync_two_devices.rs`
+- Severity: 🟡
+- Observation: **the window.** DIV-022 refuses a dividend whose amount converts to zero in the account's currency with `TotalAmountNotPositive`; the mapping of dividend errors does not list the code, so recording or correcting such a dividend says "unknown error" though the message exists. **A clause without a test.** DIV-022: the one test is named after DIV-021, and correcting a dividend to such an amount has none. SPL-062: the test of the order gives the unknown account a holding, so it passes with the two checks in either order; no case has a wrong ratio with an unknown account. FXR-014 / SYN-083: no test joins from an installation that holds a pair and shows the pair replaced. CFR-044 is implemented and tested.
+- User value: A dividend too small to count in the account's currency is refused with the reason.
+- Done when: the mapping lists the code, with its test; each clause above has a test that fails when the order or the replacement is wrong.

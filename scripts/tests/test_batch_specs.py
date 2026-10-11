@@ -28,7 +28,7 @@ class BatchSpecs(unittest.TestCase):
         self.write("docs/spec/asset.md", "one")
         self.write("docs/spec/sync.md", "one")
         self.write("docs/spec/gone.md", "one")
-        self.write("docs/todo.md", "one")
+        self.write("docs/work/todo/TODO-001.md", "one")
         self.commit("first")
 
     def git(self, *args):
@@ -59,7 +59,7 @@ class BatchSpecs(unittest.TestCase):
         self.git("tag", "v0.1.0")
         self.write("docs/spec/asset.md", "two")
         self.write("docs/spec/new.md", "a rule of its own")
-        self.write("docs/todo.md", "two")
+        self.write("docs/work/todo/TODO-001.md", "two")
         (self.repo / "docs/spec/gone.md").unlink()
         self.commit("the batch")
 
@@ -84,7 +84,7 @@ class BatchSpecs(unittest.TestCase):
 
     def test_a_batch_that_touched_no_spec_lists_nothing(self):
         self.git("tag", "v0.1.0")
-        self.write("docs/todo.md", "two")
+        self.write("docs/work/todo/TODO-001.md", "two")
         self.commit("docs only")
 
         listed = self.run_script()

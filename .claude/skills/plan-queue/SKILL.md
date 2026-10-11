@@ -5,9 +5,9 @@ description: Shows the owner's queue, the entries ready to queue, the entries wa
 
 # Skill — `plan-queue`
 
-The owner sets the queue (`docs/todo.md` § Next); the agent runs it (`/run-entry`). This
+The owner sets the queue (`docs/work/queue.md`); the agent runs it (`/run-entry`). This
 skill shows what the owner needs to set it: what is queued, what could be, what waits on
-them — and proposes an order. It decides nothing and never edits § Next.
+them — and proposes an order. It decides nothing and never edits the queue.
 
 ---
 
@@ -20,7 +20,7 @@ them — and proposes an order. It decides nothing and never edits § Next.
 ## When to use
 
 - At the start of a session, or after a gap.
-- When § Next is empty or every queued entry is blocked.
+- When nothing is left of the queue or every queued entry is blocked.
 - Before a release, to see what is still open.
 
 ---
@@ -30,20 +30,20 @@ them — and proposes an order. It decides nothing and never edits § Next.
 ### Step 1 — Collect
 
 ```bash
-python3 scripts/work-queue.py
+just queue
 ```
 
 One JSON document:
 
-- `queued` — the references of § Next in the owner's order, each with a `state`:
-  `ready`, `blocked` (with `waits_on`) or `closed` (the entry is gone: its work merged).
+- `queued` — the references of the queue file in the owner's order, each with a `state`:
+  `ready`, `blocked` (with `waits_on`), `closed` (the entry's file is gone: it shipped; or
+  a flow entry that carries a verdict and no proposal) or `unknown` (not an entry id).
 - `ready` — todo entries not queued that the agent could run today.
 - `blocked` — todo entries not queued, each with `waits_on`: the unticked open
   questions, a design to validate, or a missing Done when.
 - `techdebt_not_queued` — tech-debt entries not queued, grouped by theme (`refs`).
-- `flow_not_queued` — the entries of `docs/flow.md` not queued: its own proposals
-  (`FLOW-NNN`; `waits_on` the owner's decision for some) and the todo and tech-debt
-  entries that are about the flow.
+- `flow_not_queued` — the flow entries not queued that propose a change (`FLOW-NNN`;
+  `waits_on` the owner's decision for some).
 - `pull_requests` — open pull requests with `ci`: `green`, `running`, `failing`, `none`.
 - `in_flight` — uncommitted files, unmerged local branches, recent commits.
 - `roadmap` — the roadmap's headings.
@@ -64,7 +64,7 @@ and the open issues, propose one queue of ten lines at most:
 4. A theme is proposed as one line (`DEBT-046–DEBT-053`), not one line per entry.
 5. Blocked entries are never proposed; they are listed with what they wait on.
 6. A ready flow entry is proposed like a debt theme. One whose figure moved in the last
-   audit (the measured sections of `docs/flow.md`) comes before one that did not.
+   audit (`docs/work/audits.md`) comes before one that did not.
 7. An open issue no entry names is proposed as "to file or close": it is work nobody
    tracks. An issue an entry names is never proposed; its entry is.
 8. Ten lines at most. What does not fit stays in its section, unranked: the proposal is
@@ -97,10 +97,11 @@ Print the output below, then save it to the path given by
 - PR #{n} — {title} — CI {green|running|failing}
 - {N} uncommitted file(s); unmerged branches: {list}
 
-### Queued (§ Next, in order)
+### Queued (`docs/work/queue.md`, in order)
 1. {ref} — {title} — ready
 2. {ref} — {title} — blocked: {what it waits on}
-3. {ref} — closed, to remove from the queue
+3. {ref} — closed (shipped)
+4. {ref} — unknown: not an entry id, to correct in the queue
 
 ### Ready, not queued
 - {ref} — {title} — {user value, one clause}
@@ -136,7 +137,7 @@ they are written by others.
 
 ## Rules
 
-1. **The owner sets the queue.** Never edit § Next; never start an entry from here.
+1. **The owner sets the queue.** Never edit the queue; never start an entry from here.
 2. **Three lists, one proposal.** Every entry appears in exactly one of queued, ready or
    blocked.
 3. **Blocked means a named wait.** Each blocked entry shows the questions or the design

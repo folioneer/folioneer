@@ -62,7 +62,7 @@ jobs:
           security=$(has '^(src-tauri/src/.*/api\.rs$|src-tauri/capabilities/|src-tauri/src/core/specta_builder\.rs$|src-tauri/src/context/sync/)')
           e2e=$(has '^e2e/.*\.test\.ts$')
           # The two documents the code reviewers read as the truth get a reviewer
-          # of their own when they change (docs/flow.md FLOW-016).
+          # of their own when they change (FLOW-016).
           spec=$(has '^docs/spec/.*\.md$')
           contract=$(has '^docs/contracts/.*\.md$')
           arch=false
@@ -239,7 +239,7 @@ jobs:
               review-session.json 2>/dev/null | tail -c 1500 || true)
             # A session stopped by the subscription's usage limit reviewed nothing:
             # say "did not run", not "no report", so the red check is not read as
-            # a finding (docs/flow.md FLOW-002). It still fails — an unreviewed
+            # a finding (FLOW-002). It still fails — an unreviewed
             # pull request does not merge — and is re-run once the limit resets.
             if grep -qiE "hit your (session|usage|weekly) limit|usage limit reached" <<<"$last"; then
               heading="did not run (usage limit)"
@@ -251,7 +251,7 @@ jobs:
             # Why the session stopped, in one line of named fields (its turn limit
             # leaves no final message). The script is read from the base branch and
             # run from outside the checkout: this step holds a token, and a pull
-            # request must not choose what runs beside it (docs/flow.md FLOW-026).
+            # request must not choose what runs beside it (FLOW-026).
             stopped="the stop reason could not be read"
             if git show "origin/$BASE:scripts/review-stop-reason.py" > "$RUNNER_TEMP/review-stop-reason.py" 2>/dev/null; then
               stopped=$(python3 "$RUNNER_TEMP/review-stop-reason.py" review-session.json || echo "$stopped")

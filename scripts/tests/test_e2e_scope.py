@@ -16,7 +16,7 @@ class SuiteMustRun(unittest.TestCase):
     # committed visual proofs) changes nothing the suite can execute.
     def test_records_only_skip_the_suite(self):
         files = [
-            "docs/todo.md",
+            "docs/work/todo/TODO-001.md",
             "CHANGELOG.md",
             "README.md",
             "docs/adr/021-withdraw-the-keyless-price-source.md",
@@ -40,7 +40,7 @@ class SuiteMustRun(unittest.TestCase):
             "scripts/visual-proof-capture.mjs",
         ]:
             with self.subTest(path=path):
-                self.assertTrue(e2e_scope.suite_must_run(["docs/todo.md", path]))
+                self.assertTrue(e2e_scope.suite_must_run(["docs/work/todo/TODO-001.md", path]))
 
     # TODO-041 — no file list means nothing proves the change is records only: run.
     def test_an_unknown_change_runs_the_suite(self):

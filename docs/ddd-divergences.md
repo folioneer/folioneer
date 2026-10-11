@@ -138,7 +138,7 @@ Read this when:
 
 **Trade**: Splitting these aggregate methods into typed factory + apply pairs (so they return `Result<_, AccountError>` directly) is a real refactor across the account BC. The error-enum collapse into a single flat `AccountError` is in place; this aggregate-method retrofit is the remaining step. The bridges are intentional until it happens.
 
-**When to revisit**: Now that the flat `AccountError` has landed, fold the aggregate methods into typed `Result<_, AccountError>` and delete the bridges (`to_holding_tx_error`, `to_open_holding_error`). This is also the prerequisite for the `replay_cash_holding` factory-call fix tracked in `docs/techdebt.md` (2026-06-20), whose `Holding::new`/`with_id` calls need typed `AccountError` rather than `anyhow::Result`.
+**When to revisit**: Now that the flat `AccountError` has landed, fold the aggregate methods into typed `Result<_, AccountError>` and delete the bridges (`to_holding_tx_error`, `to_open_holding_error`). This is also the prerequisite for the `replay_cash_holding` factory-call fix tracked in `docs/work/debt/` (2026-06-20), whose `Holding::new`/`with_id` calls need typed `AccountError` rather than `anyhow::Result`.
 
 ---
 
@@ -196,7 +196,7 @@ Read this when:
 
 **Practice**: `ChangeRecorder` (`shared/infrastructure/change_recorder.rs`), `RankStamper` (`context/sync/domain/rank_stamper.rs`), `ChangeLogRepository` (`context/sync/domain/change_log.rs`) and the `stamp_sync_rank(conn, rank)` method on the account, asset and currency repository traits all take a `&mut sqlx::SqliteConnection`; `use_cases/portfolio_sync/rank_stamper.rs` forwards that connection to the three services. `ChangeRecorder` sits under `shared/infrastructure/`, not `shared/domain/`, for the same reason: its signature names a persistence handle.
 
-**Trade**: A record and its change row must commit together (SYN-020), and the first publish must write the header's first segment, stamp every existing row in three bounded contexts and enrol the device in **one** transaction (SYN-013: "rolled back on failure"). Without a unit of work (ADR-006 is unimplemented — see `docs/techdebt.md`), the only way to keep those writes atomic is to hand the live transaction through the ports. Each context still owns its own SQL; the use case only carries the handle.
+**Trade**: A record and its change row must commit together (SYN-020), and the first publish must write the header's first segment, stamp every existing row in three bounded contexts and enrol the device in **one** transaction (SYN-013: "rolled back on failure"). Without a unit of work (ADR-006 is unimplemented — see `docs/work/debt/`), the only way to keep those writes atomic is to hand the live transaction through the ports. Each context still owns its own SQL; the use case only carries the handle.
 
 **When to revisit**: When ADR-006's unit of work lands, the ports take the unit of work instead of a raw connection and the use case stops seeing sqlx types.
 
