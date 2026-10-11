@@ -1,11 +1,11 @@
 # Contract — Agent Connection
 
 > Domain: `agent-connection`
-> Last updated by: agent-connection (AGT-022–036, AGT-039, AGT-045, AGT-052, AGT-053)
+> Last updated by: agent-connection (AGT-022–036, AGT-039, AGT-045, AGT-052, AGT-053, AGT-064)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName" }` object. The FE matches on `code`.
 >
-> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051) are not Tauri commands: what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
+> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–064) are not Tauri commands: what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
 
 ---
 
@@ -53,6 +53,8 @@ struct AgentSession {
     reads: u32,                            // its calls of a read tool that were answered
     recordings: u32,                       // the transactions it recorded that still exist
     last_recording: Option<LastRecording>, // the last recorded of them; None when none is left
+    assets_added: u32,                     // the assets it added (AGT-064)
+    last_asset: Option<LastAsset>,         // the last added of them; None when it added none
 }
 
 // AGT-052 — the last transaction a session recorded.
@@ -60,6 +62,12 @@ struct LastRecording {
     kind: TransactionType, // account-contract.md
     asset: String,         // the asset's reference; its identifier when the asset cannot be read
     date: String,          // YYYY-MM-DD
+}
+
+// AGT-064 — the last asset a session added.
+struct LastAsset {
+    name: String,      // the asset's name
+    reference: String, // the asset's reference
 }
 
 // AGT-053 — what removing everything a session recorded did.
@@ -88,6 +96,7 @@ The mark of a transaction an agent recorded (AGT-045) reaches the window in the 
 
 ## Changelog
 
+- 2026-10-12 — TODO-063: `AgentSession` gains `assets_added` and `last_asset`, with `LastAsset { name: String, reference: String }` (AGT-064). No command or error changes.
 - 2026-10-09 — Created: the four commands, their types and the event (AGT-022–039).
 - 2026-10-09 — AGT-045: the mark of an agent's recording reaches the window as `JournalRow.recorded_by` (`account-contract.md`); no command added.
 - 2026-10-10 — TODO-060: `remove_agent_recordings` and `SessionRemoval` (AGT-053); `AgentSession` gains `started_at`, `reads`, `recordings` and `last_recording`, with `LastRecording` (AGT-052); `AgentConnectionError` gains `DatabaseError`.

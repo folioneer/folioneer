@@ -78,6 +78,7 @@ fn agt_010_the_program_started_with_mcp_lists_its_tools() {
             "record_split",
             "record_free_shares",
             "record_price",
+            "add_asset",
             "correct_recording",
             "cancel_recording",
         ]
@@ -121,7 +122,8 @@ fn agt_013_every_tool_listed_says_whether_it_only_reads() {
             .unwrap_or_else(|| panic!("{name} says whether it only reads"));
         let records = name.starts_with("record_")
             || name == "correct_recording"
-            || name == "cancel_recording";
+            || name == "cancel_recording"
+            || name == "add_asset";
         assert_eq!(only_reads, !records, "{name}");
         if only_reads {
             reading.push(name);

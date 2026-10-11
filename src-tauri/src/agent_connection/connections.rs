@@ -38,6 +38,19 @@ pub struct AgentSession {
     pub recordings: u32,
     /// The one it recorded last among them.
     pub last_recording: Option<LastRecording>,
+    /// How many assets it added (AGT-064).
+    pub assets_added: u32,
+    /// The one it added last.
+    pub last_asset: Option<LastAsset>,
+}
+
+/// The last asset a session added, as the window names it (AGT-064).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct LastAsset {
+    /// The asset's name.
+    pub name: String,
+    /// The asset's reference.
+    pub reference: String,
 }
 
 /// The last transaction a session recorded, as the window names it (AGT-052).
@@ -59,9 +72,16 @@ struct Facts {
     /// How many of its recordings still exist, and the last of them: read from the
     /// portfolio after each change, so the two always agree.
     recordings: Mutex<(u32, Option<LastRecording>)>,
+    /// How many assets it added, and the last of them (AGT-064): counted as they are
+    /// added, and kept until the session ends.
+    assets: Mutex<(u32, Option<LastAsset>)>,
 }
 
 impl Facts {
+    fn assets(&self) -> MutexGuard<'_, (u32, Option<LastAsset>)> {
+        self.assets.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
     fn recordings(&self) -> MutexGuard<'_, (u32, Option<LastRecording>)> {
         self.recordings
             .lock()
@@ -108,6 +128,12 @@ impl Granted {
         self.facts.reads.fetch_add(1, Ordering::SeqCst);
     }
 
+    /// AGT-064 — the session added an asset: one more, and the last of them.
+    pub fn count_asset(&self, name: String, reference: String) {
+        let mut assets = self.facts.assets();
+        *assets = (assets.0 + 1, Some(LastAsset { name, reference }));
+    }
+
     /// AGT-052 — what the session recorded and that still exists, as the portfolio has it
     /// now: how many, and the last of them.
     pub fn recordings_are(&self, count: u32, last: Option<LastRecording>) {
@@ -132,10 +158,13 @@ impl Open {
     /// The session with what it did so far.
     fn told(&self) -> AgentSession {
         let (recordings, last_recording) = self.facts.recordings().clone();
+        let (assets_added, last_asset) = self.facts.assets().clone();
         AgentSession {
             reads: self.facts.reads.load(Ordering::SeqCst),
             recordings,
             last_recording,
+            assets_added,
+            last_asset,
             ..self.session.clone()
         }
     }
@@ -256,6 +285,8 @@ impl AgentConnections {
                     reads: 0,
                     recordings: 0,
                     last_recording: None,
+                    assets_added: 0,
+                    last_asset: None,
                 },
                 ended: Arc::clone(&ended),
                 key: key.clone(),
@@ -445,6 +476,8 @@ mod tests {
                 reads: 0,
                 recordings: 0,
                 last_recording: None,
+                assets_added: 0,
+                last_asset: None,
             }]
         );
         assert!(connections.requests().is_empty());

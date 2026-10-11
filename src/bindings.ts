@@ -1677,7 +1677,15 @@ recordings: number;
 /**
  * The one it recorded last among them.
  */
-last_recording: LastRecording | null }
+last_recording: LastRecording | null; 
+/**
+ * How many assets it added (AGT-064).
+ */
+assets_added: number; 
+/**
+ * The one it added last.
+ */
+last_asset: LastAsset | null }
 /**
  * Use-case composite for the **archive asset** failure surface — the single
  * command `archive_asset` (OQ-6) and its full chain of rejections.
@@ -3433,6 +3441,18 @@ export type KindProblem =
  * It is the same asset as another.
  */
 { code: "SameAsAnother"; other_id: string; other_name: string }
+/**
+ * The last asset a session added, as the window names it (AGT-064).
+ */
+export type LastAsset = { 
+/**
+ * The asset's name.
+ */
+name: string; 
+/**
+ * The asset's reference.
+ */
+reference: string }
 /**
  * The last transaction a session recorded, as the window names it (AGT-052).
  */

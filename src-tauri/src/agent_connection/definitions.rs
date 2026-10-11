@@ -176,6 +176,26 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "add_asset",
+            title: "Add an asset",
+            only_reads: false,
+            description: "Add an asset the portfolio does not have yet, so that it can be recorded in an account: a listed one (a share, a fund, a bond — it has an ISIN), a crypto asset, or a custom one (anything else: real estate, an unlisted fund). Look for it with list_assets first: the same asset is refused twice. Give a kind, a class, or both. It takes one place of the session's limit.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string", "description": "The asset's name." },
+                    "reference": { "type": "string", "description": "Its ticker, its symbol for a crypto asset, or a short reference of your choice for a custom one." },
+                    "currency": { "type": "string", "description": "The ISO code of the currency it is priced in: EUR, USD." },
+                    "kind": { "type": "string", "description": "Listed, Crypto or Custom. Left out, it follows from the class and the ISIN." },
+                    "class": { "type": "string", "description": "RealEstate, Stocks, Bonds, ETF, ETP, MutualFunds, DigitalAsset or Derivatives. Left out, the usual class of the kind: Stocks for Listed, DigitalAsset for Crypto, RealEstate for Custom." },
+                    "isin": { "type": "string", "description": "Its ISIN: required for a listed asset, refused for the others." },
+                    "exchange": { "type": "string", "description": "The MIC code of its exchange (XPAR), for a listed asset. Optional." }
+                },
+                "required": ["name", "reference", "currency"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
             name: "correct_recording",
             title: "Correct a recording",
             only_reads: false,

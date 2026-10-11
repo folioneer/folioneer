@@ -1524,3 +1524,148 @@ async fn agt_063_a_session_records_a_split_and_free_shares() {
     .expect_err("refused");
     assert_eq!(past_the_limit.code, "SessionLimitReached");
 }
+
+// AGT-064 — a session adds the assets a statement names, of each kind, through the rules
+// of the window's form: the same asset is refused twice, each added asset takes a place
+// of the session's limit, and the window is told how many and the last.
+#[tokio::test]
+async fn agt_064_a_session_adds_an_asset_of_each_kind() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+
+    let listed = call(
+        "add_asset",
+        json!({ "name": "Air Liquide", "reference": "ai", "currency": "EUR", "kind": "listed", "isin": "FR0000120073" }),
+    )
+    .await
+    .expect("a listed asset");
+    assert_eq!(listed["status"], "added");
+    assert_eq!(listed["asset"]["name"], "Air Liquide");
+    assert_eq!(listed["asset"]["reference"], "AI");
+    assert_eq!(listed["asset"]["kind"], "Listed");
+    assert_eq!(listed["asset"]["class"], "Stocks");
+    assert_eq!(listed["asset"]["isin"], "FR0000120073");
+    assert_eq!(listed["reference_shared"], false);
+    let crypto = call(
+        "add_asset",
+        json!({ "name": "Bitcoin", "reference": "BTC", "currency": "EUR", "kind": "Crypto" }),
+    )
+    .await
+    .expect("a crypto asset");
+    assert_eq!(crypto["asset"]["class"], "DigitalAsset");
+    let custom = call(
+        "add_asset",
+        json!({ "name": "Flat in Lyon", "reference": "LYON", "currency": "EUR", "class": "realestate" }),
+    )
+    .await
+    .expect("a custom asset");
+    assert_eq!(custom["asset"]["kind"], "Custom");
+
+    // The window's refusals, with their codes; what is missing or misread as for any tool.
+    for (arguments, code) in [
+        (
+            json!({ "name": "Air Liquide again", "reference": "AIR", "currency": "EUR", "kind": "listed", "isin": "FR0000120073" }),
+            "AssetAlreadyExists",
+        ),
+        (
+            json!({ "name": "LVMH", "reference": "MC", "currency": "EUR", "kind": "listed" }),
+            "IsinRequired",
+        ),
+        (
+            json!({ "name": "Ether", "reference": "ETH", "currency": "EUR", "kind": "crypto", "isin": "FR0000121014" }),
+            "IsinNotAllowed",
+        ),
+        (
+            json!({ "name": "LVMH", "reference": "MC", "currency": "EURO", "kind": "custom" }),
+            "InvalidCurrency",
+        ),
+        (
+            json!({ "reference": "MC", "currency": "EUR", "kind": "custom" }),
+            "MissingArgument",
+        ),
+        (
+            json!({ "name": "LVMH", "reference": "MC", "currency": "EUR" }),
+            "MissingArgument",
+        ),
+        (
+            json!({ "name": "Euros", "reference": "EUR", "currency": "EUR", "kind": "cash" }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "name": "LVMH", "reference": "MC", "currency": "EUR", "class": "shares" }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "name": "LVMH", "reference": "MC", "currency": "EUR", "kind": "custom", "isin": 12 }),
+            "InvalidArguments",
+        ),
+        // Text the portfolio keeps and the window shows: bounded, and nothing in it that
+        // hides or reorders what is read.
+        (
+            json!({ "name": "L".repeat(101), "reference": "MC", "currency": "EUR", "kind": "custom" }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "name": "LVMH", "reference": "M".repeat(31), "currency": "EUR", "kind": "custom" }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "name": "LVMH\u{202E}HMVL", "reference": "MC", "currency": "EUR", "kind": "custom" }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "name": "LVMH", "reference": "MC\nlast: X", "currency": "EUR", "kind": "custom" }),
+            "InvalidArguments",
+        ),
+    ] {
+        assert_eq!(
+            call("add_asset", arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{arguments}"
+        );
+    }
+
+    // The portfolio has them, the window is told how many and the last, and an asset is
+    // no transaction.
+    let assets = call("list_assets", json!({})).await.expect("listed");
+    let references: Vec<&str> = assets
+        .as_array()
+        .expect("assets")
+        .iter()
+        .map(|asset| asset["reference"].as_str().expect("a reference"))
+        .collect();
+    for reference in ["AI", "BTC", "LYON"] {
+        assert!(
+            references.contains(&reference),
+            "{reference} in {references:?}"
+        );
+    }
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.assets_added, 3);
+    let last = told.last_asset.expect("a last asset");
+    assert_eq!(
+        (last.name.as_str(), last.reference.as_str()),
+        ("Flat in Lyon", "LYON")
+    );
+    assert_eq!(told.recordings, 0);
+
+    // Its three assets took three places of the session's limit.
+    for _ in 3..super::connections::MAX_RECORDINGS {
+        granted.count_recording();
+    }
+    let past_the_limit = call(
+        "add_asset",
+        json!({ "name": "Gold", "reference": "GOLD", "currency": "EUR", "kind": "custom" }),
+    )
+    .await
+    .expect_err("refused");
+    assert_eq!(past_the_limit.code, "SessionLimitReached");
+}

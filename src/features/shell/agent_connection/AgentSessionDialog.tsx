@@ -13,7 +13,7 @@ interface AgentSessionDialogProps {
 }
 
 /**
- * AGT-052 / AGT-053 — what a connected agent did in its session, and the one action on
+ * AGT-052 / AGT-053 / AGT-064 — what a connected agent did in its session, and the one action on
  * it: removing everything it recorded, and nothing the owner typed. The removal asks to
  * confirm, and refusing is the filled action in focus.
  */
@@ -26,10 +26,21 @@ export function AgentSessionDialog({
   const { t, i18n } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const last = session.last_recording;
+  const lastAsset = session.last_asset;
 
   const rows: [string, string][] = [
     [t("agent.session_since"), formatIsoTime(session.started_at, i18n.language)],
     [t("agent.session_read"), t("agent.session_read_count", { count: session.reads })],
+    [
+      t("agent.session_assets"),
+      lastAsset
+        ? t("agent.session_assets_count", {
+            count: session.assets_added,
+            name: lastAsset.name,
+            reference: lastAsset.reference,
+          })
+        : t("agent.session_none"),
+    ],
     [t("agent.session_recorded"), t("agent.session_recorded_count", { count: session.recordings })],
     [
       t("agent.session_last"),

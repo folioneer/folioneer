@@ -36,6 +36,8 @@ const session = (overrides = {}) => ({
   reads: 27,
   recordings: 12,
   last_recording: { kind: "Purchase", asset: "CW8", date: "2019-12-31" },
+  assets_added: 0,
+  last_asset: null,
   ...overrides,
 });
 const request = { id: 4, client: "Claude Code", asked_at: "2026-10-09T14:32:00" };
@@ -65,7 +67,12 @@ describe("AgentConnectionMount", () => {
     expect(dialog).toHaveTextContent("agent.connection_started_by_user(phil)");
     expect(dialog).toHaveTextContent("14:32");
     expect(dialog).toHaveTextContent("agent.connection_covers_read");
-    expect(dialog).toHaveTextContent("agent.connection_covers_record");
+    // AGT-064 — adding assets has a line of its own, between reading and recording.
+    expect(Array.from(dialog.querySelectorAll("li")).map((line) => line.textContent)).toEqual([
+      "agent.connection_covers_read",
+      "agent.connection_covers_add",
+      "agent.connection_covers_record",
+    ]);
     expect(dialog).toHaveTextContent("agent.connection_never");
     expect(document.getElementById("agent-connection-refuse")).toHaveFocus();
   });
@@ -191,6 +198,37 @@ describe("AgentIndicator", () => {
 
     fireEvent.click(document.getElementById("agent-session-close") as HTMLElement);
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  // AGT-064 — the session dialog says how many assets the session added and names the
+  // last one, between what it read and what it recorded; none is said as such.
+  it("says the assets the session added, or that it added none", () => {
+    hook.mockReturnValue(
+      state({
+        sessions: [
+          session({ assets_added: 2, last_asset: { name: "Air Liquide", reference: "AI" } }),
+        ],
+      }),
+    );
+    const { unmount } = render(<AgentIndicator />);
+    fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
+    const rows = () =>
+      Array.from(screen.getByRole("dialog").querySelectorAll("dt")).map((row) => [
+        row.textContent,
+        row.nextElementSibling?.textContent,
+      ]);
+    expect(rows()[1]).toEqual(["agent.session_read", "agent.session_read_count(27)"]);
+    expect(rows()[2]).toEqual([
+      "agent.session_assets",
+      "agent.session_assets_count(2,Air Liquide,AI)",
+    ]);
+    expect(rows()[3]).toEqual(["agent.session_recorded", "agent.session_recorded_count(12)"]);
+    unmount();
+
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    render(<AgentIndicator />);
+    fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
+    expect(rows()[2]).toEqual(["agent.session_assets", "agent.session_none"]);
   });
 
   // AGT-053 — removing everything asks to confirm, keeping is the action in focus, and

@@ -67,6 +67,16 @@ pub fn shown_name(given: &str) -> String {
     }
 }
 
+/// AGT-064 — whether text an agent wrote can be kept and shown as it is: no control
+/// character, none of the invisible ones that reorder or hide text, and `longest`
+/// characters at most.
+pub fn shows_as_written(text: &str, longest: usize) -> bool {
+    text.chars().count() <= longest
+        && !text
+            .chars()
+            .any(|character| character.is_control() || is_invisible(character))
+}
+
 /// Zero-width, directional and other formatting characters: they show nothing and can
 /// make a name read as another.
 fn is_invisible(character: char) -> bool {

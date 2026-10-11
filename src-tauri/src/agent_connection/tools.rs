@@ -6,18 +6,21 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use crate::context::account::{AccountError, AccountServiceContract, AgentRecording};
-use crate::context::asset::{Asset, AssetClass, AssetKind, AssetServiceContract};
+use crate::context::asset::{
+    Asset, AssetClass, AssetCreationDefaults, AssetError, AssetKind, AssetServiceContract,
+    NamedAsset,
+};
 use crate::context::currency::CurrencyService;
 use crate::core::BACKEND;
 use crate::use_cases::account_details::AccountDetailsUseCase;
 use crate::use_cases::account_summary::AccountSummaryUseCase;
 use crate::use_cases::holding_transaction::{
-    decimal_to_micro, CashAmount, Correction, DividendAmount, FreeShares,
+    code_of, decimal_to_micro, CashAmount, Correction, DividendAmount, FreeShares,
     HoldingTransactionUseCase, PriceAt, Recording, StockSplit, Target, Trade, TradeAmount,
 };
 
 use super::connections::{Granted, LastRecording, MAX_RECORDINGS};
-use super::definitions;
+use super::{definitions, wire};
 
 /// Why a tool call is refused: a stable code and a reason for the agent to read.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -192,6 +195,7 @@ impl AgentTools {
                     .await
             }
             "record_price" => self.record_price(granted, arguments).await,
+            "add_asset" => self.add_asset(granted, arguments).await,
             "portfolio_summary" => self
                 .summaries
                 .get_account_summaries()
@@ -332,6 +336,57 @@ impl AgentTools {
         }))
     }
 
+    /// AGT-064 — adds an asset through the rules of the window's form, as the command line
+    /// does (CLI-026): the core decides what is left out. It takes a place of the session's
+    /// limit (AGT-047) and the window is told.
+    async fn add_asset(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
+        let kind = asset_kind(arguments)?;
+        let named = NamedAsset {
+            name: kept_text(arguments, "name", ASSET_NAME_LENGTH)?,
+            reference: kept_text(arguments, "reference", ASSET_REFERENCE_LENGTH)?,
+            kind,
+            class: asset_class(arguments, kind)?,
+            currency: text(arguments, "currency")?.to_string(),
+            isin: optional_text(arguments, "isin")?,
+            exchange_code: optional_text(arguments, "exchange")?,
+            risk_level: None,
+            category_name: None,
+        };
+        if !granted.may_record_one_more() {
+            return Err(session_limit_reached());
+        }
+        let added = self
+            .asset_service
+            .add_named_asset(named)
+            .await
+            .map_err(|error| {
+                let code = code_of(&error);
+                if matches!(error, AssetError::DatabaseError) {
+                    tracing::error!(target: BACKEND, session = granted.session_id, "agent adding an asset: the portfolio could not be read or written");
+                }
+                Refusal {
+                    message: match error {
+                        AssetError::AssetAlreadyExists { .. } => {
+                            "the portfolio already has this asset".to_string()
+                        }
+                        AssetError::DatabaseError => {
+                            "the portfolio could not be read or written".to_string()
+                        }
+                        _ => format!("refused by the rules ({code})"),
+                    },
+                    code,
+                }
+            })?;
+        granted.count_recording();
+        granted.count_asset(added.asset.name.clone(), added.asset.reference.clone());
+        tracing::info!(target: BACKEND, session = granted.session_id, asset = %added.asset.id, "agent added an asset");
+        as_json(&serde_json::json!({
+            "status": "added",
+            "asset": AssetRow::from(added.asset),
+            "reference_shared": added.reference_shared,
+        }))
+    }
+
     /// AGT-052 — reads what the session recorded and that still exists, for the window. A
     /// read that fails leaves what the window was last told.
     async fn tell_recordings(&self, granted: &Granted) {
@@ -450,7 +505,7 @@ fn session_limit_reached() -> Refusal {
     Refusal {
         code: "SessionLimitReached".to_string(),
         message: format!(
-            "this session has recorded {MAX_RECORDINGS} transactions and prices, its limit: the owner disconnects and allows a new session to go on"
+            "this session has recorded or added {MAX_RECORDINGS} transactions, prices and assets, its limit: the owner disconnects and allows a new session to go on"
         ),
     }
 }
@@ -510,6 +565,68 @@ fn whole(arguments: &Value, name: &str) -> Result<i64, Refusal> {
         let shown: String = typed.chars().take(40).collect();
         not_whole(&format!(": \"{}\"", shown.escape_debug()))
     })
+}
+
+/// AGT-064 — the longest name and reference an agent gives an asset, in characters.
+const ASSET_NAME_LENGTH: usize = 100;
+const ASSET_REFERENCE_LENGTH: usize = 30;
+
+/// AGT-064 — text an agent wrote that the portfolio keeps and the window shows: it is
+/// refused when it is too long or holds a character that shows nothing or reorders text.
+fn kept_text(arguments: &Value, name: &str, longest: usize) -> Result<String, Refusal> {
+    let typed = text(arguments, name)?;
+    if !wire::shows_as_written(typed, longest) {
+        return Err(Refusal {
+            code: "InvalidArguments".to_string(),
+            message: format!(
+                "{name} is longer than {longest} characters, or holds a control or an invisible character"
+            ),
+        });
+    }
+    Ok(typed.to_string())
+}
+
+/// AGT-064 — `kind` as one of the kinds the core lets a user add an asset of, case ignored;
+/// left out, the core decides it (AST-034).
+fn asset_kind(arguments: &Value) -> Result<Option<AssetKind>, Refusal> {
+    let Some(typed) = optional_text(arguments, "kind")? else {
+        return Ok(None);
+    };
+    AssetCreationDefaults::current()
+        .kinds
+        .into_iter()
+        .map(|form| form.kind)
+        .find(|kind| kind.to_string().eq_ignore_ascii_case(typed.trim()))
+        .map(Some)
+        .ok_or_else(|| Refusal {
+            code: "InvalidArguments".to_string(),
+            message: "kind is not one of Listed, Crypto, Custom".to_string(),
+        })
+}
+
+/// AGT-064 — `class` as one of the classes the core lets a user add an asset in, case
+/// ignored; left out, it is the class the core preselects for `kind` (AST-037).
+fn asset_class(arguments: &Value, kind: Option<AssetKind>) -> Result<AssetClass, Refusal> {
+    let Some(typed) = optional_text(arguments, "class")? else {
+        return kind
+            .and_then(AssetCreationDefaults::class_of)
+            .ok_or_else(|| Refusal {
+                code: "MissingArgument".to_string(),
+                message: "class is missing: give a kind, a class, or both".to_string(),
+            });
+    };
+    let addable = AssetClass::user_addable();
+    addable
+        .iter()
+        .find(|class| class.to_string().eq_ignore_ascii_case(typed.trim()))
+        .cloned()
+        .ok_or_else(|| {
+            let names: Vec<String> = addable.iter().map(ToString::to_string).collect();
+            Refusal {
+                code: "InvalidArguments".to_string(),
+                message: format!("class is not one of {}", names.join(", ")),
+            }
+        })
 }
 
 /// The account, the asset, the quantity and the date of a recording.

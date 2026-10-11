@@ -201,6 +201,7 @@ mod tests {
                 "record_split",
                 "record_free_shares",
                 "record_price",
+                "add_asset",
                 "correct_recording",
                 "cancel_recording"
             ]
