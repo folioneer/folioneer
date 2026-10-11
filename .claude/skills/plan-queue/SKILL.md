@@ -65,8 +65,11 @@ and the open issues, propose one queue of ten lines at most:
 5. Blocked entries are never proposed; they are listed with what they wait on.
 6. A ready flow entry is proposed like a debt theme. One whose figure moved in the last
    audit (`docs/work/audits.md`) comes before one that did not.
-7. An open issue no entry names is proposed as "to file or close": it is work nobody
-   tracks. An issue an entry names is never proposed; its entry is.
+7. A GitHub issue is never proposed, nor queued: an entry is. An open issue no entry
+   names is work nobody tracks: its line in the issues section says so, and the
+   questions to answer before queueing ask whether to file a todo entry that names it
+   — one entry per issue, or several when the issue holds parts of different urgency —
+   or to close it. Once an entry names it, the entry is what is proposed.
 8. Ten lines at most. What does not fit stays in its section, unranked: the proposal is
    the next batch, not the backlog in order.
 
@@ -122,12 +125,12 @@ Print the output below, then save it to the path given by
 ### Proposed queue
 1. {ref} — {why here}
 2. FLOW-{NNN} — {the figure that moved}
-3. gh{n} — to file or close: {what it asks}
 …
 10. {the last line the proposal may hold}
 
 ### To answer before queueing
 - {ref} — {question, with what each answer changes} (Recommended: {answer})
+- gh{n} — a todo entry that names it, or closed? {what it asks} (Recommended: {answer})
 ```
 
 Omit a section that is empty. Escape `|` in issue titles and cut them at 80 characters:

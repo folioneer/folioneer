@@ -1,11 +1,11 @@
-# TODO-072 — (backend) — An agent and the command line record interest and a management fee (deferred)
+# TODO-072 — (backend) — An agent records interest and a management fee (deferred)
 
-From gh209, refined with the owner on 2026-10-11: not urgent for now. The application models interest credited to a holding or to cash (INT) and a management fee taken in units (FEE) as transaction kinds, recorded in the window; an agent and the command line can record neither. The yearly statements of an insurance contract mostly show these two.
+From gh209, refined with the owner on 2026-10-11: not urgent for now. The application models interest credited to a holding or to cash (INT) and a management fee taken in units (FEE) as transaction kinds, recorded in the window; an agent can record neither. The yearly statements of an insurance contract mostly show these two.
 
-The same wiring as TODO-071, for the two kinds.
+The same wiring as TODO-071, for the two kinds; the command line's commands are TODO-077.
 
 **User value:** An agent enters the interest and the fees a yearly statement shows, instead of leaving them to be typed.
-**Done when:** `record_interest` and `record_management_fee` exist as tools and as commands of the command line, through the one recorder and the window's rules (INT, FEE); each is marked, counted, cancelled and shown like the other recordings.
+**Done when:** `record_interest` and `record_management_fee` exist as tools, through the shared recorder and the window's rules (INT, FEE); each is marked, counted, cancelled and shown like the other recordings.
 **Design:** none
 **Open questions:**
 

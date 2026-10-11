@@ -430,13 +430,15 @@ class SkillProposal(unittest.TestCase):
         block = self.SKILL.split("### Proposed queue", 1)[1].split("```", 1)[0]
         return [line for line in block.splitlines() if line.strip()]
 
-    def test_the_example_proposes_a_flow_entry_and_an_untracked_issue(self):
-        # The example is the skill file's of this commit: an issue reads `gh{n}` there.
-        example = self.proposal_example()
-        self.assertTrue(any("FLOW-" in line for line in example), example)
-        self.assertTrue(
-            any("gh{n}" in line and "to file or close" in line for line in example), example
-        )
+    def test_the_example_proposes_a_flow_entry_and_never_an_issue(self):
+        # The queue holds entries: an issue no entry names is a question to the owner —
+        # a todo entry that names it, or closed — never a line of the proposal.
+        proposed = [line for line in self.proposal_example() if line[0].isdigit()]
+        self.assertTrue(any("FLOW-" in line for line in proposed), proposed)
+        self.assertFalse(any("gh{n}" in line for line in proposed), proposed)
+        questions = self.SKILL.split("### To answer before queueing")[-1].split("```", 1)[0]
+        self.assertIn("gh{n}", questions)
+        self.assertIn("a todo entry that names it", questions)
 
     def test_the_example_stops_at_ten_lines_as_the_ordering_step_says(self):
         numbers = [
@@ -446,7 +448,7 @@ class SkillProposal(unittest.TestCase):
         ordering = self.SKILL.split("### Step 2", 1)[1].split("### Step 3", 1)[0]
         self.assertIn("ten lines at most", ordering)
         self.assertIn("flow entr", ordering)
-        self.assertIn("to file or close", ordering)
+        self.assertIn("A GitHub issue is never proposed, nor queued", ordering)
 
     def test_the_issues_section_says_which_entries_name_each_issue(self):
         issues = self.SKILL.split("### GitHub issues", 1)[1].split("###", 1)[0]

@@ -56,7 +56,9 @@ under them.
 
 - The file is the queue of one batch: `TODO-NNN`, `DEBT-NNN` and `FLOW-NNN` references
   in the order to work them, one per line as a plain list (`- TODO-NNN`). Empty, or
-  absent, nothing is queued.
+  absent, nothing is queued. A GitHub issue is never queued (owner,
+  2026-10-11): an issue worth doing gets a todo entry that names it (`ghNN`), and the
+  entry is queued.
 - Order and additions are the human's. No pull request that ships an entry edits it, so
   two closures never meet in the file.
 - A queued reference whose entry file is gone has shipped, and a flow entry that is a
