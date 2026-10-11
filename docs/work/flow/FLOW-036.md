@@ -12,3 +12,4 @@
   `scripts/work-queue.py`, with its test.
 - Costs: about an hour. Protects: the audit's "was" column, and a prune that would
   otherwise skip a release's files.
+- Queued by the owner on 2026-10-11, to be amended if needed when it is built.

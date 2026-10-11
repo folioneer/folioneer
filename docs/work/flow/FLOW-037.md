@@ -20,3 +20,4 @@
 - Costs: minutes per entry at the opening; a line per clause in the body. Protects: a
   pull request rewritten after its push, and a consent sentence that says less than what
   it allows.
+- Queued first by the owner on 2026-10-11, so that the batch that follows is the first one read that way.

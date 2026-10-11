@@ -6,9 +6,11 @@ request that ships an entry touches it. `just queue` says what has shipped.
 
 <!-- One reference per line, as a plain list: `- TODO-NNN`, `- DEBT-NNN`, `- FLOW-NNN`. -->
 
+- FLOW-037
 - TODO-071
 - DEBT-106
 - FLOW-011
+- FLOW-036
 - TODO-074
 - TODO-075
 - TODO-065
