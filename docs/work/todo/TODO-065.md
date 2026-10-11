@@ -5,4 +5,6 @@ Raised on 2026-10-10 by an audit of the agent connection against the protocol's 
 **User value:** The owner sees each recording an agent makes as it happens, whatever view is open; a dialog never asks about a connection nobody waits for; Claude asks before recording and not before reading.
 **Done when:** the window shows a notice naming the agent and what it recorded, on every view; a cancelled call (`notifications/cancelled`) withdraws its connection request; each tool carries a title and says whether it only reads (`readOnlyHint`), and a test holds that every recording says it does not.
 **Design:** none
-**Open questions:** none
+**Open questions:**
+
+- [x] The notice on every view: the window's existing snackbar, or a new element? — The existing snackbar, one message per recording, a new one replacing the one before; no new element and no layout change, so no mock-up. Its sentences, in English and in French, are shown to the owner before they are coded (owner, 2026-10-11).
