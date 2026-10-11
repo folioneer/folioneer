@@ -5,7 +5,7 @@ Raised on 2026-10-10. The three interfaces share their rules — one recorder, o
 One document lists each capability and which interface offers it. A check fails when a tool or a command is added without its line. The same table ships with the application and is shown in it, as the page that says what this version can do through each interface (owner, 2026-10-10).
 
 **User value:** The owner reads in the application what an agent and the command line can do in this version, and a new capability never appears in one interface by accident.
-**Done when:** the table exists in the docs, one line per capability, one column per interface; a check fails on a tool or a command with no line, seen red; the application shows the table on a page of its own, in both languages, from the same source as the docs.
+**Done when:** the table exists in the docs, one line per capability, one column per interface, the tool that adds an asset among them (TODO-063); a check fails on a tool or a command with no line, seen red; the application shows the table on a page of its own, in both languages, from the same source as the docs.
 **Design:** none
 **Open questions:**
 
