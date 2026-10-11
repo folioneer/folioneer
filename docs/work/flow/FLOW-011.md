@@ -12,3 +12,8 @@
 - Since the 0.8.0 batch a pull request that touches the Rust code is compiled for Windows
   and runs the agent connection's tests there (Quality `windows`). What is left of this
   proposal is the release workflow's own steps: packaging and publishing.
+- 2026-10-11: the release refused to start on its own validation — `cargo sqlx prepare
+--check` asked for a database address, which sqlx-cli 0.9.0 on the owner's machine
+  demands and 0.8.6 in CI does not (`docs/lessons.md`, 2026-05-22). Only a release runs
+  that check locally, so nothing had shown it. `scripts/check.py` now gives the address;
+  the tool's version on the machine is still not the one CI pins.

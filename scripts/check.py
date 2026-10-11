@@ -404,6 +404,18 @@ class QualityChecker:
         """The full SQLx check runs in CI and for a release (--strict), not in the local loop."""
         return self.strict_mode or os.environ.get("CI") == "true"
 
+    def sqlx_check_database(self) -> dict:
+        """The database address `cargo sqlx prepare --check` is given when the shell sets none.
+
+        sqlx-cli 0.9 refuses to start without one, even offline (docs/lessons.md, 2026-05-22).
+        CI sets it in the workflow; a release run from a terminal has none, so it gets the
+        check database `just prepare-sqlx` keeps, at the address CI uses.
+        """
+        if os.environ.get("DATABASE_URL"):
+            return {}
+        database = self.repo_root / BACKEND_DIR / ".local" / "dev_check.sqlite"
+        return {"DATABASE_URL": f"sqlite:{database}"}
+
     def check_sqlx(self) -> bool:
         if self._maybe_skip_for_stack(
             "sqlx",
@@ -452,6 +464,7 @@ class QualityChecker:
             "SQLx Prepare Check",
             ["cargo", "sqlx", "prepare", "--check"],
             cwd=self.repo_root / BACKEND_DIR,
+            env_update=self.sqlx_check_database(),
         )
         self._set_metric("sqlx", STATUS_PASS if success else STATUS_STALE)
         return success
