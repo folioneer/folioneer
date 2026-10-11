@@ -32,6 +32,22 @@ class SqlxPrepareCheck(unittest.TestCase):
         with mock.patch.dict(os.environ, {}, clear=True):
             self.assertTrue(runs_prepare_check(SimpleNamespace(strict_mode=True)))
 
+    # A release run from a terminal sets no database address, and sqlx-cli 0.9 refuses to
+    # start without one: the check is given the check database, at the address CI uses.
+    def test_a_release_gives_the_check_a_database_when_the_shell_sets_none(self):
+        checker = SimpleNamespace(repo_root=Path("/repo"))
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(
+                check.QualityChecker.sqlx_check_database(checker),
+                {"DATABASE_URL": "sqlite:/repo/src-tauri/.local/dev_check.sqlite"},
+            )
+
+    # The address the shell or the workflow sets is left as it is.
+    def test_an_address_already_set_is_kept(self):
+        checker = SimpleNamespace(repo_root=Path("/repo"))
+        with mock.patch.dict(os.environ, {"DATABASE_URL": "sqlite:/ci/db.sqlite"}, clear=True):
+            self.assertEqual(check.QualityChecker.sqlx_check_database(checker), {})
+
 
 if __name__ == "__main__":
     unittest.main()
