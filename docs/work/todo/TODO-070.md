@@ -8,6 +8,8 @@ Sync already records a change for every write of a synced record (the confirmed 
 
 Until this ships: a recorded price stays as TODO-059 left it, and the removal takes transactions only.
 
+A batch — several recordings an agent makes as one and cancels as one (gh208) — is the same idea on a smaller range than a session (owner, 2026-10-11): one of the groups "within what" must cover. Its other half, recording all of a batch or none of it, is separate work; neither is urgent.
+
 **User value:** The owner sees who made any change and when — himself, an agent's session, a fetch — to understand when something looks wrong, and undoes everything one session did, prices included.
 **Done when:** to be written with the entry's specification; at least: every change of a record carries who made it, through what, on which computer, when and within what; the owner reads it for a transaction and for a price; "Recorded by" and the removal of a session's recordings read it too.
 **Design:** needed
