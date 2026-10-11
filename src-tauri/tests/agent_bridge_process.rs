@@ -75,6 +75,8 @@ fn agt_010_the_program_started_with_mcp_lists_its_tools() {
             "record_deposit",
             "record_withdrawal",
             "record_dividend",
+            "record_split",
+            "record_free_shares",
             "record_price",
             "correct_recording",
             "cancel_recording",

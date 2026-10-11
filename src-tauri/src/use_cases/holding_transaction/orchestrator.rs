@@ -88,6 +88,33 @@ pub enum SplitSize {
     },
 }
 
+impl SplitSize {
+    /// SPL-062 — the micro-scaled factor recording stores: a ratio's is
+    /// `round(new × MICRO / old)`. A part not typed, or not strictly positive, and a ratio
+    /// whose factor rounds to 0 or cannot be held are no factor.
+    pub fn factor(self) -> Result<i64, AccountError> {
+        match self {
+            SplitSize::Ratio {
+                new: Some(new),
+                old: Some(old),
+            } if new > 0 && old > 0 => rounded(i128::from(new) * MICRO_WIDE, i128::from(old))
+                .filter(|factor| *factor > 0)
+                .ok_or(AccountError::SplitFactorNotPositive),
+            SplitSize::Ratio { .. } => Err(AccountError::SplitFactorNotPositive),
+            SplitSize::Factor { factor } => Ok(factor),
+        }
+    }
+}
+
+/// One unit in micro-units, wide enough for a ratio or a price multiplied by it.
+const MICRO_WIDE: i128 = 1_000_000;
+
+/// `round(numerator / denominator)` on positive integers, halves up; `None` when the
+/// result is no amount the application can hold.
+fn rounded(numerator: i128, denominator: i128) -> Option<i64> {
+    i64::try_from((2 * numerator + denominator) / (2 * denominator)).ok()
+}
+
 /// A split as the user is still entering it (SPL-062/063). Empty strings are fields not filled
 /// yet.
 #[derive(Debug, Clone, serde::Deserialize, specta::Type)]
@@ -331,27 +358,10 @@ impl HoldingTransactionUseCase {
         &self,
         draft: StockSplitDraft,
     ) -> Result<StockSplitPreview, TransactionDraftError> {
-        const MICRO: i128 = 1_000_000;
-        // `round(numerator / denominator)` on positive integers, halves up; `None` when
-        // the result is no amount the application can hold.
-        let rounded = |numerator: i128, denominator: i128| {
-            i64::try_from((2 * numerator + denominator) / (2 * denominator)).ok()
-        };
         if draft.date.trim().is_empty() {
             return Err(TransactionDraftTask::DateMissing.into());
         }
-        // SPL-061 — a ratio's factor is `round(new × MICRO / old)`; a part not typed yet,
-        // or not strictly positive, is no factor.
-        let factor = match draft.size {
-            SplitSize::Ratio {
-                new: Some(new),
-                old: Some(old),
-            } if new > 0 && old > 0 => rounded(new as i128 * MICRO, old as i128)
-                .filter(|factor| *factor > 0)
-                .ok_or(AccountError::SplitFactorNotPositive)?,
-            SplitSize::Ratio { .. } => return Err(AccountError::SplitFactorNotPositive.into()),
-            SplitSize::Factor { factor } => factor,
-        };
+        let factor = draft.size.factor()?;
         let position = if draft.correcting.is_some() {
             // SPL-063 — a correction is checked on its date and factor alone.
             Transaction::split(
@@ -400,7 +410,7 @@ impl HoldingTransactionUseCase {
             .into_iter()
             .filter(|price| price.date < draft.date)
             .max_by(|a, b| a.date.cmp(&b.date))
-            .and_then(|latest| rounded(latest.price as i128 * MICRO, factor as i128));
+            .and_then(|latest| rounded(i128::from(latest.price) * MICRO_WIDE, i128::from(factor)));
         Ok(StockSplitPreview {
             factor,
             position,

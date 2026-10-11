@@ -944,7 +944,7 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
         assert_eq!(refusal.code, "InvalidArguments");
         assert_eq!(
             refusal.message,
-            "a deposit, a withdrawal or a dividend is not corrected: cancel it and record it again"
+            "a deposit, a withdrawal, a dividend, a split or free shares is not corrected: cancel it and record it again"
         );
     }
     let cancelled = call(
@@ -1279,4 +1279,248 @@ async fn agt_053_the_owner_removes_everything_a_session_recorded() {
         "the last recording named is one that is left"
     );
     assert_eq!(bench.connections.key_of(granted.session_id + 100), None);
+}
+
+// AGT-063 — a session records a split and free shares through the window's rules (SPL,
+// FSD): each is marked, counted against the session's limit, told to the window,
+// cancelled like any recording and never corrected.
+#[tokio::test]
+async fn agt_063_a_session_records_a_split_and_free_shares() {
+    use crate::context::account::TransactionType;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+
+    call(
+        "record_deposit",
+        json!({ "account": "PEA", "amount": 2000, "date": "2019-01-15" }),
+    )
+    .await
+    .expect("deposited");
+    // Neither applies to an asset the account does not hold.
+    for (tool, arguments) in [
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": 2, "old": 1, "date": "2019-06-01" }),
+        ),
+        (
+            "record_free_shares",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "date": "2019-06-01" }),
+        ),
+    ] {
+        assert_eq!(
+            call(tool, arguments).await.expect_err("refused").code,
+            "AssetNotHeld",
+            "{tool}"
+        );
+    }
+    call(
+        "record_purchase",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 10, "price": 100, "date": "2019-03-01" }),
+    )
+    .await
+    .expect("bought");
+
+    // A split of 2 for 1: the factor is stored, no money moves, and the 10 held are 20 —
+    // a sale of 15 after it is no oversell.
+    let split = call(
+        "record_split",
+        json!({ "account": "pea", "asset": "cw8", "new": 2, "old": "1", "date": "2019-06-01", "note": "statement 2019" }),
+    )
+    .await
+    .expect("split");
+    assert_eq!(split["status"], "recorded");
+    assert_eq!(split["transaction"]["transaction_type"], "Split");
+    assert_eq!(split["transaction"]["quantity"], 2 * M);
+    assert_eq!(split["transaction"]["total_amount"], 0);
+    assert_eq!(split["transaction"]["note"], "statement 2019");
+    assert_eq!(split["account"], "PEA");
+    assert_eq!(split["asset"], "CW8");
+    call(
+        "record_sale",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 15, "price": 60, "date": "2019-07-01" }),
+    )
+    .await
+    .expect("sold what the split gave");
+
+    // Free shares: a quantity, fractions included, and no money.
+    let free_shares = call(
+        "record_free_shares",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": "1.5", "date": "2019-08-01" }),
+    )
+    .await
+    .expect("free shares");
+    assert_eq!(free_shares["transaction"]["transaction_type"], "FreeShares");
+    assert_eq!(free_shares["transaction"]["quantity"], 1_500_000_i64);
+    assert_eq!(free_shares["transaction"]["total_amount"], 0);
+    assert_eq!(free_shares["asset"], "CW8");
+
+    // What is missing or misread is refused as for any recording (AGT-048); the rest is
+    // the window's refusal, with its code.
+    for (tool, arguments, code) in [
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": 2 }),
+            "MissingArgument",
+        ),
+        (
+            "record_split",
+            json!({ "account": "PEA", "new": 2, "old": 1 }),
+            "MissingArgument",
+        ),
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": "1.5", "old": 1 }),
+            "InvalidFigure",
+        ),
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": 2.0, "old": 1 }),
+            "InvalidFigure",
+        ),
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": true, "old": 1 }),
+            "InvalidFigure",
+        ),
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": 0, "old": 1 }),
+            "SplitFactorNotPositive",
+        ),
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": -2, "old": 1 }),
+            "SplitFactorNotPositive",
+        ),
+        // A ratio whose factor rounds to nothing is no factor (SPL-062).
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": 1, "old": 3000000 }),
+            "SplitFactorNotPositive",
+        ),
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": 3, "old": 3 }),
+            "SplitFactorIsOne",
+        ),
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "NOPE", "new": 2, "old": 1 }),
+            "AssetNotFound",
+        ),
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": 2, "old": 1, "date": 20190101 }),
+            "InvalidArguments",
+        ),
+        (
+            "record_free_shares",
+            json!({ "account": "PEA", "asset": "CW8" }),
+            "MissingArgument",
+        ),
+        (
+            "record_free_shares",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 0 }),
+            "QuantityNotPositive",
+        ),
+        (
+            "record_free_shares",
+            json!({ "account": "NOPE", "asset": "CW8", "quantity": 1 }),
+            "AccountNotFound",
+        ),
+        (
+            "record_free_shares",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "date": "2999-01-01" }),
+            "DateInFuture",
+        ),
+    ] {
+        assert_eq!(
+            call(tool, arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{tool} {arguments}"
+        );
+    }
+
+    // Each is marked with the session; the last one is what the window names.
+    for recorded in [&split, &free_shares] {
+        let mark = bench
+            .accounts
+            .agent_recording_of(&recorded_id(recorded))
+            .await
+            .expect("read")
+            .expect("a mark");
+        assert_eq!(mark.session, granted.key);
+        assert_eq!(mark.agent, "claude-code");
+    }
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.recordings, 5);
+    let last = told.last_recording.expect("a last recording");
+    assert_eq!(last.kind, TransactionType::FreeShares);
+    assert_eq!(
+        (last.asset.as_str(), last.date.as_str()),
+        ("CW8", "2019-08-01")
+    );
+
+    // Never corrected: cancelled and recorded again (AGT-061).
+    for recorded in [&split, &free_shares] {
+        let refusal = call(
+            "correct_recording",
+            json!({ "transaction": recorded_id(recorded), "date": "2019-08-15" }),
+        )
+        .await
+        .expect_err("refused");
+        assert_eq!(refusal.code, "InvalidArguments");
+        assert_eq!(
+            refusal.message,
+            "a deposit, a withdrawal, a dividend, a split or free shares is not corrected: cancel it and record it again"
+        );
+    }
+    let cancelled = call(
+        "cancel_recording",
+        json!({ "transaction": recorded_id(&free_shares) }),
+    )
+    .await
+    .expect("cancelled");
+    assert_eq!(cancelled["status"], "cancelled");
+    assert_eq!(bench.connections.sessions().remove(0).recordings, 4);
+    // A split a later sale depends on is the window's refusal to delete.
+    assert_eq!(
+        call(
+            "cancel_recording",
+            json!({ "transaction": recorded_id(&split) }),
+        )
+        .await
+        .expect_err("refused")
+        .code,
+        "CascadingOversell"
+    );
+
+    // The five recordings took five places of the session's limit, the split and the
+    // free shares among them: with all but one of the others taken, one more is recorded
+    // and the next is refused.
+    for _ in 5..super::connections::MAX_RECORDINGS - 1 {
+        granted.count_recording();
+    }
+    call(
+        "record_free_shares",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "date": "2019-09-01" }),
+    )
+    .await
+    .expect("the last place");
+    let past_the_limit = call(
+        "record_split",
+        json!({ "account": "PEA", "asset": "CW8", "new": 3, "old": 1, "date": "2019-10-01" }),
+    )
+    .await
+    .expect_err("refused");
+    assert_eq!(past_the_limit.code, "SessionLimitReached");
 }

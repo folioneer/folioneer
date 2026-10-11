@@ -12,8 +12,8 @@ use crate::core::BACKEND;
 use crate::use_cases::account_details::AccountDetailsUseCase;
 use crate::use_cases::account_summary::AccountSummaryUseCase;
 use crate::use_cases::holding_transaction::{
-    decimal_to_micro, CashAmount, Correction, DividendAmount, HoldingTransactionUseCase, PriceAt,
-    Recording, Target, Trade, TradeAmount,
+    decimal_to_micro, CashAmount, Correction, DividendAmount, FreeShares,
+    HoldingTransactionUseCase, PriceAt, Recording, StockSplit, Target, Trade, TradeAmount,
 };
 
 use super::connections::{Granted, LastRecording, MAX_RECORDINGS};
@@ -175,6 +175,28 @@ impl AgentTools {
                     note: note(arguments)?,
                 };
                 self.record(granted, Recording::Dividend(dividend)).await
+            }
+            "record_split" => {
+                let split = StockSplit {
+                    account: text(arguments, "account")?.to_string(),
+                    asset: text(arguments, "asset")?.to_string(),
+                    date: optional_text(arguments, "date")?,
+                    new: whole(arguments, "new")?,
+                    old: whole(arguments, "old")?,
+                    note: note(arguments)?,
+                };
+                self.record(granted, Recording::Split(split)).await
+            }
+            "record_free_shares" => {
+                let free_shares = FreeShares {
+                    account: text(arguments, "account")?.to_string(),
+                    asset: text(arguments, "asset")?.to_string(),
+                    date: optional_text(arguments, "date")?,
+                    quantity: amount(arguments, "quantity")?,
+                    note: note(arguments)?,
+                };
+                self.record(granted, Recording::FreeShares(free_shares))
+                    .await
             }
             "record_price" => self.record_price(granted, arguments).await,
             "portfolio_summary" => self
@@ -470,6 +492,30 @@ fn amount(arguments: &Value, name: &str) -> Result<i64, Refusal> {
     figure(arguments, name)?.ok_or_else(|| Refusal {
         code: "MissingArgument".to_string(),
         message: format!("{name} is missing"),
+    })
+}
+
+/// AGT-063 — a part of a split's ratio: a whole number, as text or as a JSON number. The
+/// refusal repeats at most the first 40 characters of what was sent.
+fn whole(arguments: &Value, name: &str) -> Result<i64, Refusal> {
+    let not_whole = |sent: &str| Refusal {
+        code: "InvalidFigure".to_string(),
+        message: format!("{name} is not a whole number{sent}"),
+    };
+    let typed = match arguments.get(name) {
+        None | Some(Value::Null) => {
+            return Err(Refusal {
+                code: "MissingArgument".to_string(),
+                message: format!("{name} is missing"),
+            })
+        }
+        Some(Value::String(text)) => text.clone(),
+        Some(Value::Number(number)) => number.to_string(),
+        Some(_) => return Err(not_whole("")),
+    };
+    typed.trim().parse().map_err(|_| {
+        let shown: String = typed.chars().take(40).collect();
+        not_whole(&format!(": \"{}\"", shown.escape_debug()))
     })
 }
 

@@ -11,9 +11,10 @@ use crate::context::asset::{Asset, AssetError, AssetPrice};
 use crate::core::BACKEND;
 
 use super::error::{
-    DividendError, DividendTask, NameLookupError, OpenHoldingError, OpenHoldingTask,
+    DividendError, DividendTask, FreeSharesError, FreeSharesTask, NameLookupError,
+    OpenHoldingError, OpenHoldingTask, SplitError, SplitTask,
 };
-use super::orchestrator::{HoldingTransactionUseCase, OpeningBalanceDraft};
+use super::orchestrator::{HoldingTransactionUseCase, OpeningBalanceDraft, SplitSize};
 
 const MICRO: i64 = 1_000_000;
 /// The longest id a transaction carries: a generated deduction's (`fee-` and 32 digits) and
@@ -88,6 +89,39 @@ pub struct DividendAmount {
     pub note: Option<String>,
 }
 
+/// A stock split as typed: its size is a "new for old" ratio, as the window takes it
+/// (SPL-062).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StockSplit {
+    /// The account's name as typed.
+    pub account: String,
+    /// The asset's name or reference as typed.
+    pub asset: String,
+    /// The date, or `None` for today.
+    pub date: Option<String>,
+    /// Shares after, for `old` shares before.
+    pub new: i64,
+    /// Shares before.
+    pub old: i64,
+    /// Optional note.
+    pub note: Option<String>,
+}
+
+/// Free shares as typed: a quantity received at no cost.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FreeShares {
+    /// The account's name as typed.
+    pub account: String,
+    /// The distributing asset's name or reference as typed.
+    pub asset: String,
+    /// The date, or `None` for today.
+    pub date: Option<String>,
+    /// How many shares were received (micro-units).
+    pub quantity: i64,
+    /// Optional note.
+    pub note: Option<String>,
+}
+
 /// A price of an asset at a date, as typed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PriceAt {
@@ -140,6 +174,10 @@ pub enum Recording {
     Withdrawal(CashAmount),
     /// A dividend a held asset paid (DIV-023).
     Dividend(DividendAmount),
+    /// A stock split of a held asset (SPL-010).
+    Split(StockSplit),
+    /// Free shares of a held asset (FSD-022).
+    FreeShares(FreeShares),
 }
 
 /// Which way cash moves.
@@ -281,14 +319,14 @@ impl HoldingTransactionUseCase {
         correction: Correction,
     ) -> Result<Transaction, Refusal> {
         let recorded = self.recorded_by(transaction_id, session).await?;
-        // AGT-061 — a deposit, a withdrawal or a dividend is cancelled and recorded again.
+        // AGT-061 — anything else is cancelled and recorded again.
         if !matches!(
             recorded.transaction_type,
             TransactionType::OpeningBalance | TransactionType::Purchase | TransactionType::Sell
         ) {
             return Err(Refusal {
                 code: "InvalidArguments".to_string(),
-                message: "a deposit, a withdrawal or a dividend is not corrected: cancel it and record it again".to_string(),
+                message: "a deposit, a withdrawal, a dividend, a split or free shares is not corrected: cancel it and record it again".to_string(),
             });
         }
         // TRX-047 — an opening balance has a quantity, a total cost and a date, nothing else.
@@ -413,7 +451,77 @@ impl HoldingTransactionUseCase {
             Recording::Deposit(cash) => self.record_cash(cash, Cash::PaidIn, today).await,
             Recording::Withdrawal(cash) => self.record_cash(cash, Cash::TakenOut, today).await,
             Recording::Dividend(dividend) => self.record_dividend_named(dividend, today).await,
+            Recording::Split(split) => self.record_split_named(split, today).await,
+            Recording::FreeShares(free_shares) => {
+                self.record_free_shares_named(free_shares, today).await
+            }
         }
+    }
+
+    /// AGT-063 — a split: the account and the asset found by what was typed, the factor
+    /// its ratio gives (SPL-062), the split recorded through the rules of the window.
+    async fn record_split_named(
+        &self,
+        split: StockSplit,
+        today: &str,
+    ) -> Result<Recorded, Refusal> {
+        let found = self
+            .find_by_name(&split.account, &split.asset)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let factor = SplitSize::Ratio {
+            new: Some(split.new),
+            old: Some(split.old),
+        }
+        .factor()
+        .map_err(|error| refusal_from_account(&error))?;
+        let date = split.date.unwrap_or_else(|| today.to_string());
+        self.record_split(
+            &found.account_id,
+            found.asset_id.clone(),
+            date,
+            factor,
+            split.note,
+        )
+        .await
+        .map(|transaction| Recorded {
+            transaction: Box::new(transaction),
+            account_name: found.account_name,
+            currency: found.currency,
+            asset_reference: Some(found.asset_reference),
+            zero_cost: false,
+        })
+        .map_err(|error| refusal_from_split(&error))
+    }
+
+    /// AGT-063 — free shares: the account and the distributing asset found by what was
+    /// typed, the distribution recorded through the rules of the window.
+    async fn record_free_shares_named(
+        &self,
+        free_shares: FreeShares,
+        today: &str,
+    ) -> Result<Recorded, Refusal> {
+        let found = self
+            .find_by_name(&free_shares.account, &free_shares.asset)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let date = free_shares.date.unwrap_or_else(|| today.to_string());
+        self.record_free_shares(
+            &found.account_id,
+            found.asset_id.clone(),
+            date,
+            free_shares.quantity,
+            free_shares.note,
+        )
+        .await
+        .map(|transaction| Recorded {
+            transaction: Box::new(transaction),
+            account_name: found.account_name,
+            currency: found.currency,
+            asset_reference: Some(found.asset_reference),
+            zero_cost: false,
+        })
+        .map_err(|error| refusal_from_free_shares(&error))
     }
 
     /// CLI-027 — a deposit or a withdrawal: the account found by its name, the cash moved
@@ -750,6 +858,41 @@ fn refusal_from_open(error: &OpenHoldingError) -> Refusal {
     }
 }
 
+/// AGT-063 — a split's rejection keeps its code.
+fn refusal_from_split(error: &SplitError) -> Refusal {
+    match error {
+        SplitError::Account(error) => refusal_from_account(error),
+        SplitError::UseCase(task) => Refusal {
+            code: code_of(task),
+            message: match task {
+                SplitTask::AssetNotFound => "the asset no longer exists".to_string(),
+                SplitTask::AssetNotHeld => {
+                    "nothing of this asset is held in the account".to_string()
+                }
+            },
+        },
+    }
+}
+
+/// AGT-063 — a rejection of free shares keeps its code.
+fn refusal_from_free_shares(error: &FreeSharesError) -> Refusal {
+    match error {
+        FreeSharesError::Account(error) => refusal_from_account(error),
+        FreeSharesError::UseCase(task) => Refusal {
+            code: code_of(task),
+            message: match task {
+                FreeSharesTask::AssetNotFound => "the asset no longer exists".to_string(),
+                FreeSharesTask::AssetNotHeld => {
+                    "nothing of this asset is held in the account".to_string()
+                }
+                FreeSharesTask::FreeSharesOnCashAsset => {
+                    "free shares cannot be recorded on cash".to_string()
+                }
+            },
+        },
+    }
+}
+
 /// CLI-021 — a price's rejection keeps its code; the sentence is the command line's.
 fn refusal_from_asset(error: &AssetError) -> Refusal {
     let message = match error {
@@ -824,6 +967,14 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
         AccountError::AmountNotPositive => "the amount must be above zero".to_string(),
         AccountError::TotalAmountBelowFees => "the total is below the fees it includes".to_string(),
         AccountError::InvalidTotalCost => "the total cost cannot be negative".to_string(),
+        AccountError::SplitFactorNotPositive => {
+            "new and old must be whole numbers above zero".to_string()
+        }
+        AccountError::SplitFactorIsOne => "a split of 1 for 1 changes nothing".to_string(),
+        AccountError::SplitOnCashAsset => "cash cannot be split".to_string(),
+        AccountError::SplitCollapsesPosition => {
+            "this split would leave nothing of the position".to_string()
+        }
         AccountError::AccountNotFound { .. } => "the account no longer exists".to_string(),
         AccountError::DatabaseError | AccountError::ApplicationWriteOutranked => {
             "the portfolio could not be read or written".to_string()
@@ -834,10 +985,6 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
         | AccountError::NegativeQuantity
         | AccountError::NegativeAveragePrice
         | AccountError::TransactionNotFound
-        | AccountError::SplitFactorNotPositive
-        | AccountError::SplitFactorIsOne
-        | AccountError::SplitOnCashAsset
-        | AccountError::SplitCollapsesPosition
         | AccountError::PercentageNotPositive
         | AccountError::PercentageAboveHundred
         | AccountError::ManagementFeeAmountInvalid

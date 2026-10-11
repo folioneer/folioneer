@@ -102,6 +102,39 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "record_split",
+            description: "Record a stock split, or a reverse split, of an asset held in an account: `new` shares for every `old` shares held (2 and 1 for a 2-for-1 split, 1 and 10 for a 1-for-10 reverse split). The quantity held is rescaled from that date, its cost is unchanged and no cash moves. It records no price: record the price after the split with record_price, or the price from before it values the new quantity. The recording follows the application's rules and is marked as recorded by this agent.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "account": { "type": "string", "description": "The account's name, as list_accounts gives it." },
+                    "asset": { "type": "string", "description": "The asset's name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
+                    "new": { "type": ["string", "integer"], "description": "Shares after the split, for every `old` shares before: a whole number above zero." },
+                    "old": { "type": ["string", "integer"], "description": "Shares before the split: a whole number above zero." },
+                    "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." },
+                    "note": { "type": "string", "description": "A note kept with the transaction." }
+                },
+                "required": ["account", "asset", "new", "old"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "record_free_shares",
+            description: "Record shares of an asset held in an account received at no cost — a bonus issue, a dividend paid in shares: the quantity held rises, its cost is unchanged and no cash moves. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "account": { "type": "string", "description": "The account's name, as list_accounts gives it." },
+                    "asset": { "type": "string", "description": "The asset's name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
+                    "quantity": { "type": ["string", "number"], "description": "How many shares were received." },
+                    "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." },
+                    "note": { "type": "string", "description": "A note kept with the transaction." }
+                },
+                "required": ["account", "asset", "quantity"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
             name: "record_price",
             description: "Record the price of one unit of an asset on a date, in the asset's currency — a year-end price from a statement, for instance. It is stored as recorded by an agent and replaces the price the asset already has on that date, if any. Figures are decimals with a dot (12.5), not millionths.",
             input_schema: json!({

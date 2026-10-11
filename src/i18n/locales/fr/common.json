@@ -279,7 +279,7 @@
     "session_removed_other": "{{count}} transactions supprimées.",
     "session_kept_one": "{{count}} gardée : une transaction enregistrée depuis en dépend.",
     "session_kept_other": "{{count}} gardées : une transaction enregistrée depuis en dépend.",
-    "connection_covers_record": "enregistrer des soldes d'ouverture, des achats, des ventes, des dépôts, des retraits, des dividendes et des prix — jusqu'à 500 par session — chacun marqué comme enregistré par lui."
+    "connection_covers_record": "enregistrer des soldes d'ouverture, des achats, des ventes, des dépôts, des retraits, des dividendes, des divisions, des actions gratuites et des prix — jusqu'à 500 par session — chacun marqué comme enregistré par lui."
   },
   "sync": {
     "title": "Synchronisation multi-appareils",
