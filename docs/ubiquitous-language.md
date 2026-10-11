@@ -105,7 +105,7 @@ How recent the portfolio's prices are, told by two figures. The **newest price d
 
 ### AssetPriceSource
 
-A value-object enum qualifying the provenance of an `AssetPrice` record. Variants: `Manual` (user-entered via manual entry or transaction auto-record) and `YahooFinance` (written by a fetch through a Yahoo Finance provider, as in the owner's private build). Metadata for traceability per ADR-012 — does not influence read/write precedence (latest-write-wins).
+A value-object enum qualifying the provenance of an `AssetPrice` record. Variants: `Manual` (user-entered via manual entry or transaction auto-record), `YahooFinance` (written by a fetch through a Yahoo Finance provider, as in the owner's private build) and `Agent` (recorded by an agent the owner allowed — the Mark of a price; owner, 2026-10-10). Metadata for traceability per ADR-012 — does not influence read/write precedence (latest-write-wins).
 
 > Status: confirmed
 
@@ -452,7 +452,7 @@ What one "Allow for this session" opens: the agent's calls are served without an
 
 > Status: confirmed
 
-What a transaction an agent recorded carries: the agent's name and its session. The account journal shows it in the column "Recorded by" ("Enregistré par"); a transaction the owner typed has none. In code: `AgentRecording`, `recorded_by`. In French: "Marque".
+What a transaction or a price an agent recorded carries (widened to a price by the owner, 2026-10-10). A transaction carries the agent's name and its session: the account journal shows it in the column "Recorded by" ("Enregistré par"); a transaction the owner typed has none. A price carries the source "Agent", shown in the price history. In code: `AgentRecording`, `recorded_by`; `AssetPriceSource::Agent`. In French: "Marque".
 
 ## Multi-Device Sync Concepts (introduced by SYN spec)
 

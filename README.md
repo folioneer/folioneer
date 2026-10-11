@@ -119,7 +119,7 @@ cd src-tauri && cargo test # Backend tests only
 
 ## Command line
 
-The installed program records an opening balance, a purchase, a sale, a dividend, a deposit or a withdrawal without opening a window. Close the window first: a command that records refuses while it is open; the lists answer anyway.
+The installed program records an opening balance, a purchase, a sale, a dividend, a deposit, a withdrawal or a price without opening a window. Close the window first: a command that records refuses while it is open; the lists answer anyway.
 
 ```
 folioneer holding open --account "PEA" --asset CW8 --quantity 10 --total-cost 4950 [--date 2026-09-28] [--json]
@@ -132,6 +132,7 @@ folioneer account withdraw --account "PEA" --amount 200 …
 folioneer account list        # the accounts: what --account takes
 folioneer asset list          # the assets: what --asset takes (--archived for the archived ones)
 folioneer asset add --name "ASML Holding" --reference ASML --class Stocks --currency EUR
+folioneer asset price --asset CW8 --price 512.30 [--date 2025-12-31] [--json]
 folioneer --help              # the commands, with examples
 folioneer holding buy --help  # one command's options and defaults
 ```
@@ -148,7 +149,7 @@ folioneer holding buy --help  # one command's options and defaults
 
 ## Agents (Model Context Protocol)
 
-An agent — Claude Code, Claude Desktop — can read the portfolio and record opening balances, purchases, sales, dividends, deposits and withdrawals through the application while it is open, on Linux and on Windows. Nothing answers when Folioneer is closed.
+An agent — Claude Code, Claude Desktop — can read the portfolio and record opening balances, purchases, sales, dividends, deposits, withdrawals and prices through the application while it is open, on Linux and on Windows. Nothing answers when Folioneer is closed.
 
 1. In Folioneer, **Settings → Allow agents to connect** (off by default).
 2. Tell the agent how to start the bridge, which is the installed program with `--mcp`:

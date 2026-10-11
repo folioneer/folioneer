@@ -24,10 +24,12 @@ pub enum HelpTopic {
     AssetList,
     /// `asset add`.
     AssetAdd,
+    /// `asset price`.
+    AssetPrice,
 }
 
 /// Every command, as typed after the program name, with its page — in the overview's order.
-const PAGES: [(&str, HelpTopic); 9] = [
+const PAGES: [(&str, HelpTopic); 10] = [
     ("holding open", HelpTopic::Open),
     ("holding buy", HelpTopic::Buy),
     ("holding sell", HelpTopic::Sell),
@@ -37,6 +39,7 @@ const PAGES: [(&str, HelpTopic); 9] = [
     ("account list", HelpTopic::AccountList),
     ("asset list", HelpTopic::AssetList),
     ("asset add", HelpTopic::AssetAdd),
+    ("asset price", HelpTopic::AssetPrice),
 ];
 
 const RECORDING_EXIT_CODES: &str = "Exit codes: 0 recorded, 1 refused, 2 wrong usage.";
@@ -129,6 +132,18 @@ pub fn help(program: &str, topic: HelpTopic) -> String {
             ],
             &TRADE_OPTIONS,
             "--account PEA --asset ASML --quantity 1 --total 1300",
+        ),
+        HelpTopic::AssetPrice => page(
+            program,
+            "asset price",
+            "Record the price of an asset on a date.",
+            &["--asset <name> --price <amount> [options]"],
+            &[
+                ("--asset <name>", "Asset name, reference, ISIN or REF@EXCHANGE"),
+                ("--price <amount>", "Price of one unit, in the asset's currency"),
+            ],
+            &[("--date <YYYY-MM-DD>", "Date", Some("today"))],
+            "--asset CW8 --price 512.30 --date 2025-12-31",
         ),
         HelpTopic::Dividend => page(
             program,
@@ -257,6 +272,7 @@ Commands:
   account list       List the accounts
   asset list         List the assets
   asset add          Add an asset
+  asset price        Record the price of an asset on a date
 
 Examples:
   {program} holding buy  --account PEA --asset ASML --quantity 1 --price 1236.50
@@ -465,8 +481,14 @@ Exit codes: 0 recorded, 1 refused, 2 wrong usage."
             HelpTopic::of(Some("account"), Some("withdraw")),
             HelpTopic::Withdraw
         );
+        let price = help("folioneer", HelpTopic::AssetPrice);
+        assert!(price.starts_with("Record the price of an asset on a date.\n"));
+        assert!(price
+            .contains("\n  --price <amount>      Price of one unit, in the asset's currency\n"));
+        assert!(!price.contains("--account"));
         let overview = help("folioneer", HelpTopic::Overview);
         for line in [
+            "\n  asset price        Record the price of an asset on a date\n",
             "\n  holding dividend   Record a dividend\n",
             "\n  account deposit    Record cash paid into an account\n",
             "\n  account withdraw   Record cash taken out of an account\n",

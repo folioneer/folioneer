@@ -10,29 +10,29 @@ The agent connection exists on Linux and other Unix systems, and on Windows. A s
 
 One stored entity, the mark of a transaction an agent recorded (AGT-045), in its own table beside the transactions. The rest is held in memory by the application, until it closes:
 
-| Entity             | Field                | Type    | Meaning                                                                    |
-| ------------------ | -------------------- | ------- | -------------------------------------------------------------------------- |
-| Connection request | `id`                 | integer | identifies the request in the owner's answer                               |
-|                    | `client`             | text    | the name the agent gave, cleaned (AGT-037)                                 |
-|                    | `asked_at`           | instant | when it asked, in this computer's time                                     |
-| Agent session      | `id`                 | integer | identifies the session when the owner disconnects it                       |
-|                    | `client`             | text    | the name the agent gave, cleaned (AGT-037)                                 |
-|                    | `calls`              | integer | the tool calls it made                                                     |
-|                    | `recorded`           | integer | the transactions it recorded, counted against its limit (AGT-047)          |
-|                    | `reads`              | integer | its calls of a read tool that were answered (AGT-052)                      |
-|                    | `recordings`         | integer | the transactions it recorded that still exist (AGT-052)                    |
-|                    | `last_recording`     | record  | the kind, the asset's reference and the date of the last recorded of them  |
-|                    | `key`                | text    | identifies the session in what it records, never used again by another run |
-|                    | `started_at`         | instant | when the owner allowed it                                                  |
-| Mark (AGT-045)     | `transaction`        | text    | the transaction it marks: one mark at most per transaction                 |
-|                    | `agent`              | text    | the name of the agent that recorded the transaction                        |
-|                    | `session`            | text    | the `key` of the session that recorded it                                  |
-|                    | `session_started_at` | instant | the `started_at` of that session                                           |
-| State (AGT-036)    | `available`          | boolean | this system has an agent connection (AGT-023)                              |
-|                    | `allowed`            | boolean | the owner's setting (AGT-022)                                              |
-|                    | `user`               | text    | the user the application runs as, when the system says it                  |
-|                    | `requests`           | list    | the connection requests waiting, oldest first                              |
-|                    | `sessions`           | list    | the agent sessions open, oldest first                                      |
+| Entity             | Field                | Type    | Meaning                                                                      |
+| ------------------ | -------------------- | ------- | ---------------------------------------------------------------------------- |
+| Connection request | `id`                 | integer | identifies the request in the owner's answer                                 |
+|                    | `client`             | text    | the name the agent gave, cleaned (AGT-037)                                   |
+|                    | `asked_at`           | instant | when it asked, in this computer's time                                       |
+| Agent session      | `id`                 | integer | identifies the session when the owner disconnects it                         |
+|                    | `client`             | text    | the name the agent gave, cleaned (AGT-037)                                   |
+|                    | `calls`              | integer | the tool calls it made                                                       |
+|                    | `recorded`           | integer | the transactions and prices it recorded, counted against its limit (AGT-047) |
+|                    | `reads`              | integer | its calls of a read tool that were answered (AGT-052)                        |
+|                    | `recordings`         | integer | the transactions it recorded that still exist (AGT-052)                      |
+|                    | `last_recording`     | record  | the kind, the asset's reference and the date of the last recorded of them    |
+|                    | `key`                | text    | identifies the session in what it records, never used again by another run   |
+|                    | `started_at`         | instant | when the owner allowed it                                                    |
+| Mark (AGT-045)     | `transaction`        | text    | the transaction it marks: one mark at most per transaction                   |
+|                    | `agent`              | text    | the name of the agent that recorded the transaction                          |
+|                    | `session`            | text    | the `key` of the session that recorded it                                    |
+|                    | `session_started_at` | instant | the `started_at` of that session                                             |
+| State (AGT-036)    | `available`          | boolean | this system has an agent connection (AGT-023)                                |
+|                    | `allowed`            | boolean | the owner's setting (AGT-022)                                                |
+|                    | `user`               | text    | the user the application runs as, when the system says it                    |
+|                    | `requests`           | list    | the connection requests waiting, oldest first                                |
+|                    | `sessions`           | list    | the agent sessions open, oldest first                                        |
 
 Two things are kept on the computer across restarts, and neither is synced to the owner's other computers: the owner's setting "Allow agents to connect", as a file `agents-allowed` in the application's data folder; and the marks (AGT-045).
 
@@ -66,7 +66,7 @@ Two things are kept on the computer across restarts, and neither is synced to th
 
 **AGT-031 — Nothing runs before the owner allowed (backend)**: A tool call on a connection the owner has not allowed is refused and reaches no tool. A refusal ends that request; the bridge then closes its connection, so the agent's next call asks again.
 
-**AGT-032 — The owner allows or refuses in the window (frontend + backend)**: While an agent waits, a dialog shows over whatever view is open: the agent's name, the user it runs as — the application's own, the only one whose programs can connect (AGT-021) — the time it asked, what a yes covers — reading the accounts, the assets, the holdings and the totals, and recording opening balances, purchases, sales, deposits, withdrawals and dividends, up to the session's limit (AGT-044, AGT-060, AGT-047) — that one answer covers the whole session, and what it never covers: changing or removing a transaction the owner typed — the session corrects or cancels only what it recorded itself (AGT-050) — and reading a file, a setting or the sync folder. Its two actions are "Allow for this session" and "Refuse". It is easy to refuse and hard to approve blindly: refusing is the filled action and has the focus; "Allow" is inactive for a moment after the dialog appears; the keyboard's focus stays on the two actions; and the dialog closes only by an answer — neither its corner nor its backdrop dismisses it. A refusal gives the agent nothing: its call is answered that the connection was refused. Several agents waiting are shown one at a time, oldest first.
+**AGT-032 — The owner allows or refuses in the window (frontend + backend)**: While an agent waits, a dialog shows over whatever view is open: the agent's name, the user it runs as — the application's own, the only one whose programs can connect (AGT-021) — the time it asked, what a yes covers — reading the accounts, the assets, the holdings and the totals, and recording opening balances, purchases, sales, deposits, withdrawals, dividends and prices, up to the session's limit (AGT-044, AGT-060, AGT-062, AGT-047) — that one answer covers the whole session, and what it never covers: changing or removing a transaction the owner typed — the session corrects or cancels only what it recorded itself (AGT-050) — and reading a file, a setting or the sync folder. Its two actions are "Allow for this session" and "Refuse". It is easy to refuse and hard to approve blindly: refusing is the filled action and has the focus; "Allow" is inactive for a moment after the dialog appears; the keyboard's focus stays on the two actions; and the dialog closes only by an answer — neither its corner nor its backdrop dismisses it. A refusal gives the agent nothing: its call is answered that the connection was refused. Several agents waiting are shown one at a time, oldest first.
 
 **AGT-033 — One grant covers the session (frontend + backend)**: Once allowed, the agent's calls on that connection are served without another question, and each is counted. While an agent is connected the header says so — "{agent} is connected" — on every view; a long name is shown cut, with the whole name as its hint. Nothing of a grant is remembered once the session ends, except on what it recorded (AGT-045).
 
@@ -96,9 +96,9 @@ Two things are kept on the computer across restarts, and neither is synced to th
 
 **AGT-045 — What an agent recorded is marked (frontend + backend)**: A transaction an agent recorded is marked with the agent's name, the key of its session and the time that session started; a transaction without a mark is one the owner typed, one an agent recorded on another of the owner's computers — the mark is kept on the computer that recorded it and is not sent to the others — or, should both the marking and its undoing fail, the one AGT-049 names. The rows of the account journal carry the mark (TXL-060), and the journal shows it in a column "Recorded by": the agent's name, with "{agent} · session of {date and time}" as its hint (TXL-061). The mark goes with its transaction: correcting the transaction keeps it, removing the transaction removes it.
 
-**AGT-046 — No other tool exists (backend)**: The tools are the four of AGT-040, the three of AGT-044, the two of AGT-050 and the three of AGT-060. Nothing corrects or deletes a transaction the session did not record itself, creates an account or an asset, or takes or returns a path, a setting or anything of sync.
+**AGT-046 — No other tool exists (backend)**: The tools are the four of AGT-040, the three of AGT-044, the two of AGT-050, the three of AGT-060 and the one of AGT-062. Nothing corrects or deletes a transaction the session did not record itself, creates an account or an asset, or takes or returns a path, a setting or anything of sync.
 
-**AGT-047 — A session records up to a limit (backend)**: One session records at most 500 transactions. The next recording is refused with `SessionLimitReached`, which says the owner disconnects and allows a new session to go on; reading is not limited.
+**AGT-047 — A session records up to a limit (backend)**: One session records at most 500 transactions and prices (AGT-062) in all. The next recording is refused with `SessionLimitReached`, which says the owner disconnects and allows a new session to go on; reading is not limited.
 
 **AGT-048 — The refusals of a recording (backend)**: Figures are decimals with a dot and at most six decimals, as text or as JSON numbers; anything else is refused with `InvalidFigure`; a missing figure, account or asset with `MissingArgument`. An argument a recording does not know is ignored, as for the read tools (AGT-040). A price together with a total, or neither, a `date` or a `note` that is not text, and a note that is too long are refused with `InvalidArguments` — a date that is not text is never read as today. Every other refusal is the recording's own, with its code and its reason: the account or the asset not found or ambiguous (CLI-011), a date that is text but not a date (`InvalidDate`) or is in the future (`DateInFuture`), an oversell, and the rest of the window's rules (CLI-012).
 
@@ -116,11 +116,13 @@ Two things are kept on the computer across restarts, and neither is synced to th
 
 **AGT-054 — The session dialog (frontend)**: In the header, "{agent} is connected" (AGT-033) opens a dialog on that session, over the whole window. It shows since when the agent is connected, how many of its calls of a read tool were answered — shown as requests — how many transactions it recorded that still exist, and its last recording — its kind, the asset's reference and its date — or that there is none (AGT-052); the figures follow the state as it changes (AGT-036). Its three actions are "Remove everything it recorded", "Close" and "Disconnect" (AGT-034); a sentence says what the first removes — the session's recordings as they stand, a correction the owner made to one of them included, and no transaction the owner recorded — and that it asks to confirm. With no recording left the removal is inactive and the sentence says so. Removing asks in a second dialog, which names the agent and the number of transactions as it stands then: keeping them is the filled action and has the focus, and only "Remove" there removes (AGT-053). The removal runs behind the session dialog, whose actions stay active. What it did is said in a snackbar: how many transactions were removed and, when some were kept, how many, because a transaction recorded since depends on them. A refusal (`SessionAlreadyEnded`) or a failure (`DatabaseError`) is said in a snackbar too, and the state is read again: after a failure the dialog's figures show what is left. Both dialogs close when the session ends. A connection request that arrives meanwhile takes their place until it is answered (AGT-032).
 
-### Cash and dividends (060–069)
+### Cash, dividends and prices (060–069)
 
 **AGT-060 — Deposits, withdrawals and dividends (backend)**: A connected agent may record three more transactions, through the same recorder and the same rules as the command line (CLI-027, CLI-028): `record_deposit` and `record_withdrawal` — an account by its name and an amount in the account's currency, and no asset; `record_dividend` — an account, a paying asset named as in AGT-044, the total net amount received in the asset's currency and optionally the exchange rate to the account's currency (default 1, CLI-014). Each takes optionally a date (default today) and a note. The figures, the date, the note and what is missing are read and refused as a recording's (AGT-048). Each is answered as a recording is (AGT-044) — the asset being `null` for a deposit or a withdrawal — marked (AGT-045), counted against the session's limit (AGT-047), undone when it cannot be marked (AGT-049), told to the window (AGT-052) — the asset of a deposit or a withdrawal being the account's Cash Asset — cancelled by `cancel_recording` (AGT-050) and removed with the session's recordings (AGT-053). The refusals are the window's (CLI-012), among them `AmountNotPositive`, `InsufficientCash` for a withdrawal that would leave the account's cash below zero, today or at any point from its date on (CSH-031, CSH-080), and `AssetNotHeld` for a dividend of an asset the account does not hold today, whatever the date (DIV-011).
 
 **AGT-061 — A deposit, a withdrawal or a dividend is not corrected (backend)**: `correct_recording` refuses a deposit, a withdrawal or a dividend the session recorded with `InvalidArguments`, saying to cancel it and record it again. A transaction the session did not record is answered `NotYourRecording` first (AGT-051), so the refusal never says what kind of transaction another's is.
+
+**AGT-062 — A price at a date (backend)**: A connected agent may call `record_price` — an asset named as in AGT-044, the price of one unit in the asset's currency, and optionally a date (default today); it names no account. The figure and what is missing are read and refused as a recording's (AGT-048), and so is a date that is not text. The price is written with the source `Agent`, which is its mark (MKT-103): it shows wherever a price's source does, on this computer and on the owner's others. The latest write wins, as for every price: it replaces the price the asset already has on that date, typed or fetched, and the next write on that date replaces it in turn (MKT-103). The refusals are a price's own: `NotPositive`, `DateInFuture`, `InvalidDateFormat` for a date that is text but not a date, `Archived`. It is answered with the price as stored, the asset's reference and its currency, and takes one place of the session's limit (AGT-047). A price is no transaction: it is not counted in what the window is told of the session (AGT-052), `correct_recording` and `cancel_recording` do not name it (AGT-050), and "Remove everything it recorded" leaves it (AGT-053) — the owner edits or deletes it in the price history.
 
 ---
 
@@ -168,6 +170,8 @@ header: "{agent} is connected" · Disconnect (AGT-033, AGT-034)
 - **CLI-027, CLI-028, CSH-031, CSH-080, DIV-011** — an agent's deposits, withdrawals and dividends are the command line's, checked by the window's rules (AGT-060).
 - **TXL-060, TXL-061** — the rows of the account journal carry the mark, and the journal shows which agent session recorded a transaction (AGT-045).
 - **SYN-023** — the marks are device-local data: they are never synced (AGT-045).
+- **MKT-100, MKT-103, SYN-038** — a price an agent recorded carries the source `Agent`, a value of data format version 3 (AGT-062).
+- **CLI-029** — the command line records a price by the same lookup and the same checks; both replace the price at that date; the command line's is the owner's own — source `Manual` — where an agent's is marked `Agent` (AGT-062).
 - **ADR-023** — the bridge holds no data and the channel is never a network port.
 
 ## Open Questions

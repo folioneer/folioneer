@@ -37,6 +37,15 @@ pub(super) fn source_from_storage(value: &str) -> AssetPriceSource {
     })
 }
 
+/// CFR-016 — a price the application fetched on its own is an application change; one the
+/// owner typed, or an agent recorded for the owner, is a user change.
+fn origin_of(source: &AssetPriceSource) -> Origin {
+    match source {
+        AssetPriceSource::Manual | AssetPriceSource::Agent => Origin::User,
+        AssetPriceSource::YahooFinance => Origin::Application,
+    }
+}
+
 /// Whether `value` is met for the first time in this process.
 fn first_sighting(value: &str) -> bool {
     static SIGHTED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
@@ -108,12 +117,7 @@ impl SqliteAssetPriceRepository {
         } else {
             Operation::Created
         };
-        // CFR-016 — a price the application fetched on its own is an application change.
-        let origin = if price.source == AssetPriceSource::Manual {
-            Origin::User
-        } else {
-            Origin::Application
-        };
+        let origin = origin_of(&price.source);
         let draft = ChangeDraft::new(
             RecordKind::AssetPrice,
             identity(&price.asset_id, &price.date),
@@ -314,6 +318,25 @@ mod tests {
             AssetPriceSource::Manual
         );
         assert_eq!(source_from_storage("Manual"), AssetPriceSource::Manual);
+    }
+
+    // CFR-016 / MKT-103 — an agent records for the owner: its price ranks as a user change,
+    // like one the owner typed, and above one the application fetched.
+    #[test]
+    fn cfr_016_a_price_an_agent_recorded_is_a_user_change() {
+        assert_eq!(origin_of(&AssetPriceSource::Agent), Origin::User);
+        assert_eq!(origin_of(&AssetPriceSource::Manual), Origin::User);
+        assert_eq!(
+            origin_of(&AssetPriceSource::YahooFinance),
+            Origin::Application
+        );
+    }
+
+    // MKT-103 — the source an agent's price carries is stored and read back as written.
+    #[test]
+    fn mkt_103_the_agent_source_reads_back_as_written() {
+        assert_eq!(source_from_storage("Agent"), AssetPriceSource::Agent);
+        assert_eq!(AssetPriceSource::Agent.to_string(), "Agent");
     }
 
     /// Inserts a throwaway asset row so FK constraints on asset_prices are satisfied.

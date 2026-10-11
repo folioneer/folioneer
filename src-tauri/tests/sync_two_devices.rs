@@ -1580,7 +1580,7 @@ fn written_values_of_every_synced_enum() -> serde_json::Value {
             AssetKind::Listed, AssetKind::Crypto, AssetKind::Custom, AssetKind::Cash,
         ]),
         "AssetPriceSource": written_values!(AssetPriceSource, [
-            AssetPriceSource::Manual, AssetPriceSource::YahooFinance,
+            AssetPriceSource::Manual, AssetPriceSource::YahooFinance, AssetPriceSource::Agent,
         ]),
         "CurrencyRateSource": written_values!(CurrencyRateSource, [
             CurrencyRateSource::Manual, CurrencyRateSource::Frankfurter, CurrencyRateSource::Ecb,

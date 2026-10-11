@@ -97,6 +97,7 @@ pub(crate) async fn run_in(data_dir: &Path, command: Command, json: bool) -> Pri
     let outcome = match writing {
         Writing::Record(recording) => runner.run(recording, &today).await,
         Writing::AddAsset(named) => runner.add_asset(named).await,
+        Writing::Price(price) => runner.record_price(price, &today).await,
     };
     render(&outcome, json)
 }
@@ -246,6 +247,74 @@ mod tests {
         assert_eq!(value["status"], "recorded");
         assert_eq!(value["transaction"]["transaction_type"], "Sell");
         assert_eq!(value["transaction"]["total_amount"], 990 * M);
+    }
+
+    // CLI-029 — a price is recorded as the owner's own, through the rules of a price: it
+    // replaces the one at that date, and a price of zero or a future date is refused.
+    #[tokio::test]
+    async fn cli_029_records_a_price_as_the_owners_own() {
+        use crate::context::asset::AssetPriceSource;
+
+        let dir = portfolio("price").await;
+        let first = run_line(
+            &dir,
+            "asset price --asset cw8 --price 500 --date 2025-12-31",
+        )
+        .await;
+        assert_eq!(first.exit_code, RECORDED);
+        assert_eq!(
+            first.stdout.as_deref(),
+            Some("Recorded: price of CW8 on 2025-12-31 — 500 EUR")
+        );
+        let again = run_line(
+            &dir,
+            "asset price --asset CW8 --price 512.30 --date 2025-12-31 --json",
+        )
+        .await;
+        let value: serde_json::Value =
+            serde_json::from_str(again.stdout.as_deref().expect("json")).expect("valid json");
+        assert_eq!(value["status"], "recorded");
+        assert_eq!(value["price"]["price"], 512_300_000);
+        assert_eq!(value["price"]["source"], "Manual");
+
+        for (line, code) in [
+            (
+                "asset price --asset CW8 --price 0 --date 2025-12-31 --json",
+                "NotPositive",
+            ),
+            (
+                "asset price --asset CW8 --price 1 --date 2999-01-01 --json",
+                "DateInFuture",
+            ),
+            ("asset price --asset NOPE --price 1 --json", "AssetNotFound"),
+        ] {
+            let refused = run_line(&dir, line).await;
+            assert_eq!(refused.exit_code, REFUSED, "{line}");
+            let value: serde_json::Value =
+                serde_json::from_str(refused.stdout.as_deref().expect("json")).expect("valid json");
+            assert_eq!(value["code"], code, "{line}");
+        }
+
+        let database = Database::new(dir.clone()).await.expect("database");
+        let container = AppContainer::for_headless_writes(database.pool);
+        let asset = container
+            .asset_service
+            .get_non_cash_assets()
+            .await
+            .expect("assets")
+            .into_iter()
+            .find(|asset| asset.reference == "CW8")
+            .expect("CW8");
+        let prices = container
+            .asset_service
+            .get_asset_prices(&asset.id)
+            .await
+            .expect("prices");
+        assert_eq!(prices.len(), 1);
+        assert_eq!(
+            (prices[0].price, prices[0].source.clone()),
+            (512_300_000, AssetPriceSource::Manual)
+        );
     }
 
     // CLI-027 / CLI-028 — a deposit, a withdrawal and a dividend are recorded through the

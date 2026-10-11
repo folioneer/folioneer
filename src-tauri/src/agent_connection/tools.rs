@@ -12,8 +12,8 @@ use crate::core::BACKEND;
 use crate::use_cases::account_details::AccountDetailsUseCase;
 use crate::use_cases::account_summary::AccountSummaryUseCase;
 use crate::use_cases::holding_transaction::{
-    decimal_to_micro, CashAmount, Correction, DividendAmount, HoldingTransactionUseCase, Recording,
-    Target, Trade, TradeAmount,
+    decimal_to_micro, CashAmount, Correction, DividendAmount, HoldingTransactionUseCase, PriceAt,
+    Recording, Target, Trade, TradeAmount,
 };
 
 use super::connections::{Granted, LastRecording, MAX_RECORDINGS};
@@ -176,6 +176,7 @@ impl AgentTools {
                 };
                 self.record(granted, Recording::Dividend(dividend)).await
             }
+            "record_price" => self.record_price(granted, arguments).await,
             "portfolio_summary" => self
                 .summaries
                 .get_account_summaries()
@@ -241,17 +242,9 @@ impl AgentTools {
     /// and its session. The refusals are the recording's own (CLI-011, CLI-012).
     async fn record(&self, granted: &Granted, recording: Recording) -> Result<Value, Refusal> {
         if !granted.may_record_one_more() {
-            return Err(Refusal {
-                code: "SessionLimitReached".to_string(),
-                message: format!(
-                    "this session has recorded {MAX_RECORDINGS} transactions, its limit: the owner disconnects and allows a new session to go on"
-                ),
-            });
+            return Err(session_limit_reached());
         }
-        let today = chrono::Local::now()
-            .date_naive()
-            .format("%Y-%m-%d")
-            .to_string();
+        let today = today();
         let mark = AgentRecording {
             agent: granted.client.clone(),
             session: granted.key.clone(),
@@ -292,6 +285,35 @@ impl AgentTools {
             "currency": recorded.currency,
             "asset": recorded.asset_reference,
             "zero_cost": recorded.zero_cost,
+        }))
+    }
+
+    /// AGT-062 — records a price with the source `Agent`. It counts against the session's
+    /// limit like a transaction (AGT-047).
+    async fn record_price(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
+        let typed = PriceAt {
+            asset: text(arguments, "asset")?.to_string(),
+            date: optional_text(arguments, "date")?,
+            price: amount(arguments, "price")?,
+        };
+        if !granted.may_record_one_more() {
+            return Err(session_limit_reached());
+        }
+        let recorded = self
+            .recorder
+            .record_price_named_by_agent(typed, &today())
+            .await
+            .map_err(|refusal| Refusal {
+                code: refusal.code,
+                message: refusal.message,
+            })?;
+        granted.count_recording();
+        tracing::info!(target: BACKEND, session = granted.session_id, asset = %recorded.price.asset_id, date = %recorded.price.date, "agent recorded a price");
+        as_json(&serde_json::json!({
+            "status": "recorded",
+            "price": recorded.price,
+            "asset": recorded.asset_reference,
+            "currency": recorded.currency,
         }))
     }
 
@@ -406,6 +428,24 @@ impl AgentTools {
         }
         Ok(found.id.clone())
     }
+}
+
+/// AGT-047 — the refusal of a recording past the session's limit.
+fn session_limit_reached() -> Refusal {
+    Refusal {
+        code: "SessionLimitReached".to_string(),
+        message: format!(
+            "this session has recorded {MAX_RECORDINGS} transactions and prices, its limit: the owner disconnects and allows a new session to go on"
+        ),
+    }
+}
+
+/// Today on this computer, as a recording without a date takes it.
+fn today() -> String {
+    chrono::Local::now()
+        .date_naive()
+        .format("%Y-%m-%d")
+        .to_string()
 }
 
 /// AGT-048 — a figure as an agent sends it: a decimal with a dot and at most six decimals,

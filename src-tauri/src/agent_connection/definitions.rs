@@ -102,6 +102,20 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "record_price",
+            description: "Record the price of one unit of an asset on a date, in the asset's currency — a year-end price from a statement, for instance. It is stored as recorded by an agent and replaces the price the asset already has on that date, if any. Figures are decimals with a dot (12.5), not millionths.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "asset": { "type": "string", "description": "The asset's name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
+                    "price": { "type": ["string", "number"], "description": "The price of one unit, in the asset's currency, with at most six decimals." },
+                    "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." }
+                },
+                "required": ["asset", "price"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
             name: "correct_recording",
             description: "Correct a transaction this session recorded: give its id, as the recording returned it, and only what changes. A transaction the owner typed, or one another session recorded, is refused. Figures are decimals with a dot (12.5), not millionths.",
             input_schema: json!({

@@ -517,6 +517,12 @@ describe("formatSource", () => {
     expect(formatSource(source)).toBe("mkt.source_manual");
   });
 
+  // MKT-103 — Agent source → i18n key
+  it("returns mkt.source_agent for Agent source", () => {
+    const source: AssetPriceSource = "Agent";
+    expect(formatSource(source)).toBe("mkt.source_agent");
+  });
+
   // MKT-102 — YahooFinance source → i18n key
   it("returns mkt.source_yahoo for YahooFinance source", () => {
     const source: AssetPriceSource = "YahooFinance";

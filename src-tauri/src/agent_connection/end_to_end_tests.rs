@@ -617,6 +617,7 @@ struct Workbench {
     tools: AgentTools,
     connections: Arc<AgentConnections>,
     accounts: Arc<crate::context::account::AccountService>,
+    assets: Arc<crate::context::asset::AssetService>,
     recorder: crate::use_cases::holding_transaction::HoldingTransactionUseCase,
 }
 
@@ -639,6 +640,7 @@ async fn workbench(data_dir: &Path) -> Workbench {
         ),
         connections,
         accounts: container.account_service,
+        assets: container.asset_service,
         recorder: crate::use_cases::holding_transaction::HoldingTransactionUseCase::new(
             accounts, assets,
         ),
@@ -973,6 +975,133 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
         .expect("a last recording");
     assert_eq!(last.kind, TransactionType::Deposit);
     assert_eq!(last.asset, "EUR");
+}
+
+// AGT-062 — a session records a price: stored with the source Agent, replacing the price
+// at that date like any price, counted against the session's limit and not among its
+// transactions.
+#[tokio::test]
+async fn agt_062_a_session_records_a_price() {
+    use crate::context::asset::AssetPriceSource;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+
+    let recorded = call(
+        "record_price",
+        json!({ "asset": "cw8", "price": "512.30", "date": "2019-12-31" }),
+    )
+    .await
+    .expect("recorded");
+    assert_eq!(recorded["status"], "recorded");
+    assert_eq!(recorded["price"]["price"], 512_300_000);
+    assert_eq!(recorded["price"]["source"], "Agent");
+    assert_eq!(recorded["price"]["date"], "2019-12-31");
+    assert_eq!(recorded["asset"], "CW8");
+    assert_eq!(recorded["currency"], "EUR");
+
+    // The latest write wins, as for every price: an agent's price replaces its own and one
+    // the owner typed, and the row then reads Agent.
+    let asset = bench
+        .assets
+        .get_non_cash_assets()
+        .await
+        .expect("assets")
+        .remove(0);
+    bench
+        .assets
+        .record_asset_price_in_micros(&asset.id, "2020-12-31", 700 * M)
+        .await
+        .expect("typed");
+    for (date, price) in [("2019-12-31", 600), ("2020-12-31", 710)] {
+        let replaced = call(
+            "record_price",
+            json!({ "asset": "CW8", "price": price, "date": date }),
+        )
+        .await
+        .expect("recorded");
+        assert_eq!(replaced["price"]["source"], "Agent");
+    }
+    let prices = bench
+        .assets
+        .get_asset_prices(&asset.id)
+        .await
+        .expect("prices");
+    let stored: Vec<(&str, i64, &AssetPriceSource)> = prices
+        .iter()
+        .map(|price| (price.date.as_str(), price.price, &price.source))
+        .collect();
+    assert_eq!(
+        stored,
+        vec![
+            ("2020-12-31", 710 * M, &AssetPriceSource::Agent),
+            ("2019-12-31", 600 * M, &AssetPriceSource::Agent),
+        ]
+    );
+    // The owner's next write wins in turn.
+    bench
+        .assets
+        .record_asset_price_in_micros(&asset.id, "2020-12-31", 705 * M)
+        .await
+        .expect("typed again");
+    let latest = bench
+        .assets
+        .get_asset_prices(&asset.id)
+        .await
+        .expect("prices")
+        .remove(0);
+    assert_eq!(
+        (latest.price, latest.source),
+        (705 * M, AssetPriceSource::Manual)
+    );
+
+    for (arguments, code) in [
+        (json!({ "asset": "CW8" }), "MissingArgument"),
+        (json!({ "price": 1 }), "MissingArgument"),
+        (json!({ "asset": "CW8", "price": "1,5" }), "InvalidFigure"),
+        (
+            json!({ "asset": "CW8", "price": 0, "date": "2018-12-31" }),
+            "NotPositive",
+        ),
+        (
+            json!({ "asset": "CW8", "price": 1, "date": "2999-01-01" }),
+            "DateInFuture",
+        ),
+        (
+            json!({ "asset": "CW8", "price": 1, "date": 20181231 }),
+            "InvalidArguments",
+        ),
+        (json!({ "asset": "NOPE", "price": 1 }), "AssetNotFound"),
+    ] {
+        assert_eq!(
+            call("record_price", arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{arguments}"
+        );
+    }
+
+    // A price is no transaction: the session's transactions are as they were.
+    assert_eq!(bench.connections.sessions().remove(0).recordings, 0);
+    // Its three prices took three places of the session's limit: 497 more and the next is
+    // refused.
+    for _ in 3..super::connections::MAX_RECORDINGS {
+        granted.count_recording();
+    }
+    let past_the_limit = call(
+        "record_price",
+        json!({ "asset": "CW8", "price": 1, "date": "2018-12-31" }),
+    )
+    .await
+    .expect_err("refused");
+    assert_eq!(past_the_limit.code, "SessionLimitReached");
 }
 
 // AGT-051 — a transaction the owner typed, one another session recorded and one that does

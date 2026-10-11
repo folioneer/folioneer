@@ -1,11 +1,13 @@
 //! Recording by what a person named (CLI-011, CLI-012, AGT-044): the account and the asset
 //! found by name, the transaction recorded through the rules of the window, and the refusal
 //! worded for whoever asked. The command line and the agent connection both record through
-//! it, so the two never differ.
+//! it, so the two never differ. A price at a date is recorded here too (CLI-029, AGT-062): it
+//! is no holding transaction, and it shares the lookup by name and the refusals.
 
 use serde::Serialize;
 
 use crate::context::account::{AccountError, AgentRecording, Transaction, TransactionType};
+use crate::context::asset::{Asset, AssetError, AssetPrice};
 use crate::core::BACKEND;
 
 use super::error::{
@@ -84,6 +86,38 @@ pub struct DividendAmount {
     pub rate: Option<i64>,
     /// Optional note.
     pub note: Option<String>,
+}
+
+/// A price of an asset at a date, as typed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PriceAt {
+    /// The asset's name or reference as typed.
+    pub asset: String,
+    /// The date, or `None` for today.
+    pub date: Option<String>,
+    /// The unit price in the asset's currency (micro-units).
+    pub price: i64,
+}
+
+/// A price as recorded, with what names its asset for a person.
+#[derive(Debug, Clone)]
+pub struct RecordedPrice {
+    /// The price as stored.
+    pub price: AssetPrice,
+    /// The asset's reference.
+    pub asset_reference: String,
+    /// The asset's currency.
+    pub currency: String,
+}
+
+impl RecordedPrice {
+    fn of(price: AssetPrice, asset: Asset) -> Self {
+        Self {
+            price,
+            asset_reference: asset.reference,
+            currency: asset.currency,
+        }
+    }
 }
 
 /// A command that records a transaction.
@@ -527,6 +561,46 @@ impl HoldingTransactionUseCase {
         })
     }
 
+    /// CLI-029 — records the price the owner typed for the asset named: it replaces a price
+    /// already at that date, as in the window (MKT-025).
+    pub async fn record_price_named(
+        &self,
+        typed: PriceAt,
+        today: &str,
+    ) -> Result<RecordedPrice, Refusal> {
+        let (asset, date) = self.priced(&typed, today).await?;
+        self.asset_service
+            .record_asset_price_in_micros(&asset.id, &date, typed.price)
+            .await
+            .map(|price| RecordedPrice::of(price, asset))
+            .map_err(|error| refusal_from_asset(&error))
+    }
+
+    /// AGT-062 — records the price an agent gave for the asset named, with the source
+    /// `Agent`; it replaces a price already at that date, like any price (MKT-103).
+    pub async fn record_price_named_by_agent(
+        &self,
+        typed: PriceAt,
+        today: &str,
+    ) -> Result<RecordedPrice, Refusal> {
+        let (asset, date) = self.priced(&typed, today).await?;
+        self.asset_service
+            .record_asset_price_by_agent(&asset.id, &date, typed.price)
+            .await
+            .map(|price| RecordedPrice::of(price, asset))
+            .map_err(|error| refusal_from_asset(&error))
+    }
+
+    /// CLI-011 — the asset a price names and the date it is for.
+    async fn priced(&self, typed: &PriceAt, today: &str) -> Result<(Asset, String), Refusal> {
+        let asset = self
+            .find_asset_by_name(&typed.asset)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let date = typed.date.clone().unwrap_or_else(|| today.to_string());
+        Ok((asset, date))
+    }
+
     /// AGT-044 / AGT-049 — records what an agent named, marked with the agent and its
     /// session. When the mark cannot be written the recording is undone, and the refusal
     /// says so.
@@ -673,6 +747,24 @@ fn refusal_from_open(error: &OpenHoldingError) -> Refusal {
                 }
             },
         },
+    }
+}
+
+/// CLI-021 — a price's rejection keeps its code; the sentence is the command line's.
+fn refusal_from_asset(error: &AssetError) -> Refusal {
+    let message = match error {
+        AssetError::NotPositive => "the price must be above zero".to_string(),
+        AssetError::InvalidDateFormat { .. } => "the date is not a valid date".to_string(),
+        AssetError::DateInFuture => "the date is in the future".to_string(),
+        AssetError::Archived => "the asset is archived: unarchive it to record a price".to_string(),
+        AssetError::AssetNotFound { .. } => "the asset no longer exists".to_string(),
+        AssetError::DatabaseError => "the portfolio could not be read or written".to_string(),
+        // The rejections of other operations on an asset, which a price never meets.
+        other => format!("refused by the rules ({})", code_of(other)),
+    };
+    Refusal {
+        code: code_of(error),
+        message,
     }
 }
 
@@ -923,6 +1015,41 @@ mod tests {
             let message = refusal_from_lookup(&error).message;
             assert!(message.contains("PEA\\u{1b}[2J\\nRecorded:"), "{message}");
             assert!(!message.chars().any(char::is_control), "{message}");
+        }
+    }
+
+    // CLI-021 — a price's rejections keep their code, each with its sentence.
+    #[test]
+    fn cli_021_price_rejections_keep_their_code() {
+        for (error, code, message) in [
+            (
+                AssetError::NotPositive,
+                "NotPositive",
+                "the price must be above zero",
+            ),
+            (
+                AssetError::DateInFuture,
+                "DateInFuture",
+                "the date is in the future",
+            ),
+            (
+                AssetError::Archived,
+                "Archived",
+                "the asset is archived: unarchive it to record a price",
+            ),
+            (
+                AssetError::InvalidDateFormat {
+                    date: "31/12/2019".to_string(),
+                },
+                "InvalidDateFormat",
+                "the date is not a valid date",
+            ),
+        ] {
+            let refusal = refusal_from_asset(&error);
+            assert_eq!(
+                (refusal.code.as_str(), refusal.message.as_str()),
+                (code, message)
+            );
         }
     }
 

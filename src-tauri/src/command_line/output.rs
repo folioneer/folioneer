@@ -118,6 +118,28 @@ pub fn render(outcome: &Outcome, json: bool) -> Printed {
             }),
             exit_code: RECORDED,
         },
+        (
+            Outcome::PriceRecorded {
+                price,
+                asset_reference,
+                currency,
+            },
+            json,
+        ) => Printed {
+            stdout: Some(if json {
+                json!({ "status": "recorded", "price": price }).to_string()
+            } else {
+                format!(
+                    "Recorded: price of {} on {} — {} {}",
+                    printable(asset_reference),
+                    price.date,
+                    decimal(price.price),
+                    currency
+                )
+            }),
+            stderr: None,
+            exit_code: RECORDED,
+        },
         (Outcome::Listed(listing), json) => Printed {
             stdout: Some(if json {
                 listed_as_json(listing)

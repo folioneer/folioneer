@@ -2072,7 +2072,11 @@ export type AssetPriceSource =
 /**
  * Fetched from Yahoo Finance by a fetch task or a price history backfill (MKT-102).
  */
-"YahooFinance"
+"YahooFinance" | 
+/**
+ * Recorded by an agent the owner allowed (MKT-103, AGT-062).
+ */
+"Agent"
 /**
  * An asset the rules of its kind would refuse today, and the first rule it breaks (AST-035).
  */

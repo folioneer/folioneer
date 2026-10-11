@@ -279,7 +279,7 @@
     "session_removed_other": "{{count}} transactions supprimées.",
     "session_kept_one": "{{count}} gardée : une transaction enregistrée depuis en dépend.",
     "session_kept_other": "{{count}} gardées : une transaction enregistrée depuis en dépend.",
-    "connection_covers_record": "enregistrer des soldes d'ouverture, des achats, des ventes, des dépôts, des retraits et des dividendes — jusqu'à 500 par session — chacun marqué comme enregistré par lui."
+    "connection_covers_record": "enregistrer des soldes d'ouverture, des achats, des ventes, des dépôts, des retraits, des dividendes et des prix — jusqu'à 500 par session — chacun marqué comme enregistré par lui."
   },
   "sync": {
     "title": "Synchronisation multi-appareils",
@@ -668,6 +668,7 @@
     "fetch_progress_label": "Actualisation des cours… ({{done}}/{{total}})",
     "source_manual": "Manuel",
     "source_yahoo": "Yahoo Finance",
+    "source_agent": "Agent",
     "staleness_today": "0 j",
     "staleness_days_ago": "{{days}} j",
     "price_state": {

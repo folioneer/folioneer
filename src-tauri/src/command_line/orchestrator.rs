@@ -6,12 +6,15 @@ use std::sync::Arc;
 use serde::Serialize;
 
 use crate::context::account::{AccountServiceContract, Transaction, TransactionType};
+use crate::context::asset::AssetPrice;
 use crate::context::asset::{
     Asset, AssetClass, AssetError, AssetKind, AssetServiceContract, NamedAsset,
 };
 use crate::core::BACKEND;
 pub use crate::use_cases::holding_transaction::Refusal;
-use crate::use_cases::holding_transaction::{code_of, HoldingTransactionUseCase, Recording};
+use crate::use_cases::holding_transaction::{
+    code_of, HoldingTransactionUseCase, PriceAt, Recording,
+};
 
 use super::args::Listed;
 
@@ -32,6 +35,12 @@ pub enum Outcome {
     AssetAdded {
         asset: AssetRow,
         reference_shared: bool,
+    },
+    /// It recorded this price of this asset, in this currency (CLI-029).
+    PriceRecorded {
+        price: AssetPrice,
+        asset_reference: String,
+        currency: String,
     },
     /// It listed these accounts or assets, sorted by name.
     Listed(Listing),
@@ -156,6 +165,18 @@ impl CommandRunner {
                     }
                 }
             }
+        }
+    }
+
+    /// CLI-029 — records a price through the core's recorder, as the owner's own.
+    pub async fn record_price(&self, price: PriceAt, today: &str) -> Outcome {
+        match self.holding.record_price_named(price, today).await {
+            Ok(recorded) => Outcome::PriceRecorded {
+                price: recorded.price,
+                asset_reference: recorded.asset_reference,
+                currency: recorded.currency,
+            },
+            Err(refusal) => Outcome::Refused(refusal),
         }
     }
 

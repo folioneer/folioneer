@@ -198,6 +198,7 @@ mod tests {
                 "record_deposit",
                 "record_withdrawal",
                 "record_dividend",
+                "record_price",
                 "correct_recording",
                 "cancel_recording"
             ]

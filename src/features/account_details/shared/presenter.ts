@@ -422,6 +422,8 @@ export function formatSource(source: AssetPriceSource | null): string | null {
       return "mkt.source_manual";
     case "YahooFinance":
       return "mkt.source_yahoo";
+    case "Agent":
+      return "mkt.source_agent";
   }
 }
 

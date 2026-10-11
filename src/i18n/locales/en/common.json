@@ -279,7 +279,7 @@
     "session_removed_other": "{{count}} transactions removed.",
     "session_kept_one": "{{count}} kept: a transaction recorded since depends on it.",
     "session_kept_other": "{{count}} kept: a transaction recorded since depends on them.",
-    "connection_covers_record": "record opening balances, purchases, sales, deposits, withdrawals and dividends — up to 500 in a session — each marked as recorded by it."
+    "connection_covers_record": "record opening balances, purchases, sales, deposits, withdrawals, dividends and prices — up to 500 in a session — each marked as recorded by it."
   },
   "sync": {
     "title": "Multi-device sync",
@@ -668,6 +668,7 @@
     "fetch_progress_label": "Refreshing market prices… ({{done}}/{{total}})",
     "source_manual": "Manual",
     "source_yahoo": "Yahoo Finance",
+    "source_agent": "Agent",
     "staleness_today": "0d",
     "staleness_days_ago": "{{days}}d",
     "price_state": {

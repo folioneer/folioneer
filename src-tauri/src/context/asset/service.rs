@@ -591,24 +591,58 @@ impl AssetService {
             return Err(AssetError::NonFinite);
         }
         let price_micros = Self::f64_to_micros(price_f64);
-        // MKT-021, MKT-022 — validate via domain entity factory; MKT-101 — user-driven write stamps source = Manual
-        let price = AssetPrice::new(
-            asset_id.to_string(),
-            date.to_string(),
-            price_micros,
-            AssetPriceSource::Manual,
-        )?;
-        // MKT-025 — upsert
-        self.price_repo.upsert(price).await.map_err(|e| {
-            tracing::error!(target: BACKEND, asset_id = %asset_id, date = %date, err = ?e, "record_asset_price: upsert failure");
+        // MKT-101 — user-driven write stamps source = Manual
+        self.write_price(asset_id, date, price_micros, AssetPriceSource::Manual)
+            .await
+            .map(|_| ())
+    }
+
+    /// Records (or overwrites) a price given in micro-units, as the owner's own (MKT-101):
+    /// the command line reads its figure as a decimal, never as a float (CLI-029).
+    pub async fn record_asset_price_in_micros(
+        &self,
+        asset_id: &str,
+        date: &str,
+        price_micros: i64,
+    ) -> StdResult<AssetPrice, AssetError> {
+        ensure_asset_writable_for_price(&*self.asset_repo, asset_id).await?;
+        self.write_price(asset_id, date, price_micros, AssetPriceSource::Manual)
+            .await
+    }
+
+    /// MKT-103 — records (or overwrites) a price an agent gave, with the source `Agent`:
+    /// the latest write wins, as for every price (MKT-025).
+    pub async fn record_asset_price_by_agent(
+        &self,
+        asset_id: &str,
+        date: &str,
+        price_micros: i64,
+    ) -> StdResult<AssetPrice, AssetError> {
+        ensure_asset_writable_for_price(&*self.asset_repo, asset_id).await?;
+        self.write_price(asset_id, date, price_micros, AssetPriceSource::Agent)
+            .await
+    }
+
+    /// MKT-021, MKT-022, MKT-025 — validates a price through the entity's factory and
+    /// upserts it.
+    async fn write_price(
+        &self,
+        asset_id: &str,
+        date: &str,
+        price_micros: i64,
+        source: AssetPriceSource,
+    ) -> StdResult<AssetPrice, AssetError> {
+        let price = AssetPrice::new(asset_id.to_string(), date.to_string(), price_micros, source)?;
+        self.price_repo.upsert(price.clone()).await.map_err(|e| {
+            tracing::error!(target: BACKEND, asset_id = %asset_id, date = %date, source = %price.source, err = ?e, "asset price: upsert failure");
             AssetError::DatabaseError
         })?;
-        tracing::info!(target: BACKEND, asset_id = %asset_id, date = %date, "Asset price recorded");
+        tracing::info!(target: BACKEND, asset_id = %asset_id, date = %date, source = %price.source, "Asset price recorded");
         // MKT-026 — publish bare signal event
         if let Some(bus) = &self.event_bus {
             bus.publish(Event::AssetPriceUpdated);
         }
-        Ok(())
+        Ok(price)
     }
 
     /// Returns the most recently dated market price for the given asset, or None (MKT-031).
@@ -1015,6 +1049,20 @@ pub trait AssetServiceContract: Send + Sync {
     async fn get_latest_price(&self, asset_id: &str) -> Result<Option<AssetPrice>>;
     /// Returns all recorded market prices for the given asset, sorted date descending (MKT-072).
     async fn get_asset_prices(&self, asset_id: &str) -> StdResult<Vec<AssetPrice>, AssetError>;
+    /// See [`AssetService::record_asset_price_in_micros`].
+    async fn record_asset_price_in_micros(
+        &self,
+        asset_id: &str,
+        date: &str,
+        price_micros: i64,
+    ) -> StdResult<AssetPrice, AssetError>;
+    /// See [`AssetService::record_asset_price_by_agent`].
+    async fn record_asset_price_by_agent(
+        &self,
+        asset_id: &str,
+        date: &str,
+        price_micros: i64,
+    ) -> StdResult<AssetPrice, AssetError>;
     /// Records a daily-close series for an asset with source=YahooFinance (SPF-034); no event published (SPF-024).
     async fn record_daily_closes(
         &self,
@@ -1068,6 +1116,22 @@ impl AssetServiceContract for AssetService {
 
     async fn get_asset_prices(&self, asset_id: &str) -> StdResult<Vec<AssetPrice>, AssetError> {
         AssetService::get_asset_prices(self, asset_id).await
+    }
+    async fn record_asset_price_in_micros(
+        &self,
+        asset_id: &str,
+        date: &str,
+        price_micros: i64,
+    ) -> StdResult<AssetPrice, AssetError> {
+        AssetService::record_asset_price_in_micros(self, asset_id, date, price_micros).await
+    }
+    async fn record_asset_price_by_agent(
+        &self,
+        asset_id: &str,
+        date: &str,
+        price_micros: i64,
+    ) -> StdResult<AssetPrice, AssetError> {
+        AssetService::record_asset_price_by_agent(self, asset_id, date, price_micros).await
     }
 
     async fn record_daily_closes(
@@ -2352,6 +2416,101 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(err, AssetError::Archived), "got: {err:?}");
+    }
+
+    // MKT-103 — an agent's price is written with the source Agent, and the latest write
+    // wins: it is upserted whatever is at that date, never looked up first.
+    #[tokio::test]
+    async fn mkt_103_an_agents_price_is_upserted_with_the_source_agent() {
+        let mut ar = MockAssetRepository::new();
+        ar.expect_get_by_id()
+            .times(1)
+            .return_once(|_| Ok(Some(make_asset("asset-id", false))));
+        let mut pr = MockAssetPriceRepository::new();
+        pr.expect_get_by_asset_and_date().never();
+        pr.expect_upsert()
+            .times(1)
+            .withf(|price| {
+                price.source == AssetPriceSource::Agent
+                    && price.date == "2019-12-31"
+                    && price.price == 512_300_000
+            })
+            .returning(|_| Ok(()));
+        let svc = make_svc(ar, MockAssetCategoryRepository::new(), pr);
+
+        let recorded = svc
+            .record_asset_price_by_agent("asset-id", "2019-12-31", 512_300_000)
+            .await
+            .expect("recorded");
+        assert_eq!(
+            (recorded.price, recorded.source),
+            (512_300_000, AssetPriceSource::Agent)
+        );
+    }
+
+    // MKT-103 — an agent's price goes through the rules of a price: an archived or unknown
+    // asset, a price that is not above zero and a future date are refused, and nothing is
+    // written.
+    #[tokio::test]
+    async fn mkt_103_an_agents_price_is_refused_like_any_price() {
+        let mut ar = MockAssetRepository::new();
+        ar.expect_get_by_id()
+            .withf(|id| id == "archived-id")
+            .returning(|_| Ok(Some(make_asset("archived-id", true))));
+        ar.expect_get_by_id()
+            .withf(|id| id == "asset-id")
+            .returning(|_| Ok(Some(make_asset("asset-id", false))));
+        ar.expect_get_by_id().returning(|_| Ok(None));
+        let mut pr = MockAssetPriceRepository::new();
+        pr.expect_upsert().never();
+        let svc = make_svc(ar, MockAssetCategoryRepository::new(), pr);
+
+        let refused = |asset: &'static str, date: &'static str, price: i64| {
+            let svc = &svc;
+            async move {
+                svc.record_asset_price_by_agent(asset, date, price)
+                    .await
+                    .expect_err("refused")
+            }
+        };
+        assert!(matches!(
+            refused("archived-id", "2019-12-31", 1_000_000).await,
+            AssetError::Archived
+        ));
+        assert!(matches!(
+            refused("unknown-id", "2019-12-31", 1_000_000).await,
+            AssetError::AssetNotFound { .. }
+        ));
+        assert!(matches!(
+            refused("asset-id", "2019-12-31", 0).await,
+            AssetError::NotPositive
+        ));
+        assert!(matches!(
+            refused("asset-id", "2999-01-01", 1_000_000).await,
+            AssetError::DateInFuture
+        ));
+    }
+
+    // CLI-029 — a price the owner typed on the command line is the owner's own: source
+    // Manual, replacing what was there (MKT-025).
+    #[tokio::test]
+    async fn cli_029_a_typed_price_in_micros_is_manual_and_replaces() {
+        let mut ar = MockAssetRepository::new();
+        ar.expect_get_by_id()
+            .times(1)
+            .return_once(|_| Ok(Some(make_asset("asset-id", false))));
+        let mut pr = MockAssetPriceRepository::new();
+        pr.expect_get_by_asset_and_date().never();
+        pr.expect_upsert()
+            .times(1)
+            .withf(|price| price.source == AssetPriceSource::Manual && price.price == 512_300_000)
+            .returning(|_| Ok(()));
+        let svc = make_svc(ar, MockAssetCategoryRepository::new(), pr);
+        let recorded = svc
+            .record_asset_price_in_micros("asset-id", "2019-12-31", 512_300_000)
+            .await
+            .expect("recorded");
+        assert_eq!(recorded.price, 512_300_000);
     }
 
     // MKT-021 — record_asset_price rejects price <= 0

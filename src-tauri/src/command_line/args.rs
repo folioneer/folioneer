@@ -4,7 +4,7 @@
 use crate::context::asset::{AssetClass, AssetCreationDefaults, AssetKind, NamedAsset};
 
 use crate::use_cases::holding_transaction::{
-    decimal_to_micro, CashAmount, DividendAmount, Recording, Target, Trade, TradeAmount,
+    decimal_to_micro, CashAmount, DividendAmount, PriceAt, Recording, Target, Trade, TradeAmount,
 };
 
 use super::help::{closest, commands, HelpTopic};
@@ -27,6 +27,8 @@ pub enum Writing {
     Record(Recording),
     /// Add an asset (CLI-026).
     AddAsset(NamedAsset),
+    /// Record the price of an asset at a date (CLI-029).
+    Price(PriceAt),
 }
 
 /// A command the user asked for.
@@ -141,6 +143,7 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
             "--date",
             "--note",
         ],
+        "asset price" => &["--asset", "--price", "--date"],
         "asset add" => &[
             "--name",
             "--reference",
@@ -192,6 +195,16 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
                 exchange_code: options.get("--exchange").map(str::to_string),
                 risk_level: options.risk()?,
                 category_name: options.get("--category").map(str::to_string),
+            })),
+            json,
+        });
+    }
+    if command == "asset price" {
+        return Ok(Invocation::Run {
+            command: Command::Write(Writing::Price(PriceAt {
+                asset: options.text("--asset")?,
+                date: options.date()?,
+                price: options.amount("--price")?,
             })),
             json,
         });
@@ -447,6 +460,36 @@ mod tests {
                 },
                 total_cost: 4_950_500_000,
             }
+        );
+    }
+
+    // CLI-029 — a price reads its asset, its figure and its date; no account.
+    #[test]
+    fn cli_029_reads_a_price() {
+        let price = |line: &str| match parse(&args(line)).expect("valid") {
+            Invocation::Run {
+                command: Command::Write(Writing::Price(price)),
+                json,
+            } => (price, json),
+            other => panic!("not a price: {other:?}"),
+        };
+        assert_eq!(
+            price("asset price --asset CW8 --price 512.30 --date 2025-12-31 --json"),
+            (
+                PriceAt {
+                    asset: "CW8".to_string(),
+                    date: Some("2025-12-31".to_string()),
+                    price: 512_300_000,
+                },
+                true
+            )
+        );
+        assert_eq!(price("asset price --asset CW8 --price 1").0.date, None);
+        let refused = |line: &str| parse(&args(line)).expect_err("usage error").message;
+        assert_eq!(refused("asset price --asset CW8"), "--price is missing");
+        assert_eq!(
+            refused("asset price --asset CW8 --price 1 --account PEA"),
+            "unknown option \"--account\""
         );
     }
 

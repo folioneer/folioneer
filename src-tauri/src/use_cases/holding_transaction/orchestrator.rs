@@ -469,6 +469,19 @@ impl HoldingTransactionUseCase {
         })
     }
 
+    /// CLI-011 — the one asset `typed` names, for a recording that names no account.
+    pub async fn find_asset_by_name(&self, typed: &str) -> Result<Asset, NameLookupError> {
+        let assets = self
+            .asset_service
+            .get_non_cash_assets()
+            .await
+            .map_err(|error| {
+                tracing::error!(target: BACKEND, err = ?error, "find_asset_by_name: asset lookup failed");
+                NameLookupError::DatabaseError
+            })?;
+        match_asset(&assets, typed).cloned()
+    }
+
     /// CLI-011 — the one account with this name, for a recording that names no asset.
     pub async fn find_account_by_name(&self, typed: &str) -> Result<Account, NameLookupError> {
         let accounts = self.account_service.get_all().await.map_err(|error| {

@@ -77,6 +77,8 @@ pub enum AssetPriceSource {
     Manual,
     /// Fetched from Yahoo Finance by a fetch task or a price history backfill (MKT-102).
     YahooFinance,
+    /// Recorded by an agent the owner allowed (MKT-103, AGT-062).
+    Agent,
 }
 
 /// A quote returned by a [`PriceProvider`]: the price plus the provider's
