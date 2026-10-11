@@ -12,11 +12,11 @@
   not check the doc map here: a Markdown file outside every location of
   `docs/README.md` passes (`docs/advice-module-design.md` is in none).
 - Proposal: take them one at a time, each as its own pull request, in this order: the
-  doc-map check; `scoped-checks.sh`; `review-lanes.sh`; `/spec-writer`. For the usage
-  log, the release notes and the privacy check, the owner says which this repository
-  needs: it holds no personal data of a third party, and `/flow-audit` counts what was
-  used from the session's transcript.
+  doc-map check; `scoped-checks.sh`; `review-lanes.sh`; `/spec-writer`. The usage log is
+  wanted (owner, 2026-10-11) and is FLOW-035. For the release notes and the privacy
+  check, the owner says which this repository needs: it holds no personal data of a
+  third party.
 - Costs: about half a day for the first four, each with its tests. Protects: one reading
   of the setup document for both repositories, and a skill or a script that can be
   carried from one to the other.
-- Needs the owner: yes — which of the last three are wanted here.
+- Needs the owner: yes — which of the release notes and the privacy check are wanted here.
