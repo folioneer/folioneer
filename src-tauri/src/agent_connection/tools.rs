@@ -12,7 +12,8 @@ use crate::core::BACKEND;
 use crate::use_cases::account_details::AccountDetailsUseCase;
 use crate::use_cases::account_summary::AccountSummaryUseCase;
 use crate::use_cases::holding_transaction::{
-    decimal_to_micro, Correction, HoldingTransactionUseCase, Recording, Target, Trade, TradeAmount,
+    decimal_to_micro, CashAmount, Correction, DividendAmount, HoldingTransactionUseCase, Recording,
+    Target, Trade, TradeAmount,
 };
 
 use super::connections::{Granted, LastRecording, MAX_RECORDINGS};
@@ -155,6 +156,25 @@ impl AgentTools {
             "record_sale" => {
                 self.record(granted, Recording::Sell(trade(arguments)?))
                     .await
+            }
+            "record_deposit" => {
+                self.record(granted, Recording::Deposit(cash(arguments)?))
+                    .await
+            }
+            "record_withdrawal" => {
+                self.record(granted, Recording::Withdrawal(cash(arguments)?))
+                    .await
+            }
+            "record_dividend" => {
+                let dividend = DividendAmount {
+                    account: text(arguments, "account")?.to_string(),
+                    asset: text(arguments, "asset")?.to_string(),
+                    date: optional_text(arguments, "date")?,
+                    amount: amount(arguments, "amount")?,
+                    rate: figure(arguments, "rate")?,
+                    note: note(arguments)?,
+                };
+                self.record(granted, Recording::Dividend(dividend)).await
             }
             "portfolio_summary" => self
                 .summaries
@@ -420,6 +440,16 @@ fn target(arguments: &Value) -> Result<Target, Refusal> {
         asset: text(arguments, "asset")?.to_string(),
         date: optional_text(arguments, "date")?,
         quantity: amount(arguments, "quantity")?,
+    })
+}
+
+/// AGT-060 — a deposit or a withdrawal: the account, the amount and the date.
+fn cash(arguments: &Value) -> Result<CashAmount, Refusal> {
+    Ok(CashAmount {
+        account: text(arguments, "account")?.to_string(),
+        date: optional_text(arguments, "date")?,
+        amount: amount(arguments, "amount")?,
+        note: note(arguments)?,
     })
 }
 

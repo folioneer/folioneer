@@ -2,6 +2,7 @@
 
 use serde_json::json;
 
+use crate::context::account::{Transaction, TransactionType};
 use crate::use_cases::holding_transaction::{decimal, Refusal};
 
 use super::orchestrator::{verb, AssetRow, Listing, Outcome};
@@ -45,15 +46,11 @@ pub fn render(outcome: &Outcome, json: bool) -> Printed {
             },
             false,
         ) => Printed {
-            stdout: Some(format!(
-                "Recorded: {} {} {} in {} on {} — {} {}",
-                verb(transaction.transaction_type),
-                decimal(transaction.quantity),
-                asset_reference,
+            stdout: Some(recorded_line(
+                transaction,
                 account_name,
-                transaction.date,
-                money(transaction.total_amount),
-                currency
+                currency,
+                asset_reference.as_deref(),
             )),
             // TRX-065 — recorded all the same: the warning never blocks.
             stderr: zero_cost.then(|| {
@@ -131,6 +128,39 @@ pub fn render(outcome: &Outcome, json: bool) -> Printed {
             exit_code: RECORDED,
         },
         (Outcome::Refused(refusal), json) => refused(refusal, json),
+    }
+}
+
+/// CLI-020 — the line of a recorded transaction: what was recorded, the account, the date
+/// and its total in the account's currency.
+fn recorded_line(
+    transaction: &Transaction,
+    account_name: &str,
+    currency: &str,
+    asset_reference: Option<&str>,
+) -> String {
+    let (date, total) = (&transaction.date, money(transaction.total_amount));
+    // A name is typed by a person: a control character in it never reaches the terminal.
+    let account_name = printable(account_name);
+    let asset_reference = asset_reference.map(printable);
+    match (transaction.transaction_type, asset_reference) {
+        (TransactionType::Deposit, _) => {
+            format!("Recorded: deposited {total} {currency} in {account_name} on {date}")
+        }
+        (TransactionType::Withdrawal, _) => {
+            format!("Recorded: withdrew {total} {currency} from {account_name} on {date}")
+        }
+        (TransactionType::Dividend, Some(asset)) => {
+            format!(
+                "Recorded: dividend of {asset} in {account_name} on {date} — {total} {currency}"
+            )
+        }
+        (kind, asset) => format!(
+            "Recorded: {} {} {} in {account_name} on {date} — {total} {currency}",
+            verb(kind),
+            decimal(transaction.quantity),
+            asset.unwrap_or_default(),
+        ),
     }
 }
 
@@ -276,7 +306,7 @@ mod tests {
             transaction: Box::new(purchase()),
             account_name: "PEA".to_string(),
             currency: "EUR".to_string(),
-            asset_reference: "CW8".to_string(),
+            asset_reference: Some("CW8".to_string()),
             zero_cost: false,
         }
     }

@@ -469,6 +469,15 @@ impl HoldingTransactionUseCase {
         })
     }
 
+    /// CLI-011 — the one account with this name, for a recording that names no asset.
+    pub async fn find_account_by_name(&self, typed: &str) -> Result<Account, NameLookupError> {
+        let accounts = self.account_service.get_all().await.map_err(|error| {
+            tracing::error!(target: BACKEND, err = ?error, "find_account_by_name: account lookup failed");
+            NameLookupError::DatabaseError
+        })?;
+        match_account(&accounts, typed).cloned()
+    }
+
     /// Seeds a holding from a known quantity and total cost (TRX-042).
     ///
     /// Cross-BC guard: rejects the request if the asset does not exist

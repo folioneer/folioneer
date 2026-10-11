@@ -195,6 +195,9 @@ mod tests {
                 "record_opening_balance",
                 "record_purchase",
                 "record_sale",
+                "record_deposit",
+                "record_withdrawal",
+                "record_dividend",
                 "correct_recording",
                 "cancel_recording"
             ]

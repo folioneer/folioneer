@@ -119,13 +119,16 @@ cd src-tauri && cargo test # Backend tests only
 
 ## Command line
 
-The installed program records an opening balance, a purchase or a sale without opening a window. Close the window first: a command that records refuses while it is open; the lists answer anyway.
+The installed program records an opening balance, a purchase, a sale, a dividend, a deposit or a withdrawal without opening a window. Close the window first: a command that records refuses while it is open; the lists answer anyway.
 
 ```
 folioneer holding open --account "PEA" --asset CW8 --quantity 10 --total-cost 4950 [--date 2026-09-28] [--json]
 folioneer holding buy  --account "PEA" --asset CW8 --quantity 2 --price 495.10 [--fees 1.99] [--rate 1] [--date …] [--note "…"] [--json]
 folioneer holding buy  --account "PEA" --asset CW8 --quantity 2 --total 992.19 [--fees 1.99] …
 folioneer holding sell …same options as buy…
+folioneer holding dividend --account "PEA" --asset CW8 --amount 12.50 [--rate 1] [--date …] [--note "…"] [--json]
+folioneer account deposit  --account "PEA" --amount 1500 [--date …] [--note "…"] [--json]
+folioneer account withdraw --account "PEA" --amount 200 …
 folioneer account list        # the accounts: what --account takes
 folioneer asset list          # the assets: what --asset takes (--archived for the archived ones)
 folioneer asset add --name "ASML Holding" --reference ASML --class Stocks --currency EUR
@@ -145,7 +148,7 @@ folioneer holding buy --help  # one command's options and defaults
 
 ## Agents (Model Context Protocol)
 
-An agent — Claude Code, Claude Desktop — can read the portfolio and record opening balances, purchases and sales through the application while it is open, on Linux and on Windows. Nothing answers when Folioneer is closed.
+An agent — Claude Code, Claude Desktop — can read the portfolio and record opening balances, purchases, sales, dividends, deposits and withdrawals through the application while it is open, on Linux and on Windows. Nothing answers when Folioneer is closed.
 
 1. In Folioneer, **Settings → Allow agents to connect** (off by default).
 2. Tell the agent how to start the bridge, which is the installed program with `--mcp`:

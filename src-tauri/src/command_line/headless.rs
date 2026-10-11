@@ -248,6 +248,101 @@ mod tests {
         assert_eq!(value["transaction"]["total_amount"], 990 * M);
     }
 
+    // CLI-027 / CLI-028 — a deposit, a withdrawal and a dividend are recorded through the
+    // window's rules: a withdrawal above the cash held and a dividend of an asset not held
+    // are refused with the window's codes, and nothing is written.
+    #[tokio::test]
+    async fn cli_027_records_cash_and_a_dividend_through_the_window_rules() {
+        let dir = portfolio("cash").await;
+
+        let deposited = run_line(
+            &dir,
+            "account deposit --account pea --amount 1500.50 --date 2026-01-15",
+        )
+        .await;
+        assert_eq!(deposited.exit_code, RECORDED);
+        assert_eq!(
+            deposited.stdout.as_deref(),
+            Some("Recorded: deposited 1500.50 EUR in PEA on 2026-01-15")
+        );
+
+        let overdrawn = run_line(
+            &dir,
+            "account withdraw --account PEA --amount 7000 --date 2026-01-20 --json",
+        )
+        .await;
+        assert_eq!(overdrawn.exit_code, REFUSED);
+        let refusal: serde_json::Value =
+            serde_json::from_str(overdrawn.stdout.as_deref().expect("json")).expect("valid json");
+        assert_eq!(refusal["code"], "InsufficientCash");
+        assert_eq!(refusal["message"], "not enough cash in the account");
+
+        let withdrawn = run_line(
+            &dir,
+            "account withdraw --account PEA --amount 500 --date 2026-01-20",
+        )
+        .await;
+        assert_eq!(
+            withdrawn.stdout.as_deref(),
+            Some("Recorded: withdrew 500.00 EUR from PEA on 2026-01-20")
+        );
+
+        let not_held = run_line(
+            &dir,
+            "holding dividend --account PEA --asset CW8 --amount 12 --date 2026-02-01 --json",
+        )
+        .await;
+        assert_eq!(not_held.exit_code, REFUSED);
+        let refusal: serde_json::Value =
+            serde_json::from_str(not_held.stdout.as_deref().expect("json")).expect("valid json");
+        assert_eq!(refusal["code"], "AssetNotHeld");
+
+        run_line(
+            &dir,
+            "holding buy --account PEA --asset CW8 --quantity 2 --price 100 --date 2026-02-01",
+        )
+        .await;
+        let paid = run_line(
+            &dir,
+            "holding dividend --account PEA --asset CW8 --amount 12.5 --date 2026-03-01",
+        )
+        .await;
+        assert_eq!(
+            paid.stdout.as_deref(),
+            Some("Recorded: dividend of CW8 in PEA on 2026-03-01 — 12.50 EUR")
+        );
+        let nothing = run_line(
+            &dir,
+            "account deposit --account PEA --amount 0 --date 2026-03-02 --json",
+        )
+        .await;
+        let refusal: serde_json::Value =
+            serde_json::from_str(nothing.stdout.as_deref().expect("json")).expect("valid json");
+        assert_eq!(refusal["code"], "AmountNotPositive");
+        assert_eq!(refusal["message"], "the amount must be above zero");
+
+        // The refused ones wrote nothing.
+        let database = Database::new(dir.clone()).await.expect("database");
+        let container = AppContainer::for_headless_writes(database.pool);
+        let account = container
+            .account_service
+            .get_all()
+            .await
+            .expect("accounts")
+            .remove(0);
+        let kinds: Vec<String> = container
+            .account_service
+            .get_all_transactions_for_account(&account.id)
+            .await
+            .expect("transactions")
+            .iter()
+            .map(|transaction| transaction.transaction_type.to_string())
+            .collect();
+        assert_eq!(kinds.iter().filter(|kind| *kind == "Deposit").count(), 2);
+        assert_eq!(kinds.iter().filter(|kind| *kind == "Withdrawal").count(), 1);
+        assert_eq!(kinds.iter().filter(|kind| *kind == "Dividend").count(), 1);
+    }
+
     // CLI-011 — an unknown account, an unknown asset and an ambiguous name are refused,
     // naming only what was typed.
     #[tokio::test]

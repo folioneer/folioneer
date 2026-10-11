@@ -279,7 +279,7 @@
     "session_removed_other": "{{count}} transactions removed.",
     "session_kept_one": "{{count}} kept: a transaction recorded since depends on it.",
     "session_kept_other": "{{count}} kept: a transaction recorded since depends on them.",
-    "connection_covers_record": "record opening balances, purchases and sales — up to 500 in a session — each shown here as it happens and marked as recorded by it."
+    "connection_covers_record": "record opening balances, purchases, sales, deposits, withdrawals and dividends — up to 500 in a session — each marked as recorded by it."
   },
   "sync": {
     "title": "Multi-device sync",

@@ -12,6 +12,12 @@ pub enum HelpTopic {
     Buy,
     /// `holding sell`.
     Sell,
+    /// `holding dividend`.
+    Dividend,
+    /// `account deposit`.
+    Deposit,
+    /// `account withdraw`.
+    Withdraw,
     /// `account list`.
     AccountList,
     /// `asset list`.
@@ -21,10 +27,13 @@ pub enum HelpTopic {
 }
 
 /// Every command, as typed after the program name, with its page — in the overview's order.
-const PAGES: [(&str, HelpTopic); 6] = [
+const PAGES: [(&str, HelpTopic); 9] = [
     ("holding open", HelpTopic::Open),
     ("holding buy", HelpTopic::Buy),
     ("holding sell", HelpTopic::Sell),
+    ("holding dividend", HelpTopic::Dividend),
+    ("account deposit", HelpTopic::Deposit),
+    ("account withdraw", HelpTopic::Withdraw),
     ("account list", HelpTopic::AccountList),
     ("asset list", HelpTopic::AssetList),
     ("asset add", HelpTopic::AssetAdd),
@@ -121,6 +130,47 @@ pub fn help(program: &str, topic: HelpTopic) -> String {
             &TRADE_OPTIONS,
             "--account PEA --asset ASML --quantity 1 --total 1300",
         ),
+        HelpTopic::Dividend => page(
+            program,
+            "holding dividend",
+            "Record a dividend an asset held in an account paid.",
+            &["--account <name> --asset <name> --amount <amount> [options]"],
+            &[
+                ("--account <name>", "Account name"),
+                ("--asset <name>", "Asset name, reference, ISIN or REF@EXCHANGE"),
+                ("--amount <amount>", "Total net amount received, in the asset's currency"),
+            ],
+            &[
+                ("--rate <rate>", "Exchange rate", Some("1")),
+                ("--date <YYYY-MM-DD>", "Date", Some("today")),
+                ("--note <text>", "Note", None),
+            ],
+            "--account PEA --asset \"Air Liquide\" --amount 31.90",
+        ),
+        HelpTopic::Deposit => page(
+            program,
+            "account deposit",
+            "Record cash paid into an account.",
+            &["--account <name> --amount <amount> [options]"],
+            &[
+                ("--account <name>", "Account name"),
+                ("--amount <amount>", "Amount, in the account's currency"),
+            ],
+            &CASH_OPTIONS,
+            "--account PEA --amount 1500",
+        ),
+        HelpTopic::Withdraw => page(
+            program,
+            "account withdraw",
+            "Record cash taken out of an account.",
+            &["--account <name> --amount <amount> [options]"],
+            &[
+                ("--account <name>", "Account name"),
+                ("--amount <amount>", "Amount, in the account's currency"),
+            ],
+            &CASH_OPTIONS,
+            "--account PEA --amount 200 --date 2019-12-31",
+        ),
         HelpTopic::AccountList => page(
             program,
             "account list",
@@ -185,6 +235,11 @@ const TRADE_OPTIONS: [(&str, &str, Option<&str>); 4] = [
     ("--note <text>", "Note", None),
 ];
 
+const CASH_OPTIONS: [(&str, &str, Option<&str>); 2] = [
+    ("--date <YYYY-MM-DD>", "Date", Some("today")),
+    ("--note <text>", "Note", None),
+];
+
 fn overview(program: &str) -> String {
     format!(
         "\
@@ -193,12 +248,15 @@ Record holdings in your Folioneer portfolio from a terminal.
 Usage: {program} <command> [options]
 
 Commands:
-  holding open   Add an asset you already hold to an account (opening balance)
-  holding buy    Record a purchase
-  holding sell   Record a sale
-  account list   List the accounts
-  asset list     List the assets
-  asset add      Add an asset
+  holding open       Add an asset you already hold to an account (opening balance)
+  holding buy        Record a purchase
+  holding sell       Record a sale
+  holding dividend   Record a dividend
+  account deposit    Record cash paid into an account
+  account withdraw   Record cash taken out of an account
+  account list       List the accounts
+  asset list         List the assets
+  asset add          Add an asset
 
 Examples:
   {program} holding buy  --account PEA --asset ASML --quantity 1 --price 1236.50
@@ -368,6 +426,55 @@ Exit codes: 0 recorded, 1 refused, 2 wrong usage."
         );
     }
 
+    // CLI-027 / CLI-028 — a deposit, a withdrawal and a dividend have their pages: an
+    // amount, no quantity.
+    #[test]
+    fn cli_027_cash_and_a_dividend_have_their_own_pages() {
+        assert_eq!(
+            help("folioneer", HelpTopic::Deposit),
+            "\
+Record cash paid into an account.
+
+Usage: folioneer account deposit --account <name> --amount <amount> [options]
+
+Required:
+  --account <name>      Account name
+  --amount <amount>     Amount, in the account's currency
+
+Options:
+  --date <YYYY-MM-DD>   Date   [default: today]
+  --note <text>         Note
+  --json                Print the result as JSON
+  -h, --help            Show this help
+
+Example:
+  folioneer account deposit --account PEA --amount 1500
+
+Exit codes: 0 recorded, 1 refused, 2 wrong usage."
+        );
+        let withdraw = help("folioneer", HelpTopic::Withdraw);
+        assert!(withdraw.starts_with("Record cash taken out of an account.\n"));
+        assert!(!withdraw.contains("--asset"));
+        let dividend = help("folioneer", HelpTopic::Dividend);
+        assert!(dividend.contains(
+            "\n  --amount <amount>     Total net amount received, in the asset's currency\n"
+        ));
+        assert!(dividend.contains("\n  --rate <rate>         Exchange rate   [default: 1]\n"));
+        assert!(!dividend.contains("--quantity"));
+        assert_eq!(
+            HelpTopic::of(Some("account"), Some("withdraw")),
+            HelpTopic::Withdraw
+        );
+        let overview = help("folioneer", HelpTopic::Overview);
+        for line in [
+            "\n  holding dividend   Record a dividend\n",
+            "\n  account deposit    Record cash paid into an account\n",
+            "\n  account withdraw   Record cash taken out of an account\n",
+        ] {
+            assert!(overview.contains(line), "{line}");
+        }
+    }
+
     // CLI-023 — an opening balance and a sale have their own pages, with their own options.
     #[test]
     fn cli_023_each_command_has_its_own_page() {
@@ -424,9 +531,8 @@ Exit codes: 0 listed, 1 refused, 2 wrong usage."
         assert!(page.contains("[default: its class's]"));
         assert!(page.contains("[default: none]"));
         assert!(page.ends_with("Exit codes: 0 recorded, 1 refused, 2 wrong usage."));
-        assert!(
-            help("folioneer", HelpTopic::Overview).contains("\n  asset add      Add an asset\n")
-        );
+        assert!(help("folioneer", HelpTopic::Overview)
+            .contains("\n  asset add          Add an asset\n"));
     }
 
     // CLI-024 — the hint names the page of the command that was mistyped.

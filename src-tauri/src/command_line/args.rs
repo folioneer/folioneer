@@ -4,7 +4,7 @@
 use crate::context::asset::{AssetClass, AssetCreationDefaults, AssetKind, NamedAsset};
 
 use crate::use_cases::holding_transaction::{
-    decimal_to_micro, Recording, Target, Trade, TradeAmount,
+    decimal_to_micro, CashAmount, DividendAmount, Recording, Target, Trade, TradeAmount,
 };
 
 use super::help::{closest, commands, HelpTopic};
@@ -132,6 +132,15 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
             "--date",
             "--note",
         ],
+        "account deposit" | "account withdraw" => &["--account", "--amount", "--date", "--note"],
+        "holding dividend" => &[
+            "--account",
+            "--asset",
+            "--amount",
+            "--rate",
+            "--date",
+            "--note",
+        ],
         "asset add" => &[
             "--name",
             "--reference",
@@ -184,6 +193,40 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
                 risk_level: options.risk()?,
                 category_name: options.get("--category").map(str::to_string),
             })),
+            json,
+        });
+    }
+    // CLI-027 / CLI-028 — cash and a dividend have an amount and no quantity.
+    let recording = match command.as_str() {
+        "account deposit" | "account withdraw" => {
+            let cash = CashAmount {
+                account: options.text("--account")?,
+                date: options.date()?,
+                amount: options.amount("--amount")?,
+                note: options.get("--note").map(str::to_string),
+            };
+            Some(if verb == "deposit" {
+                Recording::Deposit(cash)
+            } else {
+                Recording::Withdrawal(cash)
+            })
+        }
+        "holding dividend" => Some(Recording::Dividend(DividendAmount {
+            account: options.text("--account")?,
+            asset: options.text("--asset")?,
+            date: options.date()?,
+            amount: options.amount("--amount")?,
+            rate: options
+                .get("--rate")
+                .map(|_| options.amount("--rate"))
+                .transpose()?,
+            note: options.get("--note").map(str::to_string),
+        })),
+        _ => None,
+    };
+    if let Some(recording) = recording {
+        return Ok(Invocation::Run {
+            command: Command::Write(Writing::Record(recording)),
             json,
         });
     }
@@ -404,6 +447,71 @@ mod tests {
                 },
                 total_cost: 4_950_500_000,
             }
+        );
+    }
+
+    // CLI-027 — a deposit and a withdrawal read an account and an amount; no asset, no
+    // quantity.
+    #[test]
+    fn cli_027_reads_a_deposit_and_a_withdrawal() {
+        assert_eq!(
+            run("account deposit --account PEA --amount 1500.5"),
+            Recording::Deposit(CashAmount {
+                account: "PEA".to_string(),
+                date: None,
+                amount: 1_500_500_000,
+                note: None,
+            })
+        );
+        assert_eq!(
+            run("account withdraw --account PEA --amount 200 --date 2019-12-31 --note x --json"),
+            Recording::Withdrawal(CashAmount {
+                account: "PEA".to_string(),
+                date: Some("2019-12-31".to_string()),
+                amount: 200 * MICRO,
+                note: Some("x".to_string()),
+            })
+        );
+        let refused = |line: &str| parse(&args(line)).expect_err("usage error").message;
+        assert_eq!(
+            refused("account deposit --account PEA"),
+            "--amount is missing"
+        );
+        assert_eq!(
+            refused("account deposit --account PEA --amount 1 --asset CW8"),
+            "unknown option \"--asset\""
+        );
+    }
+
+    // CLI-028 — a dividend reads its account, its asset and its amount; the rate defaults
+    // to 1.
+    #[test]
+    fn cli_028_reads_a_dividend() {
+        assert_eq!(
+            run("holding dividend --account PEA --asset CW8 --amount 31.9"),
+            Recording::Dividend(DividendAmount {
+                account: "PEA".to_string(),
+                asset: "CW8".to_string(),
+                date: None,
+                amount: 31_900_000,
+                rate: None,
+                note: None,
+            })
+        );
+        let Recording::Dividend(dividend) = run(
+            "holding dividend --account PEA --asset CW8 --amount 10 --rate 0.92 --date 2020-06-01",
+        ) else {
+            panic!("dividend");
+        };
+        assert_eq!(dividend.rate, Some(920_000));
+        assert_eq!(dividend.date.as_deref(), Some("2020-06-01"));
+        assert_eq!(
+            parse(&args(
+                "holding dividend --account PEA --asset CW8 --amount 1 --quantity 2"
+            ))
+            .expect_err("usage error")
+            .message,
+            "unknown option \"--quantity\""
         );
     }
 

@@ -18,13 +18,13 @@ use super::args::Listed;
 /// What a command did.
 #[derive(Debug, Clone)]
 pub enum Outcome {
-    /// It recorded this transaction, in this account and currency, on this asset; an
-    /// opening balance of zero cost is said so (TRX-065).
+    /// It recorded this transaction, in this account and currency, on this asset — none
+    /// for cash; an opening balance of zero cost is said so (TRX-065).
     Recorded {
         transaction: Box<Transaction>,
         account_name: String,
         currency: String,
-        asset_reference: String,
+        asset_reference: Option<String>,
         zero_cost: bool,
     },
     /// It added this asset; another asset has the same reference when `reference_shared`

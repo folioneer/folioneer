@@ -76,6 +76,31 @@ pub fn definitions() -> Vec<ToolDefinition> {
             "record_sale",
             "Record a sale of an asset held in an account. Give either the unit price, in the asset's currency, or the broker's all-in total, in the account's currency. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
         ),
+        cash_definition(
+            "record_deposit",
+            "Record cash paid into an account from outside. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+        ),
+        cash_definition(
+            "record_withdrawal",
+            "Record cash taken out of an account. The account must hold that cash on the date. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+        ),
+        ToolDefinition {
+            name: "record_dividend",
+            description: "Record a dividend an asset held in an account paid: the cash of the account receives it, the holding is unchanged. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "account": { "type": "string", "description": "The account's name, as list_accounts gives it." },
+                    "asset": { "type": "string", "description": "The paying asset's name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
+                    "amount": { "type": ["string", "number"], "description": "The total net amount received, in the asset's currency." },
+                    "rate": { "type": ["string", "number"], "description": "Exchange rate from the asset's currency to the account's. Default: 1." },
+                    "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." },
+                    "note": { "type": "string", "description": "A note kept with the transaction." }
+                },
+                "required": ["account", "asset", "amount"],
+                "additionalProperties": false
+            }),
+        },
         ToolDefinition {
             name: "correct_recording",
             description: "Correct a transaction this session recorded: give its id, as the recording returned it, and only what changes. A transaction the owner typed, or one another session recorded, is refused. Figures are decimals with a dot (12.5), not millionths.",
@@ -108,6 +133,25 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
     ]
+}
+
+/// A deposit or a withdrawal as an agent is told of it.
+fn cash_definition(name: &'static str, description: &'static str) -> ToolDefinition {
+    ToolDefinition {
+        name,
+        description,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "account": { "type": "string", "description": "The account's name, as list_accounts gives it." },
+                "amount": { "type": ["string", "number"], "description": "The amount, in the account's currency." },
+                "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." },
+                "note": { "type": "string", "description": "A note kept with the transaction." }
+            },
+            "required": ["account", "amount"],
+            "additionalProperties": false
+        }),
+    }
 }
 
 /// A purchase or a sale as an agent is told of it.

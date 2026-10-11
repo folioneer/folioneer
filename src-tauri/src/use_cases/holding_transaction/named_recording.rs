@@ -8,7 +8,9 @@ use serde::Serialize;
 use crate::context::account::{AccountError, AgentRecording, Transaction, TransactionType};
 use crate::core::BACKEND;
 
-use super::error::{NameLookupError, OpenHoldingError, OpenHoldingTask};
+use super::error::{
+    DividendError, DividendTask, NameLookupError, OpenHoldingError, OpenHoldingTask,
+};
 use super::orchestrator::{HoldingTransactionUseCase, OpeningBalanceDraft};
 
 const MICRO: i64 = 1_000_000;
@@ -53,6 +55,37 @@ pub struct Trade {
     pub note: Option<String>,
 }
 
+/// A deposit or a withdrawal as typed: cash of the account, so no asset and no quantity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CashAmount {
+    /// The account's name as typed.
+    pub account: String,
+    /// The date, or `None` for today.
+    pub date: Option<String>,
+    /// The amount in the account's currency (micro-units).
+    pub amount: i64,
+    /// Optional note.
+    pub note: Option<String>,
+}
+
+/// A dividend as typed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DividendAmount {
+    /// The account's name as typed.
+    pub account: String,
+    /// The paying asset's name or reference as typed.
+    pub asset: String,
+    /// The date, or `None` for today.
+    pub date: Option<String>,
+    /// The amount received, in the asset's currency (micro-units).
+    pub amount: i64,
+    /// Exchange rate from the asset's currency to the account's (micro-units), or `None`
+    /// for 1 (CLI-014).
+    pub rate: Option<i64>,
+    /// Optional note.
+    pub note: Option<String>,
+}
+
 /// A command that records a transaction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Recording {
@@ -66,6 +99,25 @@ pub enum Recording {
     /// A purchase.
     Buy(Trade),
     /// A sale.
+    Sell(Trade),
+    /// A deposit of cash into the account (CSH-022).
+    Deposit(CashAmount),
+    /// A withdrawal of cash from the account (CSH-032).
+    Withdrawal(CashAmount),
+    /// A dividend a held asset paid (DIV-023).
+    Dividend(DividendAmount),
+}
+
+/// Which way cash moves.
+enum Cash {
+    PaidIn,
+    TakenOut,
+}
+
+/// A recording on a holding: what `Recording` holds besides cash and dividends.
+enum OnHolding {
+    Open { target: Target, total_cost: i64 },
+    Buy(Trade),
     Sell(Trade),
 }
 
@@ -87,8 +139,8 @@ pub struct Recorded {
     pub account_name: String,
     /// The account's currency.
     pub currency: String,
-    /// The asset's reference.
-    pub asset_reference: String,
+    /// The asset's reference; none for a deposit or a withdrawal, which are cash.
+    pub asset_reference: Option<String>,
     /// An opening balance of zero cost (TRX-065).
     pub zero_cost: bool,
 }
@@ -195,6 +247,16 @@ impl HoldingTransactionUseCase {
         correction: Correction,
     ) -> Result<Transaction, Refusal> {
         let recorded = self.recorded_by(transaction_id, session).await?;
+        // AGT-061 — a deposit, a withdrawal or a dividend is cancelled and recorded again.
+        if !matches!(
+            recorded.transaction_type,
+            TransactionType::OpeningBalance | TransactionType::Purchase | TransactionType::Sell
+        ) {
+            return Err(Refusal {
+                code: "InvalidArguments".to_string(),
+                message: "a deposit, a withdrawal or a dividend is not corrected: cancel it and record it again".to_string(),
+            });
+        }
         // TRX-047 — an opening balance has a quantity, a total cost and a date, nothing else.
         if recorded.transaction_type == TransactionType::OpeningBalance
             && (correction.price.is_some()
@@ -307,9 +369,92 @@ impl HoldingTransactionUseCase {
     /// what was typed, then the transaction through the rules of the window. `today` is the
     /// date used when the recording gives none.
     pub async fn record_named(&self, command: Recording, today: &str) -> Result<Recorded, Refusal> {
+        match command {
+            Recording::Open { target, total_cost } => {
+                self.record_on_holding(OnHolding::Open { target, total_cost }, today)
+                    .await
+            }
+            Recording::Buy(trade) => self.record_on_holding(OnHolding::Buy(trade), today).await,
+            Recording::Sell(trade) => self.record_on_holding(OnHolding::Sell(trade), today).await,
+            Recording::Deposit(cash) => self.record_cash(cash, Cash::PaidIn, today).await,
+            Recording::Withdrawal(cash) => self.record_cash(cash, Cash::TakenOut, today).await,
+            Recording::Dividend(dividend) => self.record_dividend_named(dividend, today).await,
+        }
+    }
+
+    /// CLI-027 — a deposit or a withdrawal: the account found by its name, the cash moved
+    /// through the rules of the window.
+    async fn record_cash(
+        &self,
+        cash: CashAmount,
+        way: Cash,
+        today: &str,
+    ) -> Result<Recorded, Refusal> {
+        let account = self
+            .find_account_by_name(&cash.account)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let date = cash.date.unwrap_or_else(|| today.to_string());
+        let recorded = match way {
+            Cash::PaidIn => {
+                self.record_deposit(&account.id, date, cash.amount, cash.note)
+                    .await
+            }
+            Cash::TakenOut => {
+                self.record_withdrawal(&account.id, date, cash.amount, cash.note)
+                    .await
+            }
+        };
+        recorded
+            .map(|transaction| Recorded {
+                transaction: Box::new(transaction),
+                account_name: account.name,
+                currency: account.currency,
+                asset_reference: None,
+                zero_cost: false,
+            })
+            .map_err(|error| refusal_from_account(&error))
+    }
+
+    /// CLI-028 — a dividend: the account and the paying asset found by what was typed, the
+    /// dividend recorded through the rules of the window.
+    async fn record_dividend_named(
+        &self,
+        dividend: DividendAmount,
+        today: &str,
+    ) -> Result<Recorded, Refusal> {
+        let found = self
+            .find_by_name(&dividend.account, &dividend.asset)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let date = dividend.date.unwrap_or_else(|| today.to_string());
+        self.record_dividend(
+            &found.account_id,
+            found.asset_id.clone(),
+            date,
+            dividend.amount,
+            dividend.rate.unwrap_or(MICRO),
+            dividend.note,
+        )
+        .await
+        .map(|transaction| Recorded {
+            transaction: Box::new(transaction),
+            account_name: found.account_name,
+            currency: found.currency,
+            asset_reference: Some(found.asset_reference),
+            zero_cost: false,
+        })
+        .map_err(|error| refusal_from_dividend(&error))
+    }
+
+    async fn record_on_holding(
+        &self,
+        command: OnHolding,
+        today: &str,
+    ) -> Result<Recorded, Refusal> {
         let target = match &command {
-            Recording::Open { target, .. } => target,
-            Recording::Buy(trade) | Recording::Sell(trade) => &trade.target,
+            OnHolding::Open { target, .. } => target,
+            OnHolding::Buy(trade) | OnHolding::Sell(trade) => &trade.target,
         };
         let found = match self.find_by_name(&target.account, &target.asset).await {
             Ok(found) => found,
@@ -318,7 +463,7 @@ impl HoldingTransactionUseCase {
         let date = target.date.clone().unwrap_or_else(|| today.to_string());
         // TRX-065 — the core says whether an opening balance calls for the warning.
         let zero_cost = match &command {
-            Recording::Open { target, total_cost } => self
+            OnHolding::Open { target, total_cost } => self
                 .validate_opening_balance_draft(&OpeningBalanceDraft {
                     account_id: found.account_id.clone(),
                     asset_id: found.asset_id.clone(),
@@ -327,10 +472,10 @@ impl HoldingTransactionUseCase {
                     total_cost: Some(*total_cost),
                 })
                 .is_ok_and(|preview| preview.zero_cost),
-            Recording::Buy(_) | Recording::Sell(_) => false,
+            OnHolding::Buy(_) | OnHolding::Sell(_) => false,
         };
         let result = match command {
-            Recording::Open { target, total_cost } => self
+            OnHolding::Open { target, total_cost } => self
                 .open_holding(
                     &found.account_id,
                     found.asset_id.clone(),
@@ -340,7 +485,7 @@ impl HoldingTransactionUseCase {
                 )
                 .await
                 .map_err(|error| refusal_from_open(&error)),
-            Recording::Buy(trade) => {
+            OnHolding::Buy(trade) => {
                 let (unit_price, total) = split(&trade);
                 self.buy_holding(
                     &found.account_id,
@@ -356,7 +501,7 @@ impl HoldingTransactionUseCase {
                 .await
                 .map_err(|error| refusal_from_account(&error))
             }
-            Recording::Sell(trade) => {
+            OnHolding::Sell(trade) => {
                 let (unit_price, total) = split(&trade);
                 self.sell_holding(
                     &found.account_id,
@@ -377,7 +522,7 @@ impl HoldingTransactionUseCase {
             transaction: Box::new(transaction),
             account_name: found.account_name,
             currency: found.currency,
-            asset_reference: found.asset_reference,
+            asset_reference: Some(found.asset_reference),
             zero_cost,
         })
     }
@@ -459,17 +604,27 @@ pub fn decimal_to_micro(text: &str) -> Option<i64> {
     Some(if negative { -micros } else { micros })
 }
 
-/// CLI-011 — a name the use case could not resolve, naming only what was typed.
+/// CLI-011 — a name the use case could not resolve, naming only what was typed, with any
+/// control character escaped: the sentence is printed to a terminal and read by an agent.
 fn refusal_from_lookup(error: &NameLookupError) -> Refusal {
     let message = match error {
-        NameLookupError::AccountNotFound { typed } => format!("no account named \"{typed}\""),
+        NameLookupError::AccountNotFound { typed } => {
+            format!("no account named \"{}\"", typed.escape_debug())
+        }
         NameLookupError::AccountAmbiguous { typed } => {
-            format!("more than one account is named \"{typed}\"")
+            format!(
+                "more than one account is named \"{}\"",
+                typed.escape_debug()
+            )
         }
         NameLookupError::AssetNotFound { typed } => {
-            format!("no asset matches \"{typed}\" by name, reference or ISIN")
+            format!(
+                "no asset matches \"{}\" by name, reference or ISIN",
+                typed.escape_debug()
+            )
         }
         NameLookupError::AssetAmbiguous { typed } => {
+            let typed = typed.escape_debug();
             format!(
                 "\"{typed}\" matches more than one asset — use its name, its ISIN, or its reference with its exchange (ASML@XAMS)"
             )
@@ -521,6 +676,25 @@ fn refusal_from_open(error: &OpenHoldingError) -> Refusal {
     }
 }
 
+/// CLI-021 — a dividend's rejection keeps its code; the sentence is the command line's.
+fn refusal_from_dividend(error: &DividendError) -> Refusal {
+    match error {
+        DividendError::Account(error) => refusal_from_account(error),
+        DividendError::UseCase(task) => Refusal {
+            code: code_of(task),
+            message: match task {
+                DividendTask::AssetNotFound => "the asset no longer exists".to_string(),
+                DividendTask::AssetNotHeld => {
+                    "nothing of this asset is held in the account".to_string()
+                }
+                DividendTask::DividendOnCashAsset => {
+                    "a dividend cannot be recorded on cash".to_string()
+                }
+            },
+        },
+    }
+}
+
 /// CLI-021 — a recording rejection keeps its code; the sentence is the command line's. Every
 /// variant is named, so a new one fails to compile until it has a sentence.
 fn refusal_from_account(error: &AccountError) -> Refusal {
@@ -536,9 +710,7 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
             decimal(*available),
             decimal(*requested)
         ),
-        AccountError::InsufficientCash { .. } => {
-            "not enough cash in the account for this purchase".to_string()
-        }
+        AccountError::InsufficientCash { .. } => "not enough cash in the account".to_string(),
         AccountError::ClosedPosition => "nothing of this asset is held in the account".to_string(),
         AccountError::CascadingOversell => {
             "this would leave a later sale above the quantity held".to_string()
@@ -557,20 +729,19 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
         AccountError::FeesNegative => "the fees cannot be negative".to_string(),
         AccountError::ExchangeRateNotPositive => "the exchange rate must be above zero".to_string(),
         AccountError::TotalAmountNotPositive => "the total must be above zero".to_string(),
+        AccountError::AmountNotPositive => "the amount must be above zero".to_string(),
         AccountError::TotalAmountBelowFees => "the total is below the fees it includes".to_string(),
         AccountError::InvalidTotalCost => "the total cost cannot be negative".to_string(),
         AccountError::AccountNotFound { .. } => "the account no longer exists".to_string(),
         AccountError::DatabaseError | AccountError::ApplicationWriteOutranked => {
             "the portfolio could not be read or written".to_string()
         }
-        // Rejections of other operations, which an opening balance, a purchase or a sale
-        // never meets.
+        // Rejections of other operations, which no recording by name meets.
         AccountError::NameEmpty
         | AccountError::InvalidCurrency { .. }
         | AccountError::NegativeQuantity
         | AccountError::NegativeAveragePrice
         | AccountError::TransactionNotFound
-        | AccountError::AmountNotPositive
         | AccountError::SplitFactorNotPositive
         | AccountError::SplitFactorIsOne
         | AccountError::SplitOnCashAsset
@@ -728,6 +899,63 @@ mod tests {
         );
         let through = refusal_from_open(&OpenHoldingError::Account(AccountError::DateInFuture));
         assert_eq!(through.code, "DateInFuture");
+    }
+
+    // CLI-011 / AGT-042 — what was typed is repeated with its control characters escaped:
+    // the sentence reaches a terminal and an agent.
+    #[test]
+    fn cli_011_a_lookup_refusal_escapes_what_was_typed() {
+        let typed = "PEA\u{1b}[2J\nRecorded:".to_string();
+        for error in [
+            NameLookupError::AccountNotFound {
+                typed: typed.clone(),
+            },
+            NameLookupError::AccountAmbiguous {
+                typed: typed.clone(),
+            },
+            NameLookupError::AssetNotFound {
+                typed: typed.clone(),
+            },
+            NameLookupError::AssetAmbiguous {
+                typed: typed.clone(),
+            },
+        ] {
+            let message = refusal_from_lookup(&error).message;
+            assert!(message.contains("PEA\\u{1b}[2J\\nRecorded:"), "{message}");
+            assert!(!message.chars().any(char::is_control), "{message}");
+        }
+    }
+
+    // CLI-021 — a dividend's rejections keep their code, each with its sentence.
+    #[test]
+    fn cli_021_dividend_rejections_keep_their_code() {
+        for (task, code, message) in [
+            (
+                DividendTask::AssetNotHeld,
+                "AssetNotHeld",
+                "nothing of this asset is held in the account",
+            ),
+            (
+                DividendTask::AssetNotFound,
+                "AssetNotFound",
+                "the asset no longer exists",
+            ),
+            (
+                DividendTask::DividendOnCashAsset,
+                "DividendOnCashAsset",
+                "a dividend cannot be recorded on cash",
+            ),
+        ] {
+            let refusal = refusal_from_dividend(&DividendError::UseCase(task));
+            assert_eq!(
+                (refusal.code.as_str(), refusal.message.as_str()),
+                (code, message)
+            );
+        }
+        let refusal =
+            refusal_from_dividend(&DividendError::Account(AccountError::AmountNotPositive));
+        assert_eq!(refusal.code, "AmountNotPositive");
+        assert_eq!(refusal.message, "the amount must be above zero");
     }
 
     // CLI-011 — a name the use case could not resolve keeps its code and names only what was

@@ -793,6 +793,188 @@ async fn agt_050_a_session_corrects_and_cancels_what_it_recorded() {
     assert_eq!(told.last_recording, None);
 }
 
+// AGT-060 / AGT-061 — a session records a deposit, a withdrawal and a dividend through the
+// rules of the window: each is marked and counted, cancelled like any recording, never
+// corrected.
+#[tokio::test]
+async fn agt_060_a_session_records_cash_and_a_dividend() {
+    use crate::context::account::TransactionType;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+
+    let deposit = call(
+        "record_deposit",
+        json!({ "account": "pea", "amount": "1500.5", "date": "2019-01-15", "note": "statement 2019" }),
+    )
+    .await
+    .expect("deposited");
+    assert_eq!(deposit["status"], "recorded");
+    assert_eq!(deposit["transaction"]["transaction_type"], "Deposit");
+    assert_eq!(deposit["transaction"]["total_amount"], 1_500_500_000_i64);
+    assert_eq!(deposit["transaction"]["note"], "statement 2019");
+    assert_eq!(deposit["account"], "PEA");
+    assert_eq!(deposit["asset"], Value::Null);
+
+    // A withdrawal above the cash the account held on that date is the window's refusal.
+    let overdrawn = call(
+        "record_withdrawal",
+        json!({ "account": "PEA", "amount": 2000, "date": "2019-02-01" }),
+    )
+    .await
+    .expect_err("refused");
+    assert_eq!(overdrawn.code, "InsufficientCash");
+    let withdrawal = call(
+        "record_withdrawal",
+        json!({ "account": "PEA", "amount": 500, "date": "2019-02-01" }),
+    )
+    .await
+    .expect("withdrawn");
+    assert_eq!(withdrawal["transaction"]["transaction_type"], "Withdrawal");
+
+    // A dividend of an asset the account does not hold is refused; held, it is recorded
+    // in the account's currency at the rate given.
+    let not_held = call(
+        "record_dividend",
+        json!({ "account": "PEA", "asset": "CW8", "amount": 10, "date": "2019-03-01" }),
+    )
+    .await
+    .expect_err("refused");
+    assert_eq!(not_held.code, "AssetNotHeld");
+    call(
+        "record_purchase",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 2, "price": 100, "date": "2019-03-01" }),
+    )
+    .await
+    .expect("bought");
+    let dividend = call(
+        "record_dividend",
+        json!({ "account": "PEA", "asset": "cw8", "amount": "10", "rate": 0.5, "date": "2019-06-01" }),
+    )
+    .await
+    .expect("paid");
+    assert_eq!(dividend["transaction"]["transaction_type"], "Dividend");
+    assert_eq!(dividend["transaction"]["total_amount"], 5 * M);
+    assert_eq!(dividend["asset"], "CW8");
+
+    // What is missing or misread is refused as for any recording (AGT-048).
+    for (tool, arguments, code) in [
+        (
+            "record_deposit",
+            json!({ "account": "PEA" }),
+            "MissingArgument",
+        ),
+        ("record_deposit", json!({ "amount": 1 }), "MissingArgument"),
+        (
+            "record_deposit",
+            json!({ "account": "PEA", "amount": "1,5" }),
+            "InvalidFigure",
+        ),
+        (
+            "record_deposit",
+            json!({ "account": "PEA", "amount": 0 }),
+            "AmountNotPositive",
+        ),
+        (
+            "record_withdrawal",
+            json!({ "account": "NOPE", "amount": 1 }),
+            "AccountNotFound",
+        ),
+        (
+            "record_dividend",
+            json!({ "account": "PEA", "amount": 1 }),
+            "MissingArgument",
+        ),
+        (
+            "record_dividend",
+            json!({ "account": "PEA", "asset": "NOPE", "amount": 1 }),
+            "AssetNotFound",
+        ),
+        (
+            "record_deposit",
+            json!({ "account": "PEA", "amount": 1, "date": 20190101 }),
+            "InvalidArguments",
+        ),
+    ] {
+        assert_eq!(
+            call(tool, arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{tool} {arguments}"
+        );
+    }
+
+    // Each is marked with the session and counted; the last one is what the window names.
+    for recorded in [&deposit, &withdrawal, &dividend] {
+        let mark = bench
+            .accounts
+            .agent_recording_of(&recorded_id(recorded))
+            .await
+            .expect("read")
+            .expect("a mark");
+        assert_eq!(mark.session, granted.key);
+        assert_eq!(mark.agent, "claude-code");
+    }
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.recordings, 4);
+    let last = told.last_recording.expect("a last recording");
+    assert_eq!(last.kind, TransactionType::Dividend);
+    assert_eq!(
+        (last.asset.as_str(), last.date.as_str()),
+        ("CW8", "2019-06-01")
+    );
+
+    // Never corrected: cancelled and recorded again.
+    for recorded in [&deposit, &withdrawal, &dividend] {
+        let refusal = call(
+            "correct_recording",
+            json!({ "transaction": recorded_id(recorded), "date": "2019-07-01" }),
+        )
+        .await
+        .expect_err("refused");
+        assert_eq!(refusal.code, "InvalidArguments");
+        assert_eq!(
+            refusal.message,
+            "a deposit, a withdrawal or a dividend is not corrected: cancel it and record it again"
+        );
+    }
+    let cancelled = call(
+        "cancel_recording",
+        json!({ "transaction": recorded_id(&dividend) }),
+    )
+    .await
+    .expect("cancelled");
+    assert_eq!(cancelled["status"], "cancelled");
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.recordings, 3);
+    // The purchase is the last recorded that is left; a deposit names the Cash Asset.
+    call(
+        "cancel_recording",
+        json!({ "transaction": recorded_id(&withdrawal) }),
+    )
+    .await
+    .expect("cancelled");
+    let deposit_again = call("record_deposit", json!({ "account": "PEA", "amount": 1 }))
+        .await
+        .expect("deposited");
+    assert_eq!(deposit_again["asset"], Value::Null);
+    let last = bench
+        .connections
+        .sessions()
+        .remove(0)
+        .last_recording
+        .expect("a last recording");
+    assert_eq!(last.kind, TransactionType::Deposit);
+    assert_eq!(last.asset, "EUR");
+}
+
 // AGT-051 — a transaction the owner typed, one another session recorded and one that does
 // not exist are refused alike, in the same words: nothing is said of what exists.
 #[tokio::test]
