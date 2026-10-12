@@ -10,8 +10,11 @@
 mod api;
 /// Use-case-owned typed errors (composite + application leaf).
 mod error;
-/// Cross-BC orchestrator (one struct, one method per operation).
+/// Listing by what a person named (AGT-070).
+mod named_listing;
+/// Recording by what a person named (CLI-011, AGT-044).
 mod named_recording;
+/// Cross-BC orchestrator (one struct, one method per operation).
 mod orchestrator;
 /// Shared helpers used by the orchestrator.
 mod shared;
@@ -22,6 +25,9 @@ pub use error::{
     DividendError, DividendTask, FreeSharesError, FreeSharesTask, InterestError, InterestTask,
     ManagementFeeError, ManagementFeeTask, NameLookupError, OpenHoldingError, OpenHoldingTask,
     SplitError, SplitTask, TransactionDraftError, TransactionDraftTask,
+};
+pub use named_listing::{
+    ListedTransaction, ListedTransactions, RecordedBy, TransactionsAsked, TRANSACTIONS_PER_PAGE,
 };
 pub use named_recording::{
     code_of, decimal, decimal_to_micro, CashAmount, Correction, DividendAmount, FreeShares,

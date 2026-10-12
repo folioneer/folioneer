@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::context::account::{AccountError, AccountServiceContract, AgentRecording};
+use crate::context::account::{
+    AccountError, AccountServiceContract, AgentRecording, TransactionType,
+};
 use crate::context::asset::{
     Asset, AssetClass, AssetCreationDefaults, AssetError, AssetKind, AssetServiceContract,
     NamedAsset,
@@ -16,7 +18,8 @@ use crate::use_cases::account_details::AccountDetailsUseCase;
 use crate::use_cases::account_summary::AccountSummaryUseCase;
 use crate::use_cases::holding_transaction::{
     code_of, decimal_to_micro, CashAmount, Correction, DividendAmount, FreeShares,
-    HoldingTransactionUseCase, PriceAt, Recording, StockSplit, Target, Trade, TradeAmount,
+    HoldingTransactionUseCase, PriceAt, RecordedBy, Recording, StockSplit, Target, Trade,
+    TradeAmount, TransactionsAsked,
 };
 
 use super::connections::{Granted, LastRecording, MAX_RECORDINGS};
@@ -230,6 +233,7 @@ impl AgentTools {
                 let rows: Vec<AssetRow> = assets.into_iter().map(AssetRow::from).collect();
                 as_json(&rows)
             }
+            "list_transactions" => self.list_transactions(granted, arguments).await,
             "list_holdings" => {
                 let account = text(arguments, "account")?;
                 // AGT-043 — a date that is not text is refused, never read as today.
@@ -333,6 +337,78 @@ impl AgentTools {
             "price": recorded.price,
             "asset": recorded.asset_reference,
             "currency": recorded.currency,
+        }))
+    }
+
+    /// AGT-070 — the transactions of an account, one page at a time, each with who recorded
+    /// it: the owner, an agent, or this session.
+    async fn list_transactions(
+        &self,
+        granted: &Granted,
+        arguments: &Value,
+    ) -> Result<Value, Refusal> {
+        // A date that is not text is refused, never read as no bound (AGT-043).
+        let date = |name: &str| {
+            optional_text(arguments, name).map_err(|_| Refusal {
+                code: "InvalidDate".to_string(),
+                message: format!("{name} is not a date written YYYY-MM-DD"),
+            })
+        };
+        let asked = TransactionsAsked {
+            account: text(arguments, "account")?.to_string(),
+            asset: optional_text(arguments, "asset")?,
+            from: date("from")?,
+            to: date("to")?,
+            kind: transaction_type(arguments)?,
+            recorded_by: recorded_by(arguments, &granted.key)?,
+            page: page(arguments)?,
+        };
+        let listed = self
+            .recorder
+            .list_named(asked)
+            .await
+            .map_err(|refusal| Refusal {
+                code: refusal.code,
+                message: refusal.message,
+            })?;
+        let rows: Vec<Value> = listed
+            .transactions
+            .into_iter()
+            .map(|row| {
+                let transaction = row.transaction;
+                // The words `recorded_by` filters with: no mark on this computer is the
+                // owner's, this session's mark is `session`, any other `agent`.
+                let recorded_by = match row.recorded_by {
+                    None => serde_json::json!({ "by": "owner" }),
+                    Some(mark) => serde_json::json!({
+                        "by": if mark.session == granted.key { "session" } else { "agent" },
+                        "agent": mark.agent,
+                        "session_started_at": mark.session_started_at,
+                    }),
+                };
+                serde_json::json!({
+                    "id": transaction.id,
+                    "date": transaction.date,
+                    "transaction_type": transaction.transaction_type,
+                    "asset": row.asset_reference,
+                    "quantity": transaction.quantity,
+                    "unit_price": transaction.unit_price,
+                    "total_amount": transaction.total_amount,
+                    "fees": transaction.fees,
+                    "exchange_rate": transaction.exchange_rate,
+                    "note": transaction.note,
+                    "recorded_by": recorded_by,
+                })
+            })
+            .collect();
+        Ok(serde_json::json!({
+            "status": "listed",
+            "account": listed.account_name,
+            "currency": listed.currency,
+            "total": listed.total,
+            "page": listed.page,
+            "pages": listed.pages,
+            "transactions": rows,
         }))
     }
 
@@ -565,6 +641,53 @@ fn whole(arguments: &Value, name: &str) -> Result<i64, Refusal> {
         let shown: String = typed.chars().take(40).collect();
         not_whole(&format!(": \"{}\"", shown.escape_debug()))
     })
+}
+
+/// AGT-070 — `transaction_type` as one of the types a transaction has, case ignored.
+fn transaction_type(arguments: &Value) -> Result<Option<TransactionType>, Refusal> {
+    let Some(typed) = optional_text(arguments, "transaction_type")? else {
+        return Ok(None);
+    };
+    TransactionType::named(&typed)
+        .map(Some)
+        .ok_or_else(|| Refusal {
+            code: "InvalidArguments".to_string(),
+            message: format!(
+                "transaction_type is not one of {}",
+                TransactionType::names().join(", ")
+            ),
+        })
+}
+
+/// AGT-070 — `recorded_by` as `owner`, `agent` or `session`, this session being `session`.
+fn recorded_by(arguments: &Value, session: &str) -> Result<Option<RecordedBy>, Refusal> {
+    let Some(typed) = optional_text(arguments, "recorded_by")? else {
+        return Ok(None);
+    };
+    match typed.trim().to_lowercase().as_str() {
+        "owner" => Ok(Some(RecordedBy::Owner)),
+        "agent" => Ok(Some(RecordedBy::Agent)),
+        "session" => Ok(Some(RecordedBy::Session(session.to_string()))),
+        _ => Err(Refusal {
+            code: "InvalidArguments".to_string(),
+            message: "recorded_by is not one of owner, agent, session".to_string(),
+        }),
+    }
+}
+
+/// AGT-070 — `page` as a whole number from 1; left out, the first.
+fn page(arguments: &Value) -> Result<usize, Refusal> {
+    match arguments.get("page") {
+        None | Some(Value::Null) => Ok(1),
+        Some(value) => value
+            .as_u64()
+            .filter(|page| *page >= 1)
+            .and_then(|page| usize::try_from(page).ok())
+            .ok_or_else(|| Refusal {
+                code: "InvalidArguments".to_string(),
+                message: "page is not a whole number from 1".to_string(),
+            }),
+    }
 }
 
 /// AGT-064 — the longest name and reference an agent gives an asset, in characters.

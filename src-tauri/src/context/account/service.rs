@@ -1710,6 +1710,12 @@ pub trait AccountServiceContract: Send + Sync {
         &self,
         session: &str,
     ) -> StdResult<Vec<SessionRecording>, AccountError>;
+    /// The account journal of an account, the rows the filter keeps (TXL-060).
+    async fn get_account_journal(
+        &self,
+        account_id: &str,
+        filter: &JournalFilter,
+    ) -> StdResult<AccountJournal, AccountError>;
     /// Retrieves a transaction by ID.
     async fn get_transaction_by_id(&self, id: &str)
         -> StdResult<Option<Transaction>, AccountError>;
@@ -1981,6 +1987,14 @@ impl AccountServiceContract for AccountService {
         session: &str,
     ) -> StdResult<Vec<SessionRecording>, AccountError> {
         AccountService::recorded_in_session(self, session).await
+    }
+
+    async fn get_account_journal(
+        &self,
+        account_id: &str,
+        filter: &JournalFilter,
+    ) -> StdResult<AccountJournal, AccountError> {
+        AccountService::get_account_journal(self, account_id, filter).await
     }
 
     async fn get_transaction_by_id(

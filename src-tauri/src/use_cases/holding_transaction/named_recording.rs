@@ -788,7 +788,7 @@ pub fn decimal_to_micro(text: &str) -> Option<i64> {
 
 /// CLI-011 — a name the use case could not resolve, naming only what was typed, with any
 /// control character escaped: the sentence is printed to a terminal and read by an agent.
-fn refusal_from_lookup(error: &NameLookupError) -> Refusal {
+pub(super) fn refusal_from_lookup(error: &NameLookupError) -> Refusal {
     let message = match error {
         NameLookupError::AccountNotFound { typed } => {
             format!("no account named \"{}\"", typed.escape_debug())

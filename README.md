@@ -149,7 +149,7 @@ folioneer holding buy --help  # one command's options and defaults
 
 ## Agents (Model Context Protocol)
 
-An agent — Claude Code, Claude Desktop — can read the portfolio, add an asset it does not have yet and record opening balances, purchases, sales, dividends, deposits, withdrawals, splits, free shares and prices through the application while it is open, on Linux and on Windows. Nothing answers when Folioneer is closed.
+An agent — Claude Code, Claude Desktop — can read the portfolio, an account's transactions included, add an asset it does not have yet and record opening balances, purchases, sales, dividends, deposits, withdrawals, splits, free shares and prices through the application while it is open, on Linux and on Windows. Nothing answers when Folioneer is closed.
 
 1. In Folioneer, **Settings → Allow agents to connect** (off by default).
 2. Tell the agent how to start the bridge, which is the installed program with `--mcp`:

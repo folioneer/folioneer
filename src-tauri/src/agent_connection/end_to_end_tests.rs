@@ -1669,3 +1669,212 @@ async fn agt_064_a_session_adds_an_asset_of_each_kind() {
     .expect_err("refused");
     assert_eq!(past_the_limit.code, "SessionLimitReached");
 }
+
+// AGT-070 — a session lists an account's transactions, oldest first and in pages, with the
+// id of each and who recorded it: the owner, an agent, or this session. It is a read.
+#[tokio::test]
+async fn agt_070_a_session_lists_the_transactions_of_an_account() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let other = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+
+    // The owner typed a deposit on 2026-01-02 (the seed); this session records two
+    // transactions and another session one.
+    call(
+        "record_deposit",
+        json!({ "account": "PEA", "amount": 2000, "date": "2019-01-15" }),
+    )
+    .await
+    .expect("deposited");
+    let purchase = call(
+        "record_purchase",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 10, "price": 100, "date": "2019-03-01", "note": "statement 2019" }),
+    )
+    .await
+    .expect("bought");
+    bench
+        .tools
+        .call(
+            &other,
+            "record_deposit",
+            &json!({ "account": "PEA", "amount": 50, "date": "2019-05-01" }),
+        )
+        .await
+        .expect("deposited by another session");
+
+    let all = call("list_transactions", json!({ "account": "pea" }))
+        .await
+        .expect("listed");
+    assert_eq!(all["status"], "listed");
+    assert_eq!(all["account"], "PEA");
+    assert_eq!(all["currency"], "EUR");
+    assert_eq!(
+        (
+            all["total"].clone(),
+            all["page"].clone(),
+            all["pages"].clone()
+        ),
+        (json!(4), json!(1), json!(1))
+    );
+    let rows = all["transactions"].as_array().expect("transactions");
+    let seen: Vec<(&str, &str, &str)> = rows
+        .iter()
+        .map(|row| {
+            (
+                row["date"].as_str().expect("a date"),
+                row["transaction_type"].as_str().expect("a type"),
+                row["recorded_by"]["by"].as_str().expect("who"),
+            )
+        })
+        .collect();
+    assert_eq!(
+        seen,
+        [
+            ("2019-01-15", "Deposit", "session"),
+            ("2019-03-01", "Purchase", "session"),
+            ("2019-05-01", "Deposit", "agent"),
+            ("2026-01-02", "Deposit", "owner"),
+        ]
+    );
+    // A row says what a recording's answer says: the id, the figures in millionths, the
+    // asset by its reference — none for cash — the note, and the agent that recorded it.
+    let bought = &rows[1];
+    assert_eq!(bought["id"], purchase["transaction"]["id"]);
+    assert_eq!(bought["asset"], "CW8");
+    assert_eq!(bought["quantity"], 10 * M);
+    assert_eq!(bought["unit_price"], 100 * M);
+    assert_eq!(bought["total_amount"], 1_000 * M);
+    assert_eq!(bought["fees"], 0);
+    assert_eq!(bought["exchange_rate"], M);
+    assert_eq!(bought["note"], "statement 2019");
+    assert_eq!(bought["recorded_by"]["agent"], "claude-code");
+    assert_eq!(rows[0]["asset"], Value::Null);
+    assert_eq!(rows[3]["recorded_by"], json!({ "by": "owner" }));
+
+    // Each filter keeps its rows, and they combine.
+    for (arguments, dates) in [
+        (
+            json!({ "account": "PEA", "asset": "cw8" }),
+            vec!["2019-03-01"],
+        ),
+        (
+            json!({ "account": "PEA", "from": "2019-02-01", "to": "2019-12-31" }),
+            vec!["2019-03-01", "2019-05-01"],
+        ),
+        (
+            json!({ "account": "PEA", "transaction_type": "deposit" }),
+            vec!["2019-01-15", "2019-05-01", "2026-01-02"],
+        ),
+        (
+            json!({ "account": "PEA", "recorded_by": "owner" }),
+            vec!["2026-01-02"],
+        ),
+        (
+            json!({ "account": "PEA", "recorded_by": "agent" }),
+            vec!["2019-01-15", "2019-03-01", "2019-05-01"],
+        ),
+        (
+            json!({ "account": "PEA", "recorded_by": "session" }),
+            vec!["2019-01-15", "2019-03-01"],
+        ),
+        (
+            json!({ "account": "PEA", "recorded_by": "session", "transaction_type": "Deposit", "to": "2019-01-15" }),
+            vec!["2019-01-15"],
+        ),
+        (json!({ "account": "PEA", "from": "2030-01-01" }), vec![]),
+    ] {
+        let listed = call("list_transactions", arguments.clone())
+            .await
+            .expect("listed");
+        let found: Vec<&str> = listed["transactions"]
+            .as_array()
+            .expect("transactions")
+            .iter()
+            .map(|row| row["date"].as_str().expect("a date"))
+            .collect();
+        assert_eq!(found, dates, "{arguments}");
+    }
+
+    // What is missing or misread is refused, naming only what was sent (AGT-042).
+    for (arguments, code) in [
+        (json!({}), "MissingArgument"),
+        (json!({ "account": "NOPE" }), "AccountNotFound"),
+        (
+            json!({ "account": "PEA", "asset": "NOPE" }),
+            "AssetNotFound",
+        ),
+        (
+            json!({ "account": "PEA", "from": "january" }),
+            "InvalidDate",
+        ),
+        (json!({ "account": "PEA", "to": 20190101 }), "InvalidDate"),
+        (
+            json!({ "account": "PEA", "transaction_type": "transfer" }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "account": "PEA", "recorded_by": "me" }),
+            "InvalidArguments",
+        ),
+        (json!({ "account": "PEA", "page": 0 }), "InvalidArguments"),
+        (
+            json!({ "account": "PEA", "page": "two" }),
+            "InvalidArguments",
+        ),
+    ] {
+        assert_eq!(
+            call("list_transactions", arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{arguments}"
+        );
+    }
+
+    // It is a read: counted as one each time it is answered, never as a recording, and the
+    // id it gives is the one this session cancels with.
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.reads, 9);
+    assert_eq!(told.recordings, 2);
+    assert!(granted.may_record_one_more());
+    call(
+        "cancel_recording",
+        json!({ "transaction": bought["id"].clone() }),
+    )
+    .await
+    .expect("cancelled by the listed id");
+
+    // A page holds 100 transactions: one more than a page makes two.
+    let account = bench.accounts.get_all().await.expect("accounts").remove(0);
+    for day in 1..=98 {
+        bench
+            .accounts
+            .record_deposit(&account.id, format!("2020-01-{:02}", day % 28 + 1), M, None)
+            .await
+            .expect("deposit");
+    }
+    let first = call("list_transactions", json!({ "account": "PEA" }))
+        .await
+        .expect("listed");
+    assert_eq!(
+        (first["total"].clone(), first["pages"].clone()),
+        (json!(101), json!(2))
+    );
+    assert_eq!(first["transactions"].as_array().expect("rows").len(), 100);
+    let second = call("list_transactions", json!({ "account": "PEA", "page": 2 }))
+        .await
+        .expect("listed");
+    let last = second["transactions"].as_array().expect("rows");
+    assert_eq!(last.len(), 1);
+    assert_eq!(last[0]["date"], "2026-01-02");
+    let past = call("list_transactions", json!({ "account": "PEA", "page": 3 }))
+        .await
+        .expect("listed");
+    assert!(past["transactions"].as_array().expect("rows").is_empty());
+}

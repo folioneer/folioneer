@@ -192,6 +192,7 @@ mod tests {
                 "list_accounts",
                 "list_assets",
                 "list_holdings",
+                "list_transactions",
                 "record_opening_balance",
                 "record_purchase",
                 "record_sale",

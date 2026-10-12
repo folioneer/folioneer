@@ -20,6 +20,7 @@ use uuid::Uuid;
     Default,
     strum_macros::Display,
     strum_macros::EnumString,
+    strum_macros::EnumIter,
 )]
 pub enum TransactionType {
     /// A purchase (acquisition) of an asset.
@@ -45,6 +46,20 @@ pub enum TransactionType {
     /// Interest credited at zero cost: quantity rises, cost basis unchanged (INT-024);
     /// on the account's cash line it credits the balance directly (INT-023).
     Interest,
+}
+
+impl TransactionType {
+    /// The type `typed` names, case ignored: one of `names`.
+    pub fn named(typed: &str) -> Option<Self> {
+        use strum::IntoEnumIterator;
+        Self::iter().find(|kind| kind.to_string().eq_ignore_ascii_case(typed.trim()))
+    }
+
+    /// The name of every type, as a transaction carries it.
+    pub fn names() -> Vec<String> {
+        use strum::IntoEnumIterator;
+        Self::iter().map(|kind| kind.to_string()).collect()
+    }
 }
 
 /// A single financial event affecting an asset's quantity and cost basis within an account.

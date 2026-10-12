@@ -66,6 +66,26 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "list_transactions",
+            title: "List an account's transactions",
+            only_reads: true,
+            description: "The transactions of one account, oldest first, 100 to a page: each with its id — the one correct_recording and cancel_recording take — its date, transaction_type, asset, quantity, unit price, total, fees, exchange rate and note, and who recorded it (recorded_by.by): owner, agent — with the agent's name — or session, this session. owner means no agent recorded it on this computer. Read it before recording from a statement, so that nothing is recorded twice. Amounts and quantities are whole numbers of millionths: 1500000 is 1.5; a figure a transaction does not have is 0, and the quantity of a Split is its factor.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "account": { "type": "string", "description": "The account's name, as list_accounts gives it." },
+                    "asset": { "type": "string", "description": "Only this asset's transactions: its name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
+                    "from": { "type": "string", "description": "Only from this date on, YYYY-MM-DD." },
+                    "to": { "type": "string", "description": "Only up to this date, YYYY-MM-DD." },
+                    "transaction_type": { "type": "string", "description": "Only this type: Purchase, Sell, OpeningBalance, Deposit, Withdrawal, Dividend, FreeShares, ManagementFee, Split or Interest." },
+                    "recorded_by": { "type": "string", "description": "Only what the owner typed (owner), what an agent recorded (agent), or what this session recorded (session)." },
+                    "page": { "type": "integer", "description": "The page, from 1. Default: 1." }
+                },
+                "required": ["account"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
             name: "record_opening_balance",
             title: "Record an opening balance",
             only_reads: false,
