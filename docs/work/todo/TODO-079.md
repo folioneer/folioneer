@@ -9,3 +9,4 @@ Split from TODO-065 on 2026-10-11 with the owner. A recording made by an agent s
 **Open questions:**
 
 - [x] The notice on every view: the window's existing snackbar, or a new element? — The existing snackbar, one message per recording, a new one replacing the one before; no new element and no layout change, so no mock-up. Its sentences, in English and in French, are shown to the owner before they are coded (owner, 2026-10-11).
+- [x] The snackbar's sentences, and is an asset an agent adds announced too? — For a transaction: "{agent} recorded: Purchase · CW8 · 14/03/2019" ("{agent} a enregistré : Achat · CW8 · 14/03/2019") — its type, the asset's reference and the date, as the session dialog's "Last recording" shows them. For an added asset (TODO-063): "{agent} added an asset: Air Liquide (AI)" ("{agent} a ajouté un actif : Air Liquide (AI)"). A recorded price is not announced: the window is not told of it (owner, 2026-10-12).

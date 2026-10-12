@@ -8,4 +8,6 @@ The mock-up of the ask is `screenshots/design/061-*-ask.png`, validated by the o
 **User value:** The owner lets an agent replace a typed position by the rebuilt history, one transaction at a time, seeing exactly what goes.
 **Done when:** a removal of a transaction the owner typed is asked in the window, shown in full, refused by default, one at a time; a refusal gives the agent nothing; nothing of an answer is remembered for the next ask.
 **Design:** validated
-**Open questions:** none
+**Open questions:**
+
+- [x] The connection dialog says an agent corrects or cancels "never a transaction you typed": what does it say once an agent may ask to remove one? — "It can correct or cancel only what it recorded in this session; for a transaction you typed it can only ask you, one at a time — and it never reads a file, a setting or your sync folder." ("Il ne peut corriger ou annuler que ce qu'il a enregistré pendant cette session ; pour une transaction que vous avez saisie, il ne peut que vous demander, une à la fois — et ne lit jamais un fichier, un réglage ou votre dossier de synchronisation.") (owner, 2026-10-12).

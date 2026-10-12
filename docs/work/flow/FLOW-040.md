@@ -21,3 +21,4 @@
 - Costs: about an hour. Protects: the usage figures of an audit meaning what they say,
   and a rule that is passed over for three batches being either kept or changed.
 - Accepted by the owner on 2026-10-12, when the audit was handed over: ready to queue.
+- Decided with the owner on 2026-10-12, when it was queued: a contract amended by one row or one type is written by hand and goes to `contract-reviewer`; `/contract` is for a new command or a new contract. The workflow says so.

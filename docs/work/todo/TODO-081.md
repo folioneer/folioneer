@@ -10,4 +10,6 @@ To read when this is scheduled, none of it verified: the manifest's fields for a
 **User value:** The owner connects Claude Desktop to Folioneer by opening a file and confirming, without editing a configuration file.
 **Done when:** each release carries a `.mcpb` bundle beside its installers; opened in Claude Desktop on a computer where that release is installed, it installs without editing a file, and Claude Desktop then lists Folioneer's tools; the README says so, the block of JSON kept for the other clients; a test holds that the manifest names the tools' program as the release installs it.
 **Design:** none
-**Open questions:** none
+**Open questions:**
+
+- [x] The clause "opened in Claude Desktop … it installs … and lists Folioneer's tools" is checked at a screen, and the AppImage is wherever the owner saved it: what carries the entry? — The test that the manifest names the program as the Windows installer and the `.deb` install it, the bundle attached to each release, and the README. Opening it in Claude Desktop is the owner's own first use, not a gate: should it fail, that is a new entry. The AppImage keeps the block of JSON, which the README says (owner, 2026-10-12).
