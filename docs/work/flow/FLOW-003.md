@@ -17,3 +17,4 @@
   In 0.9.0, 4 rounds of 22 (18 %; 0.8.0: 11 of 30, 37 %): one counted, a fix after a
   review; none known to be a pull request sent round by another's merge — the entries
   were stacked again. The verdict stands.
+- 0.10.0 batch (2026-10-12): 22 rounds for 22 branches, none beyond the first — each entry was prepared behind the one in review and pushed once it had merged (`docs/workflow.md` § 11), so no merge sent another pull request round again. The verdict stands.

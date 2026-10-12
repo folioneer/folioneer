@@ -14,3 +14,4 @@
   sort; the figure argues for waiting until the share rises again.
 - 0.9.0: 4 later rounds in 22; one cause counted by hand, three not. The share stays
   low while entries are stacked; the figure still argues for waiting.
+- 0.10.0 batch (2026-10-12): no round came after the first, of 22: nothing to count. The batch before counted 1 cause of 4.

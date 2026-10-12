@@ -16,3 +16,4 @@
   #200 all the same: the local run had graded the write-time check against ADR-012 as a
   warning with a decision for the owner, CI's as a critical. The same finding, two
   grades: one round, and the decision the owner then took.
+- 0.10.0 batch (2026-10-12): 31 local reviewer launches, 7 real defects found before a push, and no Review failure in CI where the batch before had 2. The verdict stands.
