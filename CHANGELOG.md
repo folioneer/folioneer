@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-10-12
+
+### Added
+
+- an agent reads an asset's price at a past date
+- an agent lists an account's transactions
+- an agent adds an asset the portfolio does not have
+- an agent client knows a read from a recording
+- an agent records a split and free shares
+
+### Fixed
+
+- a computer joins a folder after starting over or a move
+
 ## [0.9.0] - 2026-10-11
 
 ### Added
