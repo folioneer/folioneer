@@ -330,6 +330,110 @@ mod tests {
         );
     }
 
+    // CLI-029 — the price of an archived asset is refused as archived, never as an asset
+    // that is not found; the JSON names the asset's id and the date; the line prints a
+    // unit price with the decimals it has.
+    #[tokio::test]
+    async fn cli_029_an_archived_asset_is_found_and_refused_and_a_price_is_printed_as_typed() {
+        let dir = portfolio("price-archived").await;
+        {
+            let database = Database::new(dir.clone()).await.expect("database");
+            let container = AppContainer::for_headless_writes(database.pool);
+            let asset = container
+                .asset_service
+                .get_non_cash_assets()
+                .await
+                .expect("assets")
+                .into_iter()
+                .find(|asset| asset.reference == "C50")
+                .expect("C50");
+            container
+                .asset_service
+                .archive_asset(&asset.id)
+                .await
+                .expect("archived");
+        }
+        let archived = run_line(
+            &dir,
+            "asset price --asset C50 --price 10 --date 2025-12-31 --json",
+        )
+        .await;
+        assert_eq!(archived.exit_code, REFUSED);
+        let value: serde_json::Value =
+            serde_json::from_str(archived.stdout.as_deref().expect("json")).expect("valid json");
+        assert_eq!(value["code"], "Archived");
+
+        let printed = run_line(
+            &dir,
+            "asset price --asset CW8 --price 512.30 --date 2025-12-31",
+        )
+        .await;
+        assert_eq!(
+            printed.stdout.as_deref(),
+            Some("Recorded: price of CW8 on 2025-12-31 — 512.3 EUR")
+        );
+        let json = run_line(
+            &dir,
+            "asset price --asset CW8 --price 0.004500 --date 2025-12-30 --json",
+        )
+        .await;
+        let value: serde_json::Value =
+            serde_json::from_str(json.stdout.as_deref().expect("json")).expect("valid json");
+        assert_eq!(value["price"]["date"], "2025-12-30");
+        assert_eq!(value["price"]["price"], 4_500);
+        let database = Database::new(dir.clone()).await.expect("database");
+        let container = AppContainer::for_headless_writes(database.pool);
+        let cw8 = container
+            .asset_service
+            .get_non_cash_assets()
+            .await
+            .expect("assets")
+            .into_iter()
+            .find(|asset| asset.reference == "CW8")
+            .expect("CW8");
+        assert_eq!(value["price"]["asset_id"], cw8.id);
+    }
+
+    // CLI-028 — a dividend of a position since closed is refused: the asset must be held
+    // today, whatever the date of the dividend.
+    #[tokio::test]
+    async fn cli_028_a_dividend_of_a_position_since_closed_is_refused() {
+        let dir = portfolio("dividend-closed").await;
+        for line in [
+            "holding buy --account PEA --asset CW8 --quantity 2 --price 100 --date 2026-02-01",
+            "holding sell --account PEA --asset CW8 --quantity 2 --price 110 --date 2026-03-01",
+        ] {
+            assert_eq!(run_line(&dir, line).await.exit_code, RECORDED, "{line}");
+        }
+        let refused = run_line(
+            &dir,
+            "holding dividend --account PEA --asset CW8 --amount 5 --date 2026-02-15 --json",
+        )
+        .await;
+        assert_eq!(refused.exit_code, REFUSED);
+        let value: serde_json::Value =
+            serde_json::from_str(refused.stdout.as_deref().expect("json")).expect("valid json");
+        assert_eq!(value["code"], "AssetNotHeld");
+    }
+
+    // CLI-014, its date — a command without `--date` records today, on the computer running it.
+    #[tokio::test]
+    async fn cli_014_a_command_without_a_date_records_today() {
+        let dir = portfolio("date-default").await;
+        let before = chrono::Local::now().date_naive();
+        let recorded = run_line(&dir, "account deposit --account PEA --amount 10 --json").await;
+        let after = chrono::Local::now().date_naive();
+        assert_eq!(recorded.exit_code, RECORDED);
+        let value: serde_json::Value =
+            serde_json::from_str(recorded.stdout.as_deref().expect("json")).expect("valid json");
+        let date = value["transaction"]["date"].as_str().expect("a date");
+        assert!(
+            date == before.format("%Y-%m-%d").to_string()
+                || date == after.format("%Y-%m-%d").to_string(),
+            "{date}"
+        );
+    }
+
     // CLI-027 / CLI-028 — a deposit, a withdrawal and a dividend are recorded through the
     // window's rules: a withdrawal above the cash held and a dividend of an asset not held
     // are refused with the window's codes, and nothing is written.

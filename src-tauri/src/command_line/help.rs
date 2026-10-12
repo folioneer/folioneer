@@ -408,6 +408,25 @@ mod tests {
         assert!(text.ends_with(EXIT_CODES));
     }
 
+    // CLI-016 / CLI-023 — the overview shows a few examples; the example of every command
+    // is on that command's own page.
+    #[test]
+    fn cli_016_every_command_has_a_page_with_its_example() {
+        for command in commands() {
+            let (group, verb) = command.split_once(' ').expect("a group and a verb");
+            let page = help("folioneer", HelpTopic::of(Some(group), Some(verb)));
+            let example = page
+                .split_once("\nExample:\n  ")
+                .and_then(|(_, rest)| rest.lines().next())
+                .unwrap_or_default();
+            assert!(
+                example == format!("folioneer {command}")
+                    || example.starts_with(&format!("folioneer {command} ")),
+                "{command}:\n{page}"
+            );
+        }
+    }
+
     // CLI-023 — a command's page shows that command only: its usage, one option per line,
     // aligned, with its default, then an example.
     #[test]

@@ -1,9 +1,0 @@
-# 2026-10-11 — DEBT-113 — What the spec check of the command line found after TODO-059
-
-- Found by: `spec-checker` on `docs/spec/command-line.md`, at the hand-over of the batch (2026-10-11), on the tree of TODO-059's second pull request; it only read. Split on 2026-10-11 from one entry that held the three spec checks of that hand-over: the agent connection is DEBT-115, prices DEBT-116, what is older than the batch DEBT-117
-- Where: `src-tauri/src/command_line/help.rs` (`overview` and its test); `src-tauri/src/command_line/headless.rs` (tests); `README.md` (§ Command line)
-- Severity: 🟡
-- Size: M — one pull request: a rule of the command line's spec, tests, the README.
-- Observation: **code short of its rule.** CLI-016 promises an example of each command in the overview: it has four for ten commands, and a test pins three `holding` examples. **A clause without a test.** CLI-029: `asset price` on an archived asset — a lookup that dropped archived assets would answer `AssetNotFound` unnoticed; the asset's id and the date in the JSON; a text line with decimals. CLI-028: a dividend of a position since closed. CLI-014: the date recorded when `--date` is left out. **Words behind the code.** The README's command-line section says `--asset` is a name or a reference (not an ISIN nor `REFERENCE@EXCHANGE`), shows `asset add` with `--class` only, and gives the currency of no figure.
-- User value: `folioneer --help` and the README say how each command is typed; the rest is none directly.
-- Done when: CLI-016 says what is true — the overview shows a few examples of the most common commands, and each command's own page shows its example — and a test holds that every command's page has one (owner, 2026-10-11); each clause above has a test that fails when the clause is broken; the README says what is.

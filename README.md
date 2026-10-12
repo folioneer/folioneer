@@ -131,13 +131,14 @@ folioneer account deposit  --account "PEA" --amount 1500 [--date …] [--note "�
 folioneer account withdraw --account "PEA" --amount 200 …
 folioneer account list        # the accounts: what --account takes
 folioneer asset list          # the assets: what --asset takes (--archived for the archived ones)
-folioneer asset add --name "ASML Holding" --reference ASML --class Stocks --currency EUR
+folioneer asset add --name "ASML Holding" --reference ASML --kind Listed --isin NL0010273215 --currency EUR [--exchange XAMS] [--class Stocks]
+folioneer asset add --name "Flat in Lyon" --reference LYON --kind Custom --currency EUR   # --kind Listed, Crypto or Custom, or a --class alone
 folioneer asset price --asset CW8 --price 512.30 [--date 2025-12-31] [--json]
 folioneer --help              # the commands, with examples
 folioneer holding buy --help  # one command's options and defaults
 ```
 
-`--account` is the account's name; `--asset` is the asset's name or reference; case does not matter. Amounts are decimals with a dot. A command prints one `Recorded:` or `Refused:` line — or one JSON object with `--json` — and exits with 0 when it recorded, 1 when it was refused, 2 when the command itself is wrong — it then prints the mistake, the closest command or option when one was mistyped, and the help to run.
+`--account` is the account's name; `--asset` is the asset's name, its reference or its ISIN, or `REFERENCE@EXCHANGE` (`ASML@XAMS`) when two assets share a reference; case does not matter. Amounts are decimals with a dot: `--price` and a dividend's `--amount` are in the asset's currency; `--total`, `--total-cost`, `--fees` and a deposit's or a withdrawal's `--amount` are in the account's; `--rate` is the exchange rate from the asset's currency to the account's. A command prints one `Recorded:` or `Refused:` line — or one JSON object with `--json` — and exits with 0 when it recorded, 1 when it was refused, 2 when the command itself is wrong — it then prints the mistake, the closest command or option when one was mistyped, and the help to run.
 
 - **Linux** — the program itself: `folioneer holding …` once the `.deb` is installed, or the AppImage's path with the same arguments (`~/Applications/Folioneer.AppImage holding …`).
 - **Windows (PowerShell)** — the console program installed beside the main one:
