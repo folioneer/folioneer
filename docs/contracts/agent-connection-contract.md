@@ -5,7 +5,7 @@
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName" }` object. The FE matches on `code`.
 >
-> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–064, AGT-070) are not Tauri commands: what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
+> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–064, AGT-070, AGT-071) are not Tauri commands: what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
 
 ---
 

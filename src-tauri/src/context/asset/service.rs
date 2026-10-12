@@ -665,6 +665,21 @@ impl AssetService {
             })
     }
 
+    /// MKT-104 — the price the asset has on `date`, or the closest earlier one; `None` when
+    /// it has no price up to that date. An archived asset is read like any other.
+    pub async fn price_as_of(
+        &self,
+        asset_id: &str,
+        date: &str,
+    ) -> StdResult<Option<AssetPrice>, AssetError> {
+        Ok(self
+            .get_asset_prices(asset_id)
+            .await?
+            .into_iter()
+            .filter(|price| price.date.as_str() <= date)
+            .max_by(|a, b| a.date.cmp(&b.date)))
+    }
+
     /// Updates the date and/or price of an existing price record (MKT-083/084).
     /// Same-date: in-place upsert. Different-date: atomic delete-old + upsert-new (MKT-084).
     /// Publishes AssetPriceUpdated on success (MKT-085).
@@ -1049,6 +1064,12 @@ pub trait AssetServiceContract: Send + Sync {
     async fn get_latest_price(&self, asset_id: &str) -> Result<Option<AssetPrice>>;
     /// Returns all recorded market prices for the given asset, sorted date descending (MKT-072).
     async fn get_asset_prices(&self, asset_id: &str) -> StdResult<Vec<AssetPrice>, AssetError>;
+    /// See [`AssetService::price_as_of`].
+    async fn price_as_of(
+        &self,
+        asset_id: &str,
+        date: &str,
+    ) -> StdResult<Option<AssetPrice>, AssetError>;
     /// See [`AssetService::record_asset_price_in_micros`].
     async fn record_asset_price_in_micros(
         &self,
@@ -1116,6 +1137,13 @@ impl AssetServiceContract for AssetService {
 
     async fn get_asset_prices(&self, asset_id: &str) -> StdResult<Vec<AssetPrice>, AssetError> {
         AssetService::get_asset_prices(self, asset_id).await
+    }
+    async fn price_as_of(
+        &self,
+        asset_id: &str,
+        date: &str,
+    ) -> StdResult<Option<AssetPrice>, AssetError> {
+        AssetService::price_as_of(self, asset_id, date).await
     }
     async fn record_asset_price_in_micros(
         &self,

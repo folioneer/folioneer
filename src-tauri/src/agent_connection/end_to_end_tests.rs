@@ -1878,3 +1878,116 @@ async fn agt_070_a_session_lists_the_transactions_of_an_account() {
         .expect("listed");
     assert!(past["transactions"].as_array().expect("rows").is_empty());
 }
+
+// AGT-071 — a session reads the price the application holds for an asset at a date: the
+// price of that date or the closest earlier one, with its own date and its source, or
+// plainly that there is none. It is a read.
+#[tokio::test]
+async fn agt_071_a_session_reads_the_price_of_an_asset_at_a_date() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+
+    // An asset with no price says so, and is not refused.
+    let none = call("get_price", json!({ "asset": "CW8" }))
+        .await
+        .expect("answered");
+    assert_eq!(none["status"], "no_price");
+    assert_eq!(none["price"], Value::Null);
+    assert_eq!(none["asset"], "CW8");
+
+    let asset = bench
+        .assets
+        .get_non_cash_assets()
+        .await
+        .expect("assets")
+        .remove(0);
+    bench
+        .assets
+        .record_asset_price_in_micros(&asset.id, "2019-12-31", 500 * M)
+        .await
+        .expect("typed by the owner");
+    call(
+        "record_price",
+        json!({ "asset": "CW8", "price": 600, "date": "2020-06-30" }),
+    )
+    .await
+    .expect("recorded by the agent");
+
+    for (asked, found) in [
+        (Some("2019-12-31"), Some(("2019-12-31", 500 * M, "Manual"))),
+        (Some("2020-03-15"), Some(("2019-12-31", 500 * M, "Manual"))),
+        (Some("2020-06-30"), Some(("2020-06-30", 600 * M, "Agent"))),
+        (Some("2020-12-31"), Some(("2020-06-30", 600 * M, "Agent"))),
+        (None, Some(("2020-06-30", 600 * M, "Agent"))),
+        (Some("2019-12-30"), None),
+    ] {
+        let arguments = match asked {
+            Some(date) => json!({ "asset": "cw8", "date": date }),
+            None => json!({ "asset": "cw8" }),
+        };
+        let answer = call("get_price", arguments.clone())
+            .await
+            .expect("answered");
+        assert_eq!(answer["asset"], "CW8", "{arguments}");
+        assert_eq!(answer["currency"], "EUR", "{arguments}");
+        match found {
+            Some((date, price, source)) => {
+                assert_eq!(answer["status"], "priced", "{arguments}");
+                assert_eq!(answer["price"]["date"], date, "{arguments}");
+                assert_eq!(answer["price"]["price"], price, "{arguments}");
+                assert_eq!(answer["price"]["source"], source, "{arguments}");
+            }
+            None => {
+                assert_eq!(answer["status"], "no_price", "{arguments}");
+                assert_eq!(answer["price"], Value::Null, "{arguments}");
+            }
+        }
+        if let Some(date) = asked {
+            assert_eq!(answer["date"], date, "{arguments}");
+        }
+    }
+
+    // An archived asset keeps its prices, and they are read like any other.
+    bench
+        .assets
+        .archive_asset(&asset.id)
+        .await
+        .expect("archived");
+    let archived = call("get_price", json!({ "asset": "CW8", "date": "2020-01-01" }))
+        .await
+        .expect("answered");
+    assert_eq!(archived["price"]["date"], "2019-12-31");
+
+    for (arguments, code) in [
+        (json!({}), "MissingArgument"),
+        (json!({ "asset": "NOPE" }), "AssetNotFound"),
+        (json!({ "asset": "CW8", "date": "december" }), "InvalidDate"),
+        (json!({ "asset": "CW8", "date": 20191231 }), "InvalidDate"),
+        (
+            json!({ "asset": "CW8", "date": "2999-01-01" }),
+            "InvalidDate",
+        ),
+    ] {
+        assert_eq!(
+            call("get_price", arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{arguments}"
+        );
+    }
+
+    // Eight answers, eight reads; the one recorded price is the only place taken.
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.reads, 8);
+    for _ in 1..super::connections::MAX_RECORDINGS {
+        granted.count_recording();
+    }
+    assert!(!granted.may_record_one_more());
+}

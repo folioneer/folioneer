@@ -1,13 +1,15 @@
-//! Listing by what a person named (AGT-070): the transactions of the account named, the
-//! rows a filter keeps, oldest first and one page at a time, each with the reference of
-//! its asset and the mark of the agent session that recorded it. It reads the account
-//! journal the window reads (TXL-060) and writes nothing.
+//! Reading by what a person named, and writing nothing. The transactions of the account
+//! named (AGT-070): the rows a filter keeps of the account journal the window reads
+//! (TXL-060), oldest first and one page at a time, each with the reference of its asset and
+//! the mark of the agent session that recorded it. The price of the asset named at a date
+//! (AGT-071).
 
 use std::collections::HashMap;
 
 use chrono::NaiveDate;
 
 use crate::context::account::{AgentRecording, JournalFilter, Transaction, TransactionType};
+use crate::context::asset::{Asset, AssetPrice};
 use crate::core::BACKEND;
 
 use super::named_recording::{refusal_from_lookup, Refusal};
@@ -72,6 +74,18 @@ pub struct ListedTransactions {
     pub pages: usize,
     /// The transactions of the page, oldest first.
     pub transactions: Vec<ListedTransaction>,
+}
+
+/// The price of an asset at a date, as read (AGT-071).
+#[derive(Debug, Clone)]
+pub struct PriceRead {
+    /// The asset named.
+    pub asset: Asset,
+    /// The date the price was asked for.
+    pub date: String,
+    /// The price on that date or the closest earlier one; `None` when the asset has no
+    /// price up to that date.
+    pub price: Option<AssetPrice>,
 }
 
 impl HoldingTransactionUseCase {
@@ -160,6 +174,36 @@ impl HoldingTransactionUseCase {
                 .take(TRANSACTIONS_PER_PAGE)
                 .collect(),
         })
+    }
+
+    /// AGT-071 — the price the asset named has on `date`, today when none is given, or the
+    /// closest earlier one. A date in the future is refused: no price is of it yet.
+    pub async fn price_named(
+        &self,
+        asset: &str,
+        date: Option<&str>,
+        today: &str,
+    ) -> Result<PriceRead, Refusal> {
+        let date = bound(date, "date")?.unwrap_or_else(|| today.to_string());
+        if date.as_str() > today {
+            return Err(Refusal {
+                code: "InvalidDate".to_string(),
+                message: "date is in the future".to_string(),
+            });
+        }
+        let asset = self
+            .find_asset_by_name(asset)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let price = self
+            .asset_service
+            .price_as_of(&asset.id, &date)
+            .await
+            .map_err(|error| {
+                tracing::error!(target: BACKEND, err = ?error, "price_named: the prices could not be read");
+                unreadable()
+            })?;
+        Ok(PriceRead { asset, date, price })
     }
 }
 

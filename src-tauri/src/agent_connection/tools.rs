@@ -234,6 +234,7 @@ impl AgentTools {
                 as_json(&rows)
             }
             "list_transactions" => self.list_transactions(granted, arguments).await,
+            "get_price" => self.get_price(arguments).await,
             "list_holdings" => {
                 let account = text(arguments, "account")?;
                 // AGT-043 — a date that is not text is refused, never read as today.
@@ -409,6 +410,32 @@ impl AgentTools {
             "page": listed.page,
             "pages": listed.pages,
             "transactions": rows,
+        }))
+    }
+
+    /// AGT-071 — the price an asset has at a date, or the closest earlier one, with its own
+    /// date and its source; `no_price` when it has none up to that date.
+    async fn get_price(&self, arguments: &Value) -> Result<Value, Refusal> {
+        let asset = text(arguments, "asset")?;
+        // A date that is not text is refused, never read as today (AGT-043).
+        let date = optional_text(arguments, "date").map_err(|_| Refusal {
+            code: "InvalidDate".to_string(),
+            message: "date is not a date written YYYY-MM-DD".to_string(),
+        })?;
+        let read = self
+            .recorder
+            .price_named(asset, date.as_deref(), &today())
+            .await
+            .map_err(|refusal| Refusal {
+                code: refusal.code,
+                message: refusal.message,
+            })?;
+        Ok(serde_json::json!({
+            "status": if read.price.is_some() { "priced" } else { "no_price" },
+            "asset": read.asset.reference,
+            "currency": read.asset.currency,
+            "date": read.date,
+            "price": read.price,
         }))
     }
 

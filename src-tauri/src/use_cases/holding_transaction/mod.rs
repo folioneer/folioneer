@@ -27,7 +27,8 @@ pub use error::{
     SplitError, SplitTask, TransactionDraftError, TransactionDraftTask,
 };
 pub use named_listing::{
-    ListedTransaction, ListedTransactions, RecordedBy, TransactionsAsked, TRANSACTIONS_PER_PAGE,
+    ListedTransaction, ListedTransactions, PriceRead, RecordedBy, TransactionsAsked,
+    TRANSACTIONS_PER_PAGE,
 };
 pub use named_recording::{
     code_of, decimal, decimal_to_micro, CashAmount, Correction, DividendAmount, FreeShares,

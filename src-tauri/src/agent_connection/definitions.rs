@@ -86,6 +86,21 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "get_price",
+            title: "Read an asset's price at a date",
+            only_reads: true,
+            description: "The price the application holds for one unit of an asset at a date, in the asset's currency: the price of that date or, when it has none, the closest earlier one — its own date says which. With it, its source: Manual (typed by the owner), Agent (recorded by an agent), or the name of the provider it was fetched from. status is no_price when the asset has no price up to that date. Use it to check a valuation against a statement. The price is a whole number of millionths: 1500000 is 1.5.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "asset": { "type": "string", "description": "The asset's name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
+                    "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." }
+                },
+                "required": ["asset"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
             name: "record_opening_balance",
             title: "Record an opening balance",
             only_reads: false,

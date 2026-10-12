@@ -70,6 +70,7 @@ fn agt_010_the_program_started_with_mcp_lists_its_tools() {
             "list_assets",
             "list_holdings",
             "list_transactions",
+            "get_price",
             "record_opening_balance",
             "record_purchase",
             "record_sale",
@@ -137,7 +138,8 @@ fn agt_013_every_tool_listed_says_whether_it_only_reads() {
             "list_accounts",
             "list_assets",
             "list_holdings",
-            "list_transactions"
+            "list_transactions",
+            "get_price"
         ]
     );
 }
