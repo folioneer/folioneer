@@ -12,3 +12,5 @@ In this order (owner, 2026-10-11): the model first — the rules and the core; t
 - [ ] A fraction of a share the exchange leaves: kept as a fraction, or paid in cash?
 - [ ] The cash part of an exchange (a balancing amount): a gain realised on that part alone, or a reduction of the cost basis?
 - [ ] One transaction on two assets, or two linked transactions — and how does the journal of each asset show it?
+- [ ] A distribution of another company's shares (a spin-off, gh241): the new asset's cost is taken from the holding that gave it — by a ratio the owner types, by the broker's ratio — or is zero? And is it this entry's exchange with nothing given up, or a transaction of its own? gh241 closes when this entry and TODO-089 have both shipped.
+- [ ] A fraction the event leaves and the broker pays in cash (gh241): recorded with the event in one step, or left as a sale of the fraction, which works today?
