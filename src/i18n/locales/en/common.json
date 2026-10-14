@@ -297,7 +297,9 @@
     "removal_remove": "Remove this transaction",
     "removal_refuse": "Refuse",
     "removal_changed": "The transaction changed since the agent asked: nothing was removed.",
-    "removal_gone": "The transaction no longer exists: nothing was removed."
+    "removal_gone": "The transaction no longer exists: nothing was removed.",
+    "notice_recorded": "{{agent}} recorded: {{kind}} · {{asset}} · {{date}}",
+    "notice_added": "{{agent}} added an asset: {{name}} ({{reference}})"
   },
   "sync": {
     "title": "Multi-device sync",

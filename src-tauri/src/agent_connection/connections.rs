@@ -36,6 +36,9 @@ pub struct AgentSession {
     pub reads: u32,
     /// How many transactions it recorded that still exist: its own to remove.
     pub recordings: u32,
+    /// How many transactions it recorded and marked, whatever became of them since: a count
+    /// that only rises, by which the window tells a new recording (AGT-084).
+    pub transactions_recorded: u32,
     /// The one it recorded last among them.
     pub last_recording: Option<LastRecording>,
     /// How many assets it added (AGT-064).
@@ -138,6 +141,8 @@ impl WaitingRemoval {
 #[derive(Debug, Default)]
 struct Facts {
     reads: AtomicU32,
+    /// How many transactions it recorded, whatever became of them (AGT-084).
+    recorded: AtomicU32,
     /// How many of its recordings still exist, and the last of them: read from the
     /// portfolio after each change, so the two always agree.
     recordings: Mutex<(u32, Option<LastRecording>)>,
@@ -192,6 +197,13 @@ impl Granted {
         self.recorded.fetch_add(1, Ordering::SeqCst);
     }
 
+    /// AGT-047 / AGT-084 — the session recorded and marked one more transaction: one more
+    /// place of its limit taken, and one more recording for the window to say.
+    pub fn count_marked_transaction(&self) {
+        self.count_recording();
+        self.facts.recorded.fetch_add(1, Ordering::SeqCst);
+    }
+
     /// AGT-052 — one call that read the portfolio was answered.
     pub fn count_read(&self) {
         self.facts.reads.fetch_add(1, Ordering::SeqCst);
@@ -230,6 +242,7 @@ impl Open {
         let (assets_added, last_asset) = self.facts.assets().clone();
         AgentSession {
             reads: self.facts.reads.load(Ordering::SeqCst),
+            transactions_recorded: self.facts.recorded.load(Ordering::SeqCst),
             recordings,
             last_recording,
             assets_added,
@@ -376,6 +389,7 @@ impl AgentConnections {
                     started_at: started_at.clone(),
                     reads: 0,
                     recordings: 0,
+                    transactions_recorded: 0,
                     last_recording: None,
                     assets_added: 0,
                     last_asset: None,
@@ -639,6 +653,7 @@ mod tests {
                 started_at: granted.started_at.clone(),
                 reads: 0,
                 recordings: 0,
+                transactions_recorded: 0,
                 last_recording: None,
                 assets_added: 0,
                 last_asset: None,

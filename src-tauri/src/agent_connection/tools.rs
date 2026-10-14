@@ -306,7 +306,7 @@ impl AgentTools {
                 message: refusal.message,
             }
         })?;
-        granted.count_recording();
+        granted.count_marked_transaction();
         self.tell_recordings(granted).await;
         tracing::info!(target: BACKEND, session = granted.session_id, transaction = %recorded.transaction.id, kind = %recorded.transaction.transaction_type, "agent recording");
         as_json(&serde_json::json!({

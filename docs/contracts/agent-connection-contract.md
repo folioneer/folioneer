@@ -1,7 +1,7 @@
 # Contract — Agent Connection
 
 > Domain: `agent-connection`
-> Last updated by: agent-connection (AGT-022–036, AGT-039, AGT-045, AGT-052–054, AGT-064, AGT-081–083)
+> Last updated by: agent-connection (AGT-022–036, AGT-039, AGT-045, AGT-052–054, AGT-064, AGT-081, AGT-082, AGT-084)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName" }` object; a variant with fields carries them beside `code`, as `TransactionNotRemoved { reason }` does. The FE matches on `code`.
 >
@@ -55,7 +55,8 @@ struct AgentSession {
     started_at: String,                    // RFC 3339, this computer's time: when the owner allowed it
     reads: u32,                            // its calls of a read tool that were answered
     recordings: u32,                       // the transactions it recorded that still exist
-    last_recording: Option<LastRecording>, // the last recorded of them; None when none is left
+    transactions_recorded: u32,            // the transactions it recorded, whatever became of them; only rises (AGT-084)
+    last_recording: Option<LastRecording>, // the last recorded of those that still exist; None when none is left
     assets_added: u32,                     // the assets it added (AGT-064)
     last_asset: Option<LastAsset>,         // the last added of them; None when it added none
 }
@@ -128,3 +129,4 @@ The mark of a transaction an agent recorded (AGT-045) reaches the window in the 
 - 2026-10-10 — TODO-060: `remove_agent_recordings` and `SessionRemoval` (AGT-053); `AgentSession` gains `started_at`, `reads`, `recordings` and `last_recording`, with `LastRecording` (AGT-052); `AgentConnectionError` gains `DatabaseError`.
 - 2026-10-12 — TODO-063: `AgentSession` gains `assets_added` and `last_asset`, with `LastAsset { name: String, reference: String }` (AGT-064). No command or error changes.
 - 2026-10-14 — TODO-061: `answer_removal_request` (AGT-081); `AgentConnectionState` gains `removals`, with `RemovalRequest` and `TransactionShown`; `AgentConnectionError` gains `RemovalRequestGone` and `TransactionNotRemoved { reason }`.
+- 2026-10-14 — TODO-079: `AgentSession` gains `transactions_recorded` (AGT-084). No command or error changes.

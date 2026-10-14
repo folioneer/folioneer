@@ -297,7 +297,9 @@
     "removal_remove": "Supprimer cette transaction",
     "removal_refuse": "Refuser",
     "removal_changed": "La transaction a changé depuis la demande de l'agent : rien n'a été supprimé.",
-    "removal_gone": "La transaction n'existe plus : rien n'a été supprimé."
+    "removal_gone": "La transaction n'existe plus : rien n'a été supprimé.",
+    "notice_recorded": "{{agent}} a enregistré : {{kind}} · {{asset}} · {{date}}",
+    "notice_added": "{{agent}} a ajouté un actif : {{name}} ({{reference}})"
   },
   "sync": {
     "title": "Synchronisation multi-appareils",

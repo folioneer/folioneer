@@ -2921,3 +2921,54 @@ async fn agt_063_a_split_that_cannot_be_marked_is_undone() {
             .expect("count");
     assert_eq!(splits, 0, "the split was undone");
 }
+
+// AGT-084 — the session counts every transaction it recorded, whatever became of it: a
+// cancelling lowers what still exists, never what was recorded.
+#[tokio::test]
+async fn agt_084_the_session_counts_every_transaction_it_recorded() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let deposit = json!({ "account": "PEA", "amount": 10, "date": "2026-02-01" });
+    let first = bench
+        .tools
+        .call(&granted, "record_deposit", &deposit)
+        .await
+        .expect("recorded");
+    bench
+        .tools
+        .call(
+            &granted,
+            "cancel_recording",
+            &json!({ "transaction": recorded_id(&first) }),
+        )
+        .await
+        .expect("cancelled");
+    bench
+        .tools
+        .call(&granted, "record_deposit", &deposit)
+        .await
+        .expect("recorded again");
+    // A price and a refused recording are no transaction recorded.
+    bench
+        .tools
+        .call(
+            &granted,
+            "record_price",
+            &json!({ "asset": "CW8", "price": 500, "date": "2026-02-01" }),
+        )
+        .await
+        .expect("priced");
+    bench
+        .tools
+        .call(
+            &granted,
+            "record_deposit",
+            &json!({ "account": "PEA", "amount": 0 }),
+        )
+        .await
+        .expect_err("refused");
+
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!((told.transactions_recorded, told.recordings), (2, 1));
+}
