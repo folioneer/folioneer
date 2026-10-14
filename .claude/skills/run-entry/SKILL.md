@@ -34,7 +34,8 @@ rules are `docs/workflow.md`; this file is the checklist.
 
 - `git checkout -b <type>/todo-NNN-<slug>` (or `<type>/debt-NNN-<slug>`, `<type>/flow-NNN-<slug>`), `<type>` being the commit
   type the change will carry (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `ci`).
-- `TaskCreate` one task per step below; mark each `in_progress` / `completed` as you go.
+- Outside a batch, `TaskCreate` one task per step below; mark each `in_progress` /
+  `completed` as you go. In a batch (`/run-queue`) the entry's one task is the record.
 
 ## Step 2 — Design gate
 
@@ -57,8 +58,9 @@ which renders the mocks and flips the line to `proposed (…)`.
   rule in `docs/spec/<feature>.md` in the same commit. A domain without a spec gets one,
   its trigram registered in `docs/spec-index.md`.
 - A new or changed Tauri command updates `docs/contracts/<domain>-contract.md` (created
-  with the domain's first command) in the same commit; `spec-reviewer` and
-  `contract-reviewer` run on those files in Step 6.
+  with the domain's first command) in the same commit: a new command or a new contract
+  with `/contract`, loaded with the `Skill` tool; a row or a type amended by hand.
+  `spec-reviewer` and `contract-reviewer` run on those files in Step 6.
 - Run the suites; confirm the new tests are red, before the code that makes them green
   is written. The pull request's body says so per Done-when clause (Step 8): the test,
   and `seen red` — or why it could not be (a clause that only removes, a record). If a clause cannot become a test
@@ -93,7 +95,8 @@ No question to the human. CI runs the same reviewers on every push (Step 8).
 
 ## Step 7 — Evidence
 
-`/visual-proof` for every changed `.tsx`/`.css`; stage the screenshots. Write the
+`/visual-proof`, loaded with the `Skill` tool, for every changed `.tsx`/`.css`; stage the
+screenshots. Write the
 commit: conventional title as the changelog line (≤ 72 characters, user-facing words
 for `feat`/`fix`), body ≤ 2 lines with the ref.
 

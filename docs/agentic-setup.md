@@ -48,9 +48,11 @@ Written to read the same in every repository that works this way.
 - `.claude/skills/design-proposal/` — renders the target state before anything a user
   sees changes. Never: builds what it shows.
 - `.claude/skills/visual-proof/` — captures every state of a changed component, light
-  and dark. Never: stands in for the design proposal.
+  and dark; the skills that send to its steps load it with the `Skill` tool. Never:
+  stands in for the design proposal.
 - `.claude/skills/contract/` — derives the record of a domain's commands from a
-  validated spec. Never: overwrites a command it was not asked to change.
+  validated spec, for a new command or a new contract; one row or one type is amended by
+  hand. Never: overwrites a command it was not asked to change.
 - `.claude/skills/adr-writer/` — records a technical choice that is costly to reverse.
   Never: a functional decision, nor a tentative one.
 - `.claude/skills/dep-audit/` — checks the dependencies for outdated versions and known

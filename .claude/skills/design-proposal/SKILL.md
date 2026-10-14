@@ -19,7 +19,8 @@ new column, the dialog with the moved buttons, the empty case if it changes).
 
 ## Step 2 — Build the target state as a preview
 
-Follow `/visual-proof` Steps 0 (config), 3 (write `preview.html` and
+Load `/visual-proof` with the `Skill` tool — its steps are followed as loaded, never from
+memory — and follow its Steps 0 (config), 3 (write `preview.html` and
 `src/__preview__/main.tsx`) and 4 (capture script and Playwright present) with one
 difference: the preview renders the **proposed** component tree, not the current one. Copy the current component into the
 preview where the change is layout-only, or compose the target from existing `ui/`

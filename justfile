@@ -55,9 +55,10 @@ coverage-gate *ARGS:
 licence-check:
     python3 scripts/licence-check.py
 
-# Unit tests of the repository's own scripts
-test-scripts: (_used "test-scripts")
-    USAGE_LOG=off python3 -m unittest discover -s scripts/tests -p "test_*.py"
+# Unit tests of the repository's own scripts; pass test files to run some
+# (just test-scripts scripts/tests/test_mcpb_bundle.py)
+test-scripts *PATHS: (_used "test-scripts")
+    if [ "$#" -eq 0 ]; then USAGE_LOG=off python3 -m unittest discover -s scripts/tests -p "test_*.py"; else USAGE_LOG=off python3 -m unittest "$@"; fi
 
 # Check the mechanical architecture rules (scripts/arch-check.py); pass --write-allowlist to shrink arch-allowlist.json to today's state
 arch-check *ARGS:
