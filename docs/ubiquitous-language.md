@@ -442,6 +442,12 @@ The program an agent client starts to reach the application. It holds no data: i
 
 An agent waiting for the owner's answer in the window. Nothing is served to it until the owner allows; refusing gives it nothing. In French: "Demande de connexion".
 
+### Removal request
+
+> Status: confirmed
+
+An agent asking the owner, in the window, to remove one transaction the owner typed: the transaction is shown in full with what would become of it, refusing is the default, and the answer covers that one transaction only. The agent calls `request_removal`. In French: "Demande de suppression" (owner, 2026-10-14).
+
 ### Agent session
 
 > Status: confirmed

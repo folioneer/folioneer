@@ -11,3 +11,4 @@ The mock-up of the ask is `screenshots/design/061-*-ask.png`, validated by the o
 **Open questions:**
 
 - [x] The connection dialog says an agent corrects or cancels "never a transaction you typed": what does it say once an agent may ask to remove one? — "It can correct or cancel only what it recorded in this session; for a transaction you typed it can only ask you, one at a time — and it never reads a file, a setting or your sync folder." ("Il ne peut corriger ou annuler que ce qu'il a enregistré pendant cette session ; pour une transaction que vous avez saisie, il ne peut que vous demander, une à la fois — et ne lit jamais un fichier, un réglage ou votre dossier de synchronisation.") (owner, 2026-10-12).
+- [x] The term for an agent's ask to remove a typed transaction, and the tool it calls? — "Removal request" ("Demande de suppression"), added to `docs/ubiquitous-language.md`; the tool is `request_removal` (owner, 2026-10-14).
