@@ -1750,3 +1750,275 @@ async fn syn_038_the_written_form_matches_the_snapshot_of_the_current_data_forma
          published snapshot."
     );
 }
+
+/// Sets the device's logical clock, as two devices that sync converge on one.
+async fn set_logical_clock(ctx: &Ctx, clock: i64) {
+    sqlx::query("UPDATE sync_device SET logical_clock = ?")
+        .bind(clock)
+        .execute(&ctx.pool)
+        .await
+        .expect("clock set");
+}
+
+fn header_of(folder: &std::path::Path) -> Vec<u8> {
+    std::fs::read(folder.join("vaultcompass-sync.json")).expect("a header")
+}
+
+// SYN-074 / DEBT-126 — a folder is known by more than its creation mark: two computers at
+// the same clock that each move the portfolio to an empty folder write the same mark, and
+// one that then designates the other's folder is refused, not adopted.
+#[tokio::test]
+async fn syn_074_two_movers_at_the_same_clock_are_told_apart() {
+    let dir = tempfile::tempdir().unwrap();
+    let desktop_move = tempfile::tempdir().unwrap();
+    let laptop_move = tempfile::tempdir().unwrap();
+    let (desktop, laptop, _account, _area) = two_devices_sharing(dir.path()).await;
+    set_logical_clock(&desktop, 500).await;
+    set_logical_clock(&laptop, 500).await;
+    for (ctx, folder) in [(&desktop, &desktop_move), (&laptop, &laptop_move)] {
+        ctx.orchestrator
+            .change_sync_folder(folder.path().to_string_lossy().to_string())
+            .await
+            .expect("moved to an empty folder");
+    }
+    let marks: Vec<String> = [&desktop_move, &laptop_move]
+        .iter()
+        .map(|folder| {
+            let header: serde_json::Value =
+                serde_json::from_slice(&header_of(folder.path())).unwrap();
+            header["created_at"].as_str().unwrap().to_string()
+        })
+        .collect();
+    assert_eq!(marks[0], marks[1], "precondition: the same creation mark");
+
+    let refused = desktop
+        .orchestrator
+        .change_sync_folder(laptop_move.path().to_string_lossy().to_string())
+        .await
+        .expect_err("the other computer's beginning is not this one's");
+    assert_eq!(
+        serde_json::to_value(&refused).unwrap()["code"],
+        "InstallationHoldsUserData"
+    );
+    let status = desktop.orchestrator.get_sync_status().await.unwrap();
+    assert_eq!(
+        status.folder.as_deref(),
+        Some(desktop_move.path().to_string_lossy().as_ref())
+    );
+}
+
+// SYN-084 / DEBT-126 — a run refuses a header of another beginning as it does a reset:
+// a device whose folder came to hold the portfolio as another device moved it publishes
+// nothing there, and pauses.
+#[tokio::test]
+async fn syn_084_a_run_refuses_a_header_of_another_beginning() {
+    let dir = tempfile::tempdir().unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    let (desktop, laptop, account_id, desktop_area) = two_devices_sharing(dir.path()).await;
+    laptop
+        .orchestrator
+        .change_sync_folder(elsewhere.path().to_string_lossy().to_string())
+        .await
+        .expect("Laptop moved the portfolio");
+    // The folder Desktop follows now holds Laptop's beginning, under the same key.
+    std::fs::write(
+        dir.path().join("vaultcompass-sync.json"),
+        header_of(elsewhere.path()),
+    )
+    .unwrap();
+    let before = segment_names(&desktop_area);
+    desktop
+        .account_service
+        .record_deposit(&account_id, "2026-03-01".into(), 1_000_000, None)
+        .await
+        .unwrap();
+
+    let report = desktop.orchestrator.sync_now().await.expect("a report");
+    assert_eq!(
+        serde_json::to_value(&report).unwrap()["failures"][0],
+        "PortfolioReset"
+    );
+    assert_eq!(
+        segment_names(&desktop_area),
+        before,
+        "nothing was published"
+    );
+    assert!(desktop.orchestrator.get_sync_status().await.unwrap().paused);
+}
+
+// SYN-069 / SYN-074 / DEBT-126 — a move to an empty folder needs nothing of the folder it
+// leaves: with that folder gone, the device moves all the same, under the same passphrase.
+#[tokio::test]
+async fn syn_069_a_move_needs_nothing_of_the_folder_it_leaves() {
+    let dir = tempfile::tempdir().unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    let (desktop, _laptop, _account, _area) = two_devices_sharing(dir.path()).await;
+    let left = header_of(dir.path());
+    std::fs::remove_dir_all(dir.path()).unwrap();
+
+    desktop
+        .orchestrator
+        .change_sync_folder(elsewhere.path().to_string_lossy().to_string())
+        .await
+        .expect("moved with the folder it leaves out of reach");
+    let left: serde_json::Value = serde_json::from_slice(&left).unwrap();
+    let moved: serde_json::Value = serde_json::from_slice(&header_of(elsewhere.path())).unwrap();
+    assert_eq!(
+        moved["derivation_parameters"], left["derivation_parameters"],
+        "the same passphrase reaches the same key"
+    );
+}
+
+/// What a device keeps of the others' history: its cursors, held-back changes and notices.
+async fn received_history(ctx: &Ctx) -> (i64, i64, i64) {
+    let count = |table: &'static str| {
+        let pool = ctx.pool.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(&format!("SELECT COUNT(*) FROM {table}"))
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+        }
+    };
+    (
+        count("sync_cursors").await,
+        count("held_back_changes").await,
+        count("conflict_notices").await,
+    )
+}
+
+async fn keep_a_held_back_change_and_a_notice(ctx: &Ctx) {
+    sqlx::query(
+        "INSERT OR REPLACE INTO sync_cursors (device_id, applied_through, last_applied_at) VALUES ('another-device', 3, NULL)",
+    )
+    .execute(&ctx.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO held_back_changes (id, origin_device_id, sequence, payload, waiting_kind, waiting_identity, held_since)
+         VALUES ('held', 'another-device', 9, '{}', 'Account', 'missing', '2026-08-22T00:00:00Z')",
+    )
+    .execute(&ctx.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO conflict_notices (notice_id, kind, record_kind, record_identity, record_label, other_device_id, other_device_name, raised_at)
+         VALUES ('notice', 'OverruledEdit', 'Account', 'a', 'PEA', 'another-device', 'Laptop', '2026-08-22T00:00:00Z')",
+    )
+    .execute(&ctx.pool)
+    .await
+    .unwrap();
+}
+
+// SYN-074 / DEBT-126 — the same portfolio, copied to another folder, is adopted through the
+// action: the device moves there with its identity, its numbering and what it kept of the
+// others, and syncs on; the device left behind syncs on in the first folder.
+#[tokio::test]
+async fn syn_074_a_copy_of_the_folder_is_adopted_through_the_action() {
+    let dir = tempfile::tempdir().unwrap();
+    let copy = tempfile::tempdir().unwrap();
+    let (desktop, laptop, account_id, _area) = two_devices_sharing(dir.path()).await;
+    laptop.orchestrator.sync_now().await.unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    let before = desktop.orchestrator.get_sync_status().await.unwrap();
+    let kept = received_history(&desktop).await;
+    let copied = std::process::Command::new("cp")
+        .arg("-r")
+        .arg(format!("{}/.", dir.path().display()))
+        .arg(copy.path())
+        .status()
+        .unwrap();
+    assert!(copied.success());
+
+    desktop
+        .orchestrator
+        .change_sync_folder(copy.path().to_string_lossy().to_string())
+        .await
+        .expect("the same portfolio is adopted");
+    let after = desktop.orchestrator.get_sync_status().await.unwrap();
+    assert_eq!(
+        after.folder.as_deref(),
+        Some(copy.path().to_string_lossy().as_ref())
+    );
+    assert_eq!(after.device_id, before.device_id);
+    assert_eq!(received_history(&desktop).await, kept);
+    desktop
+        .account_service
+        .record_deposit(&account_id, "2026-03-01".into(), 1_000_000, None)
+        .await
+        .unwrap();
+    let report = desktop.orchestrator.sync_now().await.unwrap();
+    assert!(report.failures.is_empty(), "{:?}", report.failures);
+    assert_eq!(report.published_changes, 1);
+    let left_behind = laptop.orchestrator.sync_now().await.unwrap();
+    assert!(
+        left_behind.failures.is_empty(),
+        "{:?}",
+        left_behind.failures
+    );
+}
+
+// SYN-074 / DEBT-126 — a move to an empty folder forgets the held-back changes and the
+// notices too; a move that fails changes nothing: the device stays on its folder with what
+// it kept, and what it wrote in the new one is removed.
+#[tokio::test]
+async fn syn_074_a_move_forgets_the_history_left_and_a_failed_one_changes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let broken = tempfile::tempdir().unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    let (desktop, laptop, _account, _area) = two_devices_sharing(dir.path()).await;
+    laptop.orchestrator.sync_now().await.unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    keep_a_held_back_change_and_a_notice(&desktop).await;
+    let kept = received_history(&desktop).await;
+    assert_eq!((kept.1, kept.2), (1, 1));
+    assert!(kept.0 >= 1);
+
+    // A folder whose device areas cannot be written: the move fails.
+    std::fs::write(broken.path().join("devices"), b"not a directory").unwrap();
+    desktop
+        .orchestrator
+        .change_sync_folder(broken.path().to_string_lossy().to_string())
+        .await
+        .expect_err("the publish fails");
+    let status = desktop.orchestrator.get_sync_status().await.unwrap();
+    assert_eq!(
+        status.folder.as_deref(),
+        Some(dir.path().to_string_lossy().as_ref())
+    );
+    assert_eq!(received_history(&desktop).await, kept);
+    assert!(!broken.path().join("vaultcompass-sync.json").exists());
+
+    desktop
+        .orchestrator
+        .change_sync_folder(elsewhere.path().to_string_lossy().to_string())
+        .await
+        .expect("moved");
+    assert_eq!(received_history(&desktop).await, (0, 0, 0));
+}
+
+// SYN-073 / SYN-084 / DEBT-126 — resuming into a folder that was started over meanwhile is
+// the reset case: the device stays paused and publishes nothing there.
+#[tokio::test]
+async fn syn_073_resuming_into_a_folder_started_over_is_the_reset() {
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop, _account, desktop_area) = two_devices_sharing(dir.path()).await;
+    desktop.sync_service.pause_sync().await.expect("paused");
+    laptop
+        .orchestrator
+        .start_sync_over(
+            dir.path().to_string_lossy().to_string(),
+            "another long passphrase".into(),
+            "Laptop".into(),
+        )
+        .await
+        .expect("Laptop started over");
+
+    let resumed = desktop.orchestrator.resume_sync().await;
+    let paused = desktop.orchestrator.get_sync_status().await.unwrap().paused;
+    assert!(paused, "{resumed:?}");
+    assert!(
+        !desktop_area.exists(),
+        "nothing was published into the reset folder"
+    );
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT device_id, device_name, folder, joined_at, paused, portfolio_created_at,\n                      data_format_version\n               FROM sync_device WHERE id = 1",
+  "query": "SELECT device_id, device_name, folder, joined_at, paused, portfolio_created_at,\n                      portfolio_created_by, derivation_parameters, data_format_version\n               FROM sync_device WHERE id = 1",
   "describe": {
     "columns": [
       {
@@ -34,8 +34,18 @@
         "type_info": "Text"
       },
       {
-        "name": "data_format_version",
+        "name": "portfolio_created_by",
         "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "derivation_parameters",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "data_format_version",
+        "ordinal": 8,
         "type_info": "Integer"
       }
     ],
@@ -49,8 +59,10 @@
       false,
       false,
       false,
+      true,
+      true,
       false
     ]
   },
-  "hash": "49d407330c8f0b74e8248f09ee774049c086325a2047f12bbd1e15356572b994"
+  "hash": "257a63eed63563612b570bb41536d72b14551df6fb7747f17d315eedee180aa8"
 }

@@ -462,11 +462,13 @@ impl ChangeLogRepository for SqliteChangeLogRepository {
         logical_clock: i64,
     ) -> Result<(), SyncError> {
         let data_format_version = i64::from(device.data_format_version);
+        let derivation_parameters = super::device::stored_parameters(device)?;
         sqlx::query!(
             r#"INSERT INTO sync_device
                (id, device_id, device_name, folder, joined_at, paused, portfolio_created_at,
-                logical_clock, derived_key, data_format_version)
-               VALUES (1, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+                portfolio_created_by, derivation_parameters, logical_clock, derived_key,
+                data_format_version)
+               VALUES (1, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(id) DO UPDATE SET
                    device_id = excluded.device_id,
                    device_name = excluded.device_name,
@@ -474,6 +476,8 @@ impl ChangeLogRepository for SqliteChangeLogRepository {
                    joined_at = excluded.joined_at,
                    paused = excluded.paused,
                    portfolio_created_at = excluded.portfolio_created_at,
+                   portfolio_created_by = excluded.portfolio_created_by,
+                   derivation_parameters = excluded.derivation_parameters,
                    logical_clock = excluded.logical_clock,
                    derived_key = excluded.derived_key,
                    data_format_version = excluded.data_format_version"#,
@@ -482,6 +486,8 @@ impl ChangeLogRepository for SqliteChangeLogRepository {
             device.folder,
             device.joined_at,
             device.portfolio_created_at,
+            device.portfolio_created_by,
+            derivation_parameters,
             logical_clock,
             derived_key,
             data_format_version
@@ -489,6 +495,22 @@ impl ChangeLogRepository for SqliteChangeLogRepository {
         .execute(conn)
         .await
         .map_err(|error| SyncError::database("save_enrolment: write failed", error))?;
+        Ok(())
+    }
+
+    async fn forget_received_history(&self, conn: &mut SqliteConnection) -> Result<(), SyncError> {
+        for statement in [
+            "DELETE FROM sync_cursors",
+            "DELETE FROM held_back_changes",
+            "DELETE FROM conflict_notices",
+        ] {
+            sqlx::query(statement)
+                .execute(&mut *conn)
+                .await
+                .map_err(|error| {
+                    SyncError::database("forget_received_history: delete failed", error)
+                })?;
+        }
         Ok(())
     }
 
@@ -1114,5 +1136,58 @@ mod tests {
             .expect("record")
             .expect("a paused device still records");
         assert_eq!(rank.logical_timestamp, LogicalTimestamp::new(1));
+    }
+
+    // SYN-071 / SYN-074 — forgetting the received history empties the cursors, the held-back
+    // changes and the notices on the enrolment's transaction, keeps the device, and is undone
+    // with a transaction that does not commit.
+    #[tokio::test]
+    async fn forget_received_history_belongs_to_the_enrolment_transaction() {
+        let pool = make_pool().await;
+        seed_sync_device(&pool, "desktop-device").await;
+        for statement in [
+            "INSERT INTO sync_cursors (device_id, applied_through, last_applied_at) VALUES ('laptop', 1, NULL)",
+            "INSERT INTO held_back_changes (id, origin_device_id, sequence, payload, waiting_kind, waiting_identity, held_since) VALUES ('h', 'laptop', 2, '{}', 'Account', 'a', '2026-08-22T00:00:00Z')",
+            "INSERT INTO conflict_notices (notice_id, kind, record_kind, record_identity, record_label, other_device_id, other_device_name, raised_at) VALUES ('n', 'OverruledEdit', 'Account', 'a', 'PEA', 'laptop', 'Laptop', '2026-08-22T00:00:00Z')",
+        ] {
+            sqlx::query(statement).execute(&pool).await.expect("seeded");
+        }
+        let repository = SqliteChangeLogRepository::new(pool.clone());
+        let counts = || async {
+            let mut counts = Vec::new();
+            for table in [
+                "sync_cursors",
+                "held_back_changes",
+                "conflict_notices",
+                "sync_device",
+            ] {
+                let count: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
+                    .fetch_one(&pool)
+                    .await
+                    .expect("counted");
+                counts.push(count);
+            }
+            counts
+        };
+
+        let mut rolled_back = repository.begin().await.expect("begin");
+        repository
+            .forget_received_history(&mut rolled_back)
+            .await
+            .expect("forgotten");
+        drop(rolled_back);
+        assert_eq!(
+            counts().await,
+            [1, 1, 1, 1],
+            "a failed enrolment keeps them"
+        );
+
+        let mut committed = repository.begin().await.expect("begin");
+        repository
+            .forget_received_history(&mut committed)
+            .await
+            .expect("forgotten");
+        committed.commit().await.expect("committed");
+        assert_eq!(counts().await, [0, 0, 0, 1], "the device stays");
     }
 }

@@ -293,6 +293,26 @@ describe("useSyncPage — rename device / change folder (SYN-072/074)", () => {
     expect(gateway.changeSyncFolder).toHaveBeenCalledWith("/home/user/new-sync");
     expect(result.current.folder).toBe("/home/user/new-sync");
   });
+
+  // SYN-074 — a folder the portfolio was moved to by another device is refused as a join
+  // on an installation that holds data: the reason is said and the folder stays.
+  it("says why a moved portfolio's folder is refused, and keeps the folder", async () => {
+    vi.mocked(gateway.changeSyncFolder).mockResolvedValue({
+      status: "error",
+      error: { code: "InstallationHoldsUserData" },
+    } as never);
+
+    const { result } = renderHook(() => useSyncPage());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    const before = result.current.folder;
+
+    await act(async () => {
+      await result.current.handleChangeFolder("/home/user/moved-elsewhere");
+    });
+
+    expect(result.current.actionError).toEqual({ key: "sync.errors.InstallationHoldsUserData" });
+    expect(result.current.folder).toBe(before);
+  });
 });
 
 describe("useSyncPage — leave sync confirmation (SYN-071/082)", () => {

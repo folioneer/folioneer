@@ -29,6 +29,8 @@ struct DeviceRow {
     joined_at: String,
     paused: i64,
     portfolio_created_at: String,
+    portfolio_created_by: Option<String>,
+    derivation_parameters: Option<String>,
     data_format_version: i64,
 }
 
@@ -41,9 +43,31 @@ impl From<DeviceRow> for SyncDevice {
             joined_at: row.joined_at,
             paused: row.paused != 0,
             portfolio_created_at: row.portfolio_created_at,
+            portfolio_created_by: row.portfolio_created_by,
+            // Unreadable parameters are as good as none: a move then reads its folder's.
+            derivation_parameters: row.derivation_parameters.and_then(|stored| {
+                serde_json::from_str(&stored)
+                    .inspect_err(|error| {
+                        tracing::error!(target: crate::core::BACKEND, err = %error, "sync device: the kept derivation parameters cannot be read");
+                    })
+                    .ok()
+            }),
             data_format_version: u32::try_from(row.data_format_version).unwrap_or(0),
         })
     }
+}
+
+/// The derivation parameters the device keeps, as stored: JSON text.
+pub(crate) fn stored_parameters(device: &SyncDevice) -> Result<Option<String>, SyncError> {
+    device
+        .derivation_parameters
+        .as_ref()
+        .map(serde_json::to_string)
+        .transpose()
+        .map_err(|error| {
+            tracing::error!(target: crate::core::BACKEND, err = %error, "sync device: the derivation parameters could not be written");
+            SyncError::DatabaseError
+        })
 }
 
 #[derive(sqlx::FromRow)]
@@ -129,7 +153,7 @@ impl SyncStateRepository for SqliteSyncStateRepository {
         let row = sqlx::query_as!(
             DeviceRow,
             r#"SELECT device_id, device_name, folder, joined_at, paused, portfolio_created_at,
-                      data_format_version
+                      portfolio_created_by, derivation_parameters, data_format_version
                FROM sync_device WHERE id = 1"#
         )
         .fetch_optional(&self.pool)
@@ -141,11 +165,13 @@ impl SyncStateRepository for SqliteSyncStateRepository {
     async fn save_device(&self, device: &SyncDevice) -> Result<(), SyncError> {
         let paused = device.paused as i64;
         let data_format_version = i64::from(device.data_format_version);
+        let derivation_parameters = stored_parameters(device)?;
         sqlx::query!(
             r#"INSERT INTO sync_device
                (id, device_id, device_name, folder, joined_at, paused, portfolio_created_at,
-                logical_clock, derived_key, data_format_version)
-               VALUES (1, ?, ?, ?, ?, ?, ?, 0, X'', ?)
+                portfolio_created_by, derivation_parameters, logical_clock, derived_key,
+                data_format_version)
+               VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 0, X'', ?)
                ON CONFLICT(id) DO UPDATE SET
                    device_id = excluded.device_id,
                    device_name = excluded.device_name,
@@ -153,6 +179,8 @@ impl SyncStateRepository for SqliteSyncStateRepository {
                    joined_at = excluded.joined_at,
                    paused = excluded.paused,
                    portfolio_created_at = excluded.portfolio_created_at,
+                   portfolio_created_by = excluded.portfolio_created_by,
+                   derivation_parameters = excluded.derivation_parameters,
                    data_format_version = excluded.data_format_version"#,
             device.device_id,
             device.device_name,
@@ -160,6 +188,8 @@ impl SyncStateRepository for SqliteSyncStateRepository {
             device.joined_at,
             paused,
             device.portfolio_created_at,
+            device.portfolio_created_by,
+            derivation_parameters,
             data_format_version
         )
         .execute(&self.pool)
@@ -210,28 +240,6 @@ impl SyncStateRepository for SqliteSyncStateRepository {
             .commit()
             .await
             .map_err(|error| SyncError::database("discard_device_state: commit failed", error))
-    }
-
-    async fn discard_received_history(&self) -> Result<(), SyncError> {
-        let mut transaction = self.pool.begin().await.map_err(|error| {
-            SyncError::database("discard_received_history: begin failed", error)
-        })?;
-        for statement in [
-            "DELETE FROM sync_cursors",
-            "DELETE FROM held_back_changes",
-            "DELETE FROM conflict_notices",
-        ] {
-            sqlx::query(statement)
-                .execute(&mut *transaction)
-                .await
-                .map_err(|error| {
-                    SyncError::database("discard_received_history: delete failed", error)
-                })?;
-        }
-        transaction
-            .commit()
-            .await
-            .map_err(|error| SyncError::database("discard_received_history: commit failed", error))
     }
 
     async fn get_cursor(&self, device_id: &str) -> Result<Option<SyncCursor>, SyncError> {
@@ -437,6 +445,8 @@ mod tests {
             joined_at: "2026-08-22T00:00:00Z".into(),
             paused: false,
             portfolio_created_at: "2026-08-22T00:00:00Z".into(),
+            portfolio_created_by: None,
+            derivation_parameters: None,
             data_format_version: 1,
         })
     }
@@ -525,31 +535,6 @@ mod tests {
                 .unwrap();
         assert_eq!(key, vec![0xAB]);
         assert_eq!(clock, 7);
-    }
-
-    // SYN-071 — forgetting the received history empties the cursors, the held-back changes
-    // and the notices, and keeps the device.
-    #[tokio::test]
-    async fn discard_received_history_keeps_the_device_and_empties_the_rest() {
-        let pool = make_pool().await;
-        let repo = SqliteSyncStateRepository::new(pool.clone());
-        repo.save_device(&sample_device()).await.unwrap();
-        repo.upsert_cursor(&SyncCursor {
-            device_id: "laptop-device".into(),
-            applied_through: 1,
-            last_applied_at: None,
-        })
-        .await
-        .unwrap();
-        repo.insert_held_back(&sample_held_back()).await.unwrap();
-        repo.insert_notice(&sample_notice()).await.unwrap();
-
-        repo.discard_received_history().await.unwrap();
-
-        assert!(repo.get_device().await.unwrap().is_some());
-        assert!(repo.get_cursor("laptop-device").await.unwrap().is_none());
-        assert!(repo.list_held_back().await.unwrap().is_empty());
-        assert!(repo.list_undismissed_notices().await.unwrap().is_empty());
     }
 
     // SYN-082 — discarding the device state empties every sync-owned table.

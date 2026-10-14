@@ -218,7 +218,8 @@ pub(super) async fn join(
         folder,
         header.created_at.clone(),
         DATA_FORMAT_VERSION,
-    )?;
+    )?
+    .following(&header);
 
     let _recording_suspended = change_recorder.suspend();
     let mut transaction = change_log.begin().await?;

@@ -81,6 +81,11 @@ pub trait ChangeLogRepository: Send + Sync {
         logical_clock: i64,
     ) -> Result<(), SyncError>;
 
+    /// Forgets what this device kept of the other devices' history, on `conn` (SYN-071,
+    /// SYN-074): every cursor, every held-back change and every conflict notice — in the
+    /// enrolment's transaction, so an enrolment that fails keeps them.
+    async fn forget_received_history(&self, conn: &mut SqliteConnection) -> Result<(), SyncError>;
+
     /// Drops every change `device_id` recorded before this enrolment, on `conn`: the first
     /// segment replays the whole portfolio instead (SYN-026), as a history numbered from 1
     /// (SYN-025).

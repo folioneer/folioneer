@@ -8,24 +8,22 @@ use crate::context::currency::CurrencyError;
 use crate::context::sync::SyncError;
 
 /// Orchestrator-level guards and the catch-all — the codes `PortfolioSyncError` itself never
-/// re-declares. PR-B raises only `InstallationHoldsUserData` (the join branch, always
-/// returned in PR-B per D3) and `PortfolioCreatedElsewhere` (delegated straight from
-/// `SyncError`, wired here too since the orchestrator surfaces it verbatim); `HistoryIncomplete`
-/// and `RebuildInterrupted` are PR-C join/rebuild codes declared now so the wire shape is
-/// stable across PR-B/PR-C.
+/// re-declares: a join refused on an installation that holds data, which is also the refusal
+/// of a folder the portfolio was moved to by another device (SYN-014, SYN-074); a join whose
+/// history is incomplete or whose rebuild was interrupted (SYN-036, SYN-080).
 #[derive(Debug, thiserror::Error, serde::Serialize, specta::Type, Clone)]
 #[serde(tag = "code")]
 pub enum PortfolioSyncTask {
-    /// The joining installation holds user-entered records (SYN-014). PR-B always returns
-    /// this for the join branch — the rebuild lands in PR-C.
+    /// The joining installation holds user-entered records (SYN-014), or the folder holds the
+    /// portfolio as another device moved it there (SYN-074).
     #[error("A fresh installation is required to join this portfolio")]
     InstallationHoldsUserData,
 
-    /// A segment of the replay set could not be read while joining (SYN-036, PR-C).
+    /// A segment of the replay set could not be read while joining (SYN-036).
     #[error("The published history is incomplete")]
     HistoryIncomplete,
 
-    /// The rebuild transaction was interrupted; the device is left as before (SYN-080, PR-C).
+    /// The rebuild transaction was interrupted; the device is left as before (SYN-080).
     #[error("Joining was interrupted and has been rolled back")]
     RebuildInterrupted,
 

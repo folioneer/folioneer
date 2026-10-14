@@ -10,6 +10,7 @@ use sqlx::SqliteConnection;
 
 use crate::context::sync::domain::conflict_notice::ConflictNotice;
 use crate::context::sync::domain::cursor::SyncCursor;
+use crate::context::sync::domain::folder::{DerivationParameters, FolderHeader};
 use crate::context::sync::domain::held_back::HeldBackChange;
 use crate::context::sync::error::SyncError;
 
@@ -29,6 +30,10 @@ pub struct StoredDevice {
     pub paused: bool,
     /// The folder header's creation mark this device follows (SYN-084).
     pub portfolio_created_at: String,
+    /// The device that wrote that header; `None` when enrolled before it was kept.
+    pub portfolio_created_by: Option<String>,
+    /// The key's derivation parameters, as that header gives them; `None` likewise.
+    pub derivation_parameters: Option<DerivationParameters>,
     /// The data format of the application that last published from this device (SYN-035).
     pub data_format_version: u32,
 }
@@ -49,6 +54,13 @@ pub struct SyncDevice {
     /// Which folder header this device follows — its creation mark — so a reset is
     /// recognised (SYN-084).
     pub portfolio_created_at: String,
+    /// The device that wrote the header followed, so two headers written at the same logical
+    /// clock are told apart (SYN-074, SYN-084); `None` on a device enrolled before it was
+    /// kept, which is then known by its creation mark alone.
+    pub portfolio_created_by: Option<String>,
+    /// The derivation parameters of the header followed (SYN-051), so a move needs nothing
+    /// of the folder it leaves (SYN-069, SYN-074); `None` as above.
+    pub derivation_parameters: Option<DerivationParameters>,
     /// The data format of the application that last published from this device (SYN-035).
     pub data_format_version: u32,
 }
@@ -79,6 +91,8 @@ impl SyncDevice {
             joined_at: chrono::Utc::now().to_rfc3339(),
             paused: false,
             portfolio_created_at,
+            portfolio_created_by: None,
+            derivation_parameters: None,
             data_format_version,
         })
     }
@@ -92,6 +106,8 @@ impl SyncDevice {
             joined_at,
             paused,
             portfolio_created_at,
+            portfolio_created_by,
+            derivation_parameters,
             data_format_version,
         } = stored;
         Self {
@@ -101,6 +117,8 @@ impl SyncDevice {
             joined_at,
             paused,
             portfolio_created_at,
+            portfolio_created_by,
+            derivation_parameters,
             data_format_version,
         }
     }
@@ -175,6 +193,27 @@ impl SyncDevice {
         })
     }
 
+    /// Follows `header` (SYN-084): its creation mark, the device that wrote it, and its
+    /// derivation parameters — on joining, or on publishing as an origin (SYN-013).
+    pub fn following(self, header: &FolderHeader) -> Self {
+        Self {
+            portfolio_created_at: header.created_at.clone(),
+            portfolio_created_by: Some(header.created_by_device_id.clone()),
+            derivation_parameters: Some(header.derivation_parameters.clone()),
+            ..self
+        }
+    }
+
+    /// Whether `header` is the one this device follows (SYN-074, SYN-084): the same creation
+    /// mark, written by the same device when the device knows which.
+    pub fn follows(&self, header: &FolderHeader) -> bool {
+        header.created_at == self.portfolio_created_at
+            && self
+                .portfolio_created_by
+                .as_ref()
+                .is_none_or(|by| *by == header.created_by_device_id)
+    }
+
     /// Designates a different folder holding the same portfolio (SYN-074).
     pub fn designate_folder(self, folder: String) -> Self {
         Self { folder, ..self }
@@ -196,9 +235,6 @@ pub trait SyncStateRepository: Send + Sync {
     /// every cursor, every held-back change, and every notice. The local portfolio is
     /// untouched.
     async fn discard_device_state(&self) -> Result<(), SyncError>;
-    /// Forgets what this device kept of the other devices' history (SYN-071): every cursor,
-    /// every held-back change and every notice. The device row stays: it keeps its identity.
-    async fn discard_received_history(&self) -> Result<(), SyncError>;
     /// Records `completed_at` as the end of this device's last successful sync (SYN-063).
     async fn record_last_sync(&self, completed_at: &str) -> Result<(), SyncError>;
     /// When this device's last successful sync ended, or `None` if none has (SYN-063).
@@ -260,6 +296,8 @@ mod tests {
             joined_at: "2026-08-22T00:00:00Z".into(),
             paused: false,
             portfolio_created_at: "2026-08-22T00:00:00Z".into(),
+            portfolio_created_by: None,
+            derivation_parameters: None,
             data_format_version: 1,
         })
     }

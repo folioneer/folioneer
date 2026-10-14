@@ -465,6 +465,8 @@ mod tests {
             joined_at: "2026-08-22T00:00:00Z".into(),
             paused: false,
             portfolio_created_at: "2026-08-22T00:00:00Z".into(),
+            portfolio_created_by: None,
+            derivation_parameters: None,
             data_format_version: 1,
         })
     }

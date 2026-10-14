@@ -93,8 +93,9 @@ impl FirstPublish {
     /// portfolio this device follows (its passphrase check matches the kept key, its
     /// creation mark is the one followed) is adopted as is; one where another device moved
     /// the portfolio is `FolderChange::AnotherBeginning`; an empty one receives this device's
-    /// current portfolio as a first device, under the kept key and the current folder's
-    /// derivation parameters, and the device forgets what it kept of the history it leaves.
+    /// current portfolio as a first device, under the kept key and the derivation parameters
+    /// the device keeps — read from the folder it leaves only for a device enrolled before
+    /// they were kept — and the device forgets what it kept of the history it leaves.
     /// Any other folder is `FolderHoldsOtherPortfolio`.
     pub async fn change_folder(
         &self,
@@ -125,7 +126,9 @@ impl FirstPublish {
                 }
                 // The portfolio was moved there by another device, as a history of its
                 // own: this device's cursors and its own area belong to the one it follows.
-                if header.created_at != device.portfolio_created_at {
+                // A folder is known by its creation mark and the device that wrote it, not
+                // by the clock alone: devices that sync converge on the same clock.
+                if !device.follows(&header) {
                     self.folder_store.retarget(&device.folder);
                     return Ok(FolderChange::AnotherBeginning);
                 }
@@ -138,7 +141,12 @@ impl FirstPublish {
                 ))))
             }
             None => {
-                let derivation_parameters = self.derivation_parameters_of(&device.folder).await?;
+                // SYN-069 — the parameters the device keeps: the folder it leaves may be out
+                // of reach. One enrolled before they were kept reads them there.
+                let derivation_parameters = match device.derivation_parameters.clone() {
+                    Some(kept) => kept,
+                    None => self.derivation_parameters_of(&device.folder).await?,
+                };
                 let status = self
                     .publish_as_origin(
                         folder,
@@ -207,6 +215,7 @@ impl FirstPublish {
             created_at: timestamp.as_str().to_string(),
             created_by_device_id: device.device_id.clone(),
         };
+        let device = device.following(&header);
         match self
             .folder_store
             .write_header_if_absent(encode_header(&header)?)
@@ -219,12 +228,7 @@ impl FirstPublish {
             .enroll(&device, &key, logical_clock, &timestamp, records)
             .await
         {
-            Ok(()) => {
-                // SYN-071 / SYN-074 — an origin begins a history: what the device kept of
-                // the one it leaves is forgotten. A publish that fails keeps it.
-                self.state_repo.discard_received_history().await?;
-                Ok(SyncStatus::for_device(&device, None, vec![]))
-            }
+            Ok(()) => Ok(SyncStatus::for_device(&device, None, vec![])),
             Err(error) => {
                 self.roll_back_folder(&device.device_id).await;
                 Err(error)
@@ -248,6 +252,11 @@ impl FirstPublish {
             .await?;
         self.change_log
             .discard_earlier_changes(&mut transaction, &device.device_id)
+            .await?;
+        // SYN-071 / SYN-074 — an origin begins a history: what the device kept of the one it
+        // leaves is forgotten in the same write as the enrolment, so a failure keeps both.
+        self.change_log
+            .forget_received_history(&mut transaction)
             .await?;
         let first_sequence = self
             .change_log

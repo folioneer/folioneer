@@ -88,12 +88,13 @@ enum HeaderGate {
     /// folder without one is a mount point whose volume is gone, not a portfolio that was
     /// started over (SYN-069).
     Absent,
-    /// A header whose passphrase check no longer matches the kept key: the portfolio was
-    /// started over elsewhere.
+    /// A header whose passphrase check no longer matches the kept key — the portfolio was
+    /// started over elsewhere — or one of another beginning, as another device moved the
+    /// portfolio into this folder (SYN-074): either way not the header this device follows.
     Reset,
 }
 
-fn header_gate(header_bytes: Option<&[u8]>, key: &Key) -> HeaderGate {
+fn header_gate(header_bytes: Option<&[u8]>, key: &Key, device: &SyncDevice) -> HeaderGate {
     let Some(bytes) = header_bytes else {
         return HeaderGate::Absent;
     };
@@ -103,7 +104,9 @@ fn header_gate(header_bytes: Option<&[u8]>, key: &Key) -> HeaderGate {
         return HeaderGate::UpdateRequired(version);
     }
     match decode_header(bytes) {
-        Ok(header) if verify_check(key, &header.passphrase_check) => HeaderGate::Proceed,
+        Ok(header) if verify_check(key, &header.passphrase_check) && device.follows(&header) => {
+            HeaderGate::Proceed
+        }
         _ => HeaderGate::Reset,
     }
 }
@@ -473,7 +476,7 @@ impl SyncRun {
             return self.pause_for_reset(device).await;
         };
         let mut failures = Vec::new();
-        match header_gate(header_bytes.as_deref(), &key) {
+        match header_gate(header_bytes.as_deref(), &key, device) {
             HeaderGate::Proceed => {}
             HeaderGate::UpdateRequired(data_format_version) => {
                 failures.push(SyncFailure::UpdateRequired {
@@ -654,6 +657,8 @@ mod tests {
             joined_at: "2026-08-22T00:00:00Z".into(),
             paused: false,
             portfolio_created_at: "2026-08-22T00:00:00Z".into(),
+            portfolio_created_by: None,
+            derivation_parameters: None,
             data_format_version: 1,
         })
     }
@@ -670,7 +675,7 @@ mod tests {
             },
             passphrase_check: make_check(&kept_key_for_tests()),
             data_format_version: DATA_FORMAT_VERSION,
-            created_at: "00000000000000000001".into(),
+            created_at: "2026-08-22T00:00:00Z".into(),
             created_by_device_id: "desktop-device".into(),
         })
         .expect("a valid header encodes")
