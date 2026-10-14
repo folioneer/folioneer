@@ -208,6 +208,19 @@ jobs:
           fi
           echo "✓ latest.json covers linux-x86_64 and windows-x86_64"
 
+      - name: Attach the Claude Desktop bundle
+        # TODO-081: a manifest naming the program the Windows installer and the deb
+        # install, started with --mcp (scripts/mcpb-bundle.py); nothing else is in it.
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bundle=$(python3 scripts/mcpb-bundle.py "$RUNNER_TEMP/mcpb")
+          gh release upload "${{ github.ref_name }}" "$bundle" --clobber --repo "${{ github.repository }}"
+          gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" --json assets \
+            --jq '.assets[].name' | grep -qx "$(basename "$bundle")" \
+            || { echo "::error::the Claude Desktop bundle is not attached to the release"; exit 1; }
+
       - name: Clear Rust cache on failure
         if: failure()
         env:

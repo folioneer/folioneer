@@ -105,6 +105,8 @@ Written to read the same in every repository that works this way.
   moved on the remote.
 - `scripts/release.py` — computes the version, writes the changelog, tags and pushes,
   for the owner. Never: run by the agent.
+- `scripts/mcpb-bundle.py` — builds the Claude Desktop bundle the release attaches, from
+  the release's product name, version and binary. Never: holds the program or data.
 - `scripts/flow-audit.py` — the figures of a batch, as one document. Never: reads
   them.
 - `scripts/usage_log.py` — writes one line per run of a tool, locally. Never: in CI,

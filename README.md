@@ -155,7 +155,7 @@ An agent — Claude Code, Claude Desktop — can read the portfolio, an account'
 1. In Folioneer, **Settings → Allow agents to connect** (off by default).
 2. Tell the agent how to start the bridge, which is the installed program with `--mcp`:
    - **Claude Code**: `claude mcp add folioneer -- folioneer --mcp` (with the AppImage: `claude mcp add folioneer -- ~/Applications/Folioneer.AppImage --mcp`; on Windows, from PowerShell: `claude mcp add folioneer -- "$env:LOCALAPPDATA\Folioneer\folioneer.exe" --mcp`).
-   - **Claude Desktop**: in `~/.config/Claude/claude_desktop_config.json` (on Windows `%APPDATA%\Claude\claude_desktop_config.json`, with the program's full path as the command), then restart it:
+   - **Claude Desktop**, with the Windows installer or the `.deb`: download `Folioneer-<version>.mcpb` from the same release and open it; Claude Desktop installs Folioneer's tools after one confirmation. With the AppImage, or for another agent client, add the bridge to its configuration — for Claude Desktop, `~/.config/Claude/claude_desktop_config.json` (on Windows `%APPDATA%\Claude\claude_desktop_config.json`), with the program's full path as the command, then restart it:
 
      ```json
      {
