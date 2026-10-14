@@ -99,7 +99,32 @@ pub async fn serve_connection<S>(
             (Request::Call { .. }, None) => refused("NotConnected", "not connected"),
             (Request::Call { tool, arguments }, Some(granted)) => {
                 connections.count_call(granted.session_id);
-                let result = tools.run(granted, &tool, &arguments).await;
+                let running = tools.run(granted, &tool, &arguments);
+                tokio::pin!(running);
+                // AGT-082 / AGT-085 — a call whose bridge left is given up: what it waits
+                // for — a removal request — is withdrawn as the call is dropped, and the
+                // session ends with the connection. A recording, once started, runs to its
+                // end on its own (AGT-049). What the bridge sends meanwhile waits its turn.
+                let result = tokio::select! {
+                    result = &mut running => result,
+                    // The bridge's next frame is not read here: `fill_buf` takes nothing,
+                    // and what it holds waits in the reader's buffer.
+                    left = reading.fill_buf() => {
+                        let gone = match left {
+                            Ok(bytes) => bytes.is_empty(),
+                            Err(error) => {
+                                tracing::warn!(target: BACKEND, session = granted.session_id, err = %error, "agent connection: the bridge could not be read");
+                                true
+                            }
+                        };
+                        if gone {
+                            tracing::info!(target: BACKEND, session = granted.session_id, tool = %tool, "agent tool call given up: the bridge left");
+                            connections.notify();
+                            break;
+                        }
+                        running.await
+                    }
+                };
                 // AGT-052 — what the call read or recorded shows in the window.
                 connections.notify();
                 // AGT-041 — every call is written to the log with its tool.

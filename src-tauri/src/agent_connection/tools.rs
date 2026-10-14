@@ -330,10 +330,17 @@ impl AgentTools {
         if !granted.may_record_one_more() {
             return Err(session_limit_reached());
         }
-        let recorded = self
-            .recorder
-            .record_price_named_by_agent(typed, &today())
+        // As a recording (AGT-049, AGT-086): once started, the write runs to its end.
+        let recorder = Arc::clone(&self.recorder);
+        let recorded =
+            tokio::spawn(
+                async move { recorder.record_price_named_by_agent(typed, &today()).await },
+            )
             .await
+            .map_err(|error| {
+                tracing::error!(target: BACKEND, err = ?error, "agent price: the task ended early");
+                portfolio_unreadable()
+            })?
             .map_err(|refusal| Refusal {
                 code: refusal.code,
                 message: refusal.message,
@@ -470,10 +477,14 @@ impl AgentTools {
         if !granted.may_record_one_more() {
             return Err(session_limit_reached());
         }
-        let added = self
-            .asset_service
-            .add_named_asset(named)
+        // As a recording (AGT-049, AGT-086): once started, the addition runs to its end.
+        let assets = Arc::clone(&self.asset_service);
+        let added = tokio::spawn(async move { assets.add_named_asset(named).await })
             .await
+            .map_err(|error| {
+                tracing::error!(target: BACKEND, err = ?error, "agent adding an asset: the task ended early");
+                portfolio_unreadable()
+            })?
             .map_err(|error| {
                 let code = code_of(&error);
                 if matches!(error, AssetError::DatabaseError) {

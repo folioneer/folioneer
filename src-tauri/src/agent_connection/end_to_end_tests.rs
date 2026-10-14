@@ -145,18 +145,28 @@ fn call(id: u32, tool: &str, arguments: Value) -> String {
     .to_string()
 }
 
-/// What an agent client is answered when it sends `lines` to the bridge.
+/// What an agent client is answered when it sends `lines` to the bridge: it keeps its
+/// input open until each request among them is answered, as a client does (AGT-085).
 async fn answers(data_dir: &Path, lines: &[String]) -> Vec<Value> {
-    let input = format!("{}\n", lines.join("\n"));
-    let mut output = Vec::new();
-    bridge::serve(input.as_bytes(), &mut output, reaching(data_dir))
-        .await
-        .expect("served");
-    String::from_utf8(output)
-        .expect("text")
-        .lines()
-        .map(|line| serde_json::from_str(line).expect("json"))
-        .collect()
+    let requests = lines
+        .iter()
+        .filter(|line| {
+            serde_json::from_str::<Value>(line).is_ok_and(|message| message.get("id").is_some())
+        })
+        .count();
+    let mut client = LiveClient::start(data_dir);
+    for line in lines {
+        client
+            .say(serde_json::from_str(line).expect("a JSON line"))
+            .await;
+    }
+    let mut answered = Vec::with_capacity(requests);
+    for _ in 0..requests {
+        answered.push(client.heard().await);
+    }
+    drop(client.writing);
+    client.served.await.expect("served").expect("ended");
+    answered
 }
 
 /// The owner answers the next connection request.
@@ -2971,4 +2981,208 @@ async fn agt_084_the_session_counts_every_transaction_it_recorded() {
 
     let told = bench.connections.sessions().remove(0);
     assert_eq!((told.transactions_recorded, told.recordings), (2, 1));
+}
+
+/// An agent client speaking to the bridge as it goes: what it writes reaches the bridge at
+/// once, and what the bridge answers is read line by line.
+struct LiveClient {
+    writing: tokio::io::DuplexStream,
+    reading: tokio::io::BufReader<tokio::io::DuplexStream>,
+    served: tokio::task::JoinHandle<std::io::Result<()>>,
+}
+
+impl LiveClient {
+    fn start(data_dir: &Path) -> Self {
+        let (writing, input) = tokio::io::duplex(64 * 1024);
+        let (output, reading) = tokio::io::duplex(64 * 1024);
+        let connector = reaching(data_dir);
+        let served = tokio::spawn(async move { bridge::serve(input, output, connector).await });
+        Self {
+            writing,
+            reading: tokio::io::BufReader::new(reading),
+            served,
+        }
+    }
+
+    async fn say(&mut self, message: Value) {
+        use tokio::io::AsyncWriteExt;
+        let mut line = message.to_string();
+        line.push('\n');
+        self.writing.write_all(line.as_bytes()).await.expect("said");
+    }
+
+    async fn heard(&mut self) -> Value {
+        use tokio::io::AsyncBufReadExt;
+        let mut line = String::new();
+        tokio::time::timeout(Duration::from_secs(5), self.reading.read_line(&mut line))
+            .await
+            .expect("an answer in time")
+            .expect("read");
+        serde_json::from_str(&line).expect("json")
+    }
+}
+
+fn cancelled(id: u32) -> Value {
+    json!({ "jsonrpc": "2.0", "method": "notifications/cancelled",
+        "params": { "requestId": id, "reason": "the user gave up" } })
+}
+
+async fn until(what: &str, mut holds: impl FnMut() -> bool) {
+    for _ in 0..400 {
+        if holds() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    panic!("{what} did not happen");
+}
+
+// AGT-085 — a call the agent client cancels while its connection waits for the owner
+// withdraws the request: the dialog leaves the window, and the call is not answered.
+#[tokio::test]
+async fn agt_085_a_cancelled_call_withdraws_its_connection_request() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let gate = application(data_dir.path()).await;
+    gate.allow(true).expect("allowed");
+    let mut client = LiveClient::start(data_dir.path());
+    client
+        .say(json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize",
+            "params": { "clientInfo": { "name": "claude-code" } } }))
+        .await;
+    client.heard().await;
+    client
+        .say(serde_json::from_str(&call(1, "list_accounts", json!({}))).expect("json"))
+        .await;
+    until("the request", || !gate.connections().requests().is_empty()).await;
+
+    client.say(cancelled(1)).await;
+    until("the withdrawal", || {
+        gate.connections().requests().is_empty()
+    })
+    .await;
+
+    // The client goes on: a ping is answered, and the cancelled call never is.
+    client
+        .say(json!({ "jsonrpc": "2.0", "id": 2, "method": "ping" }))
+        .await;
+    assert_eq!(client.heard().await["id"], 2);
+    assert!(gate.connections().sessions().is_empty());
+    drop(client.writing);
+    client.served.await.expect("served").expect("ended");
+}
+
+// AGT-085 — a cancel for a call of a session already allowed changes nothing of it: the
+// call is answered, and the session stays.
+#[tokio::test]
+async fn agt_085_a_cancel_in_an_allowed_session_changes_nothing() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let gate = application(data_dir.path()).await;
+    gate.allow(true).expect("allowed");
+    let owner = owner_answers(&gate, true);
+    let mut client = LiveClient::start(data_dir.path());
+    client
+        .say(json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize",
+            "params": { "clientInfo": { "name": "claude-code" } } }))
+        .await;
+    client.heard().await;
+    client
+        .say(serde_json::from_str(&call(1, "list_accounts", json!({}))).expect("json"))
+        .await;
+    assert_eq!(client.heard().await["id"], 1);
+    owner.await.expect("owner");
+
+    client
+        .say(serde_json::from_str(&call(2, "list_assets", json!({}))).expect("json"))
+        .await;
+    client.say(cancelled(2)).await;
+    let answered = client.heard().await;
+    assert_eq!(answered["id"], 2);
+    assert_eq!(answered["result"]["isError"], false);
+    assert_eq!(gate.connections().sessions().len(), 1);
+}
+
+// AGT-082 / AGT-086 — an agent that goes away while its removal request waits withdraws it.
+#[tokio::test]
+async fn agt_086_an_agent_that_goes_away_withdraws_its_removal_request() {
+    use crate::context::account::JournalFilter;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let (gate, accounts) = application_with_accounts(data_dir.path()).await;
+    gate.allow(true).expect("allowed");
+    let owner = owner_answers(&gate, true);
+    let account = accounts.get_all().await.expect("accounts").remove(0);
+    let deposit = accounts
+        .get_account_journal(&account.id, &JournalFilter::default())
+        .await
+        .expect("journal")
+        .rows
+        .remove(0)
+        .transaction;
+    let mut client = LiveClient::start(data_dir.path());
+    client
+        .say(json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize",
+            "params": { "clientInfo": { "name": "claude-code" } } }))
+        .await;
+    client.heard().await;
+    client
+        .say(
+            serde_json::from_str(&call(
+                1,
+                "request_removal",
+                json!({ "transaction": deposit.id }),
+            ))
+            .expect("json"),
+        )
+        .await;
+    owner.await.expect("owner");
+    until("the removal request", || {
+        !gate.connections().removals().is_empty()
+    })
+    .await;
+
+    drop(client.writing);
+    until("the withdrawal", || {
+        gate.connections().removals().is_empty()
+    })
+    .await;
+    until("the session's end", || {
+        gate.connections().sessions().is_empty()
+    })
+    .await;
+}
+
+// AGT-085 — a line the client writes in part while a call waits holds nothing back: the
+// call is answered, and the line is read whole once its end comes.
+#[tokio::test]
+async fn agt_085_a_line_written_in_part_holds_nothing_back() {
+    use tokio::io::AsyncWriteExt;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let gate = application(data_dir.path()).await;
+    gate.allow(true).expect("allowed");
+    let mut client = LiveClient::start(data_dir.path());
+    client
+        .say(json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize",
+            "params": { "clientInfo": { "name": "claude-code" } } }))
+        .await;
+    client.heard().await;
+    client
+        .say(serde_json::from_str(&call(1, "list_accounts", json!({}))).expect("json"))
+        .await;
+    until("the request", || !gate.connections().requests().is_empty()).await;
+
+    client
+        .writing
+        .write_all(br#"{"jsonrpc":"2.0","id":5,"me"#)
+        .await
+        .expect("half a line");
+    owner_answers(&gate, true).await.expect("owner");
+    assert_eq!(client.heard().await["id"], 1);
+
+    client
+        .writing
+        .write_all(b"thod\":\"ping\"}\n")
+        .await
+        .expect("the rest");
+    assert_eq!(client.heard().await["id"], 5);
 }
