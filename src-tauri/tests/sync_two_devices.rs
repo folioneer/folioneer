@@ -230,7 +230,7 @@ async fn join_produces_a_byte_identical_portfolio() {
 
     let laptop_bus = Arc::new(SideEffectEventBus::new());
     let laptop = build_ctx_on_bus(dir.path(), laptop_bus.clone()).await;
-    // The bus keeps a published event only while someone is subscribed.
+    // The bus delivers an event only to who was subscribed when it was published.
     let mut laptop_events = laptop_bus.subscribe();
     laptop
         .orchestrator
@@ -242,8 +242,8 @@ async fn join_produces_a_byte_identical_portfolio() {
         .await
         .expect("SYN-014/036: a fresh Laptop must join and rebuild the shared portfolio");
     assert_eq!(
-        *laptop_events.borrow_and_update(),
-        Event::SyncCompleted,
+        laptop_events.drain(),
+        vec![Event::SyncCompleted],
         "SYN-064: a join announces the rebuilt portfolio with one SyncCompleted"
     );
 
@@ -810,8 +810,7 @@ async fn a_catch_up_sync_announces_itself_once_whatever_the_number_of_applied_re
         let seen = seen.clone();
         let mut events = laptop_bus.subscribe();
         tokio::spawn(async move {
-            while events.changed().await.is_ok() {
-                let event = events.borrow_and_update().clone();
+            while let Some(event) = events.next().await {
                 seen.lock().unwrap().push(event);
             }
         })

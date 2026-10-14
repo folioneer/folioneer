@@ -1679,12 +1679,10 @@ mod tests {
         .with_event_bus(Arc::clone(&bus));
         let mut announced = bus.subscribe();
         let mut heard = |what: &'static str| {
-            let changed = announced.has_changed().expect("the bus lives");
-            assert!(changed, "{what} is not announced");
             assert_eq!(
-                *announced.borrow_and_update(),
-                Event::FeeScheduleUpdated,
-                "{what}"
+                announced.drain(),
+                vec![Event::FeeScheduleUpdated],
+                "{what} is not announced"
             );
         };
 

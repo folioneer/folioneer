@@ -11,7 +11,6 @@ use folioneer_lib::context::asset::{
 use folioneer_lib::core::{Event, SideEffectEventBus};
 use sqlx::sqlite::SqlitePoolOptions;
 use std::sync::Arc;
-use std::time::Duration;
 
 async fn make_pool() -> sqlx::Pool<sqlx::Sqlite> {
     let pool = SqlitePoolOptions::new()
@@ -188,11 +187,8 @@ async fn test_create_asset_publishes_asset_updated_event() {
         .await
         .unwrap();
 
-    tokio::time::timeout(Duration::from_millis(200), rx.changed())
-        .await
-        .expect("event not received within 200ms")
-        .expect("watch sender dropped before event fired");
-    assert_eq!(*rx.borrow(), Event::AssetUpdated);
+    let event = rx.drain().pop().expect("event not received within 200ms");
+    assert_eq!(event, Event::AssetUpdated);
 }
 
 /// archive_asset() fires AssetUpdated on the event bus.
@@ -208,11 +204,8 @@ async fn test_archive_asset_publishes_asset_updated_event() {
 
     svc.archive_asset(&asset.id).await.unwrap();
 
-    tokio::time::timeout(Duration::from_millis(200), rx.changed())
-        .await
-        .expect("event not received within 200ms")
-        .expect("watch sender dropped before event fired");
-    assert_eq!(*rx.borrow(), Event::AssetUpdated);
+    let event = rx.drain().pop().expect("event not received within 200ms");
+    assert_eq!(event, Event::AssetUpdated);
 }
 
 /// unarchive_asset() fires AssetUpdated on the event bus.
@@ -229,11 +222,8 @@ async fn test_unarchive_asset_publishes_asset_updated_event() {
 
     svc.unarchive_asset(&asset.id).await.unwrap();
 
-    tokio::time::timeout(Duration::from_millis(200), rx.changed())
-        .await
-        .expect("event not received within 200ms")
-        .expect("watch sender dropped before event fired");
-    assert_eq!(*rx.borrow(), Event::AssetUpdated);
+    let event = rx.drain().pop().expect("event not received within 200ms");
+    assert_eq!(event, Event::AssetUpdated);
 }
 
 /// delete_asset() fires AssetUpdated on the event bus.
@@ -246,11 +236,8 @@ async fn test_delete_asset_publishes_asset_updated_event() {
 
     svc.delete_asset(&asset.id).await.unwrap();
 
-    tokio::time::timeout(Duration::from_millis(200), rx.changed())
-        .await
-        .expect("event not received within 200ms")
-        .expect("watch sender dropped before event fired");
-    assert_eq!(*rx.borrow(), Event::AssetUpdated);
+    let event = rx.drain().pop().expect("event not received within 200ms");
+    assert_eq!(event, Event::AssetUpdated);
 }
 
 /// create_category() fires CategoryUpdated on the event bus.
@@ -261,11 +248,8 @@ async fn test_create_category_publishes_category_updated_event() {
 
     svc.create_category("EventCat").await.unwrap();
 
-    tokio::time::timeout(Duration::from_millis(200), rx.changed())
-        .await
-        .expect("event not received within 200ms")
-        .expect("watch sender dropped before event fired");
-    assert_eq!(*rx.borrow(), Event::CategoryUpdated);
+    let event = rx.drain().pop().expect("event not received within 200ms");
+    assert_eq!(event, Event::CategoryUpdated);
 }
 
 // ── Exchange field (AST-001, AST-022) ────────────────────────────────────────

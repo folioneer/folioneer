@@ -286,8 +286,7 @@ mod tests {
             .remember_run(&mut quiet_report("2026-08-22T10:00:00Z"))
             .await;
 
-        assert!(rx.has_changed().unwrap());
-        assert_eq!(*rx.borrow_and_update(), Event::SyncCompleted);
+        assert_eq!(rx.drain(), vec![Event::SyncCompleted]);
     }
 
     // SYN-064 — a join announces the rebuilt portfolio like a run that applied changes.
@@ -298,8 +297,7 @@ mod tests {
 
         service.announce_join();
 
-        assert!(rx.has_changed().unwrap());
-        assert_eq!(*rx.borrow_and_update(), Event::SyncCompleted);
+        assert_eq!(rx.drain(), vec![Event::SyncCompleted]);
     }
 
     #[tokio::test]
@@ -309,13 +307,12 @@ mod tests {
             .remember_run(&mut quiet_report("2026-08-22T10:00:00Z"))
             .await;
         let mut rx = bus.subscribe();
-        rx.borrow_and_update();
 
         service
             .remember_run(&mut quiet_report("2026-08-22T10:00:05Z"))
             .await;
 
-        assert!(!rx.has_changed().unwrap());
+        assert!(rx.drain().is_empty());
     }
 
     #[tokio::test]
@@ -325,18 +322,16 @@ mod tests {
             .remember_run(&mut quiet_report("2026-08-22T10:00:00Z"))
             .await;
         let mut rx = bus.subscribe();
-        rx.borrow_and_update();
 
         let mut applied = quiet_report("2026-08-22T10:00:05Z");
         applied.applied_changes = 1;
         service.remember_run(&mut applied).await;
-        assert!(rx.has_changed().unwrap());
-        rx.borrow_and_update();
+        assert_eq!(rx.drain(), vec![Event::SyncCompleted]);
 
         let mut failed = quiet_report("2026-08-22T10:00:10Z");
         failed.failures = vec![SyncFailure::PortfolioReset];
         service.remember_run(&mut failed).await;
-        assert!(rx.has_changed().unwrap());
+        assert_eq!(rx.drain(), vec![Event::SyncCompleted]);
     }
 
     fn repository_remembering_syncs() -> MockSyncStateRepository {

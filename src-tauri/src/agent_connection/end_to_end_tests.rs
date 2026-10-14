@@ -10,6 +10,8 @@ use serde_json::{json, Value};
 
 use crate::context::account::{AccountServiceContract, UpdateFrequency};
 use crate::context::asset::{AssetClass, AssetServiceContract, CreateAssetDTO};
+use crate::context::sync::SqliteChangeRecorder;
+use crate::core::event_bus::{Event, EventReceiver, SideEffectEventBus};
 use crate::core::Database;
 use crate::shared::infrastructure::container::AppContainer;
 use crate::use_cases::account_creation::AccountCreationUseCase;
@@ -96,6 +98,33 @@ async fn application_with_accounts(
         )),
     ));
     (gate, container.account_service)
+}
+
+/// The application as the window runs it: its services and its agent connection publish on
+/// one bus, which the test listens to in the window's place.
+async fn application_on_bus(data_dir: &Path) -> (Arc<AgentGate>, EventReceiver) {
+    // Seeds the account, its cash and the asset.
+    drop(application_with_accounts(data_dir).await);
+    let database = Database::new(data_dir.to_path_buf())
+        .await
+        .expect("database");
+    let bus = Arc::new(SideEffectEventBus::new());
+    let window = bus.subscribe();
+    let recorder = Arc::new(SqliteChangeRecorder::new(database.pool.clone()));
+    let container =
+        AppContainer::build(database.pool, None, None, Some(Arc::clone(&bus)), recorder);
+    let gate = Arc::new(AgentGate::new(
+        data_dir.to_path_buf(),
+        Arc::new(AgentConnections::new(move || {
+            bus.publish(Event::AgentConnectionChanged);
+        })),
+        Arc::new(AgentTools::new(
+            Arc::clone(&container.account_service) as _,
+            Arc::clone(&container.asset_service) as _,
+            Arc::clone(&container.currency_service),
+        )),
+    ));
+    (gate, window)
 }
 
 fn reaching(data_dir: &Path) -> Connector {
@@ -1990,4 +2019,78 @@ async fn agt_071_a_session_reads_the_price_of_an_asset_at_a_date() {
         granted.count_recording();
     }
     assert!(!granted.may_record_one_more());
+}
+
+// AGT-036 / B45 / TODO-083 — every write an agent makes reaches the window with the session's
+// change after it: an added asset, a transaction on it, a price, then many recordings sent
+// at once, none of them lost to the one after.
+#[tokio::test]
+async fn agt_036_every_write_of_an_agent_reaches_the_window() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let (gate, mut window) = application_on_bus(data_dir.path()).await;
+    gate.allow(true).expect("allowed");
+    let owner = owner_answers(&gate, true);
+    const MANY: u32 = 40;
+    let mut lines = vec![
+        json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize",
+            "params": { "clientInfo": { "name": "claude-code" } } })
+        .to_string(),
+        call(
+            1,
+            "add_asset",
+            json!({ "name": "Air Liquide", "reference": "AI",
+            "currency": "EUR", "kind": "custom" }),
+        ),
+        call(
+            2,
+            "record_purchase",
+            json!({ "account": "PEA", "asset": "AI",
+            "quantity": "1", "price": "1", "date": "2026-02-01" }),
+        ),
+        call(
+            3,
+            "record_price",
+            json!({ "asset": "AI", "price": "2", "date": "2026-02-01" }),
+        ),
+    ];
+    lines.extend((0..MANY).map(|n| {
+        call(
+            4 + n,
+            "record_purchase",
+            json!({ "account": "PEA", "asset": "CW8",
+            "quantity": "1", "price": "1", "date": "2026-02-02" }),
+        )
+    }));
+
+    let answered = answers(data_dir.path(), &lines).await;
+    owner.await.expect("owner");
+    assert!(answered[1..]
+        .iter()
+        .all(|answer| answer["result"]["isError"] == false));
+
+    // What the window is told, call by call: the session's change closes each call, and a
+    // call that wrote is told by its write's event first — a recording's twice, once
+    // recorded and once marked (AGT-045).
+    let told = window.drain();
+    let calls: Vec<&[Event]> = told
+        .split(|event| *event == Event::AgentConnectionChanged)
+        .collect();
+    let mut writes = vec![
+        Event::AssetUpdated,
+        Event::TransactionUpdated,
+        Event::AssetPriceUpdated,
+    ];
+    writes.extend((0..MANY).map(|_| Event::TransactionUpdated));
+    let mut told_writes = calls.iter().filter(|call| !call.is_empty());
+    for write in &writes {
+        let call = told_writes
+            .next()
+            .unwrap_or_else(|| panic!("{write:?} was not told: {told:?}"));
+        assert!(
+            call.iter().all(|event| event == write),
+            "{call:?} for {write:?}"
+        );
+    }
+    assert!(told_writes.next().is_none(), "{told:?}");
+    assert_eq!(told.last(), Some(&Event::AgentConnectionChanged));
 }

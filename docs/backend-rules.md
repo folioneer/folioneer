@@ -131,9 +131,11 @@ Service-layer checks are appropriate ONLY for cross-aggregate invariants (unique
 
 **B15** — SHOULD always publish a `{Domain}Updated` event when its state changes (create, update, delete, etc.). The BC Application Service (`service.rs`) is responsible for event emission. If no Application Service exists, the `api.rs` handler is responsible.
 
-**B45** — An action publishes exactly one event. The bus is a `tokio::sync::watch` channel: two
-back-to-back `send()`s deliver only the second to every subscriber. A removal publishes the event
-of the kind it removed, never a generic one followed by a specific one. A new event is declared in
+**B45** — Every event reaches every subscriber, in the order published. The bus is a
+`tokio::sync::broadcast` channel: back-to-back `publish()`s are all delivered — an agent's tool call
+publishes its write's event, then `AgentConnectionChanged` (AGT-036). Each event is a re-read in the
+window, so an action publishes what it changed and no more: a removal publishes the event of the
+kind it removed, never a generic one followed by a specific one. A new event is declared in
 `core/event_bus/event.rs`, published after persistence, and subscribed in the feature hook that
 re-fetches.
 

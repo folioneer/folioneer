@@ -826,8 +826,8 @@ mod tests {
         .await
         .unwrap();
 
-        rx.changed().await.unwrap();
-        assert_eq!(*rx.borrow(), Event::CurrencyRateUpdated);
+        let event = rx.drain().pop().expect("an event");
+        assert_eq!(event, Event::CurrencyRateUpdated);
     }
 
     // FXR-021 — record_currency_rate rejects a non-positive rate
@@ -1059,8 +1059,8 @@ mod tests {
         .await
         .unwrap();
 
-        rx.changed().await.unwrap();
-        assert_eq!(*rx.borrow(), Event::CurrencyRateUpdated);
+        let event = rx.drain().pop().expect("an event");
+        assert_eq!(event, Event::CurrencyRateUpdated);
     }
 
     // -------------------------------------------------------------------------
@@ -1150,8 +1150,8 @@ mod tests {
         .await
         .unwrap();
 
-        rx.changed().await.unwrap();
-        assert_eq!(*rx.borrow(), Event::CurrencyRateUpdated);
+        let event = rx.drain().pop().expect("an event");
+        assert_eq!(event, Event::CurrencyRateUpdated);
     }
 
     // -------------------------------------------------------------------------
@@ -1719,11 +1719,11 @@ mod tests {
         let result = svc.refresh_all_rates(vec![make_pair("USD", "EUR")]).await;
         assert!(result.is_ok(), "happy path must return Ok: {result:?}");
 
-        assert!(
-            rx.changed().await.is_ok(),
+        assert_eq!(
+            rx.drain(),
+            vec![Event::CurrencyRateUpdated],
             "expected CurrencyRateUpdated event on the bus"
         );
-        assert_eq!(*rx.borrow(), Event::CurrencyRateUpdated);
     }
 
     // FXR-073/083 — missing-leg skip: pair JPY→KRW but snapshot lacks KRW →
@@ -2242,8 +2242,11 @@ mod tests {
             .unwrap();
 
         assert_eq!(written, 1);
-        assert!(rx.has_changed().unwrap(), "the update must be announced");
-        assert_eq!(*rx.borrow_and_update(), Event::CurrencyRateUpdated);
+        assert_eq!(
+            rx.drain(),
+            vec![Event::CurrencyRateUpdated],
+            "the update must be announced"
+        );
     }
 
     #[tokio::test]
@@ -2396,11 +2399,11 @@ mod tests {
             .await
             .expect("FXR-054: declaring a valid pair succeeds");
 
-        tokio::time::timeout(std::time::Duration::from_millis(200), rx.changed())
-            .await
-            .expect("CurrencyPairUpdated not received within 200ms")
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::CurrencyPairUpdated);
+        let event = rx
+            .drain()
+            .pop()
+            .expect("CurrencyPairUpdated not received within 200ms");
+        assert_eq!(event, Event::CurrencyPairUpdated);
     }
 
     // FXR-054 — a rejected pair announces nothing: the bus never fires.
@@ -2420,9 +2423,7 @@ mod tests {
 
         // 50 ms on purpose: this waits for a notice that must never come.
         assert!(
-            tokio::time::timeout(std::time::Duration::from_millis(50), rx.changed())
-                .await
-                .is_err(),
+            rx.drain().is_empty(),
             "a rejected declaration must not announce a pair"
         );
     }
@@ -2437,7 +2438,7 @@ mod tests {
             .times(1)
             .returning(|_, _, _| Ok(()));
         let bus = Arc::new(SideEffectEventBus::new());
-        let rx = bus.subscribe();
+        let mut rx = bus.subscribe();
         let svc = make_service(pair_repo, MockCurrencyRateRepository::new())
             .with_event_bus(Arc::clone(&bus));
 
@@ -2450,7 +2451,7 @@ mod tests {
         .expect("CFR-017: applying an incoming currency pair must succeed");
 
         assert!(
-            !rx.has_changed().unwrap(),
+            rx.drain().is_empty(),
             "SYN-064: an applied pair must not raise its own event"
         );
     }
@@ -2464,7 +2465,7 @@ mod tests {
             .times(2)
             .returning(|_, _, _| Ok(()));
         let bus = Arc::new(SideEffectEventBus::new());
-        let rx = bus.subscribe();
+        let mut rx = bus.subscribe();
         let svc = make_service(pair_repo, MockCurrencyRateRepository::new())
             .with_event_bus(Arc::clone(&bus));
 
@@ -2478,7 +2479,7 @@ mod tests {
         }
 
         assert!(
-            !rx.has_changed().unwrap(),
+            rx.drain().is_empty(),
             "SYN-064: an applied removal must not raise its own event"
         );
     }

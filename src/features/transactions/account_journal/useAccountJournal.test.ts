@@ -221,6 +221,41 @@ describe("useAccountJournal", () => {
     expect(mockGetJournal).toHaveBeenCalledTimes(2);
   });
 
+  // TODO-083 / AGT-036 — an agent adds an asset then records on it: the window is told
+  // AssetUpdated (the store re-reads the assets) then TransactionUpdated (the journal
+  // re-reads), and the new row names the asset, not its id.
+  it("names an asset added just before the transaction recorded on it", async () => {
+    const { result } = renderHook(() => useAccountJournal());
+    await act(async () => {});
+    mockGetJournal.mockResolvedValue({
+      status: "ok",
+      data: {
+        ...JOURNAL,
+        rows: [
+          {
+            ...JOURNAL.rows[1],
+            transaction: tx({ id: "c", asset_id: "asset-new", date: "2026-10-13" }),
+          },
+          ...JOURNAL.rows,
+        ],
+      },
+    });
+
+    await act(async () => {
+      useAppStore.setState({
+        assets: [
+          ...useAppStore.getState().assets,
+          { id: "asset-new", name: "Air Liquide" } as Asset,
+        ],
+      });
+      eventCallback?.("TransactionUpdated");
+    });
+
+    expect(result.current.filteredSortedRows.find((r) => r.id === "c")?.assetName).toBe(
+      "Air Liquide",
+    );
+  });
+
   it("re-fetches once when a sync completes", async () => {
     renderHook(() => useAccountJournal());
     await act(async () => {});

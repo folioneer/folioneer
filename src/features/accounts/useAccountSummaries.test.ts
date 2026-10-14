@@ -120,6 +120,38 @@ describe("useAccountSummaries", () => {
     expect(mockGetAccountSummaries.mock.calls.length).toBeGreaterThan(beforeCount);
   });
 
+  // TODO-083 / AGT-036 — a recording, the owner's or an agent's, moves the global view
+  // without leaving the page.
+  it("re-fetches summaries when a transaction is recorded", async () => {
+    let capturedCallback: ((type: string) => void) | null = null;
+    mockSubscribeToEvents.mockImplementation((cb: (type: string) => void) => {
+      capturedCallback = cb;
+      return Promise.resolve(() => {});
+    });
+    mockGetAccountSummaries.mockResolvedValue({
+      status: "ok",
+      data: {
+        summaries: [],
+        total: {
+          total_global_value: 0,
+          total_unrealized_pnl: null,
+          currency: "EUR",
+          incomplete: false,
+        },
+      },
+    });
+
+    renderHook(() => useAccountSummaries());
+    await act(async () => {});
+    const beforeCount = mockGetAccountSummaries.mock.calls.length;
+
+    await act(async () => {
+      capturedCallback?.("TransactionUpdated");
+    });
+
+    expect(mockGetAccountSummaries.mock.calls.length).toBe(beforeCount + 1);
+  });
+
   // TODO-020 / SYN-064 — changes applied from another device arrive as one SyncCompleted.
   it("re-fetches summaries once when a sync completes", async () => {
     let capturedCallback: ((type: string) => void) | null = null;

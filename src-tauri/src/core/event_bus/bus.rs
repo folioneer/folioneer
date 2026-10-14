@@ -1,21 +1,26 @@
 //! Global event bus for cross-context communication.
 
-use tokio::sync::watch;
+use tokio::sync::broadcast::{self, error::RecvError, error::TryRecvError};
+
+use crate::core::logger::BACKEND;
 
 use super::event::Event;
 
-/// Global event bus for side effects across features.
-/// Each event published here can be subscribed to by any feature service.
-/// Subscriptions are auto-managed: dropping a receiver automatically unsubscribes.
+/// How many events a subscriber may fall behind before the oldest are lost. The window's
+/// forwarder only re-emits each event, so it never comes near it; a lag is logged.
+const CAPACITY: usize = 1024;
+
+/// Global event bus for side effects across features (B45): every event published reaches
+/// every subscriber, in the order published — two back-to-back publishes deliver both.
 #[derive(Debug, Clone)]
 pub struct SideEffectEventBus {
-    tx: watch::Sender<Event>,
+    tx: broadcast::Sender<Event>,
 }
 
 impl SideEffectEventBus {
     /// Create a new event bus instance
     pub fn new() -> Self {
-        let (tx, _) = watch::channel(Event::Health);
+        let (tx, _) = broadcast::channel(CAPACITY);
         Self { tx }
     }
 
@@ -25,15 +30,9 @@ impl SideEffectEventBus {
         let _ = self.tx.send(event);
     }
 
-    /// Subscribe to events. Returns a receiver that auto-unsubscribes when dropped.
-    /// The receiver will receive all future events from the moment of subscription.
-    pub fn subscribe(&self) -> watch::Receiver<Event> {
-        self.tx.subscribe()
-    }
-
-    /// Get the current/last published event
-    pub fn current(&self) -> Event {
-        self.tx.borrow().clone()
+    /// Subscribe to the events published from now on. Dropping the receiver unsubscribes.
+    pub fn subscribe(&self) -> EventReceiver {
+        EventReceiver(self.tx.subscribe())
     }
 }
 
@@ -41,6 +40,40 @@ impl Default for SideEffectEventBus {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// One subscriber's view of the bus: the events published since it subscribed, in order.
+#[derive(Debug)]
+pub struct EventReceiver(broadcast::Receiver<Event>);
+
+impl EventReceiver {
+    /// The next event, waiting for it; `None` once every handle on the bus is gone.
+    pub async fn next(&mut self) -> Option<Event> {
+        loop {
+            match self.0.recv().await {
+                Ok(event) => return Some(event),
+                Err(RecvError::Lagged(missed)) => fell_behind(missed),
+                Err(RecvError::Closed) => return None,
+            }
+        }
+    }
+
+    /// The events published since the last read, without waiting.
+    pub fn drain(&mut self) -> Vec<Event> {
+        let mut events = Vec::new();
+        loop {
+            match self.0.try_recv() {
+                Ok(event) => events.push(event),
+                Err(TryRecvError::Lagged(missed)) => fell_behind(missed),
+                Err(TryRecvError::Empty | TryRecvError::Closed) => return events,
+            }
+        }
+    }
+}
+
+/// The oldest events were lost to a subscriber that fell behind; the newer ones follow.
+fn fell_behind(missed: u64) {
+    tracing::warn!(target: BACKEND, missed, "event subscriber fell behind");
 }
 
 #[cfg(test)]
@@ -52,12 +85,44 @@ mod tests {
         let bus = SideEffectEventBus::new();
         let mut rx = bus.subscribe();
 
-        // Publish an event
-        let event = Event::AssetUpdated;
-        bus.publish(event.clone());
+        bus.publish(Event::AssetUpdated);
 
-        // Subscribe and receive
-        rx.changed().await.unwrap();
-        assert_eq!(*rx.borrow(), event);
+        assert_eq!(rx.next().await, Some(Event::AssetUpdated));
+    }
+
+    // B45 / TODO-083 — two publishes with nothing between both reach a subscriber, in order.
+    #[tokio::test]
+    async fn back_to_back_publishes_all_reach_a_subscriber_in_order() {
+        let bus = SideEffectEventBus::new();
+        let mut rx = bus.subscribe();
+
+        bus.publish(Event::AssetUpdated);
+        bus.publish(Event::TransactionUpdated);
+        bus.publish(Event::AgentConnectionChanged);
+
+        assert_eq!(rx.next().await, Some(Event::AssetUpdated));
+        assert_eq!(
+            rx.drain(),
+            vec![Event::TransactionUpdated, Event::AgentConnectionChanged]
+        );
+    }
+
+    // A subscriber that falls behind loses the oldest events and keeps the newest.
+    #[tokio::test]
+    async fn a_subscriber_that_falls_behind_keeps_the_newest_events() {
+        let bus = SideEffectEventBus::new();
+        let mut rx = bus.subscribe();
+
+        bus.publish(Event::AssetUpdated);
+        bus.publish(Event::AssetUpdated);
+        for _ in 0..CAPACITY {
+            bus.publish(Event::TransactionUpdated);
+        }
+
+        let kept = rx.drain();
+        assert_eq!(kept.len(), CAPACITY);
+        assert!(kept.iter().all(|event| *event == Event::TransactionUpdated));
+        bus.publish(Event::AccountUpdated);
+        assert_eq!(rx.next().await, Some(Event::AccountUpdated));
     }
 }

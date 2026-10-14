@@ -449,7 +449,7 @@ async fn record_dividend_publishes_transaction_updated_event() {
         .await
         .unwrap();
     // Drain the AssetUpdated event from create_asset.
-    let _ = rx.changed().await;
+    rx.drain();
 
     let account = account_service
         .create(
@@ -462,13 +462,13 @@ async fn record_dividend_publishes_transaction_updated_event() {
         .await
         .unwrap();
     // Drain AccountUpdated.
-    let _ = rx.changed().await;
+    rx.drain();
 
     uc.record_deposit(&account.id, "2024-01-01".to_string(), micro(1_000), None)
         .await
         .unwrap();
     // Drain TransactionUpdated from deposit.
-    let _ = rx.changed().await;
+    rx.drain();
 
     uc.buy_holding(
         &account.id,
@@ -484,7 +484,7 @@ async fn record_dividend_publishes_transaction_updated_event() {
     .await
     .unwrap();
     // Drain TransactionUpdated from buy.
-    let _ = rx.changed().await;
+    rx.drain();
 
     uc.record_dividend(
         &account.id,
@@ -498,9 +498,10 @@ async fn record_dividend_publishes_transaction_updated_event() {
     .unwrap();
 
     // The next event must be TransactionUpdated (DIV-026).
-    let changed = rx.changed().await;
-    assert!(changed.is_ok(), "expected an event after record_dividend");
-    let event = rx.borrow().clone();
+    let event = rx
+        .drain()
+        .pop()
+        .expect("expected an event after record_dividend");
     use folioneer_lib::core::event_bus::Event;
     assert_eq!(
         event,

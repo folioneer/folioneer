@@ -3823,7 +3823,6 @@ mod tests {
     // so this avoids racing against events emitted during setup.
     #[tokio::test]
     async fn csh_100_record_deposit_publishes_transaction_updated_event() {
-        use std::time::Duration;
         let pool = make_pool().await;
         let bus = Arc::new(SideEffectEventBus::new());
         let svc = AccountService::new(
@@ -3849,16 +3848,15 @@ mod tests {
         svc.record_deposit(&account.id, "2020-02-01".to_string(), 50_000_000, None)
             .await
             .unwrap();
-        tokio::time::timeout(Duration::from_millis(200), rx.changed())
-            .await
-            .expect("TransactionUpdated event not received within 200ms")
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::TransactionUpdated);
+        let event = rx
+            .drain()
+            .pop()
+            .expect("TransactionUpdated event not received within 200ms");
+        assert_eq!(event, Event::TransactionUpdated);
     }
 
     #[tokio::test]
     async fn csh_100_record_withdrawal_publishes_transaction_updated_event() {
-        use std::time::Duration;
         let pool = make_pool().await;
         let bus = Arc::new(SideEffectEventBus::new());
         let svc = AccountService::new(
@@ -3884,11 +3882,11 @@ mod tests {
         svc.record_withdrawal(&account.id, "2020-02-01".to_string(), 100_000_000, None)
             .await
             .unwrap();
-        tokio::time::timeout(Duration::from_millis(200), rx.changed())
-            .await
-            .expect("TransactionUpdated event not received within 200ms")
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::TransactionUpdated);
+        let event = rx
+            .drain()
+            .pop()
+            .expect("TransactionUpdated event not received within 200ms");
+        assert_eq!(event, Event::TransactionUpdated);
     }
 
     // -------------------------------------------------------------------------
@@ -4350,7 +4348,6 @@ mod tests {
     #[tokio::test]
     async fn fsd_026_record_free_shares_publishes_transaction_updated_event() {
         // FSD-026 — TransactionUpdated must be emitted after a successful distribution
-        use std::time::Duration;
         let pool = make_pool().await;
         let bus = Arc::new(SideEffectEventBus::new());
         let svc = AccountService::new(
@@ -4398,13 +4395,13 @@ mod tests {
         .await
         .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(200), rx.changed())
-            .await
-            .expect("TransactionUpdated event not received within 200ms")
-            .expect("watch sender dropped");
+        let event = rx
+            .drain()
+            .pop()
+            .expect("TransactionUpdated event not received within 200ms");
         use crate::core::event_bus::Event;
         assert_eq!(
-            *rx.borrow(),
+            event,
             Event::TransactionUpdated,
             "record_free_shares must publish TransactionUpdated (FSD-026)"
         );
@@ -4415,7 +4412,6 @@ mod tests {
     // independent of the fee parameter (INT-050).
     #[tokio::test]
     async fn int_025_record_interest_publishes_transaction_updated_event() {
-        use std::time::Duration;
         let pool = make_pool().await;
         let bus = Arc::new(SideEffectEventBus::new());
         let svc = AccountService::new(
@@ -4465,13 +4461,13 @@ mod tests {
         .await
         .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(200), rx.changed())
-            .await
-            .expect("TransactionUpdated event not received within 200ms")
-            .expect("watch sender dropped");
+        let event = rx
+            .drain()
+            .pop()
+            .expect("TransactionUpdated event not received within 200ms");
         use crate::core::event_bus::Event;
         assert_eq!(
-            *rx.borrow(),
+            event,
             Event::TransactionUpdated,
             "record_interest must publish TransactionUpdated (INT-025)"
         );
@@ -5893,7 +5889,6 @@ mod tests {
     // signal rather than on a broader one.
     #[tokio::test]
     async fn hno_020_upsert_holding_note_publishes_holding_note_updated() {
-        use std::time::Duration;
         let pool = make_pool().await;
         let bus = Arc::new(SideEffectEventBus::new());
         let (svc, asset_id) = setup(&pool).await;
@@ -5905,17 +5900,16 @@ mod tests {
         svc.upsert_holding_note(&account.id, asset_id, "watch".to_string(), None, None)
             .await
             .unwrap();
-        tokio::time::timeout(Duration::from_millis(200), rx.changed())
-            .await
-            .expect("HoldingNoteUpdated not received within 200ms")
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::HoldingNoteUpdated);
+        let event = rx
+            .drain()
+            .pop()
+            .expect("HoldingNoteUpdated not received within 200ms");
+        assert_eq!(event, Event::HoldingNoteUpdated);
     }
 
     // HNO-021 — deleting a note announces it the same way.
     #[tokio::test]
     async fn hno_021_delete_holding_note_publishes_holding_note_updated() {
-        use std::time::Duration;
         let pool = make_pool().await;
         let bus = Arc::new(SideEffectEventBus::new());
         let (svc, asset_id) = setup(&pool).await;
@@ -5935,11 +5929,11 @@ mod tests {
         svc.delete_holding_note(&account.id, &asset_id)
             .await
             .unwrap();
-        tokio::time::timeout(Duration::from_millis(200), rx.changed())
-            .await
-            .expect("HoldingNoteUpdated not received within 200ms")
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::HoldingNoteUpdated);
+        let event = rx
+            .drain()
+            .pop()
+            .expect("HoldingNoteUpdated not received within 200ms");
+        assert_eq!(event, Event::HoldingNoteUpdated);
     }
 
     // SYN-064 — applying a note publishes nothing: the sync run announces everything it
@@ -5962,7 +5956,7 @@ mod tests {
         let content = serde_json::to_string(&incoming).unwrap();
 
         // Subscribe AFTER setup — `changed()` fires only on the next publish.
-        let rx = bus.subscribe();
+        let mut rx = bus.subscribe();
         let mut conn = pool.acquire().await.unwrap();
         svc.apply_holding_note(&mut conn, &content, incoming_rank("laptop", 100))
             .await
@@ -5970,7 +5964,7 @@ mod tests {
         drop(conn);
 
         assert!(
-            !rx.has_changed().unwrap(),
+            rx.drain().is_empty(),
             "SYN-064: an applied note must not raise its own event"
         );
         let notes = svc.get_holding_notes(&account.id).await.unwrap();
@@ -5999,7 +5993,7 @@ mod tests {
         assert_eq!(svc.get_holding_notes(&account.id).await.unwrap().len(), 1);
 
         // Subscribe AFTER setup — `changed()` fires only on the next publish.
-        let rx = bus.subscribe();
+        let mut rx = bus.subscribe();
         let mut conn = pool.acquire().await.unwrap();
         svc.apply_removal(
             &mut conn,
@@ -6011,7 +6005,7 @@ mod tests {
         drop(conn);
 
         assert!(
-            !rx.has_changed().unwrap(),
+            rx.drain().is_empty(),
             "SYN-064: an applied removal must not raise its own event"
         );
         assert!(

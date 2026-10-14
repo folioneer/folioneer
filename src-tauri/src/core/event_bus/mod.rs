@@ -3,5 +3,5 @@
 mod bus;
 mod event;
 
-pub use bus::SideEffectEventBus;
+pub use bus::{EventReceiver, SideEffectEventBus};
 pub use event::{Event, PriceMovementReport, PriceMovementRow, UnpricedAsset};

@@ -1336,7 +1336,6 @@ mod tests {
         MockAssetPriceRepository, MockAssetRepository,
     };
     use std::sync::Arc;
-    use std::time::Duration;
 
     fn make_svc(
         ar: MockAssetRepository,
@@ -2597,11 +2596,8 @@ mod tests {
         svc.record_asset_price("asset-id", "2026-01-01", 150.5)
             .await
             .unwrap();
-        tokio::time::timeout(Duration::from_millis(200), rx.changed())
-            .await
-            .expect("event not received within 200ms")
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::AssetPriceUpdated);
+        let event = rx.drain().pop().expect("event not received within 200ms");
+        assert_eq!(event, Event::AssetPriceUpdated);
     }
 
     // MKT-057 — notify_asset_price_updated publishes AssetPriceUpdated when a bus is configured
@@ -2616,11 +2612,8 @@ mod tests {
         )
         .with_event_bus(bus);
         svc.notify_asset_price_updated();
-        tokio::time::timeout(Duration::from_millis(200), rx.changed())
-            .await
-            .expect("event not received within 200ms")
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::AssetPriceUpdated);
+        let event = rx.drain().pop().expect("event not received within 200ms");
+        assert_eq!(event, Event::AssetPriceUpdated);
     }
 
     // MKT-031 — get_latest_price returns None when no price has been recorded
@@ -2942,11 +2935,8 @@ mod tests {
         svc.update_asset_price("asset-id", "2026-01-01", "2026-01-01", 150.0)
             .await
             .unwrap();
-        tokio::time::timeout(Duration::from_millis(200), rx.changed())
-            .await
-            .expect("event not received within 200ms")
-            .unwrap();
-        assert_eq!(*rx.borrow(), Event::AssetPriceUpdated);
+        let event = rx.drain().pop().expect("event not received within 200ms");
+        assert_eq!(event, Event::AssetPriceUpdated);
     }
 
     // -------------------------------------------------------------------------
@@ -3038,11 +3028,8 @@ mod tests {
         svc.delete_asset_price("asset-id", "2026-01-01")
             .await
             .unwrap();
-        tokio::time::timeout(Duration::from_millis(200), rx.changed())
-            .await
-            .expect("event not received within 200ms")
-            .unwrap();
-        assert_eq!(*rx.borrow(), Event::AssetPriceUpdated);
+        let event = rx.drain().pop().expect("event not received within 200ms");
+        assert_eq!(event, Event::AssetPriceUpdated);
     }
 
     // -------------------------------------------------------------------------
@@ -3258,10 +3245,8 @@ mod tests {
 
         svc.archive_asset("a-id").await.unwrap();
 
-        rx.changed()
-            .await
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::AssetUpdated);
+        let event = rx.drain().pop().expect("the event fired");
+        assert_eq!(event, Event::AssetUpdated);
     }
 
     #[tokio::test]
@@ -3281,10 +3266,8 @@ mod tests {
 
         svc.unarchive_asset("a-id").await.unwrap();
 
-        rx.changed()
-            .await
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::AssetUpdated);
+        let event = rx.drain().pop().expect("the event fired");
+        assert_eq!(event, Event::AssetUpdated);
     }
 
     #[tokio::test]
@@ -3304,10 +3287,8 @@ mod tests {
 
         svc.delete_asset("a-id").await.unwrap();
 
-        rx.changed()
-            .await
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::AssetUpdated);
+        let event = rx.drain().pop().expect("the event fired");
+        assert_eq!(event, Event::AssetUpdated);
     }
 
     // CSH-016 — update_asset rejects a system Cash Asset
@@ -3434,10 +3415,8 @@ mod tests {
 
         svc.create_category("NewCat").await.unwrap();
 
-        rx.changed()
-            .await
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::CategoryUpdated);
+        let event = rx.drain().pop().expect("the event fired");
+        assert_eq!(event, Event::CategoryUpdated);
     }
 
     #[tokio::test]
@@ -3462,10 +3441,8 @@ mod tests {
 
         svc.update_category("some-id", "Updated").await.unwrap();
 
-        rx.changed()
-            .await
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::CategoryUpdated);
+        let event = rx.drain().pop().expect("the event fired");
+        assert_eq!(event, Event::CategoryUpdated);
     }
 
     #[tokio::test]
@@ -3491,10 +3468,8 @@ mod tests {
 
         svc.delete_category("some-cat-id").await.unwrap();
 
-        rx.changed()
-            .await
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::CategoryUpdated);
+        let event = rx.drain().pop().expect("the event fired");
+        assert_eq!(event, Event::CategoryUpdated);
     }
 
     // -------------------------------------------------------------------------
@@ -3810,11 +3785,8 @@ mod tests {
             .await
             .unwrap();
 
-        tokio::time::timeout(Duration::from_millis(200), rx.changed())
-            .await
-            .expect("event not received within 200ms")
-            .expect("watch sender dropped before event fired");
-        assert_eq!(*rx.borrow(), Event::AssetPriceUpdated);
+        let event = rx.drain().pop().expect("event not received within 200ms");
+        assert_eq!(event, Event::AssetPriceUpdated);
     }
 
     // MKT-194 — a backfill that wrote nothing publishes nothing. The test above
@@ -3853,9 +3825,7 @@ mod tests {
             }
         );
         assert!(
-            tokio::time::timeout(Duration::from_millis(50), rx.changed())
-                .await
-                .is_err(),
+            rx.drain().is_empty(),
             "no event may be published when nothing was written"
         );
     }
@@ -4070,7 +4040,7 @@ mod tests {
             .times(3)
             .returning(|_, _, _| Ok(()));
         let bus = Arc::new(SideEffectEventBus::new());
-        let rx = bus.subscribe();
+        let mut rx = bus.subscribe();
         let svc = make_svc(
             ar,
             MockAssetCategoryRepository::new(),
@@ -4096,7 +4066,7 @@ mod tests {
         }
 
         assert!(
-            !rx.has_changed().unwrap(),
+            rx.drain().is_empty(),
             "SYN-064: an applied write must not raise its own event"
         );
     }

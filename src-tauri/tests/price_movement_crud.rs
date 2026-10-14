@@ -184,11 +184,12 @@ async fn await_completion(bus: &SideEffectEventBus) -> Event {
     let mut rx = bus.subscribe();
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
-            rx.changed()
+            let event = rx
+                .next()
                 .await
                 .expect("bus closed before AssetPriceFetchCompleted arrived");
-            if matches!(*rx.borrow(), Event::AssetPriceFetchCompleted { .. }) {
-                return rx.borrow().clone();
+            if matches!(event, Event::AssetPriceFetchCompleted { .. }) {
+                return event;
             }
         }
     })

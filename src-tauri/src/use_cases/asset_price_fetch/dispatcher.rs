@@ -344,8 +344,8 @@ mod task_tests {
         );
         let mut progress = Vec::new();
         let (ok, skipped, unpriced) = loop {
-            events.changed().await.expect("bus open");
-            match events.borrow().clone() {
+            let event = events.next().await.expect("bus open");
+            match event {
                 Event::AssetPriceFetchProgress { done, total } => progress.push((done, total)),
                 Event::AssetPriceFetchCompleted {
                     ok,

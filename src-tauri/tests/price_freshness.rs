@@ -156,10 +156,11 @@ async fn freshness_read_on_completion(provider: Arc<dyn PriceProvider>) -> Price
         .expect("dispatch");
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
-            rx.changed()
+            let event = rx
+                .next()
                 .await
                 .expect("bus closed before AssetPriceFetchCompleted arrived");
-            if matches!(*rx.borrow(), Event::AssetPriceFetchCompleted { .. }) {
+            if matches!(event, Event::AssetPriceFetchCompleted { .. }) {
                 return;
             }
         }

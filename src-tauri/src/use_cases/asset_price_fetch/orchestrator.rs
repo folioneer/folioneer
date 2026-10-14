@@ -295,9 +295,8 @@ mod tests {
             ),
             "an empty DB must reject before dispatch, got: {result:?}"
         );
-        // No event was published: `changed()` must not resolve within a short window.
-        let outcome =
-            tokio::time::timeout(std::time::Duration::from_millis(200), rx.changed()).await;
+        // No event was published: none arrives within a short window.
+        let outcome = tokio::time::timeout(std::time::Duration::from_millis(200), rx.next()).await;
         assert!(
             outcome.is_err(),
             "no AssetPriceFetchCompleted (or any other event) may be published on a pre-dispatch rejection"

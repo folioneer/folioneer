@@ -637,10 +637,11 @@ async fn fetch_publishes_completion_event_with_counts() {
     // The fetch runs in a detached task; wait for the terminal completion event.
     let counts = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
-            rx.changed()
+            let event = rx
+                .next()
                 .await
                 .expect("bus closed before AssetPriceFetchCompleted arrived");
-            if let Event::AssetPriceFetchCompleted { ok, skipped, .. } = *rx.borrow() {
+            if let Event::AssetPriceFetchCompleted { ok, skipped, .. } = event {
                 return (ok, skipped);
             }
         }
@@ -782,7 +783,8 @@ async fn fetch_completion_event_unpriced_list_contains_skipped_asset_with_last_p
     // Wait for the terminal completion event.
     let event = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
-            rx.changed()
+            let event = rx
+                .next()
                 .await
                 .expect("bus closed before AssetPriceFetchCompleted arrived");
             if let Event::AssetPriceFetchCompleted {
@@ -790,7 +792,7 @@ async fn fetch_completion_event_unpriced_list_contains_skipped_asset_with_last_p
                 skipped,
                 ref unpriced,
                 ..
-            } = *rx.borrow()
+            } = event
             {
                 return (ok, skipped, unpriced.clone());
             }
@@ -943,10 +945,11 @@ async fn fetch_completion_unpriced_entry_has_none_last_price_when_never_priced()
     let unpriced: Vec<UnpricedAsset> =
         tokio::time::timeout(std::time::Duration::from_secs(5), async {
             loop {
-                rx.changed()
+                let event = rx
+                    .next()
                     .await
                     .expect("bus closed before AssetPriceFetchCompleted arrived");
-                if let Event::AssetPriceFetchCompleted { ref unpriced, .. } = *rx.borrow() {
+                if let Event::AssetPriceFetchCompleted { ref unpriced, .. } = event {
                     return unpriced.clone();
                 }
             }
@@ -1072,10 +1075,11 @@ async fn fetch_completion_unpriced_list_excludes_successfully_fetched_asset() {
     let unpriced: Vec<UnpricedAsset> =
         tokio::time::timeout(std::time::Duration::from_secs(5), async {
             loop {
-                rx.changed()
+                let event = rx
+                    .next()
                     .await
                     .expect("bus closed before AssetPriceFetchCompleted arrived");
-                if let Event::AssetPriceFetchCompleted { ref unpriced, .. } = *rx.borrow() {
+                if let Event::AssetPriceFetchCompleted { ref unpriced, .. } = event {
                     return unpriced.clone();
                 }
             }
@@ -1223,7 +1227,8 @@ async fn fetch_completion_unpriced_len_equals_skipped_count_in_mixed_outcome() {
 
     let event = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
-            rx.changed()
+            let event = rx
+                .next()
                 .await
                 .expect("bus closed before AssetPriceFetchCompleted arrived");
             if let Event::AssetPriceFetchCompleted {
@@ -1231,7 +1236,7 @@ async fn fetch_completion_unpriced_len_equals_skipped_count_in_mixed_outcome() {
                 skipped,
                 ref unpriced,
                 ..
-            } = *rx.borrow()
+            } = event
             {
                 return (ok, skipped, unpriced.clone());
             }

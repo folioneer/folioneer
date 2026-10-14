@@ -159,11 +159,7 @@ pub fn run() {
                 let mut rx = event_bus.subscribe();
                 let forwarder_handle = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    loop {
-                        if rx.changed().await.is_err() {
-                            break;
-                        }
-                        let event = rx.borrow().clone();
+                    while let Some(event) = rx.next().await {
                         let _ = Event::emit(&event, &forwarder_handle);
                     }
                 });

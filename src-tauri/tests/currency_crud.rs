@@ -104,8 +104,8 @@ async fn record_currency_rate_publishes_event_end_to_end() {
     .await
     .unwrap();
 
-    rx.changed().await.unwrap();
-    assert_eq!(*rx.borrow(), Event::CurrencyRateUpdated);
+    let event = rx.drain().pop().expect("an event");
+    assert_eq!(event, Event::CurrencyRateUpdated);
 }
 
 /// FXR-053 — delete_currency_rate returns RateNotFound when the record does not exist.

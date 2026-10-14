@@ -110,21 +110,21 @@ async fn update_asset_price_date_change_is_atomic_end_to_end() {
         .await
         .unwrap();
     // Drain the record_asset_price event
-    rx.changed().await.unwrap();
+    rx.drain();
 
     // Pre-existing record at the target date — must be silently overwritten (MKT-084)
     svc.record_asset_price(&asset_id, "2026-01-02", 105.0)
         .await
         .unwrap();
-    rx.changed().await.unwrap();
+    rx.drain();
 
     svc.update_asset_price(&asset_id, "2026-01-01", "2026-01-02", 200.0)
         .await
         .unwrap();
 
     // MKT-085 — event fired
-    rx.changed().await.unwrap();
-    assert_eq!(*rx.borrow(), Event::AssetPriceUpdated);
+    let event = rx.drain().pop().expect("an event");
+    assert_eq!(event, Event::AssetPriceUpdated);
 
     // DB state: only 2026-01-02 row remains with the updated price
     let prices = svc.get_asset_prices(&asset_id).await.unwrap();
@@ -144,19 +144,19 @@ async fn delete_asset_price_removes_record_leaves_others_and_publishes_event() {
     svc.record_asset_price(&asset_id, "2026-01-01", 100.0)
         .await
         .unwrap();
-    rx.changed().await.unwrap();
+    rx.drain();
     svc.record_asset_price(&asset_id, "2026-01-02", 110.0)
         .await
         .unwrap();
-    rx.changed().await.unwrap();
+    rx.drain();
 
     svc.delete_asset_price(&asset_id, "2026-01-01")
         .await
         .unwrap();
 
     // MKT-091 — event fired
-    rx.changed().await.unwrap();
-    assert_eq!(*rx.borrow(), Event::AssetPriceUpdated);
+    let event = rx.drain().pop().expect("an event");
+    assert_eq!(event, Event::AssetPriceUpdated);
 
     // DB state: only the 2026-01-02 record remains
     let prices = svc.get_asset_prices(&asset_id).await.unwrap();

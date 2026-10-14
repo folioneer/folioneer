@@ -420,9 +420,9 @@ async fn refresh_report(p: &Portfolio) -> Value {
         .expect("refresh");
     let event = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
-            rx.changed().await.expect("bus closed");
-            if matches!(*rx.borrow(), Event::AssetPriceFetchCompleted { .. }) {
-                return rx.borrow().clone();
+            let event = rx.next().await.expect("bus closed");
+            if matches!(event, Event::AssetPriceFetchCompleted { .. }) {
+                return event;
             }
         }
     })
