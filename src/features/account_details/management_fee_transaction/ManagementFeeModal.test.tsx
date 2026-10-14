@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { todayIso } from "@/ui/format/date";
 import { ManagementFeeModal } from "./ManagementFeeModal";
 
 // ── Mock the hook that drives the component ────────────────────────────────────
@@ -29,7 +30,7 @@ const heldAssets = [
   { assetId: "asset-equity-2", assetName: "Tesla Inc", assetCurrency: "USD" },
 ];
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = todayIso();
 
 const makeHookReturn = (overrides: Record<string, unknown> = {}) => ({
   formData: {

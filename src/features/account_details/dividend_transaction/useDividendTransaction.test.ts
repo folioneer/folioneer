@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { logger } from "@/lib/logger";
+import { todayIso } from "@/ui/format/date";
 import { useDividendTransaction } from "./useDividendTransaction";
 
 const { mockRecordDividend, mockShowSnackbar } = vi.hoisted(() => ({
@@ -29,7 +30,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = todayIso();
 
 const fakeSubmit = { preventDefault: vi.fn() } as unknown as React.FormEvent;
 

@@ -10,6 +10,7 @@ vi.mock("./gateway", () => ({
   },
 }));
 
+import { todayIso } from "@/ui/format/date";
 import * as gateway from "./gateway";
 import { useUnpricedPrices } from "./useUnpricedPrices";
 
@@ -79,7 +80,7 @@ describe("useUnpricedPrices — record (MKT-175)", () => {
       status: "ok",
       data: null,
     });
-    const TODAY = new Date().toISOString().slice(0, 10);
+    const TODAY = todayIso();
     const asset = makeAsset();
     const { result } = renderHook(() => useUnpricedPrices([asset], vi.fn()));
 

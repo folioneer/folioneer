@@ -100,6 +100,10 @@ const onClose = vi.fn();
 const { result } = renderHook(() => useMyHook(item, onClose));
 ```
 
+### Today's date
+
+A test that expects today's date takes it as the code does: `todayIso()` (`@/ui/format/date`), the day on this computer. `new Date().toISOString()` is the day in UTC: away from UTC it differs for part of every day, and the test fails there while CI, in UTC, passes. A test that needs a given day fixes the clock (`vi.useFakeTimers()` and `vi.setSystemTime(...)`).
+
 ### Async patterns
 
 Use `waitFor` to wait for async state to settle, `act` to trigger synchronous actions:

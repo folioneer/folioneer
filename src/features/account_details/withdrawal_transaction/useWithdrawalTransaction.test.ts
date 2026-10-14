@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { logger } from "@/lib/logger";
+import { todayIso } from "@/ui/format/date";
 import { useWithdrawalTransaction } from "./useWithdrawalTransaction";
 
 const { mockRecordWithdrawal, mockCorrectTransaction, mockShowSnackbar } = vi.hoisted(() => ({
@@ -44,7 +45,7 @@ describe("useWithdrawalTransaction (CSH-030/031/032/035/081)", () => {
   // CSH-030 — initial state
   it("initial state has today's date and blank amount/note", () => {
     const { result } = renderHook(() => useWithdrawalTransaction({ accountId: "account-1" }));
-    expect(result.current.formData.date).toBe(new Date().toISOString().slice(0, 10));
+    expect(result.current.formData.date).toBe(todayIso());
     expect(result.current.formData.amount).toBe("");
   });
 

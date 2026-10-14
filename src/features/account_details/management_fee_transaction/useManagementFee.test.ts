@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { logger } from "@/lib/logger";
+import { todayIso } from "@/ui/format/date";
 import { useManagementFee } from "./useManagementFee";
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────────
@@ -46,7 +47,7 @@ vi.mock("@/lib/lastOperationDateStorage", () => ({
 }));
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = todayIso();
 
 const fakeSubmit = { preventDefault: vi.fn() } as unknown as React.FormEvent;
 

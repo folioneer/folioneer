@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TransactionDraft } from "@/bindings";
 import { microToFormatted } from "@/lib/microUnits";
+import { todayIso } from "@/ui/format/date";
 import { useSellTransaction } from "./useSellTransaction";
 
 const { mockSellHolding, mockRecordAssetPrice, mockGetSnapshot, mockValidateDraft } = vi.hoisted(
@@ -425,7 +426,7 @@ describe("useSellTransaction", () => {
   // SEL-029 — default form values: date=today, exchangeRate=1.000000, fees=0
   it("initialises defaults: date=today, exchangeRate=1.000000, fees=0 (SEL-029)", () => {
     const { result } = renderHook(() => useSellTransaction(BASE_PROPS));
-    const expectedToday = new Date().toISOString().slice(0, 10);
+    const expectedToday = todayIso();
     expect(result.current.formData.date).toBe(expectedToday);
     expect(result.current.formData.exchangeRate).toBe("1.000000");
     expect(result.current.formData.fees).toBe("0");

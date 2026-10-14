@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { todayIso } from "@/ui/format/date";
 import { FeeScheduleModal } from "./FeeScheduleModal";
 
 // ── Mock the hook that drives the component ────────────────────────────────────
@@ -24,7 +25,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 // ── Shared fixtures ────────────────────────────────────────────────────────────
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = todayIso();
 
 const makeHookReturn = (overrides: Record<string, unknown> = {}) => ({
   formData: {

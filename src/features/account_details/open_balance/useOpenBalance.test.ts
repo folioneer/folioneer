@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpeningBalanceDraft } from "@/bindings";
 import { logger } from "@/lib/logger";
+import { todayIso } from "@/ui/format/date";
 import { useOpenBalance } from "./useOpenBalance";
 
 // ── Gateway mock ──────────────────────────────────────────────────────────────
@@ -92,7 +93,7 @@ describe("useOpenBalance", () => {
   // Default form values: date=today, quantity and totalCost empty
   it("initialises date to today and quantity/totalCost to empty string", () => {
     const { result } = renderHook(() => useOpenBalance(BASE_PROPS));
-    const expectedToday = new Date().toISOString().slice(0, 10);
+    const expectedToday = todayIso();
     expect(result.current.formData.date).toBe(expectedToday);
     expect(result.current.formData.quantity).toBe("");
     expect(result.current.formData.totalCost).toBe("");

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Account, Asset } from "@/bindings";
 import { useAppStore } from "@/lib/store";
+import { todayIso } from "@/ui/format/date";
 import { OpenBalanceModal } from "./OpenBalanceModal";
 
 // ── Mock the hook that drives the component ───────────────────────────────────
@@ -34,7 +35,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 // ── Shared hook return factories ──────────────────────────────────────────────
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = todayIso();
 
 const makeHookReturn = (overrides: Record<string, unknown> = {}) => ({
   formData: {
