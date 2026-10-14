@@ -13,9 +13,10 @@ interface AgentSessionDialogProps {
 }
 
 /**
- * AGT-052 / AGT-053 / AGT-064 — what a connected agent did in its session, and the one action on
- * it: removing everything it recorded, and nothing the owner typed. The removal asks to
- * confirm, and refusing is the filled action in focus.
+ * AGT-054 — the session dialog: what a connected agent did in its session (AGT-052,
+ * AGT-064) and its three actions — removing everything it recorded and nothing the owner
+ * typed (AGT-053), closing, disconnecting. The removal asks to confirm, and keeping is the
+ * filled action in focus.
  */
 export function AgentSessionDialog({
   session,

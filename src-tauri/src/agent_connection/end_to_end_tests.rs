@@ -416,7 +416,7 @@ async fn agt_044_an_agent_records_through_the_rules_and_its_recordings_are_marke
 // AGT-049 — a recording that cannot be marked is undone: when the mark cannot be
 // written the recording is undone, and the agent is told nothing was recorded.
 #[tokio::test]
-async fn agt_045_a_recording_that_cannot_be_marked_is_undone() {
+async fn agt_049_a_recording_that_cannot_be_marked_is_undone() {
     use crate::context::account::JournalFilter;
 
     let data_dir = tempfile::tempdir().expect("tempdir");
@@ -1136,6 +1136,11 @@ async fn agt_062_a_session_records_a_price() {
     .await
     .expect_err("refused");
     assert_eq!(past_the_limit.code, "SessionLimitReached");
+    // AGT-047 — the refusal says how the owner lets the agent go on.
+    assert_eq!(
+        past_the_limit.message,
+        "this session has recorded or added 500 transactions, prices and assets, its limit: the owner disconnects and allows a new session to go on"
+    );
 }
 
 // AGT-051 — a transaction the owner typed, one another session recorded and one that does
@@ -2100,6 +2105,12 @@ async fn agt_036_every_write_of_an_agent_reaches_the_window() {
     assert_eq!(told.last(), Some(&Event::AgentConnectionChanged));
 }
 
+/// CW8 listed in Paris: an asset that shares its reference with the seeded CW8.
+fn paris_listing() -> Value {
+    json!({ "name": "Amundi MSCI World Paris", "reference": "CW8", "currency": "EUR",
+        "kind": "listed", "isin": "LU1681043599", "exchange": "XPAR" })
+}
+
 /// The owner answers the next removal request of `connections`.
 async fn removal_waiting(connections: &AgentConnections) -> super::connections::RemovalRequest {
     for _ in 0..400 {
@@ -2409,4 +2420,504 @@ async fn agt_080_a_removal_is_refused_before_asking_or_by_the_deletion() {
     let refused = asked.await.expect("asked").expect_err("refused");
     assert_eq!(refused.code, "RemovalRefused");
     assert!(bench.connections.removals().is_empty());
+}
+
+// AGT-070 — the listing's edges: no page when nothing is kept, bounds the wrong way round
+// keep nothing, arguments that are not text, the order within one date, a split's factor
+// as its quantity, when the recording session started, and a name that matches two assets.
+#[tokio::test]
+async fn agt_070_the_edges_of_a_listing() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+
+    let nothing = call(
+        "list_transactions",
+        json!({ "account": "PEA", "from": "2030-01-01" }),
+    )
+    .await
+    .expect("listed");
+    assert_eq!(nothing["total"], 0);
+    assert_eq!(nothing["pages"], 0, "{nothing}");
+    let reversed = call(
+        "list_transactions",
+        json!({ "account": "PEA", "from": "2026-12-31", "to": "2019-01-01" }),
+    )
+    .await
+    .expect("listed, not refused");
+    assert_eq!(reversed["total"], 0);
+
+    // Three transactions on one date come in the order they were entered; a split's
+    // quantity is its factor; a marked one says when its session started.
+    for (tool, arguments) in [
+        (
+            "record_deposit",
+            json!({ "account": "PEA", "amount": 2000, "date": "2019-03-01" }),
+        ),
+        (
+            "record_purchase",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 10, "price": 100, "date": "2019-03-01" }),
+        ),
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": 3, "old": 1, "date": "2019-03-01" }),
+        ),
+    ] {
+        call(tool, arguments).await.expect("recorded");
+    }
+    let listed = call(
+        "list_transactions",
+        json!({ "account": "PEA", "to": "2019-12-31" }),
+    )
+    .await
+    .expect("listed");
+    let rows = listed["transactions"].as_array().expect("rows");
+    let kinds: Vec<&str> = rows
+        .iter()
+        .map(|row| row["transaction_type"].as_str().expect("a kind"))
+        .collect();
+    assert_eq!(kinds, ["Deposit", "Purchase", "Split"]);
+    assert_eq!(rows[2]["quantity"], 3 * M);
+    assert_eq!(
+        rows[0]["recorded_by"]["session_started_at"],
+        json!(granted.started_at)
+    );
+
+    // An asset whose reference another shares is ambiguous by that reference.
+    call("add_asset", paris_listing()).await.expect("added");
+    for (arguments, code) in [
+        (
+            json!({ "account": "PEA", "asset": "CW8" }),
+            "AssetAmbiguous",
+        ),
+        (json!({ "account": "PEA", "page": "2" }), "InvalidArguments"),
+        (json!({ "account": 7 }), "MissingArgument"),
+        (json!({ "account": "PEA", "asset": 7 }), "InvalidArguments"),
+        (
+            json!({ "account": "PEA", "transaction_type": 7 }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "account": "PEA", "recorded_by": true }),
+            "InvalidArguments",
+        ),
+    ] {
+        assert_eq!(
+            call("list_transactions", arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{arguments}"
+        );
+    }
+}
+
+// AGT-071 — the date answered when none is asked is today; a fetched price names its
+// provider; the price carries its date, its figure and its source, and nothing else; a
+// name that matches two assets is refused.
+#[tokio::test]
+async fn agt_071_the_edges_of_a_price_read() {
+    use crate::context::asset::DatedClose;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+    let asset = bench
+        .assets
+        .get_non_cash_assets()
+        .await
+        .expect("assets")
+        .remove(0);
+    bench
+        .assets
+        .record_daily_closes(
+            &asset.id,
+            vec![DatedClose {
+                date: "2020-01-02".to_string(),
+                price: 300 * M,
+            }],
+        )
+        .await
+        .expect("fetched");
+
+    let read = call("get_price", json!({ "asset": "CW8" }))
+        .await
+        .expect("answered");
+    assert_eq!(
+        read["date"],
+        chrono::Local::now()
+            .date_naive()
+            .format("%Y-%m-%d")
+            .to_string()
+    );
+    assert_eq!(
+        read["price"],
+        json!({ "date": "2020-01-02", "price": 300 * M, "source": "YahooFinance" })
+    );
+
+    call("add_asset", paris_listing()).await.expect("added");
+    assert_eq!(
+        call("get_price", json!({ "asset": "CW8" }))
+            .await
+            .expect_err("refused")
+            .code,
+        "AssetAmbiguous"
+    );
+}
+
+// AGT-064 — the edges of an addition: what the form refuses, with its codes and the
+// reason of a duplicate; the exchange read with case ignored; a shared reference; a refused
+// addition takes no place of the limit; an added asset is no recording.
+#[tokio::test]
+async fn agt_064_the_edges_of_an_addition() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+
+    for (arguments, code) in [
+        (
+            json!({ "name": "", "reference": "MC", "currency": "EUR", "kind": "custom" }),
+            "MissingArgument",
+        ),
+        (
+            json!({ "name": 7, "reference": "MC", "currency": "EUR", "kind": "custom" }),
+            "MissingArgument",
+        ),
+        (
+            json!({ "name": "LVMH", "reference": "", "currency": "EUR", "kind": "custom" }),
+            "MissingArgument",
+        ),
+        (
+            json!({ "name": "LVMH", "reference": "MC", "currency": 7, "kind": "custom" }),
+            "MissingArgument",
+        ),
+        (
+            json!({ "name": "LVMH", "reference": "MC", "currency": "EUR", "class": "cash" }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "name": "LVMH", "reference": "MC", "currency": "EUR", "kind": 7 }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "name": "LVMH", "reference": "MC", "currency": "EUR", "kind": "listed", "isin": "FR123" }),
+            "InvalidIsinFormat",
+        ),
+        (
+            json!({ "name": "LVMH", "reference": "MC", "currency": "EUR", "kind": "listed", "isin": "FR0000121014", "exchange": "NOPE" }),
+            "InvalidExchange",
+        ),
+        (
+            json!({ "name": "Flat", "reference": "FLAT", "currency": "EUR", "kind": "custom", "exchange": "XPAR" }),
+            "ExchangeNotAllowed",
+        ),
+        (
+            json!({ "name": "Ether", "reference": "ETH", "currency": "EUR", "kind": "crypto", "class": "realestate" }),
+            "ClassNotAllowed",
+        ),
+    ] {
+        assert_eq!(
+            call("add_asset", arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{arguments}"
+        );
+    }
+
+    // The exchange is read with case ignored; another asset sharing the reference is said.
+    let paris = call(
+        "add_asset",
+        json!({ "name": "Amundi MSCI World Paris", "reference": "CW8", "currency": "EUR", "kind": "listed", "isin": "LU1681043599", "exchange": "xpar" }),
+    )
+    .await
+    .expect("added");
+    assert_eq!(paris["asset"]["exchange"], "XPAR");
+    assert_eq!(paris["reference_shared"], true);
+
+    // A duplicate is refused, an archived one included, and the reason names nothing.
+    let lvmh = json!({ "name": "LVMH", "reference": "MC", "currency": "EUR", "kind": "listed", "isin": "FR0000121014" });
+    call("add_asset", lvmh.clone()).await.expect("added");
+    let duplicate = call("add_asset", lvmh.clone()).await.expect_err("refused");
+    assert_eq!(duplicate.code, "AssetAlreadyExists");
+    assert!(!duplicate.message.contains("LVMH") && !duplicate.message.contains("MC"));
+    let added = bench
+        .assets
+        .get_non_cash_assets_by_name(true)
+        .await
+        .expect("assets")
+        .into_iter()
+        .find(|asset| asset.name == "LVMH")
+        .expect("LVMH");
+    bench
+        .assets
+        .archive_asset(&added.id)
+        .await
+        .expect("archived");
+    assert_eq!(
+        call("add_asset", lvmh).await.expect_err("refused").code,
+        "AssetAlreadyExists"
+    );
+
+    // An added asset is no recording: the session's tools do not name it, and removing
+    // everything the session recorded leaves it.
+    assert_eq!(
+        call(
+            "cancel_recording",
+            json!({ "transaction": added.id.clone() })
+        )
+        .await
+        .expect_err("refused")
+        .code,
+        "NotYourRecording"
+    );
+    bench
+        .recorder
+        .remove_recorded_in_session(&granted.key)
+        .await
+        .expect("removed");
+    assert!(bench
+        .assets
+        .get_non_cash_assets_by_name(true)
+        .await
+        .expect("assets")
+        .iter()
+        .any(|asset| asset.id == added.id));
+
+    // A refused addition takes no place: with one place left, a refusal leaves it free.
+    for _ in 2..super::connections::MAX_RECORDINGS - 1 {
+        granted.count_recording();
+    }
+    assert_eq!(
+        call("add_asset", json!({ "name": "LVMH", "reference": "MC", "currency": "EUR", "kind": "listed", "isin": "FR0000121014" }))
+            .await
+            .expect_err("refused")
+            .code,
+        "AssetAlreadyExists"
+    );
+    call(
+        "add_asset",
+        json!({ "name": "Air Liquide", "reference": "AI", "currency": "EUR", "kind": "custom" }),
+    )
+    .await
+    .expect("the last place");
+    assert_eq!(
+        call(
+            "add_asset",
+            json!({ "name": "Bitcoin", "reference": "BTC", "currency": "EUR", "kind": "crypto" }),
+        )
+        .await
+        .expect_err("refused")
+        .code,
+        "SessionLimitReached"
+    );
+}
+
+// AGT-063 — the edges of a split and free shares through the tool: the ratio's forms, the
+// window's refusals with their codes, no price recorded, and a split removed with the
+// session's recordings.
+#[tokio::test]
+async fn agt_063_the_edges_of_a_split_and_free_shares() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+    call(
+        "record_purchase",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 10, "price": 100, "date": "2026-02-01" }),
+    )
+    .await
+    .expect("bought");
+
+    for (tool, arguments, code) in [
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": "99999999999999999999", "old": 1 }),
+            "InvalidFigure",
+        ),
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": 99_999_999_999_999_i64, "old": 1 }),
+            "SplitFactorNotPositive",
+        ),
+        // The account's cash is never named (CSH-018): a split or free shares of it is not found.
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "EUR", "new": 2, "old": 1 }),
+            "AssetNotFound",
+        ),
+        (
+            "record_free_shares",
+            json!({ "account": "PEA", "asset": "EUR", "quantity": 1 }),
+            "AssetNotFound",
+        ),
+    ] {
+        assert_eq!(
+            call(tool, arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{tool} {arguments}"
+        );
+    }
+
+    // A split that leaves less than a millionth of a share collapses the position.
+    call(
+        "add_asset",
+        json!({ "name": "Tiny", "reference": "TINY", "currency": "EUR", "kind": "custom" }),
+    )
+    .await
+    .expect("added");
+    call(
+        "record_purchase",
+        json!({ "account": "PEA", "asset": "TINY", "quantity": "0.000001", "price": 1, "date": "2026-02-01" }),
+    )
+    .await
+    .expect("bought a millionth");
+    assert_eq!(
+        call(
+            "record_split",
+            json!({ "account": "PEA", "asset": "TINY", "new": 1, "old": 2, "date": "2026-03-01" }),
+        )
+        .await
+        .expect_err("refused")
+        .code,
+        "SplitCollapsesPosition"
+    );
+
+    // A sign and spaces around the digits are read; no price is recorded with the split.
+    let split = call(
+        "record_split",
+        json!({ "account": "PEA", "asset": "CW8", "new": " +2 ", "old": "1", "date": "2026-03-01" }),
+    )
+    .await
+    .expect("split");
+    assert_eq!(split["transaction"]["quantity"], 2 * M);
+    for asset in bench.assets.get_non_cash_assets().await.expect("assets") {
+        assert!(bench
+            .assets
+            .get_asset_prices(&asset.id)
+            .await
+            .expect("prices")
+            .is_empty());
+    }
+
+    // All 20 sold, 5 bought again: a split of a half before the sale leaves it oversold,
+    // and one while nothing was held splits a closed position.
+    for (tool, arguments) in [
+        (
+            "record_sale",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 20, "price": 60, "date": "2026-05-01" }),
+        ),
+        (
+            "record_purchase",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 5, "price": 60, "date": "2026-07-01" }),
+        ),
+    ] {
+        call(tool, arguments).await.expect("recorded");
+    }
+    for (arguments, code) in [
+        (
+            json!({ "account": "PEA", "asset": "CW8", "new": 1, "old": 2, "date": "2026-04-01" }),
+            "CascadingOversell",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "CW8", "new": 2, "old": 1, "date": "2026-06-01" }),
+            "ClosedPosition",
+        ),
+    ] {
+        assert_eq!(
+            call("record_split", arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{arguments}"
+        );
+    }
+
+    // Removed with the session's recordings, the split with them.
+    let removal = bench
+        .recorder
+        .remove_recorded_in_session(&granted.key)
+        .await
+        .expect("removed");
+    assert_eq!((removal.removed, removal.kept), (5, 0));
+    assert!(bench
+        .accounts
+        .get_transaction_by_id(&recorded_id(&split))
+        .await
+        .expect("read")
+        .is_none());
+}
+
+// AGT-063 / AGT-049 — a split that cannot be marked is undone, as any recording.
+#[tokio::test]
+async fn agt_063_a_split_that_cannot_be_marked_is_undone() {
+    use crate::use_cases::holding_transaction::{HoldingTransactionUseCase, Recording, Target};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let (gate, _, pool) = application_with_database(data_dir.path()).await;
+    let container = AppContainer::for_headless_writes(pool.clone());
+    HoldingTransactionUseCase::new(
+        Arc::clone(&container.account_service) as _,
+        Arc::clone(&container.asset_service) as _,
+    )
+    .record_named(
+        Recording::Open {
+            target: Target {
+                account: "PEA".to_string(),
+                asset: "CW8".to_string(),
+                date: Some("2026-01-05".to_string()),
+                quantity: 10 * M,
+            },
+            total_cost: 4_000 * M,
+        },
+        "2026-10-14",
+    )
+    .await
+    .expect("the owner's opening balance");
+    sqlx::query("DROP TABLE agent_recordings")
+        .execute(&pool)
+        .await
+        .expect("the marks cannot be written");
+    gate.allow(true).expect("allowed");
+    let owner = owner_answers(&gate, true);
+
+    let answered = answers(
+        data_dir.path(),
+        &[call(
+            1,
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": 2, "old": 1, "date": "2026-02-01" }),
+        )],
+    )
+    .await;
+    owner.await.expect("owner");
+
+    assert_eq!(answered[0]["result"]["isError"], true);
+    let splits: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM transactions WHERE transaction_type = 'Split'")
+            .fetch_one(&pool)
+            .await
+            .expect("count");
+    assert_eq!(splits, 0, "the split was undone");
 }

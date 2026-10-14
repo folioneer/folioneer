@@ -1,5 +1,5 @@
-//! Running the tools an agent may call (AGT-040), in the running application: each is a
-//! query the window already makes.
+//! Running the tools an agent may call (AGT-046), in the running application: each reads or
+//! writes through the queries and commands the window uses.
 
 use std::sync::Arc;
 
@@ -442,7 +442,12 @@ impl AgentTools {
             "asset": read.asset.reference,
             "currency": read.asset.currency,
             "date": read.date,
-            "price": read.price,
+            // Its own date, the price of one unit and its source: what the rule lists.
+            "price": read.price.map(|price| serde_json::json!({
+                "date": price.date,
+                "price": price.price,
+                "source": price.source,
+            })),
         }))
     }
 

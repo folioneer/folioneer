@@ -1,4 +1,4 @@
-//! The tools an agent is told of (AGT-040): fixed text, which the bridge lists on its own.
+//! The tools an agent is told of (AGT-046): fixed text, which the bridge lists on its own.
 //! Running a tool is the running application's (`tools.rs`); nothing here reaches it.
 
 use serde_json::{json, Value};

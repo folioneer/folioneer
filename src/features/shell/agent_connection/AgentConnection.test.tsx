@@ -114,6 +114,18 @@ describe("AgentConnectionMount", () => {
     expect(answer).toHaveBeenLastCalledWith(4, true);
   });
 
+  // AGT-032 — neither the corner nor the backdrop dismisses the dialog.
+  it("is not dismissed by its backdrop", () => {
+    hook.mockReturnValue(state({ request }));
+    render(<AgentConnectionMount />);
+    const backdrop = screen.getByRole("dialog").parentElement?.querySelector("button[aria-hidden]");
+    expect(backdrop).not.toBeNull();
+
+    fireEvent.click(backdrop as HTMLElement);
+    expect(answer).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toHaveAttribute("id", "agent-connection-dialog");
+  });
+
   // AGT-032 — hard to approve blindly: a dialog that just appeared allows nothing, also
   // when it replaces another one under the pointer.
   it("keeps Allow inactive for a moment after it appears, for each request anew", () => {
@@ -373,6 +385,21 @@ describe("AgentIndicator", () => {
     hook.mockReturnValue(state({ sessions: [session()] }));
     rerender(<AgentIndicator />);
     expect(document.getElementById("agent-session-dialog")).not.toBeNull();
+  });
+
+  // AGT-054 — a connection request that arrives while the removal asks to confirm takes
+  // the place of both dialogs until it is answered.
+  it("gives way to a connection request while the removal asks to confirm", () => {
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    const { rerender } = render(<AgentIndicator />);
+    fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
+    fireEvent.click(document.getElementById("agent-session-remove") as HTMLElement);
+    expect(document.getElementById("agent-session-remove-confirm")).not.toBeNull();
+
+    hook.mockReturnValue(state({ sessions: [session()], request }));
+    rerender(<AgentIndicator />);
+    expect(document.getElementById("agent-session-remove-confirm")).toBeNull();
+    expect(document.getElementById("agent-session-dialog")).toBeNull();
   });
 
   // AGT-034 — the dialog disconnects its agent, and closes once the session is gone.

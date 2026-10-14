@@ -1,11 +1,11 @@
 # Contract — Agent Connection
 
 > Domain: `agent-connection`
-> Last updated by: agent-connection (AGT-022–036, AGT-039, AGT-045, AGT-052, AGT-053, AGT-064, AGT-080–082)
+> Last updated by: agent-connection (AGT-022–036, AGT-039, AGT-045, AGT-052–054, AGT-064, AGT-081–083)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName" }` object; a variant with fields carries them beside `code`, as `TransactionNotRemoved { reason }` does. The FE matches on `code`.
 >
-> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–064, AGT-070, AGT-071, AGT-080) are not Tauri commands: what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
+> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–063, AGT-070, AGT-071, AGT-080) and the tool of AGT-064 are not Tauri commands — what the window shows of an added asset is `AgentSession.assets_added` and `last_asset` here; what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
 
 ---
 
