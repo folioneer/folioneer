@@ -265,6 +265,20 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "additionalProperties": false
             }),
         },
+        ToolDefinition {
+            name: "request_removal",
+            title: "Ask to remove a transaction you typed",
+            only_reads: false,
+            description: "Ask the owner to remove a transaction the owner typed: give its id, as list_transactions gives it. The owner is shown it in the window and answers it alone; the call waits for that answer. Answered removed, or refused with RemovalRefused, which gives nothing else. A transaction an agent recorded is refused: a session cancels its own with cancel_recording.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "transaction": { "type": "string", "description": "The transaction's id, as list_transactions gives it." }
+                },
+                "required": ["transaction"],
+                "additionalProperties": false
+            }),
+        },
     ]
 }
 

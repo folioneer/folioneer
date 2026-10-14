@@ -88,13 +88,15 @@ async fn application_with_accounts(
             .await
             .expect("asset");
     }
+    let connections = Arc::new(AgentConnections::new(|| {}));
     let gate = Arc::new(AgentGate::new(
         data_dir.to_path_buf(),
-        Arc::new(AgentConnections::new(|| {})),
+        Arc::clone(&connections),
         Arc::new(AgentTools::new(
             accounts,
             assets,
             Arc::clone(&container.currency_service),
+            connections,
         )),
     ));
     (gate, container.account_service)
@@ -113,15 +115,17 @@ async fn application_on_bus(data_dir: &Path) -> (Arc<AgentGate>, EventReceiver) 
     let recorder = Arc::new(SqliteChangeRecorder::new(database.pool.clone()));
     let container =
         AppContainer::build(database.pool, None, None, Some(Arc::clone(&bus)), recorder);
+    let connections = Arc::new(AgentConnections::new(move || {
+        bus.publish(Event::AgentConnectionChanged);
+    }));
     let gate = Arc::new(AgentGate::new(
         data_dir.to_path_buf(),
-        Arc::new(AgentConnections::new(move || {
-            bus.publish(Event::AgentConnectionChanged);
-        })),
+        Arc::clone(&connections),
         Arc::new(AgentTools::new(
             Arc::clone(&container.account_service) as _,
             Arc::clone(&container.asset_service) as _,
             Arc::clone(&container.currency_service),
+            connections,
         )),
     ));
     (gate, window)
@@ -666,6 +670,7 @@ async fn workbench(data_dir: &Path) -> Workbench {
             Arc::clone(&accounts),
             Arc::clone(&assets),
             Arc::clone(&container.currency_service),
+            Arc::clone(&connections),
         ),
         connections,
         accounts: container.account_service,
@@ -2093,4 +2098,315 @@ async fn agt_036_every_write_of_an_agent_reaches_the_window() {
     }
     assert!(told_writes.next().is_none(), "{told:?}");
     assert_eq!(told.last(), Some(&Event::AgentConnectionChanged));
+}
+
+/// The owner answers the next removal request of `connections`.
+async fn removal_waiting(connections: &AgentConnections) -> super::connections::RemovalRequest {
+    for _ in 0..400 {
+        if let Some(request) = connections.removals().into_iter().next() {
+            return request;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    panic!("no removal request arrived");
+}
+
+// AGT-080 / AGT-081 / AGT-082 — an agent asks to remove a transaction the owner typed: the
+// window is shown it in full, a refusal gives the agent nothing and removes nothing, the
+// next ask is asked again, and a yes removes it through the window's deletion.
+#[tokio::test]
+async fn agt_080_an_agent_asks_and_the_owner_answers_each_removal() {
+    use super::gate::{answer_removal, AnswerRefused};
+    use crate::context::account::TransactionType;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = Arc::new(workbench(data_dir.path()).await);
+    let granted = session(&bench.connections).await;
+    let account = bench.accounts.get_all().await.expect("accounts").remove(0);
+    let deposit = bench
+        .accounts
+        .get_account_journal(
+            &account.id,
+            &crate::context::account::JournalFilter::default(),
+        )
+        .await
+        .expect("journal")
+        .rows
+        .remove(0)
+        .transaction;
+    let ask = |granted: super::connections::Granted| {
+        let bench = Arc::clone(&bench);
+        let id = deposit.id.clone();
+        tokio::spawn(async move {
+            bench
+                .tools
+                .call(&granted, "request_removal", &json!({ "transaction": id }))
+                .await
+        })
+    };
+
+    // Asked, and shown in full; the call waits.
+    let asked = ask(granted.clone());
+    let request = removal_waiting(&bench.connections).await;
+    assert_eq!(request.client, "claude-code");
+    assert_eq!(request.session, granted.session_id);
+    assert_eq!(request.transaction.id, deposit.id);
+    assert_eq!(request.transaction.date, "2026-01-02");
+    assert_eq!(request.transaction.account, "PEA");
+    assert_eq!(request.transaction.currency, "EUR");
+    assert_eq!(request.transaction.kind, TransactionType::Deposit);
+    assert_eq!(request.transaction.asset_name, None);
+    assert_eq!(request.transaction.amount, 5_000 * M);
+    assert!(!asked.is_finished());
+
+    // Refused: the agent is given nothing, and nothing is removed.
+    answer_removal(&bench.connections, &bench.recorder, request.id, false)
+        .await
+        .expect("answered");
+    let refused = asked.await.expect("asked").expect_err("refused");
+    assert_eq!(refused.code, "RemovalRefused");
+    assert!(bench.connections.removals().is_empty());
+    assert!(bench
+        .accounts
+        .get_transaction_by_id(&deposit.id)
+        .await
+        .expect("read")
+        .is_some());
+    // The request is gone once answered.
+    assert_eq!(
+        answer_removal(&bench.connections, &bench.recorder, request.id, true).await,
+        Err(AnswerRefused::Gone)
+    );
+
+    // Nothing of the refusal is kept: the same transaction is asked again, and removed.
+    let asked = ask(granted.clone());
+    let request = removal_waiting(&bench.connections).await;
+    answer_removal(&bench.connections, &bench.recorder, request.id, true)
+        .await
+        .expect("removed");
+    let removed = asked.await.expect("asked").expect("removed");
+    assert_eq!(
+        removed,
+        json!({ "status": "removed", "transaction": deposit.id })
+    );
+    assert!(bench
+        .accounts
+        .get_transaction_by_id(&deposit.id)
+        .await
+        .expect("read")
+        .is_none());
+
+    // A transaction an agent recorded is not asked about: the session cancels its own.
+    let of_the_agent = recorded_id(
+        &bench
+            .tools
+            .call(
+                &granted,
+                "record_deposit",
+                &json!({ "account": "PEA", "amount": 10, "date": "2026-01-03" }),
+            )
+            .await
+            .expect("recorded"),
+    );
+    let refused = bench
+        .tools
+        .call(
+            &granted,
+            "request_removal",
+            &json!({ "transaction": of_the_agent }),
+        )
+        .await
+        .expect_err("refused");
+    assert_eq!(refused.code, "NotTypedByOwner");
+    assert!(bench.connections.removals().is_empty());
+}
+
+// AGT-080 — what is refused before anything is asked, and a deletion the window refuses.
+#[tokio::test]
+async fn agt_080_a_removal_is_refused_before_asking_or_by_the_deletion() {
+    use super::gate::{answer_removal, AnswerRefused};
+    use crate::use_cases::holding_transaction::{Recording, Target, Trade, TradeAmount};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = Arc::new(workbench(data_dir.path()).await);
+    let granted = session(&bench.connections).await;
+    for (arguments, code) in [
+        (json!({}), "MissingArgument"),
+        (json!({ "transaction": 7 }), "MissingArgument"),
+        (
+            json!({ "transaction": "no-such-transaction" }),
+            "TransactionNotFound",
+        ),
+        (
+            json!({ "transaction": "x".repeat(200) }),
+            "TransactionNotFound",
+        ),
+    ] {
+        let refused = bench
+            .tools
+            .call(&granted, "request_removal", &arguments)
+            .await
+            .expect_err("refused");
+        assert_eq!(refused.code, code, "{arguments}");
+    }
+    assert!(bench.connections.removals().is_empty(), "nothing was asked");
+
+    // The owner typed an opening balance and a sale that depends on it.
+    let target = |date: &str, quantity: i64| Target {
+        account: "PEA".to_string(),
+        asset: "CW8".to_string(),
+        date: Some(date.to_string()),
+        quantity,
+    };
+    let opened = bench
+        .recorder
+        .record_named(
+            Recording::Open {
+                target: target("2026-01-05", 10 * M),
+                total_cost: 4_000 * M,
+            },
+            "2026-10-14",
+        )
+        .await
+        .expect("opened");
+    bench
+        .recorder
+        .record_named(
+            Recording::Sell(Trade {
+                target: target("2026-03-01", 8 * M),
+                amount: TradeAmount::Price(500 * M),
+                fees: 0,
+                rate: M,
+                note: None,
+            }),
+            "2026-10-14",
+        )
+        .await
+        .expect("sold");
+    let tools = Arc::clone(&bench);
+    let id = opened.transaction.id.clone();
+    let waiting_granted = granted.clone();
+    let asked = tokio::spawn(async move {
+        tools
+            .tools
+            .call(
+                &waiting_granted,
+                "request_removal",
+                &json!({ "transaction": id }),
+            )
+            .await
+    });
+    let request = removal_waiting(&bench.connections).await;
+    assert_eq!(
+        request.transaction.asset_name.as_deref(),
+        Some("Amundi MSCI World")
+    );
+    assert_eq!(request.transaction.asset_reference.as_deref(), Some("CW8"));
+    assert_eq!(request.transaction.quantity, 10 * M);
+    let answered = answer_removal(&bench.connections, &bench.recorder, request.id, true).await;
+    let Err(AnswerRefused::NotRemoved { reason }) = answered else {
+        panic!("the deletion refused: {answered:?}");
+    };
+    let refused = asked.await.expect("asked").expect_err("not removed");
+    assert_eq!(refused.code, reason);
+    assert!(bench
+        .accounts
+        .get_transaction_by_id(&opened.transaction.id)
+        .await
+        .expect("read")
+        .is_some());
+
+    // AGT-081 — a transaction that changed while its request waited is not removed: the
+    // owner answered what was shown.
+    let sold = bench
+        .accounts
+        .get_account_journal(
+            &opened.transaction.account_id,
+            &crate::context::account::JournalFilter::default(),
+        )
+        .await
+        .expect("journal")
+        .rows
+        .into_iter()
+        .find(|row| {
+            row.transaction.transaction_type == crate::context::account::TransactionType::Sell
+        })
+        .expect("the sale")
+        .transaction;
+    let ask = |id: String| {
+        let tools = Arc::clone(&bench);
+        let granted = granted.clone();
+        tokio::spawn(async move {
+            tools
+                .tools
+                .call(&granted, "request_removal", &json!({ "transaction": id }))
+                .await
+        })
+    };
+    let asked = ask(sold.id.clone());
+    let request = removal_waiting(&bench.connections).await;
+    bench
+        .recorder
+        .correct_transaction(
+            &sold.account_id,
+            &sold.id,
+            sold.date.clone(),
+            7 * M,
+            sold.unit_price,
+            sold.exchange_rate,
+            sold.fees,
+            None,
+            None,
+        )
+        .await
+        .expect("corrected in the journal");
+    assert_eq!(
+        answer_removal(&bench.connections, &bench.recorder, request.id, true).await,
+        Err(AnswerRefused::NotRemoved {
+            reason: "TransactionChanged".to_string()
+        })
+    );
+    assert_eq!(
+        asked.await.expect("asked").expect_err("changed").code,
+        "TransactionChanged"
+    );
+
+    // One deleted in the journal while its request waited is not found.
+    let asked = ask(sold.id.clone());
+    let request = removal_waiting(&bench.connections).await;
+    bench
+        .recorder
+        .cancel_transaction(&sold.account_id, &sold.id)
+        .await
+        .expect("deleted in the journal");
+    assert_eq!(
+        answer_removal(&bench.connections, &bench.recorder, request.id, true).await,
+        Err(AnswerRefused::NotRemoved {
+            reason: "TransactionNotFound".to_string()
+        })
+    );
+    assert_eq!(
+        asked.await.expect("asked").expect_err("gone").code,
+        "TransactionNotFound"
+    );
+
+    // AGT-082 — a request whose session ends is withdrawn, and its call refused.
+    let tools = Arc::clone(&bench);
+    let id = opened.transaction.id.clone();
+    let waiting_granted = granted.clone();
+    let asked = tokio::spawn(async move {
+        tools
+            .tools
+            .call(
+                &waiting_granted,
+                "request_removal",
+                &json!({ "transaction": id }),
+            )
+            .await
+    });
+    removal_waiting(&bench.connections).await;
+    assert!(bench.connections.end(granted.session_id));
+    let refused = asked.await.expect("asked").expect_err("refused");
+    assert_eq!(refused.code, "RemovalRefused");
+    assert!(bench.connections.removals().is_empty());
 }

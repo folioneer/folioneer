@@ -22,7 +22,9 @@ use crate::use_cases::holding_transaction::{
     TradeAmount, TransactionsAsked,
 };
 
-use super::connections::{Granted, LastRecording, MAX_RECORDINGS};
+use super::connections::{
+    AgentConnections, Granted, LastRecording, RemovalAnswer, TransactionShown, MAX_RECORDINGS,
+};
 use super::{definitions, wire};
 
 /// Why a tool call is refused: a stable code and a reason for the agent to read.
@@ -87,6 +89,8 @@ pub struct AgentTools {
     asset_service: Arc<dyn AssetServiceContract>,
     summaries: AccountSummaryUseCase,
     details: AccountDetailsUseCase,
+    /// Where a removal request waits for the owner's answer (AGT-080).
+    connections: Arc<AgentConnections>,
 }
 
 impl AgentTools {
@@ -95,6 +99,7 @@ impl AgentTools {
         account_service: Arc<dyn AccountServiceContract>,
         asset_service: Arc<dyn AssetServiceContract>,
         currency_service: Arc<CurrencyService>,
+        connections: Arc<AgentConnections>,
     ) -> Self {
         Self {
             recorder: Arc::new(HoldingTransactionUseCase::new(
@@ -113,6 +118,7 @@ impl AgentTools {
             ),
             account_service,
             asset_service,
+            connections,
         }
     }
 
@@ -141,6 +147,7 @@ impl AgentTools {
         match tool {
             "correct_recording" => self.correct(granted, arguments).await,
             "cancel_recording" => self.cancel(granted, arguments).await,
+            "request_removal" => self.request_removal(granted, arguments).await,
             "record_opening_balance" => {
                 let recording = Recording::Open {
                     target: target(arguments)?,
@@ -526,6 +533,49 @@ impl AgentTools {
         self.tell_recordings(granted).await;
         tracing::info!(target: BACKEND, session = granted.session_id, transaction = %cancelled.id, "agent cancelled its recording");
         as_json(&serde_json::json!({ "status": "cancelled", "transaction": cancelled.id }))
+    }
+
+    /// AGT-080 — the session asks the owner to remove a transaction the owner typed, and
+    /// waits for the answer.
+    async fn request_removal(
+        &self,
+        granted: &Granted,
+        arguments: &Value,
+    ) -> Result<Value, Refusal> {
+        let transaction_id = text(arguments, "transaction")?;
+        let typed = self
+            .recorder
+            .typed_by_owner(transaction_id)
+            .await
+            .map_err(|refusal| Refusal {
+                code: refusal.code,
+                message: refusal.message,
+            })?;
+        let (asset_name, asset_reference) = typed.asset.map_or((None, None), |asset| {
+            (Some(asset.name), Some(asset.reference))
+        });
+        let shown = TransactionShown {
+            id: typed.transaction.id.clone(),
+            date: typed.transaction.date,
+            account: typed.account_name,
+            currency: typed.currency,
+            kind: typed.transaction.transaction_type,
+            asset_name,
+            asset_reference,
+            quantity: typed.transaction.quantity,
+            amount: typed.transaction.total_amount,
+        };
+        tracing::info!(target: BACKEND, session = granted.session_id, transaction = %typed.transaction.id, "agent asks to remove a transaction the owner typed");
+        match self.connections.ask_removal(granted, shown).await {
+            RemovalAnswer::Removed => as_json(
+                &serde_json::json!({ "status": "removed", "transaction": typed.transaction.id }),
+            ),
+            RemovalAnswer::Refused => Err(Refusal {
+                code: "RemovalRefused".to_string(),
+                message: "the owner did not remove this transaction".to_string(),
+            }),
+            RemovalAnswer::NotRemoved { code, message } => Err(Refusal { code, message }),
+        }
     }
 
     /// AGT-050 — the session corrects a transaction it recorded itself.

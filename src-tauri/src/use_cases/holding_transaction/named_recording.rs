@@ -7,7 +7,7 @@
 use serde::Serialize;
 
 use crate::context::account::{AccountError, AgentRecording, Transaction, TransactionType};
-use crate::context::asset::{Asset, AssetError, AssetPrice};
+use crate::context::asset::{Asset, AssetClass, AssetError, AssetPrice};
 use crate::core::BACKEND;
 
 use super::error::{
@@ -202,6 +202,32 @@ pub struct Refusal {
     pub message: String,
 }
 
+/// What the owner was shown of a transaction before answering its removal (AGT-081).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AsShown {
+    /// Its date.
+    pub date: String,
+    /// What kind of transaction.
+    pub kind: TransactionType,
+    /// Its quantity, in micro-units.
+    pub quantity: i64,
+    /// Its amount in the account's currency, in micro-units.
+    pub amount: i64,
+}
+
+/// A transaction the owner typed, with what names it for a person (AGT-081).
+#[derive(Debug, Clone)]
+pub struct TypedTransaction {
+    /// The transaction as stored.
+    pub transaction: Transaction,
+    /// The name of its account.
+    pub account_name: String,
+    /// The account's currency.
+    pub currency: String,
+    /// Its asset; `None` for a transaction on the account's cash.
+    pub asset: Option<Asset>,
+}
+
 /// What was recorded, with what names it for a person.
 #[derive(Debug, Clone)]
 pub struct Recorded {
@@ -305,6 +331,87 @@ impl HoldingTransactionUseCase {
             .await
             .map_err(|error| refusal_from_account(&error))?;
         Ok(transaction)
+    }
+
+    /// AGT-080 — the transaction `transaction_id` when the owner typed it, with the names it
+    /// is shown by: refused when no transaction has that id, or when an agent recorded it.
+    pub async fn typed_by_owner(&self, transaction_id: &str) -> Result<TypedTransaction, Refusal> {
+        let not_found = || Refusal {
+            code: "TransactionNotFound".to_string(),
+            message: "no transaction has this id: list_transactions gives each one's".to_string(),
+        };
+        // An id is a uuid: anything longer is no transaction, and is not looked up.
+        if transaction_id.len() > TRANSACTION_ID_LENGTH {
+            return Err(not_found());
+        }
+        let transaction = self
+            .account_service
+            .get_transaction_by_id(transaction_id)
+            .await
+            .map_err(|error| refusal_from_account(&error))?
+            .ok_or_else(not_found)?;
+        let mark = self
+            .account_service
+            .agent_recording_of(transaction_id)
+            .await
+            .map_err(|error| refusal_from_account(&error))?;
+        if mark.is_some() {
+            return Err(Refusal {
+                code: "NotTypedByOwner".to_string(),
+                message: "an agent recorded this transaction: a session cancels its own with cancel_recording".to_string(),
+            });
+        }
+        let account = self
+            .account_service
+            .get_by_id(&transaction.account_id)
+            .await
+            .map_err(|error| refusal_from_account(&error))?
+            .ok_or_else(not_found)?;
+        let asset = self
+            .asset_service
+            .get_asset_by_id(&transaction.asset_id)
+            .await
+            .map_err(|error| {
+                tracing::error!(target: BACKEND, err = ?error, "typed_by_owner: the asset could not be read");
+                refusal_from_account(&AccountError::DatabaseError)
+            })?
+            .filter(|asset| asset.class != AssetClass::Cash);
+        Ok(TypedTransaction {
+            transaction,
+            account_name: account.name,
+            currency: account.currency,
+            asset,
+        })
+    }
+
+    /// AGT-080 — removes a transaction the owner typed, on the owner's answer, through the
+    /// deletion of the window (TRX-034): refused as `typed_by_owner` refuses, with
+    /// `TransactionChanged` when it no longer stands as the owner was shown it, or as the
+    /// deletion refuses.
+    pub async fn remove_typed_by_owner(
+        &self,
+        transaction_id: &str,
+        shown: &AsShown,
+    ) -> Result<Transaction, Refusal> {
+        let typed = self.typed_by_owner(transaction_id).await?;
+        let stands = &typed.transaction;
+        if (
+            &stands.date,
+            stands.transaction_type,
+            stands.quantity,
+            stands.total_amount,
+        ) != (&shown.date, shown.kind, shown.quantity, shown.amount)
+        {
+            return Err(Refusal {
+                code: "TransactionChanged".to_string(),
+                message: "the transaction changed since the owner was shown it: ask again"
+                    .to_string(),
+            });
+        }
+        self.cancel_transaction(&typed.transaction.account_id, &typed.transaction.id)
+            .await
+            .map_err(|error| refusal_from_account(&error))?;
+        Ok(typed.transaction)
     }
 
     /// AGT-050 — an agent corrects a transaction its session recorded, through the rules of

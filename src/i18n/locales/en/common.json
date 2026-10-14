@@ -1040,6 +1040,8 @@
     "NoAgentChannel": "The agent connection is not available on this system yet.",
     "AgentChannelFailed": "The agent connection could not be changed.",
     "ConnectionRequestGone": "This agent is no longer asking to connect.",
+    "RemovalRequestGone": "This removal request is no longer waiting.",
+    "TransactionNotRemoved": "The transaction could not be removed: a later transaction depends on it.",
     "SessionAlreadyEnded": "This agent was already disconnected."
   },
   "price_freshness": {

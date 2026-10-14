@@ -83,6 +83,7 @@ fn agt_010_the_program_started_with_mcp_lists_its_tools() {
             "add_asset",
             "correct_recording",
             "cancel_recording",
+            "request_removal",
         ]
     );
     for tool in tools {
@@ -98,8 +99,8 @@ fn agt_010_the_program_started_with_mcp_lists_its_tools() {
 }
 
 // AGT-013 — the program started with `--mcp` gives each tool a title and says whether it
-// only reads: the four read tools do, and everything that records, corrects or cancels
-// says it does not — so an agent client asks its user before a recording and not before a
+// only reads: the read tools do, and everything that records, corrects, cancels or asks
+// to remove says it does not — so an agent client asks its user before a recording and not before a
 // read.
 #[test]
 fn agt_013_every_tool_listed_says_whether_it_only_reads() {
@@ -125,6 +126,7 @@ fn agt_013_every_tool_listed_says_whether_it_only_reads() {
         let records = name.starts_with("record_")
             || name == "correct_recording"
             || name == "cancel_recording"
+            || name == "request_removal"
             || name == "add_asset";
         assert_eq!(only_reads, !records, "{name}");
         if only_reads {

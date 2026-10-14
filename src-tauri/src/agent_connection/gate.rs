@@ -7,10 +7,77 @@ use std::sync::{Arc, Mutex, PoisonError};
 use tokio::task::JoinHandle;
 
 use crate::core::BACKEND;
+use crate::use_cases::holding_transaction::{AsShown, HoldingTransactionUseCase};
 
 use super::channel;
-use super::connections::AgentConnections;
+use super::connections::{AgentConnections, RemovalAnswer};
 use super::server::ToolRunner;
+
+/// Why the owner's answer to a removal request removed nothing (AGT-081).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AnswerRefused {
+    /// The request was already answered, or its session ended.
+    Gone,
+    /// The owner said yes and the transaction stays: `reason` is the code the agent is given.
+    NotRemoved {
+        /// The code.
+        reason: String,
+    },
+    /// The portfolio could not be read or written.
+    Unreadable,
+}
+
+/// AGT-081 — the owner's answer to a removal request, over the connections and the
+/// recorder: removing the transaction through the deletion of the window, or refusing. The
+/// agent that asked is told what became of it.
+pub async fn answer_removal(
+    connections: &AgentConnections,
+    recorder: &HoldingTransactionUseCase,
+    request_id: u32,
+    remove: bool,
+) -> Result<(), AnswerRefused> {
+    let answered = connections
+        .take_removal(request_id)
+        .ok_or(AnswerRefused::Gone)?;
+    let transaction = answered.request.transaction.id.clone();
+    if !remove {
+        tracing::info!(target: BACKEND, session = answered.request.session, transaction = %transaction, "the owner refused a removal");
+        answered.tell(RemovalAnswer::Refused);
+        return Ok(());
+    }
+    let shown = &answered.request.transaction;
+    let as_shown = AsShown {
+        date: shown.date.clone(),
+        kind: shown.kind,
+        quantity: shown.quantity,
+        amount: shown.amount,
+    };
+    match recorder
+        .remove_typed_by_owner(&transaction, &as_shown)
+        .await
+    {
+        Ok(_) => {
+            tracing::info!(target: BACKEND, session = answered.request.session, transaction = %transaction, "the owner removed a transaction an agent asked to remove");
+            answered.tell(RemovalAnswer::Removed);
+            Ok(())
+        }
+        Err(refusal) => {
+            tracing::warn!(target: BACKEND, session = answered.request.session, code = %refusal.code, "answer_removal_request: the deletion refused");
+            let error = if refusal.code == "DatabaseError" {
+                AnswerRefused::Unreadable
+            } else {
+                AnswerRefused::NotRemoved {
+                    reason: refusal.code.clone(),
+                }
+            };
+            answered.tell(RemovalAnswer::NotRemoved {
+                code: refusal.code,
+                message: refusal.message,
+            });
+            Err(error)
+        }
+    }
+}
 
 /// AGT-038 — how many bridges may be connected at once.
 pub const MAX_CONNECTIONS: usize = 8;

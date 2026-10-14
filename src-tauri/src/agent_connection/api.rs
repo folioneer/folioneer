@@ -2,8 +2,8 @@
 #![allow(clippy::unreachable)]
 
 //! The window's commands over the agent connection (AGT-022, AGT-032 to AGT-036, AGT-053):
-//! the owner's setting, the answer to a connection request, the disconnect, and the removal
-//! of what a session recorded.
+//! the owner's setting, the answer to a connection request or to a removal request (AGT-081),
+//! the disconnect, and the removal of what a session recorded.
 
 use std::sync::Arc;
 
@@ -12,8 +12,8 @@ use specta::Type;
 use tauri::State;
 
 use super::channel;
-use super::connections::{AgentConnectionRequest, AgentSession};
-use super::gate::{AgentGate, GateError};
+use super::connections::{AgentConnectionRequest, AgentSession, RemovalRequest};
+use super::gate::{answer_removal, AgentGate, AnswerRefused, GateError};
 use crate::core::BACKEND;
 use crate::use_cases::holding_transaction::{HoldingTransactionUseCase, SessionRemoval};
 
@@ -33,9 +33,28 @@ pub enum AgentConnectionError {
     /// The session already ended.
     #[error("No such agent session")]
     SessionAlreadyEnded,
+    /// The removal request was already answered, or its session ended (AGT-081).
+    #[error("No such removal request")]
+    RemovalRequestGone,
+    /// The deletion refused to remove the transaction (AGT-081): `reason` is its code.
+    #[error("The transaction could not be removed")]
+    TransactionNotRemoved {
+        /// The deletion's code.
+        reason: String,
+    },
     /// What the session recorded could not be read or removed; the cause is in the log.
     #[error("The portfolio could not be read or written")]
     DatabaseError,
+}
+
+impl From<AnswerRefused> for AgentConnectionError {
+    fn from(refused: AnswerRefused) -> Self {
+        match refused {
+            AnswerRefused::Gone => Self::RemovalRequestGone,
+            AnswerRefused::NotRemoved { reason } => Self::TransactionNotRemoved { reason },
+            AnswerRefused::Unreadable => Self::DatabaseError,
+        }
+    }
 }
 
 impl From<GateError> for AgentConnectionError {
@@ -61,6 +80,8 @@ pub struct AgentConnectionState {
     pub requests: Vec<AgentConnectionRequest>,
     /// The agent clients connected, oldest first.
     pub sessions: Vec<AgentSession>,
+    /// The removal requests waiting for the owner's answer, oldest first (AGT-081).
+    pub removals: Vec<RemovalRequest>,
 }
 
 /// The state of `gate`, as the window reads it.
@@ -74,6 +95,7 @@ pub fn state_of(gate: &AgentGate) -> AgentConnectionState {
             .filter(|user| !user.trim().is_empty()),
         requests: gate.connections().requests(),
         sessions: gate.connections().sessions(),
+        removals: gate.connections().removals(),
     }
 }
 
@@ -109,6 +131,19 @@ pub fn answer_agent_connection(
     } else {
         Err(AgentConnectionError::ConnectionRequestGone)
     }
+}
+
+/// AGT-081 — the owner's answer to a removal request: removing the transaction through the
+/// deletion of the window, or refusing. The agent that asked is told what became of it.
+#[tauri::command]
+#[specta::specta]
+pub async fn answer_removal_request(
+    gate: State<'_, Arc<AgentGate>>,
+    recorder: State<'_, HoldingTransactionUseCase>,
+    request_id: u32,
+    remove: bool,
+) -> Result<(), AgentConnectionError> {
+    Ok(answer_removal(gate.connections(), &recorder, request_id, remove).await?)
 }
 
 /// AGT-034 — the owner disconnects an agent client.
@@ -181,11 +216,23 @@ mod tests {
                 AgentConnectionError::SessionAlreadyEnded,
                 "SessionAlreadyEnded",
             ),
+            (
+                AgentConnectionError::RemovalRequestGone,
+                "RemovalRequestGone",
+            ),
         ] {
             assert_eq!(
                 serde_json::to_value(&error).expect("json"),
                 json!({ "code": code })
             );
         }
+        // AGT-081 — a deletion that refused carries its own code.
+        assert_eq!(
+            serde_json::to_value(AgentConnectionError::TransactionNotRemoved {
+                reason: "CascadingOversell".to_string()
+            })
+            .expect("json"),
+            json!({ "code": "TransactionNotRemoved", "reason": "CascadingOversell" })
+        );
     }
 }

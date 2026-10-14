@@ -205,7 +205,8 @@ mod tests {
                 "record_price",
                 "add_asset",
                 "correct_recording",
-                "cancel_recording"
+                "cancel_recording",
+                "request_removal",
             ]
         );
         assert_eq!(

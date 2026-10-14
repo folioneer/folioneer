@@ -451,7 +451,14 @@ describe("settingsGateway — dismissConflictNotice (SYN-066)", () => {
 describe("settingsGateway — the agent connection setting (AGT-022, AGT-023)", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  const state = { available: true, allowed: true, user: "phil", requests: [], sessions: [] };
+  const state = {
+    available: true,
+    allowed: true,
+    user: "phil",
+    requests: [],
+    sessions: [],
+    removals: [],
+  };
 
   it("getAgentConnectionState returns the state as the core gives it", async () => {
     mockInvoke.mockResolvedValue(state);

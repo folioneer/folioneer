@@ -64,6 +64,75 @@ pub struct LastRecording {
     pub date: String,
 }
 
+/// A transaction the owner typed, as the owner is shown it before removing it (AGT-081).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct TransactionShown {
+    /// The transaction's id.
+    pub id: String,
+    /// Its date.
+    pub date: String,
+    /// The name of its account.
+    pub account: String,
+    /// The account's currency, which its amount is in.
+    pub currency: String,
+    /// What kind of transaction.
+    pub kind: TransactionType,
+    /// Its asset's name; `None` for a transaction on the account's cash.
+    pub asset_name: Option<String>,
+    /// Its asset's reference; `None` for a transaction on the account's cash.
+    pub asset_reference: Option<String>,
+    /// Its quantity, in micro-units.
+    pub quantity: i64,
+    /// Its amount in the account's currency, in micro-units.
+    pub amount: i64,
+}
+
+/// An agent asking the owner to remove a transaction the owner typed (AGT-080).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct RemovalRequest {
+    /// Identifies the request in the owner's answer.
+    pub id: u32,
+    /// The session that asks.
+    pub session: u32,
+    /// The name of the agent that asks.
+    pub client: String,
+    /// When it asked, as an RFC 3339 timestamp in this computer's time.
+    pub asked_at: String,
+    /// The transaction, as it stood when the agent asked.
+    pub transaction: TransactionShown,
+}
+
+/// What became of a removal request, as the agent that asked is told (AGT-080).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RemovalAnswer {
+    /// The owner removed the transaction.
+    Removed,
+    /// The owner refused, or the session ended before an answer.
+    Refused,
+    /// The owner removed it and the deletion refused: its code and reason.
+    NotRemoved {
+        /// The deletion's code.
+        code: String,
+        /// The deletion's reason.
+        message: String,
+    },
+}
+
+/// A removal request waiting for the owner's answer, with the call that waits on it: whoever
+/// takes it to perform the owner's answer tells the agent what became of it.
+pub struct WaitingRemoval {
+    /// The request.
+    pub request: RemovalRequest,
+    answer: oneshot::Sender<RemovalAnswer>,
+}
+
+impl WaitingRemoval {
+    /// Tells the agent that asked what became of its request; it may be gone.
+    pub fn tell(self, answer: RemovalAnswer) {
+        let _ = self.answer.send(answer);
+    }
+}
+
 /// What a session did, shared by the connection that serves it and by what the window is
 /// told of it.
 #[derive(Debug, Default)]
@@ -181,6 +250,7 @@ struct State {
     last_id: u32,
     pending: Vec<Pending>,
     open: Vec<Open>,
+    removals: Vec<WaitingRemoval>,
 }
 
 /// The requests waiting and the sessions open. `changed` is called after every change, so
@@ -205,6 +275,28 @@ impl Drop for Withdrawal<'_> {
                 .pending
                 .retain(|pending| pending.request.id != self.request_id);
             state.pending.len() != before
+        };
+        if withdrawn {
+            (self.connections.changed)();
+        }
+    }
+}
+
+/// Withdraws a removal request whose call went away before the owner answered.
+struct RemovalWithdrawal<'a> {
+    connections: &'a AgentConnections,
+    request_id: u32,
+}
+
+impl Drop for RemovalWithdrawal<'_> {
+    fn drop(&mut self) {
+        let withdrawn = {
+            let mut state = self.connections.state();
+            let before = state.removals.len();
+            state
+                .removals
+                .retain(|pending| pending.request.id != self.request_id);
+            state.removals.len() != before
         };
         if withdrawn {
             (self.connections.changed)();
@@ -351,7 +443,14 @@ impl AgentConnections {
                 .open
                 .iter()
                 .position(|open| open.session.id == session_id);
-            position.map(|position| state.open.remove(position))
+            let ended = position.map(|position| state.open.remove(position));
+            // AGT-082 — its removal requests are withdrawn: their calls are refused.
+            if ended.is_some() {
+                state
+                    .removals
+                    .retain(|pending| pending.request.session != session_id);
+            }
+            ended
         };
         match ended {
             None => false,
@@ -365,15 +464,17 @@ impl AgentConnections {
 
     /// AGT-035 — stops admitting agents, refuses every request and ends every session.
     pub fn end_all(&self) {
-        let (pending, open) = {
+        let (pending, open, removals) = {
             let mut state = self.state();
             state.admitting = false;
+            let removals = std::mem::take(&mut state.removals);
             (
                 std::mem::take(&mut state.pending),
                 std::mem::take(&mut state.open),
+                removals,
             )
         };
-        if pending.is_empty() && open.is_empty() {
+        if pending.is_empty() && open.is_empty() && removals.is_empty() {
             return;
         }
         for pending in pending {
@@ -382,7 +483,70 @@ impl AgentConnections {
         for open in open {
             open.ended.notify_one();
         }
+        // AGT-082 — the removal requests' calls are refused as their answers drop.
+        drop(removals);
         (self.changed)();
+    }
+
+    /// AGT-080 — the session `granted` asks the owner to remove the transaction `shown`
+    /// and waits for the answer: `Refused` when the session is no longer open, or ends
+    /// before an answer. A caller that stops waiting withdraws its request.
+    ///
+    /// No limit is kept here: a session's connection serves its calls one after the other
+    /// (`server.rs`), so at most one request waits per session, and sessions are limited
+    /// (AGT-038).
+    pub async fn ask_removal(&self, granted: &Granted, shown: TransactionShown) -> RemovalAnswer {
+        let (answer, answered) = oneshot::channel();
+        let request_id = {
+            let mut state = self.state();
+            if !state
+                .open
+                .iter()
+                .any(|open| open.session.id == granted.session_id)
+            {
+                return RemovalAnswer::Refused;
+            }
+            state.last_id = state.last_id.wrapping_add(1);
+            let request = RemovalRequest {
+                id: state.last_id,
+                session: granted.session_id,
+                client: granted.client.clone(),
+                asked_at: chrono::Local::now().to_rfc3339(),
+                transaction: shown,
+            };
+            state.removals.push(WaitingRemoval { request, answer });
+            state.last_id
+        };
+        (self.changed)();
+        let _withdrawal = RemovalWithdrawal {
+            connections: self,
+            request_id,
+        };
+        answered.await.unwrap_or(RemovalAnswer::Refused)
+    }
+
+    /// AGT-081 — takes the removal request the owner answered from those waiting; `None`
+    /// when no such request waits. The window is told it is gone.
+    pub fn take_removal(&self, request_id: u32) -> Option<WaitingRemoval> {
+        let taken = {
+            let mut state = self.state();
+            let position = state
+                .removals
+                .iter()
+                .position(|pending| pending.request.id == request_id);
+            position.map(|position| state.removals.remove(position))
+        }?;
+        (self.changed)();
+        Some(taken)
+    }
+
+    /// The removal requests waiting, oldest first (AGT-081).
+    pub fn removals(&self) -> Vec<RemovalRequest> {
+        self.state()
+            .removals
+            .iter()
+            .map(|pending| pending.request.clone())
+            .collect()
     }
 
     /// The requests waiting, oldest first.

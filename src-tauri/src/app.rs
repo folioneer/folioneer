@@ -350,15 +350,17 @@ pub fn run() {
                 // AGT-022 — the agent connection: its channel opens only when the owner's
                 // setting allows it, and every change is told to the window (AGT-036).
                 let agent_events = Arc::clone(&event_bus);
+                let agent_connections = Arc::new(AgentConnections::new(move || {
+                    agent_events.publish(Event::AgentConnectionChanged);
+                }));
                 let agent_gate = Arc::new(AgentGate::new(
                     agent_data_dir,
-                    Arc::new(AgentConnections::new(move || {
-                        agent_events.publish(Event::AgentConnectionChanged);
-                    })),
+                    Arc::clone(&agent_connections),
                     Arc::new(AgentTools::new(
                         account_service.clone(),
                         asset_service.clone(),
                         Arc::clone(&currency_service),
+                        agent_connections,
                     )),
                 ));
                 agent_gate.open_if_allowed();

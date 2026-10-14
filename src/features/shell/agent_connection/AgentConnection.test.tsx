@@ -22,6 +22,7 @@ const removeRecordings = vi.fn();
 const state = (overrides = {}) => ({
   request: null,
   sessions: [],
+  removals: [],
   user: "phil",
   answer,
   disconnect,

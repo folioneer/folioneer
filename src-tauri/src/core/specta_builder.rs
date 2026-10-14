@@ -207,6 +207,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             agent_connection::api::get_agent_connection_state,
             agent_connection::api::set_agents_allowed,
             agent_connection::api::answer_agent_connection,
+            agent_connection::api::answer_removal_request,
             agent_connection::api::disconnect_agent,
             agent_connection::api::remove_agent_recordings,
             // ----- core -----

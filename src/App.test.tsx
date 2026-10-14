@@ -27,7 +27,14 @@ vi.mock("./bindings", async (importOriginal) => ({
     installUpdate: vi.fn(() => Promise.resolve({ status: "ok", data: null })),
     applyDueFeeDeductions: vi.fn(() => Promise.resolve({ status: "ok", data: null })),
     getAgentConnectionState: vi.fn(() =>
-      Promise.resolve({ available: true, allowed: false, user: null, requests: [], sessions: [] }),
+      Promise.resolve({
+        available: true,
+        allowed: false,
+        user: null,
+        requests: [],
+        sessions: [],
+        removals: [],
+      }),
     ),
     getPriceFreshness: vi.fn(() =>
       Promise.resolve({ status: "ok", data: { newest_price_date: null, last_fetch_at: null } }),

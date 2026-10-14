@@ -79,7 +79,14 @@ describe("shellGateway — the agent connection (AGT-032, AGT-034, AGT-036)", ()
   beforeEach(() => vi.clearAllMocks());
 
   it("getAgentConnectionState returns the state as the core gives it", async () => {
-    const state = { available: true, allowed: true, user: "phil", requests: [], sessions: [] };
+    const state = {
+      available: true,
+      allowed: true,
+      user: "phil",
+      requests: [],
+      sessions: [],
+      removals: [],
+    };
     mockInvoke.mockResolvedValue(state);
 
     expect(await shellGateway.getAgentConnectionState()).toEqual(state);

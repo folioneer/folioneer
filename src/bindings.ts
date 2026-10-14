@@ -1073,6 +1073,18 @@ async answerAgentConnection(requestId: number, allow: boolean) : Promise<Result<
 }
 },
 /**
+ * AGT-081 — the owner's answer to a removal request: removing the transaction through the
+ * deletion of the window, or refusing. The agent that asked is told what became of it.
+ */
+async answerRemovalRequest(requestId: number, remove: boolean) : Promise<Result<null, AgentConnectionError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("answer_removal_request", { requestId, remove }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * AGT-034 — the owner disconnects an agent client.
  */
 async disconnectAgent(sessionId: number) : Promise<Result<null, AgentConnectionError>> {
@@ -1586,6 +1598,14 @@ export type AgentConnectionError =
  */
 { code: "SessionAlreadyEnded" } | 
 /**
+ * The removal request was already answered, or its session ended (AGT-081).
+ */
+{ code: "RemovalRequestGone" } | 
+/**
+ * The deletion refused to remove the transaction (AGT-081): `reason` is its code.
+ */
+{ code: "TransactionNotRemoved"; reason: string } | 
+/**
  * What the session recorded could not be read or removed; the cause is in the log.
  */
 { code: "DatabaseError" }
@@ -1629,7 +1649,11 @@ requests: AgentConnectionRequest[];
 /**
  * The agent clients connected, oldest first.
  */
-sessions: AgentSession[] }
+sessions: AgentSession[]; 
+/**
+ * The removal requests waiting for the owner's answer, oldest first (AGT-081).
+ */
+removals: RemovalRequest[] }
 /**
  * The mark of a transaction an agent recorded (AGT-045): which agent, in which session.
  */
@@ -4153,6 +4177,30 @@ factor: number;
  */
 note: string | null }
 /**
+ * An agent asking the owner to remove a transaction the owner typed (AGT-080).
+ */
+export type RemovalRequest = { 
+/**
+ * Identifies the request in the owner's answer.
+ */
+id: number; 
+/**
+ * The session that asks.
+ */
+session: number; 
+/**
+ * The name of the agent that asks.
+ */
+client: string; 
+/**
+ * When it asked, as an RFC 3339 timestamp in this computer's time.
+ */
+asked_at: string; 
+/**
+ * The transaction, as it stood when the agent asked.
+ */
+transaction: TransactionShown }
+/**
  * One other device known from the roster (the manifest set, SYN-037).
  */
 export type RosterEntry = { 
@@ -4942,6 +4990,46 @@ total_amount: number;
  * hold what is sold, or cannot be read (TDI-031).
  */
 realized_pnl: number | null }
+/**
+ * A transaction the owner typed, as the owner is shown it before removing it (AGT-081).
+ */
+export type TransactionShown = { 
+/**
+ * The transaction's id.
+ */
+id: string; 
+/**
+ * Its date.
+ */
+date: string; 
+/**
+ * The name of its account.
+ */
+account: string; 
+/**
+ * The account's currency, which its amount is in.
+ */
+currency: string; 
+/**
+ * What kind of transaction.
+ */
+kind: TransactionType; 
+/**
+ * Its asset's name; `None` for a transaction on the account's cash.
+ */
+asset_name: string | null; 
+/**
+ * Its asset's reference; `None` for a transaction on the account's cash.
+ */
+asset_reference: string | null; 
+/**
+ * Its quantity, in micro-units.
+ */
+quantity: number; 
+/**
+ * Its amount in the account's currency, in micro-units.
+ */
+amount: number }
 /**
  * Type of financial transaction.
  */
