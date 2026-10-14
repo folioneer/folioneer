@@ -46,6 +46,14 @@ export function answerAgentConnection(
   return commands.answerAgentConnection(requestId, allow);
 }
 
+// AGT-081 — the owner's answer to an agent's removal request.
+export function answerRemovalRequest(
+  requestId: number,
+  remove: boolean,
+): Promise<Result<null, AgentConnectionError>> {
+  return commands.answerRemovalRequest(requestId, remove);
+}
+
 // AGT-034 — the owner disconnects an agent.
 export function disconnectAgent(sessionId: number): Promise<Result<null, AgentConnectionError>> {
   return commands.disconnectAgent(sessionId);

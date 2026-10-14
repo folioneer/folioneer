@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentConnectionRequest, AgentSession } from "@/bindings";
+import type { AgentConnectionRequest, AgentSession, RemovalRequest } from "@/bindings";
 import { logger } from "@/lib/logger";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import {
   answerAgentConnection,
+  answerRemovalRequest,
   disconnectAgent,
   getAgentConnectionState,
   onAgentConnectionChanged,
@@ -14,14 +15,26 @@ import {
 export interface UseAgentConnectionsResult {
   /** The agent waiting for the owner's answer: the oldest one, others wait their turn. */
   request: AgentConnectionRequest | null;
+  /**
+   * AGT-083 — the removal request to answer: the oldest one, once no agent waits to connect.
+   */
+  removal: RemovalRequest | null;
   /** The agents connected, oldest first. */
   sessions: AgentSession[];
   /** The user whose programs can connect; null when the system does not say. */
   user: string | null;
   answer: (requestId: number, allow: boolean) => void;
+  answerRemoval: (requestId: number, remove: boolean) => void;
   disconnect: (sessionId: number) => void;
   /** AGT-053 — removes everything the session recorded, and says how much went. */
   removeRecordings: (sessionId: number) => void;
+}
+
+/** AGT-081 — the sentence for a refused command; a removal that did not happen says why. */
+function refusalKey(error: { code: string; reason?: string }): string {
+  if (error.reason === "TransactionChanged") return "agent.removal_changed";
+  if (error.reason === "TransactionNotFound") return "agent.removal_gone";
+  return `error.${error.code}`;
 }
 
 /**
@@ -33,6 +46,7 @@ export function useAgentConnections(): UseAgentConnectionsResult {
   const showSnackbar = useSnackbar();
   const [requests, setRequests] = useState<AgentConnectionRequest[]>([]);
   const [sessions, setSessions] = useState<AgentSession[]>([]);
+  const [removals, setRemovals] = useState<RemovalRequest[]>([]);
   const [user, setUser] = useState<string | null>(null);
 
   // Reads may answer out of order: only the latest one asked is shown.
@@ -46,6 +60,7 @@ export function useAgentConnections(): UseAgentConnectionsResult {
       if (read !== latestRead.current) return;
       setRequests(state.requests);
       setSessions(state.sessions);
+      setRemovals(state.removals);
       setUser(state.user);
     } catch (e) {
       logger.error("[useAgentConnections] state not read", { error: e });
@@ -61,13 +76,18 @@ export function useAgentConnections(): UseAgentConnectionsResult {
   }, [refresh]);
 
   // AGT-039 — a refused command means the request or the session is already gone: the
-  // state is read again and the reason is said.
+  // state is read again and the reason is said. AGT-081 — a removal that did not happen
+  // says why, by the reason's code.
   const settle = useCallback(
-    (call: Promise<{ status: "ok" } | { status: "error"; error: { code: string } }>) => {
+    (
+      call: Promise<
+        { status: "ok" } | { status: "error"; error: { code: string; reason?: string } }
+      >,
+    ) => {
       call
         .then((result) => {
           if (result.status === "error") {
-            showSnackbar(t(`error.${result.error.code}`), "error");
+            showSnackbar(t(refusalKey(result.error)), "error");
           }
         })
         .catch((e) => {
@@ -81,6 +101,10 @@ export function useAgentConnections(): UseAgentConnectionsResult {
 
   const answer = useCallback(
     (requestId: number, allow: boolean) => settle(answerAgentConnection(requestId, allow)),
+    [settle],
+  );
+  const answerRemoval = useCallback(
+    (requestId: number, remove: boolean) => settle(answerRemovalRequest(requestId, remove)),
     [settle],
   );
   const disconnect = useCallback(
@@ -112,5 +136,15 @@ export function useAgentConnections(): UseAgentConnectionsResult {
     [refresh, showSnackbar, t],
   );
 
-  return { request: requests[0] ?? null, sessions, user, answer, disconnect, removeRecordings };
+  const request = requests[0] ?? null;
+  return {
+    request,
+    removal: request ? null : (removals[0] ?? null),
+    sessions,
+    user,
+    answer,
+    answerRemoval,
+    disconnect,
+    removeRecordings,
+  };
 }

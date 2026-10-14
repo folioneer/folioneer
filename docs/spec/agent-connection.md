@@ -152,6 +152,8 @@ Two things are kept on the computer across restarts, and neither is synced to th
 
 **AGT-082 — Nothing of an answer is kept (backend)**: The session's grant (AGT-032) never covers a removal: every one is asked, and an answer covers the one transaction it was asked for. Nothing of an answer is remembered for the next request, the same transaction's included. A request is withdrawn when its session ends — the owner disconnects it or switches the setting off (AGT-034, AGT-035) — and its call is answered `RemovalRefused` before its connection closes.
 
+**AGT-083 — The removal dialog (frontend)**: While a removal request waits and no agent waits to connect — a connection request comes first (AGT-032) — a dialog shows over whatever view is open, and the session dialog gives way to it as to a connection request (AGT-054). Its title is "{agent} asks to remove a transaction you typed". It shows the transaction in full, as the state carries it (AGT-081): its date, its account, its kind, its asset with its reference, its quantity, and its total with the account's currency. A transaction on the account's cash shows no asset and no quantity. A split's quantity is its factor; a total of 0 is shown as 0. It says what would become of it — removed, the account's holdings and cash recomputed from the transactions that remain — and that the answer covers this transaction only. Its two actions are "Remove this transaction" and "Refuse"; no action covers more than one. Refusing is the filled action and has the focus; "Remove this transaction" is inactive for the same moment as "Allow" (AGT-032); the keyboard's focus stays on the two actions; neither its corner nor its backdrop dismisses it: it closes on an answer, or when its request is withdrawn (AGT-082). Several requests are shown one at a time, oldest first. A removal says nothing more: the views that show the transaction follow it (AGT-036). A yes that removed nothing says why in a snackbar — the transaction changed since the agent asked, it no longer exists, or a later transaction depends on it —, as does an answer that came too late or a portfolio that could not be written; the state is read again.
+
 ---
 
 ## Workflow
@@ -185,6 +187,7 @@ header: "{agent} is connected" · Disconnect (AGT-033, AGT-034)
 - **An agent asks**: the connection dialog, refusing in focus (AGT-032).
 - **Connected**: the header names the agent and offers to disconnect (AGT-033); the name opens the session dialog (AGT-054).
 - **Session**: what the agent read, the assets it added and what it recorded, its last recording, and the removal of everything it recorded, confirmed in a second dialog where keeping is in focus; the outcome is said in a snackbar (AGT-054).
+- **An agent asks to remove a transaction you typed**: the removal dialog, the transaction's date, account, kind, asset, quantity and total, refusing in focus (AGT-083).
 - **Too late**: a request already withdrawn or a session already ended is said in a snackbar, and the state is read again (AGT-039).
 
 ---

@@ -4,6 +4,7 @@ import type { AgentConnectionRequest } from "@/bindings";
 import { Button } from "@/ui/components/button/Button";
 import { Dialog } from "@/ui/components/modal/Dialog";
 import { formatIsoTime } from "@/ui/format/date";
+import { useKeepFocusOnActions } from "./useKeepFocusOnActions";
 
 interface AgentConnectionDialogProps {
   request: AgentConnectionRequest;
@@ -33,22 +34,7 @@ export function AgentConnectionDialog({ request, user, onAnswer }: AgentConnecti
     return () => window.clearTimeout(timer);
   }, []);
 
-  // Tab moves between the dialog's actions and never to what lies behind it.
-  useEffect(() => {
-    const keepFocus = (event: KeyboardEvent) => {
-      if (event.key !== "Tab") return;
-      const actions = Array.from(
-        document.querySelectorAll<HTMLButtonElement>(`#${DIALOG_ID} button:not(:disabled)`),
-      );
-      if (actions.length === 0) return;
-      event.preventDefault();
-      const current = actions.indexOf(document.activeElement as HTMLButtonElement);
-      const step = event.shiftKey ? -1 : 1;
-      actions[(current + step + actions.length) % actions.length]?.focus();
-    };
-    document.addEventListener("keydown", keepFocus, true);
-    return () => document.removeEventListener("keydown", keepFocus, true);
-  }, []);
+  useKeepFocusOnActions(DIALOG_ID);
 
   const rows: [string, string][] = [
     [t("agent.connection_agent"), request.client],

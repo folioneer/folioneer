@@ -17,14 +17,16 @@ import { AgentConnectionMount } from "./AgentConnectionMount";
 import { AgentIndicator } from "./AgentIndicator";
 
 const answer = vi.fn();
+const answerRemoval = vi.fn();
 const disconnect = vi.fn();
 const removeRecordings = vi.fn();
 const state = (overrides = {}) => ({
   request: null,
   sessions: [],
-  removals: [],
+  removal: null,
   user: "phil",
   answer,
+  answerRemoval,
   disconnect,
   removeRecordings,
   ...overrides,
@@ -42,6 +44,24 @@ const session = (overrides = {}) => ({
   ...overrides,
 });
 const request = { id: 4, client: "Claude Code", asked_at: "2026-10-09T14:32:00" };
+const removal = (overrides = {}) => ({
+  id: 9,
+  session: 1,
+  client: "Claude Code",
+  asked_at: "2026-10-14T09:00:00",
+  transaction: {
+    id: "tx-1",
+    date: "2026-01-02",
+    account: "PEA Boursorama",
+    currency: "EUR",
+    kind: "OpeningBalance",
+    asset_name: "Amundi MSCI World",
+    asset_reference: "CW8",
+    quantity: 118_000_000,
+    amount: 31_204_000_000,
+  },
+  ...overrides,
+});
 
 describe("AgentConnectionMount", () => {
   beforeEach(() => {
@@ -139,6 +159,60 @@ describe("AgentConnectionMount", () => {
     fireEvent.keyDown(refuse, { key: "Tab", shiftKey: true });
     expect(allow).toHaveFocus();
     expect(document.getElementById("behind")).not.toHaveFocus();
+  });
+  // AGT-083 — an agent asks to remove a transaction the owner typed: the transaction in
+  // full, what would become of it, and that the answer covers it alone; refusing is in
+  // focus, and removing is inactive for a moment.
+  it("shows a removal request in full, with refusing in focus", () => {
+    hook.mockReturnValue(state({ removal: removal() }));
+    render(<AgentConnectionMount />);
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("id", "agent-removal-dialog");
+    expect(dialog).toHaveTextContent("agent.removal_title(Claude Code)");
+    expect(dialog).toHaveTextContent("02/01/2026");
+    expect(dialog).toHaveTextContent("PEA Boursorama");
+    expect(dialog).toHaveTextContent("transaction.type_openingbalance");
+    expect(dialog).toHaveTextContent("Amundi MSCI World (CW8)");
+    expect(dialog).toHaveTextContent("118");
+    expect(dialog).toHaveTextContent("EUR");
+    expect(dialog).toHaveTextContent("agent.removal_becomes_removed");
+    expect(dialog).toHaveTextContent("agent.removal_covers");
+    expect(document.getElementById("modal-close-btn")).toBeNull();
+    expect(document.getElementById("agent-removal-refuse")).toHaveFocus();
+    const remove = document.getElementById("agent-removal-remove") as HTMLButtonElement;
+    expect(remove).toBeDisabled();
+
+    fireEvent.click(screen.getByText("agent.removal_refuse"));
+    expect(answerRemoval).toHaveBeenLastCalledWith(9, false);
+    act(() => vi.advanceTimersByTime(ALLOW_AFTER_MS));
+    fireEvent.click(remove);
+    expect(answerRemoval).toHaveBeenLastCalledWith(9, true);
+  });
+
+  // AGT-083 — a transaction on the account's cash has no asset and no quantity to show.
+  it("shows no asset for a transaction on the account's cash", () => {
+    const cash = removal().transaction;
+    hook.mockReturnValue(
+      state({
+        removal: removal({
+          transaction: { ...cash, kind: "Deposit", asset_name: null, asset_reference: null },
+        }),
+      }),
+    );
+    render(<AgentConnectionMount />);
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).not.toHaveTextContent("agent.removal_asset");
+    expect(dialog).not.toHaveTextContent("agent.removal_quantity");
+    expect(dialog).toHaveTextContent("agent.removal_amount");
+  });
+
+  // AGT-083 — an agent asking to connect comes first; the removal waits its turn.
+  it("shows a connection request before a removal request", () => {
+    hook.mockReturnValue(state({ request, removal: null }));
+    render(<AgentConnectionMount />);
+    expect(screen.getByRole("dialog")).toHaveAttribute("id", "agent-connection-dialog");
   });
 });
 
@@ -278,6 +352,21 @@ describe("AgentIndicator", () => {
     expect(document.getElementById("agent-session-dialog")).not.toBeNull();
 
     hook.mockReturnValue(state({ sessions: [session()], request }));
+    rerender(<AgentIndicator />);
+    expect(document.getElementById("agent-session-dialog")).toBeNull();
+
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    rerender(<AgentIndicator />);
+    expect(document.getElementById("agent-session-dialog")).not.toBeNull();
+  });
+
+  // AGT-083 / AGT-054 — an agent that asks to remove a transaction comes first too.
+  it("gives way to a removal request and comes back once it is answered", () => {
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    const { rerender } = render(<AgentIndicator />);
+    fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
+
+    hook.mockReturnValue(state({ sessions: [session()], removal: removal() }));
     rerender(<AgentIndicator />);
     expect(document.getElementById("agent-session-dialog")).toBeNull();
 

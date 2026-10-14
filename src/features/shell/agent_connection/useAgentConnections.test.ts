@@ -6,6 +6,7 @@ const unlisten = vi.fn();
 vi.mock("../gateway", () => ({
   getAgentConnectionState: vi.fn(),
   answerAgentConnection: vi.fn(),
+  answerRemovalRequest: vi.fn(),
   disconnectAgent: vi.fn(),
   removeAgentRecordings: vi.fn(),
   onAgentConnectionChanged: vi.fn((callback: () => void) => {
@@ -173,5 +174,46 @@ describe("useAgentConnections", () => {
     vi.mocked(gateway.removeAgentRecordings).mockRejectedValue(new Error("no core"));
     act(() => result.current.removeRecordings(3));
     await waitFor(() => expect(showSnackbar).toHaveBeenCalledWith("error.Unknown", "error"));
+  });
+  // AGT-083 — a removal request is answered once no agent waits to connect, oldest first.
+  it("offers the oldest removal request once no agent waits to connect", async () => {
+    const removal = (id: number) => ({ id, session: 1, client: "agent-1" });
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(
+      state({ requests: [request(1)], removals: [removal(7), removal(8)] }) as never,
+    );
+    const { result } = renderHook(() => useAgentConnections());
+    await waitFor(() => expect(result.current.request).toEqual(request(1)));
+    expect(result.current.removal).toBeNull();
+
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(
+      state({ removals: [removal(7), removal(8)] }) as never,
+    );
+    act(() => changed?.());
+    await waitFor(() => expect(result.current.removal).toEqual(removal(7)));
+  });
+
+  // AGT-081 — the owner's answer is sent; a removal that did not happen says why.
+  it("sends the owner's answer and says why a removal did not happen", async () => {
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(state());
+    const { result } = renderHook(() => useAgentConnections());
+    await waitFor(() => expect(gateway.getAgentConnectionState).toHaveBeenCalled());
+
+    for (const [error, sentence] of [
+      [{ code: "TransactionNotRemoved", reason: "TransactionChanged" }, "agent.removal_changed"],
+      [{ code: "TransactionNotRemoved", reason: "TransactionNotFound" }, "agent.removal_gone"],
+      [
+        { code: "TransactionNotRemoved", reason: "CascadingOversell" },
+        "error.TransactionNotRemoved",
+      ],
+      [{ code: "RemovalRequestGone" }, "error.RemovalRequestGone"],
+    ] as const) {
+      vi.mocked(gateway.answerRemovalRequest).mockResolvedValue({
+        status: "error",
+        error,
+      } as never);
+      act(() => result.current.answerRemoval(7, true));
+      await waitFor(() => expect(showSnackbar).toHaveBeenLastCalledWith(sentence, "error"));
+    }
+    expect(gateway.answerRemovalRequest).toHaveBeenLastCalledWith(7, true);
   });
 });

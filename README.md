@@ -167,7 +167,7 @@ An agent — Claude Code, Claude Desktop — can read the portfolio, an account'
 
 3. At the agent's first call, Folioneer asks you to allow or refuse the connection. A yes lasts until you click **Disconnect** in the header or close Folioneer.
 
-What an agent recorded is marked in the account journal ("Recorded by"). An agent can correct or cancel what it recorded in its own session, never a transaction you typed, and reads no file.
+What an agent recorded is marked in the account journal ("Recorded by"). An agent can correct or cancel what it recorded in its own session; for a transaction you typed it can only ask you, one at a time — Folioneer shows it in full and you remove it or refuse. It reads no file.
 
 ## Documentation
 
