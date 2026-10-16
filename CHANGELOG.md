@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-10-16
+
+### Added
+
+- Claude Desktop connects to Folioneer from one file in the release
+- the window says what an agent records, whatever view is open
+- the window asks you before an agent removes what you typed
+- an agent asks to remove a transaction you typed, one at a time
+
+### Fixed
+
+- the network layer takes rustls 0.23.46, past four advisories
+- a computer never joins another's moved sync folder as its own
+- a call an agent gave up on withdraws what it asked the window
+- an agent's tools do what their rules say, with a test each
+- what an agent adds or records shows in the window at once
+
 ## [0.10.0] - 2026-10-12
 
 ### Added
