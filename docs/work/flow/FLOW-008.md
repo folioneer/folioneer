@@ -17,3 +17,4 @@
   warning with a decision for the owner, CI's as a critical. The same finding, two
   grades: one round, and the decision the owner then took.
 - 0.10.0 batch (2026-10-12): 31 local reviewer launches, 7 real defects found before a push, and no Review failure in CI where the batch before had 2. The verdict stands.
+- 0.11.0 batch (2026-10-16): 38 local reviewer launches, 9 real defects found before a push; CI's spec lane still found a 🔴 twice (#253, #260), both on text written in answer to the local review and not reviewed again (FLOW-041). The verdict stands.

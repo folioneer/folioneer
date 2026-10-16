@@ -15,3 +15,4 @@
 - 0.9.0: 4 later rounds in 22; one cause counted by hand, three not. The share stays
   low while entries are stacked; the figure still argues for waiting.
 - 0.10.0 batch (2026-10-12): no round came after the first, of 22: nothing to count. The batch before counted 1 cause of 4.
+- 0.11.0 batch (2026-10-16): 16 later rounds in 36; 4 causes counted by hand (two CI spec 🔴, a Windows build, a reviewer with no report), the rest the pushes of `just merge` itself, which the script cannot yet tell from a fix. The figure now argues for the sort: without it the share reads as a slowdown that was not one.

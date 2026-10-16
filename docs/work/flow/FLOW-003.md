@@ -18,3 +18,4 @@
   review; none known to be a pull request sent round by another's merge — the entries
   were stacked again. The verdict stands.
 - 0.10.0 batch (2026-10-12): 22 rounds for 22 branches, none beyond the first — each entry was prepared behind the one in review and pushed once it had merged (`docs/workflow.md` § 11), so no merge sent another pull request round again. The verdict stands.
+- 0.11.0 batch (2026-10-16): 16 rounds beyond the first, of 36: none was a pull request sent round by another's merge — the entries were stacked — and most are the push `just merge` makes when it folds a branch's fixups or rebases it, which the script counts as a round. The verdict stands.
