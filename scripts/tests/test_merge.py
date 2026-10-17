@@ -197,6 +197,28 @@ class FoldingFixups(unittest.TestCase):
         with self.assertRaises(SystemExit):
             merge.merge_method("main", before, "work")
 
+    # PR #316: GitHub refused the squash, and the folded branch stayed, refused at the next run.
+    def test_a_stop_that_pushed_nothing_puts_the_branch_back(self):
+        self.commit("feat: show the total", {"total.txt": "total\n"})
+        before = self.commit("fixup! feat: show the total", {"total.txt": "fixed\n"})
+        merge.rebase_folding_fixups("main")
+        self.assertNotEqual(self.run_git("rev-parse", "HEAD"), before)
+
+        merge.restore_unpushed("work", before)
+
+        self.assertEqual(self.run_git("rev-parse", "HEAD"), before)
+
+    def test_a_branch_the_stop_pushed_stays_as_pushed(self):
+        self.commit("feat: show the total", {"total.txt": "total\n"})
+        before = self.commit("fixup! feat: show the total", {"total.txt": "fixed\n"})
+        merge.rebase_folding_fixups("main")
+        folded = self.run_git("rev-parse", "HEAD")
+        self.run_git("update-ref", "refs/remotes/origin/work", folded)
+
+        merge.restore_unpushed("work", before)
+
+        self.assertEqual(self.run_git("rev-parse", "HEAD"), folded)
+
     # PR #315: GitHub deleted the merged branch itself, and the delete that followed was told as a failure.
     def test_a_branch_the_remote_no_longer_holds_is_gone(self):
         remote = tempfile.TemporaryDirectory()
