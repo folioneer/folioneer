@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentConnectionRequest } from "@/bindings";
 import { Button } from "@/ui/components/button/Button";
 import { Dialog } from "@/ui/components/modal/Dialog";
 import { formatIsoTime } from "@/ui/format/date";
+import { useActiveAfterAMoment } from "./useActiveAfterAMoment";
 import { useKeepFocusOnActions } from "./useKeepFocusOnActions";
 
 interface AgentConnectionDialogProps {
@@ -15,9 +15,6 @@ interface AgentConnectionDialogProps {
 
 const DIALOG_ID = "agent-connection-dialog";
 
-/** How long a dialog that just appeared keeps "Allow" inactive, in milliseconds. */
-export const ALLOW_AFTER_MS = 800;
-
 /**
  * AGT-032 — an agent asks to connect. The dialog names it and says what a yes covers;
  * refusing is the filled action, and the dialog closes only by an answer: neither its
@@ -27,12 +24,7 @@ export const ALLOW_AFTER_MS = 800;
  */
 export function AgentConnectionDialog({ request, user, onAnswer }: AgentConnectionDialogProps) {
   const { t, i18n } = useTranslation();
-  const [canAllow, setCanAllow] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setCanAllow(true), ALLOW_AFTER_MS);
-    return () => window.clearTimeout(timer);
-  }, []);
+  const canAllow = useActiveAfterAMoment();
 
   useKeepFocusOnActions(DIALOG_ID);
 

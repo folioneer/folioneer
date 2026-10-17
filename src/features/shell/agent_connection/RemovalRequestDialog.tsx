@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { RemovalRequest } from "@/bindings";
 import { Button } from "@/ui/components/button/Button";
 import { Dialog } from "@/ui/components/modal/Dialog";
-import { ALLOW_AFTER_MS } from "./AgentConnectionDialog";
 import { transactionRows } from "./transactionRows";
+import { useActiveAfterAMoment } from "./useActiveAfterAMoment";
 import { useKeepFocusOnActions } from "./useKeepFocusOnActions";
 
 interface RemovalRequestDialogProps {
@@ -23,12 +22,7 @@ const DIALOG_ID = "agent-removal-dialog";
  */
 export function RemovalRequestDialog({ request, onAnswer }: RemovalRequestDialogProps) {
   const { t, i18n } = useTranslation();
-  const [canRemove, setCanRemove] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setCanRemove(true), ALLOW_AFTER_MS);
-    return () => window.clearTimeout(timer);
-  }, []);
+  const canRemove = useActiveAfterAMoment();
 
   useKeepFocusOnActions(DIALOG_ID);
 

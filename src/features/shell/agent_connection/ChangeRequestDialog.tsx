@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ChangeRequest, TransactionShown } from "@/bindings";
 import { Button } from "@/ui/components/button/Button";
 import { Dialog } from "@/ui/components/modal/Dialog";
-import { ALLOW_AFTER_MS } from "./AgentConnectionDialog";
 import { movedRow, transactionRows } from "./transactionRows";
+import { useActiveAfterAMoment } from "./useActiveAfterAMoment";
 import { useKeepFocusOnActions } from "./useKeepFocusOnActions";
 
 interface ChangeRequestDialogProps {
@@ -24,12 +23,7 @@ const DIALOG_ID = "agent-change-dialog";
  */
 export function ChangeRequestDialog({ request, onAnswer }: ChangeRequestDialogProps) {
   const { t, i18n } = useTranslation();
-  const [canChange, setCanChange] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setCanChange(true), ALLOW_AFTER_MS);
-    return () => window.clearTimeout(timer);
-  }, []);
+  const canChange = useActiveAfterAMoment();
 
   useKeepFocusOnActions(DIALOG_ID);
 

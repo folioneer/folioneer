@@ -12,9 +12,9 @@ vi.mock("react-i18next", () => ({
 const hook = vi.fn();
 vi.mock("./useAgentConnections", () => ({ useAgentConnections: () => hook() }));
 
-import { ALLOW_AFTER_MS } from "./AgentConnectionDialog";
 import { AgentConnectionMount } from "./AgentConnectionMount";
 import { AgentIndicator } from "./AgentIndicator";
+import { ALLOW_AFTER_MS } from "./useActiveAfterAMoment";
 
 const answer = vi.fn();
 const answerRemoval = vi.fn();
