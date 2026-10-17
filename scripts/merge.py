@@ -208,6 +208,12 @@ def rebase_folding_fixups(target: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def remote_branch_gone(branch: str) -> bool:
+    """True when origin holds no branch of that name (`git ls-remote` answered and listed none)."""
+    listed = git("ls-remote", "origin", f"refs/heads/{branch}", check=False)
+    return listed.returncode == 0 and not listed.stdout.strip()
+
+
 def worktree_holding(branch: str, listing: str, here: str) -> str | None:
     """The path of another worktree that has `branch` checked out, from the output of
     `git worktree list --porcelain`; None when no other worktree holds it."""
@@ -556,8 +562,10 @@ def main() -> int:
             result = git("push", "--delete", "origin", branch, check=False)
             if result.returncode == 0:
                 remote_state = "deleted"
-            elif "remote ref does not exist" in (result.stderr or "").lower():
-                remote_state = "gone"  # race — already removed elsewhere
+            elif "remote ref does not exist" in (result.stderr or "").lower() or remote_branch_gone(branch):
+                # GitHub deletes a merged pull request's branch itself when the
+                # repository asks it to, often while this push is under way.
+                remote_state = "gone"
             else:
                 remote_state = "failed"
                 stderr_excerpt = (result.stderr or "").strip().splitlines()
