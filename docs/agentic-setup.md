@@ -110,8 +110,9 @@ Written to read the same in every repository that works this way.
 - `scripts/commit-check.sh` — refuses a commit that breaks `docs/commit-rules.md`,
   its author included, on a pull request and on `main` since the last release. Never: exempts an
   author other than a bot.
-- `scripts/release.py` — computes the version, writes the changelog, tags and pushes,
-  for the owner. Never: run by the agent.
+- `scripts/release.py` — computes the version, writes the changelog, lands them through
+  a pull request and tags what merged, for the owner. Never: run by the agent, nor
+  pushes to `main`.
 - `scripts/mcpb-bundle.py` — builds the Claude Desktop bundle the release attaches, from
   the release's product name, version and binary. Never: holds the program or data.
 - `scripts/flow-audit.py` — the figures of a batch, as one document. Never: reads

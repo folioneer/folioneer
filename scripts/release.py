@@ -56,6 +56,15 @@ CHANGELOG_INTRO = (
 # Default branch this release script targets. Override in a downstream fork
 # if the project uses `master` / `trunk` / etc.
 MAIN_BRANCH = "main"
+# What the release commit holds, and nothing else.
+RELEASE_FILES = (
+    "package.json",
+    "package-lock.json",
+    "src-tauri/Cargo.toml",
+    "src-tauri/Cargo.lock",
+    "src-tauri/tauri.conf.json",
+    "CHANGELOG.md",
+)
 
 
 class Mode(Enum):
@@ -451,37 +460,70 @@ class ReleaseManager:
             print(f'{YELLOW}⚠ "just" command not found. Skipping format.{NC}')
             return True
 
-    def commit_and_tag(self) -> bool:
-        """Commit version changes and create git tag."""
+    def release_branch(self) -> str:
+        return f"chore/release-v{self.new_version}"
+
+    def _git(self, *args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(["git", *args], cwd=self.repo_root, capture_output=True, text=True, check=False)
+
+    def on_fresh_main(self) -> bool:
+        """A release starts from main as GitHub holds it: the release branch is cut from
+        here, and the commits since the last tag are read here."""
+        branch = self._git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+        if branch != MAIN_BRANCH:
+            print(f'{RED}❌ Current branch is "{branch}", not "{MAIN_BRANCH}". Release must be run from {MAIN_BRANCH}.{NC}')
+            return False
+        fetched = self._git("fetch", "--quiet", "origin", MAIN_BRANCH).returncode == 0
+        here = self._git("rev-parse", "HEAD").stdout.strip()
+        there = self._git("rev-parse", f"origin/{MAIN_BRANCH}").stdout.strip()
+        if not fetched or here != there:
+            print(f"{RED}❌ Local {MAIN_BRANCH} is not origin/{MAIN_BRANCH}: git pull --ff-only, then release.{NC}")
+            return False
+        edited = self._git("status", "--porcelain", "--", *RELEASE_FILES).stdout.strip()
+        if edited:
+            print(f"{RED}❌ A file the release commit holds has uncommitted edits; commit or drop them first:{NC}")
+            print(f"{RED}{edited}{NC}")
+            return False
+        return True
+
+    def recovery(self, number: str | None = None) -> str:
+        """What to do when the release stops between its push and its tag: the pull request
+        may still merge, or have merged, so both ways out are named."""
+        branch, tag = self.release_branch(), f"v{self.new_version}"
+        state = f"gh pr view {number} --json state" if number else f"gh pr list --head {branch} --state all"
+        return (
+            f"Nothing is tagged. See where the pull request stands: {state}. "
+            f"Merged (or merge it once green: gh pr merge <n> --rebase): git switch {MAIN_BRANCH} && git pull --ff-only && "
+            f"git log -1 --format=%s should say 'chore: release {tag}', then "
+            f"git tag -a {tag} -m 'Version {self.new_version}' {MAIN_BRANCH} && git push origin refs/tags/{tag}. "
+            f"To drop it instead: gh pr close <n> --delete-branch (if one is open); "
+            f"git switch {MAIN_BRANCH} && git branch -D {branch}."
+        )
+
+    def commit_release(self) -> bool:
+        """Commit the version changes on a branch of their own: main takes them only
+        through a pull request whose checks passed."""
         prefix = self._format_mode_prefix()
-        print(f"{BLUE}{prefix}Creating commit and tag...{NC}")
+        print(f"{BLUE}{prefix}Creating the release commit...{NC}")
 
         if self.mode is Mode.DRY_RUN:
+            print(f"  → Branch: {self.release_branch()}")
             print(f"  → Commit: chore: release v{self.new_version}")
-            print(f"  → Tag: v{self.new_version}")
             return True
 
         try:
             subprocess.run(
-                [
-                    "git",
-                    "add",
-                    "package.json",
-                    "package-lock.json",
-                    "src-tauri/Cargo.toml",
-                    "src-tauri/Cargo.lock",
-                    "src-tauri/tauri.conf.json",
-                    "CHANGELOG.md",
-                ],
+                ["git", "switch", "--quiet", "-c", self.release_branch()],
                 cwd=self.repo_root,
                 check=True,
             )
+            subprocess.run(["git", "add", *RELEASE_FILES], cwd=self.repo_root, check=True)
 
             # --no-verify intentionally skips the commit-msg + pre-commit hooks.
             # Waiver: the commit message is fixed by this script (conventional
             # "chore: release vX.Y.Z") so the commit-msg lint is a no-op, and
             # run_tests() already passed the full quality suite so the pre-commit
-            # lint pass would be redundant.
+            # lint pass would be redundant. The pull request's checks read it again.
             subprocess.run(
                 [
                     "git",
@@ -493,28 +535,18 @@ class ReleaseManager:
                 cwd=self.repo_root,
                 check=True,
             )
-            print("  ✓ Commit created")
-
-            subprocess.run(
-                [
-                    "git",
-                    "tag",
-                    "-a",
-                    f"v{self.new_version}",
-                    "-m",
-                    f"Version {self.new_version}",
-                ],
-                cwd=self.repo_root,
-                check=True,
-            )
-            print(f"  ✓ Tag created: v{self.new_version}")
-
+            print(f"  ✓ Commit created on {self.release_branch()}")
             return True
         except subprocess.CalledProcessError as e:
             print(f"{RED}Error: {e}{NC}", file=sys.stderr)
             detail = (e.stderr or e.stdout or "").strip()
             if detail:
                 print(f"{RED}{detail}{NC}", file=sys.stderr)
+            print(
+                f"{BLUE}   Nothing was pushed. To start again: git switch {MAIN_BRANCH}; "
+                f"git restore --source=HEAD --staged --worktree -- {' '.join(RELEASE_FILES)}; git branch -D {self.release_branch()}{NC}",
+                file=sys.stderr,
+            )
             return False
 
     def head_runs_are_green(self) -> bool:
@@ -597,6 +629,8 @@ class ReleaseManager:
         """Run tests, fetch + analyze commits, compute or force ``new_version``,
         show analysis, and confirm with the user. Returns the resolution that
         ``run()`` should act on (see :class:`_Resolution`)."""
+        if self.mode is not Mode.PREVIEW and not self.on_fresh_main():
+            return _Resolution.EARLY_FAIL
         if self.mode is not Mode.PREVIEW and not self.head_runs_are_green():
             return _Resolution.EARLY_FAIL
         if self.mode is not Mode.PREVIEW and not self.run_tests():
@@ -666,7 +700,11 @@ class ReleaseManager:
         return _Resolution.READY
 
     def _apply_changes(self) -> bool:
-        """Update version files + changelog, run formatters, create commit + tag."""
+        """Update version files + changelog, run formatters, create the release commit."""
+        if self.mode is not Mode.DRY_RUN and self._git("rev-parse", "--verify", "--quiet", f"refs/heads/{self.release_branch()}").returncode == 0:
+            print(f"{RED}❌ {self.release_branch()} is left from an earlier attempt; nothing was changed.{NC}")
+            print(f"{BLUE}   {self.recovery()}{NC}")
+            return False
         self.update_version_files()
         self.update_changelog()
 
@@ -674,7 +712,7 @@ class ReleaseManager:
             print(f"\n{RED}❌ Formatting failed. Release cancelled.{NC}\n")
             return False
 
-        return self.commit_and_tag()
+        return self.commit_release()
 
     def _finalize(self) -> bool:
         """Push (real mode only) and print the outcome message."""
@@ -691,57 +729,79 @@ class ReleaseManager:
         return True
 
     def push_release(self) -> bool:
-        """Push commit and tag to origin."""
-        print(f"{BLUE}Pushing to origin...{NC}")
+        """Land the release commit through a pull request, then tag what landed.
 
-        # Safety: ensure we are on main before pushing
-        branch = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=self.repo_root,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-        if branch != MAIN_BRANCH:
-            print(
-                f'{RED}❌ Current branch is "{branch}", not "{MAIN_BRANCH}". Release must be run from {MAIN_BRANCH}.{NC}'
-            )
+        main accepts only a commit whose checks passed: the branch is pushed, its pull
+        request waits for every required check (`scripts/watch-pr.py`), GitHub merges it,
+        and the tag — which starts the release workflow — goes on the commit main holds.
+        """
+        branch = self.release_branch()
+        tag = f"v{self.new_version}"
+        print(f"{BLUE}Opening the release pull request...{NC}")
+
+        def run(*command: str) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(command, cwd=self.repo_root, capture_output=True, text=True, check=False)
+
+        def stop(message: str, *hints: str) -> bool:
+            print(f"{RED}❌ {message}{NC}", file=sys.stderr)
+            for hint in hints:
+                print(f"{BLUE}   {hint}{NC}", file=sys.stderr)
             return False
 
-        try:
-            # --no-verify intentionally skips the pre-push hook here.
-            # Waiver: run_tests() already executed the full quality suite (check.py,
-            # tests, build) earlier in this release flow and would have aborted on
-            # any failure. Re-running it in the hook would be redundant and slow.
-            #
-            # --atomic: push branch + tag in one atomic operation so we never end
-            # up with the release commit on the branch and no tag (or vice versa).
-            # Either both refs land on origin or neither does — the next release
-            # run sees a coherent state.
-            subprocess.run(
-                [
-                    "git",
-                    "push",
-                    "--atomic",
-                    "origin",
-                    MAIN_BRANCH,
-                    f"refs/tags/v{self.new_version}",
-                    "--no-verify",
-                ],
-                cwd=self.repo_root,
-                check=True,
-            )
-            print(
-                f"  ✓ {MAIN_BRANCH} + tag v{self.new_version} pushed atomically → GitHub Action triggered"
-            )
+        current = run("git", "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+        if current != branch:
+            return stop(f'Current branch is "{current}", not "{branch}".')
+        commit = run("git", "rev-parse", "HEAD").stdout.strip()
 
-            return True
-        except subprocess.CalledProcessError as e:
-            print(f"{RED}Error: {e}{NC}", file=sys.stderr)
-            detail = (e.stderr or e.stdout or "").strip()
-            if detail:
-                print(f"{RED}{detail}{NC}", file=sys.stderr)
-            return False
+        # --no-verify intentionally skips the pre-push hook here.
+        # Waiver: run_tests() already executed the full quality suite (check.py,
+        # tests, build) earlier in this release flow and would have aborted on
+        # any failure. Re-running it in the hook would be redundant and slow.
+        pushed = run("git", "push", "--quiet", "--no-verify", "-u", "origin", branch)
+        if pushed.returncode != 0:
+            return stop(f"Could not push {branch}.", pushed.stderr.strip(), self.recovery())
+        opened = run(
+            "gh", "pr", "create", "--base", MAIN_BRANCH, "--head", branch,
+            "--title", f"chore: release {tag}", "--body", f"The version and the changelog of {tag}.",
+        )
+        if opened.returncode != 0:
+            return stop("Could not open the release pull request.", opened.stderr.strip(), self.recovery())
+        number = opened.stdout.strip().rstrip("/").rsplit("/", 1)[-1]
+        print(f"  ✓ Pull request #{number} opened — waiting for its checks")
+
+        undo = self.recovery(number)
+        watched = subprocess.run(
+            [sys.executable, str(self.repo_root / "scripts" / "watch-pr.py"), number, "--timeout", "3600"],
+            cwd=self.repo_root, check=False,
+        )
+        if watched.returncode != 0:
+            return stop(f"The watch of pull request #{number} did not end green (exit {watched.returncode}).", undo)
+
+        merged = run("gh", "pr", "merge", number, "--rebase", "--match-head-commit", commit)
+        if merged.returncode != 0:
+            return stop(f"GitHub refused to merge pull request #{number}.", merged.stderr.strip(), undo)
+
+        # GitHub rebased the commit: the tag goes on the one main holds, once it is
+        # known to be the release commit (same tree, same title).
+        synced = run("git", "switch", "--quiet", MAIN_BRANCH).returncode == 0 and (
+            run("git", "pull", "--quiet", "--ff-only", "origin", MAIN_BRANCH).returncode == 0
+        )
+        landed = run("git", "log", "-1", "--format=%s", MAIN_BRANCH).stdout.strip()
+        same_tree = run("git", "diff", "--quiet", commit, MAIN_BRANCH).returncode == 0
+        if not synced or landed != f"chore: release {tag}" or not same_tree:
+            return stop(f"Pull request #{number} is merged, but {MAIN_BRANCH}'s head is not the release commit.", undo)
+        tagged = run("git", "tag", "-a", tag, "-m", f"Version {self.new_version}", MAIN_BRANCH)
+        if tagged.returncode != 0:
+            return stop(f"Could not tag {MAIN_BRANCH} as {tag}.", tagged.stderr.strip(), undo)
+        pushed = run("git", "push", "--quiet", "--no-verify", "origin", f"refs/tags/{tag}")
+        if pushed.returncode != 0:
+            return stop(
+                f"Could not push the tag {tag}.", pushed.stderr.strip(),
+                f"Retry: git push origin refs/tags/{tag}",
+            )
+        run("git", "branch", "-D", branch)
+        print(f"  ✓ {tag} tagged on {MAIN_BRANCH} and pushed → GitHub Action triggered")
+        return True
 
 
 def _semver_str(value: str) -> str:

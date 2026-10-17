@@ -268,8 +268,8 @@ and nothing else.
 | Security audit            | `security-audit.yml`                                                                          | new advisory                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Mutation sweep            | `.github/workflows/mutants.yml`, monthly                                                      | none; cargo-mutants on the logic code (`src-tauri/.cargo/mutants.toml`), survivors listed in the sticky issue "Mutation sweep — surviving mutants" in the techdebt entry format, `mutants.out` kept 90 days                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
-The `main-protection` ruleset lists the same checks; the owner's laptop bypasses it for
-`just release`, so the guard in `just merge` is the enforced gate.
+The `main-protection` ruleset requires the same checks of every update of `main`: `just merge`
+and `just release` land through a pull request GitHub merges, and neither pushes to `main`.
 
 **The usage log.** The audit after a release reads `logs/usage.log`: one line per run of
 a script or a recipe (time, tool, duration, result), written by `scripts/usage_log.py`.

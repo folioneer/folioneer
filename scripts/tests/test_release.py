@@ -118,6 +118,7 @@ class HeadRuns(unittest.TestCase):
         manager = release.ReleaseManager.__new__(release.ReleaseManager)
         manager.mode = release.Mode.REAL
         called = []
+        manager.on_fresh_main = lambda: True
         manager.head_runs_are_green = lambda: False
         manager.run_tests = lambda: called.append("tests") or True
         self.assertIs(manager._resolve_version(), release._Resolution.EARLY_FAIL)
@@ -143,6 +144,119 @@ class Validation(unittest.TestCase):
         checker = release.release_validation()
         self.assertFalse(checker.fast_mode)
         self.assertTrue(checker.strict_mode)
+
+
+class ThroughAPullRequest(unittest.TestCase):
+    """The release commit reaches main through a pull request, and the tag goes on what landed."""
+
+    def manager(self):
+        manager = release.ReleaseManager.__new__(release.ReleaseManager)
+        manager.mode = release.Mode.REAL
+        manager.repo_root = Path(".")
+        manager.new_version = "0.12.0"
+        return manager
+
+    def github(self, checks=0, landed="chore: release v0.12.0", same_tree=0):
+        """Answers each command as git and gh would; records them in order."""
+        ran = []
+
+        def answer(command, **_):
+            command = [str(part) for part in command]
+            ran.append(command)
+            out, code = "", 0
+            if command[:3] == ["git", "rev-parse", "--abbrev-ref"]:
+                out = "chore/release-v0.12.0\n"
+            elif command[:2] == ["git", "rev-parse"]:
+                out = "abc123\n"
+            elif command[:3] == ["gh", "pr", "create"]:
+                out = "https://github.com/o/r/pull/42\n"
+            elif command[1].endswith("watch-pr.py"):
+                code = checks
+            elif command[:3] == ["git", "log", "-1"]:
+                out = landed + "\n"
+            elif command[:3] == ["git", "diff", "--quiet"]:
+                code = same_tree
+            return subprocess.CompletedProcess(command, code, stdout=out, stderr="")
+
+        return ran, answer
+
+    @staticmethod
+    def did(ran, *start):
+        return any(command[: len(start)] == list(start) for command in ran)
+
+    def test_the_release_lands_through_its_pull_request_then_is_tagged(self):
+        ran, answer = self.github()
+        with mock.patch.object(release.subprocess, "run", side_effect=answer):
+            self.assertTrue(self.manager().push_release())
+        merge = next(c for c in ran if c[:3] == ["gh", "pr", "merge"])
+        self.assertEqual(merge, ["gh", "pr", "merge", "42", "--rebase", "--match-head-commit", "abc123"])
+        steps = [c[:3] for c in ran]
+        self.assertLess(steps.index(["gh", "pr", "merge"]), steps.index(["git", "tag", "-a"]))
+        self.assertIn(["git", "tag", "-a", "v0.12.0", "-m", "Version 0.12.0", "main"], ran)
+        self.assertIn(["git", "push", "--quiet", "--no-verify", "origin", "refs/tags/v0.12.0"], ran)
+        self.assertFalse(self.did(ran, "git", "push", "--atomic"))
+        self.assertFalse(any(c[:2] == ["git", "push"] and "main" in c for c in ran))
+
+    def test_a_release_whose_checks_fail_is_neither_merged_nor_tagged(self):
+        ran, answer = self.github(checks=1)
+        with mock.patch.object(release.subprocess, "run", side_effect=answer):
+            self.assertFalse(self.manager().push_release())
+        self.assertFalse(self.did(ran, "gh", "pr", "merge"))
+        self.assertFalse(self.did(ran, "git", "tag"))
+
+    def test_a_head_of_main_that_is_not_the_release_commit_is_not_tagged(self):
+        for kwargs in ({"landed": "docs: something else"}, {"same_tree": 1}):
+            ran, answer = self.github(**kwargs)
+            with mock.patch.object(release.subprocess, "run", side_effect=answer):
+                self.assertFalse(self.manager().push_release())
+            self.assertFalse(self.did(ran, "git", "tag"), kwargs)
+
+    def test_a_stop_after_the_push_names_both_ways_out(self):
+        ran, answer = self.github(checks=3)
+        with mock.patch.object(release.subprocess, "run", side_effect=answer), \
+                mock.patch("sys.stderr", new_callable=lambda: __import__("io").StringIO()) as err:
+            self.assertFalse(self.manager().push_release())
+        told = err.getvalue()
+        self.assertIn("gh pr view 42 --json state", told)
+        self.assertIn("git tag -a v0.12.0 -m 'Version 0.12.0' main", told)
+        self.assertIn("gh pr close <n> --delete-branch", told)
+        self.assertNotIn("checkout -- .", told)
+
+    # A release branch is cut from main as GitHub holds it, nowhere else.
+    def test_a_release_starts_only_from_a_fresh_main(self):
+        def git_saying(branch, here, there):
+            def answer(command, **_):
+                out = branch if "--abbrev-ref" in command else {"HEAD": here, "origin/main": there}.get(command[-1], "")
+                return subprocess.CompletedProcess(command, 0, stdout=out + "\n", stderr="")
+            return answer
+
+        def edited(command, **_):
+            out = "M  CHANGELOG.md" if "status" in command else git_saying("main", "abc", "abc")(command).stdout.strip()
+            return subprocess.CompletedProcess(command, 0, stdout=out + "\n", stderr="")
+
+        for answer, expected in (
+            (git_saying("main", "abc", "abc"), True),
+            (edited, False),
+            (git_saying("fix/something", "abc", "abc"), False),
+            (git_saying("main", "abc", "def"), False),
+        ):
+            with mock.patch.object(release.subprocess, "run", side_effect=answer):
+                self.assertIs(self.manager().on_fresh_main(), expected)
+
+    def test_a_release_branch_left_from_an_earlier_attempt_stops_before_any_change(self):
+        manager = self.manager()
+        manager.update_version_files = mock.Mock()
+        found = subprocess.CompletedProcess([], 0, stdout="abc\n", stderr="")
+        with mock.patch.object(release.subprocess, "run", return_value=found):
+            self.assertFalse(manager._apply_changes())
+        manager.update_version_files.assert_not_called()
+
+    def test_a_dry_run_runs_no_command(self):
+        manager = self.manager()
+        manager.mode = release.Mode.DRY_RUN
+        with mock.patch.object(release.subprocess, "run", side_effect=AssertionError("a command ran")):
+            self.assertTrue(manager.commit_release())
+            self.assertTrue(manager._finalize())
 
 
 if __name__ == "__main__":
