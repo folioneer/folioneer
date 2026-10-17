@@ -189,6 +189,54 @@ class MeasureCiTest(unittest.TestCase):
         )
 
 
+class LaterRoundsTest(unittest.TestCase):
+    """FLOW-020 — each round after a branch's first is sorted by what caused it."""
+
+    RUNS = [
+        # branch-a: a red first round, a fix after it, then a rebase.
+        run("Quality", "branch-a", "a1", "failure", "2026-10-04T10:00:00Z", "2026-10-04T10:04:00Z"),
+        run("Quality", "branch-a", "a2", "success", "2026-10-04T11:00:00Z", "2026-10-04T11:04:00Z"),
+        run("Quality", "branch-a", "a3", "success", "2026-10-04T12:00:00Z", "2026-10-04T12:04:00Z"),
+        # branch-b: a green first round, then a fix after a review.
+        run("Quality", "branch-b", "b1", "success", "2026-10-04T10:00:00Z", "2026-10-04T10:04:00Z"),
+        run("Review", "branch-b", "b1", "success", "2026-10-04T10:00:00Z", "2026-10-04T10:02:00Z"),
+        run("Quality", "branch-b", "b2", "success", "2026-10-04T13:00:00Z", "2026-10-04T13:04:00Z"),
+    ]
+    # How GitHub relates each later round to the round before.
+    RELATIONS = {("a1", "a2"): "ahead", ("a2", "a3"): "diverged", ("b1", "b2"): "ahead"}
+
+    @classmethod
+    def relation(cls, before, sha):
+        return cls.RELATIONS.get((before, sha))
+
+    def test_flow_020_sorts_each_later_round_by_its_cause(self):
+        sorted_rounds = flow_audit.sort_later_rounds(self.RUNS, self.relation)
+        self.assertEqual(
+            sorted_rounds,
+            {"after_a_failed_check": 1, "rebase": 1, "fix": 1, "unreadable": 0},
+        )
+
+    def test_flow_020_a_comparison_github_cannot_give_is_counted_apart(self):
+        sorted_rounds = flow_audit.sort_later_rounds(self.RUNS, lambda before, sha: None)
+        self.assertEqual(
+            sorted_rounds,
+            {"after_a_failed_check": 1, "rebase": 0, "fix": 0, "unreadable": 2},
+        )
+
+    def test_flow_020_a_window_s_figures_carry_the_sort_when_commits_can_be_compared(self):
+        prs = [
+            pull_request(1, "feat: a", "2026-10-04T09:00:00Z", merged="2026-10-04T13:00:00Z", branch="branch-a"),
+            pull_request(2, "fix: b", "2026-10-04T09:00:00Z", merged="2026-10-04T14:00:00Z", branch="branch-b"),
+        ]
+        figures = flow_audit.measure_ci(self.RUNS, prs, SINCE, UNTIL, self.relation)
+        self.assertEqual(figures["rounds_beyond_the_first"], 3)
+        self.assertEqual(
+            figures["later_rounds"],
+            {"after_a_failed_check": 1, "rebase": 1, "fix": 1, "unreadable": 0},
+        )
+        self.assertNotIn("later_rounds", flow_audit.measure_ci(self.RUNS, prs, SINCE, UNTIL))
+
+
 class CommitTypeTest(unittest.TestCase):
     def test_reads_the_conventional_type(self):
         self.assertEqual(flow_audit.commit_type("refactor: a thing"), "refactor")

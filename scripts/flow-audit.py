@@ -20,12 +20,14 @@ judgment — only counting.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import re
 import shutil
 import statistics
 import subprocess
 import sys
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -114,8 +116,48 @@ def measure_pull_requests(
     }
 
 
+def sort_later_rounds(runs: list[dict], relation: Callable[[str, str], str | None]) -> dict:
+    """FLOW-020 — why each round after a branch's first came: after a failed check of the
+    round before (a failed run of any workflow on its commit); a rebase, when the round's
+    commit does not descend from the round before (the branch was rewritten onto another
+    base, the push of `just merge` among them); a fix, a commit pushed on top; or unreadable,
+    when `relation(before, sha)` — GitHub's comparison of the two commits, `ahead`,
+    `diverged`, … — cannot be read, so that a comparison GitHub refused never passes for a fix.
+    """
+    first_seen: dict[tuple[str, str], str] = {}
+    failed: set[str] = set()
+    for run in runs:
+        if run.get("conclusion") == "failure":
+            failed.add(run["headSha"])
+        if run.get("workflowName") == ROUND_WORKFLOW:
+            key = (run["headBranch"], run["headSha"])
+            first_seen[key] = min(first_seen.get(key, run["createdAt"]), run["createdAt"])
+    by_branch: dict[str, list[tuple[str, str]]] = {}
+    for (branch, sha), seen in first_seen.items():
+        by_branch.setdefault(branch, []).append((seen, sha))
+    causes = {"after_a_failed_check": 0, "rebase": 0, "fix": 0, "unreadable": 0}
+    for rounds in by_branch.values():
+        shas = [sha for _, sha in sorted(rounds)]
+        for before, sha in zip(shas, shas[1:]):
+            if before in failed:
+                causes["after_a_failed_check"] += 1
+            else:
+                compared = relation(before, sha)
+                if compared is None:
+                    causes["unreadable"] += 1
+                elif compared == "diverged":
+                    causes["rebase"] += 1
+                else:
+                    causes["fix"] += 1
+    return causes
+
+
 def measure_ci(
-    runs: list[dict], pull_requests: list[dict], since: datetime, until: datetime
+    runs: list[dict],
+    pull_requests: list[dict],
+    since: datetime,
+    until: datetime,
+    relation: Callable[[str, str], str | None] | None = None,
 ) -> dict:
     """The CI rounds of the window's pull request branches, what failed, how long runs take.
 
@@ -158,7 +200,7 @@ def measure_ci(
             durations.setdefault(name, []).append(
                 _minutes(run["startedAt"], run["updatedAt"])
             )
-    return {
+    figures = {
         "rounds": len(rounds),
         "branches": len(branches_run),
         "rounds_beyond_the_first": len(rounds) - len(branches_run),
@@ -168,17 +210,24 @@ def measure_ci(
             for name, values in sorted(durations.items())
         },
     }
+    if relation is not None:
+        figures["later_rounds"] = sort_later_rounds(in_window, relation)
+    return figures
 
 
 def measure(
-    pull_requests: list[dict], runs: list[dict], since: datetime, until: datetime
+    pull_requests: list[dict],
+    runs: list[dict],
+    since: datetime,
+    until: datetime,
+    relation: Callable[[str, str], str | None] | None = None,
 ) -> dict:
     """Every figure of one window."""
     return {
         "since": since.isoformat(),
         "until": until.isoformat(),
         "pull_requests": measure_pull_requests(pull_requests, since, until),
-        "ci": measure_ci(runs, pull_requests, since, until),
+        "ci": measure_ci(runs, pull_requests, since, until, relation),
     }
 
 
@@ -244,6 +293,29 @@ def _gh_json(*args: str) -> object:
     return json.loads(result.stdout or "null")
 
 
+@functools.lru_cache(maxsize=None)
+def compared(before: str, sha: str) -> str | None:
+    """FLOW-020 — how GitHub relates commit `sha` to `before` (`ahead`, `diverged`, …),
+    read once per pair; None when it cannot say (a commit no longer on GitHub)."""
+    try:
+        result = subprocess.run(
+            [
+                "gh",
+                "api",
+                f"repos/{{owner}}/{{repo}}/compare/{before}...{sha}",
+                "--jq",
+                ".status",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        return result.stdout.strip() or None
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return None
+
+
 def release_moment(tag: str) -> datetime:
     """When the release `tag` was published."""
     release = _gh_json("release", "view", tag, "--json", "publishedAt")
@@ -302,7 +374,7 @@ def main(argv: list[str] | None = None) -> int:
     since = release_moment(args.since)
     until = release_moment(args.until) if args.until else datetime.now(timezone.utc)
     pull_requests, runs = collect()
-    report = {"current": measure(pull_requests, runs, since, until)}
+    report = {"current": measure(pull_requests, runs, since, until, compared)}
     report["current"]["usage"] = measure_usage(
         read_usage_log(), since, until, known_tools()
     )

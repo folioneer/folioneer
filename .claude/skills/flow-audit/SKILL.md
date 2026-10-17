@@ -41,7 +41,12 @@ For the batch that led to `v0.6.0`: `python3 scripts/flow-audit.py v0.5.0 v0.6.0
 - `pull_requests` — merged, first and last number, those closed without merging, lines
   added, mean and median minutes from opening to merging, the count by commit type.
 - `ci` — rounds (one pushed commit of a branch), branches, rounds beyond the first,
-  failures by workflow, the median duration of each workflow's green runs.
+  failures by workflow, the median duration of each workflow's green runs, and
+  `later_rounds` (current window): each round beyond the first sorted by its cause —
+  `after_a_failed_check`, `rebase` (the round's commit does not descend from the round
+  before: the branch was rewritten, the push of `just merge` among them) or `fix` (a commit
+  pushed on top: a review's fix), and `unreadable` when GitHub could not compare the two
+  commits — say how many beside the split.
 - `usage` (current window only) — what `logs/usage.log` saw: `runs` and `failed` by
   tool (a script, or a recipe that runs none), `never_run` for the known tools it never
   saw, `first_line` for the moment the log starts. The log is local and not written in
@@ -60,8 +65,8 @@ If the script fails, say so and stop: figures gathered by hand are not comparabl
 
 From the session's transcript and memory notes, for the batch only:
 
-- what caused the rounds beyond the first: a rebase after another merge, a fix after a
-  review or a failed check, the usage limit;
+- what `later_rounds` cannot tell: a round the usage limit cost, a `fix` that answered
+  a CI reviewer rather than a local one;
 - real defects found by the reviewers before merge, and by challenging an entry before
   starting it — each named in a few words;
 - for each entry the batch shipped, its size beside what it took: the `Size` line of the
