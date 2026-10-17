@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-10-17
+
+### Added
+
+- agents preview cash, dividends, free shares, prices, corrections
+- an agent previews a purchase, a sale, an opening balance, a split
+- moving the portfolio to an empty folder asks to confirm first
+- an agent asks before changing a transaction you typed
+
+### Fixed
+
+- an agent's preview shows the right cash on every account
+- the updater no longer carries an unpacking library with known flaws
+- a cloud conflict copy of the sync header no longer pauses sync
+- the session dialog says its removal takes your corrections too
+
 ## [0.11.0] - 2026-10-16
 
 ### Added
