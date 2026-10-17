@@ -11,6 +11,6 @@ From gh245 (owner, 2026-10-12), which this entry closes when it ships. Two figur
 **Design:** none
 **Open questions:**
 
-- [ ] A window that opens before the holding was first held: no figure (the since-start return already covers the holding's whole life), or the return since the first purchase shown under that window's name? (Recommended: no figure.)
+- [x] A window that opens before the holding was first held: no figure (the since-start return already covers the holding's whole life), or the return since the first purchase shown under that window's name? (Recommended: no figure.) — No figure. (owner, 2026-10-17)
 - [x] What the owner brought in: `total_net_cash_input` keeps its literal meaning and a second figure counts opening balances at their cost, or the one figure changes its meaning? — A second figure: `total_net_cash_input` stays deposits less withdrawals, and a figure of the capital brought in adds the opening balances at their cost — an account opened with positions costing 50 000 and a deposit of 500 says 500 of cash and 50 500 brought in (owner, 2026-10-13).
-- [ ] Is the second figure shown in the window, or given to agents only?
+- [x] Is the second figure shown in the window, or given to agents only? — Shown in the window and given to agents. (owner, 2026-10-17)

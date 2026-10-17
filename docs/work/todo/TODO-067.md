@@ -7,5 +7,5 @@ Raised by the owner on 2026-10-11, at the 0.8.0 release: he switches "Allow agen
 **Design:** none
 **Open questions:**
 
-- [ ] Where does it show: beside the checkbox on the settings page, or in a help menu of the application, which does not exist yet and would hold more than this?
-- [ ] Which clients are named: Claude Code and Claude Desktop only, or a general form for any client as well?
+- [x] Where does it show: beside the checkbox on the settings page, or in a help menu of the application, which does not exist yet and would hold more than this? — Beside the checkbox on the settings page; the first run (gh284) points to it. (owner, 2026-10-17)
+- [x] Which clients are named: Claude Code and Claude Desktop only, or a general form for any client as well? — Claude Desktop and Claude Code ready to copy, plus a general form for any MCP client. (owner, 2026-10-17)

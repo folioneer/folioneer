@@ -9,6 +9,6 @@ Proposal: an allocation view over the whole portfolio, filterable to one account
 **Design:** none
 **Open questions:**
 
-- [ ] Where does it live — a new entry in the navigation, or a tab beside the accounts list and the global performance? (Recommended: its own navigation entry; it is a third question about the portfolio, not a detail of the other two.)
-- [ ] Targets in the first version, or splits only first? (Recommended: splits first if targets push the work past one PR per layer; the entry stays open for the second step.)
-- [ ] Targets per asset class only, or also per category and per currency? And is a drift just shown, or flagged past a tolerance (for instance the 5/25 rule mentioned in TODO-011)? (Recommended: per class, flagged past a tolerance you set once.)
+- [x] Where does it live — a new entry in the navigation, or a tab beside the accounts list and the global performance? (Recommended: its own navigation entry; it is a third question about the portfolio, not a detail of the other two.) — Its own navigation entry. (owner, 2026-10-17)
+- [x] Targets in the first version, or splits only first? (Recommended: splits first if targets push the work past one PR per layer; the entry stays open for the second step.) — Splits first; targets and drift follow in this entry. (owner, 2026-10-17)
+- [x] Targets per asset class only, or also per category and per currency? And is a drift just shown, or flagged past a tolerance (for instance the 5/25 rule mentioned in TODO-011)? (Recommended: per class, flagged past a tolerance you set once.) — Per asset class. The free category may disappear as unused, so it is not a target axis. (owner, 2026-10-17)

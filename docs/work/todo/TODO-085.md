@@ -9,6 +9,6 @@ Read on 2026-10-13: the window does say how old a price is — the holding row's
 **Design:** none
 **Open questions:**
 
-- [ ] The threshold: one number of days for every asset, or one per asset class (a fund publishes less often than a share)?
-- [ ] In the public build, which fetches nothing, every price is typed: is a typed price judged old by the same threshold, or never?
+- [x] The threshold: one number of days for every asset, or one per asset class (a fund publishes less often than a share)? — One threshold per asset class (for instance shares, ETFs and crypto past 5 business days, funds past 10, real estate and custom assets never), defaults adjustable. (owner, 2026-10-17)
+- [x] In the public build, which fetches nothing, every price is typed: is a typed price judged old by the same threshold, or never? — A typed or agent-recorded price is judged by the same threshold. (The public build fetches again, off by default: gh289.) (owner, 2026-10-17)
 - [ ] The reason of a fetch that failed: kept until the next fetch that succeeds, on this computer only, or part of what sync carries?
