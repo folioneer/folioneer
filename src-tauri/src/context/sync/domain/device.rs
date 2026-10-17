@@ -302,6 +302,49 @@ mod tests {
         })
     }
 
+    fn header(created_at: &str, created_by: &str) -> FolderHeader {
+        FolderHeader {
+            derivation_parameters: crate::context::sync::domain::DerivationParameters {
+                salt: vec![7; 16],
+                memory_cost_kib: 19_456,
+                iterations: 2,
+                parallelism: 1,
+            },
+            passphrase_check: vec![1, 2, 3],
+            data_format_version: 1,
+            created_at: created_at.into(),
+            created_by_device_id: created_by.into(),
+        }
+    }
+
+    // SYN-084 — following a header keeps its creation mark, its writer and its derivation
+    // parameters; the device then follows that header and no other.
+    #[test]
+    fn following_a_header_keeps_its_mark_its_writer_and_its_parameters() {
+        let followed = header("2026-09-01T00:00:00Z", "device-2");
+        let device = sample().following(&followed);
+
+        assert_eq!(device.portfolio_created_at, "2026-09-01T00:00:00Z");
+        assert_eq!(device.portfolio_created_by.as_deref(), Some("device-2"));
+        assert_eq!(
+            device.derivation_parameters,
+            Some(followed.derivation_parameters.clone())
+        );
+        assert!(device.follows(&followed));
+        assert!(!device.follows(&header("2026-09-01T00:00:00Z", "device-3")));
+        assert!(!device.follows(&header("2026-09-02T00:00:00Z", "device-2")));
+    }
+
+    // SyncDevice `portfolio` — a device that does not know the writer compares by creation
+    // mark alone.
+    #[test]
+    fn a_device_that_does_not_know_the_writer_compares_by_creation_mark_alone() {
+        let device = sample();
+        assert!(device.follows(&header("2026-08-22T00:00:00Z", "device-2")));
+        assert!(device.follows(&header("2026-08-22T00:00:00Z", "device-3")));
+        assert!(!device.follows(&header("2026-08-23T00:00:00Z", "device-2")));
+    }
+
     // SYN-018 — new() rejects a blank device name.
     #[test]
     fn new_rejects_blank_device_name() {

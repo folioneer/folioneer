@@ -33,6 +33,10 @@ use crate::core::logger::BACKEND;
 /// Part of the folder format, not of the application's name: every device sharing a
 /// portfolio looks for this file, whatever release it runs.
 const HEADER_FILE_NAME: &str = "vaultcompass-sync.json";
+/// What a copy of the header a cloud client makes starts and ends with: "vaultcompass-sync
+/// (Desktop's conflicted copy).json", "vaultcompass-sync (1).json" (SYN-084).
+const HEADER_COPY_PREFIX: &str = "vaultcompass-sync";
+const HEADER_COPY_SUFFIX: &str = ".json";
 const DEVICES_DIR: &str = "devices";
 const MANIFEST_FILE_NAME: &str = "manifest.bin";
 const SEGMENTS_DIR: &str = "segments";
@@ -272,6 +276,36 @@ impl FolderStore for FsFolderStore {
     async fn read_header_bytes(&self) -> Result<Option<Vec<u8>>, SyncError> {
         let path = self.header_path();
         blocking(move || read_optional(&path, MAX_HEADER_BYTES)).await
+    }
+
+    async fn read_header_copies(&self) -> Result<Vec<Vec<u8>>, SyncError> {
+        let root = self.root();
+        blocking(move || {
+            let names = list_names(&root, |entry| {
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                name != HEADER_FILE_NAME
+                    && name.starts_with(HEADER_COPY_PREFIX)
+                    && name.ends_with(HEADER_COPY_SUFFIX)
+                    && entry
+                        .file_type()
+                        .is_ok_and(|kind| kind.is_file() && !kind.is_symlink())
+            })?;
+            let mut copies = Vec::with_capacity(names.len());
+            for name in names {
+                // A copy that cannot be read is not the header followed: it is skipped, so it
+                // never stops a run the header itself lets through.
+                match read_optional(&root.join(&name), MAX_HEADER_BYTES) {
+                    Ok(Some(bytes)) => copies.push(bytes),
+                    Ok(None) => {}
+                    Err(error) => {
+                        tracing::warn!(target: BACKEND, err = ?error, copy = %name, "folder store: a copy of the header could not be read");
+                    }
+                }
+            }
+            Ok(copies)
+        })
+        .await
     }
 
     async fn write_header_if_absent(
@@ -571,6 +605,34 @@ mod tests {
                 problem: FolderProblem::IoFailure
             })
         ));
+    }
+
+    // SYN-084 / DEBT-131 — the copies a cloud client leaves beside the header are read, in
+    // name order; the header itself, other files, directories and a copy that cannot be read
+    // are not among them.
+    #[tokio::test]
+    async fn read_header_copies_reads_the_copies_beside_the_header() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(HEADER_FILE_NAME), b"the header").unwrap();
+        std::fs::write(
+            dir.path()
+                .join("vaultcompass-sync (Desktop's conflicted copy).json"),
+            b"dropbox",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("vaultcompass-sync (1).json"), b"drive").unwrap();
+        // One that cannot be read is skipped.
+        std::fs::write(
+            dir.path().join("vaultcompass-sync (2).json"),
+            vec![b'{'; (MAX_HEADER_BYTES + 1) as usize],
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("notes.json"), b"other").unwrap();
+        std::fs::create_dir(dir.path().join("vaultcompass-sync-dir.json")).unwrap();
+        let store = FsFolderStore::new(dir.path());
+
+        let copies = store.read_header_copies().await.unwrap();
+        assert_eq!(copies, vec![b"drive".to_vec(), b"dropbox".to_vec()]);
     }
 
     // A header exactly at its cap is still read.

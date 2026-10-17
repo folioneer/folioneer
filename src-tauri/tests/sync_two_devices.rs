@@ -2022,3 +2022,104 @@ async fn syn_073_resuming_into_a_folder_started_over_is_the_reset() {
         "nothing was published into the reset folder"
     );
 }
+
+// SYN-074 / DEBT-131 — the header a move writes carries a new creation mark, written by the
+// device that moved.
+#[tokio::test]
+async fn syn_074_the_header_a_move_writes_carries_a_new_creation_mark() {
+    let dir = tempfile::tempdir().unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    let (desktop, _laptop, _account, _area) = two_devices_sharing(dir.path()).await;
+    let left: serde_json::Value = serde_json::from_slice(&header_of(dir.path())).unwrap();
+    set_logical_clock(&desktop, 900).await;
+
+    desktop
+        .orchestrator
+        .change_sync_folder(elsewhere.path().to_string_lossy().to_string())
+        .await
+        .expect("moved to an empty folder");
+    let moved: serde_json::Value = serde_json::from_slice(&header_of(elsewhere.path())).unwrap();
+    assert_ne!(moved["created_at"], left["created_at"]);
+    assert!(moved["created_by_device_id"].is_string());
+    assert_eq!(
+        moved["created_by_device_id"], left["created_by_device_id"],
+        "Desktop wrote both"
+    );
+}
+
+// SyncDevice `portfolio` / DEBT-131 — a device that keeps no derivation parameters reads them
+// from the folder it leaves when it moves, and is refused as the folder being unavailable
+// when that folder is out of reach.
+#[tokio::test]
+async fn syn_074_a_device_that_keeps_no_parameters_reads_them_from_the_folder_it_leaves() {
+    let dir = tempfile::tempdir().unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    let out_of_reach = tempfile::tempdir().unwrap();
+    let (desktop, laptop, _account, _area) = two_devices_sharing(dir.path()).await;
+    for ctx in [&desktop, &laptop] {
+        sqlx::query("UPDATE sync_device SET derivation_parameters = NULL")
+            .execute(&ctx.pool)
+            .await
+            .expect("parameters forgotten");
+    }
+    let left: serde_json::Value = serde_json::from_slice(&header_of(dir.path())).unwrap();
+
+    desktop
+        .orchestrator
+        .change_sync_folder(elsewhere.path().to_string_lossy().to_string())
+        .await
+        .expect("moved, the parameters read from the folder it leaves");
+    let moved: serde_json::Value = serde_json::from_slice(&header_of(elsewhere.path())).unwrap();
+    assert_eq!(
+        moved["derivation_parameters"],
+        left["derivation_parameters"]
+    );
+
+    std::fs::remove_dir_all(dir.path()).unwrap();
+    let refused = laptop
+        .orchestrator
+        .change_sync_folder(out_of_reach.path().to_string_lossy().to_string())
+        .await
+        .expect_err("the folder it leaves is out of reach");
+    assert_eq!(
+        serde_json::to_value(&refused).unwrap()["code"],
+        "FolderUnavailable"
+    );
+}
+
+// SYN-073 / DEBT-131 — resuming into a folder that now holds another device's beginning is
+// the reset: the device stays paused and publishes nothing there.
+#[tokio::test]
+async fn syn_073_resuming_into_a_folder_holding_another_beginning_is_the_reset() {
+    let dir = tempfile::tempdir().unwrap();
+    let elsewhere = tempfile::tempdir().unwrap();
+    let (desktop, laptop, account_id, desktop_area) = two_devices_sharing(dir.path()).await;
+    desktop.sync_service.pause_sync().await.expect("paused");
+    laptop
+        .orchestrator
+        .change_sync_folder(elsewhere.path().to_string_lossy().to_string())
+        .await
+        .expect("Laptop moved the portfolio");
+    std::fs::write(
+        dir.path().join("vaultcompass-sync.json"),
+        header_of(elsewhere.path()),
+    )
+    .unwrap();
+    let before = segment_names(&desktop_area);
+    desktop
+        .account_service
+        .record_deposit(&account_id, "2026-03-01".into(), 1_000_000, None)
+        .await
+        .unwrap();
+
+    let resumed = desktop.orchestrator.resume_sync().await;
+    assert!(
+        desktop.orchestrator.get_sync_status().await.unwrap().paused,
+        "{resumed:?}"
+    );
+    assert_eq!(
+        segment_names(&desktop_area),
+        before,
+        "nothing was published"
+    );
+}

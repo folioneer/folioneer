@@ -476,7 +476,23 @@ impl SyncRun {
             return self.pause_for_reset(device).await;
         };
         let mut failures = Vec::new();
-        match header_gate(header_bytes.as_deref(), &key, device) {
+        let mut gate = header_gate(header_bytes.as_deref(), &key, device);
+        // SYN-084 — the device follows the header it knows among several: a copy a cloud
+        // client left beside the header may be it. A folder with no header is the unmounted
+        // volume, whatever copies it holds.
+        if matches!(gate, HeaderGate::Reset) {
+            let copies = match self.folder_store.read_header_copies().await {
+                Ok(copies) => copies,
+                Err(error) => return Ok(report(device, 0, vec![folder_failure(error)?])),
+            };
+            if copies
+                .iter()
+                .any(|copy| matches!(header_gate(Some(copy), &key, device), HeaderGate::Proceed))
+            {
+                gate = HeaderGate::Proceed;
+            }
+        }
+        match gate {
             HeaderGate::Proceed => {}
             HeaderGate::UpdateRequired(data_format_version) => {
                 failures.push(SyncFailure::UpdateRequired {
@@ -880,6 +896,104 @@ mod tests {
         );
     }
 
+    /// The seeded device as it follows a portfolio whose writer it knows (SYN-084).
+    fn device_knowing_its_writer() -> SyncDevice {
+        SyncDevice::restore(crate::context::sync::StoredDevice {
+            device_id: "desktop-device".into(),
+            device_name: "Desktop".into(),
+            folder: "/tmp/sync".into(),
+            joined_at: "2026-08-22T00:00:00Z".into(),
+            paused: false,
+            portfolio_created_at: "2026-08-22T00:00:00Z".into(),
+            portfolio_created_by: Some("desktop-device".into()),
+            derivation_parameters: None,
+            data_format_version: 1,
+        })
+    }
+
+    /// A header under the kept key with the followed creation mark, written by `writer`.
+    fn header_written_by(writer: &str) -> Vec<u8> {
+        encode_header(&FolderHeader {
+            derivation_parameters: DerivationParameters {
+                salt: vec![1; 16],
+                memory_cost_kib: 19_456,
+                iterations: 2,
+                parallelism: 1,
+            },
+            passphrase_check: make_check(&kept_key_for_tests()),
+            data_format_version: DATA_FORMAT_VERSION,
+            created_at: "2026-08-22T00:00:00Z".into(),
+            created_by_device_id: writer.into(),
+        })
+        .expect("a valid header encodes")
+    }
+
+    // SYN-084 — a header that differs from the one followed by its writer alone is another
+    // beginning: the device pauses as reset.
+    #[tokio::test]
+    async fn a_header_that_differs_by_its_writer_alone_pauses_the_device() {
+        let pool = make_pool().await;
+        seed_sync_device(&pool, "desktop-device").await;
+
+        let mut state_repo = MockSyncStateRepository::new();
+        state_repo.expect_save_device().returning(|_| Ok(()));
+        let mut folder_store = MockFolderStore::new();
+        folder_store.expect_retarget().return_const(());
+        folder_store.expect_check_available().returning(|| Ok(()));
+        folder_store
+            .expect_read_header_bytes()
+            .returning(|| Ok(Some(header_written_by("laptop-device"))));
+        folder_store
+            .expect_read_header_copies()
+            .returning(|| Ok(vec![]));
+        let run = run_over(&pool, Arc::new(state_repo), folder_store);
+
+        let report = run
+            .publish(&device_knowing_its_writer())
+            .await
+            .expect("SYN-062: never rejects");
+        assert!(report.failures.contains(&SyncFailure::PortfolioReset));
+        assert!(report.status.paused);
+    }
+
+    // SYN-084 / DEBT-131 — a cloud client's conflict copy holding the header followed, beside
+    // another header under the header's name, is the header the device follows: the run goes
+    // on and nothing is paused.
+    #[tokio::test]
+    async fn a_conflict_copy_holding_the_header_followed_keeps_the_device_syncing() {
+        let pool = make_pool().await;
+        seed_sync_device(&pool, "desktop-device").await;
+        seed_unpublished_change(&pool, "desktop-device", 1).await;
+
+        let state_repo = Arc::new(MockSyncStateRepository::new());
+        let mut folder_store = MockFolderStore::new();
+        folder_store.expect_retarget().return_const(());
+        folder_store.expect_check_available().returning(|| Ok(()));
+        folder_store
+            .expect_read_header_bytes()
+            .returning(|| Ok(Some(header_written_by("laptop-device"))));
+        folder_store
+            .expect_read_header_copies()
+            .returning(|| Ok(vec![header_written_by("desktop-device")]));
+        folder_store
+            .expect_write_segment()
+            .times(1)
+            .returning(|_, _, _, _| Ok(()));
+        folder_store
+            .expect_write_manifest()
+            .times(1)
+            .returning(|_, _| Ok(()));
+        let run = run_over(&pool, state_repo, folder_store);
+
+        let report = run
+            .publish(&device_knowing_its_writer())
+            .await
+            .expect("SYN-062: never rejects");
+        assert!(report.failures.is_empty(), "{:?}", report.failures);
+        assert!(!report.status.paused);
+        assert_eq!(report.published_changes, 1);
+    }
+
     // SYN-084 — a passphrase-check mismatch against the kept key reports PortfolioReset and
     // pauses the device; nothing is published under the old key into the reset folder.
     #[tokio::test]
@@ -896,6 +1010,9 @@ mod tests {
         folder_store
             .expect_read_header_bytes()
             .returning(|| Ok(Some(b"{\"passphrase_check\":\"does-not-match\"}".to_vec())));
+        folder_store
+            .expect_read_header_copies()
+            .returning(|| Ok(vec![]));
         let run = run_over(&pool, Arc::new(state_repo), folder_store);
 
         let report = run

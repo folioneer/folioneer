@@ -169,6 +169,10 @@ pub trait FolderStore: Send + Sync {
     /// Reads the header's raw bytes, or `None` when no header exists yet.
     async fn read_header_bytes(&self) -> Result<Option<Vec<u8>>, SyncError>;
 
+    /// Reads the copies of the header a cloud client left beside it — a conflict copy,
+    /// a numbered duplicate — in name order (SYN-084). The header itself is not among them.
+    async fn read_header_copies(&self) -> Result<Vec<Vec<u8>>, SyncError>;
+
     /// Writes the header only if none exists yet (SYN-081) — the last-moment re-check before
     /// a first device publishes.
     async fn write_header_if_absent(&self, bytes: Vec<u8>)
