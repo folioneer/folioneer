@@ -197,6 +197,18 @@ class FoldingFixups(unittest.TestCase):
         with self.assertRaises(SystemExit):
             merge.merge_method("main", before, "work")
 
+    # PR #315: GitHub deleted the merged branch itself, and the delete that followed was told as a failure.
+    def test_a_branch_the_remote_no_longer_holds_is_gone(self):
+        remote = tempfile.TemporaryDirectory()
+        self.addCleanup(remote.cleanup)
+        self.run_git("init", "--quiet", "--bare", remote.name)
+        self.run_git("remote", "add", "origin", remote.name)
+        self.run_git("push", "--quiet", "origin", "work")
+
+        self.assertFalse(merge.remote_branch_gone("work"))
+        self.run_git("push", "--quiet", "--delete", "origin", "work")
+        self.assertTrue(merge.remote_branch_gone("work"))
+
 
 class Worktrees(unittest.TestCase):
     LISTING = (
