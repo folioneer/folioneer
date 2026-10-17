@@ -104,9 +104,12 @@ Written to read the same in every repository that works this way.
   CI. Never: fails the job it explains.
 - `scripts/watch-pr.py` — waits for a pull request's checks and says how they ended.
   Never: merges or re-runs.
-- `scripts/merge.py` — rebases a branch whose checks are all green, merges it and
-  deletes it. Never: merges on a red or missing check, nor pushes over a branch that
-  moved on the remote.
+- `scripts/merge.py` — rebases a branch whose checks are all green, has GitHub merge
+  its pull request and deletes it. Never: merges on a red or missing check, pushes to
+  the target, nor pushes over a branch that moved on the remote.
+- `scripts/commit-check.sh` — refuses a commit that breaks `docs/commit-rules.md`,
+  its author included, on a pull request and on `main` since the last release. Never: exempts an
+  author other than a bot.
 - `scripts/release.py` — computes the version, writes the changelog, tags and pushes,
   for the owner. Never: run by the agent.
 - `scripts/mcpb-bundle.py` — builds the Claude Desktop bundle the release attaches, from

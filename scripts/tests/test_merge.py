@@ -170,6 +170,33 @@ class FoldingFixups(unittest.TestCase):
         self.assertTrue(merge._rebase_left_the_checks_standing(tested, records))
         self.assertFalse(merge._rebase_left_the_checks_standing(tested, code))
 
+    def test_a_branch_without_fixups_is_rebased_by_github(self):
+        before = self.commit("feat: show the total", {"total.txt": "total\n"})
+
+        self.assertEqual(merge.merge_method("main", before, "work"), ["--rebase"])
+
+    def test_a_branch_whose_fixups_were_folded_is_squashed_under_its_commit(self):
+        self.run_git("commit", "--quiet", "--allow-empty", "-m", "feat: show the total", "-m", "TODO-001.")
+        before = self.commit("fixup! feat: show the total", {"total.txt": "fixed\n"})
+        merge.rebase_folding_fixups("main")
+
+        self.assertEqual(
+            merge.merge_method("main", before, "work"),
+            [
+                "--squash", "--subject", "feat: show the total", "--body", "TODO-001.",
+                "--author-email", "test@example.invalid",
+            ],
+        )
+
+    def test_fixups_folded_into_two_commits_are_refused(self):
+        self.commit("feat: show the total", {"total.txt": "total\n"})
+        self.commit("docs: say so", {"docs.md": "docs\n"})
+        before = self.commit("fixup! feat: show the total", {"total.txt": "fixed\n"})
+        merge.rebase_folding_fixups("main")
+
+        with self.assertRaises(SystemExit):
+            merge.merge_method("main", before, "work")
+
 
 class Worktrees(unittest.TestCase):
     LISTING = (
