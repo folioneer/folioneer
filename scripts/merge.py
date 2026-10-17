@@ -196,6 +196,20 @@ def refuse_unfolded_fixups(target: str, branch: str, before: str) -> None:
         )
 
 
+def restore_unpushed(branch: str, before: str) -> None:
+    """After a stop that pushed nothing, put the branch back on `before`, its head before
+    the rebase: a rebased branch origin does not hold would be refused at the next run as
+    one whose origin is ahead. A branch the stop pushed is left as pushed."""
+    head = git("rev-parse", branch).stdout.strip()
+    pushed = git("rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}", check=False)
+    if head == before or (pushed.returncode == 0 and pushed.stdout.strip() == head):
+        return
+    if git("reset", "--quiet", "--hard", before, check=False).returncode == 0:
+        print(f"{BLUE}ℹ {branch} is back on {before[:7]}, as it was before the rebase.{NC}", file=sys.stderr)
+    else:
+        print(f"{RED}❌ {branch} is rebased; its original head was {before[:7]} (git reset --hard {before[:7]}).{NC}", file=sys.stderr)
+
+
 def rebase_folding_fixups(target: str) -> subprocess.CompletedProcess[str]:
     """Rebase the current branch onto `target`, folding each `fixup!` commit into the commit it names."""
     return subprocess.run(
@@ -513,19 +527,24 @@ def main() -> int:
     refuse_unfolded_fixups(target, branch, before)
     after = git("rev-parse", branch).stdout.strip()
 
-    # Step 2b — the merge guard: green checks on exactly these commits.
-    number, head = ensure_checks_green(branch, target, before, after)
+    try:
+        # Step 2b — the merge guard: green checks on exactly these commits.
+        number, head = ensure_checks_green(branch, target, before, after)
 
-    # Step 3 — GitHub merges the tested head; the target accepts no push of a commit
-    # whose checks did not run on it.
-    method = merge_method(target, before, branch)
-    result = gh("pr", "merge", str(number), *method, "--match-head-commit", head)
-    if result.returncode != 0:
-        fail(
-            f"GitHub refused to merge PR #{number}.",
-            (result.stderr or "").strip(),
-            f"Inspect: gh pr view {number} (a ruleset that asks the branch to be up to date refuses it) — then re-run `just merge`.",
-        )
+        # Step 3 — GitHub merges the tested head; the target accepts no push of a commit
+        # whose checks did not run on it.
+        method = merge_method(target, before, branch)
+        result = gh("pr", "merge", str(number), *method, "--match-head-commit", head)
+        if result.returncode != 0:
+            fail(
+                f"GitHub refused to merge PR #{number}.",
+                (result.stderr or "").strip(),
+                f"Inspect: gh pr view {number} (a ruleset that asks the branch to be up to date refuses it) — then re-run `just merge`.",
+            )
+    except BaseException:
+        # A stop, an interrupt during the wait, or a git error: the same way back.
+        restore_unpushed(branch, before)
+        raise
 
     # Step 4 — bring the local target to what GitHub landed.
     result = git("checkout", target, check=False)
