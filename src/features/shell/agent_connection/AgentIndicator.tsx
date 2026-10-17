@@ -15,7 +15,8 @@ const ON_HEADER = "border-white/60 text-white hover:enabled:bg-white/15";
  */
 export function AgentIndicator() {
   const { t } = useTranslation();
-  const { request, removal, sessions, disconnect, removeRecordings } = useAgentConnections();
+  const { request, removal, change, sessions, disconnect, removeRecordings } =
+    useAgentConnections();
   const [shown, setShown] = useState<number | null>(null);
   // A session that ended closes its dialog: there is nothing left to show.
   const shownSession = sessions.find((session) => session.id === shown) ?? null;
@@ -50,11 +51,13 @@ export function AgentIndicator() {
         </div>
       ))}
       {/* Out of the header, which stacks under the views: the dialog covers the window. An
-          agent that asks to connect (AGT-032) or to remove a transaction (AGT-083) comes first:
+          agent that asks to connect (AGT-032), or to remove or change a transaction (AGT-083,
+          AGT-089), comes first:
           the dialog gives way to it. */}
       {shownSession &&
         request === null &&
         removal === null &&
+        change === null &&
         createPortal(
           <AgentSessionDialog
             session={shownSession}

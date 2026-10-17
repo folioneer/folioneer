@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentConnectionRequest, AgentSession, RemovalRequest } from "@/bindings";
+import type {
+  AgentConnectionRequest,
+  AgentSession,
+  ChangeRequest,
+  RemovalRequest,
+} from "@/bindings";
 import { logger } from "@/lib/logger";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import {
   answerAgentConnection,
+  answerChangeRequest,
   answerRemovalRequest,
   disconnectAgent,
   getAgentConnectionState,
@@ -16,24 +22,32 @@ export interface UseAgentConnectionsResult {
   /** The agent waiting for the owner's answer: the oldest one, others wait their turn. */
   request: AgentConnectionRequest | null;
   /**
-   * AGT-083 — the removal request to answer: the oldest one, once no agent waits to connect.
+   * AGT-083 — the removal request to answer: the oldest request of either kind, once no
+   * agent waits to connect (AGT-088).
    */
   removal: RemovalRequest | null;
+  /** AGT-089 — the change request to answer, on the same terms. */
+  change: ChangeRequest | null;
   /** The agents connected, oldest first. */
   sessions: AgentSession[];
   /** The user whose programs can connect; null when the system does not say. */
   user: string | null;
   answer: (requestId: number, allow: boolean) => void;
   answerRemoval: (requestId: number, remove: boolean) => void;
+  answerChange: (requestId: number, change: boolean) => void;
   disconnect: (sessionId: number) => void;
   /** AGT-053 — removes everything the session recorded, and says how much went. */
   removeRecordings: (sessionId: number) => void;
 }
 
-/** AGT-081 — the sentence for a refused command; a removal that did not happen says why. */
+/**
+ * AGT-081 / AGT-088 — the sentence for a refused command; a removal or a change that did not
+ * happen says why.
+ */
 function refusalKey(error: { code: string; reason?: string }): string {
-  if (error.reason === "TransactionChanged") return "agent.removal_changed";
-  if (error.reason === "TransactionNotFound") return "agent.removal_gone";
+  const ask = error.code === "TransactionNotChanged" ? "change" : "removal";
+  if (error.reason === "TransactionChanged") return `agent.${ask}_changed`;
+  if (error.reason === "TransactionNotFound") return `agent.${ask}_gone`;
   return `error.${error.code}`;
 }
 
@@ -47,6 +61,7 @@ export function useAgentConnections(): UseAgentConnectionsResult {
   const [requests, setRequests] = useState<AgentConnectionRequest[]>([]);
   const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [removals, setRemovals] = useState<RemovalRequest[]>([]);
+  const [changes, setChanges] = useState<ChangeRequest[]>([]);
   const [user, setUser] = useState<string | null>(null);
 
   // Reads may answer out of order: only the latest one asked is shown.
@@ -61,6 +76,7 @@ export function useAgentConnections(): UseAgentConnectionsResult {
       setRequests(state.requests);
       setSessions(state.sessions);
       setRemovals(state.removals);
+      setChanges(state.changes);
       setUser(state.user);
     } catch (e) {
       logger.error("[useAgentConnections] state not read", { error: e });
@@ -107,6 +123,10 @@ export function useAgentConnections(): UseAgentConnectionsResult {
     (requestId: number, remove: boolean) => settle(answerRemovalRequest(requestId, remove)),
     [settle],
   );
+  const answerChange = useCallback(
+    (requestId: number, change: boolean) => settle(answerChangeRequest(requestId, change)),
+    [settle],
+  );
   const disconnect = useCallback(
     (sessionId: number) => settle(disconnectAgent(sessionId)),
     [settle],
@@ -137,13 +157,19 @@ export function useAgentConnections(): UseAgentConnectionsResult {
   );
 
   const request = requests[0] ?? null;
+  // AGT-088 — the two kinds share one order, the core's: the lower id asked first.
+  const removal = removals[0] ?? null;
+  const change = changes[0] ?? null;
+  const removalFirst = removal !== null && (change === null || removal.id < change.id);
   return {
     request,
-    removal: request ? null : (removals[0] ?? null),
+    removal: request || !removalFirst ? null : removal,
+    change: request || removalFirst ? null : change,
     sessions,
     user,
     answer,
     answerRemoval,
+    answerChange,
     disconnect,
     removeRecordings,
   };

@@ -1,11 +1,11 @@
 # Contract — Agent Connection
 
 > Domain: `agent-connection`
-> Last updated by: agent-connection (AGT-022–036, AGT-039, AGT-045, AGT-052–054, AGT-064, AGT-081, AGT-082, AGT-084)
+> Last updated by: agent-connection (AGT-022–036, AGT-039, AGT-045, AGT-052–054, AGT-064, AGT-081, AGT-082, AGT-084, AGT-088)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName" }` object; a variant with fields carries them beside `code`, as `TransactionNotRemoved { reason }` does. The FE matches on `code`.
 >
-> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–063, AGT-070, AGT-071, AGT-080) and the tool of AGT-064 are not Tauri commands — what the window shows of an added asset is `AgentSession.assets_added` and `last_asset` here; what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
+> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–063, AGT-070, AGT-071, AGT-080, AGT-087) and the tool of AGT-064 are not Tauri commands — what the window shows of an added asset is `AgentSession.assets_added` and `last_asset` here; what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
 
 ---
 
@@ -17,6 +17,7 @@
 | `set_agents_allowed`         | `allowed: bool`                   | `AgentConnectionState` | `NoAgentChannel`, `AgentChannelFailed`                                                                  |
 | `answer_agent_connection`    | `request_id: u32`, `allow: bool`  | `()`                   | `ConnectionRequestGone`                                                                                 |
 | `answer_removal_request`     | `request_id: u32`, `remove: bool` | `()`                   | `RemovalRequestGone` (AGT-081), `TransactionNotRemoved { reason }` (AGT-081), `DatabaseError` (AGT-081) |
+| `answer_change_request`      | `request_id: u32`, `change: bool` | `()`                   | `ChangeRequestGone` (AGT-088), `TransactionNotChanged { reason }` (AGT-088), `DatabaseError` (AGT-088)  |
 | `disconnect_agent`           | `session_id: u32`                 | `()`                   | `SessionAlreadyEnded`                                                                                   |
 | `remove_agent_recordings`    | `session_id: u32`                 | `SessionRemoval`       | `SessionAlreadyEnded`, `DatabaseError`                                                                  |
 
@@ -24,6 +25,7 @@
 - `set_agents_allowed` — AGT-022. `NoAgentChannel`: this system has no agent connection (AGT-023). `AgentChannelFailed`: the setting or the channel could not be written — another running application holds the channel, its folder is not a folder of the data folder — and the cause is in the log. A switch on that fails leaves the setting off. A switch off that fails has still closed the channel and ended every session: the window reads the state again.
 - `answer_agent_connection` — AGT-032. `ConnectionRequestGone`: the request was already answered, or its agent client went away (AGT-030).
 - `answer_removal_request` — AGT-081. Removes the transaction through the deletion of the window (TRX-034) when `remove`, or refuses; either way the agent that asked is told (AGT-080) and the request is gone. `RemovalRequestGone`: the request was already answered, or its session ended (AGT-082). `TransactionNotRemoved`: a yes removed nothing, and the transaction stays — `reason` is the code the agent is given: `TransactionChanged` (it no longer stands as the owner was shown it), `TransactionNotFound` (deleted meanwhile), or the deletion's own code (a later transaction depends on it). `DatabaseError`: the portfolio could not be read or written; the request is gone all the same.
+- `answer_change_request` — AGT-088. Changes the transaction through the correction of the window (TRX-031), with what the agent asked, when `change`, or refuses; either way the agent that asked is told (AGT-087) and the request is gone. `ChangeRequestGone`: the request was already answered, or its session ended (AGT-082). `TransactionNotChanged`: a yes changed nothing, and the transaction stays as it was — `reason` is the code the agent is given: `TransactionChanged` (it no longer stands as the owner was shown it), `TransactionNotFound` (deleted meanwhile), or the correction's own code. `DatabaseError`: the portfolio could not be read or written; the request is gone all the same.
 - `disconnect_agent` — AGT-034. `SessionAlreadyEnded`: the agent already left or was disconnected.
 - `remove_agent_recordings` — AGT-053. Removes every transaction the session recorded and that still exists, and nothing else. `SessionAlreadyEnded`: the session is no longer connected, and nothing was removed. `DatabaseError`: what it recorded could not be read, or a removal could not be saved; what was removed before the failure stays removed, and the state says what is left.
 
@@ -38,6 +40,7 @@ struct AgentConnectionState {
     requests: Vec<AgentConnectionRequest>, // waiting for the owner's answer, oldest first
     sessions: Vec<AgentSession>,           // connected, oldest first
     removals: Vec<RemovalRequest>,         // removal requests waiting for the owner's answer, oldest first (AGT-081)
+    changes: Vec<ChangeRequest>,           // change requests waiting, oldest first; one order with `removals`, by `id` (AGT-088)
 }
 
 // AGT-030 — an agent client waiting for the owner's answer.
@@ -83,7 +86,29 @@ struct RemovalRequest {
     transaction: TransactionShown, // the transaction as it stood when the agent asked
 }
 
-// AGT-081 — a transaction the owner typed, as the owner is shown it before removing it.
+// AGT-087 / AGT-088 — an agent asking the owner to change a transaction the owner typed.
+struct ChangeRequest {
+    id: u32,                       // shares one rising order with `RemovalRequest.id`
+    session: u32,                  // the `AgentSession.id` that asks
+    client: String,                // the agent's name, cleaned (AGT-037)
+    asked_at: String,              // RFC 3339, this computer's time
+    transaction: TransactionShown, // the transaction as it stood when the agent asked
+    becomes: TransactionShown,     // the transaction as the change would make it
+    moved: Vec<ShownValue>,        // the values the change moves, in the order they are shown (AGT-088)
+}
+
+// AGT-088 — a value of a shown transaction a change can move; serialized snake_case.
+enum ShownValue {
+    Date,
+    Quantity,
+    Amount,
+    UnitPrice,
+    Fees,
+    ExchangeRate,
+    Note,
+}
+
+// AGT-081 / AGT-088 — a transaction the owner typed, as the owner is shown it before removing or changing it.
 struct TransactionShown {
     id: String,
     date: String,                    // YYYY-MM-DD
@@ -94,6 +119,10 @@ struct TransactionShown {
     asset_reference: Option<String>, // None for a transaction on the account's cash
     quantity: i64,                   // micro-units
     amount: i64,                     // micro-units, in the account's currency
+    unit_price: i64,                 // micro-units, in the asset's currency, as stored (AGT-088)
+    fees: i64,                       // micro-units, in the account's currency, as stored (AGT-088)
+    exchange_rate: i64,              // micro-units, as stored (AGT-088)
+    note: Option<String>,            // as typed (AGT-088)
 }
 
 // AGT-053 — what removing everything a session recorded did.
@@ -110,15 +139,17 @@ enum AgentConnectionError {
     SessionAlreadyEnded,
     RemovalRequestGone,                       // AGT-081
     TransactionNotRemoved { reason: String }, // AGT-081 — the deletion's code
+    ChangeRequestGone,                        // AGT-088
+    TransactionNotChanged { reason: String }, // AGT-088 — the correction's code
     DatabaseError,
 }
 ```
 
 ## Events
 
-| Event                    | Payload | Published when                                                                                                                                                                                                                                  |
-| ------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AgentConnectionChanged` | —       | the setting is switched; a request arrives, is answered or is withdrawn; a session opens, calls a tool or ends (AGT-036); the owner removes what a session recorded (AGT-053); a removal request arrives, is answered or is withdrawn (AGT-081) |
+| Event                    | Payload | Published when                                                                                                                                                                                                                                                     |
+| ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AgentConnectionChanged` | —       | the setting is switched; a request arrives, is answered or is withdrawn; a session opens, calls a tool or ends (AGT-036); the owner removes what a session recorded (AGT-053); a removal or change request arrives, is answered or is withdrawn (AGT-081, AGT-088) |
 
 The mark of a transaction an agent recorded (AGT-045) reaches the window in the account journal: `JournalRow.recorded_by` in `account-contract.md`.
 
@@ -130,3 +161,4 @@ The mark of a transaction an agent recorded (AGT-045) reaches the window in the 
 - 2026-10-12 — TODO-063: `AgentSession` gains `assets_added` and `last_asset`, with `LastAsset { name: String, reference: String }` (AGT-064). No command or error changes.
 - 2026-10-14 — TODO-061: `answer_removal_request` (AGT-081); `AgentConnectionState` gains `removals`, with `RemovalRequest` and `TransactionShown`; `AgentConnectionError` gains `RemovalRequestGone` and `TransactionNotRemoved { reason }`.
 - 2026-10-14 — TODO-079: `AgentSession` gains `transactions_recorded` (AGT-084). No command or error changes.
+- 2026-10-17 — TODO-080: `answer_change_request` (AGT-088); `AgentConnectionState` gains `changes`, with `ChangeRequest` and `ShownValue`; `AgentConnectionError` gains `ChangeRequestGone` and `TransactionNotChanged { reason }`; `TransactionShown` gains `unit_price`, `fees`, `exchange_rate` and `note`.

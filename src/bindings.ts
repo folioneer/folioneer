@@ -1085,6 +1085,18 @@ async answerRemovalRequest(requestId: number, remove: boolean) : Promise<Result<
 }
 },
 /**
+ * AGT-088 — the owner's answer to a change request: changing the transaction through the
+ * correction of the window, or refusing. The agent that asked is told what became of it.
+ */
+async answerChangeRequest(requestId: number, change: boolean) : Promise<Result<null, AgentConnectionError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("answer_change_request", { requestId, change }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * AGT-034 — the owner disconnects an agent client.
  */
 async disconnectAgent(sessionId: number) : Promise<Result<null, AgentConnectionError>> {
@@ -1606,7 +1618,15 @@ export type AgentConnectionError =
  */
 { code: "TransactionNotRemoved"; reason: string } | 
 /**
- * What the session recorded could not be read or removed; the cause is in the log.
+ * The change request was already answered, or its session ended (AGT-088).
+ */
+{ code: "ChangeRequestGone" } | 
+/**
+ * The correction refused to change the transaction (AGT-088): `reason` is its code.
+ */
+{ code: "TransactionNotChanged"; reason: string } | 
+/**
+ * The portfolio could not be read or written; the cause is in the log.
  */
 { code: "DatabaseError" }
 /**
@@ -1653,7 +1673,12 @@ sessions: AgentSession[];
 /**
  * The removal requests waiting for the owner's answer, oldest first (AGT-081).
  */
-removals: RemovalRequest[] }
+removals: RemovalRequest[]; 
+/**
+ * The change requests waiting for the owner's answer, oldest first (AGT-088); they
+ * share one order with the removal requests.
+ */
+changes: ChangeRequest[] }
 /**
  * The mark of a transaction an agent recorded (AGT-045): which agent, in which session.
  */
@@ -2197,6 +2222,39 @@ external_provider: boolean;
  * `None` for the public build (UPD-030).
  */
 distribution_channel: string | null }
+/**
+ * An agent asking the owner to change a transaction the owner typed (AGT-087).
+ */
+export type ChangeRequest = { 
+/**
+ * Identifies the request in the owner's answer; removal and change requests share one
+ * order (AGT-088).
+ */
+id: number; 
+/**
+ * The session that asks.
+ */
+session: number; 
+/**
+ * The name of the agent that asks.
+ */
+client: string; 
+/**
+ * When it asked, as an RFC 3339 timestamp in this computer's time.
+ */
+asked_at: string; 
+/**
+ * The transaction, as it stood when the agent asked.
+ */
+transaction: TransactionShown; 
+/**
+ * The transaction as the change would make it.
+ */
+becomes: TransactionShown; 
+/**
+ * The values the change moves, in the order they are shown (AGT-088).
+ */
+moved: ShownValue[] }
 /**
  * Enriched view of a fully-closed position (quantity == 0, ACD-044).
  */
@@ -4381,6 +4439,39 @@ removed: number;
  */
 kept: number }
 /**
+ * A value of a transaction the owner is shown, as a change request names what it moves
+ * (AGT-088).
+ */
+export type ShownValue = 
+/**
+ * Its date.
+ */
+"date" | 
+/**
+ * Its quantity.
+ */
+"quantity" | 
+/**
+ * Its amount.
+ */
+"amount" | 
+/**
+ * Its unit price.
+ */
+"unit_price" | 
+/**
+ * Its fees.
+ */
+"fees" | 
+/**
+ * Its exchange rate.
+ */
+"exchange_rate" | 
+/**
+ * Its note.
+ */
+"note"
+/**
  * Use-case composite for the **record split** failure surface.
  * 
  * - `AccountError` — every account-BC rejection (lookup, infrastructure, the
@@ -4994,7 +5085,8 @@ total_amount: number;
  */
 realized_pnl: number | null }
 /**
- * A transaction the owner typed, as the owner is shown it before removing it (AGT-081).
+ * A transaction the owner typed, as the owner is shown it before removing or changing it
+ * (AGT-081, AGT-088).
  */
 export type TransactionShown = { 
 /**
@@ -5032,7 +5124,23 @@ quantity: number;
 /**
  * Its amount in the account's currency, in micro-units.
  */
-amount: number }
+amount: number; 
+/**
+ * Its unit price, in micro-units.
+ */
+unit_price: number; 
+/**
+ * Its fees, in micro-units.
+ */
+fees: number; 
+/**
+ * Its exchange rate, in micro-units.
+ */
+exchange_rate: number; 
+/**
+ * Its note.
+ */
+note: string | null }
 /**
  * Type of financial transaction.
  */

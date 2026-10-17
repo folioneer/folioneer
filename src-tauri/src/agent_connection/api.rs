@@ -12,8 +12,8 @@ use specta::Type;
 use tauri::State;
 
 use super::channel;
-use super::connections::{AgentConnectionRequest, AgentSession, RemovalRequest};
-use super::gate::{answer_removal, AgentGate, AnswerRefused, GateError};
+use super::connections::{AgentConnectionRequest, AgentSession, ChangeRequest, RemovalRequest};
+use super::gate::{answer_change, answer_removal, AgentGate, AnswerRefused, GateError};
 use crate::core::BACKEND;
 use crate::use_cases::holding_transaction::{HoldingTransactionUseCase, SessionRemoval};
 
@@ -42,16 +42,35 @@ pub enum AgentConnectionError {
         /// The deletion's code.
         reason: String,
     },
-    /// What the session recorded could not be read or removed; the cause is in the log.
+    /// The change request was already answered, or its session ended (AGT-088).
+    #[error("No such change request")]
+    ChangeRequestGone,
+    /// The correction refused to change the transaction (AGT-088): `reason` is its code.
+    #[error("The transaction could not be changed")]
+    TransactionNotChanged {
+        /// The correction's code.
+        reason: String,
+    },
+    /// The portfolio could not be read or written; the cause is in the log.
     #[error("The portfolio could not be read or written")]
     DatabaseError,
 }
 
-impl From<AnswerRefused> for AgentConnectionError {
-    fn from(refused: AnswerRefused) -> Self {
+impl AgentConnectionError {
+    /// The owner's answer to a removal request that did nothing (AGT-081).
+    fn of_removal(refused: AnswerRefused) -> Self {
         match refused {
             AnswerRefused::Gone => Self::RemovalRequestGone,
-            AnswerRefused::NotRemoved { reason } => Self::TransactionNotRemoved { reason },
+            AnswerRefused::NotDone { reason } => Self::TransactionNotRemoved { reason },
+            AnswerRefused::Unreadable => Self::DatabaseError,
+        }
+    }
+
+    /// The owner's answer to a change request that did nothing (AGT-088).
+    fn of_change(refused: AnswerRefused) -> Self {
+        match refused {
+            AnswerRefused::Gone => Self::ChangeRequestGone,
+            AnswerRefused::NotDone { reason } => Self::TransactionNotChanged { reason },
             AnswerRefused::Unreadable => Self::DatabaseError,
         }
     }
@@ -82,6 +101,9 @@ pub struct AgentConnectionState {
     pub sessions: Vec<AgentSession>,
     /// The removal requests waiting for the owner's answer, oldest first (AGT-081).
     pub removals: Vec<RemovalRequest>,
+    /// The change requests waiting for the owner's answer, oldest first (AGT-088); they
+    /// share one order with the removal requests.
+    pub changes: Vec<ChangeRequest>,
 }
 
 /// The state of `gate`, as the window reads it.
@@ -96,6 +118,7 @@ pub fn state_of(gate: &AgentGate) -> AgentConnectionState {
         requests: gate.connections().requests(),
         sessions: gate.connections().sessions(),
         removals: gate.connections().removals(),
+        changes: gate.connections().changes(),
     }
 }
 
@@ -143,7 +166,24 @@ pub async fn answer_removal_request(
     request_id: u32,
     remove: bool,
 ) -> Result<(), AgentConnectionError> {
-    Ok(answer_removal(gate.connections(), &recorder, request_id, remove).await?)
+    answer_removal(gate.connections(), &recorder, request_id, remove)
+        .await
+        .map_err(AgentConnectionError::of_removal)
+}
+
+/// AGT-088 — the owner's answer to a change request: changing the transaction through the
+/// correction of the window, or refusing. The agent that asked is told what became of it.
+#[tauri::command]
+#[specta::specta]
+pub async fn answer_change_request(
+    gate: State<'_, Arc<AgentGate>>,
+    recorder: State<'_, HoldingTransactionUseCase>,
+    request_id: u32,
+    change: bool,
+) -> Result<(), AgentConnectionError> {
+    answer_change(gate.connections(), &recorder, request_id, change)
+        .await
+        .map_err(AgentConnectionError::of_change)
 }
 
 /// AGT-034 — the owner disconnects an agent client.
@@ -220,6 +260,7 @@ mod tests {
                 AgentConnectionError::RemovalRequestGone,
                 "RemovalRequestGone",
             ),
+            (AgentConnectionError::ChangeRequestGone, "ChangeRequestGone"),
         ] {
             assert_eq!(
                 serde_json::to_value(&error).expect("json"),
@@ -233,6 +274,14 @@ mod tests {
             })
             .expect("json"),
             json!({ "code": "TransactionNotRemoved", "reason": "CascadingOversell" })
+        );
+        // AGT-088 — a correction that refused carries its own code.
+        assert_eq!(
+            serde_json::to_value(AgentConnectionError::TransactionNotChanged {
+                reason: "TransactionChanged".to_string()
+            })
+            .expect("json"),
+            json!({ "code": "TransactionNotChanged", "reason": "TransactionChanged" })
         );
     }
 }

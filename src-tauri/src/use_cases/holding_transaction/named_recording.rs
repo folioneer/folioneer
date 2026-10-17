@@ -202,7 +202,8 @@ pub struct Refusal {
     pub message: String,
 }
 
-/// What the owner was shown of a transaction before answering its removal (AGT-081).
+/// What the owner was shown of a transaction before answering its removal or change (AGT-081,
+/// AGT-088).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AsShown {
     /// Its date.
@@ -213,6 +214,48 @@ pub struct AsShown {
     pub quantity: i64,
     /// Its amount in the account's currency, in micro-units.
     pub amount: i64,
+    /// Its unit price, in micro-units.
+    pub unit_price: i64,
+    /// Its fees, in micro-units.
+    pub fees: i64,
+    /// Its exchange rate, in micro-units.
+    pub exchange_rate: i64,
+    /// Its note.
+    pub note: Option<String>,
+}
+
+impl AsShown {
+    /// Whether `transaction` still stands as the owner was shown it: the same date, type,
+    /// quantity and total (AGT-081, AGT-088).
+    fn stands(&self, transaction: &Transaction) -> bool {
+        (
+            &transaction.date,
+            transaction.transaction_type,
+            transaction.quantity,
+            transaction.total_amount,
+        ) == (&self.date, self.kind, self.quantity, self.amount)
+    }
+
+    /// Whether `transaction` still stands in full as the owner was shown it before a change:
+    /// what a removal checks, and its unit price, fees, rate and note, which a yes would
+    /// otherwise overwrite (AGT-088).
+    fn stands_in_full(&self, transaction: &Transaction) -> bool {
+        self.stands(transaction)
+            && (
+                transaction.unit_price,
+                transaction.fees,
+                transaction.exchange_rate,
+                &transaction.note,
+            ) == (self.unit_price, self.fees, self.exchange_rate, &self.note)
+    }
+}
+
+/// The refusal of an answer to a transaction that changed since the owner was shown it.
+fn transaction_changed() -> Refusal {
+    Refusal {
+        code: "TransactionChanged".to_string(),
+        message: "the transaction changed since the owner was shown it: ask again".to_string(),
+    }
 }
 
 /// A transaction the owner typed, with what names it for a person (AGT-081).
@@ -262,6 +305,99 @@ pub struct Correction {
     pub rate: Option<i64>,
     /// The new note.
     pub note: Option<String>,
+}
+
+/// What an agent asks to change of a transaction the owner typed (AGT-087): what is given
+/// replaces what is stored, the rest stays. Which of these a transaction takes depends on its
+/// type, as the window's correction of it does (TRX-031).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Change {
+    /// What a purchase, a sale, an opening balance, free shares, a fee or interest changes,
+    /// as `Correction` gives it: its date, quantity, price, total, fees, rate and note.
+    pub correction: Correction,
+    /// The amount of a deposit, a withdrawal or a dividend (micro-units).
+    pub amount: Option<i64>,
+    /// A split's shares after, for `old` before.
+    pub new: Option<i64>,
+    /// A split's shares before.
+    pub old: Option<i64>,
+}
+
+/// The values the window's correction takes (TRX-031).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CorrectionFields {
+    /// The date.
+    pub date: String,
+    /// The quantity (micro-units): a split's factor, a deposit's or a dividend's amount.
+    pub quantity: i64,
+    /// The unit price (micro-units).
+    pub unit_price: i64,
+    /// The exchange rate (micro-units).
+    pub exchange_rate: i64,
+    /// The fees (micro-units).
+    pub fees: i64,
+    /// A total kept as typed; `None` lets it follow the unit price.
+    pub total: Option<i64>,
+    /// The note.
+    pub note: Option<String>,
+}
+
+/// A change of a transaction the owner typed, ready to be asked (AGT-087): the transaction
+/// as it stands, as it would become, and what its correction takes.
+#[derive(Debug, Clone)]
+pub struct ChangeAsked {
+    /// The transaction as it stands, with the names it is shown by.
+    pub typed: TypedTransaction,
+    /// The transaction as the correction would make it.
+    pub becomes: Transaction,
+    /// What the correction is given when the owner says yes.
+    pub fields: CorrectionFields,
+}
+
+/// AGT-087 — the arguments a type of transaction takes beyond its date and note, as the
+/// window's correction of it does.
+fn changes_taken(kind: TransactionType) -> &'static [&'static str] {
+    match kind {
+        TransactionType::Purchase | TransactionType::Sell => {
+            &["quantity", "price", "total", "fees", "rate"]
+        }
+        TransactionType::OpeningBalance => &["quantity", "total"],
+        TransactionType::Deposit | TransactionType::Withdrawal => &["amount"],
+        TransactionType::Dividend => &["amount", "rate"],
+        TransactionType::Split => &["new", "old"],
+        TransactionType::FreeShares
+        | TransactionType::ManagementFee
+        | TransactionType::Interest => &["quantity"],
+    }
+}
+
+/// AGT-050 — the unit price and the total of a corrected purchase, sale or opening balance: a
+/// stored total is kept while nothing it is made of changes; a quantity, fees or a rate that
+/// change without a new price or total make it follow the unit price — except for an opening
+/// balance, whose total cost only a new total changes.
+fn price_and_total(stored: &Transaction, correction: &Correction) -> (i64, Option<i64>) {
+    let follows_the_price =
+        (correction.quantity.is_some() || correction.fees.is_some() || correction.rate.is_some())
+            && stored.transaction_type != TransactionType::OpeningBalance;
+    match (correction.price, correction.total) {
+        (Some(price), _) => (price, None),
+        (None, Some(total)) => (stored.unit_price, Some(total)),
+        (None, None) if follows_the_price => (stored.unit_price, None),
+        (None, None) => (stored.unit_price, Some(stored.total_amount)),
+    }
+}
+
+/// AGT-087 — what a change can move of a transaction: equal before and after, nothing changes.
+fn comparable(t: &Transaction) -> (&str, i64, i64, i64, i64, i64, Option<&str>) {
+    (
+        &t.date,
+        t.quantity,
+        t.total_amount,
+        t.unit_price,
+        t.fees,
+        t.exchange_rate,
+        t.note.as_deref(),
+    )
 }
 
 /// What removing everything a session recorded did (AGT-053).
@@ -394,24 +530,154 @@ impl HoldingTransactionUseCase {
         shown: &AsShown,
     ) -> Result<Transaction, Refusal> {
         let typed = self.typed_by_owner(transaction_id).await?;
-        let stands = &typed.transaction;
-        if (
-            &stands.date,
-            stands.transaction_type,
-            stands.quantity,
-            stands.total_amount,
-        ) != (&shown.date, shown.kind, shown.quantity, shown.amount)
-        {
-            return Err(Refusal {
-                code: "TransactionChanged".to_string(),
-                message: "the transaction changed since the owner was shown it: ask again"
-                    .to_string(),
-            });
+        if !shown.stands(&typed.transaction) {
+            return Err(transaction_changed());
         }
         self.cancel_transaction(&typed.transaction.account_id, &typed.transaction.id)
             .await
             .map_err(|error| refusal_from_account(&error))?;
         Ok(typed.transaction)
+    }
+
+    /// AGT-087 — what an agent asks to change of a transaction the owner typed, checked
+    /// before the owner is asked: refused as `typed_by_owner` refuses, for an argument its
+    /// type does not take, and as the window's correction refuses, with nothing written.
+    pub async fn ask_change_of_typed(
+        &self,
+        transaction_id: &str,
+        change: Change,
+    ) -> Result<ChangeAsked, Refusal> {
+        if change == Change::default() {
+            return Err(Refusal {
+                code: "MissingArgument".to_string(),
+                message: "nothing to change: give what changes".to_string(),
+            });
+        }
+        let typed = self.typed_by_owner(transaction_id).await?;
+        let stored = &typed.transaction;
+        let kind = stored.transaction_type;
+        let c = &change.correction;
+        let given = [
+            ("quantity", c.quantity.is_some()),
+            ("price", c.price.is_some()),
+            ("total", c.total.is_some()),
+            ("fees", c.fees.is_some()),
+            ("rate", c.rate.is_some()),
+            ("amount", change.amount.is_some()),
+            ("new", change.new.is_some()),
+            ("old", change.old.is_some()),
+        ];
+        let taken = changes_taken(kind);
+        if given
+            .iter()
+            .any(|(name, is_given)| *is_given && !taken.contains(name))
+        {
+            return Err(Refusal {
+                code: "InvalidArguments".to_string(),
+                message: format!(
+                    "this transaction takes date, note, {} and nothing else",
+                    taken.join(", ")
+                ),
+            });
+        }
+        if c.price.is_some() && c.total.is_some() {
+            return Err(Refusal {
+                code: "InvalidArguments".to_string(),
+                message: "give either price or total, not both".to_string(),
+            });
+        }
+        let quantity = match kind {
+            TransactionType::Deposit | TransactionType::Withdrawal | TransactionType::Dividend => {
+                change.amount.unwrap_or(stored.quantity)
+            }
+            TransactionType::Split => match (change.new, change.old) {
+                (None, None) => stored.quantity,
+                (Some(new), Some(old)) => SplitSize::Ratio {
+                    new: Some(new),
+                    old: Some(old),
+                }
+                .factor()
+                .map_err(|error| refusal_from_account(&error))?,
+                _ => {
+                    return Err(Refusal {
+                        code: "InvalidArguments".to_string(),
+                        message: "a split's ratio takes both new and old".to_string(),
+                    })
+                }
+            },
+            _ => c.quantity.unwrap_or(stored.quantity),
+        };
+        let (unit_price, total) = match kind {
+            TransactionType::Purchase | TransactionType::Sell | TransactionType::OpeningBalance => {
+                price_and_total(stored, c)
+            }
+            _ => (stored.unit_price, None),
+        };
+        let fields = CorrectionFields {
+            date: c.date.clone().unwrap_or_else(|| stored.date.clone()),
+            quantity,
+            unit_price,
+            exchange_rate: c.rate.unwrap_or(stored.exchange_rate),
+            fees: c.fees.unwrap_or(stored.fees),
+            total,
+            note: c.note.clone().or_else(|| stored.note.clone()),
+        };
+        let becomes = self
+            .account_service
+            .preview_correction(
+                &stored.account_id,
+                &stored.id,
+                fields.date.clone(),
+                fields.quantity,
+                fields.unit_price,
+                fields.exchange_rate,
+                fields.fees,
+                fields.total,
+                fields.note.clone(),
+            )
+            .await
+            .map_err(|error| refusal_from_account(&error))?;
+        if comparable(&becomes) == comparable(stored) {
+            return Err(Refusal {
+                code: "MissingArgument".to_string(),
+                message: "nothing to change: what was given is what the transaction holds"
+                    .to_string(),
+            });
+        }
+        Ok(ChangeAsked {
+            typed,
+            becomes,
+            fields,
+        })
+    }
+
+    /// AGT-088 — changes a transaction the owner typed, on the owner's answer, through the
+    /// correction of the window (TRX-031): refused as `typed_by_owner` refuses, with
+    /// `TransactionChanged` when it no longer stands as the owner was shown it, or as the
+    /// correction refuses.
+    pub async fn change_typed_by_owner(
+        &self,
+        transaction_id: &str,
+        shown: &AsShown,
+        fields: CorrectionFields,
+    ) -> Result<Transaction, Refusal> {
+        let typed = self.typed_by_owner(transaction_id).await?;
+        if !shown.stands_in_full(&typed.transaction) {
+            return Err(transaction_changed());
+        }
+        self.correct_transaction(
+            &typed.transaction.account_id,
+            &typed.transaction.id,
+            fields.date,
+            fields.quantity,
+            fields.unit_price,
+            fields.exchange_rate,
+            fields.fees,
+            fields.total,
+            fields.note,
+        )
+        .await
+        .map_err(|error| refusal_from_account(&error))
     }
 
     /// AGT-050 — an agent corrects a transaction its session recorded, through the rules of
@@ -447,16 +713,7 @@ impl HoldingTransactionUseCase {
                 message: "an opening balance has no price, fees or rate: give its quantity, its total or its date".to_string(),
             });
         }
-        let follows_the_price = (correction.quantity.is_some()
-            || correction.fees.is_some()
-            || correction.rate.is_some())
-            && recorded.transaction_type != TransactionType::OpeningBalance;
-        let (unit_price, total) = match (correction.price, correction.total) {
-            (Some(price), _) => (price, None),
-            (None, Some(total)) => (recorded.unit_price, Some(total)),
-            (None, None) if follows_the_price => (recorded.unit_price, None),
-            (None, None) => (recorded.unit_price, Some(recorded.total_amount)),
-        };
+        let (unit_price, total) = price_and_total(&recorded, &correction);
         self.correct_transaction(
             &recorded.account_id,
             &recorded.id,

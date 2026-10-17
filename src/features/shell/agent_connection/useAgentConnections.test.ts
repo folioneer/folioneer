@@ -7,6 +7,7 @@ vi.mock("../gateway", () => ({
   getAgentConnectionState: vi.fn(),
   answerAgentConnection: vi.fn(),
   answerRemovalRequest: vi.fn(),
+  answerChangeRequest: vi.fn(),
   disconnectAgent: vi.fn(),
   removeAgentRecordings: vi.fn(),
   onAgentConnectionChanged: vi.fn((callback: () => void) => {
@@ -37,6 +38,7 @@ const state = (overrides = {}) => ({
   requests: [],
   sessions: [],
   removals: [],
+  changes: [],
   ...overrides,
 });
 
@@ -190,6 +192,58 @@ describe("useAgentConnections", () => {
     );
     act(() => changed?.());
     await waitFor(() => expect(result.current.removal).toEqual(removal(7)));
+  });
+
+  // AGT-088 / AGT-089 — removal and change requests share one order: the oldest of either
+  // is offered, once no agent waits to connect.
+  it("offers the oldest removal or change request, one at a time", async () => {
+    const removal = (id: number) => ({ id, session: 1, client: "agent-1" });
+    const change = (id: number) => ({ id, session: 2, client: "agent-2" });
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(
+      state({ removals: [removal(8)], changes: [change(5), change(9)] }) as never,
+    );
+    const { result } = renderHook(() => useAgentConnections());
+    await waitFor(() => expect(result.current.change).toEqual(change(5)));
+    expect(result.current.removal).toBeNull();
+
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(
+      state({ removals: [removal(8)], changes: [change(9)] }) as never,
+    );
+    act(() => changed?.());
+    await waitFor(() => expect(result.current.removal).toEqual(removal(8)));
+    expect(result.current.change).toBeNull();
+
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(
+      state({ requests: [request(1)], changes: [change(9)] }) as never,
+    );
+    act(() => changed?.());
+    await waitFor(() => expect(result.current.request).toEqual(request(1)));
+    expect(result.current.change).toBeNull();
+  });
+
+  // AGT-088 — the owner's answer to a change is sent; a change that did not happen says why.
+  it("sends the owner's answer and says why a change did not happen", async () => {
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(state());
+    const { result } = renderHook(() => useAgentConnections());
+    await waitFor(() => expect(gateway.getAgentConnectionState).toHaveBeenCalled());
+
+    for (const [error, sentence] of [
+      [{ code: "TransactionNotChanged", reason: "TransactionChanged" }, "agent.change_changed"],
+      [{ code: "TransactionNotChanged", reason: "TransactionNotFound" }, "agent.change_gone"],
+      [
+        { code: "TransactionNotChanged", reason: "CascadingOversell" },
+        "error.TransactionNotChanged",
+      ],
+      [{ code: "ChangeRequestGone" }, "error.ChangeRequestGone"],
+    ] as const) {
+      vi.mocked(gateway.answerChangeRequest).mockResolvedValue({
+        status: "error",
+        error,
+      } as never);
+      act(() => result.current.answerChange(5, true));
+      await waitFor(() => expect(showSnackbar).toHaveBeenLastCalledWith(sentence, "error"));
+    }
+    expect(gateway.answerChangeRequest).toHaveBeenLastCalledWith(5, true);
   });
 
   // AGT-081 — the owner's answer is sent; a removal that did not happen says why.

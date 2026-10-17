@@ -26,6 +26,7 @@ const state = (allowed: boolean, available = true) => ({
   requests: [],
   sessions: [],
   removals: [],
+  changes: [],
 });
 
 describe("useAgentsAllowed", () => {

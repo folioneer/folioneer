@@ -18,15 +18,18 @@ import { AgentIndicator } from "./AgentIndicator";
 
 const answer = vi.fn();
 const answerRemoval = vi.fn();
+const answerChange = vi.fn();
 const disconnect = vi.fn();
 const removeRecordings = vi.fn();
 const state = (overrides = {}) => ({
   request: null,
   sessions: [],
   removal: null,
+  change: null,
   user: "phil",
   answer,
   answerRemoval,
+  answerChange,
   disconnect,
   removeRecordings,
   ...overrides,
@@ -59,6 +62,10 @@ const removal = (overrides = {}) => ({
     asset_reference: "CW8",
     quantity: 118_000_000,
     amount: 31_204_000_000,
+    unit_price: 264_440_000,
+    fees: 0,
+    exchange_rate: 1_000_000,
+    note: null,
   },
   ...overrides,
 });
@@ -215,9 +222,72 @@ describe("AgentConnectionMount", () => {
     render(<AgentConnectionMount />);
 
     const dialog = screen.getByRole("dialog");
-    expect(dialog).not.toHaveTextContent("agent.removal_asset");
-    expect(dialog).not.toHaveTextContent("agent.removal_quantity");
-    expect(dialog).toHaveTextContent("agent.removal_amount");
+    expect(dialog).not.toHaveTextContent("agent.transaction_asset");
+    expect(dialog).not.toHaveTextContent("agent.transaction_quantity");
+    expect(dialog).toHaveTextContent("agent.transaction_amount");
+  });
+
+  // AGT-089 — an agent asks to change a transaction the owner typed: it as it is and as it
+  // would become, the values that change marked in both; refusing is in focus, and changing
+  // is inactive for a moment.
+  it("shows a change request as it is and as it would become, with refusing in focus", () => {
+    const asItIs = removal().transaction;
+    hook.mockReturnValue(
+      state({
+        change: {
+          ...removal(),
+          id: 11,
+          becomes: { ...asItIs, quantity: 100_000_000, amount: 26_400_000_000 },
+          moved: ["quantity", "amount"],
+        },
+      }),
+    );
+    render(<AgentConnectionMount />);
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("id", "agent-change-dialog");
+    expect(dialog).toHaveTextContent("agent.change_title(Claude Code)");
+    expect(dialog).toHaveTextContent("agent.change_as_it_is");
+    expect(dialog).toHaveTextContent("agent.change_as_it_becomes");
+    expect(document.getElementById("agent-change-was-quantity")).toHaveTextContent("118");
+    expect(document.getElementById("agent-change-was-quantity")).toHaveClass("line-through");
+    expect(document.getElementById("agent-change-becomes-quantity")).toHaveTextContent("100");
+    expect(document.getElementById("agent-change-becomes-quantity")).toHaveClass("text-m3-primary");
+    expect(document.getElementById("agent-change-was-account")).not.toHaveClass("line-through");
+    expect(dialog).toHaveTextContent("agent.change_becomes_changed");
+    expect(dialog).toHaveTextContent("agent.change_covers");
+    expect(document.getElementById("modal-close-btn")).toBeNull();
+    expect(document.getElementById("agent-change-refuse")).toHaveFocus();
+    const change = document.getElementById("agent-change-change") as HTMLButtonElement;
+    expect(change).toBeDisabled();
+
+    fireEvent.click(screen.getByText("agent.removal_refuse"));
+    expect(answerChange).toHaveBeenLastCalledWith(11, false);
+    act(() => vi.advanceTimersByTime(ALLOW_AFTER_MS));
+    fireEvent.click(change);
+    expect(answerChange).toHaveBeenLastCalledWith(11, true);
+  });
+
+  // AGT-089 — a change the removal rows would not show, a note, has a row of its own; the
+  // unit price, fees and rate that do not move show none.
+  it("shows a row for a note the change moves, and none for what stays", () => {
+    const asItIs = removal().transaction;
+    hook.mockReturnValue(
+      state({
+        change: {
+          ...removal(),
+          id: 12,
+          becomes: { ...asItIs, note: "PEA transfer" },
+          moved: ["note"],
+        },
+      }),
+    );
+    render(<AgentConnectionMount />);
+
+    expect(document.getElementById("agent-change-becomes-note")).toHaveTextContent("PEA transfer");
+    expect(document.getElementById("agent-change-becomes-note")).toHaveClass("text-m3-primary");
+    expect(document.getElementById("agent-change-was-fees")).toBeNull();
+    expect(document.getElementById("agent-change-was-unit_price")).toBeNull();
   });
 
   // AGT-083 — an agent asking to connect comes first; the removal waits its turn.
@@ -379,6 +449,27 @@ describe("AgentIndicator", () => {
     fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
 
     hook.mockReturnValue(state({ sessions: [session()], removal: removal() }));
+    rerender(<AgentIndicator />);
+    expect(document.getElementById("agent-session-dialog")).toBeNull();
+
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    rerender(<AgentIndicator />);
+    expect(document.getElementById("agent-session-dialog")).not.toBeNull();
+  });
+
+  // AGT-089 / AGT-054 — an agent that asks to change a transaction comes first as well.
+  it("gives way to a change request and comes back once it is answered", () => {
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    const { rerender } = render(<AgentIndicator />);
+    fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
+
+    const asItIs = removal().transaction;
+    hook.mockReturnValue(
+      state({
+        sessions: [session()],
+        change: { ...removal(), becomes: { ...asItIs, quantity: 1 }, moved: ["quantity"] },
+      }),
+    );
     rerender(<AgentIndicator />);
     expect(document.getElementById("agent-session-dialog")).toBeNull();
 

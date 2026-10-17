@@ -7,19 +7,20 @@ use std::sync::{Arc, Mutex, PoisonError};
 use tokio::task::JoinHandle;
 
 use crate::core::BACKEND;
-use crate::use_cases::holding_transaction::{AsShown, HoldingTransactionUseCase};
+use crate::use_cases::holding_transaction::{AsShown, HoldingTransactionUseCase, Refusal};
 
 use super::channel;
-use super::connections::{AgentConnections, RemovalAnswer};
+use super::connections::{AgentConnections, ChangeAnswer, RemovalAnswer, TransactionShown};
 use super::server::ToolRunner;
 
-/// Why the owner's answer to a removal request removed nothing (AGT-081).
+/// Why the owner's answer to a removal or change request did nothing (AGT-081, AGT-088).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnswerRefused {
     /// The request was already answered, or its session ended.
     Gone,
-    /// The owner said yes and the transaction stays: `reason` is the code the agent is given.
-    NotRemoved {
+    /// The owner said yes and the transaction stays as it was: `reason` is the code the
+    /// agent is given.
+    NotDone {
         /// The code.
         reason: String,
     },
@@ -45,15 +46,8 @@ pub async fn answer_removal(
         answered.tell(RemovalAnswer::Refused);
         return Ok(());
     }
-    let shown = &answered.request.transaction;
-    let as_shown = AsShown {
-        date: shown.date.clone(),
-        kind: shown.kind,
-        quantity: shown.quantity,
-        amount: shown.amount,
-    };
     match recorder
-        .remove_typed_by_owner(&transaction, &as_shown)
+        .remove_typed_by_owner(&transaction, &as_shown(&answered.request.transaction))
         .await
     {
         Ok(_) => {
@@ -63,18 +57,80 @@ pub async fn answer_removal(
         }
         Err(refusal) => {
             tracing::warn!(target: BACKEND, session = answered.request.session, code = %refusal.code, "answer_removal_request: the deletion refused");
-            let error = if refusal.code == "DatabaseError" {
-                AnswerRefused::Unreadable
-            } else {
-                AnswerRefused::NotRemoved {
-                    reason: refusal.code.clone(),
-                }
-            };
+            let error = not_done(&refusal);
             answered.tell(RemovalAnswer::NotRemoved {
                 code: refusal.code,
                 message: refusal.message,
             });
             Err(error)
+        }
+    }
+}
+
+/// AGT-088 — the owner's answer to a change request, over the connections and the recorder:
+/// changing the transaction through the correction of the window, or refusing. The agent
+/// that asked is told what became of it.
+pub async fn answer_change(
+    connections: &AgentConnections,
+    recorder: &HoldingTransactionUseCase,
+    request_id: u32,
+    change: bool,
+) -> Result<(), AnswerRefused> {
+    let answered = connections
+        .take_change(request_id)
+        .ok_or(AnswerRefused::Gone)?;
+    let transaction = answered.request.transaction.id.clone();
+    if !change {
+        tracing::info!(target: BACKEND, session = answered.request.session, transaction = %transaction, "the owner refused a change");
+        answered.tell(ChangeAnswer::Refused);
+        return Ok(());
+    }
+    match recorder
+        .change_typed_by_owner(
+            &transaction,
+            &as_shown(&answered.request.transaction),
+            answered.held.clone(),
+        )
+        .await
+    {
+        Ok(changed) => {
+            tracing::info!(target: BACKEND, session = answered.request.session, transaction = %transaction, "the owner changed a transaction an agent asked to change");
+            answered.tell(ChangeAnswer::Changed(Box::new(changed)));
+            Ok(())
+        }
+        Err(refusal) => {
+            tracing::warn!(target: BACKEND, session = answered.request.session, code = %refusal.code, "answer_change_request: the correction refused");
+            let error = not_done(&refusal);
+            answered.tell(ChangeAnswer::NotChanged {
+                code: refusal.code,
+                message: refusal.message,
+            });
+            Err(error)
+        }
+    }
+}
+
+/// What the owner was shown of `shown`, as an answer checks it still stands.
+fn as_shown(shown: &TransactionShown) -> AsShown {
+    AsShown {
+        date: shown.date.clone(),
+        kind: shown.kind,
+        quantity: shown.quantity,
+        amount: shown.amount,
+        unit_price: shown.unit_price,
+        fees: shown.fees,
+        exchange_rate: shown.exchange_rate,
+        note: shown.note.clone(),
+    }
+}
+
+/// The window's refusal of a yes that did nothing.
+fn not_done(refusal: &Refusal) -> AnswerRefused {
+    if refusal.code == "DatabaseError" {
+        AnswerRefused::Unreadable
+    } else {
+        AnswerRefused::NotDone {
+            reason: refusal.code.clone(),
         }
     }
 }

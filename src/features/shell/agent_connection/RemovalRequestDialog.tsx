@@ -1,15 +1,10 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { RemovalRequest } from "@/bindings";
-import {
-  microToFormatted,
-  microToFormattedFactor,
-  microToFormattedQuantity,
-} from "@/lib/microUnits";
 import { Button } from "@/ui/components/button/Button";
 import { Dialog } from "@/ui/components/modal/Dialog";
-import { formatIsoDateNumeric } from "@/ui/format/date";
 import { ALLOW_AFTER_MS } from "./AgentConnectionDialog";
+import { transactionRows } from "./transactionRows";
 import { useKeepFocusOnActions } from "./useKeepFocusOnActions";
 
 interface RemovalRequestDialogProps {
@@ -29,7 +24,6 @@ const DIALOG_ID = "agent-removal-dialog";
 export function RemovalRequestDialog({ request, onAnswer }: RemovalRequestDialogProps) {
   const { t, i18n } = useTranslation();
   const [canRemove, setCanRemove] = useState(false);
-  const shown = request.transaction;
 
   useEffect(() => {
     const timer = window.setTimeout(() => setCanRemove(true), ALLOW_AFTER_MS);
@@ -38,25 +32,7 @@ export function RemovalRequestDialog({ request, onAnswer }: RemovalRequestDialog
 
   useKeepFocusOnActions(DIALOG_ID);
 
-  const rows: [string, string][] = [
-    [t("agent.removal_date"), formatIsoDateNumeric(shown.date, i18n.language)],
-    [t("agent.removal_account"), shown.account],
-    [t("agent.removal_kind"), t(`transaction.type_${shown.kind.toLowerCase()}`)],
-  ];
-  // A transaction on the account's cash has no asset, and no quantity of one.
-  if (shown.asset_name !== null) {
-    rows.push([
-      t("agent.removal_asset"),
-      shown.asset_reference ? `${shown.asset_name} (${shown.asset_reference})` : shown.asset_name,
-    ]);
-    rows.push([
-      t("agent.removal_quantity"),
-      shown.kind === "Split"
-        ? microToFormattedFactor(shown.quantity)
-        : microToFormattedQuantity(shown.quantity),
-    ]);
-  }
-  rows.push([t("agent.removal_amount"), `${microToFormatted(shown.amount, 2)} ${shown.currency}`]);
+  const rows = transactionRows(request.transaction, t, i18n.language);
 
   const actions = (
     <>
@@ -91,8 +67,8 @@ export function RemovalRequestDialog({ request, onAnswer }: RemovalRequestDialog
     >
       <div className="flex flex-col gap-4 text-sm text-m3-on-surface">
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-2xl bg-m3-surface-variant/60 px-4 py-3">
-          {rows.map(([label, value]) => (
-            <div key={label} className="contents">
+          {rows.map(([key, label, value]) => (
+            <div key={key} className="contents">
               <dt className="text-m3-on-surface-variant">{label}</dt>
               <dd className="font-medium break-words">{value}</dd>
             </div>

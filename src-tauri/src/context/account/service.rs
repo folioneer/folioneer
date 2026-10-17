@@ -588,6 +588,70 @@ impl AccountService {
         note: Option<String>,
     ) -> Result<Transaction, AccountError> {
         info!(target: BACKEND, account_id = %account_id, tx_id = %tx_id, "correct_transaction");
+        let (mut account, tx) = self
+            .corrected(
+                account_id,
+                tx_id,
+                date,
+                quantity,
+                unit_price,
+                exchange_rate,
+                fees,
+                total_amount,
+                note,
+            )
+            .await?;
+        save_account(&*self.account_repo, &mut account).await?;
+        self.emit_transaction_updated();
+        Ok(tx)
+    }
+
+    /// The transaction as `correct_transaction` would make it, with its refusals, and
+    /// nothing written: the corrected account is dropped (AGT-087).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn preview_correction(
+        &self,
+        account_id: &str,
+        tx_id: &str,
+        date: String,
+        quantity: i64,
+        unit_price: i64,
+        exchange_rate: i64,
+        fees: i64,
+        total_amount: Option<i64>,
+        note: Option<String>,
+    ) -> Result<Transaction, AccountError> {
+        let (_, tx) = self
+            .corrected(
+                account_id,
+                tx_id,
+                date,
+                quantity,
+                unit_price,
+                exchange_rate,
+                fees,
+                total_amount,
+                note,
+            )
+            .await?;
+        Ok(tx)
+    }
+
+    /// The account with the transaction corrected in memory, and the transaction as
+    /// corrected: what `correct_transaction` saves and `preview_correction` drops.
+    #[allow(clippy::too_many_arguments)]
+    async fn corrected(
+        &self,
+        account_id: &str,
+        tx_id: &str,
+        date: String,
+        quantity: i64,
+        unit_price: i64,
+        exchange_rate: i64,
+        fees: i64,
+        total_amount: Option<i64>,
+        note: Option<String>,
+    ) -> Result<(Account, Transaction), AccountError> {
         let mut account = load_account(&*self.account_repo, account_id).await?;
         let tx = account
             .correct_transaction(
@@ -602,9 +666,7 @@ impl AccountService {
             )
             .map_err(to_holding_tx_error)?
             .clone();
-        save_account(&*self.account_repo, &mut account).await?;
-        self.emit_transaction_updated();
-        Ok(tx)
+        Ok((account, tx))
     }
 
     /// Deletes a transaction and recalculates (or removes) the associated holding (TRX-034).
@@ -1806,6 +1868,20 @@ pub trait AccountServiceContract: Send + Sync {
         total_amount: Option<i64>,
         note: Option<String>,
     ) -> StdResult<Transaction, AccountError>;
+    /// The transaction as `correct_transaction` would make it, nothing written (AGT-087).
+    #[allow(clippy::too_many_arguments)]
+    async fn preview_correction(
+        &self,
+        account_id: &str,
+        tx_id: &str,
+        date: String,
+        quantity: i64,
+        unit_price: i64,
+        exchange_rate: i64,
+        fees: i64,
+        total_amount: Option<i64>,
+        note: Option<String>,
+    ) -> StdResult<Transaction, AccountError>;
     /// Deletes a transaction and recalculates (or removes) the associated holding (TRX-034).
     async fn cancel_transaction(
         &self,
@@ -2139,6 +2215,33 @@ impl AccountServiceContract for AccountService {
         note: Option<String>,
     ) -> StdResult<Transaction, AccountError> {
         AccountService::correct_transaction(
+            self,
+            account_id,
+            tx_id,
+            date,
+            quantity,
+            unit_price,
+            exchange_rate,
+            fees,
+            total_amount,
+            note,
+        )
+        .await
+    }
+
+    async fn preview_correction(
+        &self,
+        account_id: &str,
+        tx_id: &str,
+        date: String,
+        quantity: i64,
+        unit_price: i64,
+        exchange_rate: i64,
+        fees: i64,
+        total_amount: Option<i64>,
+        note: Option<String>,
+    ) -> StdResult<Transaction, AccountError> {
+        AccountService::preview_correction(
             self,
             account_id,
             tx_id,

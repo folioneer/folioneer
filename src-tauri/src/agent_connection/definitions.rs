@@ -279,6 +279,30 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "additionalProperties": false
             }),
         },
+        ToolDefinition {
+            name: "request_change",
+            title: "Ask to change a transaction you typed",
+            only_reads: false,
+            description: "Ask the owner to change a transaction the owner typed: give its id, as list_transactions gives it, and what changes; the rest stays. Every type takes date and note; a purchase or a sale quantity, price or total (not both), fees and rate; an opening balance quantity and total (its total cost); a deposit or a withdrawal amount; a dividend amount (in the asset's currency) and rate; a split new and old, its ratio; free shares, a management fee or interest quantity. A change the window's correction would refuse is refused before asking. The owner is shown it as it is and as it would become, and answers it alone; the call waits for that answer. Answered changed, with the transaction as it now stands, or refused with ChangeRefused, which gives nothing else. A transaction an agent recorded is refused: a session corrects its own with correct_recording.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "transaction": { "type": "string", "description": "The transaction's id, as list_transactions gives it." },
+                    "date": { "type": "string", "description": "The new date, YYYY-MM-DD." },
+                    "quantity": { "type": ["string", "number"], "description": "The new quantity." },
+                    "price": { "type": ["string", "number"], "description": "The new unit price, in the asset's currency." },
+                    "total": { "type": ["string", "number"], "description": "The new all-in total, in the account's currency; an opening balance's total cost." },
+                    "fees": { "type": ["string", "number"], "description": "The new fees." },
+                    "rate": { "type": ["string", "number"], "description": "The new exchange rate." },
+                    "amount": { "type": ["string", "number"], "description": "The new amount of a deposit, a withdrawal or a dividend." },
+                    "new": { "type": ["string", "integer"], "description": "A split's shares after, for old shares before." },
+                    "old": { "type": ["string", "integer"], "description": "A split's shares before." },
+                    "note": { "type": "string", "description": "The new note." }
+                },
+                "required": ["transaction"],
+                "additionalProperties": false
+            }),
+        },
     ]
 }
 

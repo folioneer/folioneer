@@ -8,7 +8,8 @@ use serde::Serialize;
 use specta::Type;
 use tokio::sync::{oneshot, Notify};
 
-use crate::context::account::TransactionType;
+use crate::context::account::{Transaction, TransactionType};
+use crate::use_cases::holding_transaction::CorrectionFields;
 
 /// An agent client waiting for the owner's answer (AGT-030).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
@@ -67,7 +68,8 @@ pub struct LastRecording {
     pub date: String,
 }
 
-/// A transaction the owner typed, as the owner is shown it before removing it (AGT-081).
+/// A transaction the owner typed, as the owner is shown it before removing or changing it
+/// (AGT-081, AGT-088).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct TransactionShown {
     /// The transaction's id.
@@ -88,6 +90,56 @@ pub struct TransactionShown {
     pub quantity: i64,
     /// Its amount in the account's currency, in micro-units.
     pub amount: i64,
+    /// Its unit price, in micro-units.
+    pub unit_price: i64,
+    /// Its fees, in micro-units.
+    pub fees: i64,
+    /// Its exchange rate, in micro-units.
+    pub exchange_rate: i64,
+    /// Its note.
+    pub note: Option<String>,
+}
+
+/// A value of a transaction the owner is shown, as a change request names what it moves
+/// (AGT-088).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ShownValue {
+    /// Its date.
+    Date,
+    /// Its quantity.
+    Quantity,
+    /// Its amount.
+    Amount,
+    /// Its unit price.
+    UnitPrice,
+    /// Its fees.
+    Fees,
+    /// Its exchange rate.
+    ExchangeRate,
+    /// Its note.
+    Note,
+}
+
+impl TransactionShown {
+    /// AGT-088 — the values `becomes` holds that differ from these.
+    pub fn moved_to(&self, becomes: &TransactionShown) -> Vec<ShownValue> {
+        [
+            (ShownValue::Date, self.date != becomes.date),
+            (ShownValue::Quantity, self.quantity != becomes.quantity),
+            (ShownValue::Amount, self.amount != becomes.amount),
+            (ShownValue::UnitPrice, self.unit_price != becomes.unit_price),
+            (ShownValue::Fees, self.fees != becomes.fees),
+            (
+                ShownValue::ExchangeRate,
+                self.exchange_rate != becomes.exchange_rate,
+            ),
+            (ShownValue::Note, self.note != becomes.note),
+        ]
+        .into_iter()
+        .filter_map(|(value, moves)| moves.then_some(value))
+        .collect()
+    }
 }
 
 /// An agent asking the owner to remove a transaction the owner typed (AGT-080).
@@ -121,20 +173,66 @@ pub enum RemovalAnswer {
     },
 }
 
-/// A removal request waiting for the owner's answer, with the call that waits on it: whoever
-/// takes it to perform the owner's answer tells the agent what became of it.
-pub struct WaitingRemoval {
-    /// The request.
-    pub request: RemovalRequest,
-    answer: oneshot::Sender<RemovalAnswer>,
+/// An agent asking the owner to change a transaction the owner typed (AGT-087).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct ChangeRequest {
+    /// Identifies the request in the owner's answer; removal and change requests share one
+    /// order (AGT-088).
+    pub id: u32,
+    /// The session that asks.
+    pub session: u32,
+    /// The name of the agent that asks.
+    pub client: String,
+    /// When it asked, as an RFC 3339 timestamp in this computer's time.
+    pub asked_at: String,
+    /// The transaction, as it stood when the agent asked.
+    pub transaction: TransactionShown,
+    /// The transaction as the change would make it.
+    pub becomes: TransactionShown,
+    /// The values the change moves, in the order they are shown (AGT-088).
+    pub moved: Vec<ShownValue>,
 }
 
-impl WaitingRemoval {
+/// What became of a change request, as the agent that asked is told (AGT-087).
+#[derive(Debug, Clone)]
+pub enum ChangeAnswer {
+    /// The owner changed the transaction: as it now stands.
+    Changed(Box<Transaction>),
+    /// The owner refused, or the session ended before an answer.
+    Refused,
+    /// The owner said yes and the correction refused: its code and reason.
+    NotChanged {
+        /// The correction's code.
+        code: String,
+        /// The correction's reason.
+        message: String,
+    },
+}
+
+/// A request waiting for the owner's answer, with what performing it needs and the call that
+/// waits on it: whoever takes it to perform the owner's answer tells the agent what became
+/// of it.
+pub struct Waiting<R, A, H = ()> {
+    /// The request.
+    pub request: R,
+    /// What performing the owner's yes needs beyond what the window is shown.
+    pub held: H,
+    answer: oneshot::Sender<A>,
+}
+
+impl<R, A, H> Waiting<R, A, H> {
     /// Tells the agent that asked what became of its request; it may be gone.
-    pub fn tell(self, answer: RemovalAnswer) {
+    pub fn tell(self, answer: A) {
         let _ = self.answer.send(answer);
     }
 }
+
+/// A removal request waiting for the owner's answer (AGT-080).
+pub type WaitingRemoval = Waiting<RemovalRequest, RemovalAnswer>;
+
+/// A change request waiting for the owner's answer, with what its correction is given
+/// (AGT-087).
+pub type WaitingChange = Waiting<ChangeRequest, ChangeAnswer, CorrectionFields>;
 
 /// What a session did, shared by the connection that serves it and by what the window is
 /// told of it.
@@ -264,6 +362,7 @@ struct State {
     pending: Vec<Pending>,
     open: Vec<Open>,
     removals: Vec<WaitingRemoval>,
+    changes: Vec<WaitingChange>,
 }
 
 /// The requests waiting and the sessions open. `changed` is called after every change, so
@@ -295,25 +394,40 @@ impl Drop for Withdrawal<'_> {
     }
 }
 
-/// Withdraws a removal request whose call went away before the owner answered.
-struct RemovalWithdrawal<'a> {
+/// Withdraws a removal or change request whose call went away before the owner answered.
+struct RequestWithdrawal<'a> {
     connections: &'a AgentConnections,
     request_id: u32,
+    /// Removes the request from those waiting; `true` when it was there.
+    withdraw: fn(&mut State, u32) -> bool,
 }
 
-impl Drop for RemovalWithdrawal<'_> {
+impl Drop for RequestWithdrawal<'_> {
     fn drop(&mut self) {
-        let withdrawn = {
-            let mut state = self.connections.state();
-            let before = state.removals.len();
-            state
-                .removals
-                .retain(|pending| pending.request.id != self.request_id);
-            state.removals.len() != before
-        };
+        let withdrawn = (self.withdraw)(&mut self.connections.state(), self.request_id);
         if withdrawn {
             (self.connections.changed)();
         }
+    }
+}
+
+impl State {
+    fn withdraw_removal(&mut self, request_id: u32) -> bool {
+        let before = self.removals.len();
+        self.removals
+            .retain(|pending| pending.request.id != request_id);
+        self.removals.len() != before
+    }
+
+    fn withdraw_change(&mut self, request_id: u32) -> bool {
+        let before = self.changes.len();
+        self.changes
+            .retain(|pending| pending.request.id != request_id);
+        self.changes.len() != before
+    }
+
+    fn is_open(&self, session_id: u32) -> bool {
+        self.open.iter().any(|open| open.session.id == session_id)
     }
 }
 
@@ -458,10 +572,13 @@ impl AgentConnections {
                 .iter()
                 .position(|open| open.session.id == session_id);
             let ended = position.map(|position| state.open.remove(position));
-            // AGT-082 — its removal requests are withdrawn: their calls are refused.
+            // AGT-082 — its removal and change requests are withdrawn: their calls are refused.
             if ended.is_some() {
                 state
                     .removals
+                    .retain(|pending| pending.request.session != session_id);
+                state
+                    .changes
                     .retain(|pending| pending.request.session != session_id);
             }
             ended
@@ -478,17 +595,17 @@ impl AgentConnections {
 
     /// AGT-035 — stops admitting agents, refuses every request and ends every session.
     pub fn end_all(&self) {
-        let (pending, open, removals) = {
+        let (pending, open, removals, changes) = {
             let mut state = self.state();
             state.admitting = false;
-            let removals = std::mem::take(&mut state.removals);
             (
                 std::mem::take(&mut state.pending),
                 std::mem::take(&mut state.open),
-                removals,
+                std::mem::take(&mut state.removals),
+                std::mem::take(&mut state.changes),
             )
         };
-        if pending.is_empty() && open.is_empty() && removals.is_empty() {
+        if pending.is_empty() && open.is_empty() && removals.is_empty() && changes.is_empty() {
             return;
         }
         for pending in pending {
@@ -497,8 +614,9 @@ impl AgentConnections {
         for open in open {
             open.ended.notify_one();
         }
-        // AGT-082 — the removal requests' calls are refused as their answers drop.
+        // AGT-082 — the removal and change requests' calls are refused as their answers drop.
         drop(removals);
+        drop(changes);
         (self.changed)();
     }
 
@@ -513,11 +631,7 @@ impl AgentConnections {
         let (answer, answered) = oneshot::channel();
         let request_id = {
             let mut state = self.state();
-            if !state
-                .open
-                .iter()
-                .any(|open| open.session.id == granted.session_id)
-            {
+            if !state.is_open(granted.session_id) {
                 return RemovalAnswer::Refused;
             }
             state.last_id = state.last_id.wrapping_add(1);
@@ -528,15 +642,87 @@ impl AgentConnections {
                 asked_at: chrono::Local::now().to_rfc3339(),
                 transaction: shown,
             };
-            state.removals.push(WaitingRemoval { request, answer });
+            state.removals.push(WaitingRemoval {
+                request,
+                held: (),
+                answer,
+            });
             state.last_id
         };
         (self.changed)();
-        let _withdrawal = RemovalWithdrawal {
+        let _withdrawal = RequestWithdrawal {
             connections: self,
             request_id,
+            withdraw: State::withdraw_removal,
         };
         answered.await.unwrap_or(RemovalAnswer::Refused)
+    }
+
+    /// AGT-087 — the session `granted` asks the owner to change the transaction `shown` into
+    /// `becomes`, and waits for the answer: `Refused` when the session is no longer open, or
+    /// ends before an answer. `fields` is what the correction is given on a yes. A caller
+    /// that stops waiting withdraws its request.
+    pub async fn ask_change(
+        &self,
+        granted: &Granted,
+        shown: TransactionShown,
+        becomes: TransactionShown,
+        fields: CorrectionFields,
+    ) -> ChangeAnswer {
+        let (answer, answered) = oneshot::channel();
+        let request_id = {
+            let mut state = self.state();
+            if !state.is_open(granted.session_id) {
+                return ChangeAnswer::Refused;
+            }
+            state.last_id = state.last_id.wrapping_add(1);
+            let request = ChangeRequest {
+                id: state.last_id,
+                session: granted.session_id,
+                client: granted.client.clone(),
+                asked_at: chrono::Local::now().to_rfc3339(),
+                moved: shown.moved_to(&becomes),
+                transaction: shown,
+                becomes,
+            };
+            state.changes.push(WaitingChange {
+                request,
+                held: fields,
+                answer,
+            });
+            state.last_id
+        };
+        (self.changed)();
+        let _withdrawal = RequestWithdrawal {
+            connections: self,
+            request_id,
+            withdraw: State::withdraw_change,
+        };
+        answered.await.unwrap_or(ChangeAnswer::Refused)
+    }
+
+    /// AGT-088 — takes the change request the owner answered from those waiting; `None`
+    /// when no such request waits. The window is told it is gone.
+    pub fn take_change(&self, request_id: u32) -> Option<WaitingChange> {
+        let taken = {
+            let mut state = self.state();
+            let position = state
+                .changes
+                .iter()
+                .position(|pending| pending.request.id == request_id);
+            position.map(|position| state.changes.remove(position))
+        }?;
+        (self.changed)();
+        Some(taken)
+    }
+
+    /// The change requests waiting, oldest first (AGT-088).
+    pub fn changes(&self) -> Vec<ChangeRequest> {
+        self.state()
+            .changes
+            .iter()
+            .map(|pending| pending.request.clone())
+            .collect()
     }
 
     /// AGT-081 — takes the removal request the owner answered from those waiting; `None`

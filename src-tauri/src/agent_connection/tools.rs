@@ -6,7 +6,7 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use crate::context::account::{
-    AccountError, AccountServiceContract, AgentRecording, TransactionType,
+    AccountError, AccountServiceContract, AgentRecording, Transaction, TransactionType,
 };
 use crate::context::asset::{
     Asset, AssetClass, AssetCreationDefaults, AssetError, AssetKind, AssetServiceContract,
@@ -17,13 +17,14 @@ use crate::core::BACKEND;
 use crate::use_cases::account_details::AccountDetailsUseCase;
 use crate::use_cases::account_summary::AccountSummaryUseCase;
 use crate::use_cases::holding_transaction::{
-    code_of, decimal_to_micro, CashAmount, Correction, DividendAmount, FreeShares,
+    code_of, decimal_to_micro, CashAmount, Change, Correction, DividendAmount, FreeShares,
     HoldingTransactionUseCase, PriceAt, RecordedBy, Recording, StockSplit, Target, Trade,
-    TradeAmount, TransactionsAsked,
+    TradeAmount, TransactionsAsked, TypedTransaction,
 };
 
 use super::connections::{
-    AgentConnections, Granted, LastRecording, RemovalAnswer, TransactionShown, MAX_RECORDINGS,
+    AgentConnections, ChangeAnswer, Granted, LastRecording, RemovalAnswer, TransactionShown,
+    MAX_RECORDINGS,
 };
 use super::{definitions, wire};
 
@@ -148,6 +149,7 @@ impl AgentTools {
             "correct_recording" => self.correct(granted, arguments).await,
             "cancel_recording" => self.cancel(granted, arguments).await,
             "request_removal" => self.request_removal(granted, arguments).await,
+            "request_change" => self.request_change(granted, arguments).await,
             "record_opening_balance" => {
                 let recording = Recording::Open {
                     target: target(arguments)?,
@@ -567,20 +569,7 @@ impl AgentTools {
                 code: refusal.code,
                 message: refusal.message,
             })?;
-        let (asset_name, asset_reference) = typed.asset.map_or((None, None), |asset| {
-            (Some(asset.name), Some(asset.reference))
-        });
-        let shown = TransactionShown {
-            id: typed.transaction.id.clone(),
-            date: typed.transaction.date,
-            account: typed.account_name,
-            currency: typed.currency,
-            kind: typed.transaction.transaction_type,
-            asset_name,
-            asset_reference,
-            quantity: typed.transaction.quantity,
-            amount: typed.transaction.total_amount,
-        };
+        let shown = shown(&typed, &typed.transaction);
         tracing::info!(target: BACKEND, session = granted.session_id, transaction = %typed.transaction.id, "agent asks to remove a transaction the owner typed");
         match self.connections.ask_removal(granted, shown).await {
             RemovalAnswer::Removed => as_json(
@@ -591,6 +580,55 @@ impl AgentTools {
                 message: "the owner did not remove this transaction".to_string(),
             }),
             RemovalAnswer::NotRemoved { code, message } => Err(Refusal { code, message }),
+        }
+    }
+
+    /// AGT-087 — the session asks the owner to change a transaction the owner typed, and
+    /// waits for the answer. What the window's correction would refuse is refused first.
+    async fn request_change(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
+        let transaction_id = text(arguments, "transaction")?;
+        let change = Change {
+            correction: Correction {
+                date: optional_text(arguments, "date")?,
+                quantity: figure(arguments, "quantity")?,
+                price: figure(arguments, "price")?,
+                total: figure(arguments, "total")?,
+                fees: figure(arguments, "fees")?,
+                rate: figure(arguments, "rate")?,
+                note: note(arguments)?,
+            },
+            amount: figure(arguments, "amount")?,
+            new: optional_whole(arguments, "new")?,
+            old: optional_whole(arguments, "old")?,
+        };
+        let asked = self
+            .recorder
+            .ask_change_of_typed(transaction_id, change)
+            .await
+            .map_err(|refusal| {
+                tracing::info!(target: BACKEND, session = granted.session_id, code = %refusal.code, "agent's change refused before asking the owner");
+                Refusal {
+                    code: refusal.code,
+                    message: refusal.message,
+                }
+            })?;
+        let id = asked.typed.transaction.id.clone();
+        let as_it_is = shown(&asked.typed, &asked.typed.transaction);
+        let becomes = shown(&asked.typed, &asked.becomes);
+        tracing::info!(target: BACKEND, session = granted.session_id, transaction = %id, "agent asks to change a transaction the owner typed");
+        match self
+            .connections
+            .ask_change(granted, as_it_is, becomes, asked.fields)
+            .await
+        {
+            ChangeAnswer::Changed(changed) => {
+                as_json(&serde_json::json!({ "status": "changed", "transaction": changed }))
+            }
+            ChangeAnswer::Refused => Err(Refusal {
+                code: "ChangeRefused".to_string(),
+                message: "the owner did not change this transaction".to_string(),
+            }),
+            ChangeAnswer::NotChanged { code, message } => Err(Refusal { code, message }),
         }
     }
 
@@ -710,6 +748,37 @@ fn amount(arguments: &Value, name: &str) -> Result<i64, Refusal> {
         code: "MissingArgument".to_string(),
         message: format!("{name} is missing"),
     })
+}
+
+/// AGT-081 — `transaction`, a state of the transaction the owner typed, with the names `typed`
+/// gives it.
+fn shown(typed: &TypedTransaction, transaction: &Transaction) -> TransactionShown {
+    let (asset_name, asset_reference) = typed.asset.as_ref().map_or((None, None), |asset| {
+        (Some(asset.name.clone()), Some(asset.reference.clone()))
+    });
+    TransactionShown {
+        id: transaction.id.clone(),
+        date: transaction.date.clone(),
+        account: typed.account_name.clone(),
+        currency: typed.currency.clone(),
+        kind: transaction.transaction_type,
+        asset_name,
+        asset_reference,
+        quantity: transaction.quantity,
+        amount: transaction.total_amount,
+        unit_price: transaction.unit_price,
+        fees: transaction.fees,
+        exchange_rate: transaction.exchange_rate,
+        note: transaction.note.clone(),
+    }
+}
+
+/// AGT-087 — a part of a split's ratio when it is given.
+fn optional_whole(arguments: &Value, name: &str) -> Result<Option<i64>, Refusal> {
+    match arguments.get(name) {
+        None | Some(Value::Null) => Ok(None),
+        Some(_) => whole(arguments, name).map(Some),
+    }
 }
 
 /// AGT-063 — a part of a split's ratio: a whole number, as text or as a JSON number. The

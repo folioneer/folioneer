@@ -2325,7 +2325,7 @@ async fn agt_080_a_removal_is_refused_before_asking_or_by_the_deletion() {
     assert_eq!(request.transaction.asset_reference.as_deref(), Some("CW8"));
     assert_eq!(request.transaction.quantity, 10 * M);
     let answered = answer_removal(&bench.connections, &bench.recorder, request.id, true).await;
-    let Err(AnswerRefused::NotRemoved { reason }) = answered else {
+    let Err(AnswerRefused::NotDone { reason }) = answered else {
         panic!("the deletion refused: {answered:?}");
     };
     let refused = asked.await.expect("asked").expect_err("not removed");
@@ -2383,7 +2383,7 @@ async fn agt_080_a_removal_is_refused_before_asking_or_by_the_deletion() {
         .expect("corrected in the journal");
     assert_eq!(
         answer_removal(&bench.connections, &bench.recorder, request.id, true).await,
-        Err(AnswerRefused::NotRemoved {
+        Err(AnswerRefused::NotDone {
             reason: "TransactionChanged".to_string()
         })
     );
@@ -2402,7 +2402,7 @@ async fn agt_080_a_removal_is_refused_before_asking_or_by_the_deletion() {
         .expect("deleted in the journal");
     assert_eq!(
         answer_removal(&bench.connections, &bench.recorder, request.id, true).await,
-        Err(AnswerRefused::NotRemoved {
+        Err(AnswerRefused::NotDone {
             reason: "TransactionNotFound".to_string()
         })
     );
@@ -3185,4 +3185,448 @@ async fn agt_085_a_line_written_in_part_holds_nothing_back() {
         .await
         .expect("the rest");
     assert_eq!(client.heard().await["id"], 5);
+}
+
+/// The owner answers the next change request of `connections`.
+async fn change_waiting(connections: &AgentConnections) -> super::connections::ChangeRequest {
+    for _ in 0..400 {
+        if let Some(request) = connections.changes().into_iter().next() {
+            return request;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    panic!("no change request arrived");
+}
+
+/// The deposit the workbench seeds, as the owner typed it.
+async fn typed_deposit(bench: &Workbench) -> crate::context::account::Transaction {
+    let account = bench.accounts.get_all().await.expect("accounts").remove(0);
+    bench
+        .accounts
+        .get_account_journal(
+            &account.id,
+            &crate::context::account::JournalFilter::default(),
+        )
+        .await
+        .expect("journal")
+        .rows
+        .remove(0)
+        .transaction
+}
+
+// AGT-087 / AGT-088 / AGT-082 — an agent asks to change a transaction the owner typed: the
+// window is shown it as it is and as it would become, a refusal gives the agent nothing and
+// changes nothing, the next ask is asked again, and a yes changes it through the window's
+// correction.
+#[tokio::test]
+async fn agt_087_an_agent_asks_and_the_owner_answers_each_change() {
+    use super::connections::ShownValue;
+    use super::gate::{answer_change, AnswerRefused};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = Arc::new(workbench(data_dir.path()).await);
+    let granted = session(&bench.connections).await;
+    let deposit = typed_deposit(&bench).await;
+    let ask = |granted: super::connections::Granted| {
+        let bench = Arc::clone(&bench);
+        let id = deposit.id.clone();
+        tokio::spawn(async move {
+            bench
+                .tools
+                .call(
+                    &granted,
+                    "request_change",
+                    &json!({ "transaction": id, "amount": "4500", "date": "2026-01-03" }),
+                )
+                .await
+        })
+    };
+
+    // Asked, and shown as it is and as it would become; the call waits.
+    let asked = ask(granted.clone());
+    let request = change_waiting(&bench.connections).await;
+    assert_eq!(request.client, "claude-code");
+    assert_eq!(request.session, granted.session_id);
+    assert_eq!(request.transaction.id, deposit.id);
+    assert_eq!(request.transaction.date, "2026-01-02");
+    assert_eq!(request.transaction.amount, 5_000 * M);
+    assert_eq!(request.becomes.id, deposit.id);
+    assert_eq!(request.becomes.date, "2026-01-03");
+    assert_eq!(request.becomes.amount, 4_500 * M);
+    assert_eq!(request.becomes.account, "PEA");
+    // A deposit holds its amount as its quantity too.
+    assert_eq!(
+        request.moved,
+        vec![ShownValue::Date, ShownValue::Quantity, ShownValue::Amount]
+    );
+    assert!(!asked.is_finished());
+
+    // Refused: the agent is given nothing, and nothing is changed.
+    answer_change(&bench.connections, &bench.recorder, request.id, false)
+        .await
+        .expect("answered");
+    let refused = asked.await.expect("asked").expect_err("refused");
+    assert_eq!(refused.code, "ChangeRefused");
+    assert!(bench.connections.changes().is_empty());
+    let stored = bench
+        .accounts
+        .get_transaction_by_id(&deposit.id)
+        .await
+        .expect("read")
+        .expect("kept");
+    assert_eq!(stored.total_amount, 5_000 * M);
+    assert_eq!(
+        answer_change(&bench.connections, &bench.recorder, request.id, true).await,
+        Err(AnswerRefused::Gone)
+    );
+
+    // Nothing of the refusal is kept: the same change is asked again, and made.
+    let asked = ask(granted.clone());
+    let request = change_waiting(&bench.connections).await;
+    answer_change(&bench.connections, &bench.recorder, request.id, true)
+        .await
+        .expect("changed");
+    let changed = asked.await.expect("asked").expect("changed");
+    assert_eq!(changed["status"], "changed");
+    assert_eq!(changed["transaction"]["id"], json!(deposit.id));
+    let stored = bench
+        .accounts
+        .get_transaction_by_id(&deposit.id)
+        .await
+        .expect("read")
+        .expect("kept");
+    assert_eq!(stored.date, "2026-01-03");
+    assert_eq!(stored.total_amount, 4_500 * M);
+
+    // A transaction an agent recorded is not asked about.
+    let of_the_agent = recorded_id(
+        &bench
+            .tools
+            .call(
+                &granted,
+                "record_deposit",
+                &json!({ "account": "PEA", "amount": 10, "date": "2026-01-04" }),
+            )
+            .await
+            .expect("recorded"),
+    );
+    let refused = bench
+        .tools
+        .call(
+            &granted,
+            "request_change",
+            &json!({ "transaction": of_the_agent, "amount": 11 }),
+        )
+        .await
+        .expect_err("refused");
+    assert_eq!(refused.code, "NotTypedByOwner");
+    assert!(bench.connections.changes().is_empty());
+}
+
+// AGT-087 — what is refused before anything is asked: the arguments, the arguments a type
+// does not take, and what the window's correction refuses, checked with nothing written.
+#[tokio::test]
+async fn agt_087_a_change_is_refused_before_asking() {
+    use crate::use_cases::holding_transaction::{Recording, Target, Trade, TradeAmount};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = Arc::new(workbench(data_dir.path()).await);
+    let granted = session(&bench.connections).await;
+    let deposit = typed_deposit(&bench).await;
+    let target = |date: &str, quantity: i64| Target {
+        account: "PEA".to_string(),
+        asset: "CW8".to_string(),
+        date: Some(date.to_string()),
+        quantity,
+    };
+    let opened = bench
+        .recorder
+        .record_named(
+            Recording::Open {
+                target: target("2026-01-05", 10 * M),
+                total_cost: 4_000 * M,
+            },
+            "2026-10-17",
+        )
+        .await
+        .expect("opened");
+    bench
+        .recorder
+        .record_named(
+            Recording::Sell(Trade {
+                target: target("2026-03-01", 8 * M),
+                amount: TradeAmount::Price(500 * M),
+                fees: 0,
+                rate: M,
+                note: None,
+            }),
+            "2026-10-17",
+        )
+        .await
+        .expect("sold");
+    let opening = opened.transaction.id.clone();
+    for (arguments, code) in [
+        (json!({ "amount": 1 }), "MissingArgument"),
+        (json!({ "transaction": deposit.id }), "MissingArgument"),
+        (
+            json!({ "transaction": "no-such-transaction", "amount": 1 }),
+            "TransactionNotFound",
+        ),
+        (
+            json!({ "transaction": deposit.id, "price": 1 }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "transaction": opening, "price": 1, "total": 2 }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "transaction": opening, "fees": 1 }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "transaction": deposit.id, "amount": "1,5" }),
+            "InvalidFigure",
+        ),
+        (
+            json!({ "transaction": deposit.id, "date": "yesterday" }),
+            "InvalidDate",
+        ),
+        // What would leave the transaction as it stands changes nothing.
+        (
+            json!({ "transaction": deposit.id, "amount": 5000, "date": "2026-01-02" }),
+            "MissingArgument",
+        ),
+        // A split's ratio takes both its parts.
+        (
+            json!({ "transaction": opening, "new": 2 }),
+            "InvalidArguments",
+        ),
+        // The sale of 8 depends on the 10 opened: 5 would oversell it.
+        (
+            json!({ "transaction": opening, "quantity": 5 }),
+            "CascadingOversell",
+        ),
+    ] {
+        let refused = bench
+            .tools
+            .call(&granted, "request_change", &arguments)
+            .await
+            .expect_err("refused");
+        assert_eq!(refused.code, code, "{arguments}");
+    }
+    assert!(bench.connections.changes().is_empty(), "nothing was asked");
+    let stored = bench
+        .accounts
+        .get_transaction_by_id(&opening)
+        .await
+        .expect("read")
+        .expect("kept");
+    assert_eq!(stored.quantity, 10 * M, "nothing was written");
+}
+
+// AGT-087 — a split is changed by its ratio, a purchase's total follows its unit price when
+// its quantity changes, as the window's correction makes them.
+#[tokio::test]
+async fn agt_087_each_type_takes_what_its_correction_takes() {
+    use super::gate::answer_change;
+    use crate::use_cases::holding_transaction::{Recording, Target, Trade, TradeAmount};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = Arc::new(workbench(data_dir.path()).await);
+    let granted = session(&bench.connections).await;
+    let target = |date: &str, quantity: i64| Target {
+        account: "PEA".to_string(),
+        asset: "CW8".to_string(),
+        date: Some(date.to_string()),
+        quantity,
+    };
+    let bought = bench
+        .recorder
+        .record_named(
+            Recording::Buy(Trade {
+                target: target("2026-01-05", 4 * M),
+                amount: TradeAmount::Price(100 * M),
+                fees: 0,
+                rate: M,
+                note: None,
+            }),
+            "2026-10-17",
+        )
+        .await
+        .expect("bought");
+    let split = bench
+        .recorder
+        .record_split(
+            &bought.transaction.account_id,
+            bought.transaction.asset_id.clone(),
+            "2026-02-01".to_string(),
+            2 * M,
+            None,
+        )
+        .await
+        .expect("split");
+    let ask = |arguments: Value| {
+        let bench = Arc::clone(&bench);
+        let granted = granted.clone();
+        tokio::spawn(async move {
+            bench
+                .tools
+                .call(&granted, "request_change", &arguments)
+                .await
+        })
+    };
+
+    let asked = ask(json!({ "transaction": split.id, "new": 3, "old": 1 }));
+    let request = change_waiting(&bench.connections).await;
+    assert_eq!(request.transaction.quantity, 2 * M);
+    assert_eq!(request.becomes.quantity, 3 * M);
+    answer_change(&bench.connections, &bench.recorder, request.id, false)
+        .await
+        .expect("answered");
+    asked.await.expect("asked").expect_err("refused");
+
+    let refused = bench
+        .tools
+        .call(
+            &granted,
+            "request_change",
+            &json!({ "transaction": split.id, "new": 3 }),
+        )
+        .await
+        .expect_err("refused");
+    assert_eq!(refused.code, "InvalidArguments");
+
+    let asked = ask(json!({ "transaction": bought.transaction.id, "quantity": 5 }));
+    let request = change_waiting(&bench.connections).await;
+    assert_eq!(request.transaction.amount, 400 * M);
+    assert_eq!(request.becomes.quantity, 5 * M);
+    assert_eq!(request.becomes.amount, 500 * M);
+    answer_change(&bench.connections, &bench.recorder, request.id, true)
+        .await
+        .expect("changed");
+    asked.await.expect("asked").expect("changed");
+}
+
+// AGT-088 — a transaction that changed while its request waited is not changed; a session
+// that ends withdraws its request (AGT-082); removal and change requests share one order.
+#[tokio::test]
+async fn agt_088_a_change_answers_what_was_shown_and_requests_share_one_order() {
+    use super::gate::{answer_change, AnswerRefused};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = Arc::new(workbench(data_dir.path()).await);
+    let granted = session(&bench.connections).await;
+    let deposit = typed_deposit(&bench).await;
+    let ask = |granted: super::connections::Granted| {
+        let bench = Arc::clone(&bench);
+        let id = deposit.id.clone();
+        tokio::spawn(async move {
+            bench
+                .tools
+                .call(
+                    &granted,
+                    "request_change",
+                    &json!({ "transaction": id, "amount": 4000 }),
+                )
+                .await
+        })
+    };
+
+    let asked = ask(granted.clone());
+    let request = change_waiting(&bench.connections).await;
+    bench
+        .recorder
+        .correct_transaction(
+            &deposit.account_id,
+            &deposit.id,
+            deposit.date.clone(),
+            4_800 * M,
+            deposit.unit_price,
+            deposit.exchange_rate,
+            deposit.fees,
+            None,
+            None,
+        )
+        .await
+        .expect("corrected in the journal");
+    assert_eq!(
+        answer_change(&bench.connections, &bench.recorder, request.id, true).await,
+        Err(AnswerRefused::NotDone {
+            reason: "TransactionChanged".to_string()
+        })
+    );
+    assert_eq!(
+        asked.await.expect("asked").expect_err("changed").code,
+        "TransactionChanged"
+    );
+    let stored = bench
+        .accounts
+        .get_transaction_by_id(&deposit.id)
+        .await
+        .expect("read")
+        .expect("kept");
+    assert_eq!(stored.total_amount, 4_800 * M);
+
+    // A note the owner typed meanwhile is not overwritten either: the transaction is
+    // checked in full, its note, fees, rate and price included.
+    let asked = ask(granted.clone());
+    let request = change_waiting(&bench.connections).await;
+    bench
+        .recorder
+        .correct_transaction(
+            &deposit.account_id,
+            &deposit.id,
+            deposit.date.clone(),
+            4_800 * M,
+            deposit.unit_price,
+            deposit.exchange_rate,
+            deposit.fees,
+            None,
+            Some("typed meanwhile".to_string()),
+        )
+        .await
+        .expect("noted in the journal");
+    assert_eq!(
+        answer_change(&bench.connections, &bench.recorder, request.id, true).await,
+        Err(AnswerRefused::NotDone {
+            reason: "TransactionChanged".to_string()
+        })
+    );
+    assert_eq!(
+        asked.await.expect("asked").expect_err("changed").code,
+        "TransactionChanged"
+    );
+
+    // One order: a removal asked by another session after this change comes after it.
+    let asked = ask(granted.clone());
+    let change = change_waiting(&bench.connections).await;
+    let other = session(&bench.connections).await;
+    let tools = Arc::clone(&bench);
+    let id = deposit.id.clone();
+    let removal_asked = tokio::spawn(async move {
+        tools
+            .tools
+            .call(&other, "request_removal", &json!({ "transaction": id }))
+            .await
+    });
+    let removal = removal_waiting(&bench.connections).await;
+    assert!(change.id < removal.id);
+
+    // The session ends: its change request is withdrawn and its call refused.
+    assert!(bench.connections.end(granted.session_id));
+    assert_eq!(
+        asked.await.expect("asked").expect_err("withdrawn").code,
+        "ChangeRefused"
+    );
+    assert!(bench.connections.changes().is_empty());
+    bench.connections.end_all();
+    assert_eq!(
+        removal_asked
+            .await
+            .expect("asked")
+            .expect_err("withdrawn")
+            .code,
+        "RemovalRefused"
+    );
 }

@@ -84,6 +84,7 @@ fn agt_010_the_program_started_with_mcp_lists_its_tools() {
             "correct_recording",
             "cancel_recording",
             "request_removal",
+            "request_change",
         ]
     );
     for tool in tools {
@@ -127,6 +128,7 @@ fn agt_013_every_tool_listed_says_whether_it_only_reads() {
             || name == "correct_recording"
             || name == "cancel_recording"
             || name == "request_removal"
+            || name == "request_change"
             || name == "add_asset";
         assert_eq!(only_reads, !records, "{name}");
         if only_reads {

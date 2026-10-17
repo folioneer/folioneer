@@ -336,6 +336,7 @@ mod tests {
                 "correct_recording",
                 "cancel_recording",
                 "request_removal",
+                "request_change",
             ]
         );
         assert_eq!(
