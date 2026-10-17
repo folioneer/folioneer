@@ -11,6 +11,6 @@ Read on 2026-10-13, against what 0.10.0 decided for an asset an agent adds (TODO
 **Design:** none
 **Open questions:**
 
-- [ ] Asked in the window for each account, refused by default (after TODO-061, with its mock-up), or covered by the session's grant and named in the connection dialog, as adding an asset is? (Recommended: covered by the grant — an empty account does no more than an unused asset.)
-- [ ] What the window says of it: a count in the session dialog, as for assets, or a mark on the account (DEBT-119 asks the same of an asset)?
-- [ ] Which optional fields on the first day: the bank and the update frequency, and the management fees' switch or not?
+- [x] Asked in the window for each account, refused by default (after TODO-061, with its mock-up), or covered by the session's grant and named in the connection dialog, as adding an asset is? (Recommended: covered by the grant — an empty account does no more than an unused asset.) — Covered by the session's grant and named in the connection dialog. (owner, 2026-10-17)
+- [x] What the window says of it: a count in the session dialog, as for assets, or a mark on the account (DEBT-119 asks the same of an asset)? — Both: a count in the session dialog and a discreet, lasting "created by an agent" mark on the account. (owner, 2026-10-17)
+- [x] Which optional fields on the first day: the bank and the update frequency, and the management fees' switch or not? — The bank, the update frequency and the wrapper (gh282) once it exists; the management fees later. (owner, 2026-10-17)

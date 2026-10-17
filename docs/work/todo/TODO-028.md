@@ -9,6 +9,6 @@ Proposal: a report by calendar year — dividends, interest, and management fees
 **Design:** none
 **Open questions:**
 
-- [ ] Are management fees part of this report, or a separate one? (Recommended: part of it — income without the cost of holding tells half the story, and the data is already there.)
-- [ ] Where does it live — a tab of the global performance view, or its own navigation entry?
-- [ ] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now?
+- [x] Are management fees part of this report, or a separate one? (Recommended: part of it — income without the cost of holding tells half the story, and the data is already there.) — Part of it, beside the income. (owner, 2026-10-17)
+- [x] Where does it live — a tab of the global performance view, or its own navigation entry? — Its own navigation entry. (owner, 2026-10-17)
+- [x] Do you want an export of the yearly figures (CSV), or is reading them on screen enough for now? — A CSV export. (owner, 2026-10-17)
