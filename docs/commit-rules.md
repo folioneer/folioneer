@@ -283,10 +283,8 @@ The script will:
 3. Calculate version bump using SemVer rules
 4. Update version files (`package.json`, `Cargo.toml`, `tauri.conf.json`)
 5. Generate CHANGELOG entry
-6. Create commit and git tag
-   - **Note:** If git hooks are configured (`git config core.hooksPath .githooks`), the pre-commit hook will run all quality checks (tests, linting, formatting) before allowing the release commit. This ensures releases only happen from clean code.
-
-See [Contributing Guidelines](../CONTRIBUTING.md) for git hook setup.
+6. Commit them on `chore/release-vX.Y.Z` and open its pull request: `main` takes a commit only through a pull request whose checks passed
+7. Wait for its checks, have GitHub merge it, then tag the commit `main` holds — the tag starts the release workflow
 
 **Example flow:**
 
@@ -298,14 +296,15 @@ See [Contributing Guidelines](../CONTRIBUTING.md) for git hook setup.
 
 ```bash
 # 1. Update version in files following SemVer
-# 2. Create commit
+# 2. Commit on a branch and open its pull request
+git switch -c chore/release-v1.1.0
 git commit -m "chore: release v1.1.0"
+git push -u origin chore/release-v1.1.0 && gh pr create --fill
 
-# 3. Tag the commit
-git tag -a v1.1.0 -m "Version 1.1.0"
-
-# 4. Push
-git push && git push --tags
+# 3. Once its checks are green and it is merged, tag what main holds
+git switch main && git pull --ff-only
+git tag -a v1.1.0 -m "Version 1.1.0" main
+git push origin refs/tags/v1.1.0
 ```
 
 ## Related Documentation
