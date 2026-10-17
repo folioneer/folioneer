@@ -210,7 +210,7 @@ def rebase_folding_fixups(target: str) -> subprocess.CompletedProcess[str]:
 
 def remote_branch_gone(branch: str) -> bool:
     """True when origin holds no branch of that name (`git ls-remote` answered and listed none)."""
-    listed = git("ls-remote", "--heads", "origin", branch, check=False)
+    listed = git("ls-remote", "origin", f"refs/heads/{branch}", check=False)
     return listed.returncode == 0 and not listed.stdout.strip()
 
 

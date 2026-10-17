@@ -209,6 +209,10 @@ class FoldingFixups(unittest.TestCase):
         self.run_git("push", "--quiet", "--delete", "origin", "work")
         self.assertTrue(merge.remote_branch_gone("work"))
 
+        # An origin that does not answer says nothing of the branch: not gone.
+        self.run_git("remote", "set-url", "origin", str(Path(remote.name) / "missing"))
+        self.assertFalse(merge.remote_branch_gone("work"))
+
 
 class Worktrees(unittest.TestCase):
     LISTING = (
