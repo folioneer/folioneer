@@ -27,6 +27,7 @@ export function SidebarVersion({ appVersion, distributionChannel, isOpen }: Side
   return (
     <div className="px-3 py-4 flex flex-col items-center justify-center min-h-12">
       <span
+        id="sidebar-version"
         className={`font-mono text-[14px] tracking-tight transition-opacity duration-300 ${tone}`}
       >
         {version}
