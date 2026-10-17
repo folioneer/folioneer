@@ -89,6 +89,8 @@ Append-only; supersede in place if the underlying ecosystem changes.
 
 **Mitigation** — (1) When CI is green on the same commit, first run one E2E spec from a known-green release tag in a `git worktree` on the same machine; if it fails the same way, the environment is the variable (here: the local WebKitGTK/driver stack losing IPC responses under load) and the bisect is pointless. (2) Kill stale drivers with `pkill -x <name>`, never `pkill -f <pattern>` — the pattern matches the shell running the command and kills it (exit 144), silently skipping everything after it. (3) Gate the merge on the CI E2E run (the suite runs on the main push) and fix forward if it reddens.
 
+**Since** — on 2026-10-17, with WebKitGTK 2.52.6, `just e2e` ran the whole suite green three times in a row on the same machine (23 spec files, about two minutes each); what fixed it was not looked for. The mitigation stands for when it comes back.
+
 ## L-012 — Every gating workflow needs a manual trigger, because GitHub silently drops pull-request events
 
 **First observed**: 2026-09-13 (a pull request opened during a GitHub 502 window got no runs at all; the next one lost the events for two consecutive pushes and a close/reopen while the status page read "all systems operational")

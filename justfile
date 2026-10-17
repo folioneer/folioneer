@@ -44,8 +44,12 @@ coverage-be: (_used "coverage-be")
     mkdir -p coverage/backend && cd src-tauri && cargo llvm-cov --lib --tests --lcov --output-path ../coverage/backend/lcov.info --ignore-filename-regex '(^|/)build\.rs$|dev/generate_bindings\.rs$|/src-tauri/tests/'
     python3 scripts/coverage-strip-tests.py coverage/backend/lcov.info
 
-# Run unit tests only (excludes E2E, which runs in CI, and coverage; see coverage-fe/coverage-be)
+# Run unit tests only (excludes E2E, which is `just e2e`, and coverage; see coverage-fe/coverage-be)
 test-unit: test test-rust
+
+# Run the E2E suite under xvfb, as CI does; pass spec files to run some (just e2e e2e/split/split.test.ts)
+e2e *SPECS:
+    bash scripts/e2e.sh "$@"
 
 # Check the coverage reports against the floors in coverage-gates.json (run coverage-fe / coverage-be first); pass --frontend or --backend for one layer
 coverage-gate *ARGS:

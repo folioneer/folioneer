@@ -89,6 +89,8 @@ Written to read the same in every repository that works this way.
   Never: runs a check.
 - `scripts/check.py` — the quality checks of each layer, fast or full. Never: fixes
   what it reports unless asked to format.
+- `scripts/e2e.sh` — the E2E suite under xvfb, or the specs given, for CI and `just e2e`.
+  Never: runs in the harness.
 - `scripts/harness.sh` — the merge gate of CI, locally, scoped to what moved. Never: a
   gate CI does not have.
 - `scripts/coverage-gate.py` — fails when coverage of the code that carries logic
