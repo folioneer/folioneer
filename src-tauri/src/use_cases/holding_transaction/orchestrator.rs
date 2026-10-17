@@ -243,6 +243,18 @@ pub struct HoldingTransactionUseCase {
     pub(super) asset_service: Arc<dyn AssetServiceContract>,
 }
 
+/// Why an asset a dividend or free shares name is refused (DIV-011, FSD-011).
+enum HeldAsset {
+    /// The account is not found, or the portfolio cannot be read.
+    Refused(AccountError),
+    /// No asset has this id.
+    NotFound,
+    /// The asset is the cash line.
+    Cash,
+    /// The account does not hold it today.
+    NotHeld,
+}
+
 impl HoldingTransactionUseCase {
     /// Creates a new HoldingTransactionUseCase.
     pub fn new(
@@ -793,37 +805,7 @@ impl HoldingTransactionUseCase {
         exchange_rate: i64,
         note: Option<String>,
     ) -> Result<Transaction, DividendError> {
-        // DIV-011 — account must exist (checked before any asset work).
-        let account = self
-            .account_service
-            .get_by_id(account_id)
-            .await?
-            .ok_or_else(|| AccountError::AccountNotFound {
-                account_id: account_id.to_string(),
-            })?;
-
-        // DIV-011 — asset must exist and must not be a Cash Asset.
-        let asset = self
-            .asset_service
-            .get_asset_by_id(&asset_id)
-            .await
-            .map_err(|e| {
-                tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "record_dividend: get_asset_by_id failed");
-                AccountError::DatabaseError
-            })?;
-        match asset {
-            None => return Err(DividendTask::AssetNotFound.into()),
-            Some(a) if a.class == AssetClass::Cash => {
-                return Err(DividendTask::DividendOnCashAsset.into())
-            }
-            Some(_) => {}
-        }
-
-        // DIV-011 — asset must be currently held (quantity > 0). A repository
-        // failure here is surfaced as `DatabaseError` by the service layer.
-        if !self.holds(account_id, &asset_id).await? {
-            return Err(DividendTask::AssetNotHeld.into());
-        }
+        let account = self.ensure_payable(account_id, &asset_id).await?;
 
         // CSH-010 — ensure the system Cash Asset for the account's currency exists.
         ensure_cash_asset(&self.asset_service, &account.currency)
@@ -862,35 +844,7 @@ impl HoldingTransactionUseCase {
         quantity: i64,
         note: Option<String>,
     ) -> Result<Transaction, FreeSharesError> {
-        // FSD-011 — account must exist (checked before any asset work).
-        self.account_service
-            .get_by_id(account_id)
-            .await?
-            .ok_or_else(|| AccountError::AccountNotFound {
-                account_id: account_id.to_string(),
-            })?;
-
-        // FSD-011 — asset must exist and must not be a Cash Asset.
-        let asset = self
-            .asset_service
-            .get_asset_by_id(&asset_id)
-            .await
-            .map_err(|e| {
-                tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "record_free_shares: get_asset_by_id failed");
-                AccountError::DatabaseError
-            })?;
-        match asset {
-            None => return Err(FreeSharesTask::AssetNotFound.into()),
-            Some(a) if a.class == AssetClass::Cash => {
-                return Err(FreeSharesTask::FreeSharesOnCashAsset.into())
-            }
-            Some(_) => {}
-        }
-
-        // FSD-011 — asset must be currently held (quantity > 0).
-        if !self.holds(account_id, &asset_id).await? {
-            return Err(FreeSharesTask::AssetNotHeld.into());
-        }
+        self.ensure_distributing(account_id, &asset_id).await?;
 
         // Delegate to the account BC; its `AccountError` surfaces on the
         // free-shares wire as `FreeSharesError::Account`.
@@ -1096,6 +1050,138 @@ impl HoldingTransactionUseCase {
             )
             .await
             .map_err(InterestError::Account)
+    }
+
+    /// DIV-011 — the account exists, the paying asset exists, is not the cash line and is
+    /// held today. The account is returned for its currency.
+    async fn ensure_payable(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+    ) -> Result<crate::context::account::Account, DividendError> {
+        self.ensure_held_asset(account_id, asset_id)
+            .await
+            .map_err(|refused| match refused {
+                HeldAsset::Refused(error) => error.into(),
+                HeldAsset::NotFound => DividendTask::AssetNotFound.into(),
+                HeldAsset::Cash => DividendTask::DividendOnCashAsset.into(),
+                HeldAsset::NotHeld => DividendTask::AssetNotHeld.into(),
+            })
+    }
+
+    /// FSD-011 — the account exists, the distributing asset exists, is not the cash line and
+    /// is held today.
+    async fn ensure_distributing(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+    ) -> Result<(), FreeSharesError> {
+        self.ensure_held_asset(account_id, asset_id)
+            .await
+            .map(|_| ())
+            .map_err(|refused| match refused {
+                HeldAsset::Refused(error) => error.into(),
+                HeldAsset::NotFound => FreeSharesTask::AssetNotFound.into(),
+                HeldAsset::Cash => FreeSharesTask::FreeSharesOnCashAsset.into(),
+                HeldAsset::NotHeld => FreeSharesTask::AssetNotHeld.into(),
+            })
+    }
+
+    /// DIV-011 / FSD-011 — what a dividend and free shares both check: the account exists,
+    /// the asset exists, is not the cash line and is held today. The account is returned.
+    async fn ensure_held_asset(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+    ) -> Result<crate::context::account::Account, HeldAsset> {
+        let account = self
+            .account_service
+            .get_by_id(account_id)
+            .await
+            .map_err(HeldAsset::Refused)?
+            .ok_or_else(|| {
+                HeldAsset::Refused(AccountError::AccountNotFound {
+                    account_id: account_id.to_string(),
+                })
+            })?;
+        let asset = self
+            .asset_service
+            .get_asset_by_id(asset_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "held asset: get_asset_by_id failed");
+                HeldAsset::Refused(AccountError::DatabaseError)
+            })?;
+        match asset {
+            None => return Err(HeldAsset::NotFound),
+            Some(a) if a.class == AssetClass::Cash => return Err(HeldAsset::Cash),
+            Some(_) => {}
+        }
+        if !self
+            .holds(account_id, asset_id)
+            .await
+            .map_err(HeldAsset::Refused)?
+        {
+            return Err(HeldAsset::NotHeld);
+        }
+        Ok(account)
+    }
+
+    /// AGT-072 — what recording a deposit or a withdrawal would do, nothing written: the
+    /// account must exist, as `ensure_cash_for` requires before seeding the cash line.
+    pub async fn preview_cash(
+        &self,
+        account_id: &str,
+        op: RecordingOp,
+    ) -> Result<RecordingPreview, AccountError> {
+        self.ensure_account(account_id).await?;
+        self.account_service.preview_recording(account_id, op).await
+    }
+
+    /// AGT-072 — what recording a dividend would do, nothing written, with its checks.
+    pub async fn preview_dividend(
+        &self,
+        account_id: &str,
+        asset_id: String,
+        date: String,
+        amount: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+    ) -> Result<RecordingPreview, DividendError> {
+        self.ensure_payable(account_id, &asset_id).await?;
+        let op = RecordingOp::Dividend {
+            asset_id,
+            date,
+            amount,
+            exchange_rate,
+            note,
+        };
+        self.account_service
+            .preview_recording(account_id, op)
+            .await
+            .map_err(DividendError::Account)
+    }
+
+    /// AGT-072 — what recording free shares would do, nothing written, with their checks.
+    pub async fn preview_free_shares(
+        &self,
+        account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity: i64,
+        note: Option<String>,
+    ) -> Result<RecordingPreview, FreeSharesError> {
+        self.ensure_distributing(account_id, &asset_id).await?;
+        let op = RecordingOp::FreeShares {
+            asset_id,
+            date,
+            quantity,
+            note,
+        };
+        self.account_service
+            .preview_recording(account_id, op)
+            .await
+            .map_err(FreeSharesError::Account)
     }
 
     /// SEL-037 — an archived asset is not sold: it is unarchived first (AST-018). An asset

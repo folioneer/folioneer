@@ -7,7 +7,8 @@
 use serde::Serialize;
 
 use crate::context::account::{
-    Account, AccountError, AgentRecording, RecordingPreview, TradeOp, Transaction, TransactionType,
+    Account, AccountError, AgentRecording, RecordingOp, RecordingPreview, TradeOp, Transaction,
+    TransactionType,
 };
 use crate::context::asset::{Asset, AssetClass, AssetError, AssetPrice};
 use crate::core::BACKEND;
@@ -441,6 +442,54 @@ pub struct Previewed {
     pub after: AccountAsOf,
 }
 
+/// A price previewed (AGT-072): as it would be recorded, and the one at its date it would
+/// replace, if any.
+#[derive(Debug, Clone)]
+pub struct PricePreviewed {
+    /// The price as it would be recorded.
+    pub price: RecordedPrice,
+    /// The price already at that date, which it would replace (MKT-103).
+    pub replaced: Option<RecordedPrice>,
+}
+
+/// AGT-050 / AGT-061 — what an agent's correction of a transaction its session recorded gives
+/// the window's correction: refused for a type it does not correct and, for an opening
+/// balance, for a price, fees or a rate; what is given replaces what was recorded.
+fn agent_correction(
+    recorded: &Transaction,
+    correction: Correction,
+) -> Result<CorrectionFields, Refusal> {
+    // AGT-061 — anything else is cancelled and recorded again.
+    if !matches!(
+        recorded.transaction_type,
+        TransactionType::OpeningBalance | TransactionType::Purchase | TransactionType::Sell
+    ) {
+        return Err(Refusal {
+            code: "InvalidArguments".to_string(),
+            message: "a deposit, a withdrawal, a dividend, a split or free shares is not corrected: cancel it and record it again".to_string(),
+        });
+    }
+    // TRX-047 — an opening balance has a quantity, a total cost and a date, nothing else.
+    if recorded.transaction_type == TransactionType::OpeningBalance
+        && (correction.price.is_some() || correction.fees.is_some() || correction.rate.is_some())
+    {
+        return Err(Refusal {
+            code: "InvalidArguments".to_string(),
+            message: "an opening balance has no price, fees or rate: give its quantity, its total or its date".to_string(),
+        });
+    }
+    let (unit_price, total) = price_and_total(recorded, &correction);
+    Ok(CorrectionFields {
+        date: correction.date.unwrap_or_else(|| recorded.date.clone()),
+        quantity: correction.quantity.unwrap_or(recorded.quantity),
+        unit_price,
+        exchange_rate: correction.rate.unwrap_or(recorded.exchange_rate),
+        fees: correction.fees.unwrap_or(recorded.fees),
+        total,
+        note: correction.note.or_else(|| recorded.note.clone()),
+    })
+}
+
 /// What removing everything a session recorded did (AGT-053).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 pub struct SessionRemoval {
@@ -678,6 +727,7 @@ impl HoldingTransactionUseCase {
             )
             .await
             .map_err(|error| refusal_from_account(&error))?;
+        let becomes = becomes.transaction;
         if comparable(&becomes) == comparable(stored) {
             return Err(Refusal {
                 code: "MissingArgument".to_string(),
@@ -733,41 +783,84 @@ impl HoldingTransactionUseCase {
         correction: Correction,
     ) -> Result<Transaction, Refusal> {
         let recorded = self.recorded_by(transaction_id, session).await?;
-        // AGT-061 — anything else is cancelled and recorded again.
-        if !matches!(
-            recorded.transaction_type,
-            TransactionType::OpeningBalance | TransactionType::Purchase | TransactionType::Sell
-        ) {
-            return Err(Refusal {
-                code: "InvalidArguments".to_string(),
-                message: "a deposit, a withdrawal, a dividend, a split or free shares is not corrected: cancel it and record it again".to_string(),
-            });
-        }
-        // TRX-047 — an opening balance has a quantity, a total cost and a date, nothing else.
-        if recorded.transaction_type == TransactionType::OpeningBalance
-            && (correction.price.is_some()
-                || correction.fees.is_some()
-                || correction.rate.is_some())
-        {
-            return Err(Refusal {
-                code: "InvalidArguments".to_string(),
-                message: "an opening balance has no price, fees or rate: give its quantity, its total or its date".to_string(),
-            });
-        }
-        let (unit_price, total) = price_and_total(&recorded, &correction);
+        let fields = agent_correction(&recorded, correction)?;
         self.correct_transaction(
             &recorded.account_id,
             &recorded.id,
-            correction.date.unwrap_or(recorded.date),
-            correction.quantity.unwrap_or(recorded.quantity),
-            unit_price,
-            correction.rate.unwrap_or(recorded.exchange_rate),
-            correction.fees.unwrap_or(recorded.fees),
-            total,
-            correction.note.or(recorded.note),
+            fields.date,
+            fields.quantity,
+            fields.unit_price,
+            fields.exchange_rate,
+            fields.fees,
+            fields.total,
+            fields.note,
         )
         .await
         .map_err(|error| refusal_from_account(&error))
+    }
+
+    /// AGT-072 — what `correct_recorded_by_agent` would do, nothing written: the same
+    /// refusals, and the account on the evening of the corrected date without the
+    /// correction and with it.
+    pub async fn preview_correction_by_agent(
+        &self,
+        transaction_id: &str,
+        session: &str,
+        correction: Correction,
+    ) -> Result<Previewed, Refusal> {
+        let recorded = self.recorded_by(transaction_id, session).await?;
+        let fields = agent_correction(&recorded, correction)?;
+        // Read for its name and currency only: the preview loads the account again, and its
+        // own load decides what the correction makes of it.
+        let account = self
+            .account_service
+            .get_by_id(&recorded.account_id)
+            .await
+            .map_err(|error| refusal_from_account(&error))?
+            .ok_or_else(|| {
+                refusal_from_account(&AccountError::AccountNotFound {
+                    account_id: recorded.account_id.clone(),
+                })
+            })?;
+        let date = fields.date.clone();
+        let previewed = self
+            .account_service
+            .preview_correction(
+                &recorded.account_id,
+                &recorded.id,
+                fields.date,
+                fields.quantity,
+                fields.unit_price,
+                fields.exchange_rate,
+                fields.fees,
+                fields.total,
+                fields.note,
+            )
+            .await
+            .map_err(|error| refusal_from_account(&error))?;
+        Ok(self
+            .told(previewed, account.name, account.currency, date)
+            .await)
+    }
+
+    /// AGT-072 — what `record_price_named_by_agent` would do, nothing written: the same
+    /// refusals, the price as it would be recorded and the one already at that date it would
+    /// replace.
+    pub async fn preview_price_named(
+        &self,
+        typed: PriceAt,
+        today: &str,
+    ) -> Result<PricePreviewed, Refusal> {
+        let (asset, date) = self.priced(&typed, today).await?;
+        let (price, replaced) = self
+            .asset_service
+            .preview_price_by_agent(&asset.id, &date, typed.price)
+            .await
+            .map_err(|error| refusal_from_asset(&error))?;
+        Ok(PricePreviewed {
+            price: RecordedPrice::of(price, asset.clone()),
+            replaced: replaced.map(|price| RecordedPrice::of(price, asset)),
+        })
     }
 
     /// AGT-052 — what the session `session` recorded and that still exists: how many
@@ -865,14 +958,13 @@ impl HoldingTransactionUseCase {
 
     /// AGT-072 — what recording `command` would do, nothing written: the same lookups and
     /// checks as `record_named`, the account's recording applied in memory, and the account
-    /// on the evening of the date without it and with it. `None` for a recording it does not
-    /// preview.
+    /// on the evening of the date without it and with it.
     pub async fn preview_named(
         &self,
         command: Recording,
         today: &str,
-    ) -> Option<Result<Previewed, Refusal>> {
-        Some(match command {
+    ) -> Result<Previewed, Refusal> {
+        match command {
             Recording::Open { target, total_cost } => {
                 self.preview_found(
                     &target.account,
@@ -956,11 +1048,54 @@ impl HoldingTransactionUseCase {
                 )
                 .await
             }
-            Recording::Deposit(_)
-            | Recording::Withdrawal(_)
-            | Recording::Dividend(_)
-            | Recording::FreeShares(_) => return None,
-        })
+            Recording::Deposit(cash) => self.preview_cash_named(cash, Cash::PaidIn, today).await,
+            Recording::Withdrawal(cash) => {
+                self.preview_cash_named(cash, Cash::TakenOut, today).await
+            }
+            Recording::Dividend(dividend) => {
+                let (account, asset) = (dividend.account.clone(), dividend.asset.clone());
+                self.preview_found(
+                    &account,
+                    &asset,
+                    dividend.date.clone(),
+                    today,
+                    |found, date| async move {
+                        self.preview_dividend(
+                            &found.account_id,
+                            found.asset_id.clone(),
+                            date,
+                            dividend.amount,
+                            dividend.rate.unwrap_or(MICRO),
+                            dividend.note,
+                        )
+                        .await
+                        .map_err(|error| refusal_from_dividend(&error))
+                    },
+                )
+                .await
+            }
+            Recording::FreeShares(free_shares) => {
+                let (account, asset) = (free_shares.account.clone(), free_shares.asset.clone());
+                self.preview_found(
+                    &account,
+                    &asset,
+                    free_shares.date.clone(),
+                    today,
+                    |found, date| async move {
+                        self.preview_free_shares(
+                            &found.account_id,
+                            found.asset_id.clone(),
+                            date,
+                            free_shares.quantity,
+                            free_shares.note,
+                        )
+                        .await
+                        .map_err(|error| refusal_from_free_shares(&error))
+                    },
+                )
+                .await
+            }
+        }
     }
 
     /// AGT-072 — the account and the asset found by name, `preview` run on them at the date
@@ -984,14 +1119,60 @@ impl HoldingTransactionUseCase {
         let date = date.unwrap_or_else(|| today.to_string());
         let (account_name, currency) = (found.account_name.clone(), found.currency.clone());
         let previewed = preview(found, date.clone()).await?;
-        Ok(Previewed {
+        Ok(self.told(previewed, account_name, currency, date).await)
+    }
+
+    /// AGT-072 — a deposit or a withdrawal previewed on the account named, as `record_cash`
+    /// records it.
+    async fn preview_cash_named(
+        &self,
+        cash: CashAmount,
+        way: Cash,
+        today: &str,
+    ) -> Result<Previewed, Refusal> {
+        let account = self
+            .find_account_by_name(&cash.account)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let date = cash.date.unwrap_or_else(|| today.to_string());
+        let op = match way {
+            Cash::PaidIn => RecordingOp::Deposit {
+                date: date.clone(),
+                amount: cash.amount,
+                note: cash.note,
+            },
+            Cash::TakenOut => RecordingOp::Withdrawal {
+                date: date.clone(),
+                amount: cash.amount,
+                note: cash.note,
+            },
+        };
+        let previewed = self
+            .preview_cash(&account.id, op)
+            .await
+            .map_err(|error| refusal_from_account(&error))?;
+        Ok(self
+            .told(previewed, account.name, account.currency, date)
+            .await)
+    }
+
+    /// AGT-072 — a preview as the agent is told it: the account without the recording and
+    /// with it, on the evening of `date`.
+    async fn told(
+        &self,
+        previewed: RecordingPreview,
+        account_name: String,
+        currency: String,
+        date: String,
+    ) -> Previewed {
+        Previewed {
             transaction: previewed.transaction,
             account_name,
             currency,
             before: self.account_as_of(&previewed.before, &date).await,
             after: self.account_as_of(&previewed.after, &date).await,
             date,
-        })
+        }
     }
 
     /// AGT-072 — the account `transactions` make on the evening of `date`: each asset held,

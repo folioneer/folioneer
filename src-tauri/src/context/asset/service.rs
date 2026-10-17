@@ -623,6 +623,30 @@ impl AssetService {
             .await
     }
 
+    /// AGT-072 — the price an agent would record for `asset_id` at `date`, checked as
+    /// `record_asset_price_by_agent` checks it, and the price already at that date it would
+    /// replace (MKT-103); nothing written.
+    pub async fn preview_price_by_agent(
+        &self,
+        asset_id: &str,
+        date: &str,
+        price_micros: i64,
+    ) -> StdResult<(AssetPrice, Option<AssetPrice>), AssetError> {
+        ensure_asset_writable_for_price(&*self.asset_repo, asset_id).await?;
+        let price = AssetPrice::new(
+            asset_id.to_string(),
+            date.to_string(),
+            price_micros,
+            AssetPriceSource::Agent,
+        )?;
+        let replaced = self
+            .get_asset_prices(asset_id)
+            .await?
+            .into_iter()
+            .find(|stored| stored.date == price.date);
+        Ok((price, replaced))
+    }
+
     /// MKT-021, MKT-022, MKT-025 — validates a price through the entity's factory and
     /// upserts it.
     async fn write_price(
@@ -1077,6 +1101,13 @@ pub trait AssetServiceContract: Send + Sync {
         date: &str,
         price_micros: i64,
     ) -> StdResult<AssetPrice, AssetError>;
+    /// See [`AssetService::preview_price_by_agent`].
+    async fn preview_price_by_agent(
+        &self,
+        asset_id: &str,
+        date: &str,
+        price_micros: i64,
+    ) -> StdResult<(AssetPrice, Option<AssetPrice>), AssetError>;
     /// See [`AssetService::record_asset_price_by_agent`].
     async fn record_asset_price_by_agent(
         &self,
@@ -1153,6 +1184,15 @@ impl AssetServiceContract for AssetService {
     ) -> StdResult<AssetPrice, AssetError> {
         AssetService::record_asset_price_in_micros(self, asset_id, date, price_micros).await
     }
+    async fn preview_price_by_agent(
+        &self,
+        asset_id: &str,
+        date: &str,
+        price_micros: i64,
+    ) -> StdResult<(AssetPrice, Option<AssetPrice>), AssetError> {
+        AssetService::preview_price_by_agent(self, asset_id, date, price_micros).await
+    }
+
     async fn record_asset_price_by_agent(
         &self,
         asset_id: &str,

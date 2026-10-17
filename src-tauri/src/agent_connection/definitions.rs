@@ -269,7 +269,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "preview_recording",
             title: "Preview a recording",
             only_reads: true,
-            description: "Preview what a recording would do, writing nothing: give tool, one of record_purchase, record_sale, record_opening_balance, record_split, and arguments, the object that tool takes. Answered with the refusal the real call would give, or with the transaction as it would be recorded and the account on the evening of its date without it (before) and with it (after): each asset held, by reference and name, with its quantity and average price, and the cash. Read the account today with list_holdings once it is recorded.",
+            description: "Preview what a recording, a correction or a price would do, writing nothing: give tool, one of record_purchase, record_sale, record_opening_balance, record_split, record_deposit, record_withdrawal, record_dividend, record_free_shares, record_price, correct_recording, and arguments, the object that tool takes. Answered with the refusal the real call would give, or with the transaction as it would be recorded and the account on the evening of its date without it (before) and with it (after): each asset held, by reference and name, with its quantity and average price, and the cash. A price is answered with the price it would replace at that date, or null. Read the account today with list_holdings once it is recorded.",
             input_schema: json!({
                 "type": "object",
                 "properties": {

@@ -56,6 +56,48 @@ pub enum RecordingOp {
     Buy(TradeOp),
     /// A sale.
     Sell(TradeOp),
+    /// A deposit of `amount` into the account's cash (CSH-022).
+    Deposit {
+        /// The date.
+        date: String,
+        /// The amount (micro-units).
+        amount: i64,
+        /// The note.
+        note: Option<String>,
+    },
+    /// A withdrawal of `amount` from the account's cash (CSH-032).
+    Withdrawal {
+        /// The date.
+        date: String,
+        /// The amount (micro-units).
+        amount: i64,
+        /// The note.
+        note: Option<String>,
+    },
+    /// A dividend paid by `asset_id` (DIV-023).
+    Dividend {
+        /// The paying asset.
+        asset_id: String,
+        /// The date.
+        date: String,
+        /// The amount in the asset's currency (micro-units).
+        amount: i64,
+        /// The exchange rate to the account's currency (micro-units).
+        exchange_rate: i64,
+        /// The note.
+        note: Option<String>,
+    },
+    /// Free shares of `asset_id` received (FSD-022).
+    FreeShares {
+        /// The distributing asset.
+        asset_id: String,
+        /// The date.
+        date: String,
+        /// The quantity received (micro-units).
+        quantity: i64,
+        /// The note.
+        note: Option<String>,
+    },
     /// A split of `factor` (micro-scaled).
     Split {
         /// The asset split.
@@ -640,7 +682,7 @@ impl AccountService {
         note: Option<String>,
     ) -> Result<Transaction, AccountError> {
         info!(target: BACKEND, account_id = %account_id, tx_id = %tx_id, "correct_transaction");
-        let (mut account, tx) = self
+        let (_, mut account, tx) = self
             .corrected(
                 account_id,
                 tx_id,
@@ -658,8 +700,9 @@ impl AccountService {
         Ok(tx)
     }
 
-    /// The transaction as `correct_transaction` would make it, with its refusals, and
-    /// nothing written: the corrected account is dropped (AGT-087).
+    /// The transaction as `correct_transaction` would make it, with its refusals, and the
+    /// account's transactions without and with the correction; nothing written: the
+    /// corrected account is dropped (AGT-072, AGT-087).
     #[allow(clippy::too_many_arguments)]
     pub async fn preview_correction(
         &self,
@@ -672,8 +715,8 @@ impl AccountService {
         fees: i64,
         total_amount: Option<i64>,
         note: Option<String>,
-    ) -> Result<Transaction, AccountError> {
-        let (_, tx) = self
+    ) -> Result<RecordingPreview, AccountError> {
+        let (before, account, transaction) = self
             .corrected(
                 account_id,
                 tx_id,
@@ -686,11 +729,16 @@ impl AccountService {
                 note,
             )
             .await?;
-        Ok(tx)
+        Ok(RecordingPreview {
+            transaction,
+            before,
+            after: account.transactions,
+        })
     }
 
-    /// The account with the transaction corrected in memory, and the transaction as
-    /// corrected: what `correct_transaction` saves and `preview_correction` drops.
+    /// The account's transactions before the correction, the account with the transaction
+    /// corrected in memory, and the transaction as corrected: what `correct_transaction`
+    /// saves and `preview_correction` drops.
     #[allow(clippy::too_many_arguments)]
     async fn corrected(
         &self,
@@ -703,8 +751,9 @@ impl AccountService {
         fees: i64,
         total_amount: Option<i64>,
         note: Option<String>,
-    ) -> Result<(Account, Transaction), AccountError> {
+    ) -> Result<(Vec<Transaction>, Account, Transaction), AccountError> {
         let mut account = load_account(&*self.account_repo, account_id).await?;
+        let before = account.transactions.clone();
         let tx = account
             .correct_transaction(
                 tx_id,
@@ -718,7 +767,7 @@ impl AccountService {
             )
             .map_err(to_holding_tx_error)?
             .clone();
-        Ok((account, tx))
+        Ok((before, account, tx))
     }
 
     /// AGT-072 — what recording `op` would make of the account: the account's own recording
@@ -818,14 +867,7 @@ impl AccountService {
     ) -> Result<Transaction, AccountError> {
         info!(target: BACKEND, account_id = %account_id, amount = amount, "record_deposit");
         let mut account = load_account(&*self.account_repo, account_id).await?;
-        let tx = Transaction::new_deposit(
-            account.id.clone(),
-            account.cash_asset_id(),
-            date,
-            amount,
-            note,
-        )?;
-        let tx = account.apply_deposit(tx)?;
+        let tx = apply(&mut account, RecordingOp::Deposit { date, amount, note })?;
         save_account(&*self.account_repo, &mut account).await?;
         self.emit_transaction_updated();
         Ok(tx)
@@ -845,14 +887,7 @@ impl AccountService {
     ) -> Result<Transaction, AccountError> {
         info!(target: BACKEND, account_id = %account_id, amount = amount, "record_withdrawal");
         let mut account = load_account(&*self.account_repo, account_id).await?;
-        let tx = Transaction::new_withdrawal(
-            account.id.clone(),
-            account.cash_asset_id(),
-            date,
-            amount,
-            note,
-        )?;
-        let tx = account.apply_withdrawal(tx)?;
+        let tx = apply(&mut account, RecordingOp::Withdrawal { date, amount, note })?;
         save_account(&*self.account_repo, &mut account).await?;
         self.emit_transaction_updated();
         Ok(tx)
@@ -928,15 +963,16 @@ impl AccountService {
     ) -> Result<Transaction, AccountError> {
         info!(target: BACKEND, account_id = %account_id, asset_id = %paying_asset_id, amount = amount_micros, "record_dividend");
         let mut account = load_account(&*self.account_repo, account_id).await?;
-        let tx = Transaction::new_dividend(
-            account.id.clone(),
-            paying_asset_id,
-            date,
-            amount_micros,
-            exchange_rate,
-            note,
+        let tx = apply(
+            &mut account,
+            RecordingOp::Dividend {
+                asset_id: paying_asset_id,
+                date,
+                amount: amount_micros,
+                exchange_rate,
+                note,
+            },
         )?;
-        let tx = account.apply_dividend(tx)?;
         save_account(&*self.account_repo, &mut account).await?;
         self.emit_transaction_updated();
         Ok(tx)
@@ -960,8 +996,15 @@ impl AccountService {
     ) -> Result<Transaction, AccountError> {
         info!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, quantity = quantity, "record_free_shares");
         let mut account = load_account(&*self.account_repo, account_id).await?;
-        let tx = Transaction::free_shares(account.id.clone(), asset_id, date, quantity, note)?;
-        let tx = account.apply_free_shares(tx).map_err(to_holding_tx_error)?;
+        let tx = apply(
+            &mut account,
+            RecordingOp::FreeShares {
+                asset_id,
+                date,
+                quantity,
+                note,
+            },
+        )?;
         save_account(&*self.account_repo, &mut account).await?;
         self.emit_transaction_updated();
         Ok(tx)
@@ -1974,7 +2017,7 @@ pub trait AccountServiceContract: Send + Sync {
         fees: i64,
         total_amount: Option<i64>,
         note: Option<String>,
-    ) -> StdResult<Transaction, AccountError>;
+    ) -> StdResult<RecordingPreview, AccountError>;
     /// AGT-072 — what recording `op` would make of the account, nothing written.
     async fn preview_recording(
         &self,
@@ -2348,7 +2391,7 @@ impl AccountServiceContract for AccountService {
         fees: i64,
         total_amount: Option<i64>,
         note: Option<String>,
-    ) -> StdResult<Transaction, AccountError> {
+    ) -> StdResult<RecordingPreview, AccountError> {
         AccountService::preview_correction(
             self,
             account_id,
@@ -2712,7 +2755,7 @@ async fn save_account_for_open_holding(
     })
 }
 
-/// A purchase, a sale or a split applied to `account` in memory — what recording saves and
+/// A recording applied to `account` in memory — what recording saves and
 /// a preview drops (AGT-072).
 fn apply(account: &mut Account, op: RecordingOp) -> Result<Transaction, AccountError> {
     match op {
@@ -2742,6 +2785,52 @@ fn apply(account: &mut Account, op: RecordingOp) -> Result<Transaction, AccountE
             )
             .map_err(to_holding_tx_error)
             .cloned(),
+        RecordingOp::Deposit { date, amount, note } => {
+            let tx = Transaction::new_deposit(
+                account.id.clone(),
+                account.cash_asset_id(),
+                date,
+                amount,
+                note,
+            )?;
+            Ok(account.apply_deposit(tx)?)
+        }
+        RecordingOp::Withdrawal { date, amount, note } => {
+            let tx = Transaction::new_withdrawal(
+                account.id.clone(),
+                account.cash_asset_id(),
+                date,
+                amount,
+                note,
+            )?;
+            Ok(account.apply_withdrawal(tx)?)
+        }
+        RecordingOp::Dividend {
+            asset_id,
+            date,
+            amount,
+            exchange_rate,
+            note,
+        } => {
+            let tx = Transaction::new_dividend(
+                account.id.clone(),
+                asset_id,
+                date,
+                amount,
+                exchange_rate,
+                note,
+            )?;
+            Ok(account.apply_dividend(tx)?)
+        }
+        RecordingOp::FreeShares {
+            asset_id,
+            date,
+            quantity,
+            note,
+        } => {
+            let tx = Transaction::free_shares(account.id.clone(), asset_id, date, quantity, note)?;
+            account.apply_free_shares(tx).map_err(to_holding_tx_error)
+        }
         RecordingOp::Split {
             asset_id,
             date,

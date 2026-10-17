@@ -4284,7 +4284,7 @@ async fn agt_072_a_preview_gives_the_refusal_of_the_real_call() {
     for (arguments, code) in [
         (json!({ "arguments": {} }), "MissingArgument"),
         (
-            json!({ "tool": "record_deposit", "arguments": {} }),
+            json!({ "tool": "add_asset", "arguments": {} }),
             "InvalidArguments",
         ),
         (
@@ -4304,7 +4304,7 @@ async fn agt_072_a_preview_gives_the_refusal_of_the_real_call() {
         .call(
             &granted,
             "preview_recording",
-            &json!({ "tool": "record_deposit", "arguments": {} }),
+            &json!({ "tool": "add_asset", "arguments": {} }),
         )
         .await
         .expect_err("refused");
@@ -4345,4 +4345,262 @@ async fn agt_072_a_preview_is_a_read_outside_the_limit() {
     assert_eq!(after.reads, before.reads + 1);
     assert_eq!(after.transactions_recorded, before.transactions_recorded);
     assert_eq!(after.recordings, before.recordings);
+}
+
+// AGT-072 / TODO-090 — a deposit, a withdrawal, a dividend and free shares are previewed as
+// the four recordings are: nothing written, the account on the evening of the date without
+// them and with them.
+#[tokio::test]
+async fn agt_072_cash_a_dividend_and_free_shares_are_previewed() {
+    use crate::use_cases::holding_transaction::{Recording, Target, Trade, TradeAmount};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    bench
+        .recorder
+        .record_named(
+            Recording::Buy(Trade {
+                target: Target {
+                    account: "PEA".to_string(),
+                    asset: "CW8".to_string(),
+                    date: Some("2026-02-01".to_string()),
+                    quantity: 4 * M,
+                },
+                amount: TradeAmount::Price(100 * M),
+                fees: 0,
+                rate: M,
+                note: None,
+            }),
+            "2026-10-17",
+        )
+        .await
+        .expect("bought");
+    let written = written_rows(&bench).await;
+    let preview = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move {
+            tools
+                .call(
+                    granted,
+                    "preview_recording",
+                    &json!({ "tool": tool, "arguments": arguments }),
+                )
+                .await
+                .expect("previewed")
+        }
+    };
+
+    let deposit = preview(
+        "record_deposit",
+        json!({ "account": "PEA", "amount": 100, "date": "2026-03-01" }),
+    )
+    .await;
+    assert_eq!(deposit["transaction"]["transaction_type"], "Deposit");
+    assert_eq!(deposit["before"]["cash"], 4_600 * M);
+    assert_eq!(deposit["after"]["cash"], 4_700 * M);
+
+    let withdrawal = preview(
+        "record_withdrawal",
+        json!({ "account": "PEA", "amount": 600, "date": "2026-03-01" }),
+    )
+    .await;
+    assert_eq!(withdrawal["after"]["cash"], 4_000 * M);
+
+    let dividend = preview(
+        "record_dividend",
+        json!({ "account": "PEA", "asset": "CW8", "amount": 12, "date": "2026-03-01" }),
+    )
+    .await;
+    assert_eq!(dividend["transaction"]["transaction_type"], "Dividend");
+    assert_eq!(dividend["after"]["cash"], 4_612 * M);
+    assert_eq!(dividend["after"]["holdings"][0]["quantity"], 4 * M);
+
+    let free_shares = preview(
+        "record_free_shares",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "date": "2026-03-01" }),
+    )
+    .await;
+    assert_eq!(free_shares["transaction"]["transaction_type"], "FreeShares");
+    assert_eq!(free_shares["after"]["holdings"][0]["quantity"], 5 * M);
+    assert_eq!(written_rows(&bench).await, written, "nothing was written");
+}
+
+// AGT-072 / TODO-090 — a price is previewed with the price it would replace at that date,
+// or none; nothing is written.
+#[tokio::test]
+async fn agt_072_a_price_is_previewed_with_the_price_it_would_replace() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let preview = |date: &'static str| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move {
+            tools
+                .call(
+                    granted,
+                    "preview_recording",
+                    &json!({ "tool": "record_price", "arguments": { "asset": "CW8", "price": "512.5", "date": date } }),
+                )
+                .await
+                .expect("previewed")
+        }
+    };
+
+    let first = preview("2026-03-02").await;
+    assert_eq!(first["status"], "previewed");
+    assert_eq!(first["price"]["price"], 512_500_000);
+    assert_eq!(first["asset"], "CW8");
+    assert_eq!(first["replaces"], Value::Null);
+
+    bench
+        .tools
+        .call(
+            &granted,
+            "record_price",
+            &json!({ "asset": "CW8", "price": "500", "date": "2026-03-02" }),
+        )
+        .await
+        .expect("recorded");
+    let prices = bench
+        .assets
+        .get_asset_prices(
+            &bench
+                .assets
+                .get_all_assets()
+                .await
+                .expect("assets")
+                .into_iter()
+                .find(|asset| asset.reference == "CW8")
+                .expect("CW8")
+                .id,
+        )
+        .await
+        .expect("prices")
+        .len();
+    let second = preview("2026-03-02").await;
+    assert_eq!(second["replaces"]["price"], 500 * M);
+    let after = bench
+        .assets
+        .get_asset_prices(
+            &bench
+                .assets
+                .get_all_assets()
+                .await
+                .expect("assets")
+                .into_iter()
+                .find(|asset| asset.reference == "CW8")
+                .expect("CW8")
+                .id,
+        )
+        .await
+        .expect("prices");
+    assert_eq!(after.len(), prices, "nothing was written");
+    assert_eq!(after[0].price, 500 * M);
+}
+
+// AGT-072 / TODO-090 — a correction of what the session recorded is previewed: the account
+// on the evening of the corrected date without the correction and with it; nothing written.
+#[tokio::test]
+async fn agt_072_a_correction_is_previewed() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let bought = recorded_id(
+        &bench
+            .tools
+            .call(
+                &granted,
+                "record_purchase",
+                &json!({ "account": "PEA", "asset": "CW8", "quantity": 2, "price": 100, "date": "2026-02-01" }),
+            )
+            .await
+            .expect("recorded"),
+    );
+    let written = written_rows(&bench).await;
+
+    let corrected = bench
+        .tools
+        .call(
+            &granted,
+            "preview_recording",
+            &json!({ "tool": "correct_recording", "arguments": { "transaction": bought, "quantity": 3 } }),
+        )
+        .await
+        .expect("previewed");
+    assert_eq!(corrected["transaction"]["id"], json!(bought));
+    assert_eq!(corrected["transaction"]["quantity"], 3 * M);
+    assert_eq!(corrected["before"]["holdings"][0]["quantity"], 2 * M);
+    assert_eq!(corrected["after"]["holdings"][0]["quantity"], 3 * M);
+    assert_eq!(corrected["after"]["cash"], 4_700 * M);
+    assert_eq!(written_rows(&bench).await, written, "nothing was written");
+}
+
+// AGT-072 / TODO-090 — each kind gives the refusal the real call gives.
+#[tokio::test]
+async fn agt_072_the_rest_gives_the_refusal_of_the_real_call() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let deposit = recorded_id(
+        &bench
+            .tools
+            .call(
+                &granted,
+                "record_deposit",
+                &json!({ "account": "PEA", "amount": 10, "date": "2026-02-01" }),
+            )
+            .await
+            .expect("recorded"),
+    );
+    for (tool, arguments) in [
+        (
+            "record_withdrawal",
+            json!({ "account": "PEA", "amount": 999999, "date": "2026-03-01" }),
+        ),
+        ("record_deposit", json!({ "account": "NOPE", "amount": 1 })),
+        ("record_deposit", json!({ "account": "PEA", "amount": 0 })),
+        (
+            "record_dividend",
+            json!({ "account": "PEA", "asset": "CW8", "amount": 1, "date": "2026-03-01" }),
+        ),
+        (
+            "record_free_shares",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "date": "2026-03-01" }),
+        ),
+        ("record_price", json!({ "asset": "NOPE", "price": 1 })),
+        (
+            "record_price",
+            json!({ "asset": "CW8", "price": 0, "date": "2026-03-01" }),
+        ),
+        (
+            "record_price",
+            json!({ "asset": "CW8", "price": 1, "date": "2099-01-01" }),
+        ),
+        (
+            "correct_recording",
+            json!({ "transaction": deposit, "amount": 1, "quantity": 2 }),
+        ),
+        (
+            "correct_recording",
+            json!({ "transaction": "no-such-transaction", "quantity": 2 }),
+        ),
+    ] {
+        let previewed = bench
+            .tools
+            .call(
+                &granted,
+                "preview_recording",
+                &json!({ "tool": tool, "arguments": arguments }),
+            )
+            .await
+            .expect_err("refused");
+        let real = bench
+            .tools
+            .call(&granted, tool, &arguments)
+            .await
+            .expect_err("refused");
+        assert_eq!(previewed.code, real.code, "{tool} {arguments}");
+        assert_eq!(previewed.message, real.message, "{tool} {arguments}");
+    }
 }
