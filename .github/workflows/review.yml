@@ -267,12 +267,15 @@ jobs:
             # The count of criticals is read whatever sign precedes it ("🔵 0 critical"
             # is clean). A reviewer that found none may leave the count out: the
             # report is then clean when it carries no 🔴 and at least one of the
-            # signs a report is written with. Anything else cannot be read, and
+            # signs a report is written with — a 🔴 counts where a finding starts (a line, a
+            # heading, a bullet), not in a sentence about one —, or is the protocol's "review skipped" reply
+            # for a lane with no file in the diff. Anything else cannot be read, and
             # fails the check as a missing report does.
             criticals=$( { grep -Eo '[0-9]+ critical' "$report" || true; } | grep -Eo '[0-9]+' | head -n 1 || true)
             if [[ -z "$criticals" ]]; then
-              if grep -q '🔴' "$report"; then criticals=1
+              if grep -qE '^(#+ +|- +)?🔴' "$report"; then criticals=1
               elif grep -qE '✅|🟡|🔵' "$report"; then criticals=0
+              elif grep -qE '^ℹ️ No .+ files modified — review skipped\.' "$report"; then criticals=0
               else criticals=1
               fi
             fi

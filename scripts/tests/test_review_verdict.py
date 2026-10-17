@@ -53,6 +53,27 @@ class Verdict(unittest.TestCase):
         self.assertEqual(criticals(report), "0")
         self.assertEqual(criticals("✅ No issues found."), "0")
 
+    # Pull request #309: a lane with no file in the diff — after the rebase `just merge`
+    # pushes, the diff against the main branch is empty — replies as the review protocol
+    # prescribes, and that reply is clean.
+    def test_a_skipped_review_is_clean(self):
+        self.assertEqual(
+            criticals("ℹ️ No reviewer-infra files modified — review skipped.\n"), "0"
+        )
+        # Only the protocol's exact reply: a critical, or prose that mentions it, still fails.
+        self.assertEqual(criticals("🔴 Critical: x\nreview skipped\n"), "1")
+        self.assertEqual(criticals("The review skipped nothing it should not have.\n"), "1")
+
+    # Pull request #311: a clean report whose prose names the sign is clean; a finding that
+    # starts with it — on its own line, under a heading or as a bullet — still fails.
+    def test_a_red_sign_counts_where_a_finding_starts(self):
+        self.assertEqual(
+            criticals("✅ No issues found.\n\n- the branch rejects a 🔴 report as it should.\n"),
+            "0",
+        )
+        self.assertEqual(criticals("### 🔴 Critical\n- x.rs: a bug.\n"), "1")
+        self.assertEqual(criticals("- 🔴 x.rs: a bug.\n"), "1")
+
     # A critical without a count line still fails the check.
     def test_a_critical_without_a_count_fails(self):
         self.assertEqual(
