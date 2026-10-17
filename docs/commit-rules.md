@@ -55,6 +55,7 @@ A change that touches production code is never `chore`, however invisible it is 
 - **Optional body**: Max 5 lines for context (rationale, what changed, breaking changes)
   - Do NOT include test results (those go in PR descriptions only)
 - **No co-authoring footers** (never include `Co-Authored-By:` lines)
+- **The owner is the author** (`phileggel@users.noreply.github.com`): an agent commits as the owner, never as itself; only a bot (Dependabot) authors as itself, and is held to the format alone
 
 ### Commit Messages vs. PR Descriptions
 
@@ -321,7 +322,7 @@ All commits go through automated checks:
 - ✅ Linters must report no critical errors
 - ✅ Commit format must be valid
 
-These checks are enforced by the `commit-msg` hook and again by the `pr-checks` job in CI.
+These checks are enforced by the `commit-msg` hook, again on a pull request's commits by the `pr-checks` job, and on everything `main` holds since the last release by the `main-commits` job (`scripts/commit-check.sh`); the author is read in CI only. A commit that breaks them and stays on `main` is listed by the owner in `commit-check-accepted.txt` (its full sha, then `# why`); otherwise it keeps `main` red until a release, which refuses to start on red.
 
 ## Troubleshooting
 

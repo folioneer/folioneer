@@ -16,7 +16,8 @@ on:
 
 concurrency:
   group: quality-${{ github.ref }}
-  cancel-in-progress: true
+  # A push to main is never cancelled: its run is what a release reads of main's head.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -34,60 +35,8 @@ jobs:
         with:
           fetch-depth: 0
       - name: Validate every commit in the PR
-        run: |
-          set -u
-          BASE=$(git merge-base HEAD origin/main)
-          FAIL=0
-          REGEX='^(feat|fix|docs|test|chore|refactor|ci)(\([^)]+\))?!?: .+'
-          # --no-merges skips the synthetic merge commit GitHub creates at
-          # HEAD for pull_request events (it represents "what main looks
-          # like if this PR merged" — not a real PR commit).
-          for sha in $(git rev-list --no-merges "$BASE..HEAD"); do
-            TITLE=$(git log -1 --pretty=%s "$sha")
-            # A `fixup!` commit is folded by `just merge` into the commit it
-            # names; the rules apply to the title it carries.
-            TITLE=${TITLE#fixup! }
-            BODY=$(git log -1 --pretty=%b "$sha")
-            AUTHOR_EMAIL=$(git log -1 --pretty=%ae "$sha")
-
-            # Conventional-commit format is load-bearing for release.py
-            # changelog parsing — enforced for every author, including bots.
-            if ! echo "$TITLE" | grep -E "$REGEX" >/dev/null; then
-              echo "::error::$sha — invalid conventional format: $TITLE"
-              FAIL=1
-            fi
-
-            # The remaining checks (title length, trailing period, body
-            # length, no Co-Authored-By) are human-writing-hygiene rules.
-            # Bot commits (Dependabot, Renovate) carry auto-generated
-            # titles/bodies that legitimately bypass them — e.g. "across
-            # N directories with M updates" titles and multi-page release
-            # notes. Enforce only for human authors.
-            if [[ "$AUTHOR_EMAIL" != *"[bot]@"* ]]; then
-              if [ ${#TITLE} -gt 72 ]; then
-                echo "::error::$sha — title > 72 chars (${#TITLE}): $TITLE"
-                FAIL=1
-              fi
-              TRIMMED=$(echo "$TITLE" | sed 's/[[:space:]]*$//')
-              if [[ "$TRIMMED" == *. ]]; then
-                echo "::error::$sha — title ends with period: $TITLE"
-                FAIL=1
-              fi
-              BODY_LINES=$(echo "$BODY" | { grep -v '^$' || true; } | { grep -v '^BREAKING CHANGE:' || true; } | wc -l)
-              if [ "$BODY_LINES" -gt 5 ]; then
-                echo "::error::$sha — body > 5 lines ($BODY_LINES): $TITLE"
-                FAIL=1
-              fi
-              if echo "$BODY" | grep -i '^Co-Authored-By:' >/dev/null; then
-                echo "::error::$sha — contains Co-Authored-By trailer: $TITLE"
-                FAIL=1
-              fi
-            fi
-          done
-          if [ "$FAIL" -eq 0 ]; then
-            echo "✅ All commits pass the commit-msg hook rules."
-          fi
-          exit "$FAIL"
+        # docs/commit-rules.md: format, length, body, trailers and the owner as author.
+        run: bash scripts/commit-check.sh "$(git merge-base HEAD origin/main)..HEAD"
       - name: Assert no published sync format snapshot is edited
         # src-tauri/tests/sync_format/vN.json pins how data format version N
         # writes what is synced (SYN-038). A snapshot already on main may not
@@ -115,6 +64,24 @@ jobs:
             echo "::error::a workflow chooses its own Rust version — use 'rustup toolchain install', which reads rust-toolchain.toml."
             exit 1
           fi
+
+  main-commits:
+    name: Commits that reached main follow the commit rules
+    # The same check on everything main holds since the last release: a merge that did
+    # not wait for the pull request's checks, or a direct push, leaves main's head red
+    # until it is undone, whatever is pushed after it, and a release refuses to start on it.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Validate every commit since the last release
+        run: |
+          # No release yet: the whole history.
+          base=$(git describe --tags --abbrev=0 HEAD 2>/dev/null) || base=$(git rev-list --max-parents=0 HEAD)
+          bash scripts/commit-check.sh "$base..HEAD"
 
   architecture:
     name: Architecture — mechanical rules

@@ -2,7 +2,7 @@
 """Auto-rebase + fast-forward merge the current feature branch into a target branch.
 
 Atomic "task done" shortcut: pull the target, rebase the branch onto it,
-FF-merge into the target, push, and delete the feature branch both locally
+have GitHub merge the pull request, and delete the feature branch both locally
 and on origin. Fails fast with a clear recovery hint at any step that can't
 proceed cleanly (rebase conflict, divergent push, dirty tree, etc.).
 
@@ -17,6 +17,12 @@ One entry lands as one commit: a fix pushed after the first push is a
 `fixup!` commit (`git commit --fixup <sha>`), and the rebase folds it into the
 commit it names. Folding rewrites commits and leaves the tree as CI tested it,
 so the checks stand.
+
+GitHub merges, never a push to the target: the target accepts only a commit whose
+checks passed, and a rebased or folded commit is a new one. The pull request's tested
+head is merged — squashed into the folded commit's message when the branch carries
+`fixup!` commits, rebased otherwise. That an older head lands on a moved target holds
+while the ruleset does not ask a branch to be up to date with it.
 """
 
 from __future__ import annotations
@@ -253,25 +259,25 @@ def _reviewer_notes(number: int, failed: list[str]) -> dict[str, str]:
     return {name: note for name, note in notes.items() if note}
 
 
-def ensure_checks_green(branch: str, target: str, before: str, after: str) -> None:
-    """Refuse the merge unless CI is green on exactly the commits about to land."""
+def ensure_checks_green(branch: str, target: str, before: str, after: str) -> tuple[int, str]:
+    """Refuse the merge unless CI is green on exactly the commits about to land.
+
+    Returns the pull request's number and its tested head, which GitHub merges.
+    """
     number, head = _open_pull_request(branch, target)
     if after != head:
-        push = git("push", "--force-with-lease", "origin", branch, check=False)
-        if push.returncode != 0:
-            fail(
-                f"Local {branch} ({after[:7]}) is not the head of PR #{number} ({head[:7]}) and the push failed.",
-                (push.stderr or "").strip(),
-            )
-        # The checks are then read on `head`, which the push above left without
-        # a ref: GitHub keeps a commit's check runs regardless (verified: a
-        # pre-rebase head answered with its 14 runs after the force push).
         if before == head and _rebase_left_the_checks_standing(before, after):
             print(
                 f"{BLUE}ℹ The rebase left the tested tree as it was, record files aside; the checks of {head[:7]} stand.{NC}",
                 file=sys.stderr,
             )
         else:
+            push = git("push", "--force-with-lease", "origin", branch, check=False)
+            if push.returncode != 0:
+                fail(
+                    f"Local {branch} ({after[:7]}) is not the head of PR #{number} ({head[:7]}) and the push failed.",
+                    (push.stderr or "").strip(),
+                )
             why = "the rebase moved the commits" if before == head else "the local branch was ahead of the pull request"
             fail(
                 f"{branch} pushed as {after[:7]} — {why}.",
@@ -300,8 +306,30 @@ def ensure_checks_green(branch: str, target: str, before: str, after: str) -> No
             *(f"  {line}" for line in not_green),
             f"Watch: gh pr checks {number} --watch — then re-run `just merge`.",
         )
-    landing = "" if after == head else f", merging {after[:7]}"
-    print(f"{GREEN}✓ PR #{number}: every check green on {head[:7]}{landing}.{NC}", file=sys.stderr)
+    print(f"{GREEN}✓ PR #{number}: every check green on {head[:7]}.{NC}", file=sys.stderr)
+    return number, head
+
+
+def merge_method(target: str, before: str, branch: str) -> list[str]:
+    """How GitHub lands the pull request, as `gh pr merge` options.
+
+    A branch that carried `fixup!` commits (`before`, its head before the rebase) is
+    squashed under the message and author of the commit they were folded into, so the
+    entry still lands as one commit; any other branch is rebased, its commits as they are.
+    """
+    if not _fold_commits(target, before):
+        return ["--rebase"]
+    log = git("log", "--format=%H", f"{target}..{branch}", check=False)
+    folded = log.stdout.split()
+    if log.returncode != 0 or len(folded) != 1:
+        fail(
+            f"`{branch}` folds into {len(folded)} commits; GitHub squashes a pull request into one.",
+            "One entry lands as one commit: fold the others into it, push, let CI run, then re-run.",
+        )
+    subject, body, email = (
+        git("log", "-1", f"--format={part}", folded[0]).stdout.strip() for part in ("%s", "%b", "%ae")
+    )
+    return ["--squash", "--subject", subject, "--body", body, "--author-email", email]
 
 
 def main() -> int:
@@ -477,43 +505,30 @@ def main() -> int:
             )
 
     refuse_unfolded_fixups(target, branch, before)
+    after = git("rev-parse", branch).stdout.strip()
 
     # Step 2b — the merge guard: green checks on exactly these commits.
-    ensure_checks_green(branch, target, before, git("rev-parse", branch).stdout.strip())
+    number, head = ensure_checks_green(branch, target, before, after)
 
-    # Step 3 — fast-forward merge target onto the rebased branch.
-    # After step 2 this is guaranteed to FF; we still pass --ff-only for safety.
+    # Step 3 — GitHub merges the tested head; the target accepts no push of a commit
+    # whose checks did not run on it.
+    method = merge_method(target, before, branch)
+    result = gh("pr", "merge", str(number), *method, "--match-head-commit", head)
+    if result.returncode != 0:
+        fail(
+            f"GitHub refused to merge PR #{number}.",
+            (result.stderr or "").strip(),
+            f"Inspect: gh pr view {number} (a ruleset that asks the branch to be up to date refuses it) — then re-run `just merge`.",
+        )
+
+    # Step 4 — bring the local target to what GitHub landed.
     result = git("checkout", target, check=False)
-    if result.returncode != 0:
-        detail = result.stderr.strip() or "(no stderr captured)"
+    if result.returncode != 0 or git("pull", "--ff-only", "--quiet", "origin", target, check=False).returncode != 0:
         fail(
-            f"Could not checkout `{target}` after rebase.",
-            f"detail: {detail}",
-            f"Rebase of `{branch}` onto `{target}` succeeded locally — only the checkout failed.",
-            f"Manually: git checkout {target} && git merge --ff-only {branch}",
+            f"PR #{number} is merged, but the local `{target}` could not be brought up to date.",
+            f"Manually: git checkout {target} && git pull --ff-only",
+            f"  git push --delete origin {branch} && git branch -D {branch}",
         )
-    result = git("merge", "--ff-only", branch, check=False)
-    if result.returncode != 0:
-        # Defensive — should be unreachable after a successful rebase.
-        fail(
-            f"Unexpected: FF-merge of `{branch}` into `{target}` failed after rebase.",
-            f"This should be unreachable after a successful rebase — `{target}` likely moved.",
-            f"Inspect: git log {target}..{branch} && git status",
-            "If target moved, re-run `just merge` — the second pass catches the new state.",
-        )
-
-    # Step 4 — push target to origin (skip if no GitHub remote).
-    if has_origin_target:
-        result = git("push", "origin", target, check=False)
-        if result.returncode != 0:
-            fail(
-                f"Could not push {target} to origin/{target}.",
-                f"Local `{target}` already contains the FF-merged feature branch — only the push failed.",
-                "Origin probably moved while merging. Reconcile and retry:",
-                f"  git fetch origin {target}",
-                f"  git rebase origin/{target}",
-                f"  git push origin {target}",
-            )
 
     # Step 5 — delete the remote feature branch (if it exists).
     # Restores the "atomic shortcut" property: one command cleans up both
@@ -557,9 +572,18 @@ def main() -> int:
                     file=sys.stderr,
                 )
 
-    # Step 6 — delete the local branch.
-    result = git("branch", "-d", branch, check=False)
-    if result.returncode != 0:
+    # Step 6 — delete the local branch. GitHub's commits are not the local ones, so
+    # git cannot see the branch as merged: it goes when what landed is its tree.
+    landed = git("diff", "--quiet", after, target, check=False).returncode == 0
+    result = git("branch", "-D" if landed else "-d", branch, check=False)
+    if result.returncode != 0 and not landed:
+        # The target moved past what landed: the merge stands, only the branch is kept.
+        print(
+            f"{BLUE}ℹ PR #{number} is merged; {target} moved since, so the local {branch} is kept: "
+            f"git branch -D {branch} once you have checked it.{NC}",
+            file=sys.stderr,
+        )
+    elif result.returncode != 0:
         fail(
             f"Could not delete local branch {branch}.",
             "The branch is merged into target, but git refused the delete —",
@@ -576,9 +600,8 @@ def main() -> int:
         parts.append("remote")
     elif remote_state == "failed":
         parts.append("remote delete failed — see above")
-    suffix = ", pushed" if has_origin_target else ""
     print(
-        f"{GREEN}✅ {branch} rebased + merged into {target}{suffix}, "
+        f"{GREEN}✅ {branch} merged into {target} by GitHub (PR #{number}), "
         f"and deleted ({' + '.join(parts)}).{NC}",
         file=sys.stderr,
     )
