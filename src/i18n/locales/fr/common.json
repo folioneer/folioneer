@@ -384,6 +384,10 @@
     "leave_confirm_message": "Cet ordinateur publiera ses modifications en attente, puis cessera de se synchroniser. Son portefeuille reste sur cet ordinateur. Il ne pourra rejoindre qu'à partir d'une installation vierge.",
     "start_over_confirm_title": "Repartir de zéro avec une nouvelle phrase secrète ?",
     "start_over_confirm_message": "Tous les fichiers publiés dans le dossier partagé seront supprimés et chaque autre ordinateur devra rejoindre à partir d'une installation vierge.",
+    "move_confirm_title": "Déplacer le portefeuille vers un dossier vide ?",
+    "move_confirm_message": "{{folder}} ne contient aucun portefeuille. Cet ordinateur l'y recommence, et chaque autre ordinateur devra rejoindre à partir d'une installation vierge. Rien n'est supprimé du dossier actuel.",
+    "move_confirm_move": "Déplacer vers ce dossier",
+    "move_confirm_keep": "Garder le dossier actuel",
     "enable_modal": {
       "title": "Activer la synchronisation",
       "title_start_over": "Repartir de zéro",

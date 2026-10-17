@@ -10,9 +10,12 @@ vi.mock("../gateway", () => ({
   resumeSync: vi.fn(),
   renameSyncDevice: vi.fn(),
   changeSyncFolder: vi.fn(),
+  inspectSyncFolder: vi.fn(),
   pickSyncFolder: vi.fn(),
   leaveSync: vi.fn(),
 }));
+
+vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 
 // 2. Import mocked modules for typed access
 import * as gateway from "../gateway";
@@ -312,6 +315,90 @@ describe("useSyncPage — rename device / change folder (SYN-072/074)", () => {
 
     expect(result.current.actionError).toEqual({ key: "sync.errors.InstallationHoldsUserData" });
     expect(result.current.folder).toBe(before);
+  });
+});
+
+describe("useSyncPage — moving to a folder that holds no portfolio (SYN-074)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(gateway.getSyncStatus).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
+    vi.mocked(gateway.changeSyncFolder).mockResolvedValue({
+      status: "ok",
+      data: makeSyncStatus({ folder: "/media/key/Folioneer" }),
+    });
+  });
+
+  // SYN-075 — a folder that holds no portfolio asks to confirm before moving.
+  it("asks to confirm before moving to a folder that holds no portfolio", async () => {
+    vi.mocked(gateway.inspectSyncFolder).mockResolvedValue({
+      status: "ok",
+      data: { problem: null, holds_portfolio: false },
+    } as never);
+    const { result } = renderHook(() => useSyncPage());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let accepted = true;
+    await act(async () => {
+      accepted = await result.current.handleChangeFolder("/media/key/Folioneer");
+    });
+    expect(accepted).toBe(false);
+    expect(gateway.changeSyncFolder).not.toHaveBeenCalled();
+    expect(result.current.pendingMove).toBe("/media/key/Folioneer");
+
+    let moved = false;
+    await act(async () => {
+      moved = await result.current.confirmMove();
+    });
+    expect(moved).toBe(true);
+    expect(gateway.changeSyncFolder).toHaveBeenCalledWith("/media/key/Folioneer");
+    expect(result.current.pendingMove).toBeNull();
+    expect(result.current.folder).toBe("/media/key/Folioneer");
+  });
+
+  // TODO-082 — keeping the current folder moves nothing.
+  it("keeps the current folder when the move is not confirmed", async () => {
+    vi.mocked(gateway.inspectSyncFolder).mockResolvedValue({
+      status: "ok",
+      data: { problem: null, holds_portfolio: false },
+    } as never);
+    const { result } = renderHook(() => useSyncPage());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.handleChangeFolder("/media/key/Folioneer");
+    });
+    act(() => result.current.cancelMove());
+    expect(result.current.pendingMove).toBeNull();
+    expect(gateway.changeSyncFolder).not.toHaveBeenCalled();
+  });
+
+  // SYN-075 — a folder that could not be read goes to the change, which says why.
+  it("changes to a folder that could not be read without asking", async () => {
+    vi.mocked(gateway.inspectSyncFolder).mockRejectedValue(new Error("no core"));
+    const { result } = renderHook(() => useSyncPage());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.handleChangeFolder("/media/key/Folioneer");
+    });
+    expect(result.current.pendingMove).toBeNull();
+    expect(gateway.changeSyncFolder).toHaveBeenCalledWith("/media/key/Folioneer");
+  });
+
+  // SYN-074 — a folder that holds the portfolio followed is changed to with no question.
+  it("changes to a folder that holds a portfolio without asking", async () => {
+    vi.mocked(gateway.inspectSyncFolder).mockResolvedValue({
+      status: "ok",
+      data: { problem: null, holds_portfolio: true },
+    } as never);
+    const { result } = renderHook(() => useSyncPage());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.handleChangeFolder("/media/key/Folioneer");
+    });
+    expect(result.current.pendingMove).toBeNull();
+    expect(gateway.changeSyncFolder).toHaveBeenCalledWith("/media/key/Folioneer");
   });
 });
 

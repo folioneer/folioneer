@@ -8,10 +8,12 @@ import type {
   SyncHealth,
   SyncStatusView,
 } from "@/bindings";
+import { logger } from "@/lib/logger";
 import type { I18nMessage } from "@/ui/format/i18n";
 import {
   changeSyncFolder,
   getSyncStatus,
+  inspectSyncFolder,
   leaveSync,
   pauseSync,
   pickSyncFolder,
@@ -53,6 +55,15 @@ export interface UseSyncPageResult {
   handleChangeFolder: (folder: string) => Promise<boolean>;
   /** SYN-074 — native folder picker; resolves to the chosen path, or null when cancelled. */
   handleBrowseFolder: () => Promise<string | null>;
+  /**
+   * SYN-075 — a folder chosen that holds no portfolio, waiting for the move to be
+   * confirmed; null when none waits.
+   */
+  pendingMove: string | null;
+  /** Moves to the folder waiting; resolves to true when the core accepted it. */
+  confirmMove: () => Promise<boolean>;
+  /** Keeps the current folder. */
+  cancelMove: () => void;
   confirmingLeave: boolean;
   requestLeave: () => void;
   cancelLeave: () => void;
@@ -153,10 +164,40 @@ export function useSyncPage(): UseSyncPageResult {
     [applyStatusResult],
   );
 
+  const [pendingMove, setPendingMove] = useState<string | null>(null);
+
+  // SYN-075 — a folder the core reads as holding no portfolio is a new beginning
+  // for the other computers: the move waits for a confirmation. Any other folder goes to
+  // the core as it is, which refuses what it refuses.
   const handleChangeFolder = useCallback(
-    (folder: string) => applyStatusResult(() => changeSyncFolder(folder)),
+    async (folder: string) => {
+      try {
+        const inspected = await inspectSyncFolder(folder);
+        if (
+          inspected.status === "ok" &&
+          inspected.data.problem === null &&
+          !inspected.data.holds_portfolio
+        ) {
+          setPendingMove(folder);
+          return false;
+        }
+      } catch (e) {
+        // A folder that could not be read goes to the change, which says why.
+        logger.error("[useSyncPage] folder not inspected", { error: e });
+      }
+      return applyStatusResult(() => changeSyncFolder(folder));
+    },
     [applyStatusResult],
   );
+
+  const confirmMove = useCallback(async () => {
+    if (pendingMove === null) return false;
+    const moved = await applyStatusResult(() => changeSyncFolder(pendingMove));
+    setPendingMove(null);
+    return moved;
+  }, [applyStatusResult, pendingMove]);
+
+  const cancelMove = useCallback(() => setPendingMove(null), []);
 
   const handleBrowseFolder = useCallback(() => pickSyncFolder(), []);
 
@@ -196,6 +237,9 @@ export function useSyncPage(): UseSyncPageResult {
     handleRename,
     handleChangeFolder,
     handleBrowseFolder,
+    pendingMove,
+    confirmMove,
+    cancelMove,
     confirmingLeave,
     requestLeave: () => setConfirmingLeave(true),
     cancelLeave: () => setConfirmingLeave(false),

@@ -384,6 +384,10 @@
     "leave_confirm_message": "This computer will publish its pending changes, then stop syncing. Its portfolio stays on this computer. It can only rejoin from a fresh installation.",
     "start_over_confirm_title": "Start over with a new passphrase?",
     "start_over_confirm_message": "Every file published to the shared folder will be discarded and every other computer will have to rejoin from a fresh installation.",
+    "move_confirm_title": "Move the portfolio to an empty folder?",
+    "move_confirm_message": "{{folder}} holds no portfolio. This computer starts it there again, and every other computer will have to rejoin from a fresh installation. Nothing is removed from the current folder.",
+    "move_confirm_move": "Move to this folder",
+    "move_confirm_keep": "Keep the current folder",
     "enable_modal": {
       "title": "Enable sync",
       "title_start_over": "Start over",

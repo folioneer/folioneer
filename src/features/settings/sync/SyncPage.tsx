@@ -8,6 +8,7 @@ import { messageText } from "@/ui/format/i18n";
 import { syncFailureToI18n } from "../shared/presenter";
 import { ChangeFolderDialog } from "./ChangeFolderDialog";
 import { EnableSyncModal } from "./enable_modal/EnableSyncModal";
+import { MoveFolderDialog } from "./MoveFolderDialog";
 import { NoticeList } from "./notices/NoticeList";
 import { RenameDeviceDialog } from "./RenameDeviceDialog";
 import { useSyncPage } from "./useSyncPage";
@@ -439,6 +440,21 @@ export function SyncPage() {
             onSubmit={state.handleChangeFolder}
             onBrowse={state.handleBrowseFolder}
             onClose={() => setDialog(null)}
+          />
+        )}
+        {/* SYN-075 — the confirmation stacks over "Change folder", which stays open with the
+            folder chosen to show a refusal of the move. reviewer-frontend FP: the stacking is
+            the rule's, as the enable dialog stacks its start-over confirmation — see PR #280 */}
+        {state.pendingMove !== null && (
+          <MoveFolderDialog
+            folder={state.pendingMove}
+            onMove={async () => {
+              if (await state.confirmMove()) setDialog(null);
+            }}
+            onKeep={() => {
+              state.cancelMove();
+              setDialog(null);
+            }}
           />
         )}
       </div>

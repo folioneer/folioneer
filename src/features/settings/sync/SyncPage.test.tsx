@@ -40,6 +40,9 @@ const makeState = (overrides: Record<string, unknown> = {}) => ({
   handleRename: vi.fn(),
   handleChangeFolder: vi.fn(),
   handleBrowseFolder: vi.fn(),
+  pendingMove: null,
+  confirmMove: vi.fn(),
+  cancelMove: vi.fn(),
   confirmingLeave: false,
   requestLeave: vi.fn(),
   cancelLeave: vi.fn(),
@@ -409,6 +412,57 @@ describe("SyncPage — enabled state (SYN-061/063/070/072/073/074/082/084)", () 
     await waitFor(() =>
       expect(handleChangeFolder).toHaveBeenCalledWith("/media/phil/KEY/Folioneer"),
     );
+  });
+
+  // SYN-075 — moving to a folder that holds no portfolio asks to confirm, says
+  // the other computers rejoin from a fresh installation, and keeps the current folder by
+  // default.
+  it("asks to confirm a move to a folder that holds no portfolio, keeping by default", () => {
+    const confirmMove = vi.fn().mockResolvedValue(true);
+    const cancelMove = vi.fn();
+    mockUseSyncPage.mockReturnValue(
+      makeState({
+        enabled: true,
+        folder: "/home/user/sync",
+        pendingMove: "/media/phil/KEY/Folioneer",
+        confirmMove,
+        cancelMove,
+      }),
+    );
+    render(<SyncPage />);
+
+    const dialog = document.getElementById("sync-move-dialog") as HTMLElement;
+    expect(dialog).toHaveTextContent("sync.move_confirm_title");
+    expect(dialog).toHaveTextContent(
+      'sync.move_confirm_message:{"folder":"/media/phil/KEY/Folioneer"}',
+    );
+    expect(document.getElementById("sync-move-keep")).toHaveFocus();
+
+    fireEvent.click(screen.getByText("sync.move_confirm_keep"));
+    expect(cancelMove).toHaveBeenCalled();
+    expect(confirmMove).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("sync.move_confirm_move"));
+    expect(confirmMove).toHaveBeenCalled();
+  });
+
+  // SYN-075 — while the move runs, neither action of the confirmation can be used.
+  it("keeps both actions of the confirmation inactive while the move runs", async () => {
+    const confirmMove = vi.fn(() => new Promise<boolean>(() => {}));
+    mockUseSyncPage.mockReturnValue(
+      makeState({
+        enabled: true,
+        folder: "/home/user/sync",
+        pendingMove: "/media/phil/KEY/Folioneer",
+        confirmMove,
+      }),
+    );
+    render(<SyncPage />);
+
+    fireEvent.click(document.getElementById("sync-move-confirm") as HTMLElement);
+    await waitFor(() => expect(document.getElementById("sync-move-confirm")).toBeDisabled());
+    expect(document.getElementById("sync-move-keep")).toBeDisabled();
+    expect(document.getElementById("modal-close-btn")).toBeNull();
   });
 
   it("leaves the typed folder untouched when the picker is cancelled (SYN-074)", async () => {
