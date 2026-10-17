@@ -49,5 +49,41 @@ class SqlxPrepareCheck(unittest.TestCase):
             self.assertEqual(check.QualityChecker.sqlx_check_database(checker), {})
 
 
+class TestsWithoutTheApp(unittest.TestCase):
+    # FLOW-042 — a change of the agent connection, the module the `app` feature splits, builds
+    # the library's tests without it, as CI's Windows job does.
+    def test_a_change_of_the_agent_connection_builds_them(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(
+                check.builds_tests_without_the_app(
+                    ["docs/workflow.md", "src-tauri/src/agent_connection/bridge.rs"]
+                )
+            )
+
+    # FLOW-042 — anything else leaves the build out: it costs about a minute.
+    def test_another_change_leaves_them_out(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(
+                check.builds_tests_without_the_app(["src-tauri/src/context/sync/mod.rs"])
+            )
+
+    # FLOW-042 — in CI the Windows job builds them; the Linux job does not build them twice.
+    def test_ci_leaves_them_to_its_windows_job(self):
+        with mock.patch.dict(os.environ, {"CI": "true"}, clear=True):
+            self.assertFalse(
+                check.builds_tests_without_the_app(["src-tauri/src/agent_connection/bridge.rs"])
+            )
+
+
+    # FLOW-042 — when the changed paths cannot be read, the tests are built rather than skipped.
+    def test_unreadable_changes_build_them(self):
+        checker = SimpleNamespace(repo_root=Path("/repo"))
+        failed = SimpleNamespace(returncode=128, stdout="")
+        with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(
+            check.subprocess, "run", return_value=failed
+        ):
+            self.assertTrue(check.QualityChecker.builds_tests_without_the_app(checker))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -38,6 +38,8 @@ STATUS_UNCOMMITTED = "Uncommitted"
 # multi-crate workspace at `crates/api/`) override this single constant
 # to point check.py at their Rust root.
 BACKEND_DIR = "src-tauri"
+# The module the `app` feature splits: its tests are also built without it (FLOW-042).
+AGENT_CONNECTION_DIR = f"{BACKEND_DIR}/src/agent_connection/"
 
 # Skip reasons for partial-stack projects. Use these everywhere a check
 # is gated on a stack marker — single source of truth for the message
@@ -141,6 +143,19 @@ def _pad_visible(s: str, width: int) -> str:
     return s + " " * max(0, width - visible_cols)
 
 
+def builds_tests_without_the_app(changed: list[str]) -> bool:
+    """Whether the library's tests are also built without default features (FLOW-042).
+
+    CI's Windows job builds them so (`cargo test --lib --no-default-features`), and a test
+    reaching a module compiled only with `app` failed there and nowhere else. Locally they
+    are built when the branch changed the agent connection, the module `app` splits; in CI
+    the Windows job does it, and the Linux job does not build them twice.
+    """
+    if os.environ.get("CI") == "true":
+        return False
+    return any(path.startswith(AGENT_CONNECTION_DIR) for path in changed)
+
+
 class QualityChecker:
     def __init__(
         self,
@@ -218,6 +233,7 @@ class QualityChecker:
             "react_tests": STATUS_SKIPPED,
             "rust_lib": STATUS_SKIPPED,
             "rust_beh": STATUS_SKIPPED,
+            "rust_no_app": STATUS_SKIPPED,
             "build": STATUS_SKIPPED,
             "sqlx": STATUS_PENDING,
             "lint": STATUS_PENDING,
@@ -651,6 +667,23 @@ class QualityChecker:
         merged with step-specific vars like SQLX_OFFLINE."""
         return {**self.cargo_jobs_env, **extra}
 
+    def builds_tests_without_the_app(self) -> bool:
+        """The paths the branch changed, uncommitted work included, decide (FLOW-042).
+
+        When they cannot be read, the tests are built: a check that turns itself off unseen
+        is the failure FLOW-042 removes.
+        """
+        result = subprocess.run(
+            ["bash", str(self.repo_root / "scripts" / "branch.sh"), "files"],
+            cwd=self.repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            return os.environ.get("CI") != "true"
+        return builds_tests_without_the_app(result.stdout.splitlines())
+
     def _run_backend_group(self):
         """Backend steps: rust tests, sqlx, clippy, fmt."""
         run_tests = not self.fast_mode and not self.skip_tests
@@ -683,6 +716,15 @@ class QualityChecker:
                     env_update=self._cargo_env(SQLX_OFFLINE="true"),
                 ):
                     self._set_metric("rust_beh", STATUS_PASS)
+
+            if self.builds_tests_without_the_app():
+                if self.run_step(
+                    "Rust Tests Without The App",
+                    ["cargo", "test", "--lib", "--no-default-features", "--no-run"],
+                    cwd=self.repo_root / BACKEND_DIR,
+                    env_update=self._cargo_env(SQLX_OFFLINE="true"),
+                ):
+                    self._set_metric("rust_no_app", STATUS_PASS)
 
         self.check_sqlx()
 
