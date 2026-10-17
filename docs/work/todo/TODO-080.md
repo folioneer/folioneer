@@ -9,3 +9,4 @@ Split from TODO-061 on 2026-10-11 with the owner; after it. The ask of TODO-061 
 **Open questions:**
 
 - [x] The mock-up validated for TODO-061 (`screenshots/design/061-*-ask.png`) shows the ask "with what would become of it": does it stand for a change as it is, or does a change — two states of one transaction side by side — need its own mock-up? — Its own mock-up: two states of one transaction side by side is another layout than one transaction leaving. It is drawn once TODO-061's dialog exists; the entry waits for the queue after it (owner, 2026-10-12).
+- [x] Its mock-up, now that TODO-061's dialog exists: drawn when? — In the next batch's opening block, and validated there (owner, 2026-10-17).

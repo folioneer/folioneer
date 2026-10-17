@@ -9,3 +9,5 @@
   to its lane before the push — the spec lane above all, whose text a fix rewrites.
 - Costs: about a minute per edited spec. Protects: a CI round per rewrite, and a 🔴 that
   reaches the pull request.
+- Size: S — one pull request: a line of `/run-entry`'s review step.
+- Queued by the owner on 2026-10-17.

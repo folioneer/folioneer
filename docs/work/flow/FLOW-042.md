@@ -10,3 +10,5 @@ agent_connection`). The local harness passed: it builds with the default feature
 --lib --no-default-features --no-run` — as CI's Windows job does.
 - Costs: one more build of the tests, about a minute, on the pull requests that touch
   the agent connection. Protects: a CI round, and a Windows-only failure found on Linux.
+- Size: S — one pull request: a check of `scripts/check.py`, with its test.
+- Queued by the owner on 2026-10-17.

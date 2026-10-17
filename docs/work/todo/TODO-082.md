@@ -8,4 +8,6 @@ A confirmation like starting over's, shown only when the folder chosen holds no 
 **User value:** The owner knows what moving the portfolio costs his other computers before he moves it.
 **Done when:** choosing a folder that holds no portfolio asks to confirm, saying the other computers rejoin from a fresh installation, keeping the current folder by default; a folder that holds the portfolio followed asks nothing; SYN-074 says so.
 **Design:** none
-**Open questions:** none
+**Open questions:**
+
+- [x] A new confirmation dialog is a screen change: its mock-up and its sentences in two languages, when? — Drawn in the next batch's opening block on the start-over confirmation's model, keeping the current folder in focus, and validated there (owner, 2026-10-17).
