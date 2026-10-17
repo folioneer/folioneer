@@ -1182,13 +1182,14 @@ impl HoldingTransactionUseCase {
         assets.sort_unstable();
         assets.dedup();
         let mut holdings = Vec::new();
-        let mut cash = 0;
+        // The cash moves with every transaction that brings or takes it, not only those on
+        // the cash line: an account of opening balances alone has none there (DEBT-135).
+        let cash = Account::cash_balance_as_of(transactions, date);
         for asset_id in assets {
-            let snapshot = Account::holding_snapshot_as_of(transactions, asset_id, date);
             if crate::core::cash::is_cash_asset(asset_id) {
-                cash += snapshot.quantity;
                 continue;
             }
+            let snapshot = Account::holding_snapshot_as_of(transactions, asset_id, date);
             if snapshot.quantity == 0 {
                 continue;
             }

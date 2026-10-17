@@ -4230,6 +4230,59 @@ async fn agt_072_a_preview_changes_nothing_and_shows_the_account_before_and_afte
     assert_eq!(written_rows(&bench).await, written, "nothing was written");
 }
 
+// AGT-072 / DEBT-135 — an account built from opening balances alone holds no transaction on
+// its cash line: the cash its sale brings is still shown, as the account will hold it.
+#[tokio::test]
+async fn agt_072_the_cash_of_an_account_built_from_opening_balances_is_previewed() {
+    use crate::use_cases::holding_transaction::{Recording, Target};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&bench.accounts) as _;
+    let assets: Arc<dyn AssetServiceContract> = Arc::clone(&bench.assets) as _;
+    AccountCreationUseCase::new(accounts, assets)
+        .create(
+            "CTO".to_string(),
+            String::new(),
+            "EUR".to_string(),
+            UpdateFrequency::ManualMonth,
+            false,
+        )
+        .await
+        .expect("account");
+    bench
+        .recorder
+        .record_named(
+            Recording::Open {
+                target: Target {
+                    account: "CTO".to_string(),
+                    asset: "CW8".to_string(),
+                    date: Some("2026-01-05".to_string()),
+                    quantity: 10 * M,
+                },
+                total_cost: 100 * M,
+            },
+            "2026-10-17",
+        )
+        .await
+        .expect("opened");
+    let granted = session(&bench.connections).await;
+
+    let sold = bench
+        .tools
+        .call(
+            &granted,
+            "preview_recording",
+            &json!({ "tool": "record_sale", "arguments": { "account": "CTO", "asset": "CW8", "quantity": 10, "price": 15, "date": "2026-03-01" } }),
+        )
+        .await
+        .expect("previewed");
+
+    assert_eq!(sold["before"]["cash"], 0);
+    assert_eq!(sold["after"]["cash"], 150 * M);
+    assert_eq!(sold["after"]["holdings"], json!([]));
+}
+
 // AGT-072 — a preview gives the refusal the real call gives, for each kind; a tool it does
 // not preview is refused, naming the four.
 #[tokio::test]
