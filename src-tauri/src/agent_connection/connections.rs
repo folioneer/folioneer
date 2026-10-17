@@ -962,4 +962,126 @@ mod tests {
         connections.notify();
         assert_eq!(changes.load(Ordering::SeqCst), before + 1);
     }
+
+    async fn granted(connections: &Arc<AgentConnections>, client: &str) -> Granted {
+        let asking = Arc::clone(connections);
+        let client = client.to_string();
+        let asked = tokio::spawn(async move { asking.ask(&client).await });
+        let request = waiting(connections).await;
+        assert!(connections.answer(request.id, true));
+        asked.await.expect("asked").expect("granted")
+    }
+
+    fn shown(id: &str) -> TransactionShown {
+        TransactionShown {
+            id: id.to_string(),
+            date: "2026-01-02".to_string(),
+            account: "PEA".to_string(),
+            currency: "EUR".to_string(),
+            kind: TransactionType::Deposit,
+            asset_name: None,
+            asset_reference: None,
+            quantity: 5_000_000_000,
+            amount: 5_000_000_000,
+            unit_price: 1_000_000,
+            fees: 0,
+            exchange_rate: 1_000_000,
+            note: None,
+        }
+    }
+
+    fn fields() -> CorrectionFields {
+        CorrectionFields {
+            date: "2026-01-03".to_string(),
+            quantity: 4_000_000_000,
+            unit_price: 1_000_000,
+            exchange_rate: 1_000_000,
+            fees: 0,
+            total: None,
+            note: None,
+        }
+    }
+
+    async fn until(condition: impl Fn() -> bool) {
+        for _ in 0..200 {
+            if condition() {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        panic!("the condition never held");
+    }
+
+    // AGT-036 / AGT-081 / AGT-088 — a removal or change request arriving, answered or
+    // withdrawn tells the window; the requests wait oldest first, in one order.
+    #[tokio::test]
+    async fn agt_036_a_request_arriving_answered_or_withdrawn_tells_the_window() {
+        let (connections, changes) = counted();
+        let first = granted(&connections, "claude-code").await;
+        let second = granted(&connections, "claude-desktop").await;
+        let told = || changes.load(Ordering::SeqCst);
+
+        // Arriving: the window is told, and the oldest is first.
+        let before = told();
+        let asking = Arc::clone(&connections);
+        let by_first = first.clone();
+        let removal =
+            tokio::spawn(async move { asking.ask_removal(&by_first, shown("tx-1")).await });
+        until(|| connections.removals().len() == 1).await;
+        assert_eq!(told(), before + 1);
+        let asking = Arc::clone(&connections);
+        let by_second = second.clone();
+        let other_removal =
+            tokio::spawn(async move { asking.ask_removal(&by_second, shown("tx-2")).await });
+        let asking = Arc::clone(&connections);
+        let by_first = first.clone();
+        let change = tokio::spawn(async move {
+            asking
+                .ask_change(&by_first, shown("tx-3"), shown("tx-3"), fields())
+                .await
+        });
+        until(|| connections.removals().len() == 2 && connections.changes().len() == 1).await;
+        assert_eq!(told(), before + 3);
+        let removals = connections.removals();
+        assert_eq!(removals[0].transaction.id, "tx-1");
+        assert_eq!(removals[1].transaction.id, "tx-2");
+        assert!(removals[1].id < connections.changes()[0].id);
+
+        // Answered: the window is told it is gone.
+        let answered = connections.take_removal(removals[0].id).expect("waiting");
+        answered.tell(RemovalAnswer::Refused);
+        assert!(matches!(
+            removal.await.expect("asked"),
+            RemovalAnswer::Refused
+        ));
+        assert_eq!(told(), before + 4);
+        let change_id = connections.changes()[0].id;
+        connections
+            .take_change(change_id)
+            .expect("waiting")
+            .tell(ChangeAnswer::Refused);
+        assert!(matches!(
+            change.await.expect("asked"),
+            ChangeAnswer::Refused
+        ));
+        assert_eq!(told(), before + 5);
+
+        // Withdrawn: a call that goes away takes its request with it, and the window is told.
+        other_removal.abort();
+        let _ = other_removal.await;
+        assert!(connections.removals().is_empty());
+        assert_eq!(told(), before + 6);
+        let asking = Arc::clone(&connections);
+        let by_second = second.clone();
+        let other_change = tokio::spawn(async move {
+            asking
+                .ask_change(&by_second, shown("tx-4"), shown("tx-4"), fields())
+                .await
+        });
+        until(|| connections.changes().len() == 1).await;
+        other_change.abort();
+        let _ = other_change.await;
+        assert!(connections.changes().is_empty());
+        assert_eq!(told(), before + 8);
+    }
 }

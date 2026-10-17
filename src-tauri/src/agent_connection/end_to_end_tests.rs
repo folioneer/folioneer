@@ -105,6 +105,19 @@ async fn application_with_accounts(
 /// The application as the window runs it: its services and its agent connection publish on
 /// one bus, which the test listens to in the window's place.
 async fn application_on_bus(data_dir: &Path) -> (Arc<AgentGate>, EventReceiver) {
+    let on_bus = owner_on_bus(data_dir).await;
+    (on_bus.gate, on_bus.window)
+}
+
+/// The application on its bus, with what the owner answers through and its database.
+struct OnBus {
+    gate: Arc<AgentGate>,
+    window: EventReceiver,
+    recorder: crate::use_cases::holding_transaction::HoldingTransactionUseCase,
+    pool: sqlx::SqlitePool,
+}
+
+async fn owner_on_bus(data_dir: &Path) -> OnBus {
     // Seeds the account, its cash and the asset.
     drop(application_with_accounts(data_dir).await);
     let database = Database::new(data_dir.to_path_buf())
@@ -112,6 +125,7 @@ async fn application_on_bus(data_dir: &Path) -> (Arc<AgentGate>, EventReceiver) 
         .expect("database");
     let bus = Arc::new(SideEffectEventBus::new());
     let window = bus.subscribe();
+    let pool = database.pool.clone();
     let recorder = Arc::new(SqliteChangeRecorder::new(database.pool.clone()));
     let container =
         AppContainer::build(database.pool, None, None, Some(Arc::clone(&bus)), recorder);
@@ -128,7 +142,15 @@ async fn application_on_bus(data_dir: &Path) -> (Arc<AgentGate>, EventReceiver) 
             connections,
         )),
     ));
-    (gate, window)
+    OnBus {
+        gate,
+        window,
+        recorder: crate::use_cases::holding_transaction::HoldingTransactionUseCase::new(
+            Arc::clone(&container.account_service) as _,
+            Arc::clone(&container.asset_service) as _,
+        ),
+        pool,
+    }
 }
 
 fn reaching(data_dir: &Path) -> Connector {
@@ -662,6 +684,8 @@ struct Workbench {
     accounts: Arc<crate::context::account::AccountService>,
     assets: Arc<crate::context::asset::AssetService>,
     recorder: crate::use_cases::holding_transaction::HoldingTransactionUseCase,
+    /// The portfolio's database, for a test that makes it unreadable.
+    pool: sqlx::SqlitePool,
 }
 
 async fn workbench(data_dir: &Path) -> Workbench {
@@ -670,6 +694,7 @@ async fn workbench(data_dir: &Path) -> Workbench {
     let database = Database::new(data_dir.to_path_buf())
         .await
         .expect("database");
+    let pool = database.pool.clone();
     let container = AppContainer::for_headless_writes(database.pool);
     let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&container.account_service) as _;
     let assets: Arc<dyn AssetServiceContract> = Arc::clone(&container.asset_service) as _;
@@ -688,6 +713,7 @@ async fn workbench(data_dir: &Path) -> Workbench {
         recorder: crate::use_cases::holding_transaction::HoldingTransactionUseCase::new(
             accounts, assets,
         ),
+        pool,
     }
 }
 
@@ -766,6 +792,10 @@ async fn agt_050_a_session_corrects_and_cancels_what_it_recorded() {
     assert_eq!(moved["transaction"]["quantity"], 3 * M);
     assert_eq!(moved["transaction"]["total_amount"], 300 * M);
     assert_eq!(moved["transaction"]["note"], "the right day");
+    // AGT-052 — the last recording is told as it stands after the correction.
+    let told = bench.connections.sessions().remove(0);
+    let last = told.last_recording.expect("a last recording");
+    assert_eq!(last.date, "2026-02-03");
     // A new total is taken as typed.
     let priced = call(
         "correct_recording",
@@ -3628,5 +3658,455 @@ async fn agt_088_a_change_answers_what_was_shown_and_requests_share_one_order() 
             .expect_err("withdrawn")
             .code,
         "RemovalRefused"
+    );
+}
+
+// AGT-070 / AGT-071 / AGT-080 / AGT-081 — a portfolio that cannot be read is refused with
+// `DatabaseError`: a listing, a price, a removal asked, and the owner's yes to one waiting.
+#[tokio::test]
+async fn agt_080_a_portfolio_that_cannot_be_read_is_a_database_error() {
+    use super::gate::{answer_removal, AnswerRefused};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = Arc::new(workbench(data_dir.path()).await);
+    let granted = session(&bench.connections).await;
+    let deposit = typed_deposit(&bench).await;
+
+    let tools = Arc::clone(&bench);
+    let waiting_granted = granted.clone();
+    let id = deposit.id.clone();
+    let asked = tokio::spawn(async move {
+        tools
+            .tools
+            .call(
+                &waiting_granted,
+                "request_removal",
+                &json!({ "transaction": id }),
+            )
+            .await
+    });
+    let request = removal_waiting(&bench.connections).await;
+
+    for table in ["transactions", "asset_prices"] {
+        sqlx::query(&format!("ALTER TABLE {table} RENAME TO {table}_unreadable"))
+            .execute(&bench.pool)
+            .await
+            .expect("made unreadable");
+    }
+
+    assert_eq!(
+        answer_removal(&bench.connections, &bench.recorder, request.id, true).await,
+        Err(AnswerRefused::Unreadable)
+    );
+    assert_eq!(
+        asked.await.expect("asked").expect_err("unreadable").code,
+        "DatabaseError"
+    );
+    for (tool, arguments) in [
+        ("list_transactions", json!({ "account": "PEA" })),
+        ("get_price", json!({ "asset": "CW8", "date": "2026-01-02" })),
+        ("request_removal", json!({ "transaction": deposit.id })),
+    ] {
+        let refused = bench
+            .tools
+            .call(&granted, tool, &arguments)
+            .await
+            .expect_err("unreadable");
+        assert_eq!(refused.code, "DatabaseError", "{tool}");
+    }
+}
+
+// AGT-080 / AGT-081 — a removal request takes no place of the session's limit: a session at
+// its limit still asks; two sessions may ask for one transaction, and once it is removed the
+// other's yes finds it no more; a split's quantity is shown as its factor.
+#[tokio::test]
+async fn agt_080_two_sessions_ask_for_one_transaction_outside_the_limit() {
+    use super::connections::MAX_RECORDINGS;
+    use super::gate::{answer_removal, AnswerRefused};
+    use crate::use_cases::holding_transaction::{Recording, Target};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = Arc::new(workbench(data_dir.path()).await);
+    let first = session(&bench.connections).await;
+    let second = session(&bench.connections).await;
+    for _ in 0..MAX_RECORDINGS {
+        first.count_recording();
+    }
+    let opened = bench
+        .recorder
+        .record_named(
+            Recording::Open {
+                target: Target {
+                    account: "PEA".to_string(),
+                    asset: "CW8".to_string(),
+                    date: Some("2026-01-05".to_string()),
+                    quantity: 10 * M,
+                },
+                total_cost: 4_000 * M,
+            },
+            "2026-10-17",
+        )
+        .await
+        .expect("opened");
+    let split = bench
+        .recorder
+        .record_split(
+            &opened.transaction.account_id,
+            opened.transaction.asset_id.clone(),
+            "2026-02-01".to_string(),
+            3 * M,
+            None,
+        )
+        .await
+        .expect("split");
+    let ask = |granted: super::connections::Granted| {
+        let bench = Arc::clone(&bench);
+        let id = split.id.clone();
+        tokio::spawn(async move {
+            bench
+                .tools
+                .call(&granted, "request_removal", &json!({ "transaction": id }))
+                .await
+        })
+    };
+
+    let by_first = ask(first.clone());
+    removal_waiting(&bench.connections).await;
+    let by_second = ask(second.clone());
+    until("two removal requests", || {
+        bench.connections.removals().len() == 2
+    })
+    .await;
+    let requests = bench.connections.removals();
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[0].session, first.session_id);
+    assert_eq!(requests[0].transaction.quantity, 3 * M, "a split's factor");
+
+    answer_removal(&bench.connections, &bench.recorder, requests[0].id, true)
+        .await
+        .expect("removed");
+    by_first.await.expect("asked").expect("removed");
+    assert_eq!(
+        answer_removal(&bench.connections, &bench.recorder, requests[1].id, true).await,
+        Err(AnswerRefused::NotDone {
+            reason: "TransactionNotFound".to_string()
+        })
+    );
+    assert_eq!(
+        by_second.await.expect("asked").expect_err("gone").code,
+        "TransactionNotFound"
+    );
+}
+
+// AGT-052 — a recording the owner deletes in the journal is not told at once: the session's
+// next write tells what is left.
+#[tokio::test]
+async fn agt_052_a_deletion_in_the_journal_is_told_at_the_next_write() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+
+    let first = recorded_id(
+        &call(
+            "record_deposit",
+            json!({ "account": "PEA", "amount": 10, "date": "2026-02-01" }),
+        )
+        .await
+        .expect("recorded"),
+    );
+    let deleted = bench
+        .accounts
+        .get_transaction_by_id(&first)
+        .await
+        .expect("read")
+        .expect("recorded");
+    bench
+        .recorder
+        .cancel_transaction(&deleted.account_id, &deleted.id)
+        .await
+        .expect("deleted in the journal");
+    assert_eq!(
+        bench.connections.sessions().remove(0).recordings,
+        1,
+        "not told yet"
+    );
+
+    call(
+        "record_deposit",
+        json!({ "account": "PEA", "amount": 20, "date": "2026-02-02" }),
+    )
+    .await
+    .expect("recorded");
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.recordings, 1);
+    assert_eq!(
+        told.last_recording.expect("a last recording").date,
+        "2026-02-02"
+    );
+}
+
+/// A live client that said hello and whose first call waits for the owner's answer.
+async fn waiting_for_the_owner(data_dir: &Path, gate: &Arc<AgentGate>) -> LiveClient {
+    let mut client = LiveClient::start(data_dir);
+    client
+        .say(json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize",
+            "params": { "clientInfo": { "name": "claude-code" } } }))
+        .await;
+    client.heard().await;
+    client
+        .say(serde_json::from_str(&call(1, "list_accounts", json!({}))).expect("json"))
+        .await;
+    until("the connection request", || {
+        !gate.connections().requests().is_empty()
+    })
+    .await;
+    client
+}
+
+// AGT-085 — a cancel naming no call being answered is ignored: the connection request
+// still waits, and the call is answered once the owner allows.
+#[tokio::test]
+async fn agt_085_a_cancel_naming_no_call_is_ignored() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let gate = application(data_dir.path()).await;
+    gate.allow(true).expect("allowed");
+    let mut client = waiting_for_the_owner(data_dir.path(), &gate).await;
+
+    client.say(cancelled(99)).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(gate.connections().requests().len(), 1, "still waiting");
+
+    owner_answers(&gate, true).await.expect("owner");
+    let answered = client.heard().await;
+    assert_eq!(answered["id"], 1);
+    assert_eq!(answered["result"]["isError"], false);
+}
+
+// AGT-085 — past 64 lines sent while a call waits, the bridge stops reading the agent: a
+// cancel sent after them is not read, so the connection request still waits; it is read
+// once the call is answered.
+#[tokio::test]
+async fn agt_085_the_bridge_stops_reading_after_64_waiting_lines() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let gate = application(data_dir.path()).await;
+    gate.allow(true).expect("allowed");
+    let mut client = waiting_for_the_owner(data_dir.path(), &gate).await;
+
+    for _ in 0..64 {
+        client
+            .say(json!({ "jsonrpc": "2.0", "method": "notifications/progress" }))
+            .await;
+    }
+    client.say(cancelled(1)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(
+        gate.connections().requests().len(),
+        1,
+        "the cancel past the 64 lines was not read"
+    );
+
+    owner_answers(&gate, true).await.expect("owner");
+    assert_eq!(client.heard().await["id"], 1);
+}
+
+// AGT-085 — up to 64 lines are read while a call waits: a cancel that is the 64th is read,
+// and withdraws the connection request.
+#[tokio::test]
+async fn agt_085_the_64th_waiting_line_is_still_read() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let gate = application(data_dir.path()).await;
+    gate.allow(true).expect("allowed");
+    let mut client = waiting_for_the_owner(data_dir.path(), &gate).await;
+
+    for _ in 0..63 {
+        client
+            .say(json!({ "jsonrpc": "2.0", "method": "notifications/progress" }))
+            .await;
+    }
+    client.say(cancelled(1)).await;
+    until("the withdrawal", || {
+        gate.connections().requests().is_empty()
+    })
+    .await;
+}
+
+// AGT-085 — once granted, a cancel of a call whose removal request waits on the owner
+// changes nothing: the request still waits, and the call is answered with the owner's
+// refusal.
+#[tokio::test]
+async fn agt_085_a_cancel_while_a_removal_request_waits_changes_nothing() {
+    use super::connections::RemovalAnswer;
+    use crate::context::account::JournalFilter;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let (gate, accounts) = application_with_accounts(data_dir.path()).await;
+    gate.allow(true).expect("allowed");
+    let owner = owner_answers(&gate, true);
+    let account = accounts.get_all().await.expect("accounts").remove(0);
+    let deposit = accounts
+        .get_account_journal(&account.id, &JournalFilter::default())
+        .await
+        .expect("journal")
+        .rows
+        .remove(0)
+        .transaction;
+    let mut client = LiveClient::start(data_dir.path());
+    client
+        .say(json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize",
+            "params": { "clientInfo": { "name": "claude-code" } } }))
+        .await;
+    client.heard().await;
+    client
+        .say(
+            serde_json::from_str(&call(
+                1,
+                "request_removal",
+                json!({ "transaction": deposit.id }),
+            ))
+            .expect("json"),
+        )
+        .await;
+    owner.await.expect("owner");
+    until("the removal request", || {
+        !gate.connections().removals().is_empty()
+    })
+    .await;
+
+    client.say(cancelled(1)).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let waiting = gate.connections().removals();
+    assert_eq!(waiting.len(), 1, "the cancel changed nothing");
+
+    gate.connections()
+        .take_removal(waiting[0].id)
+        .expect("waiting")
+        .tell(RemovalAnswer::Refused);
+    let answered = client.heard().await;
+    assert_eq!(answered["id"], 1);
+    assert_eq!(answered["result"]["isError"], true);
+    assert!(answered["result"]["content"][0]["text"]
+        .as_str()
+        .is_some_and(|text| text.contains("did not remove")));
+    assert_eq!(gate.connections().sessions().len(), 1);
+}
+
+/// A live client in a session the owner allowed, its first call answered.
+async fn allowed_client(data_dir: &Path, gate: &Arc<AgentGate>) -> LiveClient {
+    let owner = owner_answers(gate, true);
+    let mut client = LiveClient::start(data_dir);
+    client
+        .say(json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize",
+            "params": { "clientInfo": { "name": "claude-code" } } }))
+        .await;
+    client.heard().await;
+    client
+        .say(serde_json::from_str(&call(1, "list_accounts", json!({}))).expect("json"))
+        .await;
+    assert_eq!(client.heard().await["id"], 1);
+    owner.await.expect("owner");
+    client
+}
+
+/// The window's events until `wanted` of them are `TransactionUpdated`.
+async fn transactions_told(window: &mut EventReceiver, wanted: usize) -> Vec<Event> {
+    let mut told = Vec::new();
+    for _ in 0..400 {
+        told.extend(window.drain());
+        if told
+            .iter()
+            .filter(|event| **event == Event::TransactionUpdated)
+            .count()
+            >= wanted
+        {
+            return told;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    panic!("the window was told {told:?}");
+}
+
+// AGT-036 / AGT-081 — the owner's removal of a transaction an agent asked about publishes
+// `TransactionUpdated`; a recording that cannot be marked publishes twice — once written,
+// once undone — though the call is refused (AGT-049).
+#[tokio::test]
+async fn agt_036_the_owners_removal_and_an_undone_recording_reach_the_window() {
+    use super::gate::answer_removal;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let mut on_bus = owner_on_bus(data_dir.path()).await;
+    on_bus.gate.allow(true).expect("allowed");
+    let typed: String = sqlx::query_scalar("SELECT id FROM transactions LIMIT 1")
+        .fetch_one(&on_bus.pool)
+        .await
+        .expect("the seeded deposit");
+
+    // The owner's removal on an agent's request.
+    let mut client = allowed_client(data_dir.path(), &on_bus.gate).await;
+    on_bus.window.drain();
+    client
+        .say(
+            serde_json::from_str(&call(2, "request_removal", json!({ "transaction": typed })))
+                .expect("json"),
+        )
+        .await;
+    until("the removal request", || {
+        !on_bus.gate.connections().removals().is_empty()
+    })
+    .await;
+    let request = on_bus.gate.connections().removals().remove(0);
+    assert!(
+        !on_bus.window.drain().contains(&Event::TransactionUpdated),
+        "nothing is told before the owner's answer"
+    );
+    answer_removal(
+        on_bus.gate.connections(),
+        &on_bus.recorder,
+        request.id,
+        true,
+    )
+    .await
+    .expect("removed");
+    assert_eq!(client.heard().await["id"], 2);
+    transactions_told(&mut on_bus.window, 1).await;
+
+    drop(client.writing);
+    until("the session's end", || {
+        on_bus.gate.connections().sessions().is_empty()
+    })
+    .await;
+
+    // AGT-049 — a recording that cannot be marked is written, then undone: two events.
+    sqlx::query("DROP TABLE agent_recordings")
+        .execute(&on_bus.pool)
+        .await
+        .expect("dropped");
+    let mut client = allowed_client(data_dir.path(), &on_bus.gate).await;
+    on_bus.window.drain();
+    client
+        .say(
+            serde_json::from_str(&call(
+                2,
+                "record_deposit",
+                json!({ "account": "PEA", "amount": 10, "date": "2026-02-02" }),
+            ))
+            .expect("json"),
+        )
+        .await;
+    let refused = client.heard().await;
+    assert_eq!(refused["result"]["isError"], true);
+    let mut told = transactions_told(&mut on_bus.window, 2).await;
+    // Settled: no third event follows.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    told.extend(on_bus.window.drain());
+    assert_eq!(
+        told.iter()
+            .filter(|event| **event == Event::TransactionUpdated)
+            .count(),
+        2,
+        "{told:?}"
     );
 }

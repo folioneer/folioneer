@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-i18next", () => ({
@@ -290,6 +290,45 @@ describe("AgentConnectionMount", () => {
     expect(document.getElementById("agent-change-was-unit_price")).toBeNull();
   });
 
+  // AGT-083 — the keyboard stays on the removal dialog's actions, and its backdrop does not
+  // dismiss it.
+  it("keeps Tab on the removal dialog's actions and ignores its backdrop", () => {
+    hook.mockReturnValue(state({ removal: removal() }));
+    render(
+      <>
+        <button type="button" id="behind">
+          behind
+        </button>
+        <AgentConnectionMount />
+      </>,
+    );
+    const refuse = document.getElementById("agent-removal-refuse") as HTMLElement;
+    const remove = document.getElementById("agent-removal-remove") as HTMLElement;
+    act(() => vi.advanceTimersByTime(ALLOW_AFTER_MS));
+    fireEvent.keyDown(refuse, { key: "Tab" });
+    expect(remove).toHaveFocus();
+    fireEvent.keyDown(remove, { key: "Tab" });
+    expect(refuse).toHaveFocus();
+    expect(document.getElementById("behind")).not.toHaveFocus();
+
+    const backdrop = screen.getByRole("dialog").parentElement?.querySelector("button[aria-hidden]");
+    fireEvent.click(backdrop as HTMLElement);
+    expect(answerRemoval).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toHaveAttribute("id", "agent-removal-dialog");
+  });
+
+  // AGT-083 — a split's quantity is its factor, and a total of 0 is shown as 0.
+  it("shows a split's factor and a total of 0", () => {
+    const split = { ...removal().transaction, kind: "Split", quantity: 2_000_000, amount: 0 };
+    hook.mockReturnValue(state({ removal: removal({ transaction: split }) }));
+    render(<AgentConnectionMount />);
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("transaction.type_split");
+    expect(within(dialog).getByText("2")).toBeInTheDocument();
+    expect(within(dialog).getByText(/^0[.,]00 EUR$/)).toBeInTheDocument();
+  });
+
   // AGT-083 — an agent asking to connect comes first; the removal waits its turn.
   it("shows a connection request before a removal request", () => {
     hook.mockReturnValue(state({ request, removal: null }));
@@ -491,6 +530,23 @@ describe("AgentIndicator", () => {
     rerender(<AgentIndicator />);
     expect(document.getElementById("agent-session-remove-confirm")).toBeNull();
     expect(document.getElementById("agent-session-dialog")).toBeNull();
+  });
+
+  // AGT-054 — the removal's confirmation closes, with the session dialog, when the session
+  // ends.
+  it("closes the removal's confirmation when the session ends", () => {
+    const other = session({ id: 2, client: "Claude Desktop" });
+    hook.mockReturnValue(state({ sessions: [session(), other] }));
+    const { rerender } = render(<AgentIndicator />);
+    fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
+    fireEvent.click(document.getElementById("agent-session-remove") as HTMLElement);
+    expect(document.getElementById("agent-session-remove-confirm")).not.toBeNull();
+
+    hook.mockReturnValue(state({ sessions: [other] }));
+    rerender(<AgentIndicator />);
+    expect(document.getElementById("agent-connected-2")).not.toBeNull();
+    expect(document.getElementById("agent-session-remove-confirm")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   // AGT-034 — the dialog disconnects its agent, and closes once the session is gone.

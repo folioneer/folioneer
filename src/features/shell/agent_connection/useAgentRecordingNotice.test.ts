@@ -111,4 +111,66 @@ describe("useAgentRecordingNotice", () => {
     rerender({ sessions: [session({ id: 2 })] });
     expect(showSnackbar).toHaveBeenCalledTimes(1);
   });
+
+  // AGT-084 — a rise with no recording left to name says nothing.
+  it("says nothing of a rise when no recording is left", () => {
+    const { rerender } = rendered([session()]);
+    rerender({
+      sessions: [session({ recordings: 0, transactions_recorded: 2, last_recording: null })],
+    });
+    expect(showSnackbar).not.toHaveBeenCalled();
+  });
+
+  // AGT-084 — a recording and an added asset in one read: the recording first, then the
+  // asset, each message replacing the one before.
+  it("says a session's recording before its added asset in one read", () => {
+    const { rerender } = rendered([session()]);
+    rerender({
+      sessions: [
+        session({
+          transactions_recorded: 2,
+          assets_added: 1,
+          last_asset: { name: "Air Liquide", reference: "AI" },
+        }),
+      ],
+    });
+    expect(showSnackbar.mock.calls.map(([message]) => message)).toEqual([
+      "agent.notice_recorded(Claude Code|transaction.type_purchase|CW8|14/03/2019)",
+      "agent.notice_added(Claude Code|Air Liquide|AI)",
+    ]);
+  });
+
+  // AGT-084 — several sessions are said in the order the state gives them, oldest first,
+  // so the last one said stays.
+  it("says several sessions in the order the state gives them", () => {
+    const other = (overrides: Partial<AgentSession> = {}) =>
+      session({ id: 2, client: "Claude Desktop", ...overrides });
+    const { rerender } = rendered([session(), other()]);
+    rerender({
+      sessions: [session({ transactions_recorded: 2 }), other({ transactions_recorded: 2 })],
+    });
+    expect(showSnackbar.mock.calls.map(([message]) => message)).toEqual([
+      "agent.notice_recorded(Claude Code|transaction.type_purchase|CW8|14/03/2019)",
+      "agent.notice_recorded(Claude Desktop|transaction.type_purchase|CW8|14/03/2019)",
+    ]);
+  });
+
+  // AGT-084 — several recordings between two reads make one message, about the last.
+  it("says several recordings between two reads once, about the last", () => {
+    const { rerender } = rendered([session()]);
+    rerender({
+      sessions: [
+        session({
+          recordings: 4,
+          transactions_recorded: 4,
+          last_recording: { kind: "Dividend", asset: "AI", date: "2019-05-02" },
+        }),
+      ],
+    });
+    expect(showSnackbar).toHaveBeenCalledTimes(1);
+    expect(showSnackbar).toHaveBeenCalledWith(
+      "agent.notice_recorded(Claude Code|transaction.type_dividend|AI|02/05/2019)",
+      "info",
+    );
+  });
 });

@@ -7,7 +7,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 const mockInvoke = vi.mocked(invoke);
 
 // Import after mock is registered so bindings.ts picks up the mock
-const { shellGateway } = await import("./gateway");
+const { shellGateway, answerRemovalRequest, answerChangeRequest } = await import("./gateway");
 
 function makeSyncStatus(overrides: Partial<SyncStatusView> = {}): SyncStatusView {
   return {
@@ -103,6 +103,39 @@ describe("shellGateway — the agent connection (AGT-032, AGT-034, AGT-036)", ()
     expect(mockInvoke).toHaveBeenCalledWith("answer_agent_connection", {
       requestId: 4,
       allow: false,
+    });
+  });
+
+  // AGT-081 — the owner's answer to a removal request; a removal that did nothing comes
+  // back with its reason.
+  it("answerRemovalRequest sends the request and the answer, and passes its refusal through", async () => {
+    mockInvoke.mockResolvedValue(null);
+    expect(await answerRemovalRequest(7, true)).toEqual({ status: "ok", data: null });
+    expect(mockInvoke).toHaveBeenCalledWith("answer_removal_request", {
+      requestId: 7,
+      remove: true,
+    });
+
+    mockInvoke.mockRejectedValue({ code: "TransactionNotRemoved", reason: "TransactionChanged" });
+    expect(await answerRemovalRequest(7, true)).toEqual({
+      status: "error",
+      error: { code: "TransactionNotRemoved", reason: "TransactionChanged" },
+    });
+  });
+
+  // AGT-088 — the owner's answer to a change request, and its refusal.
+  it("answerChangeRequest sends the request and the answer, and passes its refusal through", async () => {
+    mockInvoke.mockResolvedValue(null);
+    expect(await answerChangeRequest(8, false)).toEqual({ status: "ok", data: null });
+    expect(mockInvoke).toHaveBeenCalledWith("answer_change_request", {
+      requestId: 8,
+      change: false,
+    });
+
+    mockInvoke.mockRejectedValue({ code: "ChangeRequestGone" });
+    expect(await answerChangeRequest(8, true)).toEqual({
+      status: "error",
+      error: { code: "ChangeRequestGone" },
     });
   });
 
