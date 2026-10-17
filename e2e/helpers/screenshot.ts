@@ -30,6 +30,7 @@ export async function captureScreen(name: string): Promise<void> {
 
   try {
     await freezeForCapture(true);
+    await maskChangingText(true);
     await parkPointer();
     for (const scheme of ["light", "dark"] as const) {
       await setDark(scheme === "dark");
@@ -37,9 +38,48 @@ export async function captureScreen(name: string): Promise<void> {
       await browser.saveScreenshot(resolve(SCREENSHOT_DIR, `${name}-${scheme}.png`));
     }
   } finally {
-    await freezeForCapture(false);
-    await setDark(wasDark);
+    // Each restore runs even when the one before it throws.
+    try {
+      await maskChangingText(false);
+    } finally {
+      try {
+        await freezeForCapture(false);
+      } finally {
+        await setDark(wasDark);
+      }
+    }
   }
+}
+
+// Text the app shows that changes between runs without any change to the screen: the
+// application's version (a release changes it, and its wider digits move the sync
+// page's columns — 0.46 % of the screen on the release of v0.12.0, PR #321) and the
+// sync folder a run creates under a random temporary name. Each is replaced by one
+// fixed placeholder for the capture, then given back its text. Their font, colour and
+// place are still compared; their own width is not, so a folder path that wraps is not.
+const CHANGING_TEXT_IDS = ["sidebar-version", "sync-status-app-version", "sync-status-folder"];
+
+async function maskChangingText(masked: boolean): Promise<void> {
+  await browser.execute(
+    (on: boolean, ids: string[]) => {
+      for (const id of ids) {
+        // The element's own text node, written in place: a React update during the
+        // capture still reaches the node the page shows.
+        const text = document.getElementById(id)?.firstChild;
+        if (!(text instanceof Text)) continue;
+        const holder = text.parentElement as HTMLElement;
+        if (on) {
+          holder.dataset.e2eText = text.nodeValue ?? "";
+          text.nodeValue = "•••";
+        } else if (holder.dataset.e2eText !== undefined) {
+          text.nodeValue = holder.dataset.e2eText;
+          delete holder.dataset.e2eText;
+        }
+      }
+    },
+    masked,
+    CHANGING_TEXT_IDS,
+  );
 }
 
 // Two things the WebView paints on its own schedule, each large enough on its
