@@ -448,6 +448,12 @@ An agent waiting for the owner's answer in the window. Nothing is served to it u
 
 An agent asking the owner, in the window, to remove one transaction the owner typed: the transaction is shown in full with what would become of it, refusing is the default, and the answer covers that one transaction only. The agent calls `request_removal`. In French: "Demande de suppression" (owner, 2026-10-14).
 
+### Change request
+
+> Status: confirmed
+
+An agent asking the owner, in the window, to change one transaction the owner typed, of any kind: the transaction is shown as it is and as it would become, refusing is the default, and the answer covers that one change only. The agent calls `request_change`. In French: "Demande de modification" (owner, 2026-10-17).
+
 ### Agent session
 
 > Status: confirmed

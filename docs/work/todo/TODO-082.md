@@ -7,7 +7,8 @@ A confirmation like starting over's, shown only when the folder chosen holds no 
 **Size:** M — one pull request: a dialog, its sentences in two languages, its screenshots, a rule of the sync spec.
 **User value:** The owner knows what moving the portfolio costs his other computers before he moves it.
 **Done when:** choosing a folder that holds no portfolio asks to confirm, saying the other computers rejoin from a fresh installation, keeping the current folder by default; a folder that holds the portfolio followed asks nothing; SYN-074 says so.
-**Design:** none
+**Design:** validated (`screenshots/design/082-*.png`)
 **Open questions:**
 
 - [x] A new confirmation dialog is a screen change: its mock-up and its sentences in two languages, when? — Drawn in the next batch's opening block on the start-over confirmation's model, keeping the current folder in focus, and validated there (owner, 2026-10-17).
+- [x] The mock-up and its sentences (`screenshots/design/082-*.png`) — validated (owner, 2026-10-17): title "Move the portfolio to an empty folder?" / « Déplacer le portefeuille vers un dossier vide ? »; text "{folder} holds no portfolio. This computer starts it there again, and every other computer will have to rejoin from a fresh installation. Nothing is removed from the current folder." / « {folder} ne contient aucun portefeuille. Cet ordinateur l'y recommence, et chaque autre ordinateur devra rejoindre à partir d'une installation vierge. Rien n'est supprimé du dossier actuel. »; actions "Move to this folder" (outlined) · "Keep the current folder" (filled, in focus) / « Déplacer vers ce dossier » · « Garder le dossier actuel ».
