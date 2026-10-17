@@ -31,10 +31,10 @@ pub use named_listing::{
     TRANSACTIONS_PER_PAGE,
 };
 pub use named_recording::{
-    code_of, decimal, decimal_to_micro, AsShown, CashAmount, Change, ChangeAsked, Correction,
-    CorrectionFields, DividendAmount, FreeShares, PriceAt, Recorded, RecordedPrice, Recording,
-    Refusal, SessionRecordings, SessionRemoval, StockSplit, Target, Trade, TradeAmount,
-    TypedTransaction,
+    code_of, decimal, decimal_to_micro, AccountAsOf, AsShown, CashAmount, Change, ChangeAsked,
+    Correction, CorrectionFields, DividendAmount, FreeShares, HeldAsOf, Previewed, PriceAt,
+    Recorded, RecordedPrice, Recording, Refusal, SessionRecordings, SessionRemoval, StockSplit,
+    Target, Trade, TradeAmount, TypedTransaction,
 };
 pub use orchestrator::{
     DraftKind, HoldingTransactionUseCase, NamedTarget, OpeningBalanceDraft, OpeningBalancePreview,

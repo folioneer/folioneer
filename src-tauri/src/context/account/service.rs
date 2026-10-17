@@ -28,6 +28,58 @@ pub struct AccountService {
     holding_note_repo: Option<Box<dyn HoldingNoteRepository>>,
 }
 
+/// A purchase or a sale as recording takes it (TRX-027, SEL-012).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TradeOp {
+    /// The asset traded.
+    pub asset_id: String,
+    /// The date (YYYY-MM-DD).
+    pub date: String,
+    /// The quantity (micro-units).
+    pub quantity: i64,
+    /// The unit price (micro-units).
+    pub unit_price: i64,
+    /// The exchange rate (micro-units).
+    pub exchange_rate: i64,
+    /// The fees (micro-units).
+    pub fees: i64,
+    /// A typed all-in total, which the unit price then follows.
+    pub total_amount: Option<i64>,
+    /// The note.
+    pub note: Option<String>,
+}
+
+/// A recording an agent previews (AGT-072): what the account's recording takes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RecordingOp {
+    /// A purchase.
+    Buy(TradeOp),
+    /// A sale.
+    Sell(TradeOp),
+    /// A split of `factor` (micro-scaled).
+    Split {
+        /// The asset split.
+        asset_id: String,
+        /// The date.
+        date: String,
+        /// The factor (micro-units).
+        factor: i64,
+        /// The note.
+        note: Option<String>,
+    },
+}
+
+/// What a recording would make of the account, nothing written (AGT-072).
+#[derive(Debug, Clone)]
+pub struct RecordingPreview {
+    /// The transaction as it would be recorded.
+    pub transaction: Transaction,
+    /// The account's transactions without it.
+    pub before: Vec<Transaction>,
+    /// The account's transactions with it.
+    pub after: Vec<Transaction>,
+}
+
 impl AccountService {
     /// Creates a new AccountService.
     pub fn new(
@@ -516,8 +568,9 @@ impl AccountService {
     ) -> Result<Transaction, AccountError> {
         info!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, "buy_holding");
         let mut account = load_account(&*self.account_repo, account_id).await?;
-        let tx = account
-            .buy_holding(
+        let tx = apply(
+            &mut account,
+            RecordingOp::Buy(TradeOp {
                 asset_id,
                 date,
                 quantity,
@@ -526,9 +579,8 @@ impl AccountService {
                 fees,
                 total_amount,
                 note,
-            )
-            .map_err(to_holding_tx_error)?
-            .clone();
+            }),
+        )?;
         save_account(&*self.account_repo, &mut account).await?;
         self.emit_transaction_updated();
         Ok(tx)
@@ -552,8 +604,9 @@ impl AccountService {
     ) -> Result<Transaction, AccountError> {
         info!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, "sell_holding");
         let mut account = load_account(&*self.account_repo, account_id).await?;
-        let tx = account
-            .sell_holding(
+        let tx = apply(
+            &mut account,
+            RecordingOp::Sell(TradeOp {
                 asset_id,
                 date,
                 quantity,
@@ -562,9 +615,8 @@ impl AccountService {
                 fees,
                 total_amount,
                 note,
-            )
-            .map_err(to_holding_tx_error)?
-            .clone();
+            }),
+        )?;
         save_account(&*self.account_repo, &mut account).await?;
         self.emit_transaction_updated();
         Ok(tx)
@@ -669,6 +721,43 @@ impl AccountService {
         Ok((account, tx))
     }
 
+    /// AGT-072 — what recording `op` would make of the account: the account's own recording
+    /// applied to it in memory, with the same refusals, and nothing written.
+    pub async fn preview_recording(
+        &self,
+        account_id: &str,
+        op: RecordingOp,
+    ) -> Result<RecordingPreview, AccountError> {
+        let mut account = load_account(&*self.account_repo, account_id).await?;
+        let before = account.transactions.clone();
+        let transaction = apply(&mut account, op)?;
+        Ok(RecordingPreview {
+            transaction,
+            before,
+            after: account.transactions.clone(),
+        })
+    }
+
+    /// AGT-072 — what recording an opening balance would make of the account, nothing
+    /// written: `open_holding` applied in memory, with its refusals.
+    pub async fn preview_opening(
+        &self,
+        account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity: i64,
+        total_cost: i64,
+    ) -> Result<RecordingPreview, OpenHoldingError> {
+        let mut account = load_account_for_open_holding(&*self.account_repo, account_id).await?;
+        let before = account.transactions.clone();
+        let transaction = apply_opening(&mut account, asset_id, date, quantity, total_cost)?;
+        Ok(RecordingPreview {
+            transaction,
+            before,
+            after: account.transactions.clone(),
+        })
+    }
+
     /// Deletes a transaction and recalculates (or removes) the associated holding (TRX-034).
     ///
     /// Loads the Account aggregate, delegates to `Account::cancel_transaction`, saves atomically.
@@ -706,10 +795,7 @@ impl AccountService {
     ) -> Result<Transaction, OpenHoldingError> {
         info!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, "open_holding");
         let mut account = load_account_for_open_holding(&*self.account_repo, account_id).await?;
-        let tx = account
-            .open_holding(asset_id, date, quantity, total_cost)
-            .map_err(to_open_holding_error)?
-            .clone();
+        let tx = apply_opening(&mut account, asset_id, date, quantity, total_cost)?;
         save_account_for_open_holding(&*self.account_repo, &mut account).await?;
         self.emit_transaction_updated();
         Ok(tx)
@@ -897,8 +983,15 @@ impl AccountService {
     ) -> Result<Transaction, AccountError> {
         info!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, factor = factor, "record_split");
         let mut account = load_account(&*self.account_repo, account_id).await?;
-        let tx = Transaction::split(account.id.clone(), asset_id, date, factor, note)?;
-        let tx = account.apply_split(tx).map_err(to_holding_tx_error)?;
+        let tx = apply(
+            &mut account,
+            RecordingOp::Split {
+                asset_id,
+                date,
+                factor,
+                note,
+            },
+        )?;
         save_account(&*self.account_repo, &mut account).await?;
         self.emit_transaction_updated();
         Ok(tx)
@@ -1882,6 +1975,21 @@ pub trait AccountServiceContract: Send + Sync {
         total_amount: Option<i64>,
         note: Option<String>,
     ) -> StdResult<Transaction, AccountError>;
+    /// AGT-072 — what recording `op` would make of the account, nothing written.
+    async fn preview_recording(
+        &self,
+        account_id: &str,
+        op: RecordingOp,
+    ) -> StdResult<RecordingPreview, AccountError>;
+    /// AGT-072 — what recording an opening balance would make of the account, nothing written.
+    async fn preview_opening(
+        &self,
+        account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity: i64,
+        total_cost: i64,
+    ) -> StdResult<RecordingPreview, OpenHoldingError>;
     /// Deletes a transaction and recalculates (or removes) the associated holding (TRX-034).
     async fn cancel_transaction(
         &self,
@@ -2256,6 +2364,26 @@ impl AccountServiceContract for AccountService {
         .await
     }
 
+    async fn preview_recording(
+        &self,
+        account_id: &str,
+        op: RecordingOp,
+    ) -> StdResult<RecordingPreview, AccountError> {
+        AccountService::preview_recording(self, account_id, op).await
+    }
+
+    async fn preview_opening(
+        &self,
+        account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity: i64,
+        total_cost: i64,
+    ) -> StdResult<RecordingPreview, OpenHoldingError> {
+        AccountService::preview_opening(self, account_id, asset_id, date, quantity, total_cost)
+            .await
+    }
+
     async fn cancel_transaction(
         &self,
         account_id: &str,
@@ -2582,6 +2710,62 @@ async fn save_account_for_open_holding(
         tracing::error!(target: BACKEND, account_id = %account.id, err = ?e, "save_account_for_open_holding: repository failure");
         AccountError::DatabaseError.into()
     })
+}
+
+/// A purchase, a sale or a split applied to `account` in memory — what recording saves and
+/// a preview drops (AGT-072).
+fn apply(account: &mut Account, op: RecordingOp) -> Result<Transaction, AccountError> {
+    match op {
+        RecordingOp::Buy(trade) => account
+            .buy_holding(
+                trade.asset_id,
+                trade.date,
+                trade.quantity,
+                trade.unit_price,
+                trade.exchange_rate,
+                trade.fees,
+                trade.total_amount,
+                trade.note,
+            )
+            .map_err(to_holding_tx_error)
+            .cloned(),
+        RecordingOp::Sell(trade) => account
+            .sell_holding(
+                trade.asset_id,
+                trade.date,
+                trade.quantity,
+                trade.unit_price,
+                trade.exchange_rate,
+                trade.fees,
+                trade.total_amount,
+                trade.note,
+            )
+            .map_err(to_holding_tx_error)
+            .cloned(),
+        RecordingOp::Split {
+            asset_id,
+            date,
+            factor,
+            note,
+        } => {
+            let tx = Transaction::split(account.id.clone(), asset_id, date, factor, note)?;
+            account.apply_split(tx).map_err(to_holding_tx_error)
+        }
+    }
+}
+
+/// An opening balance applied to `account` in memory (TRX-042, AGT-072).
+fn apply_opening(
+    account: &mut Account,
+    asset_id: String,
+    date: String,
+    quantity: i64,
+    total_cost: i64,
+) -> Result<Transaction, OpenHoldingError> {
+    account
+        .open_holding(asset_id, date, quantity, total_cost)
+        .map_err(to_open_holding_error)
+        .cloned()
 }
 
 /// Converts the `anyhow::Error` returned by the buy/sell/correct/cancel

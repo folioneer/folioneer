@@ -335,6 +335,7 @@ mod tests {
                 "add_asset",
                 "correct_recording",
                 "cancel_recording",
+                "preview_recording",
                 "request_removal",
                 "request_change",
             ]

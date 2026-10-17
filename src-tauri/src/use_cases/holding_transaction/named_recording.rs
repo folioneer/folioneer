@@ -6,7 +6,9 @@
 
 use serde::Serialize;
 
-use crate::context::account::{AccountError, AgentRecording, Transaction, TransactionType};
+use crate::context::account::{
+    Account, AccountError, AgentRecording, RecordingPreview, TradeOp, Transaction, TransactionType,
+};
 use crate::context::asset::{Asset, AssetClass, AssetError, AssetPrice};
 use crate::core::BACKEND;
 
@@ -14,7 +16,7 @@ use super::error::{
     DividendError, DividendTask, FreeSharesError, FreeSharesTask, NameLookupError,
     OpenHoldingError, OpenHoldingTask, SplitError, SplitTask,
 };
-use super::orchestrator::{HoldingTransactionUseCase, OpeningBalanceDraft, SplitSize};
+use super::orchestrator::{HoldingTransactionUseCase, NamedTarget, OpeningBalanceDraft, SplitSize};
 
 const MICRO: i64 = 1_000_000;
 /// The longest id a transaction carries: a generated deduction's (`fee-` and 32 digits) and
@@ -398,6 +400,45 @@ fn comparable(t: &Transaction) -> (&str, i64, i64, i64, i64, i64, Option<&str>) 
         t.exchange_rate,
         t.note.as_deref(),
     )
+}
+
+/// An asset an account holds on an evening, as a preview tells it (AGT-072).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct HeldAsOf {
+    /// The asset's reference.
+    pub asset: String,
+    /// The asset's name, which tells apart two assets sharing a reference (CLI-041).
+    pub name: String,
+    /// The quantity held (micro-units).
+    pub quantity: i64,
+    /// The average price, in the account's currency (micro-units).
+    pub average_price: i64,
+}
+
+/// An account on the evening of a date: what it holds and its cash (AGT-072).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AccountAsOf {
+    /// Each asset it holds then, by reference.
+    pub holdings: Vec<HeldAsOf>,
+    /// Its cash, in the account's currency (micro-units).
+    pub cash: i64,
+}
+
+/// What a recording would do, nothing written (AGT-072).
+#[derive(Debug, Clone)]
+pub struct Previewed {
+    /// The transaction as it would be recorded.
+    pub transaction: Transaction,
+    /// The account's name.
+    pub account_name: String,
+    /// The account's currency.
+    pub currency: String,
+    /// The recording's date.
+    pub date: String,
+    /// The account on the evening of that date without the recording.
+    pub before: AccountAsOf,
+    /// The account on the evening of that date with it.
+    pub after: AccountAsOf,
 }
 
 /// What removing everything a session recorded did (AGT-053).
@@ -822,6 +863,173 @@ impl HoldingTransactionUseCase {
         }
     }
 
+    /// AGT-072 — what recording `command` would do, nothing written: the same lookups and
+    /// checks as `record_named`, the account's recording applied in memory, and the account
+    /// on the evening of the date without it and with it. `None` for a recording it does not
+    /// preview.
+    pub async fn preview_named(
+        &self,
+        command: Recording,
+        today: &str,
+    ) -> Option<Result<Previewed, Refusal>> {
+        Some(match command {
+            Recording::Open { target, total_cost } => {
+                self.preview_found(
+                    &target.account,
+                    &target.asset,
+                    target.date.clone(),
+                    today,
+                    |found, date| async move {
+                        self.preview_opening(
+                            &found.account_id,
+                            found.asset_id.clone(),
+                            date,
+                            target.quantity,
+                            total_cost,
+                        )
+                        .await
+                        .map_err(|error| refusal_from_open(&error))
+                    },
+                )
+                .await
+            }
+            Recording::Buy(trade) => {
+                let (account, asset) = (trade.target.account.clone(), trade.target.asset.clone());
+                self.preview_found(
+                    &account,
+                    &asset,
+                    trade.target.date.clone(),
+                    today,
+                    |found, date| async move {
+                        self.preview_buy(
+                            &found.account_id,
+                            trade_op(&trade, found.asset_id.clone(), date),
+                        )
+                        .await
+                        .map_err(|error| refusal_from_account(&error))
+                    },
+                )
+                .await
+            }
+            Recording::Sell(trade) => {
+                let (account, asset) = (trade.target.account.clone(), trade.target.asset.clone());
+                self.preview_found(
+                    &account,
+                    &asset,
+                    trade.target.date.clone(),
+                    today,
+                    |found, date| async move {
+                        self.preview_sell(
+                            &found.account_id,
+                            trade_op(&trade, found.asset_id.clone(), date),
+                        )
+                        .await
+                        .map_err(|error| refusal_from_account(&error))
+                    },
+                )
+                .await
+            }
+            Recording::Split(split) => {
+                let ratio = SplitSize::Ratio {
+                    new: Some(split.new),
+                    old: Some(split.old),
+                };
+                self.preview_found(
+                    &split.account,
+                    &split.asset,
+                    split.date.clone(),
+                    today,
+                    |found, date| async move {
+                        let factor = ratio
+                            .factor()
+                            .map_err(|error| refusal_from_account(&error))?;
+                        self.preview_split_recording(
+                            &found.account_id,
+                            found.asset_id.clone(),
+                            date,
+                            factor,
+                            split.note,
+                        )
+                        .await
+                        .map_err(|error| refusal_from_split(&error))
+                    },
+                )
+                .await
+            }
+            Recording::Deposit(_)
+            | Recording::Withdrawal(_)
+            | Recording::Dividend(_)
+            | Recording::FreeShares(_) => return None,
+        })
+    }
+
+    /// AGT-072 — the account and the asset found by name, `preview` run on them at the date
+    /// (today when none), and the account told without the recording and with it.
+    async fn preview_found<F, Fut>(
+        &self,
+        account: &str,
+        asset: &str,
+        date: Option<String>,
+        today: &str,
+        preview: F,
+    ) -> Result<Previewed, Refusal>
+    where
+        F: FnOnce(NamedTarget, String) -> Fut,
+        Fut: std::future::Future<Output = Result<RecordingPreview, Refusal>>,
+    {
+        let found = self
+            .find_by_name(account, asset)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let date = date.unwrap_or_else(|| today.to_string());
+        let (account_name, currency) = (found.account_name.clone(), found.currency.clone());
+        let previewed = preview(found, date.clone()).await?;
+        Ok(Previewed {
+            transaction: previewed.transaction,
+            account_name,
+            currency,
+            before: self.account_as_of(&previewed.before, &date).await,
+            after: self.account_as_of(&previewed.after, &date).await,
+            date,
+        })
+    }
+
+    /// AGT-072 — the account `transactions` make on the evening of `date`: each asset held,
+    /// by reference, and the cash.
+    async fn account_as_of(&self, transactions: &[Transaction], date: &str) -> AccountAsOf {
+        let mut assets: Vec<&str> = transactions.iter().map(|tx| tx.asset_id.as_str()).collect();
+        assets.sort_unstable();
+        assets.dedup();
+        let mut holdings = Vec::new();
+        let mut cash = 0;
+        for asset_id in assets {
+            let snapshot = Account::holding_snapshot_as_of(transactions, asset_id, date);
+            if crate::core::cash::is_cash_asset(asset_id) {
+                cash += snapshot.quantity;
+                continue;
+            }
+            if snapshot.quantity == 0 {
+                continue;
+            }
+            let (reference, name) = match self.asset_service.get_asset_by_id(asset_id).await {
+                Ok(Some(asset)) => (asset.reference, asset.name),
+                Ok(None) => (asset_id.to_string(), String::new()),
+                Err(error) => {
+                    tracing::error!(target: BACKEND, asset_id = %asset_id, err = ?error, "preview: the asset could not be read");
+                    (asset_id.to_string(), String::new())
+                }
+            };
+            holdings.push(HeldAsOf {
+                asset: reference,
+                name,
+                quantity: snapshot.quantity,
+                average_price: snapshot.average_price,
+            });
+        }
+        holdings.sort_by(|a, b| a.asset.cmp(&b.asset));
+        AccountAsOf { holdings, cash }
+    }
+
     /// AGT-063 — a split: the account and the asset found by what was typed, the factor
     /// its ratio gives (SPL-062), the split recorded through the rules of the window.
     async fn record_split_named(
@@ -1180,6 +1388,21 @@ pub(super) fn refusal_from_lookup(error: &NameLookupError) -> Refusal {
     Refusal {
         code: code_of(error),
         message,
+    }
+}
+
+/// A purchase or a sale as the account records it, at `date` on `asset_id`.
+fn trade_op(trade: &Trade, asset_id: String, date: String) -> TradeOp {
+    let (unit_price, total_amount) = split(trade);
+    TradeOp {
+        asset_id,
+        date,
+        quantity: trade.target.quantity,
+        unit_price,
+        exchange_rate: trade.rate,
+        fees: trade.fees,
+        total_amount,
+        note: trade.note.clone(),
     }
 }
 

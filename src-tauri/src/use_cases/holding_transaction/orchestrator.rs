@@ -6,7 +6,7 @@ use super::error::{
 use super::shared::ensure_cash_asset;
 use crate::context::account::{
     Account, AccountError, AccountServiceContract, EnteredAmount, ManagementFeeRemoval,
-    StockSplitPosition, Transaction, TransactionType,
+    RecordingOp, RecordingPreview, StockSplitPosition, TradeOp, Transaction, TransactionType,
 };
 use crate::context::asset::{Asset, AssetClass, AssetServiceContract};
 use crate::core::logger::BACKEND;
@@ -518,27 +518,114 @@ impl HoldingTransactionUseCase {
         quantity: i64,
         total_cost: i64,
     ) -> Result<Transaction, OpenHoldingError> {
+        self.ensure_openable(account_id, &asset_id).await?;
+        self.account_service
+            .open_holding(account_id, asset_id, date, quantity, total_cost)
+            .await
+    }
+
+    /// TRX-050 / TRX-056 / CSH-061 — the asset an opening balance seeds exists, is not
+    /// archived and is not the cash line.
+    async fn ensure_openable(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+    ) -> Result<(), OpenHoldingError> {
         let asset = self
             .asset_service
-            .get_asset_by_id(&asset_id)
+            .get_asset_by_id(asset_id)
             .await
             .map_err(|e| {
                 tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "open_holding: get_asset_by_id failed");
                 AccountError::DatabaseError
             })?;
         match asset {
-            None => return Err(OpenHoldingTask::AssetNotFound.into()),
-            Some(a) if a.is_archived => return Err(OpenHoldingTask::ArchivedAsset.into()),
+            None => Err(OpenHoldingTask::AssetNotFound.into()),
+            Some(a) if a.is_archived => Err(OpenHoldingTask::ArchivedAsset.into()),
             // CSH-061 — Cash Assets cannot be seeded via OpeningBalance; user records
             // initial cash via `record_deposit` instead.
             Some(a) if a.class == AssetClass::Cash => {
-                return Err(OpenHoldingTask::OpeningBalanceOnCashAsset.into())
+                Err(OpenHoldingTask::OpeningBalanceOnCashAsset.into())
             }
-            Some(_) => {}
+            Some(_) => Ok(()),
         }
+    }
+
+    /// AGT-072 — what recording an opening balance would do, nothing written: the same
+    /// checks, then the account's recording in memory.
+    pub async fn preview_opening(
+        &self,
+        account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity: i64,
+        total_cost: i64,
+    ) -> Result<RecordingPreview, OpenHoldingError> {
+        self.ensure_openable(account_id, &asset_id).await?;
         self.account_service
-            .open_holding(account_id, asset_id, date, quantity, total_cost)
+            .preview_opening(account_id, asset_id, date, quantity, total_cost)
             .await
+    }
+
+    /// AGT-072 — what recording a purchase would do, nothing written. The cash line it moves
+    /// is not seeded: the account is not written.
+    pub async fn preview_buy(
+        &self,
+        account_id: &str,
+        trade: TradeOp,
+    ) -> Result<RecordingPreview, AccountError> {
+        self.ensure_account(account_id).await?;
+        self.account_service
+            .preview_recording(account_id, RecordingOp::Buy(trade))
+            .await
+    }
+
+    /// AGT-072 — what recording a sale would do, nothing written, with the sale's checks.
+    pub async fn preview_sell(
+        &self,
+        account_id: &str,
+        trade: TradeOp,
+    ) -> Result<RecordingPreview, AccountError> {
+        self.ensure_sellable(account_id, &trade.asset_id).await?;
+        self.ensure_account(account_id).await?;
+        self.account_service
+            .preview_recording(account_id, RecordingOp::Sell(trade))
+            .await
+    }
+
+    /// AGT-072 — what recording a split would do, nothing written, with the split's checks.
+    pub async fn preview_split_recording(
+        &self,
+        account_id: &str,
+        asset_id: String,
+        date: String,
+        factor: i64,
+        note: Option<String>,
+    ) -> Result<RecordingPreview, SplitError> {
+        self.ensure_splittable(account_id, &asset_id).await?;
+        self.account_service
+            .preview_recording(
+                account_id,
+                RecordingOp::Split {
+                    asset_id,
+                    date,
+                    factor,
+                    note,
+                },
+            )
+            .await
+            .map_err(SplitError::Account)
+    }
+
+    /// The account exists, as `ensure_cash_for` requires it before seeding the cash line.
+    async fn ensure_account(&self, account_id: &str) -> Result<(), AccountError> {
+        self.account_service
+            .get_by_id(account_id)
+            .await?
+            .map(|_| ())
+            .ok_or_else(|| AccountError::AccountNotFound {
+                account_id: account_id.to_string(),
+            })
     }
 
     /// Records a purchase of an asset into an account (TRX-027).
@@ -589,19 +676,7 @@ impl HoldingTransactionUseCase {
         total_amount: Option<i64>,
         note: Option<String>,
     ) -> Result<Transaction, AccountError> {
-        // SEL-037 — an archived asset is not sold: it is unarchived first (AST-018). An
-        // asset that does not exist is left to the recording's own refusal.
-        let asset = self
-            .asset_service
-            .get_asset_by_id(&asset_id)
-            .await
-            .map_err(|e| {
-                tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "sell_holding: get_asset_by_id failed");
-                AccountError::DatabaseError
-            })?;
-        if asset.is_some_and(|asset| asset.is_archived) {
-            return Err(AccountError::ArchivedAssetSell);
-        }
+        self.ensure_sellable(account_id, &asset_id).await?;
         self.ensure_cash_for(account_id, "sell_holding").await?;
         self.account_service
             .sell_holding(
@@ -838,35 +913,7 @@ impl HoldingTransactionUseCase {
         factor: i64,
         note: Option<String>,
     ) -> Result<Transaction, SplitError> {
-        // SPL-012 — account must exist (checked before any asset work).
-        self.account_service
-            .get_by_id(account_id)
-            .await?
-            .ok_or_else(|| AccountError::AccountNotFound {
-                account_id: account_id.to_string(),
-            })?;
-
-        // SPL-012 — asset must exist and must not be a Cash Asset.
-        let asset = self
-            .asset_service
-            .get_asset_by_id(&asset_id)
-            .await
-            .map_err(|e| {
-                tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "record_split: get_asset_by_id failed");
-                AccountError::DatabaseError
-            })?;
-        match asset {
-            None => return Err(SplitTask::AssetNotFound.into()),
-            Some(a) if a.class == AssetClass::Cash => {
-                return Err(AccountError::SplitOnCashAsset.into())
-            }
-            Some(_) => {}
-        }
-
-        // SPL-012 — asset must be currently held (quantity > 0).
-        if !self.holds(account_id, &asset_id).await? {
-            return Err(SplitTask::AssetNotHeld.into());
-        }
+        self.ensure_splittable(account_id, &asset_id).await?;
 
         // Delegate to the account BC; its `AccountError` surfaces on the
         // split wire as `SplitError::Account`.
@@ -1049,6 +1096,53 @@ impl HoldingTransactionUseCase {
             )
             .await
             .map_err(InterestError::Account)
+    }
+
+    /// SEL-037 — an archived asset is not sold: it is unarchived first (AST-018). An asset
+    /// that does not exist is left to the recording's own refusal.
+    async fn ensure_sellable(&self, account_id: &str, asset_id: &str) -> Result<(), AccountError> {
+        let asset = self
+            .asset_service
+            .get_asset_by_id(asset_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "sell_holding: get_asset_by_id failed");
+                AccountError::DatabaseError
+            })?;
+        if asset.is_some_and(|asset| asset.is_archived) {
+            return Err(AccountError::ArchivedAssetSell);
+        }
+        Ok(())
+    }
+
+    /// SPL-012 — the account exists, the asset exists and is not the cash line, and the
+    /// account holds it today.
+    async fn ensure_splittable(&self, account_id: &str, asset_id: &str) -> Result<(), SplitError> {
+        self.account_service
+            .get_by_id(account_id)
+            .await?
+            .ok_or_else(|| AccountError::AccountNotFound {
+                account_id: account_id.to_string(),
+            })?;
+        let asset = self
+            .asset_service
+            .get_asset_by_id(asset_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "record_split: get_asset_by_id failed");
+                AccountError::DatabaseError
+            })?;
+        match asset {
+            None => return Err(SplitTask::AssetNotFound.into()),
+            Some(a) if a.class == AssetClass::Cash => {
+                return Err(AccountError::SplitOnCashAsset.into())
+            }
+            Some(_) => {}
+        }
+        if !self.holds(account_id, asset_id).await? {
+            return Err(SplitTask::AssetNotHeld.into());
+        }
+        Ok(())
     }
 
     /// Loads the account, then ensures the system Cash Asset for its currency

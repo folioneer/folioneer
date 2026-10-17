@@ -4110,3 +4110,239 @@ async fn agt_036_the_owners_removal_and_an_undone_recording_reach_the_window() {
         "{told:?}"
     );
 }
+
+/// What a write would change: the rows of every table a recording, a holding, an asset
+/// seeded or a change recorded for sync touches.
+async fn written_rows(bench: &Workbench) -> Vec<i64> {
+    let mut sizes = Vec::new();
+    for table in [
+        "transactions",
+        "holdings",
+        "assets",
+        "changes",
+        "agent_recordings",
+    ] {
+        let rows: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
+            .fetch_one(&bench.pool)
+            .await
+            .expect("counted");
+        sizes.push(rows);
+    }
+    sizes
+}
+
+// AGT-072 — a preview of each of the four recordings writes nothing and answers the
+// transaction as it would be recorded, and the account on the evening of its date without
+// it and with it.
+#[tokio::test]
+async fn agt_072_a_preview_changes_nothing_and_shows_the_account_before_and_after() {
+    use crate::use_cases::holding_transaction::{Recording, Target, Trade, TradeAmount};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let preview = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move {
+            tools
+                .call(
+                    granted,
+                    "preview_recording",
+                    &json!({ "tool": tool, "arguments": arguments }),
+                )
+                .await
+        }
+    };
+    let written = written_rows(&bench).await;
+
+    let bought = preview(
+        "record_purchase",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 2, "price": 100, "date": "2026-02-01" }),
+    )
+    .await
+    .expect("previewed");
+    assert_eq!(bought["status"], "previewed");
+    assert_eq!(bought["transaction"]["transaction_type"], "Purchase");
+    assert_eq!(bought["transaction"]["total_amount"], 200 * M);
+    assert_eq!(bought["transaction"]["id"], Value::Null);
+    assert_eq!(bought["account"], "PEA");
+    assert_eq!(bought["currency"], "EUR");
+    assert_eq!(bought["date"], "2026-02-01");
+    assert_eq!(bought["before"]["cash"], 5_000 * M);
+    assert_eq!(bought["before"]["holdings"], json!([]));
+    assert_eq!(bought["after"]["cash"], 4_800 * M);
+    assert_eq!(
+        bought["after"]["holdings"],
+        json!([{ "asset": "CW8", "name": "Amundi MSCI World", "quantity": 2 * M, "average_price": 100 * M }])
+    );
+
+    let opened = preview(
+        "record_opening_balance",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 10, "total_cost": 4000, "date": "2026-01-05" }),
+    )
+    .await
+    .expect("previewed");
+    assert_eq!(opened["transaction"]["transaction_type"], "OpeningBalance");
+    assert_eq!(
+        opened["after"]["holdings"],
+        json!([{ "asset": "CW8", "name": "Amundi MSCI World", "quantity": 10 * M, "average_price": 400 * M }])
+    );
+    assert_eq!(written_rows(&bench).await, written, "nothing was written");
+
+    // A position to sell and split.
+    bench
+        .recorder
+        .record_named(
+            Recording::Buy(Trade {
+                target: Target {
+                    account: "PEA".to_string(),
+                    asset: "CW8".to_string(),
+                    date: Some("2026-02-01".to_string()),
+                    quantity: 4 * M,
+                },
+                amount: TradeAmount::Price(100 * M),
+                fees: 0,
+                rate: M,
+                note: None,
+            }),
+            "2026-10-17",
+        )
+        .await
+        .expect("bought");
+    let written = written_rows(&bench).await;
+    let sold = preview(
+        "record_sale",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "price": 150, "date": "2026-03-01" }),
+    )
+    .await
+    .expect("previewed");
+    assert_eq!(sold["before"]["holdings"][0]["quantity"], 4 * M);
+    assert_eq!(sold["after"]["holdings"][0]["quantity"], 3 * M);
+    assert_eq!(sold["after"]["cash"], 4_750 * M);
+    let split = preview(
+        "record_split",
+        json!({ "account": "PEA", "asset": "CW8", "new": 2, "old": 1, "date": "2026-03-01" }),
+    )
+    .await
+    .expect("previewed");
+    assert_eq!(split["transaction"]["transaction_type"], "Split");
+    assert_eq!(split["after"]["holdings"][0]["quantity"], 8 * M);
+    assert_eq!(written_rows(&bench).await, written, "nothing was written");
+}
+
+// AGT-072 — a preview gives the refusal the real call gives, for each kind; a tool it does
+// not preview is refused, naming the four.
+#[tokio::test]
+async fn agt_072_a_preview_gives_the_refusal_of_the_real_call() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    for (tool, arguments) in [
+        (
+            "record_sale",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 1000, "price": 1, "date": "2026-03-01" }),
+        ),
+        (
+            "record_purchase",
+            json!({ "account": "PEA", "asset": "NOPE", "quantity": 1, "price": 1, "date": "2026-03-01" }),
+        ),
+        (
+            "record_purchase",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "price": 1000000, "date": "2026-03-01" }),
+        ),
+        (
+            "record_opening_balance",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 0, "total_cost": 10, "date": "2026-01-05" }),
+        ),
+        (
+            "record_split",
+            json!({ "account": "PEA", "asset": "CW8", "new": 2, "old": 1, "date": "2026-03-01" }),
+        ),
+        (
+            "record_purchase",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "price": 1, "date": "2099-01-01" }),
+        ),
+    ] {
+        let previewed = bench
+            .tools
+            .call(
+                &granted,
+                "preview_recording",
+                &json!({ "tool": tool, "arguments": arguments }),
+            )
+            .await
+            .expect_err("refused");
+        let real = bench
+            .tools
+            .call(&granted, tool, &arguments)
+            .await
+            .expect_err("refused");
+        assert_eq!(previewed.code, real.code, "{tool} {arguments}");
+        assert_eq!(previewed.message, real.message, "{tool} {arguments}");
+    }
+
+    for (arguments, code) in [
+        (json!({ "arguments": {} }), "MissingArgument"),
+        (
+            json!({ "tool": "record_deposit", "arguments": {} }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "tool": "record_purchase", "arguments": "CW8" }),
+            "InvalidArguments",
+        ),
+    ] {
+        let refused = bench
+            .tools
+            .call(&granted, "preview_recording", &arguments)
+            .await
+            .expect_err("refused");
+        assert_eq!(refused.code, code, "{arguments}");
+    }
+    let refused = bench
+        .tools
+        .call(
+            &granted,
+            "preview_recording",
+            &json!({ "tool": "record_deposit", "arguments": {} }),
+        )
+        .await
+        .expect_err("refused");
+    for named in [
+        "record_purchase",
+        "record_sale",
+        "record_opening_balance",
+        "record_split",
+    ] {
+        assert!(refused.message.contains(named), "{}", refused.message);
+    }
+}
+
+// AGT-072 — a preview counts as one of the session's reads, takes no place of its limit and
+// is not announced: a session at its limit still previews.
+#[tokio::test]
+async fn agt_072_a_preview_is_a_read_outside_the_limit() {
+    use super::connections::MAX_RECORDINGS;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    for _ in 0..MAX_RECORDINGS {
+        granted.count_recording();
+    }
+    let before = bench.connections.sessions().remove(0);
+
+    bench
+        .tools
+        .call(
+            &granted,
+            "preview_recording",
+            &json!({ "tool": "record_purchase", "arguments": { "account": "PEA", "asset": "CW8", "quantity": 1, "price": 1, "date": "2026-03-01" } }),
+        )
+        .await
+        .expect("previewed at the limit");
+    let after = bench.connections.sessions().remove(0);
+    assert_eq!(after.reads, before.reads + 1);
+    assert_eq!(after.transactions_recorded, before.transactions_recorded);
+    assert_eq!(after.recordings, before.recordings);
+}

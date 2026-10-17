@@ -150,20 +150,11 @@ impl AgentTools {
             "cancel_recording" => self.cancel(granted, arguments).await,
             "request_removal" => self.request_removal(granted, arguments).await,
             "request_change" => self.request_change(granted, arguments).await,
-            "record_opening_balance" => {
-                let recording = Recording::Open {
-                    target: target(arguments)?,
-                    total_cost: amount(arguments, "total_cost")?,
-                };
+            "preview_recording" => self.preview(arguments).await,
+            "record_opening_balance" | "record_purchase" | "record_sale" | "record_split" => {
+                let recording =
+                    previewable(tool, arguments).unwrap_or_else(|| unreachable_recording(tool))?;
                 self.record(granted, recording).await
-            }
-            "record_purchase" => {
-                self.record(granted, Recording::Buy(trade(arguments)?))
-                    .await
-            }
-            "record_sale" => {
-                self.record(granted, Recording::Sell(trade(arguments)?))
-                    .await
             }
             "record_deposit" => {
                 self.record(granted, Recording::Deposit(cash(arguments)?))
@@ -183,17 +174,6 @@ impl AgentTools {
                     note: note(arguments)?,
                 };
                 self.record(granted, Recording::Dividend(dividend)).await
-            }
-            "record_split" => {
-                let split = StockSplit {
-                    account: text(arguments, "account")?.to_string(),
-                    asset: text(arguments, "asset")?.to_string(),
-                    date: optional_text(arguments, "date")?,
-                    new: whole(arguments, "new")?,
-                    old: whole(arguments, "old")?,
-                    note: note(arguments)?,
-                };
-                self.record(granted, Recording::Split(split)).await
             }
             "record_free_shares" => {
                 let free_shares = FreeShares {
@@ -632,6 +612,45 @@ impl AgentTools {
         }
     }
 
+    /// AGT-072 — what a recording would do, nothing written: the recording tool's arguments
+    /// read as that tool reads them, then the refusal the real call would give, or the
+    /// transaction with no id and the account without it and with it.
+    async fn preview(&self, arguments: &Value) -> Result<Value, Refusal> {
+        let tool = text(arguments, "tool")?;
+        let not_previewed = || Refusal {
+            code: "InvalidArguments".to_string(),
+            message: format!("preview_recording previews {}", PREVIEWED.join(", ")),
+        };
+        let inner = arguments.get("arguments").filter(|inner| inner.is_object());
+        let Some(inner) = inner else {
+            return Err(not_previewed());
+        };
+        let recording = previewable(tool, inner).ok_or_else(not_previewed)??;
+        let previewed = self
+            .recorder
+            .preview_named(recording, &today())
+            .await
+            .ok_or_else(not_previewed)?
+            .map_err(|refusal| Refusal {
+                code: refusal.code,
+                message: refusal.message,
+            })?;
+        let mut transaction =
+            serde_json::to_value(&previewed.transaction).map_err(|_| portfolio_unreadable())?;
+        if let Some(id) = transaction.get_mut("id") {
+            *id = Value::Null;
+        }
+        as_json(&serde_json::json!({
+            "status": "previewed",
+            "transaction": transaction,
+            "account": previewed.account_name,
+            "currency": previewed.currency,
+            "date": previewed.date,
+            "before": previewed.before,
+            "after": previewed.after,
+        }))
+    }
+
     /// AGT-050 — the session corrects a transaction it recorded itself.
     async fn correct(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
         let transaction_id = text(arguments, "transaction")?.to_string();
@@ -748,6 +767,45 @@ fn amount(arguments: &Value, name: &str) -> Result<i64, Refusal> {
         code: "MissingArgument".to_string(),
         message: format!("{name} is missing"),
     })
+}
+
+/// AGT-072 — the recordings `preview_recording` previews.
+const PREVIEWED: [&str; 4] = [
+    "record_purchase",
+    "record_sale",
+    "record_opening_balance",
+    "record_split",
+];
+
+/// AGT-044 / AGT-063 / AGT-072 — the recording `tool` makes of `arguments`, read as that
+/// tool reads them; `None` for a tool `preview_recording` does not preview.
+fn previewable(tool: &str, arguments: &Value) -> Option<Result<Recording, Refusal>> {
+    let read = || -> Result<Recording, Refusal> {
+        Ok(match tool {
+            "record_opening_balance" => Recording::Open {
+                target: target(arguments)?,
+                total_cost: amount(arguments, "total_cost")?,
+            },
+            "record_purchase" => Recording::Buy(trade(arguments)?),
+            "record_sale" => Recording::Sell(trade(arguments)?),
+            "record_split" => Recording::Split(StockSplit {
+                account: text(arguments, "account")?.to_string(),
+                asset: text(arguments, "asset")?.to_string(),
+                date: optional_text(arguments, "date")?,
+                new: whole(arguments, "new")?,
+                old: whole(arguments, "old")?,
+                note: note(arguments)?,
+            }),
+            _ => return unreachable_recording(tool),
+        })
+    };
+    PREVIEWED.contains(&tool).then(read)
+}
+
+/// The four recordings are all previewable: this is never reached.
+fn unreachable_recording(tool: &str) -> Result<Recording, Refusal> {
+    tracing::error!(target: BACKEND, tool, "a recording tool without its reading");
+    Err(portfolio_unreadable())
 }
 
 /// AGT-081 — `transaction`, a state of the transaction the owner typed, with the names `typed`

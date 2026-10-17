@@ -83,6 +83,7 @@ fn agt_010_the_program_started_with_mcp_lists_its_tools() {
             "add_asset",
             "correct_recording",
             "cancel_recording",
+            "preview_recording",
             "request_removal",
             "request_change",
         ]
@@ -143,7 +144,8 @@ fn agt_013_every_tool_listed_says_whether_it_only_reads() {
             "list_assets",
             "list_holdings",
             "list_transactions",
-            "get_price"
+            "get_price",
+            "preview_recording"
         ]
     );
 }
