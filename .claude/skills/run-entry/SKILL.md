@@ -90,7 +90,9 @@ batch. `reviewer-arch` is in that batch whenever `reviewer-backend` or
 `reviewer-frontend` is: a `.rs`, `.ts` or `.tsx` change launches both lanes, every time. Grade every finding by the four questions of `docs/workflow.md` § 7, one row
 each, and apply the policy: (a) fix,
 (b) `DEBT-NNN` entry, (c) one-off inline comment, (c) pattern → edit the reviewer prompt,
-`[DECISION]` → open question on the entry. Re-run the reviewers until no 🔴 remains.
+`[DECISION]` → open question on the entry. Re-run the reviewers until no 🔴 remains on the files as they will be pushed: a file
+edited in answer to a finding goes back to its lane, the spec lane above all
+(`docs/workflow.md` § 7).
 No question to the human. CI runs the same reviewers on every push (Step 8).
 
 ## Step 7 — Evidence

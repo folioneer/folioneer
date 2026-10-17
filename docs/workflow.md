@@ -296,7 +296,9 @@ counted from the session's transcript.
 
 ## 7. Reviewers and the triage policy
 
-Reviewers run locally on the diff before the PR, until no 🔴 remains, and CI runs them
+Reviewers run locally on the diff before the PR, until no 🔴 remains on the files as
+they will be pushed: a file edited in answer to a finding goes back to its lane before
+the push — a spec above all, whose text a fix rewrites. CI runs them
 again on every push (`.github/workflows/review.yml`, one check per lane the diff
 touches; the report is a sticky comment on the PR and any 🔴 fails the check). The
 lanes: `reviewer-backend` and `reviewer-arch` for
