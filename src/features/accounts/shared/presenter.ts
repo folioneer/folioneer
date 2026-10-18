@@ -69,6 +69,11 @@ export function accountMutationErrorToI18n(err: AccountError): I18nMessage {
   switch (err.code) {
     case "InvalidCurrency":
       return { key: "error.InvalidCurrency", vars: { currency: err.currency } };
+    // ACC-041 — the account's country or wrapper it cannot take.
+    case "InvalidCountry":
+      return { key: "error.InvalidCountry", vars: { country: err.country } };
+    case "WrapperNotAvailable":
+      return { key: "error.WrapperNotAvailable", vars: { wrapper: err.wrapper } };
     case "NameEmpty":
     case "AccountNotFound":
     case "NameAlreadyExists":

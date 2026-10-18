@@ -1751,6 +1751,8 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
         // Rejections of other operations, which no recording by name meets.
         AccountError::NameEmpty
         | AccountError::InvalidCurrency { .. }
+        | AccountError::InvalidCountry { .. }
+        | AccountError::WrapperNotAvailable { .. }
         | AccountError::NegativeQuantity
         | AccountError::NegativeAveragePrice
         | AccountError::TransactionNotFound

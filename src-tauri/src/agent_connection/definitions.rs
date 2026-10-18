@@ -34,7 +34,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "list_accounts",
             title: "List accounts",
             only_reads: true,
-            description: "The accounts, by name, each with its currency. An account is named by its name in the other tools.",
+            description: "The accounts, by name, each with its currency, its country (two letters) and the identifier of its tax wrapper, or null. An account is named by its name in the other tools.",
             input_schema: nothing(),
         },
         ToolDefinition {

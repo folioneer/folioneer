@@ -73,6 +73,8 @@ describe("useAccounts", () => {
       currency: "EUR",
       update_frequency: "ManualMonth",
       management_fees_enabled: false,
+      country: null,
+      wrapper: null,
     };
     await act(async () => {
       ret = await result.current.addAccount(dto);
@@ -99,6 +101,8 @@ describe("useAccounts", () => {
         currency: "EUR",
         update_frequency: "ManualMonth",
         management_fees_enabled: false,
+        country: null,
+        wrapper: null,
       });
     });
     expect(ret.error).toEqual({ key: "error.NameAlreadyExists" });
@@ -121,6 +125,8 @@ describe("useAccounts", () => {
       currency: "EUR",
       update_frequency: "ManualMonth",
       management_fees_enabled: false,
+      country: null,
+      wrapper: null,
     };
     await act(async () => {
       ret = await result.current.updateAccount(dto);
@@ -147,6 +153,8 @@ describe("useAccounts", () => {
         currency: "EUR",
         update_frequency: "ManualMonth",
         management_fees_enabled: false,
+        country: null,
+        wrapper: null,
       });
     });
     expect(ret.error).toEqual({ key: "error.NameAlreadyExists" });

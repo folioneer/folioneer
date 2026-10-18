@@ -67,6 +67,9 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
       currency: formData.currency,
       update_frequency: formData.update_frequency,
       management_fees_enabled: formData.management_fees_enabled,
+      // ACC-041 — kept as the account has them until the form edits them.
+      country: account.country ?? null,
+      wrapper: account.wrapper ?? null,
     });
 
     setIsSubmitting(false);

@@ -42,6 +42,10 @@ pub struct Refusal {
 struct AccountRow {
     name: String,
     currency: String,
+    /// ACC-042 — the account's country: its own, or the portfolio's.
+    country: String,
+    /// ACC-042 — its wrapper's identifier, or none.
+    wrapper: Option<String>,
 }
 
 /// An asset as a tool names it.
@@ -180,8 +184,10 @@ impl AgentTools {
                 let rows: Vec<AccountRow> = accounts
                     .into_iter()
                     .map(|account| AccountRow {
+                        country: account.effective_country().to_string(),
                         name: account.name,
                         currency: account.currency,
+                        wrapper: account.wrapper,
                     })
                     .collect();
                 as_json(&rows)

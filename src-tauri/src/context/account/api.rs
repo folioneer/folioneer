@@ -2,7 +2,8 @@
 #![allow(clippy::unreachable)]
 
 use super::domain::{
-    Account, FeeFrequency, FeeSchedule, HoldingNote, ThresholdDirection, UpdateFrequency,
+    Account, FeeFrequency, FeeSchedule, HoldingNote, ThresholdDirection, UpdateFrequency, Wrapper,
+    PORTFOLIO_COUNTRY, WRAPPERS,
 };
 use crate::context::account::{
     AccountError, AccountJournal, HoldingSnapshot, JournalFilter, Transaction,
@@ -29,6 +30,19 @@ pub struct UpdateAccountDTO {
     pub update_frequency: UpdateFrequency,
     /// Whether the % management-fee mechanism is enabled (FEE-075).
     pub management_fees_enabled: bool,
+    /// ACC-041 — the account's own country, when it differs from the portfolio's.
+    pub country: Option<String>,
+    /// ACC-043 — the identifier of its tax wrapper (ACC-040); none when unset.
+    pub wrapper: Option<String>,
+}
+
+/// ACC-040 — the wrapper lists, with the portfolio's country an account without its own takes.
+#[derive(Debug, Serialize, Type)]
+pub struct WrapperLists {
+    /// The portfolio's country (ISO 3166-1 alpha-2): France until the first run asks it.
+    pub portfolio_country: String,
+    /// Every wrapper, the generic list and each country's.
+    pub wrappers: Vec<Wrapper>,
 }
 
 // --- Commands ---
@@ -49,15 +63,28 @@ pub async fn update_account(
 ) -> Result<Account, AccountError> {
     state
         .account_service
-        .update(
+        .update_classified(
             dto.id,
             dto.name,
             dto.bank_name,
             dto.currency,
             dto.update_frequency,
             dto.management_fees_enabled,
+            dto.country,
+            dto.wrapper,
         )
         .await
+}
+
+/// ACC-040 — the wrapper lists the account form offers; infallible, the lists are the
+/// application's own.
+#[tauri::command]
+#[specta::specta]
+pub fn get_wrapper_lists() -> WrapperLists {
+    WrapperLists {
+        portfolio_country: PORTFOLIO_COUNTRY.to_string(),
+        wrappers: WRAPPERS.to_vec(),
+    }
 }
 
 /// Deletes an account (R5 — cascades to its holdings at the repo level).

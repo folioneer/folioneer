@@ -68,6 +68,8 @@ describe("accountGateway", () => {
       currency: "EUR",
       update_frequency: "ManualMonth",
       management_fees_enabled: false,
+      country: null,
+      wrapper: null,
     };
     const account = makeAccount();
     mockInvoke.mockResolvedValue(account);
@@ -83,6 +85,8 @@ describe("accountGateway", () => {
       currency: "EUR",
       update_frequency: "ManualMonth",
       management_fees_enabled: false,
+      country: null,
+      wrapper: null,
     };
     const err: AccountError = { code: "NameAlreadyExists" };
     mockInvoke.mockRejectedValue(err);
@@ -97,6 +101,8 @@ describe("accountGateway", () => {
       currency: "XYZ",
       update_frequency: "ManualMonth",
       management_fees_enabled: false,
+      country: null,
+      wrapper: null,
     };
     const err: AccountError = { code: "InvalidCurrency", currency: "XYZ" };
     mockInvoke.mockRejectedValue(err);
@@ -111,6 +117,8 @@ describe("accountGateway", () => {
       currency: "EUR",
       update_frequency: "ManualMonth",
       management_fees_enabled: false,
+      country: null,
+      wrapper: null,
     };
     const err: AccountError = { code: "NameEmpty" };
     mockInvoke.mockRejectedValue(err);
@@ -125,6 +133,8 @@ describe("accountGateway", () => {
       currency: "EUR",
       update_frequency: "ManualMonth",
       management_fees_enabled: false,
+      country: null,
+      wrapper: null,
     };
     const err: AccountError = { code: "DatabaseError" };
     mockInvoke.mockRejectedValue(err);
@@ -142,6 +152,8 @@ describe("accountGateway", () => {
       currency: "USD",
       update_frequency: "ManualMonth",
       management_fees_enabled: false,
+      country: null,
+      wrapper: null,
     };
     const account = { ...makeAccount(), name: "Renamed" };
     mockInvoke.mockResolvedValue(account);
@@ -158,6 +170,8 @@ describe("accountGateway", () => {
       currency: "EUR",
       update_frequency: "ManualMonth",
       management_fees_enabled: false,
+      country: null,
+      wrapper: null,
     };
     const err: AccountError = { code: "NameAlreadyExists" };
     mockInvoke.mockRejectedValue(err);

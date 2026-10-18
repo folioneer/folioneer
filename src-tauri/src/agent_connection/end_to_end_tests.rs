@@ -288,7 +288,7 @@ async fn agt_040_the_read_tools_answer_from_the_running_application() {
     assert_eq!(owner.await.expect("owner"), "claude-code");
     assert_eq!(
         result(&answered[1]),
-        json!([{ "name": "PEA", "currency": "EUR" }])
+        json!([{ "name": "PEA", "currency": "EUR", "country": "FR", "wrapper": null }])
     );
     assert_eq!(
         result(&answered[2]),

@@ -15,6 +15,17 @@ import {
 // account-BC mutation surface (add / update / delete / deletion-summary), all
 // consumed by useAccounts.
 describe("accountMutationErrorToI18n", () => {
+  it("names the country or the wrapper an account cannot take (ACC-041)", () => {
+    expect(accountMutationErrorToI18n({ code: "InvalidCountry", country: "fra" })).toEqual({
+      key: "error.InvalidCountry",
+      vars: { country: "fra" },
+    });
+    expect(accountMutationErrorToI18n({ code: "WrapperNotAvailable", wrapper: "de_bav" })).toEqual({
+      key: "error.WrapperNotAvailable",
+      vars: { wrapper: "de_bav" },
+    });
+  });
+
   it("InvalidCurrency interpolates the currency payload", () => {
     expect(accountMutationErrorToI18n({ code: "InvalidCurrency", currency: "ZZZ" })).toEqual({
       key: "error.InvalidCurrency",
