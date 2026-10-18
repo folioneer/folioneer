@@ -44,7 +44,7 @@ pub enum RecordKind {
     CurrencyRate,
     /// A holding note, identified by (account_id, asset_id).
     HoldingNote,
-    /// A portfolio-wide setting, identified by its name (TODO-032: the reference currency).
+    /// A portfolio-wide setting, identified by its name: the reference currency (FXR-120).
     PortfolioSetting,
 }
 
@@ -261,9 +261,9 @@ impl ChangeDraft {
 mod tests {
     use super::*;
 
-    // SYN-021 — exactly the ten synced record kinds, pairwise distinct.
+    // SYN-021 — exactly the eleven synced record kinds, pairwise distinct.
     #[test]
-    fn record_kind_has_exactly_ten_pairwise_distinct_synced_kinds() {
+    fn record_kind_has_exactly_eleven_pairwise_distinct_synced_kinds() {
         let kinds = [
             RecordKind::Account,
             RecordKind::Category,
@@ -275,12 +275,13 @@ mod tests {
             RecordKind::CurrencyPair,
             RecordKind::CurrencyRate,
             RecordKind::HoldingNote,
+            RecordKind::PortfolioSetting,
         ];
         let unique: std::collections::HashSet<_> = kinds.iter().collect();
         assert_eq!(
             unique.len(),
-            10,
-            "SYN-021 lists exactly ten synced record kinds"
+            11,
+            "SYN-021 lists exactly eleven synced record kinds"
         );
     }
 

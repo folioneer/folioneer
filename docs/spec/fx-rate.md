@@ -214,7 +214,7 @@ Historical valuations (yearly/monthly performance, as-of-date views) need a rate
 
 **FXR-120 — A setting is replaced (backend)**: Setting a portfolio setting replaces its value.
 
-**FXR-121 — A setting is never removed (backend)**: A portfolio setting, once set, is never removed.
+**FXR-121 — A setting is never removed (backend)**: No device removes a portfolio setting once set: the application offers no way to, so none publishes a removal of one.
 
 **FXR-122 — The default reference currency (backend)**: A portfolio with no reference currency set is reported in EUR.
 

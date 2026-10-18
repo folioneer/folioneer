@@ -1026,7 +1026,7 @@
     "NameAlreadyExists": "Un compte avec ce nom existe déjà.",
     "InvalidCurrency": "\"{{currency}}\" n'est pas un code de devise valide.",
     "InvalidCountry": "{{country}} n'est pas un code pays à deux lettres.",
-    "WrapperNotAvailable": "Cette enveloppe n'existe pas pour le pays du compte : {{wrapper}}.",
+    "WrapperNotAvailable": "Cette enveloppe n'existe pas dans les listes : {{wrapper}}.",
     "ReferenceEmpty": "La référence (ticker) ne peut pas être vide.",
     "InvalidIsinFormat": "L'ISIN doit faire 12 caractères avec une clé de contrôle ISO 6166 valide.",
     "IsinRequired": "Un actif coté a besoin d'un ISIN.",

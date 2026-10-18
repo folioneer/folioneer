@@ -18,8 +18,8 @@ pub enum AccountError {
         /// The country that was given.
         country: String,
     },
-    /// ACC-043 — the wrapper is neither in the generic list nor in the account's country's list.
-    #[error("Wrapper is not available for this account's country: {wrapper}")]
+    /// ACC-043 — the wrapper is not in the wrapper lists, nor the one the account already has.
+    #[error("Wrapper is not in the wrapper lists: {wrapper}")]
     WrapperNotAvailable {
         /// The wrapper identifier that was given.
         wrapper: String,

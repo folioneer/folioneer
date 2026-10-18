@@ -58,7 +58,7 @@ export function GlobalPerformancePage() {
                   {view.scopeLabel}
                 </span>
               )}
-              {/* GPF-011 — every figure is reported in the response currency (EUR for cross-account scopes). */}
+              {/* GPF-011 — every figure is reported in the response currency (the reference currency for cross-account scopes). */}
               {view.currency !== null && (
                 <span
                   data-testid="global-performance-currency"
