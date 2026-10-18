@@ -226,6 +226,12 @@ The full economic value of an account: cash balance + Σ (market value of non-ca
 
 What a holding is worth at its latest recorded price, in the asset's own currency: price × quantity, with no exchange rate involved. Shown in the Current Value column of an account's holdings; none when no price has been recorded.
 
+### Capital brought in
+
+> Status: confirmed
+
+What the owner brought into an account, cash and positions together: deposits less withdrawals (the Net Cash Input), plus every opening balance at its recorded cost. An account opened with positions costing 50 000 and a deposit of 500 brings in 50 500, of which 500 is Net Cash Input (ACD-058; owner, 2026-10-18). Code: `total_capital_brought_in`. French: "Capital apporté".
+
 ### Weight
 
 > Status: confirmed

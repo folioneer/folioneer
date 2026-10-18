@@ -24,7 +24,11 @@ import { IconButton } from "@/ui/components/button/IconButton";
 import { useCachedAccounts, useCachedAssets } from "../gateway";
 import { PnlCell } from "../shared/PnlCell";
 import { PINNED_ACTIONS_CELL, PINNED_ASSET_CELL } from "../shared/pinnedColumns";
-import { type HoldingRowViewModel, selectPerformanceCell } from "../shared/presenter";
+import {
+  type HoldingRowViewModel,
+  hasNoPeriodFigure,
+  selectPerformanceCell,
+} from "../shared/presenter";
 import type { ModalTarget, SellTarget } from "../shared/types";
 
 type HoldingRowProps = {
@@ -533,8 +537,15 @@ export function HoldingRow({
           <span className="text-m3-on-surface-variant">{row.unrealizedPnl}</span>
         )}
       </td>
-      {/* MKT-035 / ACD-054 — Performance % over the selected period */}
-      <td className="m3-td text-right tabular-nums">
+      {/* MKT-035 / ACD-054 — Performance % over the selected period; ACD-057 — a window
+          with no figure says why on hover */}
+      <td
+        id={`holding-period-performance-${row.assetId}`}
+        title={
+          hasNoPeriodFigure(row, perfPeriod) ? t("account_details.perf_period_none") : undefined
+        }
+        className="m3-td text-right tabular-nums"
+      >
         {performanceCell.formatted !== "—" ? (
           <span
             className={

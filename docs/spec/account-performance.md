@@ -134,7 +134,7 @@ Each period row decomposes how its end value (PRF-020) was built from the previo
 
 ### Asset Scope (080–089)
 
-The performance read optionally narrows to one asset's position within the account. The response shape is unchanged; every figure then describes that single holding instead of the whole account, mirroring the windowed per-holding returns of the Account Details view (ACD-054–057).
+The performance read optionally narrows to one asset's position within the account. The response shape is unchanged; every figure then describes that single holding instead of the whole account, mirroring the windowed per-holding returns of the Account Details view (ACD-054–057) — except that a period row of a position bought inside the period still has its figure (PRF-083 starts it from 0), where the Account Details view gives none for a window the position was not held through (ACD-057).
 
 **PRF-080 — Optional asset scope (backend)**: `get_account_performance` accepts an optional `asset_id`. When absent, the whole-account behaviour of PRF-010–074 applies unchanged. When present, the yearly and monthly series describe that one asset's position: every downstream figure derives from the account's transactions filtered to that asset.
 

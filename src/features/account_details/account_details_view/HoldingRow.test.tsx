@@ -429,6 +429,26 @@ describe("HoldingRow — price typed by hand toggle", () => {
   });
 });
 
+describe("HoldingRow — a window with no figure (ACD-057)", () => {
+  beforeEach(() => {
+    useAppStore.setState({ assets: [], accounts: [] });
+  });
+
+  it("says on hover why a window has no figure", () => {
+    renderInTable(baseRow, false, "five_years");
+    const cell = document.getElementById("holding-period-performance-asset-1");
+    expect(cell).toHaveTextContent("—");
+    expect(cell).toHaveAttribute("title", "account_details.perf_period_none");
+  });
+
+  it("gives no such hint when the window has a figure", () => {
+    renderInTable(baseRow, false, "ytd");
+    expect(document.getElementById("holding-period-performance-asset-1")).not.toHaveAttribute(
+      "title",
+    );
+  });
+});
+
 describe("HoldingRow — outdated price (MKT-207)", () => {
   beforeEach(() => {
     useAppStore.setState({ assets: [], accounts: [] });

@@ -376,6 +376,8 @@ export interface AccountSummaryViewModel {
   totalManagementFeesRaw: number;
   /** Formatted net cash input since inception: deposits − withdrawals, account currency (ACD-053). */
   totalNetCashInput: string;
+  /** ACD-058 — formatted capital brought in: net cash input plus opening balances at cost. */
+  totalCapitalBroughtIn: string;
   /** MKT-208 — how many active holdings have an outdated price (MKT-206). */
   outdatedPriceCount: number;
 }
@@ -502,6 +504,11 @@ export function selectPerformanceCell(
     return { formatted: row.performancePct, raw: row.unrealizedPnlRaw };
   }
   return row.periodPerformance[period];
+}
+
+/** ACD-057 — a windowed period whose return has no figure, which the cell explains on hover. */
+export function hasNoPeriodFigure(row: HoldingRowViewModel, period: StoredPerfPeriod): boolean {
+  return period !== "since_start" && row.periodPerformance[period].raw === null;
 }
 
 /** ACD-054 — i18n key for the Performance-% column header, reflecting the selected period. */
@@ -647,6 +654,7 @@ export function toAccountSummary(response: AccountDetailsResponse): AccountSumma
     totalManagementFees: microToFormatted(response.total_management_fees, 2),
     totalManagementFeesRaw: response.total_management_fees,
     totalNetCashInput: microToFormatted(response.total_net_cash_input, 2),
+    totalCapitalBroughtIn: microToFormatted(response.total_capital_brought_in, 2),
     outdatedPriceCount: response.outdated_price_count,
   };
 }

@@ -1258,6 +1258,11 @@ total_management_fees: number;
  */
 total_net_cash_input: number; 
 /**
+ * ACD-058 — the capital brought in: the net cash input plus every opening balance at its
+ * recorded cost, in account-currency micros; in the as-of view, up to that date.
+ */
+total_capital_brought_in: number; 
+/**
  * MKT-206 — how many active holdings have an outdated price (MKT-205); 0 in the
  * read-only view of a past date.
  */

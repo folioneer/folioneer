@@ -144,6 +144,17 @@ export function AccountDetailsView() {
                     {view.summary.totalNetCashInput}
                   </span>
                 </p>
+                {/* ACD-058 — what was brought in, cash and opening balances at cost */}
+                <p
+                  id="account-details-total-capital-brought-in"
+                  title={t("account_details.total_capital_brought_in_hint")}
+                  className="text-sm text-m3-on-surface-variant whitespace-nowrap"
+                >
+                  {t("account_details.total_capital_brought_in")}:{" "}
+                  <span className="font-semibold text-m3-on-surface">
+                    {view.summary.totalCapitalBroughtIn}
+                  </span>
+                </p>
                 {/* FEE-053 — total management fees deducted across all holdings;
                     hidden when the account has the mechanism disabled (FEE-076) */}
                 {view.managementFeesEnabled && (

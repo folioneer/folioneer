@@ -179,6 +179,9 @@ pub struct AccountDetailsResponse {
     /// account-currency micros (ACD-053). Negative when withdrawals exceed deposits.
     /// The as-of view counts only transactions dated on or before the as-of date.
     pub total_net_cash_input: i64,
+    /// ACD-058 — the capital brought in: the net cash input plus every opening balance at its
+    /// recorded cost, in account-currency micros; in the as-of view, up to that date.
+    pub total_capital_brought_in: i64,
     /// MKT-206 — how many active holdings have an outdated price (MKT-205); 0 in the
     /// read-only view of a past date.
     pub outdated_price_count: i64,
@@ -288,6 +291,7 @@ impl AccountDetailsUseCase {
         let mut total_dividends_received: i64 = 0;
         // ACD-053 — net external cash input since inception: deposits − withdrawals.
         let mut total_net_cash_input: i64 = 0;
+        let mut opening_balances_cost: i64 = 0;
         for t in &all_txs {
             match t.transaction_type {
                 TransactionType::Dividend => {
@@ -301,6 +305,10 @@ impl AccountDetailsUseCase {
                 }
                 TransactionType::Withdrawal => {
                     total_net_cash_input = total_net_cash_input.saturating_sub(t.total_amount);
+                }
+                // ACD-058 — an opening balance brings its positions in at their cost.
+                TransactionType::OpeningBalance => {
+                    opening_balances_cost = opening_balances_cost.saturating_add(t.total_amount);
                 }
                 _ => {}
             }
@@ -620,7 +628,8 @@ impl AccountDetailsUseCase {
             total_dividends_received,
             total_management_fees, // FEE-053/072
             total_net_cash_input,  // ACD-053
-            outdated_price_count,  // MKT-206
+            total_capital_brought_in: total_net_cash_input.saturating_add(opening_balances_cost), // ACD-058
+            outdated_price_count, // MKT-206
         })
     }
 
@@ -722,6 +731,7 @@ impl AccountDetailsUseCase {
         let mut total_dividends_received: i64 = 0;
         // ACD-053 — net cash input as of the date: deposits − withdrawals dated ≤ as_of.
         let mut total_net_cash_input: i64 = 0;
+        let mut opening_balances_cost: i64 = 0;
         for t in &all_txs {
             if t.date.as_str() > as_of_date {
                 continue;
@@ -738,6 +748,10 @@ impl AccountDetailsUseCase {
                 }
                 TransactionType::Withdrawal => {
                     total_net_cash_input = total_net_cash_input.saturating_sub(t.total_amount);
+                }
+                // ACD-058 — an opening balance brings its positions in at their cost.
+                TransactionType::OpeningBalance => {
+                    opening_balances_cost = opening_balances_cost.saturating_add(t.total_amount);
                 }
                 _ => {}
             }
@@ -1006,8 +1020,9 @@ impl AccountDetailsUseCase {
             total_unrealized_pnl,
             total_global_value,
             total_dividends_received,
-            total_management_fees,   // FEE-053/072
-            total_net_cash_input,    // ACD-053
+            total_management_fees, // FEE-053/072
+            total_net_cash_input,  // ACD-053
+            total_capital_brought_in: total_net_cash_input.saturating_add(opening_balances_cost), // ACD-058
             outdated_price_count: 0, // MKT-206
         })
     }
@@ -1133,33 +1148,33 @@ fn window_position_pct(
         &window_start.format("%Y-%m-%d").to_string(),
     )
     .quantity;
-    let start_value: i64 = if quantity_at_start <= 0 {
-        // ACD-055 — a window opening before the position existed starts from 0.
-        0
+    // ACD-057 — a window the position was not held through has no figure: the since-start
+    // return covers the holding's whole life (TODO-084).
+    if quantity_at_start <= 0 {
+        return None;
+    }
+    let priced = inputs.priced_assets.get(asset_id)?;
+    // ACD-057 — a held position with no recorded price on or before the
+    // window start cannot be valued (PRF-022 carry-forward finds nothing).
+    let price = priced.price_as_of(window_start)? as i128;
+    let converted_price = if priced.currency == inputs.account_currency {
+        price
     } else {
-        let priced = inputs.priced_assets.get(asset_id)?;
-        // ACD-057 — a held position with no recorded price on or before the
-        // window start cannot be valued (PRF-022 carry-forward finds nothing).
-        let price = priced.price_as_of(window_start)? as i128;
-        let converted_price = if priced.currency == inputs.account_currency {
-            price
-        } else {
-            // ACD-057 / FXR-034 — a foreign position with no usable rate at the
-            // window start cannot be valued.
-            at_rate(
-                price,
-                *inputs
-                    .rate_map
-                    .get(&(priced.currency.clone(), window_start))?,
-            )
-        };
-        let value = quantity_at_start as i128 * converted_price / MICRO;
-        debug_assert!(
-            value <= i64::MAX as i128 && value >= i64::MIN as i128,
-            "window_position_pct start_value i64 overflow: {value}"
-        );
-        value as i64
+        // ACD-057 / FXR-034 — a foreign position with no usable rate at the
+        // window start cannot be valued.
+        at_rate(
+            price,
+            *inputs
+                .rate_map
+                .get(&(priced.currency.clone(), window_start))?,
+        )
     };
+    let value = quantity_at_start as i128 * converted_price / MICRO;
+    debug_assert!(
+        value <= i64::MAX as i128 && value >= i64::MIN as i128,
+        "window_position_pct start_value i64 overflow: {value}"
+    );
+    let start_value = value as i64;
     let flow_window_start = window_start.succ_opt()?;
     holding_metric_for_span(
         asset_transactions,
@@ -2926,6 +2941,51 @@ mod tests {
         assert!(holding.note_threshold_price.is_none());
         assert!(holding.note_threshold_direction.is_none());
         assert!(!holding.note_alarm_triggered);
+    }
+
+    // ACD-058 / TODO-084 — the capital brought in adds the opening balances at their cost to
+    // the net cash input: positions costing 50 000 and a deposit of 500 bring in 50 500.
+    #[tokio::test]
+    async fn acd_058_capital_brought_in_counts_opening_balances_at_their_cost() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let account = make_eur_account(&account_svc).await;
+        let stock = make_stock(&asset_svc, "Opened EUR Stock", "EUR").await;
+        asset_svc.seed_cash_asset("EUR").await.unwrap();
+        let today = Local::now().date_naive();
+        account_svc
+            .open_holding(
+                &account.id,
+                stock.clone(),
+                iso(today - chrono::Duration::days(30)),
+                100_000_000,
+                50_000_000_000,
+            )
+            .await
+            .unwrap();
+        account_svc
+            .record_deposit(
+                &account.id,
+                iso(today - chrono::Duration::days(20)),
+                500_000_000,
+                None,
+            )
+            .await
+            .unwrap();
+
+        let uc = AccountDetailsUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let resp = uc.get_account_details(&account.id, None).await.unwrap();
+        assert_eq!(resp.total_net_cash_input, 500_000_000);
+        assert_eq!(resp.total_capital_brought_in, 50_500_000_000);
+        let before_the_deposit = uc
+            .get_account_details(&account.id, Some(&iso(today - chrono::Duration::days(25))))
+            .await
+            .unwrap();
+        assert_eq!(before_the_deposit.total_capital_brought_in, 50_000_000_000);
     }
 
     // ACD-053 — total_net_cash_input sums deposits minus withdrawals since inception
@@ -5599,29 +5659,28 @@ mod tests {
         assert_eq!(holding.period_performance.one_year, Some(10_000_000));
     }
 
-    // ACD-055/056 — a position opened inside the window starts from 0; the
-    // purchase is the external flow. Dated on the first flow day it carries full
-    // Dietz weight, so the denominator is exactly the purchase amount.
+    // ACD-057 / TODO-084 — a window that opens before the position was held has no figure:
+    // the since-start return covers the holding's whole life. A position bought a few
+    // days ago and priced low reads no 1-year or 5-year return (gh245: −19 800 %).
     #[tokio::test]
-    async fn period_performance_purchase_inside_window_uses_dietz_flow() {
+    async fn acd_057_a_window_opening_before_the_position_was_held_has_no_figure() {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = make_eur_account(&account_svc).await;
         let stock = make_stock(&asset_svc, "Windowed EUR Stock", "EUR").await;
         asset_svc.seed_cash_asset("EUR").await.unwrap();
         let today = Local::now().date_naive();
-        let first_flow_day = years_before(today, 1) + chrono::Duration::days(1);
         deposit_and_buy(
             &account_svc,
             &account.id,
             &stock,
-            &iso(first_flow_day),
+            &iso(today - chrono::Duration::days(9)),
             1_000_000,
             100_000_000,
         )
         .await;
         asset_svc
-            .record_asset_price(&stock, &iso(today), 110.0)
+            .record_asset_price(&stock, &iso(today), 1.0)
             .await
             .unwrap();
 
@@ -5636,8 +5695,13 @@ mod tests {
             .iter()
             .find(|h| h.asset_id == stock)
             .expect("stock holding present");
-        // start 0, flow +100.00 at full weight, end 110.00 → gain 10.00 / 100.00.
-        assert_eq!(holding.period_performance.one_year, Some(10_000_000));
+        assert_eq!(holding.period_performance.one_year, None);
+        assert_eq!(holding.period_performance.five_years, None);
+        assert_eq!(holding.period_performance.ten_years, None);
+        assert!(
+            holding.performance_pct.is_some(),
+            "the since-start figure stays"
+        );
     }
 
     // ACD-056 — a sell inside the window is a negative external flow: the
