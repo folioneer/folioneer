@@ -711,6 +711,12 @@
       "missing_ticker": "Ticker manquant",
       "no_price_available": "Pas de prix disponible"
     },
+    "fetch_failure": {
+      "NoData": "Non mis à jour : aucun prix du fournisseur",
+      "ProviderUnreachable": "Non mis à jour : le fournisseur est injoignable",
+      "NotSaved": "Non mis à jour : le prix n'a pas pu être enregistré",
+      "tooltip": "Récupération qui n'a pas trouvé son prix : {{date}}"
+    },
     "outdated": {
       "row_label": "Prix ancien · {{age}}",
       "count_one": "{{count}} prix ancien",

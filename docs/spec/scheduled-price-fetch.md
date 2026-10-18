@@ -101,7 +101,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-040 — Scope mirrors the in-app fetch tasks (backend)**: The run's scope is every active holding across all accounts with a derivable provider symbol (MKT-110), excluding system cash assets (MKT-116) and assets whose price is typed by hand (MKT-151).
 
-**SPF-041 — Per-asset silent skip (backend)**: An in-scope asset is silently skipped — nothing written, no error surfaced — when its symbol cannot be derived, the provider has no data for it, the provider call fails, or the write fails (same skip set as MKT-114). The run continues with the remaining assets, and the skip is counted in the run record.
+**SPF-041 — Per-asset silent skip (backend)**: An in-scope asset is silently skipped — nothing written, no error surfaced — when its symbol cannot be derived, the provider has no data for it, the provider call fails, or the write fails (same skip set as MKT-114); its reason is kept per MKT-220. The run continues with the remaining assets, and the skip is counted in the run record.
 
 **SPF-042 — Empty scope is a quiet success (backend)**: When the scope is empty, the run records a successful execution with zero updates and exits. Unlike the in-app rejection (MKT-111), no error is raised — there is no user watching a scheduled run.
 

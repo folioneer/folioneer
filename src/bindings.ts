@@ -1012,6 +1012,17 @@ async refreshCurrencyRates() : Promise<Result<null, RateRefreshError>> {
 }
 },
 /**
+ * Reads why this installation's last fetch could not price each asset (MKT-221).
+ */
+async getPriceFetchFailures() : Promise<Result<PriceFetchFailure[], PriceFetchFailuresError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_price_fetch_failures") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Reads the newest price date among the holdings and when this installation last
  * fetched prices, for the header's price item (MKT-200–202).
  */
@@ -1139,8 +1150,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
+export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 
 /** user-defined types **/
 
@@ -3962,6 +3973,46 @@ incomplete: boolean;
  * MKT-206 — how many holdings have an outdated price, over every account.
  */
 outdated_price_count: number }
+/**
+ * MKT-220 — the last failure recorded for one asset on this installation.
+ */
+export type PriceFetchFailure = { 
+/**
+ * The asset the fetch could not price.
+ */
+asset_id: string; 
+/**
+ * Why it could not.
+ */
+reason: PriceFetchFailureReason; 
+/**
+ * The local wall-clock moment of that fetch, `YYYY-MM-DDTHH:MM:SS`.
+ */
+failed_at: string }
+/**
+ * MKT-220 — why a fetch left an asset's price unupdated.
+ */
+export type PriceFetchFailureReason = 
+/**
+ * The provider answered with no price for the asset.
+ */
+"NoData" | 
+/**
+ * The provider could not be reached, or its answer could not be read.
+ */
+"ProviderUnreachable" | 
+/**
+ * The provider gave a price that could not be saved.
+ */
+"NotSaved"
+/**
+ * Flat error enum for `get_price_fetch_failures`; serializes as `{ "code": "..." }`.
+ */
+export type PriceFetchFailuresError = 
+/**
+ * A read failed; the cause is logged server-side.
+ */
+{ code: "DatabaseError" }
 /**
  * The two figures behind the header's price item (MKT-202).
  */

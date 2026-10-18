@@ -13,6 +13,9 @@ pub mod global_value;
 /// Derived holding inconsistency (CFR-042/SYN-040) reused by every account-reading use case.
 pub mod inconsistency;
 pub mod performance;
+/// Why this installation's last fetch could not price an asset (MKT-220), written by
+/// `asset_price_fetch` and `scheduled_fetch`, read by `price_fetch_failures`.
+pub mod price_fetch_failures;
 /// This installation's price fetch log (MKT-201), written by `asset_price_fetch` and
 /// `scheduled_fetch`, read by `price_freshness`.
 pub mod price_fetch_log;

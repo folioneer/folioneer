@@ -7,6 +7,9 @@ use crate::context::account::AccountServiceContract;
 use crate::context::asset::{AssetServiceContract, PriceProvider};
 use crate::context::currency::CurrencyService;
 use crate::shared::infrastructure::scheduler::DailyFetchScheduler;
+use crate::use_cases::shared::price_fetch_failures::{
+    PriceFetchFailureReason, PriceFetchFailureRepository,
+};
 use crate::use_cases::shared::price_fetch_log::PriceFetchLogRepository;
 use chrono::{NaiveDate, NaiveDateTime};
 use std::sync::Arc;
@@ -40,6 +43,7 @@ pub struct ScheduledFetchOrchestrator {
     scheduler: Arc<dyn DailyFetchScheduler>,
     clock: Clock,
     fetch_log: Option<Arc<dyn PriceFetchLogRepository>>,
+    fetch_failures: Option<Arc<dyn PriceFetchFailureRepository>>,
 }
 
 impl ScheduledFetchOrchestrator {
@@ -63,6 +67,7 @@ impl ScheduledFetchOrchestrator {
             scheduler,
             clock,
             fetch_log: None,
+            fetch_failures: None,
         }
     }
 
@@ -71,6 +76,34 @@ impl ScheduledFetchOrchestrator {
     pub fn with_fetch_log(mut self, fetch_log: Arc<dyn PriceFetchLogRepository>) -> Self {
         self.fetch_log = Some(fetch_log);
         self
+    }
+
+    /// Records, per asset, why the run could not price it, and forgets the failure of each
+    /// asset it priced (MKT-220).
+    pub fn with_fetch_failures(
+        mut self,
+        fetch_failures: Arc<dyn PriceFetchFailureRepository>,
+    ) -> Self {
+        self.fetch_failures = Some(fetch_failures);
+        self
+    }
+
+    /// MKT-220 — writes what the run's final attempt learned of each asset: `None` when it
+    /// was priced, the reason otherwise. A failed write never fails the run.
+    async fn note_outcomes(&self, outcomes: &[(String, Option<PriceFetchFailureReason>)]) {
+        let Some(failures) = &self.fetch_failures else {
+            return;
+        };
+        let now = (self.clock)();
+        for (asset_id, failure) in outcomes {
+            let written = match failure {
+                None => failures.clear(asset_id).await,
+                Some(reason) => failures.record(asset_id, *reason, now).await,
+            };
+            if let Err(error) = written {
+                tracing::warn!(target: crate::core::logger::BACKEND, asset_id = %asset_id, err = ?error, "scheduled run: recording why an asset was not priced failed (MKT-220)");
+            }
+        }
     }
 
     /// Applies a configuration change (SPF-010–013, SPF-019): validates the
@@ -345,6 +378,9 @@ impl ScheduledFetchOrchestrator {
             let mut updated_count: u32 = 0;
             let mut skipped_count: u32 = 0;
             let mut provider_errors: usize = 0;
+            // MKT-220 — what this attempt learned of each asset.
+            let mut outcomes: Vec<(String, Option<PriceFetchFailureReason>)> =
+                Vec::with_capacity(scope.len());
             for (asset, symbol) in scope {
                 match self
                     .price_provider
@@ -357,8 +393,15 @@ impl ScheduledFetchOrchestrator {
                             .record_daily_closes(&asset.id, closes)
                             .await
                         {
-                            Ok(_) => updated_count += 1,
+                            Ok(_) => {
+                                updated_count += 1;
+                                outcomes.push((asset.id.clone(), None));
+                            }
                             Err(error) => {
+                                outcomes.push((
+                                    asset.id.clone(),
+                                    Some(PriceFetchFailureReason::NotSaved),
+                                ));
                                 // SPF-041 — a write failure is a counted silent skip.
                                 tracing::warn!(target: crate::core::logger::BACKEND, asset_id = %asset.id, err = ?error, "scheduled run: recording daily closes failed, asset skipped");
                                 skipped_count += 1;
@@ -366,8 +409,18 @@ impl ScheduledFetchOrchestrator {
                         }
                     }
                     // SPF-041 — the provider has no data for this asset.
-                    Ok(_) => skipped_count += 1,
+                    Ok(None) => {
+                        skipped_count += 1;
+                        outcomes.push((asset.id.clone(), Some(PriceFetchFailureReason::NoData)));
+                    }
+                    // SPF-032/033 — an empty answer is a window with no close to give (no
+                    // trading day, or a session not closed yet): MKT-220 keeps what it had.
+                    Ok(Some(_)) => skipped_count += 1,
                     Err(error) => {
+                        outcomes.push((
+                            asset.id.clone(),
+                            Some(PriceFetchFailureReason::ProviderUnreachable),
+                        ));
                         tracing::warn!(target: crate::core::logger::BACKEND, symbol = %symbol, err = ?error, "scheduled run: daily-close fetch failed");
                         provider_errors += 1;
                     }
@@ -377,6 +430,7 @@ impl ScheduledFetchOrchestrator {
             // the whole sweep (SPF-051); a mixed outcome is per-asset skips.
             if provider_errors == scope.len() {
                 if attempt >= MAX_RETRY_ATTEMPTS {
+                    self.note_outcomes(&outcomes).await;
                     return (ScheduledFetchOutcome::Failed, 0, skipped_count);
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(500 * u64::from(attempt)))
@@ -384,6 +438,7 @@ impl ScheduledFetchOrchestrator {
                 continue;
             }
             skipped_count += provider_errors as u32;
+            self.note_outcomes(&outcomes).await;
             return (
                 ScheduledFetchOutcome::Succeeded,
                 updated_count,
@@ -1430,6 +1485,87 @@ mod tests {
         assert_eq!(run.outcome, ScheduledFetchOutcome::Succeeded);
         assert_eq!(run.updated_count, 1);
         assert_eq!(run.skipped_count, 4);
+    }
+
+    // MKT-220 — a run records why each asset it could not price was left, and clears the
+    // failure of each asset it priced; an empty answer (SPF-032/033) leaves the asset's
+    // reason as it was; a run that fails records the provider as unreachable for every
+    // asset, once, after its last attempt.
+    #[tokio::test(start_paused = true)]
+    async fn mkt_220_a_run_records_why_each_asset_was_not_priced() {
+        use crate::use_cases::shared::price_fetch_failures::{
+            MockPriceFetchFailureRepository, PriceFetchFailureReason,
+        };
+        use std::sync::Mutex;
+
+        type Noted = Arc<Mutex<Vec<(String, Option<PriceFetchFailureReason>)>>>;
+        fn noting(noted: &Noted) -> MockPriceFetchFailureRepository {
+            let mut failures = MockPriceFetchFailureRepository::new();
+            let into = Arc::clone(noted);
+            failures
+                .expect_record()
+                .returning(move |asset_id, reason, _| {
+                    into.lock()
+                        .unwrap()
+                        .push((asset_id.to_string(), Some(reason)));
+                    Ok(())
+                });
+            let into = Arc::clone(noted);
+            failures.expect_clear().returning(move |asset_id| {
+                into.lock().unwrap().push((asset_id.to_string(), None));
+                Ok(())
+            });
+            failures
+        }
+
+        let noted: Noted = Arc::default();
+        sweeping_orchestrator(
+            &["UPDATED", "WRITEFAIL", "NODATA", "EMPTY", "DOWN"],
+            |symbol| match symbol {
+                "UPDATED" | "WRITEFAIL" => Ok(Some(one_close())),
+                "NODATA" => Ok(None),
+                "EMPTY" => Ok(Some(vec![])),
+                _ => Err(anyhow::anyhow!("provider error")),
+            },
+        )
+        .with_fetch_failures(Arc::new(noting(&noted)))
+        .run_scheduled_fetch()
+        .await
+        .unwrap();
+        let mut seen = noted.lock().unwrap().clone();
+        seen.sort_by_key(|(asset_id, _)| asset_id.clone());
+        assert_eq!(
+            seen,
+            vec![
+                (
+                    "asset-down".to_string(),
+                    Some(PriceFetchFailureReason::ProviderUnreachable)
+                ),
+                (
+                    "asset-nodata".to_string(),
+                    Some(PriceFetchFailureReason::NoData)
+                ),
+                ("asset-updated".to_string(), None),
+                (
+                    "asset-writefail".to_string(),
+                    Some(PriceFetchFailureReason::NotSaved)
+                ),
+            ]
+        );
+
+        let noted: Noted = Arc::default();
+        sweeping_orchestrator(&["DOWN"], |_| Err(anyhow::anyhow!("provider error")))
+            .with_fetch_failures(Arc::new(noting(&noted)))
+            .run_scheduled_fetch()
+            .await
+            .unwrap();
+        assert_eq!(
+            *noted.lock().unwrap(),
+            vec![(
+                "asset-down".to_string(),
+                Some(PriceFetchFailureReason::ProviderUnreachable)
+            )]
+        );
     }
 
     // SPF-051 — when every asset fails, the sweep waits longer before each retry and the

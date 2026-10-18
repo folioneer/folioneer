@@ -12,6 +12,9 @@ use super::guard::FetchGuardLease;
 use std::collections::{HashMap, HashSet};
 
 use super::movement_capture::PriceMovementCapture;
+use crate::use_cases::shared::price_fetch_failures::{
+    PriceFetchFailureReason, PriceFetchFailureRepository,
+};
 use crate::use_cases::shared::price_fetch_log::{FetchMomentClock, PriceFetchLogRepository};
 use crate::use_cases::shared::price_movement::build_report;
 
@@ -30,6 +33,7 @@ pub struct Dispatcher {
     event_bus: Arc<SideEffectEventBus>,
     clock: Clock,
     fetch_log: Option<(Arc<dyn PriceFetchLogRepository>, FetchMomentClock)>,
+    fetch_failures: Option<(Arc<dyn PriceFetchFailureRepository>, FetchMomentClock)>,
 }
 
 impl Dispatcher {
@@ -46,6 +50,7 @@ impl Dispatcher {
             event_bus,
             clock,
             fetch_log: None,
+            fetch_failures: None,
         }
     }
 
@@ -58,6 +63,32 @@ impl Dispatcher {
     ) -> Self {
         self.fetch_log = Some((fetch_log, now));
         self
+    }
+
+    /// Records, per asset, why the task could not price it, and forgets the failure of
+    /// each asset it priced (MKT-220), at the moment read from `now`.
+    pub fn with_fetch_failures(
+        mut self,
+        fetch_failures: Arc<dyn PriceFetchFailureRepository>,
+        now: FetchMomentClock,
+    ) -> Self {
+        self.fetch_failures = Some((fetch_failures, now));
+        self
+    }
+
+    /// MKT-220 — what the task learned of one asset: `None` when it was priced, the
+    /// reason otherwise. A failed write never fails the task.
+    async fn note_outcome(&self, asset_id: &str, failure: Option<PriceFetchFailureReason>) {
+        let Some((failures, now)) = self.fetch_failures.as_ref() else {
+            return;
+        };
+        let written = match failure {
+            None => failures.clear(asset_id).await,
+            Some(reason) => failures.record(asset_id, reason, now()).await,
+        };
+        if let Err(e) = written {
+            tracing::warn!(target: BACKEND, asset_id = %asset_id, err = ?e, "asset_price_fetch: recording why an asset was not priced failed (MKT-220)");
+        }
     }
 
     /// Spawns a Tokio background task that fetches prices for the pre-derived
@@ -119,6 +150,8 @@ impl Dispatcher {
                         );
                         let written = record.clone();
                         if let Err(e) = self.price_repo.upsert(record).await {
+                            self.note_outcome(&asset.id, Some(PriceFetchFailureReason::NotSaved))
+                                .await;
                             skipped += 1;
                             unpriced_asset_ids.insert(asset.id.clone());
                             unpriced.push(self.unpriced_entry(&asset).await);
@@ -130,12 +163,15 @@ impl Dispatcher {
                                 "asset_price_fetch: upsert failed; skipping (MKT-114)"
                             );
                         } else {
+                            self.note_outcome(&asset.id, None).await;
                             ok += 1;
                             fetched.insert(asset.id.clone(), written);
                             self.event_bus.publish(Event::AssetPriceUpdated);
                         }
                     }
                     Ok(None) => {
+                        self.note_outcome(&asset.id, Some(PriceFetchFailureReason::NoData))
+                            .await;
                         skipped += 1;
                         unpriced_asset_ids.insert(asset.id.clone());
                         unpriced.push(self.unpriced_entry(&asset).await);
@@ -147,6 +183,11 @@ impl Dispatcher {
                         );
                     }
                     Err(e) => {
+                        self.note_outcome(
+                            &asset.id,
+                            Some(PriceFetchFailureReason::ProviderUnreachable),
+                        )
+                        .await;
                         skipped += 1;
                         unpriced_asset_ids.insert(asset.id.clone());
                         unpriced.push(self.unpriced_entry(&asset).await);
@@ -365,5 +406,102 @@ mod task_tests {
             "{progress:?}"
         );
         assert_eq!(started.elapsed(), INTER_FETCH_DELAY * 2);
+    }
+
+    // MKT-220 — the task records why each asset it could not price was left, and clears
+    // the failure of each asset it priced, before it announces its completion.
+    #[tokio::test(start_paused = true)]
+    async fn mkt_220_a_task_records_why_each_asset_was_not_priced() {
+        use crate::use_cases::shared::price_fetch_failures::{
+            MockPriceFetchFailureRepository, PriceFetchFailureReason,
+        };
+        use std::sync::Mutex;
+
+        let mut provider = MockPriceProvider::new();
+        provider
+            .expect_fetch_price()
+            .returning(|symbol| match symbol {
+                "NODATA" => Ok(None),
+                "DOWN" => Err(anyhow::anyhow!("unreachable")),
+                _ => Ok(Some(Quote {
+                    price: 100_000_000,
+                    date: None,
+                })),
+            });
+        let mut price_repo = MockAssetPriceRepository::new();
+        price_repo.expect_upsert().returning(|record| {
+            if record.asset_id == "asset-writefail" {
+                Err(anyhow::anyhow!("write failed"))
+            } else {
+                Ok(())
+            }
+        });
+        price_repo.expect_get_latest().returning(|_| Ok(None));
+        let recorded = Arc::new(Mutex::new(Vec::new()));
+        let cleared = Arc::new(Mutex::new(Vec::new()));
+        let mut failures = MockPriceFetchFailureRepository::new();
+        let into = Arc::clone(&recorded);
+        failures
+            .expect_record()
+            .returning(move |asset_id, reason, _| {
+                into.lock().unwrap().push((asset_id.to_string(), reason));
+                Ok(())
+            });
+        let into = Arc::clone(&cleared);
+        failures.expect_clear().returning(move |asset_id| {
+            into.lock().unwrap().push(asset_id.to_string());
+            Ok(())
+        });
+        let bus = Arc::new(SideEffectEventBus::new());
+        let mut events = bus.subscribe();
+        let dispatcher = Arc::new(
+            Dispatcher::new(
+                Arc::new(provider),
+                Arc::new(price_repo),
+                Arc::clone(&bus),
+                Arc::new(|| NaiveDate::from_ymd_opt(2026, 6, 10).expect("date")),
+            )
+            .with_fetch_failures(
+                Arc::new(failures),
+                Arc::new(|| {
+                    NaiveDate::from_ymd_opt(2026, 6, 10)
+                        .and_then(|date| date.and_hms_opt(8, 0, 0))
+                        .expect("moment")
+                }),
+            ),
+        );
+        let lease = Arc::new(FetchGuard::new()).try_acquire().expect("lease");
+
+        dispatcher.spawn(
+            vec![
+                asset("PRICED"),
+                asset("WRITEFAIL"),
+                asset("NODATA"),
+                asset("DOWN"),
+            ],
+            lease,
+            None,
+        );
+        loop {
+            if let Event::AssetPriceFetchCompleted { .. } = events.next().await.expect("bus open") {
+                break;
+            }
+        }
+
+        assert_eq!(*cleared.lock().unwrap(), vec!["asset-priced".to_string()]);
+        assert_eq!(
+            *recorded.lock().unwrap(),
+            vec![
+                (
+                    "asset-writefail".to_string(),
+                    PriceFetchFailureReason::NotSaved
+                ),
+                ("asset-nodata".to_string(), PriceFetchFailureReason::NoData),
+                (
+                    "asset-down".to_string(),
+                    PriceFetchFailureReason::ProviderUnreachable
+                ),
+            ]
+        );
     }
 }

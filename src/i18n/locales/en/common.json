@@ -711,6 +711,12 @@
       "missing_ticker": "Missing ticker",
       "no_price_available": "No price available"
     },
+    "fetch_failure": {
+      "NoData": "Not updated: no price from the provider",
+      "ProviderUnreachable": "Not updated: the provider could not be reached",
+      "NotSaved": "Not updated: the price could not be saved",
+      "tooltip": "Fetch that could not price it: {{date}}"
+    },
     "outdated": {
       "row_label": "Outdated price · {{age}}",
       "count_one": "{{count}} outdated price",

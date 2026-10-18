@@ -1,15 +1,28 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AccountDetailsResponse, Asset, ClosedHoldingDetail, HoldingDetail } from "@/bindings";
+import type {
+  AccountDetailsResponse,
+  Asset,
+  ClosedHoldingDetail,
+  HoldingDetail,
+  PriceFetchFailure,
+  PriceFetchFailuresError,
+  Result,
+} from "@/bindings";
 import { logger } from "@/lib/logger";
 import { useAppStore } from "@/lib/store";
 import { useAccountDetails } from "./useAccountDetails";
 
 const mockGetAccountDetails = vi.fn();
+const mockGetPriceFetchFailures = vi.fn(
+  (): Promise<Result<PriceFetchFailure[], PriceFetchFailuresError>> =>
+    Promise.resolve({ status: "ok", data: [] }),
+);
 
 vi.mock("../gateway", () => ({
   accountDetailsGateway: {
     getAccountDetails: (...args: unknown[]) => mockGetAccountDetails(...args),
+    getPriceFetchFailures: () => mockGetPriceFetchFailures(),
     subscribeToEvents: vi.fn(() => Promise.resolve(() => {})),
   },
   // Reads the real store so the setState-driven asset tests still drive it.
@@ -164,6 +177,60 @@ const makeCashHolding = (overrides: Partial<HoldingDetail> = {}): HoldingDetail 
     realized_pnl: 0,
     ...overrides,
   });
+
+describe("useAccountDetails — why a price was not updated (MKT-222)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAppStore.setState({ assets: [] });
+  });
+
+  it("attaches the reason the last fetch gave to its holding, in the live view", async () => {
+    mockGetAccountDetails.mockResolvedValue({
+      status: "ok",
+      data: makeResponse({ holdings: [makeHolding()] }),
+    });
+    mockGetPriceFetchFailures.mockResolvedValueOnce({
+      status: "ok",
+      data: [{ asset_id: "asset-1", reason: "NoData", failed_at: "2026-10-18T08:00:00" }],
+    });
+    const { result } = renderHook(() => useAccountDetails("acc-1"));
+    await act(async () => {});
+    expect(result.current.holdings[0]?.fetchFailure).toEqual({ key: "mkt.fetch_failure.NoData" });
+    expect(result.current.holdings[0]?.fetchFailedOn).toBe("2026-10-18");
+  });
+
+  it("reads no reason for a past date, and shows none when the read fails", async () => {
+    mockGetAccountDetails.mockResolvedValue({
+      status: "ok",
+      data: makeResponse({ holdings: [makeHolding()] }),
+    });
+    const past = renderHook(() => useAccountDetails("acc-1", "2026-01-02"));
+    await act(async () => {});
+    expect(mockGetPriceFetchFailures).not.toHaveBeenCalled();
+    expect(past.result.current.holdings[0]?.fetchFailure).toBeNull();
+
+    mockGetPriceFetchFailures.mockResolvedValueOnce({
+      status: "error",
+      error: { code: "DatabaseError" },
+    });
+    const live = renderHook(() => useAccountDetails("acc-1"));
+    await act(async () => {});
+    expect(live.result.current.holdings[0]?.fetchFailure).toBeNull();
+    expect(live.result.current.error).toBeNull();
+  });
+
+  it("keeps the details when the read of the reasons throws", async () => {
+    mockGetAccountDetails.mockResolvedValue({
+      status: "ok",
+      data: makeResponse({ holdings: [makeHolding()] }),
+    });
+    mockGetPriceFetchFailures.mockRejectedValueOnce(new Error("bridge down"));
+    const { result } = renderHook(() => useAccountDetails("acc-1"));
+    await act(async () => {});
+    expect(result.current.holdings).toHaveLength(1);
+    expect(result.current.error).toBeNull();
+  });
+});
 
 describe("useAccountDetails — cash row (CSH-092 / CSH-095)", () => {
   beforeEach(() => {

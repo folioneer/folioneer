@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AccountDetailsResponse, HoldingDetail } from "@/bindings";
+import type { AccountDetailsResponse, HoldingDetail, PriceFetchFailure } from "@/bindings";
 import { accountMutationErrorToI18n } from "@/features/accounts/shared/presenter";
 import { logger } from "@/lib/logger";
 import { useAppStore } from "@/lib/store";
@@ -12,9 +12,22 @@ import {
   toAccountSummary,
   toClosedHoldingRow,
   toHoldingRow,
+  withFetchFailure,
 } from "../shared/presenter";
 
 const UNKNOWN_ERROR: I18nMessage = { key: "error.Unknown" };
+
+/** MKT-222 — the reasons of this device's last fetch; none when they cannot be read. */
+async function readFetchFailures(): Promise<PriceFetchFailure[]> {
+  try {
+    const result = await accountDetailsGateway.getPriceFetchFailures();
+    if (result.status === "ok") return result.data;
+    logger.error("[useAccountDetails] reading the price fetch failures failed", result.error);
+  } catch (err) {
+    logger.error("[useAccountDetails] reading the price fetch failures threw", { error: err });
+  }
+  return [];
+}
 
 interface UseAccountDetailsResult {
   isLoading: boolean;
@@ -38,6 +51,7 @@ export function useAccountDetails(accountId: string, asOfDate = ""): UseAccountD
   const [data, setData] = useState<AccountDetailsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<I18nMessage | null>(null);
+  const [fetchFailures, setFetchFailures] = useState<PriceFetchFailure[]>([]);
   // ACD-051 — asset class is read from the loaded asset catalog to group holdings.
   const assets = useCachedAssets();
 
@@ -51,7 +65,12 @@ export function useAccountDetails(accountId: string, asOfDate = ""): UseAccountD
       const result = await accountDetailsGateway.getAccountDetails(accountId, asOfDate || null);
       if (request !== latestRequest.current) return;
       if (result.status === "ok") {
+        // MKT-222 — the reasons are read before either is shown, so the rows never
+        // appear without them, and a later request's answer is never mixed with this one.
+        const failures = asOfDate ? [] : await readFetchFailures();
+        if (request !== latestRequest.current) return;
         setData(result.data);
+        setFetchFailures(failures);
       } else {
         logger.error("[useAccountDetails] fetch failed", result.error);
         setError(accountMutationErrorToI18n(result.error));
@@ -117,14 +136,15 @@ export function useAccountDetails(accountId: string, asOfDate = ""): UseAccountD
       if (row.isCash) return 0;
       return classById.get(row.assetId) === "Stocks" ? 1 : 2;
     };
+    const failureById = new Map(fetchFailures.map((failure) => [failure.asset_id, failure]));
     return data.holdings
-      .map(toHoldingRow)
+      .map((detail) => withFetchFailure(toHoldingRow(detail), failureById.get(detail.asset_id)))
       .sort(
         (a, b) =>
           groupRank(a) - groupRank(b) ||
           a.assetName.toLowerCase().localeCompare(b.assetName.toLowerCase()),
       );
-  }, [data, assets]);
+  }, [data, assets, fetchFailures]);
 
   const closedHoldings = useMemo<ClosedHoldingRowViewModel[]>(
     () => (data ? data.closed_holdings.map(toClosedHoldingRow) : []),
