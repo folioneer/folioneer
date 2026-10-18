@@ -5,5 +5,7 @@ From the owner (2026-10-18), on TODO-068. The per-asset setting of MKT-150 exist
 **User value:** An owner reads at once that an asset's price is theirs to type, and why it is not fetched.
 **Done when:** the setting is named "Price typed by hand" everywhere — the asset's actions "Type its price by hand" / "Fetch its price automatically", the asset's row "Price typed by hand", its messages, in every interface language; the market-price spec (MKT-150 and after) and the glossary say so, "lock" left to TODO-068; TODO-085's reason for a price not updated names it in the same words; nothing else of its behaviour changes.
 **Size:** M — one pull request across several lanes: the strings in every language, the market-price spec and the glossary; the wording is given.
-**Design:** none
-**Open questions:** none
+**Design:** validated
+**Open questions:**
+
+- [x] The code's names too, or the words only? — The words only: `price_refresh_blocked` and its actions already say what it is; "lock" was the wrong word, on screen and in the spec. (owner, 2026-10-18)
