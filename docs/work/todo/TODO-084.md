@@ -8,6 +8,7 @@ From gh245 (owner, 2026-10-12), which this entry closes when it ships. Two figur
 
 **User value:** The returns the owner reads, and those an agent repeats, are plausible: no figure for a window a holding was not held through, and a capital figure that counts what an account was opened with.
 **Done when:** a window that opens before the position was first held shows what the owner decided below, with a test of a position bought days ago and priced low; the account says what was brought into it, opening balances included, as decided below, with a test of an account opened by balances; the rules (ACD-053, ACD-055 to ACD-057) say so.
+**Size:** L — a mock-up of the capital brought in, then the rules and the backend, then the window.
 **Design:** none
 **Open questions:**
 
