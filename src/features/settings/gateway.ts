@@ -2,8 +2,11 @@ import { open } from "@tauri-apps/plugin-dialog";
 import {
   type AgentConnectionError,
   type AgentConnectionState,
+  type CurrencyError,
   commands,
   type PortfolioSyncError,
+  type RateHistoryBackfillError,
+  type ReferenceCurrency,
   type Result,
   type ScheduledFetchError,
   type ScheduledFetchStatus,
@@ -128,3 +131,22 @@ export const settingsGateway = {
   dismissConflictNotice,
   pickSyncFolder,
 };
+
+// GPF-011 / FXR-127 — the reference currency, with every code it may be set to. Each feature
+// wraps the commands it calls, since features never import each other (F26): the shell and
+// currency gateways wrap this read and the rate backfill for their own callers.
+export async function getReferenceCurrency(): Promise<Result<ReferenceCurrency, CurrencyError>> {
+  return await commands.getReferenceCurrency();
+}
+
+// FXR-123/126 — chooses the reference currency.
+export async function setReferenceCurrency(currency: string): Promise<Result<null, CurrencyError>> {
+  return await commands.setReferenceCurrency(currency);
+}
+
+// FXR-015/112 — fetches the rate histories, the new reference currency's pairs included.
+export async function backfillCurrencyRateHistory(): Promise<
+  Result<number, RateHistoryBackfillError>
+> {
+  return await commands.backfillCurrencyRateHistory();
+}

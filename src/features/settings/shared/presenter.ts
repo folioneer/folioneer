@@ -1,7 +1,9 @@
 import type {
   ConflictNotice,
+  CurrencyError,
   FolderProblem,
   PortfolioSyncError,
+  RateHistoryBackfillError,
   RosterEntry,
   ScheduledFetchError,
   ScheduledFetchRun,
@@ -162,4 +164,53 @@ export function rosterToViewModel(roster: RosterEntry[]): RosterEntryViewModel[]
     lastAppliedAt: entry.last_applied_at,
     publishedChanges: entry.published_changes,
   }));
+}
+
+/**
+ * FXR-127 — the reference currency's choices as the window names them: "CHF — Swiss franc",
+ * the name in the window's language, the code alone when it has none.
+ */
+export function currencyChoiceOptions(
+  choices: string[],
+  language: string,
+): { value: string; label: string }[] {
+  const names = new Intl.DisplayNames([language], { type: "currency" });
+  return choices.map((code) => {
+    const name = names.of(code);
+    return { value: code, label: name && name !== code ? `${code} — ${name}` : code };
+  });
+}
+
+/** F27 — a failed read or choice of the reference currency, under `error.currency.*`. */
+export function referenceCurrencyErrorToI18n(error: CurrencyError): I18nMessage {
+  switch (error.code) {
+    case "InvalidDateFormat":
+      return { key: "error.currency.InvalidDateFormat", vars: { date: error.date } };
+    case "NotPositive":
+    case "NonFinite":
+    case "DateInFuture":
+    case "InvalidCurrency":
+    case "IdentityPair":
+    case "RateNotFound":
+    case "ProviderUnreachable":
+    case "DatabaseError":
+      return { key: `error.currency.${error.code}` };
+    default: {
+      const _exhaustive: never = error;
+      return _exhaustive;
+    }
+  }
+}
+
+/** F27 — a failed fetch of the rate histories after a choice (FXR-114). */
+export function rateHistoryErrorToI18n(error: RateHistoryBackfillError): I18nMessage {
+  switch (error.code) {
+    case "ProviderUnreachable":
+    case "DatabaseError":
+      return { key: `error.currency.${error.code}` };
+    default: {
+      const _exhaustive: never = error;
+      return _exhaustive;
+    }
+  }
 }

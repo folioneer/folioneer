@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
 import { selectHasExternalProvider, useAppStore } from "@/lib/store";
 import { AgentsAllowedSetting } from "./agent_connection/AgentsAllowedSetting";
+import { ReferenceCurrencySection } from "./reference_currency/ReferenceCurrencySection";
 import { ScheduledFetchSection } from "./scheduled_fetch/ScheduledFetchSection";
 import { SyncSummary } from "./sync/SyncSummary";
 import { type LanguageChoice, useSettings } from "./useSettings";
@@ -36,6 +37,8 @@ export function SettingsPage() {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="flex flex-col gap-6 p-6 max-w-md">
         <h2 className="text-2xl font-medium text-m3-on-surface">{t("settings.title")}</h2>
+
+        <ReferenceCurrencySection />
 
         <section className="flex flex-col gap-3">
           <span className="text-sm font-medium text-m3-on-surface-variant">

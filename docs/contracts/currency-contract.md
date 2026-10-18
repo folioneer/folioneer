@@ -1,7 +1,7 @@
 # Contract — Currency
 
 > Domain: `currency`
-> Last updated by: `fx-rate` spec
+> Last updated by: `fx-rate` spec, `global-performance` spec
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Per-command reachable codes are listed in the "Errors" column. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic chain preserved server-side via `tracing::error!`), consistent with the `account` and `asset` contracts.
 >
@@ -24,6 +24,16 @@
 | ----------------------- | -------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `declare_currency_pair` | `from_currency: String, to_currency: String` | `CurrencyPair`             | `InvalidCurrency { currency }` (FXR-023), `IdentityPair` (FXR-011/023), `DatabaseError` _(FXR-054 — idempotent: an existing pair is returned, not duplicated)_ |
 | `get_currency_pairs`    | —                                            | `Vec<CurrencyPairSummary>` | `DatabaseError` _(FXR-051 — empty list when no pair persisted; each pair enriched with its most-recent rate, FXR-035)_                                         |
+
+### Reference Currency
+
+> The currency every cross-account figure is reported in (GPF-011): a portfolio setting, synced
+> (FXR-120–125, SYN-021). Choosing it publishes `ReferenceCurrencyUpdated` (FXR-126).
+
+| Command                  | Args               | Return              | Errors                                                                                                                                     |
+| ------------------------ | ------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `get_reference_currency` | —                  | `ReferenceCurrency` | `DatabaseError` _(FXR-127 — EUR until chosen, FXR-122; a malformed synced value reads as EUR, FXR-124)_                                    |
+| `set_reference_currency` | `currency: String` | `()`                | `InvalidCurrency { currency }` (FXR-123), `DatabaseError` _(FXR-120 — replaces the value; FXR-126 — publishes `ReferenceCurrencyUpdated`)_ |
 
 ### Currency Rates
 
@@ -49,6 +59,12 @@
 ## Shared Types
 
 ```rust
+// The reference currency with what it may be set to (FXR-127).
+struct ReferenceCurrency {
+    currency: String,        // the currency the portfolio is reported in (GPF-011, FXR-122)
+    choices: Vec<String>,    // every ISO 4217 code, in code order (FXR-127)
+}
+
 // A directed currency pair the system follows (FXR-013/014). Durable; (from, to) unique; from != to.
 struct CurrencyPair {
     from_currency: String,   // ISO 4217 source currency (e.g. "USD")
@@ -88,18 +104,20 @@ struct CurrencyPairSummary {
 
 ### Published
 
-| Event                 | Payload | Rule                                                                                                                                                    |
-| --------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CurrencyRateUpdated` | —       | FXR-026 (record), FXR-052 (edit), FXR-053 (delete), FXR-074 (fetch) — bare signal, discriminant `"CurrencyRateUpdated"`, published by the `currency` BC |
-| `CurrencyPairUpdated` | —       | FXR-054 (declare) — bare signal, discriminant `"CurrencyPairUpdated"`, published by the `currency` BC                                                   |
+| Event                      | Payload | Rule                                                                                                                                                    |
+| -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CurrencyRateUpdated`      | —       | FXR-026 (record), FXR-052 (edit), FXR-053 (delete), FXR-074 (fetch) — bare signal, discriminant `"CurrencyRateUpdated"`, published by the `currency` BC |
+| `CurrencyPairUpdated`      | —       | FXR-054 (declare) — bare signal, discriminant `"CurrencyPairUpdated"`, published by the `currency` BC                                                   |
+| `ReferenceCurrencyUpdated` | —       | FXR-126 (choose) — bare signal, discriminant `"ReferenceCurrencyUpdated"`, published by the `currency` BC                                               |
 
 ### Subscribed (frontend re-fetch triggers)
 
-| Event                 | Payload | Rule                                                                                                                                                            |
-| --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CurrencyRateUpdated` | —       | FXR-036 — Currency Rates view re-fetches; **also** consumed by the `account` domain's account details view and accounts list (cross-contract wiring, see Notes) |
-| `SyncCompleted`       | —       | SYN-064 — Currency Rates view re-fetches its pair list and the selected pair's rates once for everything a sync applied                                         |
-| `CurrencyPairUpdated` | —       | FXR-056 — Currency Rates view re-fetches its pair list                                                                                                          |
+| Event                      | Payload | Rule                                                                                                                                                                                                     |
+| -------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CurrencyRateUpdated`      | —       | FXR-036 — Currency Rates view re-fetches; **also** consumed by the `account` domain's account details view and accounts list (cross-contract wiring, see Notes)                                          |
+| `SyncCompleted`            | —       | SYN-064 — Currency Rates view re-fetches its pair list and the selected pair's rates once for everything a sync applied                                                                                  |
+| `CurrencyPairUpdated`      | —       | FXR-056 — Currency Rates view re-fetches its pair list                                                                                                                                                   |
+| `ReferenceCurrencyUpdated` | —       | FXR-126 — the accounts list re-reads its summaries and portfolio total; the global performance view re-reads; the app store re-reads the currency the new-account and new-asset forms start in (FXR-128) |
 
 ---
 
@@ -114,6 +132,7 @@ struct CurrencyPairSummary {
 
 ## Changelog
 
+- 2026-10-18 — TODO-032 (FXR-120–129): `get_reference_currency`, `set_reference_currency`, type `ReferenceCurrency`, event `ReferenceCurrencyUpdated`.
 - 2026-10-18 — TODO-032 (FXR-015): the rate commands also ensure each account's pair to the reference currency. No signature changed.
 - 2026-10-10 — DEBT-096: read against the code. `update_currency_rate` no longer lists `InvalidCurrency` and `IdentityPair`: the rate is looked up first, so such a pair answers `RateNotFound`. The note on `CurrencyRateUpdated` says who reads again on it.
 - 2026-09-25 — TODO-042 (FXR-071, FXR-074–077, FXR-110–114): `refresh_currency_rates` added (launch rate refresh, every build); `backfill_currency_rate_history` backs "Update rates", ensures holding pairs first and publishes one `CurrencyRateUpdated` when it wrote a rate; the price fetch tasks no longer fetch rates

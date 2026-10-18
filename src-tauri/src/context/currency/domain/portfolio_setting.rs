@@ -2,6 +2,7 @@ use crate::shared::domain::{Rank, RecordKind, SyncedRecord};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use sqlx::SqliteConnection;
 
 /// GPF-011 — the setting naming the currency the portfolio is reported in.
@@ -9,6 +10,26 @@ pub const REFERENCE_CURRENCY_SETTING: &str = "reference_currency";
 
 /// GPF-011 — the reference currency of a portfolio that never chose one.
 pub const DEFAULT_REFERENCE_CURRENCY: &str = "EUR";
+
+/// FXR-127 — the reference currency, with every ISO 4217 code it may be set to, in code order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct ReferenceCurrency {
+    /// The currency the portfolio is reported in (GPF-011, FXR-122).
+    pub currency: String,
+    /// Every ISO 4217 code, in code order.
+    pub choices: Vec<String>,
+}
+
+/// FXR-127 — every ISO 4217 code, in code order.
+pub fn currency_codes() -> Vec<String> {
+    use iso_currency::{Currency, IntoEnumIterator};
+    let mut codes: Vec<String> = Currency::iter()
+        .map(|currency| currency.code().to_string())
+        .collect();
+    codes.sort();
+    codes.dedup();
+    codes
+}
 
 /// A portfolio-wide setting (SYN-021): the same on every device, synced, one per name.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

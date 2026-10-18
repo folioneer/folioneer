@@ -75,6 +75,7 @@ export function useAccountSummaries(): UseAccountSummariesResult {
         type === "AccountUpdated" ||
         type === "AssetUpdated" ||
         type === "CurrencyRateUpdated" ||
+        type === "ReferenceCurrencyUpdated" ||
         type === "CurrencyPairUpdated" ||
         type === "AssetPriceUpdated" ||
         type === "AssetPriceFetchCompleted" ||

@@ -4,7 +4,9 @@
 #![allow(clippy::unreachable)]
 
 use crate::context::currency::application::CurrencyService;
-use crate::context::currency::domain::{CurrencyPair, CurrencyPairSummary, CurrencyRate};
+use crate::context::currency::domain::{
+    CurrencyPair, CurrencyPairSummary, CurrencyRate, ReferenceCurrency,
+};
 use crate::context::currency::error::CurrencyError;
 
 use std::result::Result as StdResult;
@@ -112,6 +114,25 @@ pub async fn get_currency_rates(
     to_currency: String,
 ) -> StdResult<Vec<CurrencyRate>, CurrencyError> {
     svc.list_currency_rates(from_currency, to_currency).await
+}
+
+/// GPF-011 / FXR-127 — the reference currency, with every code it may be set to.
+#[tauri::command]
+#[specta::specta]
+pub async fn get_reference_currency(
+    svc: tauri::State<'_, Arc<CurrencyService>>,
+) -> StdResult<ReferenceCurrency, CurrencyError> {
+    svc.reference_currency_choice().await
+}
+
+/// GPF-011 / FXR-123 / FXR-126 — chooses the reference currency, an ISO 4217 code; synced.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_reference_currency(
+    svc: tauri::State<'_, Arc<CurrencyService>>,
+    currency: String,
+) -> StdResult<(), CurrencyError> {
+    svc.set_reference_currency(&currency).await
 }
 
 #[cfg(test)]

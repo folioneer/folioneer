@@ -12,8 +12,8 @@ pub mod rate_provider;
 pub use currency_pair::{CurrencyPair, CurrencyPairRepository, CurrencyPairSummary};
 pub use currency_rate::{CurrencyRate, CurrencyRateRepository, CurrencyRateSource};
 pub use portfolio_setting::{
-    PortfolioSetting, PortfolioSettingRepository, DEFAULT_REFERENCE_CURRENCY,
-    REFERENCE_CURRENCY_SETTING,
+    currency_codes, PortfolioSetting, PortfolioSettingRepository, ReferenceCurrency,
+    DEFAULT_REFERENCE_CURRENCY, REFERENCE_CURRENCY_SETTING,
 };
 pub use rate_provider::{EurSnapshot, RateHistoryProvider, RateProvider};
 

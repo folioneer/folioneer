@@ -73,7 +73,7 @@ tauri-plugin-window-state = { version = "2.4.1", optional = true }
 # (RUSTSEC-2026-0367/0368/0369, fixed in zip 9). The feature only unpacks zipped or gzipped
 # artifacts; `createUpdaterArtifacts: true` publishes them raw, and must stay so.
 tauri-plugin-updater = { version = "2.10.1", optional = true, default-features = false, features = ["rustls-tls"] }
-iso_currency = "0.5.3"
+iso_currency = { version = "0.5.3", features = ["iterator"] }
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "cookies"] }
 sha2 = "0.10"
 quick-xml = "0.41"

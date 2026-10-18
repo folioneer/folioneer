@@ -3,11 +3,13 @@ import type {
   AgentConnectionError,
   AgentConnectionState,
   Capabilities,
+  CurrencyError,
   Event,
   FeeGenerationError,
   PortfolioSyncError,
   PriceFreshness,
   PriceFreshnessError,
+  ReferenceCurrency,
   Result,
   SessionRemoval,
   SyncStatusView,
@@ -113,3 +115,8 @@ export const shellGateway = {
   getPriceFreshness,
   subscribeToEvents,
 };
+
+// GPF-011 / FXR-127 — the reference currency every total is reported in, with its choices.
+export function getReferenceCurrency(): Promise<Result<ReferenceCurrency, CurrencyError>> {
+  return commands.getReferenceCurrency();
+}

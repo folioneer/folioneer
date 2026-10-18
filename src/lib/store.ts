@@ -11,7 +11,7 @@ import {
 import { accountGateway } from "../features/accounts/gateway";
 import { assetGateway } from "../features/assets/gateway";
 import { categoryGateway } from "../features/categories/gateway";
-import { getCapabilities } from "../features/shell/gateway";
+import { getCapabilities, getReferenceCurrency } from "../features/shell/gateway";
 import { type SnackbarVariant, useSnackbarStore } from "../ui/components/snackbar/snackbarStore";
 import { logger } from "./logger";
 
@@ -49,6 +49,9 @@ interface AppState {
   hasExternalProvider: boolean;
   // UPD-030/031 — the distribution channel this build belongs to; null for the public build.
   distributionChannel: string | null;
+  // GPF-011 / FXR-128 — the portfolio's reference currency; new-account and new-asset forms
+  // preselect it. EUR until it is read (FXR-122).
+  referenceCurrency: string;
 
   // Loading states
   isLoadingAssets: boolean;
@@ -65,6 +68,7 @@ interface AppState {
   fetchAssets: () => Promise<void>;
   fetchCategories: () => Promise<void>;
   fetchAccounts: () => Promise<void>;
+  fetchReferenceCurrency: () => Promise<void>;
 
   // MKT-177 — dismiss the manual-fill modal, clearing the unpriced list.
   clearUnpricedAssets: () => void;
@@ -100,6 +104,7 @@ export const useAppStore = create<AppState>((set, get) => {
     // before `isInitialized` flips, so no screen renders from this default.
     hasExternalProvider: true,
     distributionChannel: null,
+    referenceCurrency: "EUR",
     isLoadingAssets: false,
     isLoadingCategories: false,
     isLoadingAccounts: false,
@@ -147,6 +152,16 @@ export const useAppStore = create<AppState>((set, get) => {
       }
     },
 
+    // FXR-128 — a failed read keeps the last known currency and is logged.
+    fetchReferenceCurrency: async () => {
+      const result = await getReferenceCurrency();
+      if (result.status === "ok") {
+        set({ referenceCurrency: result.data.currency });
+      } else {
+        logger.error("[store] failed to read the reference currency", result.error);
+      }
+    },
+
     clearUnpricedAssets: () => set({ unpricedAssets: [] }),
 
     isAnyLoading: () => {
@@ -159,7 +174,7 @@ export const useAppStore = create<AppState>((set, get) => {
         return () => {};
       }
 
-      const { fetchAssets, fetchCategories, fetchAccounts } = get();
+      const { fetchAssets, fetchCategories, fetchAccounts, fetchReferenceCurrency } = get();
 
       const fetchMetadata = async () => {
         try {
@@ -190,6 +205,7 @@ export const useAppStore = create<AppState>((set, get) => {
         fetchAccounts(),
         fetchMetadata(),
         fetchCapabilities(),
+        fetchReferenceCurrency(),
       ]).then(() => {
         set({ isInitialized: true });
       });
@@ -199,12 +215,14 @@ export const useAppStore = create<AppState>((set, get) => {
         AssetUpdated: fetchAssets,
         CategoryUpdated: fetchCategories,
         AccountUpdated: fetchAccounts,
+        ReferenceCurrencyUpdated: fetchReferenceCurrency,
         // SYN-064 — a bare marker: a run applied other devices' changes, so every
         // cached slice is re-read.
         SyncCompleted: () => {
           fetchAssets();
           fetchCategories();
           fetchAccounts();
+          fetchReferenceCurrency();
         },
       };
 

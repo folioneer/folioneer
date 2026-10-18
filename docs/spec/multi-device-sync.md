@@ -316,4 +316,4 @@ Enable-sync modal in two steps: folder picker (validated, SYN-019), then passphr
 
 ## Open Questions
 
-- A device joining a shared portfolio with a reference currency of its own (FXR-120 to FXR-125; the first run asks one, TODO-092): does it count as user data that blocks the join (SYN-014), or does the shared portfolio's choice replace it (SYN-083)? Open on TODO-032 for its next part; no device can set the reference currency before then.
+- A device joining a shared portfolio with a reference currency of its own (FXR-120 to FXR-125; the first run asks one, TODO-092): does it count as user data that blocks the join (SYN-014), or does the shared portfolio's choice replace it (SYN-083)? Open on DEBT-152.

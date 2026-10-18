@@ -249,7 +249,10 @@
     },
     "agents_allowed_label": "Autoriser les agents à se connecter",
     "agents_allowed_description": "Un agent sur cet ordinateur (Claude Code, Claude Desktop) peut demander à lire votre portefeuille et à y enregistrer tant que Folioneer est ouvert. Chaque connexion attend votre réponse. Désactivé : rien ne peut se connecter.",
-    "agents_unavailable_description": "Pas encore disponible sur ce système. Rien ne peut se connecter."
+    "agents_unavailable_description": "Pas encore disponible sur ce système. Rien ne peut se connecter.",
+    "reference_currency_label": "Devise de référence",
+    "reference_currency_help": "Les totaux, la performance et les variations de prix du portefeuille sont donnés dans cette devise, sur chaque ordinateur de la synchronisation.",
+    "reference_currency_fetching": "Récupération des historiques de taux…"
   },
   "agent": {
     "connection_title": "Un agent demande à se connecter",

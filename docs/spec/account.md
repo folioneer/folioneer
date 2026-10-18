@@ -134,7 +134,7 @@ The account section title is displayed in the application shell header, not in t
 
 **ACC-032 — When the total row is shown (frontend)**: The total row is shown only when every account is listed: it is hidden while a search filter is active (ACC-011), and absent while any read, first or re-read (ACC-013, ACC-033), is in progress, when a read fails (ACC-013), or when no account exists (ACC-012).
 
-**ACC-033 — The account table follows rate changes (frontend)**: The account table re-reads its summaries when a currency rate is recorded, edited or removed, or a currency pair is declared, applied or removed, so the converted figures, the portfolio total and its incomplete marker reflect the rates in force.
+**ACC-033 — The account table follows rate changes (frontend)**: The account table re-reads its summaries when a currency rate is recorded, edited or removed, or a currency pair is declared, applied or removed, or the reference currency is chosen (FXR-126), so the converted figures, the portfolio total and its incomplete marker reflect the rates in force.
 
 ### Wrapper (040–049)
 

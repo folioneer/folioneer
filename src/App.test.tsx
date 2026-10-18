@@ -22,6 +22,9 @@ vi.mock("./bindings", async (importOriginal) => ({
     deleteAccountType: vi.fn(),
     getAccounts: vi.fn(() => Promise.resolve({ status: "ok", data: [] })),
     getCategories: vi.fn(() => Promise.resolve({ status: "ok", data: [] })),
+    getReferenceCurrency: vi.fn(() =>
+      Promise.resolve({ status: "ok", data: { currency: "EUR", choices: ["EUR"] } }),
+    ),
     checkForUpdate: vi.fn(() => Promise.resolve({ status: "ok", data: null })),
     downloadUpdate: vi.fn(() => Promise.resolve({ status: "ok", data: null })),
     installUpdate: vi.fn(() => Promise.resolve({ status: "ok", data: null })),

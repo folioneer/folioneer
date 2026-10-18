@@ -169,6 +169,7 @@ export function useGlobalPerformance(): UseGlobalPerformanceResult {
       }
       if (
         type === "TransactionUpdated" ||
+        type === "ReferenceCurrencyUpdated" ||
         type === "AssetPriceUpdated" ||
         type === "AssetPriceFetchCompleted" ||
         type === "AccountUpdated" ||

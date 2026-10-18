@@ -455,6 +455,28 @@ async getCurrencyPairs() : Promise<Result<CurrencyPairSummary[], CurrencyError>>
 }
 },
 /**
+ * GPF-011 / FXR-127 — the reference currency, with every code it may be set to.
+ */
+async getReferenceCurrency() : Promise<Result<ReferenceCurrency, CurrencyError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_reference_currency") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * GPF-011 / FXR-123 / FXR-126 — chooses the reference currency, an ISO 4217 code; synced.
+ */
+async setReferenceCurrency(currency: string) : Promise<Result<null, CurrencyError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_reference_currency", { currency }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Returns all rates for the given pair ordered by date descending (FXR-050).
  * Returns an empty list for an unknown pair — never `RateNotFound`.
  */
@@ -2924,6 +2946,10 @@ export type Event =
  */
 { type: "CurrencyPairUpdated" } | 
 /**
+ * The reference currency was chosen (FXR-126): every total re-reads in it.
+ */
+{ type: "ReferenceCurrencyUpdated" } | 
+/**
  * A holding note was written or deleted — by this device (HNO-020/021) or applied from
  * another one (SYN-064).
  */
@@ -4365,6 +4391,18 @@ factor: number;
  * Optional user note.
  */
 note: string | null }
+/**
+ * FXR-127 — the reference currency, with every ISO 4217 code it may be set to, in code order.
+ */
+export type ReferenceCurrency = { 
+/**
+ * The currency the portfolio is reported in (GPF-011, FXR-122).
+ */
+currency: string; 
+/**
+ * Every ISO 4217 code, in code order.
+ */
+choices: string[] }
 /**
  * An agent asking the owner to remove a transaction the owner typed (AGT-080).
  */

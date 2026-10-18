@@ -51,6 +51,8 @@ pub enum Event {
     /// A currency pair was declared or removed — by this device (FXR-054) or applied from
     /// another one (SYN-064).
     CurrencyPairUpdated,
+    /// The reference currency was chosen (FXR-126): every total re-reads in it.
+    ReferenceCurrencyUpdated,
     /// A holding note was written or deleted — by this device (HNO-020/021) or applied from
     /// another one (SYN-064).
     HoldingNoteUpdated,
