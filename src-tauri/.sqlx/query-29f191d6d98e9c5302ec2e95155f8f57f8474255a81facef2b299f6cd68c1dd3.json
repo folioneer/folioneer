@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM portfolio_settings",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "29f191d6d98e9c5302ec2e95155f8f57f8474255a81facef2b299f6cd68c1dd3"
+}
