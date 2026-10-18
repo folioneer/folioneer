@@ -9,5 +9,5 @@ One document lists each capability and which interface offers it. A check fails 
 **Design:** none
 **Open questions:**
 
-- [ ] Where does the page live in the application: under Settings beside "Allow agents to connect", or in About?
-- [ ] Should the command line read what an agent reads (the portfolio summary, the holdings of an account)? The table makes the gap visible; this decides whether to close it.
+- [x] Where does the page live in the application: under Settings beside "Allow agents to connect", or in About? — In a Help page of its own, reached from the sidebar above Settings (TODO-108), which also holds the demo, connecting an agent, the guide and what's new. (owner, 2026-10-18)
+- [x] Should the command line read what an agent reads (the portfolio summary, the holdings of an account)? The table makes the gap visible; this decides whether to close it. — Yes, the gap is closed, not urgently: the command line reads the summary and the holdings from the same core, in an entry of its own when queued. (owner, 2026-10-18)

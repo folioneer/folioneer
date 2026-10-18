@@ -7,4 +7,4 @@ From gh285 (owner, 2026-10-17), which this entry closes when it ships. TODO-025 
 **Design:** none
 **Open questions:**
 
-- [ ] Which export of each broker (transactions CSV, account statement, Flex Query for Interactive Brokers)?
+- [x] Which export of each broker (transactions CSV, account statement, Flex Query for Interactive Brokers)? — Each broker's transactions CSV from its client area; Interactive Brokers through a Flex Query (CSV), which the guide describes how to set up; PDF statements are no preset's — an agent reads them (TODO-067); a broker with no transactions CSV gets no preset (gh285). (owner, 2026-10-18)

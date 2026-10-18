@@ -7,4 +7,4 @@ Moved out of TODO-071 and TODO-072 by the owner on 2026-10-11: an interface gets
 **Design:** none
 **Open questions:**
 
-- [ ] The names of the commands (`holding split`, `holding free-shares`, …): as the owner types them.
+- [x] The names of the commands (`holding split`, `holding free-shares`, …): as the owner types them. — `holding split --new 2 --old 1`, `holding free-shares --quantity`, `holding interest --amount`, `holding fee --amount` (or `--quantity` for a fee taken in units), with the same `--account`, `--asset`, `--date`, `--note`, `--json` as the others. (owner, 2026-10-18)

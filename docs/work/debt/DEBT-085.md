@@ -9,4 +9,4 @@
 
 **Open questions:**
 
-- [ ] Where do the assets to settle show: a line or a badge on their row of the assets table, a notice above it, or both with a command of the command line? (A screen changes: a design to validate.)
+- [x] Where do the assets to settle show: a line or a badge on their row of the assets table, a notice above it, or both with a command of the command line? (A screen changes: a design to validate.) — As TODO-086 now says: a line above the table and a mark on each row, with a sentence and a fix per anomaly; this entry closes with TODO-086. (owner, 2026-10-18)

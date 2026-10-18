@@ -7,5 +7,5 @@ What is sold is what a server of the owner's provides: first a price feed under 
 **Design:** none
 **Open questions:**
 
-- [ ] Which words name the paid feeds? "Sync" already means multi-device sync in the vocabulary. (Recommended: "price feed" and "bank feed".)
-- [ ] Does multi-device sync through a folder the user owns stay free, a hosted sync being a separate paid offer? (Assumed yes when the paid offer was settled, 2026-09-20.)
+- [x] Which words name the paid feeds? "Sync" already means multi-device sync in the vocabulary. (Recommended: "price feed" and "bank feed".) — "Price feed" ("Folioneer price feed" in the provider list of TODO-093) and "bank feed"; "sync" keeps its one meaning. The terms enter the glossary with the entry that ships them. (owner, 2026-10-18)
+- [x] Does multi-device sync through a folder the user owns stay free, a hosted sync being a separate paid offer? (Assumed yes when the paid offer was settled, 2026-09-20.) — Yes: sync through a folder the user owns stays free and open source for good; only what costs to run (the price feed, a hosted sync) is paid. (owner, 2026-10-18)

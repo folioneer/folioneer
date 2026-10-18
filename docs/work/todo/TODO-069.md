@@ -9,6 +9,6 @@ It reads the record of TODO-070 — every change with who made it — and adds w
 **Design:** needed
 **Open questions:**
 
-- [ ] What is journaled: prices only, or every record the owner, an agent, a fetch or a sync changes?
-- [ ] What is rewound: one change, everything a session or a command did, or the whole portfolio to a moment?
-- [ ] On several computers, is a rewind a change like any other that sync carries, or local to the computer that made it?
+- [x] What is journaled: prices only, or every record the owner, an agent, a fetch or a sync changes? — Every change the owner, an agent, a fetch or a sync makes — transactions, assets, accounts, prices. (owner, 2026-10-18)
+- [x] What is rewound: one change, everything a session or a command did, or the whole portfolio to a moment? — One change, or everything one source did together (an agent's session, an import, a command); later changes by others stay. (owner, 2026-10-18)
+- [x] On several computers, is a rewind a change like any other that sync carries, or local to the computer that made it? — A rewind is a change like any other, which sync carries: every computer ends the same. (owner, 2026-10-18)

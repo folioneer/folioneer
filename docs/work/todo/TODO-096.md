@@ -7,5 +7,5 @@ From gh291 (owner, 2026-10-17), which this entry closes when it ships. Once stra
 **Design:** none
 **Open questions:**
 
-- [ ] How many automatic copies are kept, and where (next to the database, or in the sync folder)?
-- [ ] Does a restore on one computer reach the others through sync, or stay local until confirmed?
+- [x] How many automatic copies are kept, and where (next to the database, or in the sync folder)? — The last 5, next to the database on this computer, never in the sync folder (gh291). (owner, 2026-10-18)
+- [x] Does a restore on one computer reach the others through sync, or stay local until confirmed? — It stays local until the user confirms it: the portfolio is marked restored and not yet shared, sync sends nothing, the window says so; confirming propagates it, cancelling returns to the state before (gh291). (owner, 2026-10-18)
