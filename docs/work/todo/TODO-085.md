@@ -6,6 +6,7 @@ Read on 2026-10-13: the window does say how old a price is — the holding row's
 
 **User value:** The owner never reads a value or a gain built on a price nobody noticed was old, and knows which asset needs attention and why.
 **Done when:** a holding whose price is older than the threshold is told apart from the others on its row, in both themes, and the account and the portfolio say how many of their holdings are in that case; an asset the last fetch left without a price says why, where its price shows; `list_holdings` and `portfolio_summary` give an agent the same judgement.
+**Size:** L — a mock-up (the old-price mark, the counts per account and portfolio), then the backend with the agent's tools, then the window.
 **Design:** none
 **Open questions:**
 
