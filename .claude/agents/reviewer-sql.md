@@ -1,7 +1,7 @@
 ---
 name: reviewer-sql
 description: Reviews SQLite migrations: transactions, idempotency, destructive-DDL guards, FK indexes, types, NOT NULL. Use when a migration is added or changed.
-tools: Read, Grep, Glob, Bash, Write
+tools: Read, Grep, Glob, Bash
 model: haiku
 ---
 

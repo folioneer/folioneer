@@ -1,7 +1,7 @@
 ---
 name: reviewer-backend
 description: Reviews changed Rust code: typed errors, no unwrap in production, async correctness, repositories, test conventions. Use on any .rs change.
-tools: Read, Grep, Glob, Bash, Write
+tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
 

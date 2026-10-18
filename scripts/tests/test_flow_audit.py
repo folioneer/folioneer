@@ -2,6 +2,7 @@
 
 import importlib.util
 import unittest
+from unittest import mock
 from pathlib import Path
 
 SPEC = importlib.util.spec_from_file_location(
@@ -341,6 +342,27 @@ class Usage(unittest.TestCase):
         self.assertNotIn("usage-log.sh", tools)
         # Only CI runs it, from a copy outside the checkout: it does not log.
         self.assertNotIn("review-stop-reason.py", tools)
+
+
+class RangeEndTest(unittest.TestCase):
+    def test_a_batch_tag_is_dated_by_the_tag_not_a_release(self):
+        with mock.patch.object(flow_audit, "_git", return_value="2026-10-20T18:00:00+02:00\n") as git, mock.patch.object(
+            flow_audit, "_gh_json"
+        ) as gh:
+            moment = flow_audit.batch_end_moment("batch/2026-10-20")
+        self.assertEqual(moment, flow_audit.parse_moment("2026-10-20T16:00:00Z"))
+        git.assert_called_once()
+        gh.assert_not_called()
+
+    def test_a_batch_tag_without_a_date_stops_the_audit(self):
+        with mock.patch.object(flow_audit, "_git", return_value="\n"):
+            with self.assertRaises(SystemExit):
+                flow_audit.batch_end_moment("batch/2026-10-20")
+
+    def test_a_version_tag_is_dated_by_its_publication(self):
+        with mock.patch.object(flow_audit, "_gh_json", return_value={"publishedAt": "2026-10-17T11:11:19Z"}):
+            moment = flow_audit.batch_end_moment("v0.12.0")
+        self.assertEqual(moment, flow_audit.parse_moment("2026-10-17T11:11:19Z"))
 
 
 if __name__ == "__main__":

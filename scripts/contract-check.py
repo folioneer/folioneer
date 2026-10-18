@@ -14,7 +14,7 @@ This check reads both and reports where they differ:
 
 What it cannot see: the bindings give the error *type* of a command, not which of its
 codes that command returns. A code the code returns and a row omits is found by reading
-the command (`contract-reviewer`, `/contract`), not here.
+the command (`docs/contracts/README.md`, `contract-reviewer`), not here.
 
 Gaps known when the check arrived are listed in `contract-gaps.json`. A gap outside the
 list fails; so does a line of the list that is no longer a gap, so the list only shrinks.

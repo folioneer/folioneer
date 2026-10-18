@@ -1,5 +1,43 @@
 # Architecture Decision Records
 
+An ADR keeps the _why_ of a **technical** choice costly to reverse — a framework, a storage
+or transaction strategy, a test boundary. A functional or domain decision is never an ADR:
+it is written in the spec or the glossary (owner, 2026-10-18): a developer-side choice
+hard to remove — the language, the framework, a data representation. ADRs are rare.
+
+**The gate** — all three hold, or no ADR: (1) genuinely complex, real trade-offs with no
+obvious answer; (2) not obvious from the code or the spec; (3) costly to reverse,
+significant rework across the codebase. The owner confirms before one is written.
+
+**Writing one** — `docs/adr/{NNN}-{slug}.md`, the next number (never reused), one decision,
+what was chosen and why, never how it is implemented; then its row below. An ADR is never
+deleted: a new one supersedes it, and only the old one's `Status` line and index row
+change; an ADR already superseded is not superseded again (the newer one is). The `Status`
+is `Accepted`, `Accepted — supersedes ADR-{NNN}` or `Superseded by ADR-{NNN}`; a tentative
+decision stays an open question in its spec.
+
+```markdown
+# ADR {NNN} — {Decision Title}
+
+**Date**: {YYYY-MM-DD}
+**Status**: Accepted
+
+## Context
+
+{The problem, constraint or forcing function — why a decision is needed now.}
+
+## Decision
+
+{What was chosen and why over the alternatives, which are named.}
+
+## Consequences
+
+- **Pros**: {what becomes easier or possible.}
+- **Cons**: {what becomes harder or constrained.}
+```
+
+## Index
+
 | ADR                                                                          | Title                                                                         | Status                                                   |
 | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------- |
 | [ADR-001](001-use-i64-for-monetary-amounts.md)                               | Use i64 for Monetary Amounts                                                  | Accepted                                                 |

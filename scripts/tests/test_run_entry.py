@@ -1,73 +1,46 @@
-"""Tests for scripts/run-entry.sh (TODO-049) — run with `just test-scripts`."""
+"""Tests for scripts/run-entry.sh — run with `just test-scripts`."""
 
+import json
+import re
 import shutil
 import subprocess
-import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPTS = Path(__file__).resolve().parents[1]
-SCRIPT = SCRIPTS / "run-entry.sh"
+SCRIPT = Path(__file__).resolve().parents[1] / "run-entry.sh"
 
-QUEUE = """# Queue
-
-<!-- The human's queue: one reference per line. -->
-
-- TODO-051
-- DEBT-064
-- FLOW-021
-- TODO-009
-"""
-
-ENTRIES = {
-    "todo/TODO-051.md": "# TODO-051 — (tooling) — Queued\n\nMentions DEBT-001 outside the queue.\n",
-    "debt/DEBT-064.md": "# 2026-10-01 — DEBT-064 — Queued\n\n- Done when: it is.\n",
-    "flow/FLOW-021.md": "# FLOW-021 — Queued\n\n- Proposal: one.\n",
-    "todo/TODO-010.md": "# TODO-010 — (fullstack) — Not queued\n",
+# What `gh project item-list --format json` lists: issues, a draft (no number) and a
+# pull request, in the Project's row order.
+ITEMS = {
+    "items": [
+        {"status": "Queued", "content": {"number": 412, "type": "Issue"}},
+        {"status": "Ready", "content": {"number": 380, "type": "Issue"}},
+        {"status": "Queued", "content": {"title": "a draft", "type": "DraftIssue"}},
+        {"status": "Queued", "content": {"number": 377, "type": "PullRequest"}},
+        {"status": "Done", "content": {"number": 360, "type": "Issue"}},
+    ]
 }
 
 
-def queue_line() -> str:
-    """The line of the script that reads the queue."""
-    lines = [
-        line for line in SCRIPT.read_text(encoding="utf-8").splitlines() if line.startswith("queued=$(")
-    ]
-    assert len(lines) == 1, lines
-    return lines[0]
+def project_filter() -> str:
+    """The `--jq` filter the script reads the Project's Queued items with."""
+    found = re.findall(r"--jq '([^']+)'", SCRIPT.read_text(encoding="utf-8"))
+    assert len(found) == 1, found
+    return found[0]
 
 
-def queued(queue: str) -> list[str]:
-    """What the script reads as left to work, in a folder holding `queue` and ENTRIES."""
-    with tempfile.TemporaryDirectory() as folder:
-        root = Path(folder)
-        (root / "scripts").mkdir()
-        for script in ("work-queue.py", "usage_log.py"):
-            shutil.copy(SCRIPTS / script, root / "scripts" / script)
-        for name, text in ENTRIES.items():
-            (root / "docs" / "work" / name).parent.mkdir(parents=True, exist_ok=True)
-            (root / "docs" / "work" / name).write_text(text, encoding="utf-8")
-        (root / "docs" / "work" / "queue.md").write_text(queue, encoding="utf-8")
+@unittest.skipUnless(shutil.which("jq"), "jq is not installed")
+class Batch(unittest.TestCase):
+    # The batch is the Queued items in row order; a draft has no number and is not run.
+    def test_what_is_left_of_the_batch_is_read_in_the_projects_order(self):
         printed = subprocess.run(
-            ["bash", "-c", f'log() {{ :; }}\n{queue_line()}\nprintf "%s" "$queued"'],
-            cwd=folder,
-            check=True,
+            ["jq", "-r", project_filter()],
+            input=json.dumps(ITEMS),
             capture_output=True,
             text=True,
+            check=True,
         ).stdout
-    return printed.split()
-
-
-class Queue(unittest.TestCase):
-    # TODO-049 — the queue is read in the three forms a reference takes, in the owner's
-    # order, and only from the queue file: the comment and the entries are not the queue.
-    # A queued reference whose entry file is gone has shipped: it is not run again.
-    def test_what_is_left_of_the_queue_is_read_in_the_owners_order(self):
-        self.assertEqual(queued(QUEUE), ["TODO-051", "DEBT-064", "FLOW-021"])
-
-    # TODO-049 — a reference in a form that was replaced queues nothing.
-    def test_a_replaced_form_queues_nothing(self):
-        old = QUEUE.replace("- TODO-051", "- #051").replace("- DEBT-064", "- TD-064")
-        self.assertEqual(queued(old), ["FLOW-021"])
+        self.assertEqual(printed.split(), ["#412", "#377"])
 
 
 if __name__ == "__main__":

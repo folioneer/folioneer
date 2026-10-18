@@ -1,9 +1,0 @@
-# 2026-10-18 — DEBT-140 — The settings of the project's own checks are five files at the root
-
-- Found by: the owner's question on the files at the root (2026-10-18), read against what each tool requires
-- Where: `arch-allowlist.json`, `contract-gaps.json`, `coverage-gates.json`, `licence-allowlist.json`, `required-checks.json`; named by `scripts/arch-check.py`, `contract-check.py`, `coverage-gate.py`, `licence-check.py`, `merge.py`, `watch-pr.py` and their tests, `.github/workflows/quality.yml`, the `justfile`, `src-tauri/.cargo/mutants.toml`, the `/run-entry`, `/contract` and `/dep-audit` skills, `reviewer-infra`, CLAUDE.md, `docs/workflow.md`, `docs/agentic-setup.md`, `docs/frontend-rules.md`, `docs/external-dependencies.md`
-- Severity: 🔵
-- Size: M — one pull request: five renames and about thirty files that name them; the debt entries that cite the old paths are records and stay as written.
-- Observation: no tool requires these five at the root: they are the settings the project's own checks read — the frozen architecture debt, the contract's known gaps, the coverage floors, the allowed licences, the checks a merge requires. Grouped in one folder (`config/`, for instance), the root keeps what the tools and the conventions put there, and a reader finds every gate's setting in one place. A path left behind fails loudly: each script stops when its file cannot be read (`merge.py`'s `_required_checks`, `watch-pr.py`'s "required-checks.json cannot be read").
-- User value: None directly.
-- Done when: the five live in one folder; every script, workflow, recipe, skill, agent prompt and rule document names the new path (`git grep` finds the old root paths only in debt entries and the changelog); `just harness --coverage`, `just arch-check`, `just licence-check`, `just coverage-gate` and `just merge` run on them, and CI's checks pass on the pull request that moves them.

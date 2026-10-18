@@ -1,8 +1,0 @@
-# TODO-016 — (deps) — Accepted risk: WebdriverIO 9 transitive advisories (extract-zip)
-
-`npm audit` reports 22 advisories (3 low, 1 moderate, 18 high) at the 2026-10-03 release audit — 14 (2 low, 12 high) on 2026-09-19 — all in `devDependencies`, all reached through the WebdriverIO packages; `npm audit --omit=dev` reports none. On 2026-09-19 the twelve highs shared one root: `extract-zip`, affected in every published version and reached only through `@puppeteer/browsers 2.13.2`, which WebdriverIO 9.31 pins for downloading browser binaries the suite never uses (it drives the Tauri binary through tauri-driver). npm's only proposed fix is a downgrade to WebdriverIO 8.14.6. Checked at the 2026-09-19 release audit: `extract-zip` has no patched release and none is planned (2.0.1 is its last); `@puppeteer/browsers` 3.x replaced it with another extractor, but WebdriverIO 9.31.9 — the latest — still depends on `@puppeteer/browsers ^2.2.0`, so the only way out today is an npm override across a major version of a package the E2E runner calls. The two lows are mocha's bundled `diff`. The `deepmerge-ts` and `js-yaml` advisories were cleared by the in-range bump of 2026-09-12 (`ff986f1`). Nothing from these packages enters the application bundle or the Tauri binary, and CI's `npm audit --omit=dev` gate is green. Re-run `npm audit` at each release.
-
-**User value:** None — devDependency advisories; nothing from them enters the shipped bundle.
-**Done when:** WebdriverIO depends on `@puppeteer/browsers` 3.x or later (which no longer carries `extract-zip`), the bump is taken, `npm audit` is clean, and this entry is deleted.
-**Design:** none
-**Open questions:** none

@@ -46,6 +46,15 @@
       "Bash(gh run watch *)",
       "Bash(gh issue view *)",
       "Bash(gh issue list *)",
+      "Bash(gh issue create *)",
+      "Bash(gh issue edit *)",
+      "Bash(gh issue comment *)",
+      "Bash(gh issue close *)",
+      "Bash(gh project view *)",
+      "Bash(gh project field-list *)",
+      "Bash(gh project item-list *)",
+      "Bash(gh project item-add *)",
+      "Bash(gh project item-edit *)",
       "Bash(gh repo view *)",
       "Bash(ls *)",
       "Bash(cat *)",
@@ -83,6 +92,7 @@
       "Bash(just release*)",
       "Bash(git tag *)",
       "Bash(gh pr merge *)",
+      "Bash(gh issue delete *)",
       "Edit(.claude/settings.json)"
     ]
   }

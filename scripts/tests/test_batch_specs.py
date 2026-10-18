@@ -28,7 +28,7 @@ class BatchSpecs(unittest.TestCase):
         self.write("docs/spec/asset.md", "one")
         self.write("docs/spec/sync.md", "one")
         self.write("docs/spec/gone.md", "one")
-        self.write("docs/work/todo/TODO-001.md", "one")
+        self.write("docs/lessons.md", "one")
         self.commit("first")
 
     def git(self, *args):
@@ -59,7 +59,7 @@ class BatchSpecs(unittest.TestCase):
         self.git("tag", "v0.1.0")
         self.write("docs/spec/asset.md", "two")
         self.write("docs/spec/new.md", "a rule of its own")
-        self.write("docs/work/todo/TODO-001.md", "two")
+        self.write("docs/lessons.md", "two")
         (self.repo / "docs/spec/gone.md").unlink()
         self.commit("the batch")
 
@@ -82,9 +82,19 @@ class BatchSpecs(unittest.TestCase):
             ["docs/spec/asset.md", "docs/spec/sync.md"],
         )
 
+    def test_a_batch_tag_is_a_batch_end_too(self):
+        self.git("tag", "v0.1.0")
+        self.write("docs/spec/asset.md", "two")
+        self.commit("a batch without a release")
+        self.git("tag", "-a", "batch/2026-10-20", "-m", "Batch ended without a release")
+        self.write("docs/spec/sync.md", "two")
+        self.commit("the batch")
+
+        self.assertEqual(self.run_script().stdout.split(), ["docs/spec/sync.md"])
+
     def test_a_batch_that_touched_no_spec_lists_nothing(self):
         self.git("tag", "v0.1.0")
-        self.write("docs/work/todo/TODO-001.md", "two")
+        self.write("docs/lessons.md", "two")
         self.commit("docs only")
 
         listed = self.run_script()
@@ -93,7 +103,7 @@ class BatchSpecs(unittest.TestCase):
     def test_without_a_release_tag_it_asks_for_a_starting_point(self):
         refused = self.run_script()
         self.assertEqual(refused.returncode, 1)
-        self.assertIn("no release tag", refused.stderr)
+        self.assertIn("no release or batch tag", refused.stderr)
         self.assertEqual(self.run_script("a", "b").returncode, 2)
 
 

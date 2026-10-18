@@ -8,8 +8,7 @@
 # (where only the agent's terminal message would otherwise be visible). The
 # main agent reads the file(s) when it grades the findings (docs/workflow.md § 7).
 #
-# The `.review/` folder is intentionally separate from `tmp/` (used by
-# scripts/report-path.sh for one-shot skill reports) — reviewer reports live
+# The `.review/` folder is intentionally separate from `tmp/` — reviewer reports live
 # longer because the grading may consult them after the fact. Downstream
 # projects should gitignore `.review/`.
 #

@@ -1,7 +1,7 @@
 ---
 name: reviewer-security
 description: Reviews IPC commands, capabilities, input parsing, secrets, unsafe and frontend XSS risks. Use when a command, capability or security-sensitive code changes.
-tools: Read, Grep, Glob, Bash, Write
+tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
 

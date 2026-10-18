@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """Deterministic figures for the /flow-audit skill (FLOW-018).
 
-Measures how work moved between two releases — the pull requests merged, how long each
+Measures how work moved between two batch ends (releases or `batch/<date>` tags) — the pull requests merged, how long each
 took from opening to merging, the CI rounds and what failed, how long each workflow
-runs — and prints them as one JSON document, beside the same figures for the release
+runs — and prints them as one JSON document, beside the same figures for the batch
 before when asked.
 
 Usage:
-    python3 scripts/flow-audit.py v0.5.0                 # from that release to now
-    python3 scripts/flow-audit.py v0.5.0 v0.6.0          # between two releases
+    python3 scripts/flow-audit.py v0.5.0                 # from that batch end to now
+    python3 scripts/flow-audit.py v0.5.0 v0.6.0          # between two batch ends
     python3 scripts/flow-audit.py v0.5.0 v0.6.0 --previous v0.4.0
     python3 scripts/flow-audit.py v0.5.0 --pretty
 
-A release is named by its tag; its moment is when it was published on GitHub. The skill
-turns the figures into the "Measured" section of `docs/work/audits.md`. This script has no
-judgment — only counting.
+A release is named by its tag; its moment is when it was published on GitHub. A batch
+that ended without a release is named by its `batch/<date>` tag, dated by the tag. The skill
+posts the figures on the batch's `batch-audit` issue. This script has no judgment — only
+counting.
 """
 
 from __future__ import annotations
@@ -316,8 +317,21 @@ def compared(before: str, sha: str) -> str | None:
         return None
 
 
-def release_moment(tag: str) -> datetime:
-    """When the release `tag` was published."""
+def _git(*args: str) -> str:
+    return subprocess.run(["git", *args], check=True, capture_output=True, text=True, cwd=ROOT).stdout
+
+
+BATCH_TAG_PREFIX = "batch/"
+
+
+def batch_end_moment(tag: str) -> datetime:
+    """When the batch end `tag` happened: a release's publication on GitHub, or the
+    tagger date of a `batch/<date>` tag for a batch that ended without one."""
+    if tag.startswith(BATCH_TAG_PREFIX):
+        made = _git("for-each-ref", f"refs/tags/{tag}", "--format=%(taggerdate:iso-strict)").strip()
+        if not made:
+            sys.exit(f"flow-audit: batch tag {tag} has no tagger date")
+        return parse_moment(made)
     release = _gh_json("release", "view", tag, "--json", "publishedAt")
     published = release.get("publishedAt") if isinstance(release, dict) else None
     if not published:
@@ -361,18 +375,18 @@ def truncated(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
-    parser.add_argument("since", help="the release the window starts after, by its tag")
+    parser.add_argument("since", help="the release (or `batch/<date>` tag) the window starts after")
     parser.add_argument(
-        "until", nargs="?", help="the release the window ends at (default: now)"
+        "until", nargs="?", help="the release (or `batch/<date>` tag) the window ends at (default: now)"
     )
     parser.add_argument(
-        "--previous", help="the release before `since`, to print its window too"
+        "--previous", help="the batch end before `since`, to print its window too"
     )
     parser.add_argument("--pretty", action="store_true", help="indented JSON")
     args = parser.parse_args(argv)
 
-    since = release_moment(args.since)
-    until = release_moment(args.until) if args.until else datetime.now(timezone.utc)
+    since = batch_end_moment(args.since)
+    until = batch_end_moment(args.until) if args.until else datetime.now(timezone.utc)
     pull_requests, runs = collect()
     report = {"current": measure(pull_requests, runs, since, until, compared)}
     report["current"]["usage"] = measure_usage(
@@ -380,7 +394,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     earliest = since
     if args.previous:
-        earliest = release_moment(args.previous)
+        earliest = batch_end_moment(args.previous)
         report["previous"] = measure(pull_requests, runs, earliest, since)
     report["truncated"] = truncated(pull_requests, runs, earliest)
     if report["truncated"]:

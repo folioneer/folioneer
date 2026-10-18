@@ -1,7 +1,7 @@
 ---
 name: reviewer-e2e
 description: Reviews changed E2E specs (e2e/**/*.test.ts): stable-id selectors, explicit timeouts, no mocks, independence, helpers. Use when E2E specs change.
-tools: Read, Grep, Glob, Bash, Write
+tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
 

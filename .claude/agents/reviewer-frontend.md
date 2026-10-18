@@ -1,7 +1,7 @@
 ---
 name: reviewer-frontend
 description: Reviews changed React/TypeScript under src/: gateway, presenter/errors, ids, i18n labels, imports, UX. Use on any .ts/.tsx change in src/.
-tools: Read, Grep, Glob, Bash, Write
+tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
 

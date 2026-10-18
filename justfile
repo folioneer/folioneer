@@ -118,16 +118,42 @@ merge:
     @[ -f scripts/merge.py ] || { echo "❌ scripts/merge.py not found — restore it from git history"; exit 1; }
     python3 scripts/merge.py
 
-# Where the queue stands, as one JSON document (/plan-queue proposes the order); `just queue close TODO-NNN` deletes a shipped entry's file;
-# `just queue next-id DEBT` prints the next free id; `just queue remaining` the queued references not shipped yet
-queue *ARGS:
-    @python3 scripts/work-queue.py "$@"
-
 # Wait for the checks of a pull request (the current branch's, or a number) and end with the verdict: 0 green, 1 failed, 2 GitHub unreachable, 3 timed out, 4 not open
 watch-pr *ARGS:
     @python3 scripts/watch-pr.py "$@"
 
-# Run the first ready entry of the queue (docs/work/queue.md) headless (docs/workflow.md § 9); logs under logs/run-entry/
+# Re-run the failed jobs of a workflow run (the run id of the URL `just watch-pr` printed): a lane the usage limit stopped, once it has reset
+rerun-failed RUN: (_used "rerun-failed")
+    gh run rerun "$1" --failed
+
+# The figures of a batch for /flow-audit: `just flow-audit v0.12.0 v0.13.0 --previous v0.11.0 --pretty`
+flow-audit *ARGS:
+    python3 scripts/flow-audit.py "$@"
+
+# The last N batch ends (release `v*` or `batch/<date>` tags), newest first
+batch-ends n="1": (_used "batch-ends")
+    @git fetch -q origin --tags
+    @git for-each-ref --sort=-creatordate --count="$1" --format='%(refname:short)' 'refs/tags/v*' refs/tags/batch/
+
+# End a batch with no `feat` or `fix`: tag the fresh main `batch/<UTC date>` and push the tag
+batch-end: (_used "batch-end")
+    #!/usr/bin/env bash
+    set -euo pipefail
+    git fetch -q origin main --tags
+    if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+        echo "batch-end: check out a fresh main first" >&2
+        exit 1
+    fi
+    tag="batch/$(date -u +%F)"
+    if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+        echo "batch-end: $tag already exists — a batch already ended today" >&2
+        exit 1
+    fi
+    git tag -a "$tag" -m "Batch ended without a release"
+    git push -q origin "$tag"
+    echo "✅ $tag pushed"
+
+# Run the first Queued item of the Project (github.com/orgs/folioneer/projects/1) headless (docs/workflow.md § 9); logs under logs/run-entry/
 run-entry:
     @[ -f scripts/run-entry.sh ] || { echo "❌ scripts/run-entry.sh not found — restore it from git history"; exit 1; }
     bash scripts/run-entry.sh

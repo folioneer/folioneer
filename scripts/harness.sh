@@ -45,7 +45,6 @@ echo -e "${BLUE}🔍 Harness scope: ${scope}${NC}"
 
 python3 scripts/arch-check.py
 python3 scripts/rule-homes.py
-python3 scripts/reference-forms.py
 python3 scripts/contract-check.py
 bash scripts/sync-format-check.sh "$base"
 USAGE_LOG=off python3 -m unittest discover -s scripts/tests -p "test_*.py"

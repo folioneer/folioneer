@@ -1,9 +1,0 @@
-# 2026-10-12 — DEBT-122 — Two readers of an asset's kind and class, and a limit checked before it is counted
-
-- Found by: `reviewer-arch` and `reviewer-backend` on TODO-063's pull request (2026-10-12); each read again in the code by the main agent
-- Where: `asset_kind` / `asset_class` in `src-tauri/src/agent_connection/tools.rs` and `kind` / `class` in `src-tauri/src/command_line/args.rs`; `code_of` in `src-tauri/src/use_cases/holding_transaction/named_recording.rs`; `may_record_one_more` / `count_recording` in `src-tauri/src/agent_connection/connections.rs`
-- Severity: 🔵
-- Size: S — one pull request: backend.
-- Observation: four things. The agent connection and the command line each read a kind and a class from text, case ignored, against the same lists of the asset context (`AssetCreationDefaults`, `AssetClass::user_addable`): two readers that must agree. `code_of`, which gives any rejection its code, lives in the holding-transaction use case and is used for an asset's rejections by both. A session's limit is checked, then counted once the write is done: two calls of one session running together at the last place can both pass — true of every recording since TODO-057, and of an added asset now. An asset's name and reference have no longest length and no refusal of control or invisible characters in the asset context: `add_asset` refuses them itself (AGT-064), the window's form and the command line do not
-- User value: None directly.
-- Done when: one reader of a kind and a class lives beside the asset context's lists and both interfaces call it; `code_of` lives where its name fits; a place of the limit is taken before the write and given back when it is refused, with a test of two calls at the last place; the asset context bounds a name and a reference for every interface, or the spec says why only an agent's are.

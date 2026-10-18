@@ -1,4 +1,4 @@
-"""Tests for scripts/rule-homes.py (todo TODO-050) — run with `just test-scripts`."""
+"""Tests for scripts/rule-homes.py — run with `just test-scripts`."""
 
 import importlib.util
 import unittest
@@ -12,7 +12,7 @@ SPEC.loader.exec_module(rule_homes)
 
 
 class Definitions(unittest.TestCase):
-    # TODO-050 — the three shapes a rule is defined with are recognised; a mention is not.
+    # The three shapes a rule is defined with are recognised; a mention is not.
     def test_definitions_and_mentions(self):
         text = "\n".join(
             [
@@ -20,20 +20,16 @@ class Definitions(unittest.TestCase):
                 "## E11 — E2E tests stop at the ComboboxField boundary",
                 "**MKT-143 — Current Value column (frontend + backend)**: text",
                 "The canonical tree is **F0**; see B24 and MKT-143.",
-                "# TODO-003 — (frontend) — An entry",
-                "# 2026-07-29 — DEBT-008 — An observation",
-                "# FLOW-004 — A flow entry",
-                "See TODO-003 — and `# FLOW-004 —` in the queue.",
             ]
         )
         self.assertEqual(
             rule_homes.defined_ids(text),
-            ["B24", "E11", "MKT-143", "TODO-003", "DEBT-008", "FLOW-004"],
+            ["B24", "E11", "MKT-143"],
         )
 
 
 class OneHome(unittest.TestCase):
-    # TODO-050 — a rule defined in two places is reported with both homes.
+    # A rule defined in two places is reported with both homes.
     def test_a_rule_defined_twice_is_reported(self):
         found = {
             "docs/backend-rules.md": ["B24", "B25"],
@@ -44,52 +40,9 @@ class OneHome(unittest.TestCase):
             {"B24": ["CLAUDE.md", "docs/backend-rules.md"]},
         )
 
-    # TODO-050 — every rule in one place: nothing reported.
+    # Every rule in one place: nothing reported.
     def test_one_home_each_reports_nothing(self):
         self.assertEqual(rule_homes.duplicates({"a.md": ["B1"], "b.md": ["E1"]}), {})
-
-
-class EntryFiles(unittest.TestCase):
-    """A todo, debt or flow entry is one file, named by the one ID it defines."""
-
-    def test_an_entry_named_after_its_id_in_its_folder_passes(self):
-        found = {
-            "docs/work/debt/DEBT-008.md": ["DEBT-008"],
-            "docs/work/audits.md": [],
-            "docs/work/queue.md": [],
-            "docs/backend-rules.md": ["B1", "B2"],
-        }
-        self.assertEqual(rule_homes.misnamed(found), [])
-
-    def test_a_name_that_disagrees_with_the_heading_is_reported(self):
-        found = {
-            "docs/work/debt/DEBT-008.md": ["DEBT-009"],
-            "docs/work/flow/FLOW-001.md": [],
-            "docs/work/todo/TODO-002.md": ["TODO-002", "TODO-003"],
-        }
-        self.assertEqual(
-            rule_homes.misnamed(found),
-            [
-                "docs/work/debt/DEBT-008.md: defines DEBT-009, not the one ID DEBT-008 it is named after",
-                "docs/work/flow/FLOW-001.md: defines no ID, not the one ID FLOW-001 it is named after",
-                "docs/work/todo/TODO-002.md: defines TODO-002, TODO-003, not the one ID TODO-002 it is named after",
-            ],
-        )
-
-    def test_a_file_of_another_kind_or_another_name_is_reported(self):
-        found = {
-            "docs/work/todo/DEBT-008.md": ["DEBT-008"],
-            "docs/work/flow/notes.md": [],
-            "docs/work/debt/DEBT-8.md": [],
-        }
-        self.assertEqual(
-            rule_homes.misnamed(found),
-            [
-                "docs/work/debt/DEBT-8.md: an entry of debt/ is named DEBT-NNN.md",
-                "docs/work/flow/notes.md: an entry of flow/ is named FLOW-NNN.md",
-                "docs/work/todo/DEBT-008.md: an entry of todo/ is named TODO-NNN.md",
-            ],
-        )
 
 
 class AgenticSetup(unittest.TestCase):
@@ -186,44 +139,6 @@ class AgenticSetup(unittest.TestCase):
             ),
             [],
         )
-
-
-class QueuedSizes(unittest.TestCase):
-    """FLOW-038 — an entry enters the queue with its size."""
-
-    QUEUE = "# Queue\n\n<!-- - TODO-009 -->\n\n- TODO-001\n- DEBT-002\n- FLOW-003\n- TODO-004\n- TODO-005\n"
-    ENTRIES = {
-        "TODO-001": "# TODO-001 — (backend) — Sized\n\n**Size:** M — one pull request.\n",
-        "DEBT-002": "# 2026-10-11 — DEBT-002 — Sized\n\n- Size: S — one pull request.\n",
-        "FLOW-003": "# FLOW-003 — Not sized\n\n- Kind: speed\n",
-        "TODO-004": "# TODO-004 — (fullstack) — A programme\n\n**Size:** XL — to slice.\n",
-    }
-
-    def test_a_queued_entry_without_a_size_and_a_programme_are_reported(self):
-        self.assertEqual(
-            rule_homes.unsized_queued(self.QUEUE, self.ENTRIES.get),
-            [
-                "docs/work/queue.md: FLOW-003 is queued without a size (S, M or L) — docs/workflow.md § 2",
-                "docs/work/queue.md: TODO-004 is queued as XL — a programme is sliced before it is queued",
-            ],
-        )
-
-    # TODO-005 has shipped: its file is gone, and nothing is asked of it. A reference in a
-    # comment queues nothing.
-    def test_what_has_shipped_and_what_is_not_queued_owe_nothing(self):
-        sized = "- TODO-001\n- DEBT-002\n- TODO-005\n<!-- - FLOW-003 -->\n"
-        self.assertEqual(rule_homes.unsized_queued(sized, self.ENTRIES.get), [])
-
-    # The queue is read as `just queue` reads it: a numbered item, an indented one and one
-    # with words after its reference are queued all the same.
-    def test_a_line_the_queue_script_reads_is_checked(self):
-        queue = "1. FLOW-003\n  - FLOW-003 — a note\n"
-        self.assertEqual(len(rule_homes.unsized_queued(queue, self.ENTRIES.get)), 2)
-        indented = {"DEBT-002": "# 2026-10-11 — DEBT-002 — Sized\n\n  - Size: S — one.\n"}
-        self.assertEqual(rule_homes.unsized_queued("- DEBT-002\n", indented.get), [])
-
-    def test_this_repository_queues_only_sized_entries(self):
-        self.assertEqual(rule_homes.queue_problems(), [])
 
 
 if __name__ == "__main__":

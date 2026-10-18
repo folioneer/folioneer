@@ -17,19 +17,16 @@ Written to read the same in every repository that works this way.
 - `CLAUDE.md` — the index the agent reads every turn: authority, forbidden actions,
   pointers. Never: states a rule that has a home elsewhere.
 - `docs/README.md` — the map: one location per kind of document. Never: holds a rule.
-- `docs/workflow.md` — how work moves from an entry to the main branch, and who decides
+- `docs/workflow.md` — how work moves from an issue to the main branch, and who decides
   what. Never: says how code is written.
 - `docs/commit-rules.md` — the commit format and what each type means. Never: restated
   in a hook's message beyond the line that failed.
 - `docs/ubiquitous-language.md` — what the domain words mean, validated by the owner.
   Never: extended by the agent without a question.
 - `docs/lessons.md` — failures worth teaching, one per entry. Never: a rule's home.
-- `docs/work/queue.md` — the batch, written by the owner. Never: edited by the agent.
-- `docs/work/audits.md` — the measured section of the last two batches. Never: a figure
-  nothing counted.
 - `ARCHITECTURE.md` — where code lives. Never: why a choice was made (an ADR does).
-- `.claude/rules/` — loads the rules document of a layer when one of its files is
-  read. Never: states the rule itself.
+- `.claude/rules/` — loads the rules document of a layer, or a document folder's
+  `README.md`, when one of its files is read. Never: states the rule itself.
 - `.claude/settings.json` — what the agent may run without asking, and what it may
   never run. Never: allows what `CLAUDE.md` forbids.
 - `justfile` — the one entry point to every command. Never: holds logic a script
@@ -39,26 +36,22 @@ Written to read the same in every repository that works this way.
 
 ### Skills
 
-- `.claude/skills/plan-queue/` — shows the state of the entries and proposes the next
-  queue. Never: queues anything the owner has not validated.
-- `.claude/skills/run-queue/` — runs a batch from its queue by chaining the other
-  skills. Never: decides, edits the queue or releases.
-- `.claude/skills/run-entry/` — runs one task to a merged pull request. Never: a second
-  task in the same invocation, nor a guess where a question is owed.
+- `.claude/skills/plan-batch/` — refines the candidates, proposes the next batch, and
+  sets it on the Project once approved. Never: queues what the owner has not approved, nor commits.
+- `.claude/skills/run-batch/` — runs a batch from its Queued items to its audit by
+  chaining the other skills, and owns the batch's task list. Never: decides, edits the batch or releases.
+- `.claude/skills/run-entry/` — runs one task through the ceremony (`docs/workflow.md` § 3),
+  its task list only when run alone, and files what it met and did not fix before the issue
+  closes. Never: a second task, a guess where a question is owed, nor a finding left in chat.
 - `.claude/skills/design-proposal/` — renders the target state before anything a user
   sees changes. Never: builds what it shows.
 - `.claude/skills/visual-proof/` — captures every state of a changed component, light
-  and dark; the skills that send to its steps load it with the `Skill` tool. Never:
-  stands in for the design proposal.
-- `.claude/skills/contract/` — derives the record of a domain's commands from a
-  validated spec, for a new command or a new contract; one row or one type is amended by
-  hand. Never: overwrites a command it was not asked to change.
-- `.claude/skills/adr-writer/` — records a technical choice that is costly to reverse.
-  Never: a functional decision, nor a tentative one.
+  and dark. Never: stands in for the design proposal.
 - `.claude/skills/dep-audit/` — checks the dependencies for outdated versions and known
-  vulnerabilities before a release. Never: upgrades by itself.
-- `.claude/skills/flow-audit/` — measures a released batch against the one before and
-  proposes flow entries. Never: applies its own proposals, nor runs during a batch.
+  vulnerabilities at a release's hand-over. Never: upgrades by itself.
+- `.claude/skills/flow-audit/` — judges an ended batch from its records, forked with a
+  fresh context, and posts it on the batch's issue. Never: takes the session's account,
+  nor runs during a batch.
 
 ### Agent prompts
 
@@ -66,23 +59,23 @@ Written to read the same in every repository that works this way.
   reviewer lane shares. Never: a lane's own checks.
 - `.claude/agents/reviewer-infra.md` — reviews workflows, scripts, hooks, recipes and
   configuration. Never: application code.
-- `.claude/agents/reviewer-security.md` — reviews the surface an attacker reaches, on
-  a change and across the whole code before a release. Never: code quality.
+- `.claude/agents/reviewer-guides.md` — reviews the documents and prompts the agent
+  works from: contradictions, restated rules, length. Never: tooling or code.
+- `.claude/agents/reviewer-security.md` — reviews the surface an attacker reaches: a
+  change, and the whole command surface before a batch ends. Never: code quality.
 - `.claude/agents/spec-reviewer.md` — judges a spec before anything is built from it.
   Never: checks code against it.
 - `.claude/agents/spec-checker.md` — checks that every rule of a spec is implemented
   and tested. Never: judges the spec itself.
-- `.claude/agents/contract-reviewer.md` — checks a contract against its spec. Never:
-  amends it.
+- `.claude/agents/contract-reviewer.md` — checks a contract against its spec and
+  `docs/contracts/README.md`. Never: amends it.
 - `.claude/agents/adr-reviewer.md` — checks an ADR's structure, gate and status.
   Never: writes one.
 
 ### Scripts
 
-- `scripts/work-queue.py` — classifies the entries, the queue and the open pull
-  requests; closes an entry; gives the next id. Never: ranks or recommends.
-- `scripts/run-entry.sh` — runs one ready entry with nobody to ask. Never: a second
-  entry, nor past its time budget.
+- `scripts/run-entry.sh` — runs one Queued item with nobody to ask. Never: a second
+  task, nor past its time budget.
 - `scripts/branch.sh` — where the branch left the main branch, and its diff, log and
   files. Never: changes the tree.
 - `scripts/changed-scope.sh` — classifies changed paths into the checks they need.
@@ -97,8 +90,9 @@ Written to read the same in every repository that works this way.
   drops under its floor. Never: lowers a floor.
 - `scripts/arch-check.py` — enforces the architecture rules a machine can check.
   Never: lets the allowlist grow.
-- `scripts/rule-homes.py` — one home per rule, one file per entry, one line here per piece. Never: judges
+- `scripts/rule-homes.py` — one home per rule, one line here per piece. Never: judges
   what a document says.
+- `scripts/review-lanes.sh` — only the reviewer lanes a change needs. Never: launches one.
 - `scripts/review-path.sh` — where a reviewer writes its report. Never: writes it.
 - `scripts/review-stop-reason.py` — says in one line why a reviewer session stopped in
   CI. Never: fails the job it explains.
@@ -111,8 +105,8 @@ Written to read the same in every repository that works this way.
   its author included, on a pull request and on `main` since the last release. Never: exempts an
   author other than a bot.
 - `scripts/release.py` — computes the version, writes the changelog, lands them through
-  a pull request and tags what merged, for the owner. Never: run by the agent, nor
-  pushes to `main`.
+  a pull request and tags what merged, for the owner. Never: run by the agent (its own:
+  `just batch-end` tags, `just batch-ends` lists), nor pushes to `main`.
 - `scripts/mcpb-bundle.py` — builds the Claude Desktop bundle the release attaches, from
   the release's product name, version and binary. Never: holds the program or data.
 - `scripts/flow-audit.py` — the figures of a batch, as one document. Never: reads
@@ -136,8 +130,6 @@ Written to read the same in every repository that works this way.
 
 The pieces only this repository has: the reviewers of its stack, the tools of its build.
 
-- `.claude/skills/prune/` — reports code that can be removed or collapsed, from a
-  coverage report. Never: edits, nor touches the architecture.
 - `.claude/agents/reviewer-backend.md` — the quality of Rust code against
   `backend-rules.md`. Never: layering, which is `reviewer-arch`'s.
 - `.claude/agents/reviewer-frontend.md` — the quality and UX of TypeScript and React
@@ -162,12 +154,9 @@ The pieces only this repository has: the reviewers of its stack, the tools of it
   Never: run by hand.
 - `scripts/verdict.sh` — runs a command, keeps its output in a log and prints its
   verdict in one line. Never: reads the verdict from the output instead of the exit code.
-- `scripts/report-path.sh` — where a skill writes its report. Never: writes it.
-- `scripts/reference-forms.py` — refuses a reference to an entry or an issue written in
-  a form that was replaced. Never: rewrites it.
 - `scripts/contract-check.py` — reports where a contract and the generated bindings
   differ. Never: edits either.
-- `scripts/batch-specs.sh` — lists the specs changed since the last release, for
+- `scripts/batch-specs.sh` — lists the specs changed since the last batch end, for
   `spec-checker`. Never: checks one.
 - `scripts/e2e-scope.py` — says whether a pull request must run the E2E suite. Never:
   skips it for anything the suite builds or runs.
