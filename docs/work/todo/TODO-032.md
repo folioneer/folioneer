@@ -7,7 +7,7 @@ Proposal: the reference currency becomes a choice — EUR for every existing por
 **User value:** A user who does not count in euros sees their whole portfolio — total, performance, movements — in their own currency, and no account is left out of a total for a missing rate.
 **Done when:** The reference currency can be chosen and changed, in English and French; the portfolio total, the global performance and the price movement total are reported in it and recomputed when it changes, with the needed rate history fetched; an account in another currency has its pair to the reference currency followed without the user declaring it, and a USD-only account no longer leaves the total partial; an existing portfolio opens in EUR with every figure unchanged (the golden portfolio does not move); new-account and new-asset forms preselect the reference currency; the vocabulary carries the distinct terms; DEBT-025 and DEBT-026 are removed; screenshots in light and dark mode are committed.
 **Size:** L — the GPF, FXR, ACC and PMV rules, a synced portfolio setting with a sync format bump, then the window.
-**Design:** none
+**Design:** validated
 **Open questions:**
 
 - [x] Is the reference currency a property of the portfolio, the same on every computer and therefore synced, or a setting of each computer? (Recommended: of the portfolio — two computers showing the same portfolio in two currencies is a confusion with no benefit. It needs a synced place for portfolio-wide settings, which TODO-026's targets need too; that is a new kind of synced record, hence the first bump of the sync data format version under the gate of TODO-024.) — A property of the portfolio, the same on every computer, synced. (owner, 2026-10-17)

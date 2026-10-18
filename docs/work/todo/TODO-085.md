@@ -7,9 +7,11 @@ Read on 2026-10-13: the window does say how old a price is — the holding row's
 **User value:** The owner never reads a value or a gain built on a price nobody noticed was old, and knows which asset needs attention and why.
 **Done when:** a holding whose price is older than the threshold is told apart from the others on its row, in both themes, and the account and the portfolio say how many of their holdings are in that case; an asset the last fetch left without a price says why, where its price shows; `list_holdings` and `portfolio_summary` give an agent the same judgement.
 **Size:** L — a mock-up (the old-price mark, the counts per account and portfolio), then the backend with the agent's tools, then the window.
-**Design:** none
+**Design:** validated
 **Open questions:**
 
 - [x] The threshold: one number of days for every asset, or one per asset class (a fund publishes less often than a share)? — One threshold per asset class (for instance shares, ETFs and crypto past 5 business days, funds past 10, real estate and custom assets never), defaults adjustable. (owner, 2026-10-17)
 - [x] In the public build, which fetches nothing, every price is typed: is a typed price judged old by the same threshold, or never? — A typed or agent-recorded price is judged by the same threshold. (The public build fetches again, off by default: gh289.) (owner, 2026-10-17)
 - [x] The reason of a fetch that failed: kept until the next fetch that succeeds, on this computer only, or part of what sync carries? — On the computer whose fetch failed only, kept until a fetch succeeds; sync does not carry it. (owner, 2026-10-18)
+- [x] The thresholds adjusted where? — Fixed defaults in this entry; making them adjustable is a debt entry once TODO-032's synced settings exist. (owner, 2026-10-18)
+- [x] The term? — "Outdated price" / "Prix ancien": a held asset's price older than its class's threshold, whatever recorded it; in the glossary under Price freshness. (owner, 2026-10-18)
