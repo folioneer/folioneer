@@ -127,7 +127,9 @@ repos/{owner}/{repo}/issues/<n>/comments`), grade every finding with
 ## Step 9 — Closure
 
 On the same branch before the merge, or as a follow-up docs PR if forgotten: the
-entry's file is deleted (`just queue close <id>`) and the queue is left as written; the debt entries the work resolved are deleted the same way; `ARCHITECTURE.md` if a
+entry's file is deleted (`just queue close <id>`) and the queue is left as written; a layer
+the coverage run of Step 5 measured more than a point above its floor has that floor raised to
+half a point under the figure (`coverage-gates.json`, `docs/workflow.md` § 3, step 10); the debt entries the work resolved are deleted the same way; `ARCHITECTURE.md` if a
 module appeared; design proposal images deleted. Then the closing brief (CLAUDE.md §
 Opening and closing a piece of work): what changed for the user, what the project
 accumulated; the PR number and where anything still owed was filed.
