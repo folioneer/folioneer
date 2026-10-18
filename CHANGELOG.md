@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-10-18
+
+### Added
+
+- choose the currency your whole portfolio is reported in
+- choose an account's wrapper, and group the accounts by it
+- each account carries its tax wrapper
+- a price not updated says why
+- an outdated price stands out, and each account counts them
+- an outdated price is judged per asset class
+- an asset whose price you type by hand says so, not "locked"
+
+### Fixed
+
+- a device joining a shared portfolio takes its reference currency
+- a refused wrapper says it is not in the wrapper lists
+- an account in another currency counts in the portfolio total
+- no return figure for a window a holding was not held through
+- an agent records quantities below 0.00001 as sent
+
 ## [0.12.0] - 2026-10-17
 
 ### Added
