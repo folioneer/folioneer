@@ -1245,7 +1245,12 @@ total_management_fees: number;
  * account-currency micros (ACD-053). Negative when withdrawals exceed deposits.
  * The as-of view counts only transactions dated on or before the as-of date.
  */
-total_net_cash_input: number }
+total_net_cash_input: number; 
+/**
+ * MKT-206 — how many active holdings have an outdated price (MKT-205); 0 in the
+ * read-only view of a past date.
+ */
+outdated_price_count: number }
 /**
  * Single flat error enum for the `account` bounded context (gold error model).
  * 
@@ -1588,7 +1593,11 @@ ytd_performance_pct: number | null;
  * Whether any holding of this account carries a derived inconsistency (SYN-040,
  * CFR-042) — marks the account row in the Accounts list.
  */
-has_inconsistent_holding: boolean }
+has_inconsistent_holding: boolean; 
+/**
+ * MKT-206 — how many of the account's active holdings have an outdated price (MKT-205).
+ */
+outdated_price_count: number }
 /**
  * Failures of the agent connection commands.
  */
@@ -3206,6 +3215,11 @@ current_price_date: string | null;
  */
 current_price_source: AssetPriceSource | null; 
 /**
+ * MKT-205/206 — whether the latest price is outdated for this asset; false without a
+ * price, for cash, and in the read-only view of a past date.
+ */
+price_outdated: boolean; 
+/**
  * Unrealized gain/loss in account currency (i64 micros). None when no price exists, or
  * when a foreign holding has no usable rate (MKT-033/034, FXR-031/034).
  * 0 (not None) when current price equals average price (MKT-033).
@@ -3943,7 +3957,11 @@ currency: string;
  * (FXR-034) held a non-zero Global Value or Unrealized P&L, which the total
  * therefore leaves out (ACC-028).
  */
-incomplete: boolean }
+incomplete: boolean; 
+/**
+ * MKT-206 — how many holdings have an outdated price, over every account.
+ */
+outdated_price_count: number }
 /**
  * The two figures behind the header's price item (MKT-202).
  */

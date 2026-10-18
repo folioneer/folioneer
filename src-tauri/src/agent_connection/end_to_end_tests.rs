@@ -299,9 +299,19 @@ async fn agt_040_the_read_tools_answer_from_the_running_application() {
     let summary = result(&answered[3]);
     assert_eq!(summary["summaries"][0]["name"], "PEA");
     assert_eq!(summary["summaries"][0]["total_global_value"], 5_000 * M);
+    // MKT-206 — the judgement of an outdated price reaches the agent with the figures; the
+    // seeded asset is custom, never outdated (MKT-205).
+    assert_eq!(summary["summaries"][0]["outdated_price_count"], 0);
+    assert_eq!(summary["total"]["outdated_price_count"], 0);
     let holdings = result(&answered[4]);
     assert_eq!(holdings["account_name"], "PEA");
     assert_eq!(holdings["total_global_value"], 5_000 * M);
+    assert_eq!(holdings["outdated_price_count"], 0);
+    assert!(holdings["holdings"]
+        .as_array()
+        .expect("holdings")
+        .iter()
+        .all(|holding| holding["price_outdated"] == false));
     let before_the_deposit = result(&answered[5]);
     assert_eq!(before_the_deposit["total_global_value"], 0);
 }

@@ -407,6 +407,7 @@ struct HoldingDetail {
     weight_pct: Option<i64>,            // micro-percent; market_value × 100 / total_global_value; None when market_value is None or the Global Value is not positive (ACD-052)
     inconsistency: Option<HoldingInconsistency>, // derived on read; Some when the merged ledger oversells the position or overdraws cash (SYN-040, CFR-042); None otherwise — see sync-contract.md
     current_price_source: Option<AssetPriceSource>, // where current_price comes from (asset contract); None when there is no price (MKT-142)
+    price_outdated: bool,                      // the latest price is outdated for the asset (MKT-205); false without a price, for cash and in a read with a date (MKT-206)
     fx_rate_date: Option<String>,       // ISO date of the rate that converted a foreign holding; None for a same-currency holding, cash, or when no rate is usable (FXR-090)
     fee_rate_percent_micros: Option<i64>, // annual rate of the active fee schedule of this pair, micro-percent; None without one, and always in the as-of view (FEE-074)
     period_performance: HoldingPeriodPerformance, // windowed position returns ending today (ACD-054–057)
@@ -449,6 +450,7 @@ struct AccountDetailsResponse {
     total_dividends_received: i64,             // micros, account currency: sum of dividend cash across all the account's dividend transactions; 0 when none (DIV-073)
     total_management_fees: i64,                // micros, account currency: sum of per-holding management_fees across the account; 0 when none (FEE-053)
     total_net_cash_input: i64,                 // micros, account currency: deposits minus withdrawals since inception; negative when more was withdrawn (ACD-053)
+    outdated_price_count: i64,                 // active holdings whose price is outdated (MKT-205); 0 in a read with a date (MKT-206)
 }
 
 // Row returned by get_account_summaries (ACC-021)
@@ -461,6 +463,7 @@ struct AccountSummary {
     total_unrealized_pnl: Option<i64>,         // micros, account currency: account-wide unrealized P&L, same algorithm as AccountDetailsResponse.total_unrealized_pnl (MKT-040 / ACC-023); None when no holding qualifies
     ytd_performance_pct: Option<i64>,          // micro-percent: year-to-date net-of-flows performance since Jan 1, reusing PRF-034 (ACC-024); first-year accounts use an inception baseline (present, not None); None only when the Simple-Dietz denominator is 0 (PRF-032)
     has_inconsistent_holding: bool,            // derived on read; true when any holding of the account carries an inconsistency (SYN-040, CFR-042)
+    outdated_price_count: i64,                 // the account's active holdings whose price is outdated (MKT-205, MKT-206)
 }
 
 // Response of get_account_summaries (ACC-021, ACC-027)
@@ -475,6 +478,7 @@ struct PortfolioTotal {
     total_unrealized_pnl: Option<i64>,         // micros, reference currency: Σ account Unrealized P&L converted; None when no convertible account carries one (ACC-029)
     currency: String,                          // the reference currency (GPF-011)
     incomplete: bool,                          // an account with no usable rate to the reference currency (FXR-034) held a non-zero Global Value or Unrealized P&L, which the total leaves out (ACC-028)
+    outdated_price_count: i64,                 // active holdings whose price is outdated, over every account (MKT-206)
 }
 ```
 
@@ -715,6 +719,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-10-18 — TODO-085: `HoldingDetail.price_outdated`, `AccountDetailsResponse.outdated_price_count`, `AccountSummary.outdated_price_count`, `PortfolioTotal.outdated_price_count` (MKT-205, MKT-206). No command changed.
 - 2026-10-11 — TODO-059: `HoldingDetail.current_price_source` may read `Agent` (MKT-103; the enum is the asset contract's). No field or command changed.
 - 2026-10-10 — DEBT-097: `RateAboveHundred` answers a schedule's rate of exactly 100 % too (FEE-032).
 - 2026-10-10 — DEBT-098: the codes the code returns where a row did not list them. `sell_holding` gains `SplitCollapsesPosition`; `record_management_fee` gains `ClosedPosition` and `SplitCollapsesPosition`; `record_dividend` gains `TotalAmountNotPositive`; `validate_stock_split_draft` answers `AccountNotFound` for an unknown account, before the closed-position check (SPL-062); `cancel_transaction` and `correct_transaction` say a starved management fee is `CascadingOversell` (FEE-027); `apply_due_fee_deductions` says what it skips and what it leaves for the next run (FEE-047, FEE-049). The "Known gaps" paragraph is removed.

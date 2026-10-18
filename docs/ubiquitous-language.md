@@ -103,6 +103,12 @@ How recent the portfolio's prices are, told by two figures. The **newest price d
 
 > Status: confirmed
 
+### Outdated price
+
+A held asset's price older than its kind and class allow (MKT-205): never for a custom asset, cash or real estate; otherwise more than 10 business days for a fund, 5 for any other listed or crypto asset. Judged the same way whatever recorded the price. The account and the portfolio count them. Code: `price_outdated`, `outdated_price_count`. French: "prix ancien" (owner, 2026-10-18).
+
+> Status: confirmed
+
 ### Price typed by hand
 
 An asset whose price the owner types and no fetch replaces: every fetch task leaves it (MKT-151, SPF-040) and the backfill refuses it (MKT-196), for an asset whose price cannot be fetched. Code: `price_refresh_blocked` (owner, 2026-10-18). Never called a "lock". French: "prix saisi à la main".

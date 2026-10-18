@@ -2,7 +2,7 @@ use crate::context::account::{
     Account, AccountError, AccountServiceContract, HoldingNote, ThresholdDirection, Transaction,
     TransactionType,
 };
-use crate::context::asset::{AssetPriceSource, AssetServiceContract};
+use crate::context::asset::{is_price_outdated, AssetPriceSource, AssetServiceContract};
 use crate::context::currency::CurrencyService;
 use crate::context::sync::HoldingInconsistency;
 use crate::core::cash::{is_cash_asset, system_cash_asset_id};
@@ -62,6 +62,9 @@ pub struct HoldingDetail {
     pub current_price_date: Option<String>,
     /// Provenance of `current_price`. None when current_price is None (MKT-142).
     pub current_price_source: Option<AssetPriceSource>,
+    /// MKT-205/206 — whether the latest price is outdated for this asset; false without a
+    /// price, for cash, and in the read-only view of a past date.
+    pub price_outdated: bool,
     /// Unrealized gain/loss in account currency (i64 micros). None when no price exists, or
     /// when a foreign holding has no usable rate (MKT-033/034, FXR-031/034).
     /// 0 (not None) when current price equals average price (MKT-033).
@@ -176,6 +179,9 @@ pub struct AccountDetailsResponse {
     /// account-currency micros (ACD-053). Negative when withdrawals exceed deposits.
     /// The as-of view counts only transactions dated on or before the as-of date.
     pub total_net_cash_input: i64,
+    /// MKT-206 — how many active holdings have an outdated price (MKT-205); 0 in the
+    /// read-only view of a past date.
+    pub outdated_price_count: i64,
 }
 
 /// MKT-143 — current price × quantity in the asset's own currency; None without a price.
@@ -510,6 +516,11 @@ impl AccountDetailsUseCase {
                 .unwrap_or(false);
             // CFR-042/SYN-040 — derived from the replayed holding, never stored.
             let inconsistency = holding_inconsistency(&holding);
+            // MKT-205/206 — judged on the latest price's observation date.
+            let price_outdated = current_price_date
+                .as_deref()
+                .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
+                .is_some_and(|date| is_price_outdated(&asset.kind, &asset.class, date, today_date));
             details.push(HoldingDetail {
                 asset_id: holding.asset_id,
                 asset_name: asset.name,
@@ -522,6 +533,7 @@ impl AccountDetailsUseCase {
                 current_price,
                 current_price_date,
                 current_price_source,
+                price_outdated, // MKT-206
                 unrealized_pnl,
                 performance_pct,
                 dividends_received,
@@ -540,6 +552,9 @@ impl AccountDetailsUseCase {
                 inconsistency,        // CFR-042/SYN-040
             });
         }
+
+        // MKT-206 — the account counts its holdings whose price is outdated.
+        let outdated_price_count = details.iter().filter(|d| d.price_outdated).count() as i64;
 
         // ACD-033 — sort alphabetically by asset_name ascending
         details.sort_by(|a, b| a.asset_name.cmp(&b.asset_name));
@@ -605,6 +620,7 @@ impl AccountDetailsUseCase {
             total_dividends_received,
             total_management_fees, // FEE-053/072
             total_net_cash_input,  // ACD-053
+            outdated_price_count,  // MKT-206
         })
     }
 
@@ -891,6 +907,7 @@ impl AccountDetailsUseCase {
                 current_price,
                 current_price_date,
                 current_price_source,
+                price_outdated: false, // MKT-206 — none in the past-date view
                 unrealized_pnl,
                 performance_pct,
                 dividends_received,
@@ -943,6 +960,7 @@ impl AccountDetailsUseCase {
                 current_price: None,
                 current_price_date: None,
                 current_price_source: None,
+                price_outdated: false, // MKT-206 — none in the past-date view
                 unrealized_pnl: None,
                 performance_pct: None,
                 dividends_received: 0,
@@ -988,8 +1006,9 @@ impl AccountDetailsUseCase {
             total_unrealized_pnl,
             total_global_value,
             total_dividends_received,
-            total_management_fees, // FEE-053/072
-            total_net_cash_input,  // ACD-053
+            total_management_fees,   // FEE-053/072
+            total_net_cash_input,    // ACD-053
+            outdated_price_count: 0, // MKT-206
         })
     }
 }
@@ -2284,6 +2303,94 @@ mod tests {
         // 2 units × 110.00 = 220.00 in account currency
         assert_eq!(resp.holdings[0].market_value, Some(220_000_000));
         assert_eq!(resp.total_global_value, 220_000_000);
+    }
+
+    /// A crypto asset held in the account, priced at `price_date` (MKT-205: outdated past five
+    /// business days).
+    async fn held_crypto_priced_on(
+        pool: &sqlx::SqlitePool,
+        asset_svc: &AssetService,
+        account_id: &str,
+        symbol: &str,
+        price_date: &str,
+    ) -> String {
+        let asset = asset_svc
+            .create_asset(CreateAssetDTO {
+                kind: None,
+                name: symbol.to_string(),
+                reference: symbol.to_string(),
+                isin: None,
+                class: AssetClass::DigitalAsset,
+                currency: "EUR".to_string(),
+                risk_level: 5,
+                category_id: SYSTEM_CATEGORY_ID.to_string(),
+                exchange: None,
+                interest_bearing: false,
+            })
+            .await
+            .unwrap();
+        SqliteHoldingRepository::new(pool.clone())
+            .upsert(
+                Holding::new(
+                    account_id.to_string(),
+                    asset.id.clone(),
+                    1_000_000,
+                    100_000_000,
+                    0,
+                    None,
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        asset_svc
+            .record_asset_price(&asset.id, price_date, 100.0)
+            .await
+            .unwrap();
+        asset.id
+    }
+
+    // MKT-205/206 — each holding says whether its price is outdated, and the account counts
+    // them: an old crypto price is, today's is not, a custom asset and a missing price never.
+    #[tokio::test]
+    async fn mkt_206_each_holding_says_whether_its_price_is_outdated_and_the_account_counts_them() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let account = make_eur_account(&account_svc).await;
+        let today = Local::now().date_naive().format("%Y-%m-%d").to_string();
+        held_crypto_priced_on(&pool, &asset_svc, &account.id, "OLD", "2026-01-02").await;
+        held_crypto_priced_on(&pool, &asset_svc, &account.id, "NEW", &today).await;
+        held_asset(
+            &pool,
+            &asset_svc,
+            &account.id,
+            "CUSTOM",
+            "EUR",
+            1_000_000,
+            Some(10.0),
+        )
+        .await;
+        held_asset(&pool, &asset_svc, &account.id, "NP", "EUR", 1_000_000, None).await;
+
+        let uc = AccountDetailsUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let resp = uc.get_account_details(&account.id, None).await.unwrap();
+
+        let outdated = |name: &str| {
+            resp.holdings
+                .iter()
+                .find(|h| h.asset_name == name)
+                .unwrap()
+                .price_outdated
+        };
+        assert!(outdated("OLD"));
+        assert!(!outdated("NEW"));
+        assert!(!outdated("CUSTOM"), "a custom asset is never outdated");
+        assert!(!outdated("NP"), "no price is not an outdated price");
+        assert_eq!(resp.outdated_price_count, 1);
     }
 
     async fn held_asset(

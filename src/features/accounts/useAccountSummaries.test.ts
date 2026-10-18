@@ -29,6 +29,7 @@ const makeSummary = (overrides: Partial<AccountSummary> = {}): AccountSummary =>
   total_unrealized_pnl: null,
   ytd_performance_pct: null,
   has_inconsistent_holding: false,
+  outdated_price_count: 0,
   ...overrides,
 });
 
@@ -46,6 +47,7 @@ describe("useAccountSummaries", () => {
       total_unrealized_pnl: null,
       currency: "EUR",
       incomplete: false,
+      outdated_price_count: 0,
     };
     mockGetAccountSummaries.mockResolvedValue({ status: "ok", data: { summaries, total } });
 
@@ -105,6 +107,7 @@ describe("useAccountSummaries", () => {
           total_unrealized_pnl: null,
           currency: "EUR",
           incomplete: false,
+          outdated_price_count: 0,
         },
       },
     });
@@ -137,6 +140,7 @@ describe("useAccountSummaries", () => {
           total_unrealized_pnl: null,
           currency: "EUR",
           incomplete: false,
+          outdated_price_count: 0,
         },
       },
     });
@@ -168,6 +172,7 @@ describe("useAccountSummaries", () => {
           total_unrealized_pnl: null,
           currency: "EUR",
           incomplete: false,
+          outdated_price_count: 0,
         },
       },
     });
@@ -202,6 +207,7 @@ describe("useAccountSummaries", () => {
           total_unrealized_pnl: null,
           currency: "EUR",
           incomplete: false,
+          outdated_price_count: 0,
         },
       },
     });
@@ -233,6 +239,7 @@ describe("useAccountSummaries", () => {
           total_unrealized_pnl: null,
           currency: "EUR",
           incomplete: false,
+          outdated_price_count: 0,
         },
       },
     });
@@ -270,6 +277,7 @@ describe("useAccountSummaries — bulk-fetch coalescing (MKT-181)", () => {
           total_unrealized_pnl: null,
           currency: "EUR",
           incomplete: false,
+          outdated_price_count: 0,
         },
       },
     });
@@ -306,6 +314,7 @@ describe("useAccountSummaries — bulk-fetch coalescing (MKT-181)", () => {
           total_unrealized_pnl: null,
           currency: "EUR",
           incomplete: false,
+          outdated_price_count: 0,
         },
       },
     });
@@ -331,6 +340,7 @@ describe("useAccountSummaries — bulk-fetch coalescing (MKT-181)", () => {
           total_unrealized_pnl: null,
           currency: "EUR",
           incomplete: false,
+          outdated_price_count: 0,
         },
       },
     });

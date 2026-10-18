@@ -49,7 +49,7 @@ What the interface is told about this build: what it can do and which distributi
 
 ### HoldingDetail (extended)
 
-The `HoldingDetail` DTO defined in the ACD spec gains six new fields populated by this feature.
+The `HoldingDetail` DTO defined in the ACD spec gains these fields, populated by this feature.
 
 | Field                  | Business meaning                                                                                                                                                                                                        |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -60,14 +60,16 @@ The `HoldingDetail` DTO defined in the ACD spec gains six new fields populated b
 | `unrealized_pnl`       | Unrealized gain or loss in account currency (i64 micros). `None` when no price exists or when asset and account currencies differ (MKT-034). `0` when current price equals average price (not `None`).                  |
 | `performance_pct`      | `unrealized_pnl / cost_basis × 100`, expressed as i64 micros (e.g. 5.25 % = 5 250 000). `None` when `unrealized_pnl` is `None` or `cost_basis` is zero. `0` when `unrealized_pnl` is zero.                              |
 | `current_value`        | `current_price × quantity` in asset currency (i64 micros, i128 intermediate), independent of any exchange rate (MKT-143). `None` when `current_price` is `None`.                                                        |
+| `price_outdated`       | Whether `current_price` is outdated for the asset (MKT-205). `false` without a price, for cash, and in a read with a date, today included (MKT-206).                                                                    |
 
 ### AccountDetailsResponse (extended)
 
-The `AccountDetailsResponse` DTO gains one new field.
+The `AccountDetailsResponse` DTO gains these fields.
 
 | Field                  | Business meaning                                                                                                                                                                  |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `total_unrealized_pnl` | Sum of `unrealized_pnl` (i64 micros) across all active holdings where a value is computable (same-currency with a recorded price). `None` when no holding has a computable value. |
+| `outdated_price_count` | How many active holdings have an outdated price (MKT-205); `0` in a read with a date, today included (MKT-206).                                                                   |
 
 ### Asset (extended)
 
@@ -398,7 +400,7 @@ This section fills a holding's price history in one action. Account history, as-
 
 ### Price Freshness (200–209)
 
-The header tells how recent the portfolio's prices are. Prices travel with the sync, so the date of the newest price is meaningful on every device; when a given device last fetched prices is not, and is kept apart.
+The header tells how recent the portfolio's prices are, and each holding whether its own price is too old to trust (MKT-205, MKT-206). Prices travel with the sync, so the date of the newest price is meaningful on every device; when a given device last fetched prices is not, and is kept apart.
 
 **MKT-200 — Newest price date (backend)**: The application computes the latest observation date among the prices recorded for the assets currently held (`quantity > 0`) in any account, whatever each price's source. It reflects prices fetched on any device, once a sync has applied them here. With no held asset, or no price recorded for any of them, there is none.
 
@@ -407,6 +409,10 @@ The header tells how recent the portfolio's prices are. Prices travel with the s
 **MKT-202 — Header display (frontend)**: The header shows, on every view and whether or not sync is enabled, "Prices as of" the newest price date (MKT-200) with its own icon; the item's tooltip tells when this device last fetched prices (MKT-201), or that it never did — except in a build with no External provider, where the item has no tooltip and says nothing about fetching (MKT-212). With no newest price date the item says that no price is recorded yet. The item is absent until its figures have been read, and stays absent when the read fails.
 
 **MKT-203 — Reactivity (frontend)**: The header item reads its two figures when the application starts, and again after a fetch task completes (`AssetPriceFetchCompleted`), after a price is recorded outside a fetch task (`AssetPriceUpdated`, ignored while a fetch task runs — MKT-181), after a transaction changes what is held (`TransactionUpdated`), and after a sync applied changes (`SyncCompleted`). A scheduled download runs outside the application and raises no event in it: when it runs while the application is open, the item shows its result at the next of these events or at the next start.
+
+**MKT-205 — Outdated price (backend)**: A held asset's price is outdated when more business days (Monday to Friday, no holiday calendar) have passed since its observation date than its kind and class allow. Never, first: a custom or a cash asset (kind), and an asset of class `RealEstate` whatever its kind. Otherwise 10 for an asset of class `MutualFunds`, and 5 for any other listed or crypto asset. The business days counted are those after the observation date up to today included: a price of a Friday is still current the next Friday, and outdated the Monday after. The judgement is the same whatever recorded the price — a fetch, the owner, an agent — and for an asset whose price is typed by hand (MKT-150). An asset with no price is not outdated: MKT-032 says it has none. The thresholds are fixed (owner, 2026-10-18).
+
+**MKT-206 — Where the judgement is given (backend)**: The read of an account's details without a date carries, for each active holding, whether its price is outdated (MKT-205), and for the account how many of its holdings are; a read with a date — a past date, or today given as a date — judges nothing: each holding says `false` and the account `0`. The read of the account summaries carries, for each account, how many of its active holdings have an outdated price, and on the portfolio total how many active holdings have one over every account. An agent reads the same figures through `list_holdings` and `portfolio_summary` (AGT-040).
 
 ### Without an External provider (210–219)
 

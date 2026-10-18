@@ -10,6 +10,8 @@ pub mod exchange;
 pub mod isin;
 /// OpenFIGI inbound exchange mapper — `micCode` / `exchCode` → `Exchange` (WEB-049).
 pub mod openfigi_exchange_mapper;
+/// MKT-205 — whether a held asset's price is outdated.
+pub mod outdated_price;
 /// Yahoo outbound exchange mapper — `Exchange` → Yahoo suffix (MKT-110).
 pub mod yahoo_exchange_mapper;
 /// Provider symbol derivation from asset reference, in Yahoo Finance's convention (MKT-110):
@@ -23,6 +25,7 @@ pub use asset_price::{
 };
 pub use category::*;
 pub use exchange::Exchange;
+pub use outdated_price::is_price_outdated;
 pub use yahoo_symbol::{derive_yahoo_symbol, derive_yahoo_symbol_with_exchange};
 
 #[cfg(test)]

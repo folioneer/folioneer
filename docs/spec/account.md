@@ -29,6 +29,7 @@ The total of every account, read together with the account summaries (ACC-027). 
 | `total_unrealized_pnl` | Every account's Unrealized P&L, converted the same way; absent when no convertible account carries one (ACC-029). |
 | `currency`             | The cross-account reference currency both figures are stated in (GPF-011).                                        |
 | `incomplete`           | Whether an account with no usable rate hid a non-zero figure from the total (ACC-028).                            |
+| `outdated_price_count` | How many active holdings have an outdated price, over every account (MKT-205, MKT-206).                           |
 
 ---
 

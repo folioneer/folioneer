@@ -1,7 +1,8 @@
 use crate::context::account::{Account, AccountError, AccountServiceContract, UpdateFrequency};
-use crate::context::asset::{AssetClass, AssetServiceContract};
+use crate::context::asset::{is_price_outdated, AssetClass, AssetServiceContract};
 use crate::context::currency::CurrencyService;
 use crate::core::logger::BACKEND;
+use chrono::NaiveDate;
 use std::collections::HashMap;
 
 use crate::use_cases::shared::global_value::{
@@ -47,6 +48,8 @@ pub struct AccountSummary {
     /// Whether any holding of this account carries a derived inconsistency (SYN-040,
     /// CFR-042) — marks the account row in the Accounts list.
     pub has_inconsistent_holding: bool,
+    /// MKT-206 — how many of the account's active holdings have an outdated price (MKT-205).
+    pub outdated_price_count: i64,
 }
 
 /// ACC-027/028 — the portfolio total over every account, in the reference currency.
@@ -64,6 +67,8 @@ pub struct PortfolioTotal {
     /// (FXR-034) held a non-zero Global Value or Unrealized P&L, which the total
     /// therefore leaves out (ACC-028).
     pub incomplete: bool,
+    /// MKT-206 — how many holdings have an outdated price, over every account.
+    pub outdated_price_count: i64,
 }
 
 /// Response of `get_account_summaries` (ACC-021, ACC-027): the rows and their
@@ -132,6 +137,7 @@ impl AccountSummaryUseCase {
                 .await?
                 .iter()
                 .any(|holding| holding_inconsistency(holding).is_some());
+            let outdated_price_count = self.count_outdated_prices(&account, today).await?;
             summaries.push(AccountSummary {
                 id: account.id,
                 name: account.name,
@@ -141,6 +147,7 @@ impl AccountSummaryUseCase {
                 total_unrealized_pnl,
                 ytd_performance_pct,
                 has_inconsistent_holding,
+                outdated_price_count,
             });
         }
         // ACC-027/028 — the portfolio total in the reference currency, each account
@@ -241,6 +248,48 @@ impl AccountSummaryUseCase {
         Ok(any_qualified.then_some(total))
     }
 
+    /// MKT-206 — how many of the account's active holdings have an outdated price (MKT-205):
+    /// each judged on its latest price's observation date. A price that cannot be read is
+    /// not counted, as it is left out of the value (MKT-031).
+    async fn count_outdated_prices(
+        &self,
+        account: &Account,
+        today: NaiveDate,
+    ) -> StdResult<i64, AccountError> {
+        let holdings = self
+            .account_service
+            .get_holdings_for_account(&account.id)
+            .await?;
+        let mut count = 0;
+        for holding in holdings.iter().filter(|holding| holding.is_active()) {
+            let Some(asset) = self
+                .asset_service
+                .get_asset_by_id(&holding.asset_id)
+                .await
+                .map_err(|e| {
+                    tracing::error!(target: BACKEND, asset_id = %holding.asset_id, err = ?e, "get_account_summaries: get_asset_by_id failed (outdated prices)");
+                    AccountError::DatabaseError
+                })?
+            else {
+                continue;
+            };
+            let latest = match self.asset_service.get_latest_price(&holding.asset_id).await {
+                Ok(Some(latest)) => latest,
+                Ok(None) => continue,
+                Err(e) => {
+                    tracing::error!(target: BACKEND, asset_id = %holding.asset_id, err = ?e, "get_account_summaries: get_latest_price failed; holding left out of the outdated count (MKT-031)");
+                    continue;
+                }
+            };
+            let outdated = NaiveDate::parse_from_str(&latest.date, "%Y-%m-%d")
+                .is_ok_and(|date| is_price_outdated(&asset.kind, &asset.class, date, today));
+            if outdated {
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
     /// CSH-094 — per-account economic value in account currency. Mirrors the
     /// inlined accumulator in `account_details::orchestrator::get_account_details`;
     /// kept duplicated to avoid double-iterating the holdings loop on the detail
@@ -331,6 +380,11 @@ pub(crate) fn portfolio_total(
     let mut total_global_value: i64 = 0;
     let mut total_unrealized_pnl: Option<i64> = None;
     let mut incomplete = false;
+    // MKT-206 — a count needs no conversion: every account's adds up.
+    let outdated_price_count = summaries
+        .iter()
+        .map(|summary| summary.outdated_price_count)
+        .sum();
     for summary in summaries {
         let Some(rate) = rate_to_reference.get(&summary.currency).copied().flatten() else {
             // ACC-028 — the unconvertible account counts as zero; it leaves the total
@@ -357,6 +411,7 @@ pub(crate) fn portfolio_total(
         total_unrealized_pnl,
         currency: REFERENCE_CURRENCY.to_string(),
         incomplete,
+        outdated_price_count,
     }
 }
 
@@ -623,6 +678,72 @@ mod tests {
         );
         let summaries = uc.get_account_summaries().await.unwrap().summaries;
         assert_eq!(summaries[0].total_global_value, 0);
+    }
+
+    // MKT-206 — each account counts its holdings whose price is outdated (MKT-205), and the
+    // portfolio total counts them over every account.
+    #[tokio::test]
+    async fn mkt_206_each_account_and_the_portfolio_total_count_outdated_prices() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let account = account_svc
+            .create(
+                "X".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .unwrap();
+        let today = chrono::Local::now()
+            .date_naive()
+            .format("%Y-%m-%d")
+            .to_string();
+        for (symbol, price_date) in [("OLD", "2026-01-02"), ("NEW", today.as_str())] {
+            let asset = asset_svc
+                .create_asset(CreateAssetDTO {
+                    kind: None,
+                    name: symbol.to_string(),
+                    reference: symbol.to_string(),
+                    isin: None,
+                    class: crate::context::asset::AssetClass::DigitalAsset,
+                    currency: "EUR".to_string(),
+                    risk_level: 5,
+                    category_id: SYSTEM_CATEGORY_ID.to_string(),
+                    exchange: None,
+                    interest_bearing: false,
+                })
+                .await
+                .unwrap();
+            SqliteHoldingRepository::new(pool.clone())
+                .upsert(
+                    Holding::new(
+                        account.id.clone(),
+                        asset.id.clone(),
+                        1_000_000,
+                        100_000_000,
+                        0,
+                        None,
+                    )
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            asset_svc
+                .record_asset_price(&asset.id, price_date, 100.0)
+                .await
+                .unwrap();
+        }
+
+        let uc = AccountSummaryUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let read = uc.get_account_summaries().await.unwrap();
+        assert_eq!(read.summaries[0].outdated_price_count, 1);
+        assert_eq!(read.total.outdated_price_count, 1);
     }
 
     // -------------------------------------------------------------------------
@@ -1409,6 +1530,7 @@ mod tests {
             total_unrealized_pnl: unrealized_pnl,
             ytd_performance_pct: None,
             has_inconsistent_holding: false,
+            outdated_price_count: 0,
         }
     }
 

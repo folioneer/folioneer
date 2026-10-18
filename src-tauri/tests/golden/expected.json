@@ -5,6 +5,7 @@
         "currency": "EUR",
         "has_inconsistent_holding": false,
         "name": "Main EUR",
+        "outdated_price_count": 0,
         "total_global_value": 24136700000,
         "total_unrealized_pnl": 3774200040,
         "update_frequency": "Automatic"
@@ -13,6 +14,7 @@
         "currency": "USD",
         "has_inconsistent_holding": false,
         "name": "Growth USD",
+        "outdated_price_count": 0,
         "total_global_value": 7898737960,
         "total_unrealized_pnl": -45838882,
         "update_frequency": "ManualMonth"
@@ -21,6 +23,7 @@
     "total": {
       "currency": "EUR",
       "incomplete": false,
+      "outdated_price_count": 0,
       "total_global_value": 31482526302,
       "total_unrealized_pnl": 3731569880
     }
@@ -57,6 +60,7 @@
           "two_years": null,
           "ytd": null
         },
+        "price_outdated": false,
         "quantity": 14860420,
         "realized_pnl": -55423145,
         "total_return_pct": -2186367,
@@ -91,6 +95,7 @@
           "two_years": null,
           "ytd": null
         },
+        "price_outdated": false,
         "quantity": 5848000000,
         "realized_pnl": 0,
         "total_return_pct": null,
@@ -98,6 +103,7 @@
         "weight_pct": 74037144
       }
     ],
+    "outdated_price_count": 0,
     "total_cost_basis": 2096576842,
     "total_dividends_received": 0,
     "total_global_value": 7898737960,
@@ -139,6 +145,7 @@
           "two_years": null,
           "ytd": null
         },
+        "price_outdated": false,
         "quantity": 44550000,
         "realized_pnl": 287000000,
         "total_return_pct": 49799757,
@@ -173,6 +180,7 @@
           "two_years": null,
           "ytd": null
         },
+        "price_outdated": false,
         "quantity": 10000000,
         "realized_pnl": 0,
         "total_return_pct": 1776367,
@@ -207,6 +215,7 @@
           "two_years": null,
           "ytd": null
         },
+        "price_outdated": false,
         "quantity": 13402500000,
         "realized_pnl": 0,
         "total_return_pct": null,
@@ -241,6 +250,7 @@
           "two_years": null,
           "ytd": null
         },
+        "price_outdated": false,
         "quantity": 16000000,
         "realized_pnl": 0,
         "total_return_pct": 111471321,
@@ -248,6 +258,7 @@
         "weight_pct": 14053288
       }
     ],
+    "outdated_price_count": 0,
     "total_cost_basis": 6959999959,
     "total_dividends_received": 75500000,
     "total_global_value": 24136700000,
