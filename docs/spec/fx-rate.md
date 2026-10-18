@@ -6,6 +6,8 @@ The Foreign Exchange Rate feature gives the system a representation of a **curre
 
 A rate is recorded per **directed currency pair** (`from_currency → to_currency`) and is timestamped: multiple entries accumulate over time, one per pair per date. Rates can be entered manually and fetched from an external provider. The Account Details and Account Performance read models use the most recently dated rate to convert foreign-currency market prices into the account currency.
 
+The `currency` context also owns the **portfolio settings**, starting with the reference currency every cross-account figure is reported in (GPF-011): see the PortfolioSetting entity and FXR-120 to FXR-125.
+
 A currency pair is a **persisted, durable entity** once it exists. A pair starts being followed either automatically — the moment a live holding (`quantity > 0`) exists whose asset currency differs from its account currency — or by manual declaration in the Currency Rates view. Buying a USD asset inside a EUR account auto-creates and follows the `USD → EUR` pair (FXR-013). Once created a pair is **maintained even if nothing currently uses it** (e.g. the position later closes); it is not auto-removed. Pairs are few, so keeping them costs little; an explicit archive affordance is deferred to a later iteration.
 
 In V1 a currency rate exists **only to value foreign holdings** — it is a side-effect of managing assets, not a thing the user manages for its own sake. Treating currency as a first-class subject (valuing foreign-currency cash balances, FX as a tradeable position, standalone currency tracking) is explicitly out of scope and deferred.
@@ -48,6 +50,15 @@ Represents the value of one currency expressed in another on a specific date —
 | `source`        | Provenance of this rate (see FXR-100 for variants). `Manual` for user-entered values; a provider name (`Frankfurter`, `Ecb`) for fetched values. Metadata for traceability; never a read/write precedence input (ADR-012). |
 
 > The combination `(from_currency, to_currency, date)` is unique: only one rate per directed pair per day. Recording a second rate for the same key overwrites the first regardless of either row's `source` (FXR-025, per ADR-012). The reverse pair `(to_currency, from_currency, date)` is a **separate** row and is not derived automatically.
+
+### PortfolioSetting
+
+A setting of the whole portfolio, the same on every device: owned by the `currency` context, synced (SYN-021), one per name (CFR-012); FXR-120 to FXR-125 say how it is set and read.
+
+| Field   | Business meaning                                                                                                                      |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`  | Which setting — free text, so a later setting is a new name, not a new format. Today one name exists: `reference_currency` (GPF-011). |
+| `value` | Its value, as text. For `reference_currency`, an ISO 4217 code.                                                                       |
 
 ### HoldingDetail (amended)
 
@@ -196,6 +207,20 @@ Historical valuations (yearly/monthly performance, as-of-date views) need a rate
 **FXR-101 — source: Manual on user-driven paths (backend)**: Every user-driven write (manual record FXR-025, any manual edit FXR-052) sets `source = Manual`. A fetched row edited by the user therefore becomes `Manual`. The frontend never passes a source value.
 
 **FXR-102 — source: provider on fetched paths (backend)**: A write produced by the Frankfurter tier sets `source = Frankfurter`; a write produced by the ECB XML fallback sets `source = Ecb` (FXR-070).
+
+### Portfolio Settings (120–129)
+
+**FXR-120 — A setting is replaced (backend)**: Setting a portfolio setting replaces its value.
+
+**FXR-121 — A setting is never removed (backend)**: A portfolio setting, once set, is never removed.
+
+**FXR-122 — The default reference currency (backend)**: A portfolio with no reference currency set is reported in EUR.
+
+**FXR-123 — Only an ISO 4217 code (backend)**: Setting the reference currency to anything but a recognised ISO 4217 code (as FXR-023) is refused, and nothing is stored.
+
+**FXR-124 — A malformed synced value (backend)**: A reference currency another device synced that is not a recognised ISO 4217 code (as FXR-023) is read as the default (FXR-122), so no total breaks on it.
+
+**FXR-125 — An unknown setting is kept (backend)**: A setting whose name this device does not know is kept as it arrived.
 
 ---
 

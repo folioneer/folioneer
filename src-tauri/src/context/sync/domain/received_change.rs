@@ -60,6 +60,7 @@ fn identity_fields(kind: RecordKind) -> &'static [&'static str] {
         RecordKind::AssetPrice => &["asset_id", "date"],
         RecordKind::CurrencyPair => &["from_currency", "to_currency"],
         RecordKind::CurrencyRate => &["from_currency", "to_currency", "date"],
+        RecordKind::PortfolioSetting => &["name"],
     }
 }
 

@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-/// The ten synced record kinds (SYN-021). `holdings`, performance figures, and device-local
+/// The eleven synced record kinds (SYN-021). `holdings`, performance figures, and device-local
 /// data (scheduled fetch config, window state, the sync configuration itself) are deliberately
 /// absent (SYN-022/023).
 #[derive(
@@ -44,6 +44,8 @@ pub enum RecordKind {
     CurrencyRate,
     /// A holding note, identified by (account_id, asset_id).
     HoldingNote,
+    /// A portfolio-wide setting, identified by its name (TODO-032: the reference currency).
+    PortfolioSetting,
 }
 
 /// Whether the user made the change or the application generated it on its own (CFR-016).

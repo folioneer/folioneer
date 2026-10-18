@@ -516,7 +516,10 @@ pub fn parent_references(change: &Change) -> Vec<(RecordKind, String)> {
                 _ => None,
             },
         ),
-        RecordKind::Account | RecordKind::Category | RecordKind::CurrencyPair => {}
+        RecordKind::Account
+        | RecordKind::Category
+        | RecordKind::CurrencyPair
+        | RecordKind::PortfolioSetting => {}
     }
     references
 }

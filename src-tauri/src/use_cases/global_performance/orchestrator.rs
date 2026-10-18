@@ -4,7 +4,6 @@ use crate::context::account::{
 use crate::context::asset::AssetServiceContract;
 use crate::context::currency::CurrencyService;
 use crate::core::logger::BACKEND;
-use crate::use_cases::shared::global_value::REFERENCE_CURRENCY;
 use crate::use_cases::shared::performance::{
     account_performance_series, annualized_yield_metric, lifetime_unavailable, residual_pnl,
     zero_cost_credit_value, AccountPerformanceResponse, PerformancePeriod, PeriodBridge,
@@ -85,6 +84,10 @@ impl GlobalPerformanceUseCase {
     ) -> StdResult<AccountPerformanceResponse, AccountError> {
         let accounts = self.account_service.get_all().await?;
         let today = Local::now().date_naive();
+        let reference = self.currency_service.reference_currency().await.map_err(|e| {
+            tracing::error!(target: BACKEND, err = ?e, "aggregate_across_accounts: reference currency not read");
+            AccountError::DatabaseError
+        })?;
 
         // GPF-012 — an account participates only with at least one dated
         // in-scope transaction.
@@ -119,7 +122,7 @@ impl GlobalPerformanceUseCase {
             })
             .min();
         let Some(earliest_date) = earliest_date else {
-            return Ok(empty_response());
+            return Ok(empty_response(&reference));
         };
 
         // GPF-014 — the monthly series exists only when EVERY included account
@@ -151,8 +154,14 @@ impl GlobalPerformanceUseCase {
         let mut converted_accounts = Vec::with_capacity(included.len());
         for (account, transactions) in included {
             converted_accounts.push(
-                self.prepare_account(account, transactions, &valued_dates, asset_scope)
-                    .await?,
+                self.prepare_account(
+                    account,
+                    transactions,
+                    &valued_dates,
+                    asset_scope,
+                    &reference,
+                )
+                .await?,
             );
         }
 
@@ -198,7 +207,7 @@ impl GlobalPerformanceUseCase {
             lifetime_unavailable(yearly.iter().chain(&monthly), &all_transactions);
         Ok(AccountPerformanceResponse {
             account_name: String::new(),
-            currency: REFERENCE_CURRENCY.to_string(),
+            currency: reference,
             month_view_available,
             yearly,
             monthly,
@@ -218,6 +227,7 @@ impl GlobalPerformanceUseCase {
         transactions: Vec<Transaction>,
         valued_dates: &[NaiveDate],
         asset_scope: Option<&str>,
+        reference: &str,
     ) -> StdResult<ConvertedAccount, AccountError> {
         let priced_assets = load_priced_assets(self.asset_service.as_ref(), &transactions).await?;
         // PRF-071 — zero-cost credits are valued at their grant date, so this
@@ -234,14 +244,14 @@ impl GlobalPerformanceUseCase {
         .await?;
 
         let mut reference_rate_by_date: HashMap<NaiveDate, i64> = HashMap::new();
-        if account.currency != REFERENCE_CURRENCY {
+        if account.currency != reference {
             let mut dates: BTreeSet<NaiveDate> = valued_dates.iter().copied().collect();
             dates.extend(reference_rate_dates(&transactions, asset_scope));
             for date in dates {
                 let as_of = date.format("%Y-%m-%d").to_string();
                 if let Some(rate) = self
                     .currency_service
-                    .resolve_rate_micros(&account.currency, REFERENCE_CURRENCY, &as_of)
+                    .resolve_rate_micros(&account.currency, reference, &as_of)
                     .await
                     .map_err(|e| {
                         tracing::error!(target: BACKEND, currency = %account.currency, as_of = %as_of, err = ?e, "prepare_account: resolve_rate_micros failed");
@@ -255,6 +265,7 @@ impl GlobalPerformanceUseCase {
 
         let mut converted_account = ConvertedAccount {
             currency: account.currency,
+            reference_currency: reference.to_string(),
             transactions,
             priced_assets,
             rate_map,
@@ -328,10 +339,10 @@ fn reference_rate_dates(
 }
 
 /// GPF-015 — the PRF-043-shaped empty result of an aggregation with no data span.
-fn empty_response() -> AccountPerformanceResponse {
+fn empty_response(reference: &str) -> AccountPerformanceResponse {
     AccountPerformanceResponse {
         account_name: String::new(),
-        currency: REFERENCE_CURRENCY.to_string(),
+        currency: reference.to_string(),
         month_view_available: false,
         yearly: Vec::new(),
         monthly: Vec::new(),
@@ -343,6 +354,8 @@ fn empty_response() -> AccountPerformanceResponse {
 /// pre-converted to the reference currency (GPF-020/030).
 struct ConvertedAccount {
     currency: String,
+    /// The currency the portfolio is reported in (GPF-011).
+    reference_currency: String,
     transactions: Vec<Transaction>,
     priced_assets: HashMap<String, PricedAsset>,
     rate_map: RateMap,
@@ -365,7 +378,7 @@ impl ConvertedAccount {
     /// for reference-currency accounts, the carry-forward resolution otherwise;
     /// `None` when no usable rate exists (FXR-034).
     fn reference_rate(&self, date: NaiveDate) -> Option<i64> {
-        if self.currency == REFERENCE_CURRENCY {
+        if self.currency == self.reference_currency {
             Some(IDENTITY_RATE_MICROS)
         } else {
             self.reference_rate_by_date.get(&date).copied()
@@ -1422,6 +1435,45 @@ mod tests {
         assert!(response.monthly.is_empty());
     }
 
+    // GPF-011 — the global performance is reported in the reference currency chosen: a
+    // CHF account's deposit counts in full, with no rate, in a CHF series.
+    #[tokio::test]
+    async fn gpf_011_the_global_performance_is_in_the_reference_currency_chosen() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        asset_svc.seed_cash_asset("CHF").await.unwrap();
+        let account =
+            create_account(&account_svc, "Swiss", "CHF", UpdateFrequency::Automatic).await;
+        account_svc
+            .record_deposit(&account.id, "2024-03-01".to_string(), 100_000_000, None)
+            .await
+            .unwrap();
+        let currency_svc = Arc::new(
+            CurrencyService::new(
+                Box::new(crate::context::currency::SqliteCurrencyPairRepository::new(
+                    pool.clone(),
+                )),
+                Box::new(crate::context::currency::SqliteCurrencyRateRepository::new(
+                    pool.clone(),
+                )),
+            )
+            .with_setting_repo(Box::new(
+                crate::context::currency::SqlitePortfolioSettingRepository::new(pool.clone()),
+            )),
+        );
+        currency_svc.set_reference_currency("CHF").await.unwrap();
+
+        let uc = GlobalPerformanceUseCase::new(account_svc, asset_svc, currency_svc);
+        let response = uc.get_global_performance(None, None).await.unwrap();
+        assert_eq!(response.currency, "CHF");
+        let row = response
+            .yearly
+            .iter()
+            .find(|row| row.year == 2024)
+            .expect("a 2024 row");
+        assert_eq!((row.cash_flow, row.end_value), (100_000_000, 100_000_000));
+    }
+
     // GPF-012/015 — an asset scope no account holds excludes every account and
     // yields the empty response.
     #[tokio::test]
@@ -1665,6 +1717,7 @@ mod bridge_reference_tests {
             .collect();
         ConvertedAccount {
             currency: "USD".to_string(),
+            reference_currency: "EUR".to_string(),
             transactions,
             priced_assets: priced_assets(),
             rate_map: euro_rate_on_the_grant_date(),

@@ -1902,7 +1902,8 @@ impl AccountService {
             | RecordKind::Asset
             | RecordKind::AssetPrice
             | RecordKind::CurrencyPair
-            | RecordKind::CurrencyRate => {}
+            | RecordKind::CurrencyRate
+            | RecordKind::PortfolioSetting => {}
         }
         Ok(())
     }

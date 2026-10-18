@@ -6,7 +6,7 @@ use chrono::NaiveDate;
 use std::collections::HashMap;
 
 use crate::use_cases::shared::global_value::{
-    account_global_value, AssetValuationFacts, ValuationSnapshot, REFERENCE_CURRENCY,
+    account_global_value, AssetValuationFacts, ValuationSnapshot,
 };
 use crate::use_cases::shared::inconsistency::holding_inconsistency;
 use crate::use_cases::shared::valuation::{compute_current_ytd_pct, convert_at_rate};
@@ -158,6 +158,10 @@ impl AccountSummaryUseCase {
         // converted at the read date's rate; a currency with no usable rate counts
         // as zero (FXR-034).
         let as_of = today.format("%Y-%m-%d").to_string();
+        let reference = self.currency_service.reference_currency().await.map_err(|e| {
+            tracing::error!(target: BACKEND, err = ?e, "get_account_summaries: reference currency not read");
+            AccountError::DatabaseError
+        })?;
         let mut rates: HashMap<String, Option<i64>> = HashMap::new();
         for summary in &summaries {
             if rates.contains_key(&summary.currency) {
@@ -165,7 +169,7 @@ impl AccountSummaryUseCase {
             }
             let rate = self
                 .currency_service
-                .resolve_rate_micros(&summary.currency, REFERENCE_CURRENCY, &as_of)
+                .resolve_rate_micros(&summary.currency, &reference, &as_of)
                 .await
                 .map_err(|e| {
                     tracing::error!(target: BACKEND, currency = %summary.currency, err = ?e, "get_account_summaries: resolve_rate_micros failed (portfolio total)");
@@ -173,7 +177,7 @@ impl AccountSummaryUseCase {
                 })?;
             rates.insert(summary.currency.clone(), rate);
         }
-        let total = portfolio_total(&summaries, &rates);
+        let total = portfolio_total(&summaries, &rates, &reference);
         Ok(AccountSummaries { summaries, total })
     }
 
@@ -380,6 +384,7 @@ impl AccountSummaryUseCase {
 pub(crate) fn portfolio_total(
     summaries: &[AccountSummary],
     rate_to_reference: &HashMap<String, Option<i64>>,
+    reference_currency: &str,
 ) -> PortfolioTotal {
     let mut total_global_value: i64 = 0;
     let mut total_unrealized_pnl: Option<i64> = None;
@@ -413,7 +418,7 @@ pub(crate) fn portfolio_total(
     PortfolioTotal {
         total_global_value,
         total_unrealized_pnl,
-        currency: REFERENCE_CURRENCY.to_string(),
+        currency: reference_currency.to_string(),
         incomplete,
         outdated_price_count,
     }
@@ -458,6 +463,49 @@ mod tests {
             .await
             .expect("migrations");
         pool
+    }
+
+    // GPF-011 — the portfolio total is reported in the reference currency chosen: a CHF
+    // account counts in full, with no rate, in a CHF total.
+    #[tokio::test]
+    async fn gpf_011_the_portfolio_total_is_in_the_reference_currency_chosen() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let account = account_svc
+            .create(
+                "Swiss".to_string(),
+                String::new(),
+                "CHF".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .unwrap();
+        asset_svc.seed_cash_asset("CHF").await.unwrap();
+        account_svc
+            .record_deposit(&account.id, "2020-01-01".to_string(), 250_000_000, None)
+            .await
+            .unwrap();
+        let currency_svc = Arc::new(
+            CurrencyService::new(
+                Box::new(crate::context::currency::SqliteCurrencyPairRepository::new(
+                    pool.clone(),
+                )),
+                Box::new(crate::context::currency::SqliteCurrencyRateRepository::new(
+                    pool.clone(),
+                )),
+            )
+            .with_setting_repo(Box::new(
+                crate::context::currency::SqlitePortfolioSettingRepository::new(pool.clone()),
+            )),
+        );
+        currency_svc.set_reference_currency("CHF").await.unwrap();
+
+        let uc = AccountSummaryUseCase::new(account_svc, asset_svc, currency_svc);
+        let total = uc.get_account_summaries().await.unwrap().total;
+        assert_eq!(total.currency, "CHF");
+        assert_eq!(total.total_global_value, 250_000_000);
+        assert!(!total.incomplete);
     }
 
     // ACC-021 — empty account returns total_global_value = 0
@@ -1596,7 +1644,7 @@ mod tests {
             ("USD".to_string(), Some(900_000)),
         ]);
 
-        let total = portfolio_total(&summaries, &rates);
+        let total = portfolio_total(&summaries, &rates, "EUR");
 
         assert_eq!(total.total_global_value, 280_000_000);
         assert_eq!(total.total_unrealized_pnl, Some(-8_000_000));
@@ -1616,7 +1664,7 @@ mod tests {
             ("GBP".to_string(), None),
         ]);
 
-        let total = portfolio_total(&summaries, &rates);
+        let total = portfolio_total(&summaries, &rates, "EUR");
 
         assert_eq!(total.total_global_value, 100_000_000);
         assert_eq!(total.total_unrealized_pnl, Some(10_000_000));
@@ -1635,7 +1683,7 @@ mod tests {
             ("USD".to_string(), Some(900_000)),
         ]);
 
-        let total = portfolio_total(&summaries, &rates);
+        let total = portfolio_total(&summaries, &rates, "EUR");
 
         assert_eq!(total.total_global_value, 145_000_000);
         assert_eq!(total.total_unrealized_pnl, None);
@@ -1645,7 +1693,7 @@ mod tests {
     // ACC-027 — no account: a zero, complete total with no P&L.
     #[test]
     fn portfolio_total_of_no_account_is_zero_and_complete() {
-        let total = portfolio_total(&[], &HashMap::new());
+        let total = portfolio_total(&[], &HashMap::new(), "EUR");
 
         assert_eq!(total.total_global_value, 0);
         assert_eq!(total.total_unrealized_pnl, None);
@@ -1701,6 +1749,7 @@ mod tests {
         let with_empty = portfolio_total(
             &[summary("EUR", 100_000_000, None), summary("USD", 0, None)],
             &rates,
+            "EUR",
         );
         assert!(!with_empty.incomplete);
         assert_eq!(with_empty.total_global_value, 100_000_000);
@@ -1712,6 +1761,7 @@ mod tests {
                 summary("USD", 0, Some(-5_000_000)),
             ],
             &rates,
+            "EUR",
         );
         assert!(with_hidden_pnl.incomplete);
         assert_eq!(with_hidden_pnl.total_unrealized_pnl, None);

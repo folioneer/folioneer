@@ -16,7 +16,7 @@ use crate::context::asset::{
 };
 use crate::context::currency::{
     CurrencyService, RateHistoryProvider, RateProvider, SqliteCurrencyPairRepository,
-    SqliteCurrencyRateRepository,
+    SqliteCurrencyRateRepository, SqlitePortfolioSettingRepository,
 };
 use crate::context::sync::SqliteChangeRecorder;
 use crate::core::SideEffectEventBus;
@@ -100,8 +100,14 @@ impl AppContainer {
                 SqliteCurrencyPairRepository::new(pool.clone())
                     .with_change_recorder(Arc::clone(&change_recorder)),
             ),
-            Box::new(SqliteCurrencyRateRepository::new(pool).with_change_recorder(change_recorder)),
-        );
+            Box::new(
+                SqliteCurrencyRateRepository::new(pool.clone())
+                    .with_change_recorder(Arc::clone(&change_recorder)),
+            ),
+        )
+        .with_setting_repo(Box::new(
+            SqlitePortfolioSettingRepository::new(pool).with_change_recorder(change_recorder),
+        ));
 
         if let Some(event_bus) = &event_bus {
             asset_service = asset_service.with_event_bus(Arc::clone(event_bus));

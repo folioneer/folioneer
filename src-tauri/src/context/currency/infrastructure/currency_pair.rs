@@ -217,7 +217,8 @@ impl CurrencyPairRepository for SqliteCurrencyPairRepository {
             | RecordKind::FeeSchedule
             | RecordKind::FeeCatchUpPosition
             | RecordKind::AssetPrice
-            | RecordKind::HoldingNote => Ok(None),
+            | RecordKind::HoldingNote
+            | RecordKind::PortfolioSetting => Ok(None),
         }
     }
 
@@ -319,7 +320,8 @@ impl CurrencyPairRepository for SqliteCurrencyPairRepository {
             | RecordKind::FeeSchedule
             | RecordKind::FeeCatchUpPosition
             | RecordKind::AssetPrice
-            | RecordKind::HoldingNote => {}
+            | RecordKind::HoldingNote
+            | RecordKind::PortfolioSetting => {}
         }
         Ok(())
     }

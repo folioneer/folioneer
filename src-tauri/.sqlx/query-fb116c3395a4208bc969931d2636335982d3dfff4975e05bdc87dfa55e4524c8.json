@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE portfolio_settings SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n                 WHERE name = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "fb116c3395a4208bc969931d2636335982d3dfff4975e05bdc87dfa55e4524c8"
+}

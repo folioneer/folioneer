@@ -20,6 +20,7 @@ use folioneer_lib::context::asset::{
 };
 use folioneer_lib::context::currency::{
     CurrencyService, SqliteCurrencyPairRepository, SqliteCurrencyRateRepository,
+    SqlitePortfolioSettingRepository,
 };
 use folioneer_lib::context::sync::{
     FirstPublish, FsFolderStore, SqliteChangeLogRepository, SqliteChangeRecorder,
@@ -114,6 +115,10 @@ async fn build_ctx_on_bus(folder: &std::path::Path, bus: Arc<SideEffectEventBus>
                     .with_change_recorder(recorder.clone()),
             ),
         )
+        .with_setting_repo(Box::new(
+            SqlitePortfolioSettingRepository::new(pool.clone())
+                .with_change_recorder(recorder.clone()),
+        ))
         .with_event_bus(bus.clone()),
     );
     let state_repo: Arc<dyn SyncStateRepository> =
@@ -921,6 +926,82 @@ async fn latest_timestamp(ctx: &Ctx) -> i64 {
     latest.parse().expect("a logical timestamp is a number")
 }
 
+// SYN-021 / GPF-011 — the reference currency is a portfolio setting: chosen on one device,
+// it is the other's after a sync, and the later choice wins on both.
+#[tokio::test]
+async fn syn_021_the_reference_currency_chosen_on_one_device_is_the_others() {
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop, _account_id, _desktop_area) = two_devices_sharing(dir.path()).await;
+    assert_eq!(
+        laptop.currency_service.reference_currency().await.unwrap(),
+        "EUR"
+    );
+
+    desktop
+        .currency_service
+        .set_reference_currency("CHF")
+        .await
+        .unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+    assert_eq!(
+        laptop.currency_service.reference_currency().await.unwrap(),
+        "CHF"
+    );
+
+    laptop
+        .currency_service
+        .set_reference_currency("USD")
+        .await
+        .unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    assert_eq!(
+        desktop.currency_service.reference_currency().await.unwrap(),
+        "USD"
+    );
+    assert_eq!(
+        laptop.currency_service.reference_currency().await.unwrap(),
+        "USD"
+    );
+}
+
+// SYN-013 / SYN-021 — a reference currency chosen before sync is turned on travels with the
+// first publish: a device joining takes it.
+#[tokio::test]
+async fn syn_013_a_reference_currency_chosen_before_sync_is_published() {
+    let dir = tempfile::tempdir().unwrap();
+    let desktop = build_ctx(dir.path()).await;
+    desktop
+        .currency_service
+        .set_reference_currency("GBP")
+        .await
+        .unwrap();
+    desktop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Desktop".into(),
+        )
+        .await
+        .expect("Desktop must enable as the first device");
+    let laptop = build_ctx(dir.path()).await;
+    laptop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Laptop".into(),
+        )
+        .await
+        .expect("Laptop must join the shared portfolio");
+    assert_eq!(
+        laptop.currency_service.reference_currency().await.unwrap(),
+        "GBP"
+    );
+}
+
 // SYN-013 — a first publish stamps the whole portfolio one tick after the device's clock,
 // and the device carries on from there.
 #[tokio::test]
@@ -1520,12 +1601,14 @@ async fn written_form_of_every_record_kind() -> serde_json::Value {
         .unwrap();
     let account = ctx
         .account_service
-        .create(
+        .create_classified(
             "Portfolio".into(),
             "Bank".into(),
             "EUR".into(),
             UpdateFrequency::ManualMonth,
             true,
+            Some("DE".into()),
+            Some("de_depot".into()),
         )
         .await
         .unwrap();
@@ -1576,6 +1659,10 @@ async fn written_form_of_every_record_kind() -> serde_json::Value {
         .record_currency_rate("USD".into(), "EUR".into(), "2026-01-05".into(), 920_000)
         .await
         .unwrap();
+    ctx.currency_service
+        .set_reference_currency("CHF")
+        .await
+        .unwrap();
 
     let rows: Vec<(String, String)> = sqlx::query_as(
         "SELECT record_kind, content FROM changes WHERE content IS NOT NULL ORDER BY sequence",
@@ -1610,7 +1697,7 @@ fn written_values_of_every_synced_enum() -> serde_json::Value {
             RecordKind::Account, RecordKind::Category, RecordKind::Asset,
             RecordKind::Transaction, RecordKind::FeeSchedule, RecordKind::FeeCatchUpPosition,
             RecordKind::AssetPrice, RecordKind::CurrencyPair, RecordKind::CurrencyRate,
-            RecordKind::HoldingNote,
+            RecordKind::HoldingNote, RecordKind::PortfolioSetting,
         ]),
         "Operation": written_values!(Operation, [
             Operation::Created, Operation::Updated, Operation::Removed,
