@@ -230,6 +230,7 @@ const makeDetailsResponse = (
   total_dividends_received: 0,
   total_management_fees: 0,
   total_net_cash_input: 0,
+  total_capital_brought_in: 0,
   outdated_price_count: 0,
   ...overrides,
 });

@@ -450,6 +450,7 @@ struct AccountDetailsResponse {
     total_dividends_received: i64,             // micros, account currency: sum of dividend cash across all the account's dividend transactions; 0 when none (DIV-073)
     total_management_fees: i64,                // micros, account currency: sum of per-holding management_fees across the account; 0 when none (FEE-053)
     total_net_cash_input: i64,                 // micros, account currency: deposits minus withdrawals since inception; negative when more was withdrawn (ACD-053)
+    total_capital_brought_in: i64,             // micros, account currency: net cash input plus every opening balance at its cost (ACD-058)
     outdated_price_count: i64,                 // active holdings whose price is outdated (MKT-205); 0 in a read with a date (MKT-206)
 }
 
@@ -719,6 +720,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-10-18 — TODO-084: `AccountDetailsResponse.total_capital_brought_in` (ACD-058); a holding's windowed return is `None` for a window it was not held through (ACD-057). No command changed.
 - 2026-10-18 — TODO-085: `HoldingDetail.price_outdated`, `AccountDetailsResponse.outdated_price_count`, `AccountSummary.outdated_price_count`, `PortfolioTotal.outdated_price_count` (MKT-205, MKT-206). No command changed.
 - 2026-10-11 — TODO-059: `HoldingDetail.current_price_source` may read `Agent` (MKT-103; the enum is the asset contract's). No field or command changed.
 - 2026-10-10 — DEBT-097: `RateAboveHundred` answers a schedule's rate of exactly 100 % too (FEE-032).

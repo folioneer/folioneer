@@ -54,7 +54,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "list_holdings",
             title: "List an account's holdings",
             only_reads: true,
-            description: "The holdings of one account, with their quantities, costs, latest prices and gains, and the account's totals; price_outdated says a holding's latest price is too old to trust for its kind (5 business days, 10 for a fund, never for a custom asset), and outdated_price_count how many are; as they stood on a past date when `as_of` is given. Amounts and quantities are whole numbers of millionths: 1500000 is 1.5.",
+            description: "The holdings of one account, with their quantities, costs, latest prices and gains, and the account's totals — total_capital_brought_in is what the owner brought in, cash and opening balances at cost; price_outdated says a holding's latest price is too old to trust for its kind (5 business days, 10 for a fund, never for a custom asset), and outdated_price_count how many are; as they stood on a past date when `as_of` is given. Amounts and quantities are whole numbers of millionths: 1500000 is 1.5.",
             input_schema: json!({
                 "type": "object",
                 "properties": {

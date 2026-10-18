@@ -116,6 +116,7 @@ const makeView = (overrides: Record<string, unknown> = {}) => ({
     totalGlobalValue: "1.100,00",
     totalManagementFees: "0,00",
     totalNetCashInput: "500,00",
+    totalCapitalBroughtIn: "50.500,00",
     outdatedPriceCount: 0,
     isEmpty: false,
     isAllClosed: false,
@@ -552,6 +553,14 @@ describe("AccountDetailsView — management fees (FEE-010/011/053)", () => {
     render(<AccountDetailsView />);
     const total = document.querySelector("#account-details-total-net-cash-input");
     expect(total).toHaveTextContent("500,00");
+  });
+
+  // ACD-058 — the capital brought in follows the net cash input, its definition on hover
+  it("shows the capital brought in, with its definition (ACD-058)", () => {
+    render(<AccountDetailsView />);
+    const figure = document.querySelector("#account-details-total-capital-brought-in");
+    expect(figure).toHaveTextContent("50.500,00");
+    expect(figure).toHaveAttribute("title", "account_details.total_capital_brought_in_hint");
   });
 
   // MKT-208 — the header counts the account's outdated prices, and says nothing at zero

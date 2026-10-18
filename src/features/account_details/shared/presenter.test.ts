@@ -13,6 +13,7 @@ import {
   formatStaleness,
   freeSharesErrorToI18n,
   type HoldingRowViewModel,
+  hasNoPeriodFigure,
   holdingNoteErrorToI18n,
   interestErrorToI18n,
   managementFeeErrorToI18n,
@@ -88,6 +89,7 @@ const makeResponse = (overrides: Partial<AccountDetailsResponse> = {}): AccountD
   total_dividends_received: 0,
   total_management_fees: 0,
   total_net_cash_input: 0,
+  total_capital_brought_in: 0,
   outdated_price_count: 0,
   ...overrides,
 });
@@ -934,6 +936,11 @@ describe("toAccountSummary — net cash input (ACD-053)", () => {
     expect(toAccountSummary(makeResponse({ outdated_price_count: 3 })).outdatedPriceCount).toBe(3);
   });
 
+  it("formats the capital brought in from the response (ACD-058)", () => {
+    const summary = toAccountSummary(makeResponse({ total_capital_brought_in: 620_000_000 }));
+    expect(summary.totalCapitalBroughtIn).toBe("620,00");
+  });
+
   it("formats totalNetCashInput from the response", () => {
     const summary = toAccountSummary(makeResponse({ total_net_cash_input: 120_000_000 }));
     expect(summary.totalNetCashInput).toBe("120,00");
@@ -1194,5 +1201,22 @@ describe("priceHistoryBackfillErrorToI18n (MKT-196)", () => {
     "DatabaseError",
   ] as const)("%s maps to its flat error key", (code) => {
     expect(priceHistoryBackfillErrorToI18n({ code })).toEqual({ key: `error.${code}` });
+  });
+});
+
+describe("hasNoPeriodFigure (ACD-057)", () => {
+  it("is true only for a windowed period without a figure", () => {
+    const row = toHoldingRow(makeHolding());
+    const empty = {
+      ...row,
+      periodPerformance: { ...row.periodPerformance, five_years: { formatted: "—", raw: null } },
+    };
+    expect(hasNoPeriodFigure(empty, "five_years")).toBe(true);
+    expect(hasNoPeriodFigure(empty, "since_start")).toBe(false);
+    const full = {
+      ...row,
+      periodPerformance: { ...row.periodPerformance, ytd: { formatted: "5,00%", raw: 5_000_000 } },
+    };
+    expect(hasNoPeriodFigure(full, "ytd")).toBe(false);
   });
 });
