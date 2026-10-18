@@ -69,12 +69,20 @@ impl RateHistoryBackfillUseCase {
         };
         let to = chrono::Local::now().date_naive().to_string();
         // FXR-112 — follow the pairs of active foreign holdings before fetching.
-        let pairs = holding_fx_pairs(self.account_service.as_ref(), self.asset_service.as_ref())
-            .await
-            .map_err(|error| {
-                tracing::error!(target: BACKEND, err = ?error, "rate backfill: holding lookup failed");
-                RateHistoryBackfillError::DatabaseError
-            })?;
+        let reference = self.currency_service.reference_currency().await.map_err(|error| {
+            tracing::error!(target: BACKEND, err = ?error, "rate backfill: reference currency not read");
+            RateHistoryBackfillError::DatabaseError
+        })?;
+        let pairs = holding_fx_pairs(
+            self.account_service.as_ref(),
+            self.asset_service.as_ref(),
+            &reference,
+        )
+        .await
+        .map_err(|error| {
+            tracing::error!(target: BACKEND, err = ?error, "rate backfill: holding lookup failed");
+            RateHistoryBackfillError::DatabaseError
+        })?;
 
         self.currency_service
             .backfill_rates_range(pairs, &from, &to)
