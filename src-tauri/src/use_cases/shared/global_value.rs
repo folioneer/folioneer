@@ -10,12 +10,6 @@ use std::collections::HashMap;
 
 use super::valuation::convert_at_rate;
 
-/// Fixed reference currency every cross-account figure is reported in
-/// (GPF-011). Moved here from `use_cases::global_performance::orchestrator` so
-/// the Price Movement report can use it without importing another use case
-/// (B18).
-pub const REFERENCE_CURRENCY: &str = "EUR";
-
 /// Per-asset facts a Global Value computation needs, independent of price
 /// (PMV-023).
 pub struct AssetValuationFacts {

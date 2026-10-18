@@ -958,7 +958,8 @@ impl AccountRepository for SqliteAccountRepository {
             | RecordKind::Asset
             | RecordKind::AssetPrice
             | RecordKind::CurrencyPair
-            | RecordKind::CurrencyRate => Ok(None),
+            | RecordKind::CurrencyRate
+            | RecordKind::PortfolioSetting => Ok(None),
         }
     }
 

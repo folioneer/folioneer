@@ -1,10 +1,12 @@
 use crate::context::currency::domain::cross_rate::cross_rate_micros;
+use crate::context::currency::domain::currency_pair::validate_iso4217;
 use crate::context::currency::domain::rate_provider::{
     EurSnapshot, RateHistoryProvider, RateProvider,
 };
 use crate::context::currency::domain::{
     CurrencyPair, CurrencyPairRepository, CurrencyPairSummary, CurrencyRate,
-    CurrencyRateRepository, CurrencyRateSource,
+    CurrencyRateRepository, CurrencyRateSource, PortfolioSetting, PortfolioSettingRepository,
+    DEFAULT_REFERENCE_CURRENCY, REFERENCE_CURRENCY_SETTING,
 };
 use crate::context::currency::error::CurrencyError;
 use crate::core::{Event, SideEffectEventBus, BACKEND};
@@ -35,6 +37,7 @@ pub struct CurrencyService {
     event_bus: Option<Arc<SideEffectEventBus>>,
     rate_provider: Option<Arc<dyn RateProvider>>,
     rate_history_provider: Option<Arc<dyn RateHistoryProvider>>,
+    setting_repo: Option<Box<dyn PortfolioSettingRepository>>,
 }
 
 impl CurrencyService {
@@ -49,7 +52,66 @@ impl CurrencyService {
             event_bus: None,
             rate_provider: None,
             rate_history_provider: None,
+            setting_repo: None,
         }
+    }
+
+    /// Attaches the portfolio settings (GPF-011, SYN-021); the application always does. Without
+    /// them — a test's service only — the reference currency is the default, and storing or
+    /// applying a setting fails.
+    pub fn with_setting_repo(mut self, setting_repo: Box<dyn PortfolioSettingRepository>) -> Self {
+        self.setting_repo = Some(setting_repo);
+        self
+    }
+
+    /// GPF-011 — the currency the portfolio is reported in: the one chosen, else EUR — also
+    /// when what another device synced is not an ISO 4217 code, so no total breaks on it.
+    pub async fn reference_currency(&self) -> StdResult<String, CurrencyError> {
+        let Some(repo) = &self.setting_repo else {
+            return Ok(DEFAULT_REFERENCE_CURRENCY.to_string());
+        };
+        let chosen = repo.get(REFERENCE_CURRENCY_SETTING).await.map_err(|e| {
+            tracing::error!(target: BACKEND, err = ?e, "reference_currency: repository failure");
+            CurrencyError::DatabaseError
+        })?;
+        Ok(match chosen {
+            Some(chosen) if validate_iso4217(&chosen).is_ok() => chosen,
+            Some(chosen) => {
+                tracing::warn!(target: BACKEND, value = %chosen, "reference_currency: stored value is not ISO 4217; the default applies");
+                DEFAULT_REFERENCE_CURRENCY.to_string()
+            }
+            None => DEFAULT_REFERENCE_CURRENCY.to_string(),
+        })
+    }
+
+    /// GPF-011 — chooses the currency the portfolio is reported in, an ISO 4217 code; the
+    /// choice is synced (SYN-021).
+    pub async fn set_reference_currency(&self, currency: &str) -> StdResult<(), CurrencyError> {
+        validate_iso4217(currency)?;
+        let Some(repo) = &self.setting_repo else {
+            tracing::error!(target: BACKEND, "set_reference_currency: no settings attached");
+            return Err(CurrencyError::DatabaseError);
+        };
+        repo.set(&PortfolioSetting {
+            name: REFERENCE_CURRENCY_SETTING.to_string(),
+            value: currency.to_string(),
+        })
+        .await
+        .map_err(|e| {
+            tracing::error!(target: BACKEND, err = ?e, "set_reference_currency: repository failure");
+            CurrencyError::DatabaseError
+        })
+    }
+
+    /// SYN-013 — every portfolio setting, for the first publish's snapshot.
+    pub async fn list_portfolio_settings(&self) -> StdResult<Vec<PortfolioSetting>, CurrencyError> {
+        let Some(repo) = &self.setting_repo else {
+            return Ok(Vec::new());
+        };
+        repo.list().await.map_err(|e| {
+            tracing::error!(target: BACKEND, err = ?e, "list_portfolio_settings: repository failure");
+            CurrencyError::DatabaseError
+        })
     }
 
     /// Attaches an event bus for side-effect notifications.
@@ -110,13 +172,20 @@ impl CurrencyService {
         conn: &mut SqliteConnection,
         rank: &Rank,
     ) -> StdResult<u64, CurrencyError> {
-        self.pair_repo
+        let failed = |e: anyhow::Error| {
+            tracing::error!(target: BACKEND, err = ?e, "stamp_sync_rank: repository failure");
+            CurrencyError::DatabaseError
+        };
+        let pairs_and_rates = self
+            .pair_repo
             .stamp_sync_rank(conn, rank)
             .await
-            .map_err(|e| {
-                tracing::error!(target: BACKEND, err = ?e, "stamp_sync_rank: repository failure");
-                CurrencyError::DatabaseError
-            })
+            .map_err(failed)?;
+        let settings = match &self.setting_repo {
+            Some(repo) => repo.stamp_sync_rank(conn, rank).await.map_err(failed)?,
+            None => 0,
+        };
+        Ok(pairs_and_rates + settings)
     }
 
     // -------------------------------------------------------------------------
@@ -131,10 +200,31 @@ impl CurrencyService {
         kind: RecordKind,
         identity: &str,
     ) -> StdResult<Option<SyncedRecord>, CurrencyError> {
-        self.pair_repo
-            .synced_record(conn, kind, identity)
+        let read = match (kind, &self.setting_repo) {
+            (RecordKind::PortfolioSetting, Some(repo)) => {
+                repo.synced_record(conn, kind, identity).await
+            }
+            (RecordKind::PortfolioSetting, None) => Ok(None),
+            _ => self.pair_repo.synced_record(conn, kind, identity).await,
+        };
+        read.map_err(|e| applied_write_error("synced_record", e))
+    }
+
+    /// Applies an incoming portfolio setting verbatim (CFR-017): the last change wins.
+    pub async fn apply_portfolio_setting(
+        &self,
+        conn: &mut SqliteConnection,
+        content: &str,
+        rank: Rank,
+    ) -> StdResult<(), CurrencyError> {
+        let setting: PortfolioSetting = synced_content(content)?;
+        let Some(repo) = &self.setting_repo else {
+            tracing::error!(target: BACKEND, "apply_portfolio_setting: no settings attached");
+            return Err(CurrencyError::DatabaseError);
+        };
+        repo.apply(conn, &setting, &rank)
             .await
-            .map_err(|e| applied_write_error("synced_record", e))
+            .map_err(|e| applied_write_error("apply_portfolio_setting", e))
     }
 
     /// Applies an incoming currency pair verbatim (CFR-017); its identity is its own
@@ -175,10 +265,12 @@ impl CurrencyService {
         kind: RecordKind,
         identity: &str,
     ) -> StdResult<(), CurrencyError> {
-        self.pair_repo
-            .remove_synced(conn, kind, identity)
-            .await
-            .map_err(|e| applied_write_error("apply_removal", e))
+        let removed = match (kind, &self.setting_repo) {
+            (RecordKind::PortfolioSetting, Some(repo)) => repo.remove_synced(conn, identity).await,
+            (RecordKind::PortfolioSetting, None) => Ok(()),
+            _ => self.pair_repo.remove_synced(conn, kind, identity).await,
+        };
+        removed.map_err(|e| applied_write_error("apply_removal", e))
     }
 
     /// SYN-083 — discards every currency pair and rate this installation holds, on the
@@ -638,6 +730,62 @@ mod tests {
         rate_repo: MockCurrencyRateRepository,
     ) -> CurrencyService {
         CurrencyService::new(Box::new(pair_repo), Box::new(rate_repo))
+    }
+
+    // GPF-011 / FXR-122–124 — a portfolio that never chose is reported in EUR; a chosen code is
+    // read back; a code that is not ISO 4217 is refused and nothing is stored; a synced value
+    // that is not one reads as the default.
+    #[tokio::test]
+    async fn gpf_011_the_reference_currency_defaults_to_eur_and_refuses_a_bad_code() {
+        let bare = make_service(
+            MockCurrencyPairRepository::new(),
+            MockCurrencyRateRepository::new(),
+        );
+        assert_eq!(
+            bare.reference_currency()
+                .await
+                .expect("the reference currency reads"),
+            "EUR"
+        );
+
+        let mut settings = crate::context::currency::domain::MockPortfolioSettingRepository::new();
+        settings
+            .expect_get()
+            .returning(|_| Ok(Some("CHF".to_string())));
+        settings.expect_set().times(0);
+        let chosen = make_service(
+            MockCurrencyPairRepository::new(),
+            MockCurrencyRateRepository::new(),
+        )
+        .with_setting_repo(Box::new(settings));
+        assert_eq!(
+            chosen
+                .reference_currency()
+                .await
+                .expect("the reference currency reads"),
+            "CHF"
+        );
+        assert!(matches!(
+            chosen.set_reference_currency("XYZ").await,
+            Err(CurrencyError::InvalidCurrency { .. })
+        ));
+
+        let mut synced = crate::context::currency::domain::MockPortfolioSettingRepository::new();
+        synced
+            .expect_get()
+            .returning(|_| Ok(Some("not-a-code".to_string())));
+        let malformed = make_service(
+            MockCurrencyPairRepository::new(),
+            MockCurrencyRateRepository::new(),
+        )
+        .with_setting_repo(Box::new(synced));
+        assert_eq!(
+            malformed
+                .reference_currency()
+                .await
+                .expect("the reference currency reads"),
+            "EUR"
+        );
     }
 
     fn make_rate(

@@ -298,6 +298,12 @@ Where a currency rate came from: `Manual` (entered by the user), or `Frankfurter
 
 ---
 
+### Reference currency
+
+The currency every figure spanning accounts is reported in — the portfolio total, the global performance, the price movement total (GPF-011): a setting of the portfolio, the same on every device, EUR until one is chosen (FXR-120 to FXR-125). Distinct from an account's own currency, the "account currency". In French: "devise de référence" (owner, 2026-10-17).
+
+> Status: confirmed
+
 ## Connection Context (introduced by KEY spec)
 
 ---

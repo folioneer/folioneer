@@ -6,6 +6,8 @@ pub mod currency_rate;
 pub mod ecb_client;
 /// Frankfurter JSON provider (primary, FXR-070).
 pub mod frankfurter_client;
+/// SQLite implementation of PortfolioSettingRepository (GPF-011, SYN-021).
+pub mod portfolio_setting;
 /// Ordered provider chain (ADR-009, FXR-070).
 pub mod rate_provider_chain;
 
@@ -13,4 +15,5 @@ pub use currency_pair::SqliteCurrencyPairRepository;
 pub use currency_rate::SqliteCurrencyRateRepository;
 pub use ecb_client::ReqwestEcbClient;
 pub use frankfurter_client::ReqwestFrankfurterClient;
+pub use portfolio_setting::SqlitePortfolioSettingRepository;
 pub use rate_provider_chain::ChainedRateProvider;

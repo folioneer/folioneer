@@ -189,6 +189,19 @@ impl PortfolioSnapshot for ServicePortfolioSnapshot {
             }
         }
 
+        let settings = self
+            .currency_service
+            .list_portfolio_settings()
+            .await
+            .map_err(|error| SyncError::database("snapshot: portfolio settings", error))?;
+        for setting in &settings {
+            records.push(record(
+                RecordKind::PortfolioSetting,
+                &[&setting.name],
+                setting,
+            )?);
+        }
+
         Ok(records)
     }
 }

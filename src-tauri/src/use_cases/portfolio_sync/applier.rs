@@ -84,11 +84,12 @@ impl ChangeApplier for ServiceChangeApplier {
                 .synced_record(conn, kind, identity)
                 .await
                 .map_err(|error| SyncError::database("apply: asset record not read", error)),
-            RecordKind::CurrencyPair | RecordKind::CurrencyRate => self
-                .currency_service
-                .synced_record(conn, kind, identity)
-                .await
-                .map_err(|error| SyncError::database("apply: currency record not read", error)),
+            RecordKind::CurrencyPair | RecordKind::CurrencyRate | RecordKind::PortfolioSetting => {
+                self.currency_service
+                    .synced_record(conn, kind, identity)
+                    .await
+                    .map_err(|error| SyncError::database("apply: currency record not read", error))
+            }
         }
     }
 
@@ -150,7 +151,9 @@ impl ChangeApplier for ServiceChangeApplier {
                     .map_err(|error| {
                         SyncError::database("apply: asset removal not written", error)
                     }),
-                RecordKind::CurrencyPair | RecordKind::CurrencyRate => self
+                RecordKind::CurrencyPair
+                | RecordKind::CurrencyRate
+                | RecordKind::PortfolioSetting => self
                     .currency_service
                     .apply_removal(conn, kind, identity)
                     .await
@@ -224,6 +227,15 @@ impl ChangeApplier for ServiceChangeApplier {
                     .await
                     .map_err(|error| {
                         SyncError::database("apply: currency pair not written", error)
+                    });
+            }
+            RecordKind::PortfolioSetting => {
+                return self
+                    .currency_service
+                    .apply_portfolio_setting(conn, content, rank)
+                    .await
+                    .map_err(|error| {
+                        SyncError::database("apply: portfolio setting not written", error)
                     });
             }
             RecordKind::CurrencyRate => {

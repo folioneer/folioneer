@@ -9,7 +9,7 @@ use crate::context::asset::AssetPrice;
 use crate::core::event_bus::{PriceMovementReport, PriceMovementRow};
 use std::collections::{HashMap, HashSet};
 
-use super::global_value::{account_global_value, ValuationSnapshot, REFERENCE_CURRENCY};
+use super::global_value::{account_global_value, ValuationSnapshot};
 use super::valuation::convert_at_rate;
 
 /// The "before" reading plus everything `build_report` needs to compute the
@@ -36,6 +36,8 @@ pub struct PriceMovementBaseline {
     /// converted — to the holding's account currency, or the account's own
     /// currency to the reference currency (PMV-032 second condition, PMV-042).
     pub rate_missing_accounts: HashSet<String>,
+    /// The currency both totals are reported in (GPF-011), read with the baseline.
+    pub reference_currency: String,
 }
 
 /// PMV-011/022/030..052/060 — builds the Price Movement report from the
@@ -53,6 +55,7 @@ pub fn build_report(
         before_by_account,
         observed_from,
         rate_missing_accounts,
+        reference_currency,
     } = baseline;
 
     // PMV-022 — the "after" prices are the ones THIS refresh left in place, not a
@@ -106,7 +109,7 @@ pub fn build_report(
         // usable rate contributes 0 to each (FXR-034/GPF) while keeping its own row.
         let to_reference = after_snapshot
             .rates
-            .get(&(account.currency.clone(), REFERENCE_CURRENCY.to_string()))
+            .get(&(account.currency.clone(), reference_currency.clone()))
             .copied();
         if let Some(rate) = to_reference {
             total_before = total_before.saturating_add(convert_at_rate(before, rate));
@@ -144,7 +147,7 @@ pub fn build_report(
         rows,
         total_before,
         total_after,
-        total_currency: REFERENCE_CURRENCY.to_string(),
+        total_currency: reference_currency,
         observed_from,
         observed_to,
         incomplete,
@@ -213,6 +216,44 @@ mod tests {
         }
     }
 
+    // GPF-011 / PMV-040 — the movement totals are in the reference currency chosen: a CHF
+    // account counts in full, at the identity rate, in a CHF total.
+    #[test]
+    fn gpf_011_the_movement_total_is_in_the_reference_currency_chosen() {
+        let mut snapshot = empty_snapshot();
+        snapshot.assets.insert(
+            "asset-1".to_string(),
+            AssetValuationFacts {
+                currency: "CHF".to_string(),
+                class: AssetClass::Stocks,
+            },
+        );
+        snapshot
+            .rates
+            .insert(("CHF".to_string(), "CHF".to_string()), 1_000_000);
+        let baseline = PriceMovementBaseline {
+            accounts: vec![account("acc-1", "Swiss", "CHF")],
+            holdings_by_account: HashMap::from([(
+                "acc-1".to_string(),
+                vec![holding("asset-1", 1_000_000)],
+            )]),
+            snapshot,
+            before_by_account: HashMap::from([("acc-1".to_string(), 0)]),
+            observed_from: None,
+            rate_missing_accounts: HashSet::new(),
+            reference_currency: "CHF".to_string(),
+        };
+        let fetched = HashMap::from([(
+            "asset-1".to_string(),
+            price("asset-1", "2026-09-11", 100_000_000),
+        )]);
+
+        let report = build_report(baseline, &fetched, &HashSet::new());
+
+        assert_eq!(report.total_currency, "CHF");
+        assert_eq!(report.total_after, 100_000_000);
+    }
+
     // ── PMV-022 — the latest-wins overlay guard ─────────────────────────────
 
     // PMV-022 — with no baseline price at all, the fetched price is applied.
@@ -240,6 +281,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 0)]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
         let fetched = HashMap::from([(
             "asset-1".to_string(),
@@ -286,6 +328,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 100_000_000)]),
             observed_from: Some("2026-09-10".to_string()),
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
         // A manual entry recorded a stale Friday close, dated BEFORE the stored latest (MKT-118).
         let fetched = HashMap::from([(
@@ -334,6 +377,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 100_000_000)]),
             observed_from: Some("2026-09-10".to_string()),
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
         let fetched = HashMap::from([(
             "asset-1".to_string(),
@@ -376,6 +420,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 100_000_000)]),
             observed_from: Some("2026-09-10".to_string()),
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
         let fetched = HashMap::from([(
             "asset-1".to_string(),
@@ -430,6 +475,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 90_000_000)]),
             observed_from: Some("2026-09-01".to_string()),
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
         let fetched = HashMap::from([(
             "asset-usd".to_string(),
@@ -472,6 +518,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 0)]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
         let unpriced = HashSet::from(["asset-x".to_string()]);
 
@@ -504,6 +551,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 0)]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
         let unpriced = HashSet::from(["asset-x".to_string()]);
 
@@ -528,6 +576,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 500_000_000)]),
             observed_from: None,
             rate_missing_accounts: HashSet::from(["acc-1".to_string()]),
+            reference_currency: "EUR".to_string(),
         };
 
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());
@@ -581,6 +630,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 100_000_000)]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
         // Neither the cash asset nor the locked asset ever enters the fetch scope,
         // so neither ever appears in the skip set (MKT-116 / MKT-151 / ADR-014).
@@ -607,6 +657,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 0), ("acc-2".to_string(), 0)]),
             observed_from: None,
             rate_missing_accounts: HashSet::from(["acc-2".to_string()]),
+            reference_currency: "EUR".to_string(),
         };
 
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());
@@ -624,6 +675,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 0)]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
 
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());
@@ -653,6 +705,7 @@ mod tests {
             ]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
 
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());
@@ -697,6 +750,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 100_000_000)]),
             observed_from: Some("2026-09-10".to_string()),
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
         // Nothing fetched for asset-1 this refresh — the after-reading stays at the baseline price.
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());
@@ -749,6 +803,7 @@ mod tests {
             ]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
 
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());
@@ -777,6 +832,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), -100)]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
 
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());
@@ -818,6 +874,7 @@ mod tests {
             ]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
 
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());
@@ -854,6 +911,7 @@ mod tests {
             ]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
 
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());
@@ -886,6 +944,7 @@ mod tests {
             ]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
 
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());
@@ -948,6 +1007,7 @@ mod tests {
             ]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
 
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());
@@ -975,6 +1035,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 0)]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
 
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());
@@ -1022,6 +1083,7 @@ mod tests {
             ]),
             observed_from: None,
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
 
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());
@@ -1071,6 +1133,7 @@ mod tests {
             before_by_account: HashMap::from([("acc-1".to_string(), 0)]),
             observed_from: Some("2026-09-05".to_string()),
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
         let fetched = HashMap::from([(
             "asset-1".to_string(),
@@ -1105,6 +1168,7 @@ mod tests {
             observed_from: Some("2026-09-10".to_string()),
             before_by_account: HashMap::from([("acc-1".to_string(), 0)]),
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
         // asset-1 has no baseline price, so the overlay guard applies this fetched
         // entry — but its date (09-08) is not later than the portfolio's observed_from.
@@ -1138,6 +1202,7 @@ mod tests {
             observed_from: None,
             before_by_account: HashMap::from([("acc-1".to_string(), 0)]),
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
         let fetched = HashMap::from([(
             "asset-1".to_string(),
@@ -1161,6 +1226,7 @@ mod tests {
             observed_from: None,
             before_by_account: HashMap::from([("acc-1".to_string(), 0)]),
             rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
         };
 
         let report = build_report(baseline, &HashMap::new(), &HashSet::new());

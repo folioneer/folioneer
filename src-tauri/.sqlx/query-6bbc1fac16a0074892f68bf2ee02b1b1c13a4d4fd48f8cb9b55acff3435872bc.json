@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO portfolio_settings (name, value) VALUES (?, ?)\n               ON CONFLICT(name) DO UPDATE SET value = excluded.value",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "6bbc1fac16a0074892f68bf2ee02b1b1c13a4d4fd48f8cb9b55acff3435872bc"
+}

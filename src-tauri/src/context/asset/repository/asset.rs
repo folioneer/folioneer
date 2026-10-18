@@ -575,7 +575,8 @@ impl AssetRepository for SqliteAssetRepository {
             | RecordKind::FeeCatchUpPosition
             | RecordKind::CurrencyPair
             | RecordKind::CurrencyRate
-            | RecordKind::HoldingNote => Ok(None),
+            | RecordKind::HoldingNote
+            | RecordKind::PortfolioSetting => Ok(None),
         }
     }
 
@@ -753,7 +754,8 @@ impl AssetRepository for SqliteAssetRepository {
             | RecordKind::FeeCatchUpPosition
             | RecordKind::CurrencyPair
             | RecordKind::CurrencyRate
-            | RecordKind::HoldingNote => {}
+            | RecordKind::HoldingNote
+            | RecordKind::PortfolioSetting => {}
         }
         Ok(())
     }

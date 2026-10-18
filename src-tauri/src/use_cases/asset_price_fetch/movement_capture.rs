@@ -14,7 +14,7 @@ use crate::context::asset::{AssetClass, AssetPrice, AssetServiceContract};
 use crate::context::currency::CurrencyService;
 use crate::core::logger::BACKEND;
 use crate::use_cases::shared::global_value::{
-    account_global_value, AssetValuationFacts, ValuationSnapshot, REFERENCE_CURRENCY,
+    account_global_value, AssetValuationFacts, ValuationSnapshot,
 };
 use crate::use_cases::shared::price_movement::PriceMovementBaseline;
 
@@ -56,6 +56,13 @@ impl PriceMovementCapture {
         today: NaiveDate,
     ) -> Option<PriceMovementBaseline> {
         let today_str = today.format("%Y-%m-%d").to_string();
+        let reference_currency = match self.currency_service.reference_currency().await {
+            Ok(reference_currency) => reference_currency,
+            Err(error) => {
+                tracing::warn!(target: BACKEND, err = ?error, "price_movement: reference currency not read; no report (PMV-014)");
+                return None;
+            }
+        };
         let accounts = match self.account_service.get_all().await {
             Ok(accounts) => accounts,
             Err(error) => {
@@ -86,11 +93,11 @@ impl PriceMovementCapture {
 
             // PMV-040/042 — the account -> reference-currency leg, resolved here so
             // a rate recorded during the fetch loop (FXR-075, FXR-110) cannot move it.
-            let reference_key = (account.currency.clone(), REFERENCE_CURRENCY.to_string());
+            let reference_key = (account.currency.clone(), reference_currency.clone());
             if let std::collections::hash_map::Entry::Vacant(e) = rates.entry(reference_key) {
                 match self
                     .currency_service
-                    .resolve_rate_micros(&account.currency, REFERENCE_CURRENCY, &today_str)
+                    .resolve_rate_micros(&account.currency, &reference_currency, &today_str)
                     .await
                 {
                     Ok(Some(rate)) => {
@@ -191,6 +198,7 @@ impl PriceMovementCapture {
             before_by_account,
             observed_from,
             rate_missing_accounts,
+            reference_currency,
         })
     }
 }
