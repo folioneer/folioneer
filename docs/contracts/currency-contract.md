@@ -107,13 +107,14 @@ struct CurrencyPairSummary {
 
 - **Valuation effect is not a command.** Lifting the currency-mismatch guards (FXR-030–042) changes how `use_cases/account_details/` and `use_cases/account_performance/` value foreign holdings by consuming an injected currency-rate service (B18/B24). It rides the **existing** `account` contract's `get_account_details` / `get_account_summaries` / `get_account_performance` — **no new command and no change to the `account` contract's command list**. The planner wires the use cases to a `currency` service; this introduces no FE-visible command here.
 - **Cross-contract event wiring (FXR-036/037).** `CurrencyRateUpdated` is also in the `account` contract's _Subscribed_ events table: the account details view and the accounts list read again on it.
-- **Auto-follow (FXR-013) has no command of its own.** A foreign holding's pair is ensured inside `refresh_currency_rates` and `backfill_currency_rate_history` (FXR-071). Apart from those, the only command that creates a pair is `declare_currency_pair` (FXR-054).
+- **Auto-follow (FXR-013, FXR-015) has no command of its own.** A foreign holding's pair, and each account's pair to the reference currency, is ensured inside `refresh_currency_rates` and `backfill_currency_rate_history` (FXR-071). Apart from those, the only command that creates a pair is `declare_currency_pair` (FXR-054).
 - **Rate refresh (FXR-070–076) is its own command.** The frontend calls `refresh_currency_rates` once at launch (FXR-075) and `backfill_currency_rate_history` from "Update rates" (FXR-110); the price fetch tasks fetch no rate, and no in-flight guard covers rates (FXR-076).
 
 ---
 
 ## Changelog
 
+- 2026-10-18 — TODO-032 (FXR-015): the rate commands also ensure each account's pair to the reference currency. No signature changed.
 - 2026-10-10 — DEBT-096: read against the code. `update_currency_rate` no longer lists `InvalidCurrency` and `IdentityPair`: the rate is looked up first, so such a pair answers `RateNotFound`. The note on `CurrencyRateUpdated` says who reads again on it.
 - 2026-09-25 — TODO-042 (FXR-071, FXR-074–077, FXR-110–114): `refresh_currency_rates` added (launch rate refresh, every build); `backfill_currency_rate_history` backs "Update rates", ensures holding pairs first and publishes one `CurrencyRateUpdated` when it wrote a rate; the price fetch tasks no longer fetch rates
 - 2026-09-19 — SYN-064 amended: applied pairs, rates and removals raise no event of their own (`CurrencyPairUpdated` / `CurrencyRateUpdated` are published by local writes only); the Currency Rates view subscribes to `SyncCompleted`

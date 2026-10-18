@@ -33,12 +33,20 @@ impl RateRefreshUseCase {
     /// every persisted pair (FXR-071/075). A provider failure is silent (FXR-070/073):
     /// only a lookup or a write the database refuses is an error.
     pub async fn refresh(&self) -> Result<(), RateRefreshError> {
-        let pairs = holding_fx_pairs(self.account_service.as_ref(), self.asset_service.as_ref())
-            .await
-            .map_err(|error| {
-                tracing::error!(target: BACKEND, err = ?error, "rate refresh: holding lookup failed");
-                RateRefreshError::DatabaseError
-            })?;
+        let reference = self.currency_service.reference_currency().await.map_err(|error| {
+            tracing::error!(target: BACKEND, err = ?error, "rate refresh: reference currency not read");
+            RateRefreshError::DatabaseError
+        })?;
+        let pairs = holding_fx_pairs(
+            self.account_service.as_ref(),
+            self.asset_service.as_ref(),
+            &reference,
+        )
+        .await
+        .map_err(|error| {
+            tracing::error!(target: BACKEND, err = ?error, "rate refresh: holding lookup failed");
+            RateRefreshError::DatabaseError
+        })?;
         self.currency_service
             .refresh_all_rates(pairs)
             .await
@@ -171,6 +179,58 @@ mod tests {
 
         let pairs = currency_service.list_currency_pairs().await.expect("pairs");
         assert_eq!(pairs.len(), 1, "the USD holding's pair must be followed");
+        assert_eq!(
+            (
+                pairs[0].from_currency.as_str(),
+                pairs[0].to_currency.as_str()
+            ),
+            ("USD", "EUR")
+        );
+        assert_eq!(pairs[0].latest_rate_date.as_deref(), Some("2026-09-25"));
+    }
+
+    // FXR-015 — a USD account with no foreign holding still has its pair to the
+    // reference currency followed and its rate recorded, so the total is not left partial.
+    #[tokio::test]
+    async fn fxr_015_an_account_in_another_currency_reaches_the_reference_currency() {
+        let pool = make_pool().await;
+        let mut provider = MockRateProvider::new();
+        provider.expect_fetch_eur_snapshot().times(1).returning(|| {
+            Ok(EurSnapshot {
+                date: "2026-09-25".to_string(),
+                rates: HashMap::from([("USD".to_string(), 1_164_600i64)]),
+                source: CurrencyRateSource::Frankfurter,
+            })
+        });
+        let mut account_service = MockAccountServiceContract::new();
+        account_service.expect_get_all().returning(|| {
+            Ok(vec![Account::restore(
+                "acc-usd".to_string(),
+                "Brokerage".to_string(),
+                String::new(),
+                "USD".to_string(),
+                UpdateFrequency::Automatic,
+                false,
+            )])
+        });
+        account_service
+            .expect_get_holdings_for_account()
+            .returning(|_| Ok(vec![]));
+        let currency_service = currency_service(&pool, provider);
+        let use_case = RateRefreshUseCase::new(
+            Arc::new(account_service),
+            Arc::new(MockAssetServiceContract::new()),
+            Arc::clone(&currency_service),
+        );
+
+        use_case.refresh().await.expect("refresh");
+
+        let pairs = currency_service.list_currency_pairs().await.expect("pairs");
+        assert_eq!(
+            pairs.len(),
+            1,
+            "the account's pair to the reference must be followed"
+        );
         assert_eq!(
             (
                 pairs[0].from_currency.as_str(),

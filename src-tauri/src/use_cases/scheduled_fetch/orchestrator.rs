@@ -323,6 +323,17 @@ impl ScheduledFetchOrchestrator {
                 return Err(());
             }
         };
+        let reference = match self.currency_service.reference_currency().await {
+            Ok(reference) => reference,
+            Err(error) => {
+                tracing::error!(target: crate::core::logger::BACKEND, err = ?error, "scheduled run: reference currency not read");
+                return Err(());
+            }
+        };
+        let account_currencies: Vec<String> = accounts
+            .iter()
+            .map(|account| account.currency.clone())
+            .collect();
         let mut asset_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut fx_inputs: Vec<(String, String)> = Vec::new();
         for account in accounts {
@@ -354,8 +365,11 @@ impl ScheduledFetchOrchestrator {
                 return Err(());
             }
         };
-        let fx_pairs =
-            crate::use_cases::shared::scope::build_fx_pairs(fx_inputs, &currency_by_asset);
+        let fx_pairs = crate::use_cases::shared::scope::with_reference_pairs(
+            crate::use_cases::shared::scope::build_fx_pairs(fx_inputs, &currency_by_asset),
+            account_currencies.iter().map(String::as_str),
+            &reference,
+        );
         Ok((scope, fx_pairs))
     }
 
@@ -562,9 +576,16 @@ mod tests {
         NaiveDate::from_ymd_opt(2026, 6, 10).expect("valid date")
     }
 
+    /// FXR-015 — an account in another currency than the reference has its pair declared,
+    /// which these runs accept; no rate is fetched without a history provider.
     fn make_currency_service() -> Arc<CurrencyService> {
+        let mut pair_repo = MockCurrencyPairRepository::new();
+        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo
+            .expect_list_pairs_with_latest_rate()
+            .returning(|| Ok(vec![]));
         Arc::new(CurrencyService::new(
-            Box::new(MockCurrencyPairRepository::new()),
+            Box::new(pair_repo),
             Box::new(MockCurrencyRateRepository::new()),
         ))
     }
@@ -1336,6 +1357,7 @@ mod tests {
                 }]))
             });
         let mut pair_repo = MockCurrencyPairRepository::new();
+        pair_repo.expect_upsert_pair().returning(Ok);
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .returning(|| Ok(vec![]));
@@ -1441,6 +1463,7 @@ mod tests {
             .expect_fetch_daily_closes()
             .returning(move |symbol, _, _| answer(symbol));
         let mut pair_repo = MockCurrencyPairRepository::new();
+        pair_repo.expect_upsert_pair().returning(Ok);
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .returning(|| Ok(vec![]));

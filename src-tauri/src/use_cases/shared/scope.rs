@@ -90,6 +90,31 @@ pub fn build_fx_pairs(
     pairs
 }
 
+/// FXR-015 — the pair from each account's currency to the reference currency, for every
+/// account whose currency differs from it, once each; pairs already in `pairs` are kept as
+/// they are and not repeated.
+pub fn with_reference_pairs<'a>(
+    mut pairs: Vec<CurrencyPair>,
+    account_currencies: impl IntoIterator<Item = &'a str>,
+    reference_currency: &str,
+) -> Vec<CurrencyPair> {
+    let mut seen: HashSet<(String, String)> = pairs
+        .iter()
+        .map(|pair| (pair.from_currency.clone(), pair.to_currency.clone()))
+        .collect();
+    for currency in account_currencies {
+        if currency != reference_currency
+            && seen.insert((currency.to_string(), reference_currency.to_string()))
+        {
+            pairs.push(CurrencyPair::from_storage(
+                currency.to_string(),
+                reference_currency.to_string(),
+            ));
+        }
+    }
+    pairs
+}
+
 /// A lookup that failed while deriving the pairs of active foreign holdings.
 #[derive(Debug)]
 pub enum HoldingPairsError {
@@ -104,6 +129,7 @@ pub enum HoldingPairsError {
 pub async fn holding_fx_pairs(
     account_service: &dyn AccountServiceContract,
     asset_service: &dyn AssetServiceContract,
+    reference_currency: &str,
 ) -> Result<Vec<CurrencyPair>, HoldingPairsError> {
     let accounts = account_service
         .get_all()
@@ -111,6 +137,10 @@ pub async fn holding_fx_pairs(
         .map_err(HoldingPairsError::Account)?;
     let mut asset_ids: HashSet<String> = HashSet::new();
     let mut inputs: Vec<(String, String)> = Vec::new();
+    let account_currencies: Vec<String> = accounts
+        .iter()
+        .map(|account| account.currency.clone())
+        .collect();
     for account in accounts {
         let holdings = account_service
             .get_holdings_for_account(&account.id)
@@ -124,7 +154,11 @@ pub async fn holding_fx_pairs(
     let (_, currency_by_asset) = build_scope(asset_service, asset_ids)
         .await
         .map_err(HoldingPairsError::Asset)?;
-    Ok(build_fx_pairs(inputs, &currency_by_asset))
+    Ok(with_reference_pairs(
+        build_fx_pairs(inputs, &currency_by_asset),
+        account_currencies.iter().map(String::as_str),
+        reference_currency,
+    ))
 }
 
 #[cfg(test)]
@@ -255,6 +289,25 @@ mod tests {
             .iter()
             .map(|pair| (pair.from_currency.clone(), pair.to_currency.clone()))
             .collect()
+    }
+
+    // FXR-015 — an account in another currency than the reference has its pair added once;
+    // an account in the reference currency adds none; a pair already present is not repeated.
+    #[test]
+    fn fxr_015_each_account_currency_reaches_the_reference_currency() {
+        let held = vec![CurrencyPair::from_storage("USD".into(), "CHF".into())];
+        let pairs = with_reference_pairs(held, ["USD", "CHF", "GBP", "GBP"], "CHF");
+        let keys: Vec<(String, String)> = pairs
+            .into_iter()
+            .map(|pair| (pair.from_currency, pair.to_currency))
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                ("USD".to_string(), "CHF".to_string()),
+                ("GBP".to_string(), "CHF".to_string()),
+            ]
+        );
     }
 
     // FXR-071 — a foreign holding yields one (asset_currency → account_currency) pair.
