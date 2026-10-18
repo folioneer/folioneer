@@ -966,6 +966,52 @@ async fn syn_021_the_reference_currency_chosen_on_one_device_is_the_others() {
     );
 }
 
+// SYN-083 / DEBT-152 — a device joining with a reference currency of its own takes the shared
+// portfolio's: its own is replaced, whether the shared portfolio chose one or not.
+#[tokio::test]
+async fn syn_083_a_joining_devices_reference_currency_is_replaced_by_the_shared_one() {
+    for shared_choice in [None, Some("GBP")] {
+        let dir = tempfile::tempdir().unwrap();
+        let desktop = build_ctx(dir.path()).await;
+        if let Some(choice) = shared_choice {
+            desktop
+                .currency_service
+                .set_reference_currency(choice)
+                .await
+                .unwrap();
+        }
+        desktop
+            .orchestrator
+            .enable_sync(
+                dir.path().to_string_lossy().to_string(),
+                PASSPHRASE.into(),
+                "Desktop".into(),
+            )
+            .await
+            .expect("Desktop must enable as the first device");
+        let laptop = build_ctx(dir.path()).await;
+        laptop
+            .currency_service
+            .set_reference_currency("CHF")
+            .await
+            .unwrap();
+        laptop
+            .orchestrator
+            .enable_sync(
+                dir.path().to_string_lossy().to_string(),
+                PASSPHRASE.into(),
+                "Laptop".into(),
+            )
+            .await
+            .expect("a reference currency is not user data that blocks the join (SYN-014)");
+        assert_eq!(
+            laptop.currency_service.reference_currency().await.unwrap(),
+            shared_choice.unwrap_or("EUR"),
+            "the shared portfolio's choice replaces the joining device's"
+        );
+    }
+}
+
 // SYN-013 / SYN-021 — a reference currency chosen before sync is turned on travels with the
 // first publish: a device joining takes it.
 #[tokio::test]

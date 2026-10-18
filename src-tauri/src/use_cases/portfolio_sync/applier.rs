@@ -261,6 +261,10 @@ impl ChangeApplier for ServiceChangeApplier {
             .await
             .map_err(|error| {
                 SyncError::database("apply: currency pairs and rates not discarded", error)
-            })
+            })?;
+        self.currency_service
+            .discard_portfolio_settings(conn)
+            .await
+            .map_err(|error| SyncError::database("apply: portfolio settings not discarded", error))
     }
 }

@@ -268,7 +268,7 @@ A holding's combined return from price appreciation and dividend income, express
 
 ### CurrencyPair
 
-A directed currency pair the system follows, e.g. USD → EUR. Used to value a holding whose currency differs from its account's. Created when first needed and kept thereafter.
+A directed currency pair the system follows, e.g. USD → EUR: to value a holding whose currency differs from its account's, and to bring an account into the reference currency (FXR-013, FXR-015). Created when first needed and kept thereafter (owner, 2026-10-18).
 
 > Status: confirmed
 
@@ -301,6 +301,12 @@ Where a currency rate came from: `Manual` (entered by the user), or `Frankfurter
 ### Account currency
 
 The currency an account is kept in, chosen when the account is created: its holdings, cash and figures are valued in it. Distinct from the portfolio's "reference currency". In French: "devise du compte" (owner, 2026-10-17).
+
+> Status: confirmed
+
+### Portfolio total
+
+The total row of the accounts list: every account's global value and unrealized P&L converted to the reference currency and summed (ACC-027 to ACC-030), marked incomplete — shown as "partial" — when an account cannot be converted (ACC-028). In French: "total du portefeuille" (owner, 2026-10-18).
 
 > Status: confirmed
 

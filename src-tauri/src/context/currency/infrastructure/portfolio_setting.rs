@@ -190,6 +190,14 @@ impl PortfolioSettingRepository for SqlitePortfolioSettingRepository {
         Ok(())
     }
 
+    async fn discard(&self, conn: &mut SqliteConnection) -> Result<()> {
+        sqlx::query!("DELETE FROM portfolio_settings")
+            .execute(conn)
+            .await
+            .context("Failed to discard portfolio settings")?;
+        Ok(())
+    }
+
     async fn list(&self) -> Result<Vec<PortfolioSetting>> {
         let rows = sqlx::query!("SELECT name, value FROM portfolio_settings ORDER BY name")
             .fetch_all(&self.pool)

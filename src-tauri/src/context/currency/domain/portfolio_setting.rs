@@ -75,4 +75,8 @@ pub trait PortfolioSettingRepository: Send + Sync {
 
     /// Every stored setting, for the first publish's snapshot (SYN-013).
     async fn list(&self) -> Result<Vec<PortfolioSetting>>;
+
+    /// SYN-083 — discards every setting, on the rebuild's connection, before the shared
+    /// portfolio's replace them.
+    async fn discard(&self, conn: &mut SqliteConnection) -> Result<()>;
 }

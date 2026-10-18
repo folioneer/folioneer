@@ -117,6 +117,20 @@ impl CurrencyService {
         })
     }
 
+    /// SYN-083 — discards this installation's portfolio settings, on the rebuild's connection,
+    /// so the shared portfolio's replace them.
+    pub async fn discard_portfolio_settings(
+        &self,
+        conn: &mut SqliteConnection,
+    ) -> StdResult<(), CurrencyError> {
+        let Some(repo) = &self.setting_repo else {
+            return Ok(());
+        };
+        repo.discard(conn)
+            .await
+            .map_err(|e| applied_write_error("discard_portfolio_settings", e))
+    }
+
     /// SYN-013 — every portfolio setting, for the first publish's snapshot.
     pub async fn list_portfolio_settings(&self) -> StdResult<Vec<PortfolioSetting>, CurrencyError> {
         let Some(repo) = &self.setting_repo else {
