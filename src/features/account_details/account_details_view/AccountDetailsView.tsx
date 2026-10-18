@@ -22,6 +22,7 @@ import { PERF_PERIODS, type StoredPerfPeriod } from "@/lib/perfPeriodStorage";
 import { selectHasExternalProvider, useAppStore } from "@/lib/store";
 import { Button } from "@/ui/components/button/Button";
 import { IconButton } from "@/ui/components/button/IconButton";
+import { WarningChip } from "@/ui/components/chip/WarningChip";
 import { FAB } from "@/ui/components/fab/FAB";
 import { DateField } from "@/ui/components/field/DateField";
 import { BuyTransactionModal } from "../buy_transaction/BuyTransactionModal";
@@ -155,6 +156,13 @@ export function AccountDetailsView() {
                       {view.summary.totalManagementFees}
                     </span>
                   </p>
+                )}
+                {/* MKT-208 — the account counts its outdated prices; nothing at zero */}
+                {view.summary.outdatedPriceCount > 0 && (
+                  <WarningChip
+                    id="account-details-outdated-price-count"
+                    label={t("mkt.outdated.count", { count: view.summary.outdatedPriceCount })}
+                  />
                 )}
               </div>
               {/* TRX-055 — open balance always accessible (migration tool for any account state) */}

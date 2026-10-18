@@ -285,6 +285,8 @@ export interface HoldingRowViewModel {
   isCash: boolean;
   /** Staleness label for the current price (MKT-140); null when no price is recorded. */
   staleness: StalenessLabel | null;
+  /** MKT-207 — the current price is outdated for the asset (MKT-205). */
+  priceOutdated: boolean;
   /** i18n key for the price source badge (MKT-142), or null when no price is recorded. */
   sourceLabel: string | null;
   /** FX-rate staleness label (FXR-090); null/absent unless a converted value is shown. */
@@ -369,6 +371,8 @@ export interface AccountSummaryViewModel {
   totalManagementFeesRaw: number;
   /** Formatted net cash input since inception: deposits − withdrawals, account currency (ACD-053). */
   totalNetCashInput: string;
+  /** MKT-208 — how many active holdings have an outdated price (MKT-206). */
+  outdatedPriceCount: number;
 }
 
 /**
@@ -534,6 +538,7 @@ export function toHoldingRow(detail: HoldingDetail): HoldingRowViewModel {
       totalReturnPctRaw: null,
       isCash: true,
       staleness: null,
+      priceOutdated: false,
       sourceLabel: null,
       fxStaleness: null,
       // HNO-011 — the cash line never carries a note (NoteOnCashAsset).
@@ -578,6 +583,7 @@ export function toHoldingRow(detail: HoldingDetail): HoldingRowViewModel {
     totalReturnPctRaw: detail.total_return_pct,
     isCash: false,
     staleness: formatStaleness(detail.current_price_date, new Date()),
+    priceOutdated: detail.price_outdated,
     sourceLabel: formatSource(detail.current_price_source),
     // FXR-090 — staleness of the FX rate used to value this holding; null for
     // same-currency / no-rate holdings (fx_rate_date is None).
@@ -632,5 +638,6 @@ export function toAccountSummary(response: AccountDetailsResponse): AccountSumma
     totalManagementFees: microToFormatted(response.total_management_fees, 2),
     totalManagementFeesRaw: response.total_management_fees,
     totalNetCashInput: microToFormatted(response.total_net_cash_input, 2),
+    outdatedPriceCount: response.outdated_price_count,
   };
 }

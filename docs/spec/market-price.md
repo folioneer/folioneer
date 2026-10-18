@@ -71,6 +71,14 @@ The `AccountDetailsResponse` DTO gains these fields.
 | `total_unrealized_pnl` | Sum of `unrealized_pnl` (i64 micros) across all active holdings where a value is computable (same-currency with a recorded price). `None` when no holding has a computable value. |
 | `outdated_price_count` | How many active holdings have an outdated price (MKT-205); `0` in a read with a date, today included (MKT-206).                                                                   |
 
+### AccountSummary (extended)
+
+The `AccountSummary` row of the accounts list (ACC-021) gains one field.
+
+| Field                  | Business meaning                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| `outdated_price_count` | How many of the account's active holdings have an outdated price (MKT-205, MKT-206); read by an agent. |
+
 ### Asset (extended)
 
 The `Asset` entity (owned by the AST spec) gains one field for this feature.
@@ -314,7 +322,7 @@ The launch auto-fetch (MKT-121) shows no dispatch snackbar; its outcome is silen
 
 #### Display (140–149)
 
-**MKT-140 — Staleness indicator (frontend)**: The "Current Price" column's secondary label shows "Updated today" when the most recent `AssetPrice.date` for the asset equals today's local date, "Updated Nd ago" otherwise (N integer day delta). When no price exists, the secondary label is omitted and MKT-032's diagnostic state occupies the primary cell instead.
+**MKT-140 — Staleness indicator (frontend)**: The "Current Price" column's secondary label shows "Updated today" when the most recent `AssetPrice.date` for the asset equals today's local date, "Updated Nd ago" otherwise (N integer calendar-day delta). When no price exists, the secondary label is omitted and MKT-032's diagnostic state occupies the primary cell instead.
 
 **MKT-141 — Source badge in price history (frontend)**: Each row in the price-history modal (MKT-071) displays a badge with the row's `source` value.
 
@@ -413,6 +421,10 @@ The header tells how recent the portfolio's prices are, and each holding whether
 **MKT-205 — Outdated price (backend)**: A held asset's price is outdated when more business days (Monday to Friday, no holiday calendar) have passed since its observation date than its kind and class allow. Never, first: a custom or a cash asset (kind), and an asset of class `RealEstate` whatever its kind. Otherwise 10 for an asset of class `MutualFunds`, and 5 for any other listed or crypto asset. The business days counted are those after the observation date up to today included: a price of a Friday is still current the next Friday, and outdated the Monday after. The judgement is the same whatever recorded the price — a fetch, the owner, an agent — and for an asset whose price is typed by hand (MKT-150). An asset with no price is not outdated: MKT-032 says it has none. The thresholds are fixed (owner, 2026-10-18).
 
 **MKT-206 — Where the judgement is given (backend)**: The read of an account's details without a date carries, for each active holding, whether its price is outdated (MKT-205), and for the account how many of its holdings are; a read with a date — a past date, or today given as a date — judges nothing: each holding says `false` and the account `0`. The read of the account summaries carries, for each account, how many of its active holdings have an outdated price, and on the portfolio total how many active holdings have one over every account. An agent reads the same figures through `list_holdings` and `portfolio_summary` (AGT-040).
+
+**MKT-207 — An outdated price on its row (frontend)**: On a holding row whose price is outdated (MKT-206), the staleness label (MKT-140) reads "Outdated price · Nd", N being MKT-140's count of calendar days, in the warning colour with a warning icon, on one line; a current price keeps its staleness label as it is. In French "Prix ancien · N j"; both themes.
+
+**MKT-208 — The counts of outdated prices (frontend)**: The account's header shows its count (MKT-206) as a warning chip after its figures, and the accounts list's total row shows the portfolio's count the same way: "1 outdated price" / "N outdated prices" ("1 prix ancien" / "N prix anciens"). A count is of holdings, as MKT-206 counts them: an asset held in two accounts counts twice on the total. Neither shows anything at zero, nor in a read with a date. The count of each account in the account summaries is not shown on its row; an agent reads it (AGT-040).
 
 ### Without an External provider (210–219)
 
@@ -890,6 +902,12 @@ A "Fill missing price history" icon button in the actions of each active, non-ca
 3. A snackbar reads "412 prices added · 38 days already had one"; the history and as-of views now value the fund on every trading day since 2021, up to yesterday.
 
 ---
+
+### UX Draft — Outdated price (MKT-205+)
+
+- **Holding row**: next to the source badge, the staleness label of an outdated price turns into "⚠ Outdated price · 71d" in the warning colour (MKT-207); "Price typed by hand" (MKT-158) still follows under it when it applies.
+- **Account header**: after Global Value, Net Cash Input and the management fees, a warning chip "⚠ 2 outdated prices" (MKT-208); absent at zero and in a view with a date, today included.
+- **Accounts list**: the total row carries the same chip with the portfolio's count (MKT-208); absent at zero, and with the row itself while a search filters the list (ACC-032).
 
 ## Open Questions / Deferred
 

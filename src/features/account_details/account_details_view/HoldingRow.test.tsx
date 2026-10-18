@@ -56,6 +56,7 @@ const baseRow: HoldingRowViewModel = {
   noteAlarmTriggered: false,
   inconsistency: null,
   inconsistencyLabel: null,
+  priceOutdated: false,
 };
 
 const renderInTable = (
@@ -423,6 +424,23 @@ describe("HoldingRow — price typed by hand toggle", () => {
     expect(
       screen.queryByRole("button", { name: "mkt.typed_by_hand.action_fetch_automatically" }),
     ).toBeNull();
+  });
+});
+
+describe("HoldingRow — outdated price (MKT-207)", () => {
+  beforeEach(() => {
+    useAppStore.setState({ assets: [], accounts: [] });
+  });
+
+  it("marks an outdated price in place of its age, and leaves a current one as it is", () => {
+    const { unmount } = renderInTable({ ...baseRow, priceOutdated: true });
+    expect(document.getElementById("holding-price-outdated-asset-1")).toHaveTextContent(
+      "mkt.outdated.row_label",
+    );
+    unmount();
+    renderInTable({ ...baseRow, priceOutdated: false });
+    expect(document.getElementById("holding-price-outdated-asset-1")).toBeNull();
+    expect(screen.getByText("mkt.staleness_today")).toBeInTheDocument();
   });
 });
 

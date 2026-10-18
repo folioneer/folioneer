@@ -711,6 +711,11 @@
       "missing_ticker": "Ticker manquant",
       "no_price_available": "Pas de prix disponible"
     },
+    "outdated": {
+      "row_label": "Prix ancien · {{age}}",
+      "count_one": "{{count}} prix ancien",
+      "count_other": "{{count}} prix anciens"
+    },
     "typed_by_hand": {
       "action_type_by_hand": "Saisir son prix à la main",
       "action_fetch_automatically": "Récupérer son prix automatiquement",
