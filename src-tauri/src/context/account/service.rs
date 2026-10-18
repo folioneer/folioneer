@@ -237,6 +237,36 @@ impl AccountService {
             update_frequency,
             management_fees_enabled,
         )?;
+        self.create_account(account).await
+    }
+
+    /// ACC-041 — creates a new account with its country and wrapper, both optional.
+    // The account's own fields, one argument each as `create`/`update` take them, plus
+    // its country and wrapper (ACC-041).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_classified(
+        &self,
+        name: String,
+        bank_name: String,
+        currency: String,
+        update_frequency: UpdateFrequency,
+        management_fees_enabled: bool,
+        country: Option<String>,
+        wrapper: Option<String>,
+    ) -> Result<Account, AccountError> {
+        let account = Account::new(
+            name,
+            bank_name,
+            currency,
+            update_frequency,
+            management_fees_enabled,
+        )?
+        .classified(country, wrapper)?;
+        self.create_account(account).await
+    }
+
+    /// ACC-003 — stores a valid new account whose name no other account has.
+    async fn create_account(&self, account: Account) -> Result<Account, AccountError> {
         if find_account_by_name(&*self.account_repo, &account.name)
             .await?
             .is_some()
@@ -284,7 +314,7 @@ impl AccountService {
         Ok(())
     }
 
-    /// Updates an existing account.
+    /// Updates an existing account; its country and wrapper (ACC-041) stay as they are.
     pub async fn update(
         &self,
         id: String,
@@ -302,6 +332,43 @@ impl AccountService {
             update_frequency,
             management_fees_enabled,
         )?;
+        let account = match self.get_by_id(&account.id).await? {
+            Some(current) => account.with_stored_classification(current.country, current.wrapper),
+            None => account,
+        };
+        self.update_account(account).await
+    }
+
+    /// ACC-041 — updates an existing account, its country and wrapper included.
+    // The account's own fields, one argument each as `create`/`update` take them, plus
+    // its country and wrapper (ACC-041).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn update_classified(
+        &self,
+        id: String,
+        name: String,
+        bank_name: String,
+        currency: String,
+        update_frequency: UpdateFrequency,
+        management_fees_enabled: bool,
+        country: Option<String>,
+        wrapper: Option<String>,
+    ) -> Result<Account, AccountError> {
+        let account = Account::with_id(
+            id,
+            name,
+            bank_name,
+            currency,
+            update_frequency,
+            management_fees_enabled,
+        )?
+        .classified(country, wrapper)?;
+        self.update_account(account).await
+    }
+
+    /// ACC-003/CFR-035 — stores a valid account under its id, refusing a rename into another
+    /// account's name.
+    async fn update_account(&self, account: Account) -> Result<Account, AccountError> {
         // CFR-035 — the uniqueness rule (ACC-003) binds the name being set: a name that
         // already clashes after a merge is accepted unchanged, a rename into another
         // account's name is rejected.
@@ -1928,6 +1995,20 @@ pub trait AccountServiceContract: Send + Sync {
         update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
     ) -> StdResult<Account, AccountError>;
+    /// ACC-041 — creates a new account with its country and wrapper.
+    // The account's own fields, one argument each as `create`/`update` take them, plus
+    // its country and wrapper (ACC-041).
+    #[allow(clippy::too_many_arguments)]
+    async fn create_classified(
+        &self,
+        name: String,
+        bank_name: String,
+        currency: String,
+        update_frequency: UpdateFrequency,
+        management_fees_enabled: bool,
+        country: Option<String>,
+        wrapper: Option<String>,
+    ) -> StdResult<Account, AccountError>;
     /// Seeds the account's 0-balance Cash Holding (CSH-012).
     async fn seed_cash_holding(&self, account_id: &str) -> StdResult<(), AccountError>;
     /// Retrieves all holdings for a given account (ACD-022, B24).
@@ -2250,6 +2331,29 @@ impl AccountServiceContract for AccountService {
             currency,
             update_frequency,
             management_fees_enabled,
+        )
+        .await
+    }
+
+    async fn create_classified(
+        &self,
+        name: String,
+        bank_name: String,
+        currency: String,
+        update_frequency: UpdateFrequency,
+        management_fees_enabled: bool,
+        country: Option<String>,
+        wrapper: Option<String>,
+    ) -> StdResult<Account, AccountError> {
+        AccountService::create_classified(
+            self,
+            name,
+            bank_name,
+            currency,
+            update_frequency,
+            management_fees_enabled,
+            country,
+            wrapper,
         )
         .await
     }
@@ -3040,6 +3144,85 @@ mod tests {
             Box::new(SqliteHoldingRepository::new(pool.clone())),
             Box::new(SqliteTransactionRepository::new(pool.clone())),
         )
+    }
+
+    // ACC-044 — an account is created and edited with its country and wrapper, read back as
+    // stored; an edit that does not name them (fees, sync) keeps them.
+    #[tokio::test]
+    async fn acc_044_an_account_keeps_its_country_and_wrapper() {
+        let svc = setup_service().await;
+        let created = svc
+            .create_classified(
+                "PEA".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+                None,
+                Some("fr_pea".to_string()),
+            )
+            .await
+            .unwrap();
+        let read = svc.get_by_id(&created.id).await.unwrap().unwrap();
+        assert_eq!(
+            (read.country.as_deref(), read.wrapper.as_deref()),
+            (None, Some("fr_pea"))
+        );
+
+        let enabled = enable_management_fees(&svc, &read).await;
+        assert_eq!(enabled.wrapper.as_deref(), Some("fr_pea"));
+
+        let moved = svc
+            .update_classified(
+                created.id.clone(),
+                "Depot".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                true,
+                Some("DE".to_string()),
+                Some("de_depot".to_string()),
+            )
+            .await
+            .unwrap();
+        let read = svc.get_by_id(&moved.id).await.unwrap().unwrap();
+        assert_eq!(
+            (read.country.as_deref(), read.wrapper.as_deref()),
+            (Some("DE"), Some("de_depot"))
+        );
+    }
+
+    // ACC-041/043 — a malformed country and a wrapper of another country's list are refused with
+    // their own codes, and nothing is created.
+    #[tokio::test]
+    async fn acc_041_a_country_or_a_wrapper_it_cannot_take_is_refused() {
+        let svc = setup_service().await;
+        let create = |country: Option<&str>, wrapper: Option<&str>| {
+            svc.create_classified(
+                "Account".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+                country.map(str::to_string),
+                wrapper.map(str::to_string),
+            )
+        };
+        assert!(matches!(
+            create(Some("fra"), None).await,
+            Err(AccountError::InvalidCountry { .. })
+        ));
+        assert!(matches!(
+            create(None, Some("de_depot")).await,
+            Err(AccountError::WrapperNotAvailable { .. })
+        ));
+        assert!(matches!(
+            create(Some("ES"), Some("fr_pea")).await,
+            Err(AccountError::WrapperNotAvailable { .. })
+        ));
+        assert!(svc.get_all().await.unwrap().is_empty());
+        let generic = create(Some("ES"), Some("brokerage")).await.unwrap();
+        assert_eq!(generic.wrapper.as_deref(), Some("brokerage"));
     }
 
     async fn enable_management_fees(svc: &AccountService, account: &Account) -> Account {

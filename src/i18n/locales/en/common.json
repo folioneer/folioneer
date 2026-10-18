@@ -1012,6 +1012,8 @@
     "NameEmpty": "Name cannot be empty.",
     "NameAlreadyExists": "An account with this name already exists.",
     "InvalidCurrency": "\"{{currency}}\" is not a valid currency code.",
+    "InvalidCountry": "{{country}} is not a two-letter country code.",
+    "WrapperNotAvailable": "This wrapper is not available for the account's country: {{wrapper}}.",
     "ReferenceEmpty": "Reference (ticker) cannot be empty.",
     "InvalidIsinFormat": "ISIN must be 12 characters with a valid ISO 6166 check digit.",
     "IsinRequired": "A listed asset needs an ISIN.",

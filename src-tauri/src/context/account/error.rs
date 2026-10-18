@@ -12,6 +12,18 @@ pub enum AccountError {
     /// Account name is empty or whitespace-only.
     #[error("Account name cannot be empty")]
     NameEmpty,
+    /// ACC-041 — the account's country is not two upper-case letters.
+    #[error("Country is not a two-letter code: {country}")]
+    InvalidCountry {
+        /// The country that was given.
+        country: String,
+    },
+    /// ACC-043 — the wrapper is neither in the generic list nor in the account's country's list.
+    #[error("Wrapper is not available for this account's country: {wrapper}")]
+    WrapperNotAvailable {
+        /// The wrapper identifier that was given.
+        wrapper: String,
+    },
     /// The currency string is not a valid ISO 4217 code.
     #[error("Invalid currency code: {currency}")]
     InvalidCurrency {

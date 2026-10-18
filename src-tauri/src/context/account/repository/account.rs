@@ -25,6 +25,8 @@ struct AccountRow {
     currency: String,
     update_frequency: String,
     management_fees_enabled: i64,
+    country: Option<String>,
+    wrapper: Option<String>,
 }
 
 impl From<AccountRow> for Account {
@@ -41,6 +43,7 @@ impl From<AccountRow> for Account {
             update_frequency,
             row.management_fees_enabled != 0,
         )
+        .with_stored_classification(row.country, row.wrapper)
     }
 }
 
@@ -464,7 +467,7 @@ async fn insert_transaction(conn: &mut SqliteConnection, tx: &Transaction) -> Re
 async fn load_aggregate_on(conn: &mut SqliteConnection, id: &str) -> Result<Option<Account>> {
     let account_row = sqlx::query_as!(
         AccountRow,
-        r#"SELECT id, name, bank_name, currency, update_frequency, management_fees_enabled FROM accounts WHERE id = ?"#,
+        r#"SELECT id, name, bank_name, currency, update_frequency, management_fees_enabled, country, wrapper FROM accounts WHERE id = ?"#,
         id
     )
     .fetch_optional(&mut *conn)
@@ -506,16 +509,19 @@ async fn load_aggregate_on(conn: &mut SqliteConnection, id: &str) -> Result<Opti
         .map(Transaction::try_from)
         .collect::<Result<Vec<_>>>()?;
 
-    Ok(Some(Account::restore_with_positions(
-        base.id,
-        base.name,
-        base.bank_name,
-        base.currency,
-        base.update_frequency,
-        base.management_fees_enabled,
-        holdings,
-        transactions,
-    )))
+    Ok(Some(
+        Account::restore_with_positions(
+            base.id,
+            base.name,
+            base.bank_name,
+            base.currency,
+            base.update_frequency,
+            base.management_fees_enabled,
+            holdings,
+            transactions,
+        )
+        .with_stored_classification(base.country, base.wrapper),
+    ))
 }
 
 #[async_trait::async_trait]
@@ -589,7 +595,7 @@ impl AccountRepository for SqliteAccountRepository {
     async fn get_all(&self) -> Result<Vec<Account>> {
         let rows = sqlx::query_as!(
             AccountRow,
-            r#"SELECT id, name, bank_name, currency, update_frequency, management_fees_enabled FROM accounts"#
+            r#"SELECT id, name, bank_name, currency, update_frequency, management_fees_enabled, country, wrapper FROM accounts"#
         )
         .fetch_all(&self.pool)
         .await
@@ -601,7 +607,7 @@ impl AccountRepository for SqliteAccountRepository {
     async fn get_by_id(&self, id: &str) -> Result<Option<Account>> {
         let row = sqlx::query_as!(
             AccountRow,
-            r#"SELECT id, name, bank_name, currency, update_frequency, management_fees_enabled FROM accounts WHERE id = ?"#,
+            r#"SELECT id, name, bank_name, currency, update_frequency, management_fees_enabled, country, wrapper FROM accounts WHERE id = ?"#,
             id
         )
         .fetch_optional(&self.pool)
@@ -614,7 +620,7 @@ impl AccountRepository for SqliteAccountRepository {
     async fn find_by_name(&self, name: &str) -> Result<Option<Account>> {
         let row = sqlx::query_as!(
             AccountRow,
-            r#"SELECT id, name, bank_name, currency, update_frequency, management_fees_enabled FROM accounts WHERE LOWER(name) = LOWER(?)"#,
+            r#"SELECT id, name, bank_name, currency, update_frequency, management_fees_enabled, country, wrapper FROM accounts WHERE LOWER(name) = LOWER(?)"#,
             name
         )
         .fetch_optional(&self.pool)
@@ -633,14 +639,17 @@ impl AccountRepository for SqliteAccountRepository {
             .await
             .context("Failed to begin DB transaction for account create")?;
         sqlx::query!(
-            r#"INSERT INTO accounts (id, name, bank_name, currency, update_frequency, management_fees_enabled)
-               VALUES (?, ?, ?, ?, ?, ?)"#,
+            r#"INSERT INTO accounts (id, name, bank_name, currency, update_frequency, management_fees_enabled,
+                                     country, wrapper)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
             account.id,
             account.name,
             account.bank_name,
             account.currency,
             update_freq_str,
-            management_fees_enabled
+            management_fees_enabled,
+            account.country,
+            account.wrapper
         )
         .execute(&mut *db_tx)
         .await
@@ -673,13 +682,16 @@ impl AccountRepository for SqliteAccountRepository {
         let based_on = current_account_timestamp(&mut db_tx, &account.id).await?;
         let written = sqlx::query!(
             r#"UPDATE accounts
-               SET name = ?, bank_name = ?, currency = ?, update_frequency = ?, management_fees_enabled = ?
+               SET name = ?, bank_name = ?, currency = ?, update_frequency = ?, management_fees_enabled = ?,
+                   country = ?, wrapper = ?
                WHERE id = ?"#,
             account.name,
             account.bank_name,
             account.currency,
             update_freq_str,
             management_fees_enabled,
+            account.country,
+            account.wrapper,
             account.id
         )
         .execute(&mut *db_tx)
@@ -768,7 +780,7 @@ impl AccountRepository for SqliteAccountRepository {
             RecordKind::Account => {
                 let row = sqlx::query!(
                     r#"SELECT id, name, bank_name, currency, update_frequency, management_fees_enabled,
-                              sync_logical_timestamp, sync_origin, sync_device_id
+                              country, wrapper, sync_logical_timestamp, sync_origin, sync_device_id
                        FROM accounts WHERE id = ?"#,
                     identity
                 )
@@ -783,6 +795,8 @@ impl AccountRepository for SqliteAccountRepository {
                         currency: row.currency,
                         update_frequency: row.update_frequency,
                         management_fees_enabled: row.management_fees_enabled,
+                        country: row.country,
+                        wrapper: row.wrapper,
                     });
                     Ok(SyncedRecord {
                         rank: rank_from_columns(
@@ -1054,14 +1068,16 @@ impl AccountRepository for SqliteAccountRepository {
         let columns = RankColumns::from(rank.clone());
         sqlx::query!(
             r#"INSERT INTO accounts (id, name, bank_name, currency, update_frequency, management_fees_enabled,
-                                     sync_logical_timestamp, sync_origin, sync_device_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     country, wrapper, sync_logical_timestamp, sync_origin, sync_device_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(id) DO UPDATE SET
                    name = excluded.name,
                    bank_name = excluded.bank_name,
                    currency = excluded.currency,
                    update_frequency = excluded.update_frequency,
                    management_fees_enabled = excluded.management_fees_enabled,
+                   country = excluded.country,
+                   wrapper = excluded.wrapper,
                    sync_logical_timestamp = excluded.sync_logical_timestamp,
                    sync_origin = excluded.sync_origin,
                    sync_device_id = excluded.sync_device_id"#,
@@ -1071,6 +1087,8 @@ impl AccountRepository for SqliteAccountRepository {
             account.currency,
             update_freq_str,
             management_fees_enabled,
+            account.country,
+            account.wrapper,
             columns.logical_timestamp,
             columns.origin,
             columns.device_id

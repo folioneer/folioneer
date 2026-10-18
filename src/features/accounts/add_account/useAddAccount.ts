@@ -50,6 +50,8 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
       currency: formData.currency,
       update_frequency: formData.update_frequency,
       management_fees_enabled: formData.management_fees_enabled,
+      country: null,
+      wrapper: null,
     });
 
     setIsSubmitting(false);

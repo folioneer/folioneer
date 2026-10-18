@@ -15,13 +15,14 @@
 
 ### Account CRUD
 
-| Command                        | Args                 | Return                   | Errors                                                                                                                                                                                                                                       |
-| ------------------------------ | -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_accounts`                 | —                    | `Vec<Account>`           | `DatabaseError`                                                                                                                                                                                                                              |
-| `add_account`                  | `CreateAccountDTO`   | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set, CFR-035), `InvalidCurrency { currency }` (TRX-021), `DatabaseError`                                                                                          |
-| `update_account`               | `UpdateAccountDTO`   | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set; editing other fields of an account whose name already clashes after a merge is accepted, CFR-035), `InvalidCurrency { currency }` (TRX-021), `DatabaseError` |
-| `delete_account`               | `id: String`         | `()`                     | `DatabaseError` _(ACC-005, ACC-006 — plain DELETE, silent on missing row)_                                                                                                                                                                   |
-| `get_account_deletion_summary` | `account_id: String` | `AccountDeletionSummary` | `DatabaseError` _(read-only; counts are 0 if account has no data — no NotFound raised)_                                                                                                                                                      |
+| Command                        | Args                 | Return                   | Errors                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------ | -------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_accounts`                 | —                    | `Vec<Account>`           | `DatabaseError`                                                                                                                                                                                                                                                                                                                   |
+| `add_account`                  | `CreateAccountDTO`   | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043), `DatabaseError`                                                                                          |
+| `update_account`               | `UpdateAccountDTO`   | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set; editing other fields of an account whose name already clashes after a merge is accepted, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043), `DatabaseError` |
+| `get_wrapper_lists`            | —                    | `WrapperLists`           | _(infallible — the lists are the application's own, ACC-040)_                                                                                                                                                                                                                                                                     |
+| `delete_account`               | `id: String`         | `()`                     | `DatabaseError` _(ACC-005, ACC-006 — plain DELETE, silent on missing row)_                                                                                                                                                                                                                                                        |
+| `get_account_deletion_summary` | `account_id: String` | `AccountDeletionSummary` | `DatabaseError` _(read-only; counts are 0 if account has no data — no NotFound raised)_                                                                                                                                                                                                                                           |
 
 ### Account Details
 
@@ -201,6 +202,8 @@ struct Account {
     currency: String,                    // ISO 4217 currency code (TRX-021)
     update_frequency: UpdateFrequency,   // how often the user plans to update data
     management_fees_enabled: bool,       // whether one-off fees and fee schedules are available on this account (FEE-075); a new account starts disabled
+    country: Option<String>,             // the account's own country (ISO 3166-1 alpha-2) when it differs from the portfolio's (ACC-041)
+    wrapper: Option<String>,             // identifier of its tax wrapper (ACC-040/043); none when unset
 }
 
 struct CreateAccountDTO {
@@ -209,6 +212,8 @@ struct CreateAccountDTO {
     currency: String,
     update_frequency: UpdateFrequency,
     management_fees_enabled: bool,       // FEE-075
+    country: Option<String>,             // ACC-041
+    wrapper: Option<String>,             // ACC-043
 }
 
 struct UpdateAccountDTO {
@@ -218,6 +223,22 @@ struct UpdateAccountDTO {
     currency: String,
     update_frequency: UpdateFrequency,
     management_fees_enabled: bool,
+    country: Option<String>,             // ACC-041 — the window sends the account's current value until it edits it
+    wrapper: Option<String>,             // ACC-043
+}
+
+// ACC-040 — the wrapper lists and the portfolio's country (France until TODO-092).
+struct WrapperLists {
+    portfolio_country: String,
+    wrappers: Vec<Wrapper>,
+}
+
+struct Wrapper {
+    id: String,                          // never changes once published
+    country: Option<String>,             // None for the generic list
+    label_en: String,
+    label_fr: String,
+    label_de: String,
 }
 
 enum UpdateFrequency {
@@ -720,6 +741,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-10-18 — TODO-091 (ACC-040–044): `Account`, `CreateAccountDTO` and `UpdateAccountDTO` gain `country` and `wrapper`; `add_account` / `update_account` gain `InvalidCountry` and `WrapperNotAvailable`; new `get_wrapper_lists` and the `WrapperLists` / `Wrapper` types.
 - 2026-10-18 — TODO-084: `AccountDetailsResponse.total_capital_brought_in` (ACD-058); a holding's windowed return is `None` for a window it was not held through (ACD-057). No command changed.
 - 2026-10-18 — TODO-085: `HoldingDetail.price_outdated`, `AccountDetailsResponse.outdated_price_count`, `AccountSummary.outdated_price_count`, `PortfolioTotal.outdated_price_count` (MKT-205, MKT-206). No command changed.
 - 2026-10-11 — TODO-059: `HoldingDetail.current_price_source` may read `Agent` (MKT-103; the enum is the asset contract's). No field or command changed.

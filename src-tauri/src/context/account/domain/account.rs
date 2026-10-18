@@ -3,6 +3,7 @@ use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot, StockS
 use super::holding_note::HoldingNote;
 use super::journal::CashEffect;
 use super::transaction::{EnteredAmount, Transaction, TransactionType};
+use super::wrapper::{country_well_formed, wrapper_available, PORTFOLIO_COUNTRY};
 use crate::context::account::error::AccountError;
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
 use anyhow::{anyhow, Result};
@@ -120,6 +121,13 @@ pub struct Account {
     /// Whether the % management-fee mechanism (one-off fees + schedules) is
     /// available on this account (FEE-075). New accounts start disabled.
     pub management_fees_enabled: bool,
+    /// ACC-041 — the account's own country (ISO 3166-1 alpha-2), when it differs from the
+    /// portfolio's; read as absent from a change written before it existed.
+    #[serde(default)]
+    pub country: Option<String>,
+    /// ACC-043 — the identifier of the tax wrapper the account sits in (ACC-040).
+    #[serde(default)]
+    pub wrapper: Option<String>,
     /// Holdings owned by this account. Populated only in aggregate load — excluded from bindings.
     #[serde(skip)]
     #[specta(skip)]
@@ -159,6 +167,8 @@ impl Account {
             currency,
             update_frequency,
             management_fees_enabled,
+            country: None,
+            wrapper: None,
             holdings: Vec::new(),
             transactions: Vec::new(),
             pending_changes: Vec::new(),
@@ -187,6 +197,8 @@ impl Account {
             currency,
             update_frequency,
             management_fees_enabled,
+            country: None,
+            wrapper: None,
             holdings: Vec::new(),
             transactions: Vec::new(),
             pending_changes: Vec::new(),
@@ -209,6 +221,8 @@ impl Account {
             currency,
             update_frequency,
             management_fees_enabled,
+            country: None,
+            wrapper: None,
             holdings: Vec::new(),
             transactions: Vec::new(),
             pending_changes: Vec::new(),
@@ -235,10 +249,61 @@ impl Account {
             currency,
             update_frequency,
             management_fees_enabled,
+            country: None,
+            wrapper: None,
             holdings,
             transactions,
             pending_changes: Vec::new(),
         }
+    }
+
+    /// ACC-041 — the account with its country and wrapper, both optional: a country is two
+    /// upper-case letters, and the wrapper one of the generic list or of the account's country's
+    /// list, that country being its own or the portfolio's. A blank value is none.
+    pub fn classified(
+        mut self,
+        country: Option<String>,
+        wrapper: Option<String>,
+    ) -> StdResult<Self, AccountError> {
+        let country = country
+            .map(|country| country.trim().to_string())
+            .filter(|country| !country.is_empty());
+        let wrapper = wrapper
+            .map(|wrapper| wrapper.trim().to_string())
+            .filter(|wrapper| !wrapper.is_empty());
+        if let Some(country) = &country {
+            if !country_well_formed(country) {
+                return Err(AccountError::InvalidCountry {
+                    country: country.clone(),
+                });
+            }
+        }
+        self.country = country;
+        if let Some(wrapper) = &wrapper {
+            if !wrapper_available(wrapper, self.effective_country()) {
+                return Err(AccountError::WrapperNotAvailable {
+                    wrapper: wrapper.clone(),
+                });
+            }
+        }
+        self.wrapper = wrapper;
+        Ok(self)
+    }
+
+    /// ACC-041 — the account's country: its own, or the portfolio's.
+    pub fn effective_country(&self) -> &str {
+        self.country.as_deref().unwrap_or(PORTFOLIO_COUNTRY)
+    }
+
+    /// ACC-041 — the account with the country and wrapper storage holds, as they are.
+    pub fn with_stored_classification(
+        mut self,
+        country: Option<String>,
+        wrapper: Option<String>,
+    ) -> Self {
+        self.country = country;
+        self.wrapper = wrapper;
+        self
     }
 
     /// FEE-077 — fail-fast guard: the % management-fee mechanism must be enabled
@@ -2112,6 +2177,18 @@ impl Account {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // SYN-038 / ACC-041 — an account change written before data format version 4 carries no
+    // country and no wrapper: it is read with neither.
+    #[test]
+    fn syn_038_an_account_written_before_version_4_reads_with_no_country_or_wrapper() {
+        let account: Account = serde_json::from_str(
+            r#"{"id":"a1","name":"PEA","bank_name":"","currency":"EUR",
+                "update_frequency":"ManualMonth","management_fees_enabled":false}"#,
+        )
+        .expect("a version 3 account change");
+        assert_eq!((account.country, account.wrapper), (None, None));
+    }
 
     fn micro(v: i64) -> i64 {
         v * 1_000_000

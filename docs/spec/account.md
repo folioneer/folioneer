@@ -14,10 +14,12 @@ This spec covers the CRUD lifecycle of accounts. The Account Details view (drill
 
 A financial account owned by the user.
 
-| Field              | Business meaning                                                                                                       |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `name`             | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among all accounts (case-insensitive).           |
-| `update_frequency` | Frequency at which the user plans to update the account's data. Informational only — no automation is triggered today. |
+| Field              | Business meaning                                                                                                              |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `name`             | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among all accounts (case-insensitive).                  |
+| `update_frequency` | Frequency at which the user plans to update the account's data. Informational only — no automation is triggered today.        |
+| `country`          | The account's own country (two upper-case letters), when one is set; absent otherwise (ACC-041).                              |
+| `wrapper`          | The identifier of the tax wrapper the account sits in, from the lists of ACC-040; absent when none is set (ACC-043, ACC-044). |
 
 ### PortfolioTotal
 
@@ -132,6 +134,20 @@ The account section title is displayed in the application shell header, not in t
 **ACC-032 — When the total row is shown (frontend)**: The total row is shown only when every account is listed: it is hidden while a search filter is active (ACC-011), and absent while any read, first or re-read (ACC-013, ACC-033), is in progress, when a read fails (ACC-013), or when no account exists (ACC-012).
 
 **ACC-033 — The account table follows rate changes (frontend)**: The account table re-reads its summaries when a currency rate is recorded, edited or removed, or a currency pair is declared, applied or removed, so the converted figures, the portfolio total and its incomplete marker reflect the rates in force.
+
+### Wrapper (040–049)
+
+The tax wrapper an account sits in — a PEA, an assurance vie, a Depot — is a label: no tax is computed and no rule is enforced (owner, 2026-10-17).
+
+**ACC-040 — The wrapper lists (backend)**: The application knows a generic list of wrappers — brokerage, savings, pension, life insurance, crypto wallet, other — and a list per country: France (PEA, PEA-PME, assurance vie, PER) and Germany (Depot, Riester/Rürup, bAV). Each wrapper has an identifier that never changes and a label in English, French and German. The lists are available together, with the portfolio's country. A wrapper's identifier is free text wherever it is stored or synced: a device whose lists do not know one keeps it, and shows the identifier itself.
+
+**ACC-041 — An account's country (backend)**: An account may carry a country of its own — two upper-case letters (ISO 3166-1 alpha-2), refused with `InvalidCountry` otherwise; whether the code is assigned is not checked (`XX` is accepted) — stored as given. Without one, the account's country is the portfolio's: France, fixed until the first run asks it (TODO-092).
+
+**ACC-042 — An agent reads them (backend)**: `list_accounts` gives each account's country — its own, or the portfolio's — and its wrapper's identifier, or none (AGT-040). (Dependency: an agent sets them when it creates an account, with TODO-088.)
+
+**ACC-043 — An account's wrapper (backend)**: An account may carry a wrapper: one of the generic list or of its country's list (ACC-041), refused with `WrapperNotAvailable` otherwise. A country with no list of its own offers the generic list only.
+
+**ACC-044 — Setting and editing them (backend)**: Both are optional, set when the account is created or edited (ACC-016, ACC-017), and travel with the account to the other devices (SYN-038). An edit states both, and one left empty is cleared; an edit that would leave a wrapper outside its new country's list is refused with `WrapperNotAvailable`, and nothing changes. An account that existed before has neither, and nothing else changes for it. (Dependency: the form's two fields, and the accounts list by wrapper, come with TODO-091's window part, which amends ACC-016 and ACC-017.)
 
 ### Events
 

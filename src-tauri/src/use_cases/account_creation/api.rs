@@ -21,6 +21,11 @@ pub struct CreateAccountDTO {
     /// Whether the % management-fee mechanism is enabled (FEE-075). New accounts
     /// default to false; the creation form can opt in.
     pub management_fees_enabled: bool,
+    /// ACC-041 — the account's own country (ISO 3166-1 alpha-2), when it differs from the
+    /// portfolio's; none otherwise.
+    pub country: Option<String>,
+    /// ACC-043 — the identifier of its tax wrapper (ACC-040); none when unset.
+    pub wrapper: Option<String>,
 }
 
 /// Adds a new account, eagerly seeding its Cash Asset + 0-balance Cash Holding
@@ -31,12 +36,14 @@ pub async fn add_account(
     uc: State<'_, AccountCreationUseCase>,
     dto: CreateAccountDTO,
 ) -> Result<Account, AccountError> {
-    uc.create(
+    uc.create_classified(
         dto.name,
         dto.bank_name,
         dto.currency,
         dto.update_frequency,
         dto.management_fees_enabled,
+        dto.country,
+        dto.wrapper,
     )
     .await
 }

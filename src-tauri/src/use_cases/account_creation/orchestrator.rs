@@ -40,15 +40,42 @@ impl AccountCreationUseCase {
         update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
     ) -> StdResult<Account, AccountError> {
-        // ACC-002 / TRX-021 — the account's own fields are checked before anything is
-        // seeded for it: a name or a currency it refuses is answered with its own code.
+        self.create_classified(
+            name,
+            bank_name,
+            currency,
+            update_frequency,
+            management_fees_enabled,
+            None,
+            None,
+        )
+        .await
+    }
+
+    /// The account with its country and wrapper (ACC-041), seeded as `create` seeds it.
+    // The account's own fields, one argument each as `create`/`update` take them, plus
+    // its country and wrapper (ACC-041).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_classified(
+        &self,
+        name: String,
+        bank_name: String,
+        currency: String,
+        update_frequency: UpdateFrequency,
+        management_fees_enabled: bool,
+        country: Option<String>,
+        wrapper: Option<String>,
+    ) -> StdResult<Account, AccountError> {
+        // ACC-002 / TRX-021 / ACC-041 — the account's own fields are checked before anything
+        // is seeded for it: a value it refuses is answered with its own code.
         Account::new(
             name.clone(),
             bank_name.clone(),
             currency.clone(),
             update_frequency,
             management_fees_enabled,
-        )?;
+        )?
+        .classified(country.clone(), wrapper.clone())?;
         // CSH-010 — the Cash Asset must exist before the Cash Holding references it (FK).
         self.asset_service
             .seed_cash_asset(&currency)
@@ -61,12 +88,14 @@ impl AccountCreationUseCase {
         // ACC-003; FEE-075's disabled default comes from the creation form).
         let account = self
             .account_service
-            .create(
+            .create_classified(
                 name,
                 bank_name,
                 currency,
                 update_frequency,
                 management_fees_enabled,
+                country,
+                wrapper,
             )
             .await?;
         // CSH-012 — eager 0-balance Cash Holding.

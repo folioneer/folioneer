@@ -264,6 +264,13 @@ async updateAccount(dto: UpdateAccountDTO) : Promise<Result<Account, AccountErro
 }
 },
 /**
+ * ACC-040 — the wrapper lists the account form offers; infallible, the lists are the
+ * application's own.
+ */
+async getWrapperLists() : Promise<WrapperLists> {
+    return await TAURI_INVOKE("get_wrapper_lists");
+},
+/**
  * Deletes an account (R5 — cascades to its holdings at the repo level).
  */
 async deleteAccount(id: string) : Promise<Result<null, AccountError>> {
@@ -1188,7 +1195,16 @@ update_frequency: UpdateFrequency;
  * Whether the % management-fee mechanism (one-off fees + schedules) is
  * available on this account (FEE-075). New accounts start disabled.
  */
-management_fees_enabled: boolean }
+management_fees_enabled: boolean; 
+/**
+ * ACC-041 — the account's own country (ISO 3166-1 alpha-2), when it differs from the
+ * portfolio's; read as absent from a change written before it existed.
+ */
+country?: string | null; 
+/**
+ * ACC-043 — the identifier of the tax wrapper the account sits in (ACC-040).
+ */
+wrapper?: string | null }
 /**
  * Pre-deletion counts for an account (ACC-020).
  */
@@ -1281,6 +1297,14 @@ export type AccountError =
  * Account name is empty or whitespace-only.
  */
 { code: "NameEmpty" } | 
+/**
+ * ACC-041 — the account's country is not two upper-case letters.
+ */
+{ code: "InvalidCountry"; country: string } | 
+/**
+ * ACC-043 — the wrapper is neither in the generic list nor in the account's country's list.
+ */
+{ code: "WrapperNotAvailable"; wrapper: string } | 
 /**
  * The currency string is not a valid ISO 4217 code.
  */
@@ -2436,7 +2460,16 @@ update_frequency: UpdateFrequency;
  * Whether the % management-fee mechanism is enabled (FEE-075). New accounts
  * default to false; the creation form can opt in.
  */
-management_fees_enabled: boolean }
+management_fees_enabled: boolean; 
+/**
+ * ACC-041 — the account's own country (ISO 3166-1 alpha-2), when it differs from the
+ * portfolio's; none otherwise.
+ */
+country: string | null; 
+/**
+ * ACC-043 — the identifier of its tax wrapper (ACC-040); none when unset.
+ */
+wrapper: string | null }
 /**
  * Parameters for creating a new asset.
  */
@@ -5324,7 +5357,15 @@ update_frequency: UpdateFrequency;
 /**
  * Whether the % management-fee mechanism is enabled (FEE-075).
  */
-management_fees_enabled: boolean }
+management_fees_enabled: boolean; 
+/**
+ * ACC-041 — the account's own country, when it differs from the portfolio's.
+ */
+country: string | null; 
+/**
+ * ACC-043 — the identifier of its tax wrapper (ACC-040); none when unset.
+ */
+wrapper: string | null }
 /**
  * Parameters for updating an existing asset.
  */
@@ -5521,6 +5562,42 @@ amount_micros: number;
  * Optional user note.
  */
 note: string | null }
+/**
+ * ACC-040 — one wrapper of the lists, labelled in the three languages the lists are kept in.
+ */
+export type Wrapper = { 
+/**
+ * The identifier an account stores; never changes once published.
+ */
+id: string; 
+/**
+ * The country whose list holds it (ISO 3166-1 alpha-2); `None` for the generic list.
+ */
+country: string | null; 
+/**
+ * Its label in English.
+ */
+label_en: string; 
+/**
+ * Its label in French.
+ */
+label_fr: string; 
+/**
+ * Its label in German.
+ */
+label_de: string }
+/**
+ * ACC-040 — the wrapper lists, with the portfolio's country an account without its own takes.
+ */
+export type WrapperLists = { 
+/**
+ * The portfolio's country (ISO 3166-1 alpha-2): France until the first run asks it.
+ */
+portfolio_country: string; 
+/**
+ * Every wrapper, the generic list and each country's.
+ */
+wrappers: Wrapper[] }
 
 /** tauri-specta globals **/
 
