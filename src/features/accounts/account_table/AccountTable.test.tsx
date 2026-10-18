@@ -68,6 +68,7 @@ const makeSummary = (overrides: Partial<AccountSummary> = {}): AccountSummary =>
   total_unrealized_pnl: null,
   ytd_performance_pct: null,
   has_inconsistent_holding: false,
+  outdated_price_count: 0,
   ...overrides,
 });
 
@@ -304,6 +305,7 @@ const makeTotal = (overrides: Partial<PortfolioTotal> = {}): PortfolioTotal => (
   total_unrealized_pnl: 4_857_600_000,
   currency: "EUR",
   incomplete: false,
+  outdated_price_count: 0,
   ...overrides,
 });
 

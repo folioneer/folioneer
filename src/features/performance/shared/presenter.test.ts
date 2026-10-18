@@ -360,6 +360,7 @@ describe("presentAssetScopeOptions", () => {
     current_price: null,
     current_price_date: null,
     current_price_source: null,
+    price_outdated: false,
     unrealized_pnl: null,
     performance_pct: null,
     dividends_received: 0,
@@ -397,6 +398,7 @@ describe("presentAssetScopeOptions", () => {
     total_dividends_received: 0,
     total_management_fees: 0,
     total_net_cash_input: 0,
+    outdated_price_count: 0,
   });
 
   // PRF-082 — the cash line is never offered as a scope

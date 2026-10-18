@@ -279,6 +279,7 @@ describe("accountGateway — fetchAllAssetPrices (MKT-130)", () => {
         total_unrealized_pnl: null,
         ytd_performance_pct: null,
         has_inconsistent_holding: false,
+        outdated_price_count: 0,
       },
     ];
     const response = {

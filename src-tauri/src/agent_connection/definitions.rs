@@ -27,7 +27,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "portfolio_summary",
             title: "Portfolio summary",
             only_reads: true,
-            description: "The value of the portfolio: each account with its total value, its unrealized gain and its performance this year, and the total over the accounts. Amounts and quantities are whole numbers of millionths: 1500000 is 1.5.",
+            description: "The value of the portfolio: each account with its total value, its unrealized gain, its performance this year and how many of its holdings have an outdated price (outdated_price_count), and the total over the accounts. Amounts and quantities are whole numbers of millionths: 1500000 is 1.5.",
             input_schema: nothing(),
         },
         ToolDefinition {
@@ -54,7 +54,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "list_holdings",
             title: "List an account's holdings",
             only_reads: true,
-            description: "The holdings of one account, with their quantities, costs, latest prices and gains, and the account's totals; as they stood on a past date when `as_of` is given. Amounts and quantities are whole numbers of millionths: 1500000 is 1.5.",
+            description: "The holdings of one account, with their quantities, costs, latest prices and gains, and the account's totals; price_outdated says a holding's latest price is too old to trust for its kind (5 business days, 10 for a fund, never for a custom asset), and outdated_price_count how many are; as they stood on a past date when `as_of` is given. Amounts and quantities are whole numbers of millionths: 1500000 is 1.5.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
