@@ -97,6 +97,45 @@ describe("useAddAccount", () => {
   });
 });
 
+describe("useAddAccount — country and wrapper (ACC-044)", () => {
+  beforeEach(() => {
+    mockAddAccount.mockReset();
+    mockAddAccount.mockResolvedValue({ data: { id: "new-id" }, error: null });
+  });
+
+  const change = (
+    result: { current: ReturnType<typeof useAddAccount> },
+    name: string,
+    value: string,
+  ) =>
+    act(() => {
+      result.current.handleChange({
+        target: { name, value },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+
+  it("sends the chosen wrapper, and none for the portfolio's country", async () => {
+    const { result } = renderHook(() => useAddAccount());
+    change(result, "name", "PEA");
+    change(result, "wrapper", "fr_pea");
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(mockAddAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ country: null, wrapper: "fr_pea" }),
+    );
+  });
+
+  // ACC-043 — any account may hold any wrapper: a change of country never empties it.
+  it("keeps the wrapper when the country changes", () => {
+    const { result } = renderHook(() => useAddAccount());
+    change(result, "wrapper", "fr_pea");
+    act(() => result.current.setCountry("DE"));
+    expect(result.current.formData.country).toBe("DE");
+    expect(result.current.formData.wrapper).toBe("fr_pea");
+  });
+});
+
 describe("useAddAccount — bank name (ACC-026)", () => {
   beforeEach(() => {
     mockAddAccount.mockReset();

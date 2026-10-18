@@ -18,6 +18,8 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
     currency: "EUR",
     update_frequency: "ManualMonth",
     management_fees_enabled: false,
+    country: "",
+    wrapper: "",
   });
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,6 +31,9 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
       [name]: type === "checkbox" && "checked" in e.target ? e.target.checked : value,
     }));
   };
+
+  // ACC-043 — a change of country keeps the wrapper: any account may hold any wrapper.
+  const setCountry = (country: string) => setFormData((prev) => ({ ...prev, country }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,8 +55,8 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
       currency: formData.currency,
       update_frequency: formData.update_frequency,
       management_fees_enabled: formData.management_fees_enabled,
-      country: null,
-      wrapper: null,
+      country: formData.country || null,
+      wrapper: formData.wrapper || null,
     });
 
     setIsSubmitting(false);
@@ -68,6 +73,8 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
       currency: "EUR",
       update_frequency: "ManualMonth",
       management_fees_enabled: false,
+      country: "",
+      wrapper: "",
     });
 
     if (onSubmitSuccess) {
@@ -80,6 +87,7 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
     error,
     isSubmitting,
     handleChange,
+    setCountry,
     handleSubmit,
     frequencies: FREQUENCIES,
   };

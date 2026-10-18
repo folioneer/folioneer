@@ -2,8 +2,8 @@
 #![allow(clippy::unreachable)]
 
 use super::domain::{
-    Account, FeeFrequency, FeeSchedule, HoldingNote, ThresholdDirection, UpdateFrequency, Wrapper,
-    PORTFOLIO_COUNTRY, WRAPPERS,
+    country_offers, generic_wrapper_ids, offered_countries, Account, FeeFrequency, FeeSchedule,
+    HoldingNote, ThresholdDirection, UpdateFrequency, Wrapper, PORTFOLIO_COUNTRY, WRAPPERS,
 };
 use crate::context::account::{
     AccountError, AccountJournal, HoldingSnapshot, JournalFilter, Transaction,
@@ -41,8 +41,24 @@ pub struct UpdateAccountDTO {
 pub struct WrapperLists {
     /// The portfolio's country (ISO 3166-1 alpha-2): France until the first run asks it.
     pub portfolio_country: String,
-    /// Every wrapper, the generic list and each country's.
+    /// Every wrapper, the generic list and each country's, in the lists' order (ACC-045).
     pub wrappers: Vec<Wrapper>,
+    /// ACC-045 — the countries the form offers, the portfolio's first.
+    pub countries: Vec<String>,
+    /// ACC-045 — for each country with a list of its own (and the portfolio's), its wrappers in
+    /// the order the form offers them; any other country takes `generic`.
+    pub offered: Vec<CountryWrappers>,
+    /// ACC-045 — what a country with no list of its own is offered: the generic list.
+    pub generic: Vec<String>,
+}
+
+/// ACC-045 — the wrappers one country is offered, in order.
+#[derive(Debug, Serialize, Type)]
+pub struct CountryWrappers {
+    /// The country (ISO 3166-1 alpha-2).
+    pub country: String,
+    /// Its wrappers' identifiers: its own list, then the generic one.
+    pub wrapper_ids: Vec<String>,
 }
 
 // --- Commands ---
@@ -81,9 +97,19 @@ pub async fn update_account(
 #[tauri::command]
 #[specta::specta]
 pub fn get_wrapper_lists() -> WrapperLists {
+    let owned = |ids: Vec<&str>| ids.into_iter().map(str::to_string).collect::<Vec<_>>();
     WrapperLists {
         portfolio_country: PORTFOLIO_COUNTRY.to_string(),
         wrappers: WRAPPERS.to_vec(),
+        countries: owned(offered_countries()),
+        offered: country_offers()
+            .into_iter()
+            .map(|(country, wrapper_ids)| CountryWrappers {
+                country: country.to_string(),
+                wrapper_ids: owned(wrapper_ids),
+            })
+            .collect(),
+        generic: owned(generic_wrapper_ids()),
     }
 }
 

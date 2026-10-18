@@ -261,7 +261,7 @@ impl AccountService {
             update_frequency,
             management_fees_enabled,
         )?
-        .classified(country, wrapper)?;
+        .classified(country, wrapper, None)?;
         self.create_account(account).await
     }
 
@@ -354,6 +354,9 @@ impl AccountService {
         country: Option<String>,
         wrapper: Option<String>,
     ) -> Result<Account, AccountError> {
+        // ACC-043 — read apart from the write: a sync landing in between is a single-user race
+        // whose worst case keeps a wrapper another device set, which ACC-040 allows anyway.
+        let stored_wrapper = self.get_by_id(&id).await?.and_then(|stored| stored.wrapper);
         let account = Account::with_id(
             id,
             name,
@@ -362,7 +365,7 @@ impl AccountService {
             update_frequency,
             management_fees_enabled,
         )?
-        .classified(country, wrapper)?;
+        .classified(country, wrapper, stored_wrapper.as_deref())?;
         self.update_account(account).await
     }
 
@@ -3192,14 +3195,14 @@ mod tests {
         );
     }
 
-    // ACC-041/043 — a malformed country and a wrapper of another country's list are refused with
-    // their own codes, and nothing is created.
+    // ACC-041/043 — a malformed country and a wrapper the lists do not know are refused with
+    // their own codes, and nothing is created; a known wrapper fits an account of any country.
     #[tokio::test]
-    async fn acc_041_a_country_or_a_wrapper_it_cannot_take_is_refused() {
+    async fn acc_043_any_account_takes_a_known_wrapper_and_an_unknown_one_is_refused() {
         let svc = setup_service().await;
-        let create = |country: Option<&str>, wrapper: Option<&str>| {
+        let create = |name: &str, country: Option<&str>, wrapper: Option<&str>| {
             svc.create_classified(
-                "Account".to_string(),
+                name.to_string(),
                 String::new(),
                 "EUR".to_string(),
                 UpdateFrequency::ManualMonth,
@@ -3209,20 +3212,79 @@ mod tests {
             )
         };
         assert!(matches!(
-            create(Some("fra"), None).await,
+            create("A", Some("fra"), None).await,
             Err(AccountError::InvalidCountry { .. })
         ));
         assert!(matches!(
-            create(None, Some("de_depot")).await,
-            Err(AccountError::WrapperNotAvailable { .. })
-        ));
-        assert!(matches!(
-            create(Some("ES"), Some("fr_pea")).await,
+            create("A", None, Some("isa")).await,
             Err(AccountError::WrapperNotAvailable { .. })
         ));
         assert!(svc.get_all().await.unwrap().is_empty());
-        let generic = create(Some("ES"), Some("brokerage")).await.unwrap();
-        assert_eq!(generic.wrapper.as_deref(), Some("brokerage"));
+        let french_in_spain = create("A", Some("ES"), Some("fr_pea")).await.unwrap();
+        assert_eq!(french_in_spain.wrapper.as_deref(), Some("fr_pea"));
+        let german_in_portfolio = create("B", None, Some("de_depot")).await.unwrap();
+        assert_eq!(german_in_portfolio.wrapper.as_deref(), Some("de_depot"));
+    }
+
+    // ACC-043/044 — an edit keeps a stored wrapper this device's lists do not know (another
+    // device's newer lists, ACC-040), and a change of country never empties the wrapper.
+    #[tokio::test]
+    async fn acc_043_an_edit_keeps_a_wrapper_the_lists_do_not_know() {
+        let svc = setup_service().await;
+        let created = svc
+            .create_classified(
+                "Plan".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+                Some("ES".to_string()),
+                None,
+            )
+            .await
+            .unwrap();
+        svc.account_repo
+            .update(
+                created.clone().with_stored_classification(
+                    Some("ES".to_string()),
+                    Some("es_plan".to_string()),
+                ),
+            )
+            .await
+            .unwrap();
+
+        let renamed = svc
+            .update_classified(
+                created.id.clone(),
+                "Plan pensiones".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+                Some("DE".to_string()),
+                Some("es_plan".to_string()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            (renamed.country.as_deref(), renamed.wrapper.as_deref()),
+            (Some("DE"), Some("es_plan"))
+        );
+
+        assert!(matches!(
+            svc.update_classified(
+                created.id.clone(),
+                "Plan pensiones".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+                None,
+                Some("it_pir".to_string()),
+            )
+            .await,
+            Err(AccountError::WrapperNotAvailable { .. })
+        ));
     }
 
     async fn enable_management_fees(svc: &AccountService, account: &Account) -> Account {

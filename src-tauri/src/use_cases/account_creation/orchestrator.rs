@@ -75,7 +75,7 @@ impl AccountCreationUseCase {
             update_frequency,
             management_fees_enabled,
         )?
-        .classified(country.clone(), wrapper.clone())?;
+        .classified(country.clone(), wrapper.clone(), None)?;
         // CSH-010 — the Cash Asset must exist before the Cash Holding references it (FK).
         self.asset_service
             .seed_cash_asset(&currency)

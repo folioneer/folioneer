@@ -11,6 +11,7 @@ import {
   type FetchTrigger,
   type Result,
   type UpdateAccountDTO,
+  type WrapperLists,
 } from "../../bindings";
 
 /**
@@ -32,6 +33,11 @@ export const accountGateway = {
 
   async updateAccount(dto: UpdateAccountDTO): Promise<Result<Account, AccountError>> {
     return await commands.updateAccount(dto);
+  },
+
+  // ACC-040 — the wrapper lists; infallible, the lists are the application's own.
+  async getWrapperLists(): Promise<WrapperLists> {
+    return await commands.getWrapperLists();
   },
 
   async deleteAccount(id: string): Promise<Result<null, AccountError>> {

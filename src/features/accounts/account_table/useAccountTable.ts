@@ -133,13 +133,23 @@ export function useAccountTable(
     (e: MouseEvent, account: AccountSummary) => {
       e.stopPropagation();
       // EditAccountModal expects a full Account; the summary row lacks
-      // bank_name (ACC-026) and management_fees_enabled (FEE-075), so both are
-      // read from the loaded account catalog to prefill the edit form correctly.
+      // bank_name (ACC-026), management_fees_enabled (FEE-075) and the country
+      // (ACC-041), so they are read from the loaded account catalog to prefill the
+      // edit form — an edit must not clear what it did not show.
       const { id, name, currency, update_frequency } = account;
       const catalogAccount = storeAccounts.find((a) => a.id === id);
       const bank_name = catalogAccount?.bank_name ?? "";
       const management_fees_enabled = catalogAccount?.management_fees_enabled ?? false;
-      setEditData({ id, name, bank_name, currency, update_frequency, management_fees_enabled });
+      setEditData({
+        id,
+        name,
+        bank_name,
+        currency,
+        update_frequency,
+        management_fees_enabled,
+        country: catalogAccount?.country ?? null,
+        wrapper: catalogAccount?.wrapper ?? null,
+      });
     },
     [storeAccounts],
   );

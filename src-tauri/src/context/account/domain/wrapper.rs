@@ -70,15 +70,80 @@ pub const WRAPPERS: &[Wrapper] = &[
     wrapper("de_bav", Some("DE"), ["bAV", "bAV", "bAV"]),
 ];
 
-/// ACC-043 — whether `wrapper_id` may be set on an account of `country`: one of the generic
-/// list or of that country's list.
-pub fn wrapper_available(wrapper_id: &str, country: &str) -> bool {
-    WRAPPERS.iter().any(|wrapper| {
-        wrapper.id == wrapper_id
-            && wrapper
-                .country
-                .is_none_or(|list_country| list_country == country)
-    })
+/// ACC-045 — every country, ISO 3166-1 alpha-2 in code order (from the iso-codes data); the
+/// window names each in its language.
+pub const COUNTRIES: &[&str] = &[
+    "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ",
+    "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BL", "BM", "BN", "BO", "BQ", "BR", "BS",
+    "BT", "BV", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN",
+    "CO", "CR", "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM", "DO", "DZ", "EC", "EE",
+    "EG", "EH", "ER", "ES", "ET", "FI", "FJ", "FK", "FM", "FO", "FR", "GA", "GB", "GD", "GE", "GF",
+    "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GS", "GT", "GU", "GW", "GY", "HK", "HM",
+    "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JE", "JM",
+    "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC",
+    "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MF", "MG", "MH", "MK",
+    "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA",
+    "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG",
+    "PH", "PK", "PL", "PM", "PN", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW",
+    "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS",
+    "ST", "SV", "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TK", "TL", "TM", "TN", "TO",
+    "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "UM", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI",
+    "VN", "VU", "WF", "WS", "YE", "YT", "ZA", "ZM", "ZW",
+];
+
+/// ACC-043 — whether the lists hold `wrapper_id`: a known wrapper fits an account of any
+/// country (a wrapper belongs to its country, holding it elsewhere is the user's choice).
+pub fn wrapper_known(wrapper_id: &str) -> bool {
+    WRAPPERS.iter().any(|wrapper| wrapper.id == wrapper_id)
+}
+
+/// ACC-045 — the wrappers an account of `country` is offered, in order: its country's list,
+/// then the generic one (ACC-043).
+pub fn wrapper_ids_for(country: &str) -> Vec<&'static str> {
+    let of_country = WRAPPERS
+        .iter()
+        .filter(|wrapper| wrapper.country == Some(country));
+    of_country
+        .map(|wrapper| wrapper.id)
+        .chain(generic_wrapper_ids())
+        .collect()
+}
+
+/// ACC-045 — the countries the form offers, every one once: the portfolio's first, then each
+/// other country with a list of its own in the lists' order, then the others in code order.
+pub fn offered_countries() -> Vec<&'static str> {
+    let mut countries = vec![PORTFOLIO_COUNTRY];
+    let listed = WRAPPERS.iter().filter_map(|wrapper| wrapper.country);
+    for country in listed.chain(COUNTRIES.iter().copied()) {
+        if !countries.contains(&country) {
+            countries.push(country);
+        }
+    }
+    countries
+}
+
+/// ACC-040 — the generic list, which a country with no list of its own is offered.
+pub fn generic_wrapper_ids() -> Vec<&'static str> {
+    WRAPPERS
+        .iter()
+        .filter(|wrapper| wrapper.country.is_none())
+        .map(|wrapper| wrapper.id)
+        .collect()
+}
+
+/// ACC-045 — the wrappers each country with a list of its own is offered (the portfolio's
+/// first), in order; any other country is offered `generic_wrapper_ids`.
+pub fn country_offers() -> Vec<(&'static str, Vec<&'static str>)> {
+    offered_countries()
+        .into_iter()
+        .filter(|country| {
+            *country == PORTFOLIO_COUNTRY
+                || WRAPPERS
+                    .iter()
+                    .any(|wrapper| wrapper.country == Some(country))
+        })
+        .map(|country| (country, wrapper_ids_for(country)))
+        .collect()
 }
 
 /// ACC-041 — a country is written as two upper-case letters (ISO 3166-1 alpha-2).
@@ -107,16 +172,29 @@ mod tests {
         assert_eq!((of(None), of(Some("FR")), of(Some("DE"))), (6, 4, 3));
     }
 
-    // ACC-043 — a wrapper of the generic list fits any country; a country's wrapper fits that
-    // country only; an unknown identifier fits none.
+    // ACC-043 — a wrapper the lists hold is known, whatever its country; an unknown
+    // identifier is not.
     #[test]
-    fn acc_043_a_wrapper_fits_the_generic_list_or_its_country() {
-        assert!(wrapper_available("brokerage", "FR"));
-        assert!(wrapper_available("brokerage", "ES"));
-        assert!(wrapper_available("fr_pea", "FR"));
-        assert!(!wrapper_available("fr_pea", "DE"));
-        assert!(wrapper_available("de_bav", "DE"));
-        assert!(!wrapper_available("isa", "FR"));
+    fn acc_043_a_wrapper_of_any_list_is_known() {
+        assert!(wrapper_known("brokerage"));
+        assert!(wrapper_known("fr_pea"));
+        assert!(wrapper_known("de_bav"));
+        assert!(!wrapper_known("isa"));
+    }
+
+    // ACC-045 — every country is offered once: the portfolio's first, then the countries with
+    // a list of their own, then the others in code order.
+    #[test]
+    fn acc_045_every_country_is_offered_once_the_portfolios_first() {
+        let offered = offered_countries();
+        assert_eq!(&offered[..3], &["FR", "DE", "AD"]);
+        assert_eq!(offered.len(), COUNTRIES.len());
+        assert!(offered.contains(&"ES") && offered.contains(&"ZW"));
+        let mut once = offered.clone();
+        once.sort_unstable();
+        once.dedup();
+        assert_eq!(once.len(), offered.len(), "a country is offered twice");
+        assert!(COUNTRIES.iter().all(|country| country_well_formed(country)));
     }
 
     // ACC-041 — a country is two upper-case letters.

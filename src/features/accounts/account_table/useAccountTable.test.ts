@@ -17,6 +17,7 @@ function makeAccount(
     name,
     currency: "EUR",
     update_frequency: freq,
+    wrapper: null,
     total_global_value,
     total_unrealized_pnl,
     ytd_performance_pct,
@@ -220,6 +221,8 @@ describe("useAccountTable", () => {
       currency: account.currency,
       update_frequency: account.update_frequency,
       management_fees_enabled: false,
+      country: null,
+      wrapper: null,
     });
   });
 
@@ -395,6 +398,7 @@ describe("useAccountTable — bank name column (ACC-026, ACC-008)", () => {
       bank_name,
       currency: "EUR",
       update_frequency: "ManualMonth",
+      wrapper: null,
       management_fees_enabled: false,
     };
   }
@@ -502,6 +506,22 @@ describe("useAccountTable — bank name column (ACC-026, ACC-008)", () => {
     act(() => result.current.handleEditClick(makeMouseEvent(), bankAccounts[0]));
 
     expect(result.current.editData?.bank_name).toBe("Fortuneo");
+  });
+
+  // ACC-044 — an edit must not clear what it did not show: the country and the wrapper come
+  // from the account catalog, the list row carrying no country.
+  it("handleEditClick prefills the country and the wrapper from the account catalog", () => {
+    useAppStore.setState({
+      accounts: [{ ...makeCatalogAccount("a", "Alpha", ""), country: "DE", wrapper: "de_bav" }],
+    });
+    const { result } = renderHook(() =>
+      useAccountTable(bankAccounts, "", noopDelete, noopSummary, noopAccountClick),
+    );
+
+    act(() => result.current.handleEditClick(makeMouseEvent(), bankAccounts[0]));
+
+    expect(result.current.editData?.country).toBe("DE");
+    expect(result.current.editData?.wrapper).toBe("de_bav");
   });
 });
 

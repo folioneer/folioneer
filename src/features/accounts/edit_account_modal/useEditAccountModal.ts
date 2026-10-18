@@ -20,6 +20,8 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
     currency: "EUR",
     update_frequency: "ManualMonth",
     management_fees_enabled: false,
+    country: "",
+    wrapper: "",
   });
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,6 +35,8 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
         currency: account.currency,
         update_frequency: account.update_frequency,
         management_fees_enabled: account.management_fees_enabled,
+        country: account.country ?? "",
+        wrapper: account.wrapper ?? "",
       });
       setError(null);
     }
@@ -45,6 +49,9 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
       [name]: type === "checkbox" && "checked" in e.target ? e.target.checked : value,
     }));
   };
+
+  // ACC-043 — a change of country keeps the wrapper: any account may hold any wrapper.
+  const setCountry = (country: string) => setFormData((prev) => ({ ...prev, country }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,9 +74,8 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
       currency: formData.currency,
       update_frequency: formData.update_frequency,
       management_fees_enabled: formData.management_fees_enabled,
-      // ACC-041 — kept as the account has them until the form edits them.
-      country: account.country ?? null,
-      wrapper: account.wrapper ?? null,
+      country: formData.country || null,
+      wrapper: formData.wrapper || null,
     });
 
     setIsSubmitting(false);
@@ -88,6 +94,7 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
     error,
     isSubmitting,
     handleChange,
+    setCountry,
     handleSubmit,
     frequencies: FREQUENCIES,
   };

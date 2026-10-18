@@ -28,6 +28,9 @@ pub struct AccountSummary {
     pub currency: String,
     /// Manual / Automatic update cadence (purely informational, ACC-004).
     pub update_frequency: UpdateFrequency,
+    /// ACC-046 — the identifier of the account's tax wrapper (ACC-043), for the list's column
+    /// and grouping; none when unset.
+    pub wrapper: Option<String>,
     /// Total economic value in account-currency micros (CSH-094 / FXR-041): cash
     /// quantity plus the sum of `quantity × latest_price` over priced active non-cash
     /// holdings, with foreign holdings converted to account currency. Unpriced holdings,
@@ -143,6 +146,7 @@ impl AccountSummaryUseCase {
                 name: account.name,
                 currency: account.currency,
                 update_frequency: account.update_frequency,
+                wrapper: account.wrapper,
                 total_global_value,
                 total_unrealized_pnl,
                 ytd_performance_pct,
@@ -678,6 +682,51 @@ mod tests {
         );
         let summaries = uc.get_account_summaries().await.unwrap().summaries;
         assert_eq!(summaries[0].total_global_value, 0);
+    }
+
+    // ACC-045 — each row of the accounts list carries the account's wrapper, or none.
+    #[tokio::test]
+    async fn acc_045_each_summary_carries_the_account_wrapper() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        account_svc
+            .create_classified(
+                "PEA".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+                None,
+                Some("fr_pea".to_string()),
+            )
+            .await
+            .unwrap();
+        account_svc
+            .create(
+                "Plain".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .unwrap();
+        let uc = AccountSummaryUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let summaries = uc.get_account_summaries().await.unwrap().summaries;
+        let wrapper = |name: &str| {
+            summaries
+                .iter()
+                .find(|summary| summary.name == name)
+                .unwrap()
+                .wrapper
+                .clone()
+        };
+        assert_eq!(wrapper("PEA").as_deref(), Some("fr_pea"));
+        assert_eq!(wrapper("Plain"), None);
     }
 
     // MKT-206 — each account counts its holdings whose price is outdated (MKT-205), and the
@@ -1526,6 +1575,7 @@ mod tests {
             name: "Account".to_string(),
             currency: currency.to_string(),
             update_frequency: UpdateFrequency::ManualMonth,
+            wrapper: None,
             total_global_value: global_value,
             total_unrealized_pnl: unrealized_pnl,
             ytd_performance_pct: None,

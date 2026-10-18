@@ -14,12 +14,12 @@ This spec covers the CRUD lifecycle of accounts. The Account Details view (drill
 
 A financial account owned by the user.
 
-| Field              | Business meaning                                                                                                              |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `name`             | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among all accounts (case-insensitive).                  |
-| `update_frequency` | Frequency at which the user plans to update the account's data. Informational only — no automation is triggered today.        |
-| `country`          | The account's own country (two upper-case letters), when one is set; absent otherwise (ACC-041).                              |
-| `wrapper`          | The identifier of the tax wrapper the account sits in, from the lists of ACC-040; absent when none is set (ACC-043, ACC-044). |
+| Field              | Business meaning                                                                                                                         |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`             | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among all accounts (case-insensitive).                             |
+| `update_frequency` | Frequency at which the user plans to update the account's data. Informational only — no automation is triggered today.                   |
+| `country`          | The account's own country (two upper-case letters), when one is set; absent otherwise (ACC-041).                                         |
+| `wrapper`          | The identifier of the tax wrapper the account sits in, normally one of the lists of ACC-040; absent when none is set (ACC-043, ACC-044). |
 
 ### PortfolioTotal
 
@@ -67,6 +67,7 @@ The total of every account, read together with the account summaries (ACC-027). 
 | --------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Name            | `account.name`                                                                                                          | Yes                                                                                                   |
 | Bank            | Bank or broker name (ACC-026); "—" when unset                                                                           | Yes — unset sorts last in both directions                                                             |
+| Wrapper         | The account's wrapper (ACC-046); "—" without one                                                                        | No                                                                                                    |
 | Frequency       | Human-readable label for `update_frequency`                                                                             | Yes — sorted on the logical enum order: Automatic → ManualDay → ManualWeek → ManualMonth → ManualYear |
 | Global Value    | `total_global_value` formatted in the account's own currency (ACC-021); 0 shown for empty accounts                      | Yes                                                                                                   |
 | Unrealized P&L  | `total_unrealized_pnl` formatted in the account's own currency (ACC-023); "—" when no holding has a computable value    | Yes — null values sort last                                                                           |
@@ -95,9 +96,9 @@ The account section title is displayed in the application shell header, not in t
 
 **ACC-015 — Default UpdateFrequency (frontend)** _(formerly R7)_: The create form pre-selects `ManualMonth` as the default frequency.
 
-**ACC-016 — Create via FAB (frontend)** _(formerly R14)_: A floating action button (bottom-right) opens a create modal with a Name field (required) and an `UpdateFrequency` selector. Submission is blocked if the name is empty or whitespace-only. After successful creation the modal closes and the table refreshes. On backend error, an inline error message is shown per ACC-014.
+**ACC-016 — Create via FAB (frontend)** _(formerly R14)_: A floating action button (bottom-right) opens a create modal with a Name field (required), an `UpdateFrequency` selector, and the account's Country and Wrapper (ACC-045, ACC-048). Submission is blocked if the name is empty or whitespace-only. After successful creation the modal closes and the table refreshes. On backend error, an inline error message is shown per ACC-014.
 
-**ACC-017 — Edit (frontend)** _(formerly R15)_: The Edit button opens a modal with the Name and `UpdateFrequency` fields pre-filled. After saving, the modal closes and the table refreshes. On backend error, an inline error message is shown per ACC-014.
+**ACC-017 — Edit (frontend)** _(formerly R15)_: The Edit button opens a modal with the Name and `UpdateFrequency` fields pre-filled, and the account's Country and Wrapper as the account has them, a wrapper from another country's list or one this device does not know included (ACC-043, ACC-048). After saving, the modal closes and the table refreshes. On backend error, an inline error message is shown per ACC-014.
 
 **ACC-018 — Delete empty account (frontend)** _(formerly R16)_: If the `Account` has no `Holding`, the Delete button opens a standard confirmation dialog. Confirmation triggers deletion (ACC-005, ACC-006); after deletion the dialog closes and the table refreshes.
 
@@ -127,7 +128,7 @@ The account section title is displayed in the application shell header, not in t
 
 **ACC-029 — The portfolio Unrealized P&L can be absent (backend)**: The portfolio Unrealized P&L is absent when no account that can be converted carries an Unrealized P&L; the total is then incomplete when ACC-028's condition holds.
 
-**ACC-030 — What the total row shows (frontend)**: The account table closes with a total row. Its label, "Total", spans the name, bank and frequency columns. It states the portfolio Global Value and the portfolio Unrealized P&L, both in the cross-account reference currency, which it names; the Unrealized P&L is presented as a gain when positive, a loss when negative, neither when zero, and "—" when absent (ACC-029). A "partial" marker follows the label when the total is incomplete (ACC-028). The year-to-date and actions cells stay blank.
+**ACC-030 — What the total row shows (frontend)**: The account table closes with a total row. Its label, "Total", spans the name, bank, wrapper and frequency columns. It states the portfolio Global Value and the portfolio Unrealized P&L, both in the cross-account reference currency, which it names; the Unrealized P&L is presented as a gain when positive, a loss when negative, neither when zero, and "—" when absent (ACC-029). A "partial" marker follows the label when the total is incomplete (ACC-028). The year-to-date and actions cells stay blank.
 
 **ACC-031 — Where the total row sits (frontend)**: The total row stays below every account whatever the sort column and direction (ACC-009). It is not an account row: it cannot be focused, clicked, or used to open Account Details (ACC-010).
 
@@ -139,15 +140,23 @@ The account section title is displayed in the application shell header, not in t
 
 The tax wrapper an account sits in — a PEA, an assurance vie, a Depot — is a label: no tax is computed and no rule is enforced (owner, 2026-10-17).
 
-**ACC-040 — The wrapper lists (backend)**: The application knows a generic list of wrappers — brokerage, savings, pension, life insurance, crypto wallet, other — and a list per country: France (PEA, PEA-PME, assurance vie, PER) and Germany (Depot, Riester/Rürup, bAV). Each wrapper has an identifier that never changes and a label in English, French and German. The lists are available together, with the portfolio's country. A wrapper's identifier is free text wherever it is stored or synced: a device whose lists do not know one keeps it, and shows the identifier itself.
+**ACC-040 — The wrapper lists (backend)**: The application knows a generic list of wrappers — brokerage, savings, pension, life insurance, crypto wallet, other — and a list per country: France (PEA, PEA-PME, assurance vie, PER) and Germany (Depot, Riester/Rürup, bAV). A wrapper belongs to its country's list, or to the generic one. Each has an identifier that never changes and a label in English, French and German. For any country the application gives its wrappers in order — its own list, then the generic one — and it gives every country (ISO 3166-1 alpha-2) in the order the account form offers them: the portfolio's first, then the countries with a list of their own in the order of the lists (France, then Germany), then every other country alphabetically by its two-letter code.
 
-**ACC-041 — An account's country (backend)**: An account may carry a country of its own — two upper-case letters (ISO 3166-1 alpha-2), refused with `InvalidCountry` otherwise; whether the code is assigned is not checked (`XX` is accepted) — stored as given. Without one, the account's country is the portfolio's: France, fixed until the first run asks it (TODO-092).
+**ACC-041 — An account's country (backend)**: An account may carry a country of its own — two upper-case letters (ISO 3166-1 alpha-2), refused otherwise; whether the code is assigned is not checked (`XX` is accepted) — stored as given. Without one, the account's country is the portfolio's: France, fixed until the first run asks it (TODO-092).
 
-**ACC-042 — An agent reads them (backend)**: `list_accounts` gives each account's country — its own, or the portfolio's — and its wrapper's identifier, or none (AGT-040). (Dependency: an agent sets them when it creates an account, with TODO-088.)
+**ACC-042 — An agent reads them (backend)**: An agent's list of accounts gives each account's country — its own, or the portfolio's — and its wrapper's identifier, or none (AGT-040). (Dependency: an agent sets them when it creates an account, with TODO-088.)
 
-**ACC-043 — An account's wrapper (backend)**: An account may carry a wrapper: one of the generic list or of its country's list (ACC-041), refused with `WrapperNotAvailable` otherwise. A country with no list of its own offers the generic list only.
+**ACC-043 — An account's wrapper (backend)**: An account may carry any wrapper the lists hold, whatever its country — a French PEA in an account of another country is the user's choice (owner, 2026-10-18). A wrapper's identifier is free text wherever it is stored or synced, so a device whose lists do not know one keeps it. Setting a wrapper the lists do not hold is refused, unless it is the one the account already carries: an edit keeps a wrapper another device's newer lists set.
 
-**ACC-044 — Setting and editing them (backend)**: Both are optional, set when the account is created or edited (ACC-016, ACC-017), and travel with the account to the other devices (SYN-038). An edit states both, and one left empty is cleared; an edit that would leave a wrapper outside its new country's list is refused with `WrapperNotAvailable`, and nothing changes. An account that existed before has neither, and nothing else changes for it. (Dependency: the form's two fields, and the accounts list by wrapper, come with TODO-091's window part, which amends ACC-016 and ACC-017.)
+**ACC-044 — Setting and editing them (backend)**: Both are optional, set when the account is created or edited (ACC-016, ACC-017), and travel with the account to the other devices (SYN-038). An edit states both, and one left empty is cleared; a change of country, the account's or the portfolio's, never clears the wrapper. An account that existed before has neither, and nothing else changes for it.
+
+**ACC-045 — Country in the account form (frontend)**: Once the lists are read (ACC-040) the create and edit modals show a Country and a Wrapper (ACC-048); until then, or when they cannot be read, neither shows and the account keeps what it has. Country is a searchable list of every country, named in the window's language, in the order ACC-040 gives: the portfolio's first, named after it with "(the portfolio's)" — choosing it leaves the account without a country of its own, so it follows the portfolio's. The portfolio's country is listed once, as the portfolio's entry. An account whose own country is stored keeps it on save until another country is chosen; when that stored country equals the portfolio's, no entry shows as selected and it is still kept.
+
+**ACC-048 — Wrapper in the account form (frontend)**: Wrapper offers none, then the chosen country's wrappers, then the generic ones, labelled in the window's language (French, German, else English), and after them the wrapper chosen when it is from another list (by its label) or one the lists do not know (by its identifier), so a change of country or an edit keeps it. Its help line reads "The tax wrapper the account sits in. A label only: no tax is computed."
+
+**ACC-046 — The Wrapper column (frontend)**: The account table shows each account's wrapper in a Wrapper column after Bank (ACC-008): its label in the window's language, the identifier for one the lists do not know, "—" without one or until the lists are read.
+
+**ACC-047 — Grouping by wrapper (frontend)**: Once the lists are read and accounts are listed — not while the accounts load, fail to load or none exists; a search matching nothing keeps it — a "Group by" choice above the account table offers Nothing or Wrapper; it is kept while the page stays open, not between visits. Grouped, the accounts sit under one heading per wrapper — its label in the window's language, or the identifier of one the lists do not know — in a fixed order: the generic wrappers, then France's, then Germany's, each list in the order ACC-040 names its wrappers; the wrappers they do not know after them in the order the accounts meet them, the accounts without one last under "No wrapper". A heading is not an account row: it cannot be focused, clicked or collapsed. Sorting (ACC-009) orders the accounts within each heading, the headings keeping their order; a search (ACC-011) hides a heading left with no account; the total row stays below every heading (ACC-031). Grouping changes only how this table shows the accounts.
 
 ### Events
 
@@ -168,11 +177,13 @@ The tax wrapper an account sits in — a PEA, an assurance vie, a Depot — is a
           │
           ├─ [Column header] → Toggle asc/desc sort + visual indicator (ACC-009)
           │
-          ├─ [FAB] → Create modal (Name + Frequency, default ManualMonth)
+          ├─ [Group by] → Nothing or Wrapper (ACC-047)
+          │
+          ├─ [FAB] → Create modal (Name, Bank, Frequency default ManualMonth, Country, Wrapper)
           │            → Inline error if name empty or duplicate (ACC-014)
           │            → Account created → modal closed → table refreshed
           │
-          ├─ [Edit] → Edit modal (Name + Frequency pre-filled)
+          ├─ [Edit] → Edit modal (Name, Bank, Frequency, Country, Wrapper pre-filled)
           │            → Inline error if duplicate (ACC-014)
           │            → Saved → modal closed → table refreshed
           │
@@ -192,7 +203,7 @@ The tax wrapper an account sits in — a PEA, an assurance vie, a Depot — is a
 
 ### Main component
 
-Full-width table, default sort by Name ascending. Floating action button (bottom-right). Each row is fully clickable (navigates to Account Details, ACC-010) with a `ChevronRight` hover affordance. Edit and Delete buttons per row (stop propagation). The table closes with a portfolio total row in the cross-account reference currency (ACC-030).
+Full-width table, default sort by Name ascending. Floating action button (bottom-right). Each row is fully clickable (navigates to Account Details, ACC-010) with a `ChevronRight` hover affordance. Edit and Delete buttons per row (stop propagation). A Wrapper column after Bank (ACC-046), and above the table a "Group by" choice, Nothing or Wrapper (ACC-047). The table closes with a portfolio total row in the cross-account reference currency (ACC-030).
 
 ### States
 
@@ -201,6 +212,8 @@ Full-width table, default sort by Name ascending. Floating action button (bottom
 - **Load error**: error message + Retry button (ACC-013)
 - **No search results**: message distinct from empty state (ACC-011)
 - **Filtering**: the portfolio total row is hidden while a search filter is active (ACC-032)
+- **Grouped by wrapper**: one heading per wrapper, the accounts without one under "No wrapper" (ACC-047)
+- **Wrapper lists not read**: the form shows no Country or Wrapper, the column shows "—" and there is no "Group by" (ACC-045 to ACC-048)
 - **Total incomplete**: "partial" beside the total's label when an unconvertible account hides a figure (ACC-028, ACC-030)
 - **Inline error**: message displayed inside the active modal or dialog (ACC-014)
 - **Delete empty account confirmation**: standard confirmation dialog (ACC-018)
@@ -211,7 +224,7 @@ Full-width table, default sort by Name ascending. Floating action button (bottom
 
 1. User opens the Accounts page (section title shown in the shell header).
 2. User clicks a row → navigates to Account Details for the selected account (ACC-010).
-3. User clicks FAB → modal → enters name and selects frequency → submits → account created.
+3. User clicks FAB → modal → enters name, bank, frequency, country and wrapper → submits → account created.
 4. User clicks Edit → pre-filled modal → modifies → saves → modal closes.
 5. User clicks Delete (empty account) → standard dialog → confirms → account deleted.
 6. User clicks Delete (account with positions) → reinforced dialog → confirms → account + positions + transactions deleted.

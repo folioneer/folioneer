@@ -26,13 +26,13 @@ Owns all holdings and their transaction history.
 
 ### Portfolio's country
 
-The country of residence a portfolio is kept in, which an account without a country of its own takes (ACC-041): its wrappers come from that country's list. France until the first run asks it (TODO-092). In French: "pays du portefeuille" (owner, 2026-10-17).
+The country of residence a portfolio is kept in, which an account without a country of its own takes (ACC-041): the account form suggests that country's wrappers first. France until the first run asks it (TODO-092). In French: "pays du portefeuille" (owner, 2026-10-17).
 
 > Status: confirmed
 
 ### Wrapper
 
-The tax wrapper an account sits in — a PEA, an assurance vie, a Depot: a label, from a generic list or from the account's country's list (ACC-040, ACC-043). No tax is computed from it and no rule enforced. Code: `wrapper` (an identifier of the lists), with the account's `country`. French: "enveloppe" ("enveloppe fiscale" in full) (owner, 2026-10-18).
+The tax wrapper an account sits in — a PEA, an assurance vie, a Depot: a label from the lists (ACC-040): a wrapper belongs to a country's list or to the generic one, and any account may hold any of them — holding one of another country is the user's choice (owner, 2026-10-18) (ACC-043). No tax is computed from it and no rule enforced. Code: `wrapper` (an identifier of the lists), with the account's `country`. French: "enveloppe" ("enveloppe fiscale" in full) (owner, 2026-10-18).
 
 > Status: confirmed
 

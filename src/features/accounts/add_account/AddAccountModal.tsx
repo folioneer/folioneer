@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import { Button } from "@/ui/components/button/Button";
 import { Dialog } from "@/ui/components/modal/Dialog";
 import { AccountForm } from "../shared/AccountForm";
+import { useWrapperLists } from "../useWrapperLists";
 import { useAddAccount } from "./useAddAccount";
 
 interface AddAccountModalProps {
@@ -13,13 +14,15 @@ interface AddAccountModalProps {
 
 export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
   const { t } = useTranslation();
+  const wrapperLists = useWrapperLists();
   useEffect(() => {
     logger.info("[AddAccountModal] mounted");
   }, []);
 
-  const { formData, error, isSubmitting, handleChange, handleSubmit, frequencies } = useAddAccount({
-    onSubmitSuccess: onClose,
-  });
+  const { formData, error, isSubmitting, handleChange, setCountry, handleSubmit, frequencies } =
+    useAddAccount({
+      onSubmitSuccess: onClose,
+    });
 
   const actions = (
     <>
@@ -50,7 +53,9 @@ export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
         <AccountForm
           formData={formData}
           handleChange={handleChange}
+          setCountry={setCountry}
           frequencies={frequencies}
+          wrapperLists={wrapperLists}
           idPrefix="add-account"
         />
         {/* R13 — inline error stays modal open */}
