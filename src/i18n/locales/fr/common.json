@@ -711,11 +711,12 @@
       "missing_ticker": "Ticker manquant",
       "no_price_available": "Pas de prix disponible"
     },
-    "lock": {
-      "action_block": "Bloquer les mises à jour automatiques pour cet actif",
-      "action_unblock": "Réactiver les mises à jour automatiques pour cet actif",
-      "success_blocked": "Mises à jour automatiques bloquées pour cet actif.",
-      "success_unblocked": "Mises à jour automatiques réactivées pour cet actif."
+    "typed_by_hand": {
+      "action_type_by_hand": "Saisir son prix à la main",
+      "action_fetch_automatically": "Récupérer son prix automatiquement",
+      "success_typed_by_hand": "Le prix de cet actif est désormais saisi à la main.",
+      "success_fetched_automatically": "Le prix de cet actif est désormais récupéré automatiquement.",
+      "row_label": "Prix saisi à la main"
     },
     "backfill": {
       "action": "Compléter l'historique des prix",
@@ -723,7 +724,7 @@
       "nothing_missing": "Aucun prix manquant à compléter",
       "error": {
         "AssetNeverHeld": "Ce compte n'a jamais détenu cet actif",
-        "PriceRefreshBlocked": "Les mises à jour automatiques des prix sont bloquées pour cet actif",
+        "PriceRefreshBlocked": "Le prix de cet actif est saisi à la main : il n'est pas récupéré",
         "TickerNotResolved": "Aucun historique de prix trouvé pour cet actif — vérifiez son ticker",
         "ProviderUnreachable": "Le fournisseur de prix est injoignable — rien n'a été enregistré"
       }

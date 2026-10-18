@@ -103,6 +103,12 @@ How recent the portfolio's prices are, told by two figures. The **newest price d
 
 > Status: confirmed
 
+### Price typed by hand
+
+An asset whose price the owner types and no fetch replaces: every fetch task leaves it (MKT-151, SPF-040) and the backfill refuses it (MKT-196), for an asset whose price cannot be fetched. Code: `price_refresh_blocked` (owner, 2026-10-18). Never called a "lock". French: "prix saisi à la main".
+
+> Status: confirmed
+
 ### AssetPriceSource
 
 A value-object enum qualifying the provenance of an `AssetPrice` record. Variants: `Manual` (user-entered via manual entry or transaction auto-record), `YahooFinance` (written by a fetch through a Yahoo Finance provider, as in the owner's private build) and `Agent` (recorded by an agent the owner allowed — the Mark of a price; owner, 2026-10-10). Metadata for traceability per ADR-012 — does not influence read/write precedence (latest-write-wins).

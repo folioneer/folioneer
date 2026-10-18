@@ -126,7 +126,7 @@ describe("useAccountDetailsView — price history backfill (MKT-190/197)", () =>
   });
 });
 
-describe("useAccountDetailsView — price-refresh lock toggle (MKT-156/157)", () => {
+describe("useAccountDetailsView — price typed by hand toggle (MKT-156/157)", () => {
   beforeEach(() => {
     mockBlock.mockReset();
     mockUnblock.mockReset();
@@ -139,31 +139,37 @@ describe("useAccountDetailsView — price-refresh lock toggle (MKT-156/157)", ()
     } as never);
   });
 
-  it("calls blockAssetPriceRefresh, refetches assets, and surfaces a success snackbar when toggling an unlocked asset", async () => {
+  it("calls blockAssetPriceRefresh, refetches assets, and surfaces a success snackbar when the price is fetched automatically", async () => {
     mockBlock.mockResolvedValue({ status: "ok", data: null });
     const { result } = renderHook(() => useAccountDetailsView("acc-1"));
 
     await act(async () => {
-      await result.current.handleTogglePriceRefreshLock("asset-1", false);
+      await result.current.handleTogglePriceRefreshBlocked("asset-1", false);
     });
 
     expect(mockBlock).toHaveBeenCalledWith("asset-1");
     expect(mockUnblock).not.toHaveBeenCalled();
     expect(mockFetchAssets).toHaveBeenCalledTimes(1);
-    expect(mockShowSnackbar).toHaveBeenCalledWith("mkt.lock.success_blocked", "success");
+    expect(mockShowSnackbar).toHaveBeenCalledWith(
+      "mkt.typed_by_hand.success_typed_by_hand",
+      "success",
+    );
   });
 
-  it("calls unblockAssetPriceRefresh when the asset is currently locked", async () => {
+  it("calls unblockAssetPriceRefresh when the price is typed by hand", async () => {
     mockUnblock.mockResolvedValue({ status: "ok", data: null });
     const { result } = renderHook(() => useAccountDetailsView("acc-1"));
 
     await act(async () => {
-      await result.current.handleTogglePriceRefreshLock("asset-1", true);
+      await result.current.handleTogglePriceRefreshBlocked("asset-1", true);
     });
 
     expect(mockUnblock).toHaveBeenCalledWith("asset-1");
     expect(mockBlock).not.toHaveBeenCalled();
-    expect(mockShowSnackbar).toHaveBeenCalledWith("mkt.lock.success_unblocked", "success");
+    expect(mockShowSnackbar).toHaveBeenCalledWith(
+      "mkt.typed_by_hand.success_fetched_automatically",
+      "success",
+    );
   });
 
   it("surfaces a typed error snackbar when the backend rejects", async () => {
@@ -171,7 +177,7 @@ describe("useAccountDetailsView — price-refresh lock toggle (MKT-156/157)", ()
     const { result } = renderHook(() => useAccountDetailsView("acc-1"));
 
     await act(async () => {
-      await result.current.handleTogglePriceRefreshLock("cash-id", false);
+      await result.current.handleTogglePriceRefreshBlocked("cash-id", false);
     });
 
     expect(mockShowSnackbar).toHaveBeenCalledWith("error.CashAssetNotEditable", "error");
@@ -183,7 +189,7 @@ describe("useAccountDetailsView — price-refresh lock toggle (MKT-156/157)", ()
     const { result } = renderHook(() => useAccountDetailsView("acc-1"));
 
     await act(async () => {
-      await result.current.handleTogglePriceRefreshLock("asset-1", false);
+      await result.current.handleTogglePriceRefreshBlocked("asset-1", false);
     });
 
     expect(mockShowSnackbar).toHaveBeenCalledWith("error.Unknown", "error");

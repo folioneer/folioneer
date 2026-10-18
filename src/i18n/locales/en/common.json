@@ -711,11 +711,12 @@
       "missing_ticker": "Missing ticker",
       "no_price_available": "No price available"
     },
-    "lock": {
-      "action_block": "Block automatic price updates for this asset",
-      "action_unblock": "Allow automatic price updates for this asset",
-      "success_blocked": "Automatic price updates blocked for this asset.",
-      "success_unblocked": "Automatic price updates re-enabled for this asset."
+    "typed_by_hand": {
+      "action_type_by_hand": "Type its price by hand",
+      "action_fetch_automatically": "Fetch its price automatically",
+      "success_typed_by_hand": "This asset's price is now typed by hand.",
+      "success_fetched_automatically": "This asset's price is now fetched automatically.",
+      "row_label": "Price typed by hand"
     },
     "backfill": {
       "action": "Fill missing price history",
@@ -723,7 +724,7 @@
       "nothing_missing": "No missing price to fill",
       "error": {
         "AssetNeverHeld": "This account never held this asset",
-        "PriceRefreshBlocked": "Automatic price updates are locked for this asset",
+        "PriceRefreshBlocked": "This asset's price is typed by hand: it is not fetched",
         "TickerNotResolved": "No price history found for this asset — check its ticker",
         "ProviderUnreachable": "The price provider could not be reached — nothing was written"
       }

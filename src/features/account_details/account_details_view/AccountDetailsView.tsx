@@ -387,8 +387,8 @@ export function AccountDetailsView() {
                         onPriceHistory={view.handlePriceHistory}
                         onDeposit={view.handleDepositOpen}
                         onWithdraw={view.handleWithdrawalOpen}
-                        onTogglePriceRefreshLock={
-                          hasExternalProvider ? view.handleTogglePriceRefreshLock : undefined
+                        onTogglePriceRefreshBlocked={
+                          hasExternalProvider ? view.handleTogglePriceRefreshBlocked : undefined
                         }
                         onBackfillPriceHistory={
                           hasExternalProvider ? view.handleBackfillPriceHistory : undefined

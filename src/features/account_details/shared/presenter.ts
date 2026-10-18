@@ -53,13 +53,13 @@ export function assetPriceMutationErrorToI18n(err: AssetError): I18nMessage {
 }
 
 /**
- * F27 — Maps the AssetError variants reachable by the price-refresh lock
+ * F27 — Maps the AssetError variants reachable by the typed-by-hand toggle
  * toggle commands (MKT-156) to an i18n key. The reachable codes per the asset
  * contract are `AssetNotFound`, `CashAssetNotEditable`, `DatabaseError`; other
  * `AssetError` variants cannot be produced by `block_asset_price_refresh` /
  * `unblock_asset_price_refresh` so they map to a generic key.
  */
-export function priceRefreshLockErrorToI18n(err: AssetError): I18nMessage {
+export function priceRefreshBlockedErrorToI18n(err: AssetError): I18nMessage {
   switch (err.code) {
     case "AssetNotFound":
     case "CashAssetNotEditable":
@@ -112,7 +112,7 @@ export function priceHistoryBackfillOutcomeToMessage(
  * `DividendTask`) whose combined `code` set is wider than what the
  * command can actually raise, so this switch lists the reachable codes (per the
  * account contract) and falls back to a generic key for any other — mirroring
- * `priceRefreshLockErrorToI18n` rather than the `never`-exhaustive style used
+ * `priceRefreshBlockedErrorToI18n` rather than the `never`-exhaustive style used
  * for narrow single-type errors.
  */
 export function dividendErrorToI18n(err: DividendError): I18nMessage {

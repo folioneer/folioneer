@@ -6,12 +6,12 @@ import {
   Bell,
   BellRing,
   CalendarSync,
+  Hand,
   History,
-  Lock,
-  LockOpen,
   Minus,
   Percent,
   Plus,
+  RefreshCw,
   Scissors,
   ScrollText,
   StickyNote,
@@ -37,8 +37,8 @@ type HoldingRowProps = {
   onDeposit?: () => void;
   /** Cash variant — open Withdrawal modal (CSH-091). */
   onWithdraw?: () => void;
-  /** MKT-153/156 — toggle the asset's price-refresh lock. */
-  onTogglePriceRefreshLock?: (assetId: string, currentlyBlocked: boolean) => void;
+  /** MKT-153/156 — toggle whether the asset's price is typed by hand (`price_refresh_blocked`). */
+  onTogglePriceRefreshBlocked?: (assetId: string, currentlyBlocked: boolean) => void;
   /** MKT-190 — fill the asset's price history over the period the account held it. */
   onBackfillPriceHistory?: (assetId: string) => void;
   /** MKT-190 — true while this holding's backfill runs. */
@@ -65,7 +65,7 @@ export function HoldingRow({
   onPriceHistory,
   onDeposit,
   onWithdraw,
-  onTogglePriceRefreshLock,
+  onTogglePriceRefreshBlocked,
   onBackfillPriceHistory,
   isBackfillingPriceHistory = false,
   onManageFee,
@@ -152,9 +152,9 @@ export function HoldingRow({
   const isArchived = asset?.is_archived ?? false;
   const isPriceRefreshBlocked = asset?.price_refresh_blocked ?? false;
 
-  const handleTogglePriceRefreshLock = useCallback(() => {
-    onTogglePriceRefreshLock?.(row.assetId, isPriceRefreshBlocked);
-  }, [onTogglePriceRefreshLock, row.assetId, isPriceRefreshBlocked]);
+  const handleTogglePriceRefreshBlocked = useCallback(() => {
+    onTogglePriceRefreshBlocked?.(row.assetId, isPriceRefreshBlocked);
+  }, [onTogglePriceRefreshBlocked, row.assetId, isPriceRefreshBlocked]);
 
   // Double-click a holding row to open the (router-driven) Edit Asset modal;
   // archived assets are not editable, mirroring the disabled edit affordance.
@@ -263,7 +263,7 @@ export function HoldingRow({
       {/* TODO-005 — actions first, filling two rows */}
       <td className={`m3-td ${PINNED_ACTIONS_CELL}`}>
         <div className="grid grid-flow-col grid-rows-2 gap-1 justify-start">
-          {/* As-of view is read-only: Buy/Sell/price-history/backfill/lock are hidden. */}
+          {/* As-of view is read-only: Buy/Sell/price-history/backfill/typed-by-hand toggle are hidden. */}
           {!readOnly && (
             <>
               {/* TRX-041 — Buy modal from holding row */}
@@ -327,16 +327,19 @@ export function HoldingRow({
                   className={isBackfillingPriceHistory ? "animate-pulse" : ""}
                 />
               )}
-              {/* MKT-153 — Lock toggle: blocks/allows automated price fetches (ADR-014) */}
-              {onTogglePriceRefreshLock && (
+              {/* MKT-153 — typed by hand, or fetched automatically (ADR-014); the icon is
+                  the state, the name the action */}
+              {onTogglePriceRefreshBlocked && (
                 <IconButton
-                  icon={isPriceRefreshBlocked ? <Lock size={16} /> : <LockOpen size={16} />}
+                  icon={isPriceRefreshBlocked ? <Hand size={16} /> : <RefreshCw size={16} />}
                   size="sm"
                   id={`action-toggle-price-refresh-${row.assetId}`}
                   aria-label={t(
-                    isPriceRefreshBlocked ? "mkt.lock.action_unblock" : "mkt.lock.action_block",
+                    isPriceRefreshBlocked
+                      ? "mkt.typed_by_hand.action_fetch_automatically"
+                      : "mkt.typed_by_hand.action_type_by_hand",
                   )}
-                  onClick={handleTogglePriceRefreshLock}
+                  onClick={handleTogglePriceRefreshBlocked}
                 />
               )}
               {/* FEE-011 — manage the recurring management-fee schedule for this holding */}
@@ -417,44 +420,57 @@ export function HoldingRow({
       </td>
       {/* MKT-030 — Current price; MKT-032 diagnostic states; MKT-140 staleness; MKT-142 source badge */}
       <td id={`holding-current-price-${row.assetId}`} className="m3-td text-right tabular-nums">
-        {row.currentPrice.kind === "present" ? (
-          <div className="flex flex-col items-end gap-0.5">
-            <span>{row.currentPrice.formatted}</span>
-            <div className="flex items-center gap-1.5">
-              {row.sourceLabel && (
-                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-m3-surface-container-highest text-m3-on-surface-variant">
-                  {t(row.sourceLabel)}
-                </span>
-              )}
-              {row.staleness && (
-                <span className="text-[10px] text-m3-on-surface-variant">
-                  {t(row.staleness.key, row.staleness.params)}
-                </span>
-              )}
-            </div>
-          </div>
-        ) : row.currentPrice.kind === "missing_ticker" ? (
-          /* As-of view is read-only: the edit-missing-ticker shortcut (a write)
+        <div className="flex flex-col items-end gap-0.5">
+          {row.currentPrice.kind === "present" ? (
+            <>
+              <span>{row.currentPrice.formatted}</span>
+              <div className="flex items-center gap-1.5">
+                {row.sourceLabel && (
+                  <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-m3-surface-container-highest text-m3-on-surface-variant">
+                    {t(row.sourceLabel)}
+                  </span>
+                )}
+                {row.staleness && (
+                  <span className="text-[10px] text-m3-on-surface-variant">
+                    {t(row.staleness.key, row.staleness.params)}
+                  </span>
+                )}
+              </div>
+            </>
+          ) : row.currentPrice.kind === "missing_ticker" ? (
+            /* As-of view is read-only: the edit-missing-ticker shortcut (a write)
              is hidden; the plain state text shows instead. */
-          !readOnly ? (
-            <button
-              type="button"
-              id={`action-edit-missing-ticker-${row.assetId}`}
-              onClick={handleEditMissingTicker}
-              className="text-m3-primary text-sm underline-offset-2 hover:underline focus:underline focus:outline-none"
-            >
-              {t("mkt.price_state.missing_ticker")}
-            </button>
+            !readOnly ? (
+              <button
+                type="button"
+                id={`action-edit-missing-ticker-${row.assetId}`}
+                onClick={handleEditMissingTicker}
+                className="text-m3-primary text-sm underline-offset-2 hover:underline focus:underline focus:outline-none"
+              >
+                {t("mkt.price_state.missing_ticker")}
+              </button>
+            ) : (
+              <span className="text-m3-on-surface-variant text-sm">
+                {t("mkt.price_state.missing_ticker")}
+              </span>
+            )
           ) : (
             <span className="text-m3-on-surface-variant text-sm">
-              {t("mkt.price_state.missing_ticker")}
+              {t("mkt.price_state.no_price_available")}
             </span>
-          )
-        ) : (
-          <span className="text-m3-on-surface-variant text-sm">
-            {t("mkt.price_state.no_price_available")}
-          </span>
-        )}
+          )}
+          {/* MKT-158 — a price typed by hand says so, under the price or under the
+            diagnostic of a missing one */}
+          {isPriceRefreshBlocked && (
+            <span
+              id={`holding-price-typed-by-hand-${row.assetId}`}
+              className="flex items-center gap-1 text-[10px] text-m3-on-surface-variant"
+            >
+              <Hand size={11} aria-hidden="true" />
+              {t("mkt.typed_by_hand.row_label")}
+            </span>
+          )}
+        </div>
       </td>
       {/* MKT-143 — Current value = current price × quantity (asset currency) */}
       <td id={`holding-current-value-${row.assetId}`} className="m3-td text-right tabular-nums">

@@ -311,11 +311,11 @@ describe("HoldingRow — double-click opens Edit Asset modal", () => {
   });
 });
 
-// MKT-153/156 — price-refresh lock IconButton on the holding row.
-describe("HoldingRow — price-refresh lock toggle", () => {
+// MKT-153/156 — the typed-by-hand toggle on the holding row (TODO-109).
+describe("HoldingRow — price typed by hand toggle", () => {
   const renderWithToggle = (
     row: HoldingRowViewModel,
-    onTogglePriceRefreshLock: (assetId: string, currentlyBlocked: boolean) => void,
+    onTogglePriceRefreshBlocked: (assetId: string, currentlyBlocked: boolean) => void,
   ) =>
     render(
       <table>
@@ -326,7 +326,7 @@ describe("HoldingRow — price-refresh lock toggle", () => {
             onBuy={vi.fn()}
             onSell={vi.fn()}
             onPriceHistory={vi.fn()}
-            onTogglePriceRefreshLock={onTogglePriceRefreshLock}
+            onTogglePriceRefreshBlocked={onTogglePriceRefreshBlocked}
           />
         </tbody>
       </table>,
@@ -336,7 +336,7 @@ describe("HoldingRow — price-refresh lock toggle", () => {
     useAppStore.setState({ assets: [], accounts: [] });
   });
 
-  it("renders the unlock affordance and calls the handler with currentlyBlocked=false when the asset is unlocked", () => {
+  it("offers to type the price by hand and calls the handler with currentlyBlocked=false when the price is fetched", () => {
     useAppStore.setState({
       assets: [
         { id: "asset-1", is_archived: false, price_refresh_blocked: false, currency: "USD" },
@@ -345,13 +345,13 @@ describe("HoldingRow — price-refresh lock toggle", () => {
     });
     const toggle = vi.fn();
     renderWithToggle(baseRow, toggle);
-    const button = screen.getByRole("button", { name: "mkt.lock.action_block" });
+    const button = screen.getByRole("button", { name: "mkt.typed_by_hand.action_type_by_hand" });
     expect(button.id).toBe("action-toggle-price-refresh-asset-1");
     fireEvent.click(button);
     expect(toggle).toHaveBeenCalledWith("asset-1", false);
   });
 
-  it("renders the lock affordance and calls the handler with currentlyBlocked=true when the asset is locked", () => {
+  it("offers to fetch the price automatically and calls the handler with currentlyBlocked=true when the price is typed by hand", () => {
     useAppStore.setState({
       assets: [
         { id: "asset-1", is_archived: false, price_refresh_blocked: true, currency: "USD" },
@@ -360,12 +360,50 @@ describe("HoldingRow — price-refresh lock toggle", () => {
     });
     const toggle = vi.fn();
     renderWithToggle(baseRow, toggle);
-    const button = screen.getByRole("button", { name: "mkt.lock.action_unblock" });
+    const button = screen.getByRole("button", {
+      name: "mkt.typed_by_hand.action_fetch_automatically",
+    });
     fireEvent.click(button);
     expect(toggle).toHaveBeenCalledWith("asset-1", true);
   });
 
-  it("omits the lock button entirely when no handler is provided (backward-compatible)", () => {
+  it("says under the price that it is typed by hand, only when it is (TODO-109)", () => {
+    useAppStore.setState({
+      assets: [
+        { id: "asset-1", is_archived: false, price_refresh_blocked: true, currency: "USD" },
+      ] as unknown as Asset[],
+      accounts: [],
+    });
+    const { unmount } = renderWithToggle(baseRow, vi.fn());
+    expect(document.getElementById("holding-price-typed-by-hand-asset-1")).toHaveTextContent(
+      "mkt.typed_by_hand.row_label",
+    );
+    unmount();
+    useAppStore.setState({
+      assets: [
+        { id: "asset-1", is_archived: false, price_refresh_blocked: false, currency: "USD" },
+      ] as unknown as Asset[],
+      accounts: [],
+    });
+    renderWithToggle(baseRow, vi.fn());
+    expect(document.getElementById("holding-price-typed-by-hand-asset-1")).toBeNull();
+  });
+
+  it("says the price is typed by hand under the diagnostic when there is no price (MKT-158)", () => {
+    useAppStore.setState({
+      assets: [
+        { id: "asset-1", is_archived: false, price_refresh_blocked: true, currency: "USD" },
+      ] as unknown as Asset[],
+      accounts: [],
+    });
+    renderWithToggle({ ...baseRow, currentPrice: { kind: "no_price_available" } }, vi.fn());
+    expect(screen.getByText("mkt.price_state.no_price_available")).toBeInTheDocument();
+    expect(document.getElementById("holding-price-typed-by-hand-asset-1")).toHaveTextContent(
+      "mkt.typed_by_hand.row_label",
+    );
+  });
+
+  it("omits the toggle entirely when no handler is provided", () => {
     render(
       <table>
         <tbody>
@@ -379,8 +417,12 @@ describe("HoldingRow — price-refresh lock toggle", () => {
         </tbody>
       </table>,
     );
-    expect(screen.queryByRole("button", { name: "mkt.lock.action_block" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "mkt.lock.action_unblock" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "mkt.typed_by_hand.action_type_by_hand" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "mkt.typed_by_hand.action_fetch_automatically" }),
+    ).toBeNull();
   });
 });
 
