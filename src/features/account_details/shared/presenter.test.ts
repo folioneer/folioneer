@@ -93,6 +93,11 @@ const makeResponse = (overrides: Partial<AccountDetailsResponse> = {}): AccountD
 });
 
 describe("toHoldingRow", () => {
+  it("says whether the price is outdated (MKT-207)", () => {
+    expect(toHoldingRow(makeHolding({ price_outdated: true })).priceOutdated).toBe(true);
+    expect(toHoldingRow(makeHolding({ price_outdated: false })).priceOutdated).toBe(false);
+  });
+
   it("formats fractional quantity trimming trailing zeros", () => {
     const row = toHoldingRow(makeHolding({ quantity: 1_500_000 }));
     expect(row.quantity).toBe("1,5");
@@ -925,6 +930,10 @@ describe("toHoldingRow — weight % (ACD-052)", () => {
 });
 
 describe("toAccountSummary — net cash input (ACD-053)", () => {
+  it("carries the account's count of outdated prices (MKT-208)", () => {
+    expect(toAccountSummary(makeResponse({ outdated_price_count: 3 })).outdatedPriceCount).toBe(3);
+  });
+
   it("formats totalNetCashInput from the response", () => {
     const summary = toAccountSummary(makeResponse({ total_net_cash_input: 120_000_000 }));
     expect(summary.totalNetCashInput).toBe("120,00");

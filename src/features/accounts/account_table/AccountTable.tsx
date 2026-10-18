@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { microToFormatted } from "@/lib/microUnits";
 import { Button } from "@/ui/components/button/Button";
 import { IconButton } from "@/ui/components/button/IconButton";
+import { WarningChip } from "@/ui/components/chip/WarningChip";
 import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { SortIcon } from "@/ui/components/SortIcon";
 import { EditAccountModal } from "../edit_account_modal/EditAccountModal";
@@ -403,6 +404,17 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
                     className="ml-2 text-xs text-m3-on-surface-variant"
                   >
                     {t("account.total_incomplete")}
+                  </span>
+                )}
+                {/* MKT-208 — the portfolio counts its outdated prices; nothing at zero */}
+                {portfolioTotal.outdated_price_count > 0 && (
+                  <span className="ml-3 inline-flex align-middle">
+                    <WarningChip
+                      id="account-portfolio-total-outdated"
+                      label={t("mkt.outdated.count", {
+                        count: portfolioTotal.outdated_price_count,
+                      })}
+                    />
                   </span>
                 )}
               </td>

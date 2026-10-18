@@ -430,11 +430,23 @@ export function HoldingRow({
                     {t(row.sourceLabel)}
                   </span>
                 )}
-                {row.staleness && (
-                  <span className="text-[10px] text-m3-on-surface-variant">
-                    {t(row.staleness.key, row.staleness.params)}
-                  </span>
-                )}
+                {/* MKT-207 — an outdated price says so in place of its quiet age */}
+                {row.staleness &&
+                  (row.priceOutdated ? (
+                    <span
+                      id={`holding-price-outdated-${row.assetId}`}
+                      className="flex items-center gap-1 whitespace-nowrap text-[10px] font-medium text-m3-warning"
+                    >
+                      <AlertTriangle size={11} aria-hidden="true" />
+                      {t("mkt.outdated.row_label", {
+                        age: t(row.staleness.key, row.staleness.params),
+                      })}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-m3-on-surface-variant">
+                      {t(row.staleness.key, row.staleness.params)}
+                    </span>
+                  ))}
               </div>
             </>
           ) : row.currentPrice.kind === "missing_ticker" ? (

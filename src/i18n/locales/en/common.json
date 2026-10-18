@@ -711,6 +711,11 @@
       "missing_ticker": "Missing ticker",
       "no_price_available": "No price available"
     },
+    "outdated": {
+      "row_label": "Outdated price · {{age}}",
+      "count_one": "{{count}} outdated price",
+      "count_other": "{{count}} outdated prices"
+    },
     "typed_by_hand": {
       "action_type_by_hand": "Type its price by hand",
       "action_fetch_automatically": "Fetch its price automatically",

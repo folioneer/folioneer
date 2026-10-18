@@ -116,6 +116,7 @@ const makeView = (overrides: Record<string, unknown> = {}) => ({
     totalGlobalValue: "1.100,00",
     totalManagementFees: "0,00",
     totalNetCashInput: "500,00",
+    outdatedPriceCount: 0,
     isEmpty: false,
     isAllClosed: false,
     hasClosedHoldings: false,
@@ -551,6 +552,20 @@ describe("AccountDetailsView — management fees (FEE-010/011/053)", () => {
     render(<AccountDetailsView />);
     const total = document.querySelector("#account-details-total-net-cash-input");
     expect(total).toHaveTextContent("500,00");
+  });
+
+  // MKT-208 — the header counts the account's outdated prices, and says nothing at zero
+  it("counts the outdated prices in the header, only when there are some (MKT-208)", () => {
+    const { unmount } = render(<AccountDetailsView />);
+    expect(document.querySelector("#account-details-outdated-price-count")).toBeNull();
+    unmount();
+    mockUseAccountDetailsView.mockReturnValue(
+      makeView({ summary: { ...makeView().summary, outdatedPriceCount: 2 } }),
+    );
+    render(<AccountDetailsView />);
+    expect(document.querySelector("#account-details-outdated-price-count")).toHaveTextContent(
+      "mkt.outdated.count",
+    );
   });
 
   it("routes the Management fee button to its handler (FEE-010)", () => {

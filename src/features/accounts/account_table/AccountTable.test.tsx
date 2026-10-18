@@ -342,6 +342,20 @@ describe("AccountTable — portfolio total row (ACC-027–032)", () => {
     );
   });
 
+  // MKT-208 — the total counts the portfolio's outdated prices, only when there are some
+  it("counts the portfolio's outdated prices on the total row (MKT-208)", () => {
+    render(<AccountTable searchTerm="" onAccountClick={vi.fn()} />);
+    expect(screen.queryByTestId("account-portfolio-total-outdated")).not.toBeInTheDocument();
+  });
+
+  it("shows the count of outdated prices when there are some (MKT-208)", () => {
+    mockTotal.mockReturnValue(makeTotal({ outdated_price_count: 3 }));
+    render(<AccountTable searchTerm="" onAccountClick={vi.fn()} />);
+    expect(screen.getByTestId("account-portfolio-total-outdated")).toHaveTextContent(
+      "mkt.outdated.count",
+    );
+  });
+
   it("hides the total row while a search filter is active", () => {
     render(<AccountTable searchTerm="Main" onAccountClick={vi.fn()} />);
 
