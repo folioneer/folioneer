@@ -209,12 +209,10 @@ and the question joins the closing block — unless nothing else in the queue ca
 is right only for what the reading could not show, and it says what made it unknowable
 at the start (what CI found, what an answer of the block opened).
 
-**Release** — when the queue empties the agent runs `/dep-audit` without being asked (a
-known vulnerability in what ships blocks the release; the agent fixes it or files it),
-then `spec-checker` once on every spec the batch touched — `bash scripts/batch-specs.sh`
+**Release** — when the queue empties the agent runs `spec-checker` once on every spec the batch touched — `bash scripts/batch-specs.sh`
 lists them — and files what it finds as tech debt: a promise the code does not keep is
-not fixed in the release it was found in. Then `just release-check` runs on `main` what the release itself validates before it versions anything — every test, the build, the full query check, a few minutes — so that what would stop the release stops the hand-over; a failure is fixed in a pull request of its own, or filed when it is not the batch's. It hands over a clean `main`, and says so only once the workflow runs of its head commit have ended green, naming them. The release itself is the human's only part: they run
-`just release -y` when they choose. After
+not fixed in the release it was found in. Then `just release-check` runs on `main` what the release itself validates before it versions anything — every test, the build, the full query check, a few minutes — so that what would stop the release stops the hand-over; a failure is fixed in a pull request of its own, or filed when it is not the batch's. Last, once every pull request of the hand-over has merged and the workflow runs of `main`'s head commit have ended green, the agent runs `/dep-audit` without being asked on that `main`, as it will be released (a known vulnerability in what ships blocks the release; the agent fixes it or files it, and audits again after the fix merges). It hands over a clean `main` with the audit's verdict, naming the runs. The release itself is the human's only part: they run
+`just release -y` when they choose, and publish the draft. After
 it, `/prune` runs once on the production files the release changed — a full scan is
 asked for by name — and what it recommends is filed as one tech-debt entry, like what the
 spec checks find; an audit with no finding files nothing. Then `/flow-audit` measures the
