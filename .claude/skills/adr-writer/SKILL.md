@@ -60,7 +60,7 @@ An ADR exists for one purpose: to stop an agent reversing an architectural decis
 
 > **Would an agent reading only the code plausibly undo this, and would undoing it be costly?**
 
-If the code or a spec rule already makes the choice obvious, or undoing it is cheap, no ADR. An ADR records a **technical** choice (a data representation, a storage or sync design, a build boundary); how code is organised, a pattern or a testing convention is a rule in the `docs/*-rules.md` family, never an ADR (ADR-022).
+If the code or a spec rule already makes the choice obvious, or undoing it is cheap, no ADR. An ADR records a **technical** choice on the developer's side, hard to remove (the language, the framework, a data representation such as i64 money, a build boundary); a domain decision — which records exist, what a setting is, how a business concept syncs — is a spec rule guarded by its tests, never an ADR (owner, 2026-10-18); how code is organised, a pattern or a testing convention is a rule in the `docs/*-rules.md` family, never an ADR (ADR-022).
 
 This block is the canonical source for the gate. `adr-reviewer` references it; do not restate it elsewhere in the kit without cross-linking back here.
 
