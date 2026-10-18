@@ -17,4 +17,4 @@
 - Costs: about half a day for the first four, each with its tests. Protects: one reading
   of the setup document for both repositories, and a skill or a script that can be
   carried from one to the other.
-- Needs the owner: yes — which of the release notes and the privacy check are wanted here.
+- Needs the owner: answered (owner, 2026-10-18) — both. The privacy check comes here: no personal data in fixtures, screenshots or docs before strangers contribute. The release notes too: a GitHub release says only "See the release assets to download and install this version." (`releaseBody` in `.github/workflows/release.yml`), so its page carries that version's section of `CHANGELOG.md`, the lines What's new shows.

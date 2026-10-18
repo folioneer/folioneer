@@ -15,7 +15,7 @@ From gh241 (owner, 2026-10-12), one of its two parts; the issue closes when this
 **Design:** none
 **Open questions:**
 
-- [ ] A return of capital larger than what the holding still costs: the excess is a realised gain, or the recording is refused?
-- [ ] The amount is typed per unit or in all — and in the asset's currency with a rate, as a dividend is?
-- [ ] Its name in both languages ("Return of capital" / "Remboursement de capital"?), and its place in the window: the holding's row, as a dividend is recorded. (A screen changes: a design to validate.)
-- [ ] The order of the interfaces: the window first, then the agent connection, then the command line, as for a split (owner, 2026-10-11)?
+- [x] A return of capital larger than what the holding still costs: the excess is a realised gain, or the recording is refused? — The cost stops at 0 and the excess is its own figure, "return of capital beyond cost", counted as realised in the performance meanwhile; each country's year-end report counts it as its law says (a gain in the United States, income in Spain, unsettled in Italy). Japan's return of capital (a deemed dividend and a deemed sale by a net-asset ratio) is another mechanism, not covered. (owner, 2026-10-18)
+- [x] The amount is typed per unit or in all — and in the asset's currency with a rate, as a dividend is? — As a dividend is: the total received, in the asset's currency with a rate when it differs. (owner, 2026-10-18)
+- [x] Its name in both languages ("Return of capital" / "Remboursement de capital"?), and its place in the window: the holding's row, as a dividend is recorded. (A screen changes: a design to validate.) — "Return of capital" / "Remboursement de capital" / "Kapitalrückzahlung", recorded from the holding's row beside the dividend. (owner, 2026-10-18)
+- [x] The order of the interfaces: the window first, then the agent connection, then the command line, as for a split (owner, 2026-10-11)? — The window, then an agent, then the command line (TODO-077). (owner, 2026-10-18)

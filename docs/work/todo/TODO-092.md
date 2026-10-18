@@ -7,4 +7,4 @@ From gh284 (owner, 2026-10-17), which this entry closes when it ships. A new use
 **Design:** none
 **Open questions:**
 
-- [ ] The demo portfolio: shipped with the application, or generated from the seed the E2E suite uses?
+- [x] The demo portfolio: shipped with the application, or generated from the seed the E2E suite uses? — Shipped with the application, as a fixed curated dataset kept apart from the E2E seed and kept readable by the current schema (gh284; confirmed). (owner, 2026-10-18)

@@ -9,6 +9,6 @@ Proposal: the user picks a benchmark — a ticker the price provider knows — a
 **Design:** none
 **Open questions:**
 
-- [ ] One benchmark for everything, or one per account (a bond account against a world equity index is not a fair fight)? (Recommended: a global default, overridable per account.)
-- [ ] Which benchmarks are offered ready-made — and do you agree to suggest accumulating ETFs (for instance one on MSCI World, one on the CAC 40 or Euro Stoxx 50) rather than the bare indices?
-- [ ] Does this wait for TODO-011's monitored assets, or may it introduce the "followed, not held" asset itself if it runs first? (Recommended: introduce it here in its smallest form; TODO-011 extends it.)
+- [x] One benchmark for everything, or one per account (a bond account against a world equity index is not a fair fight)? (Recommended: a global default, overridable per account.) — A global default, overridable per account. (owner, 2026-10-18)
+- [x] Which benchmarks are offered ready-made — and do you agree to suggest accumulating ETFs (for instance one on MSCI World, one on the CAC 40 or Euro Stoxx 50) rather than the bare indices? — Accumulating ETFs on the main indices (MSCI World, S&P 500, Europe or the CAC 40…), named as what could have been bought instead; any asset held or followed can be picked too. (owner, 2026-10-18)
+- [x] Does this wait for TODO-011's monitored assets, or may it introduce the "followed, not held" asset itself if it runs first? (Recommended: introduce it here in its smallest form; TODO-011 extends it.) — No: it introduces the "followed, not held" asset in its smallest form; TODO-011 extends it. (owner, 2026-10-18)
