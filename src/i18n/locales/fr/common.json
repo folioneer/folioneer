@@ -158,7 +158,17 @@
     "frequency_manual_month": "Mensuel",
     "frequency_manual_year": "Annuel",
     "open_account": "Ouvrir le compte {{name}}",
-    "inconsistent_holding": "Contient une position incohérente après une fusion de synchronisation"
+    "inconsistent_holding": "Contient une position incohérente après une fusion de synchronisation",
+    "form_country_label": "Pays",
+    "form_country_portfolio": "{{country}} (celui du portefeuille)",
+    "form_wrapper_label": "Enveloppe",
+    "form_wrapper_none": "Aucune",
+    "form_wrapper_hint": "L'enveloppe fiscale du compte. Une étiquette seulement : aucun impôt n'est calculé.",
+    "column_wrapper": "Enveloppe",
+    "group_by_label": "Grouper par",
+    "group_by_none": "Rien",
+    "group_by_wrapper": "Enveloppe",
+    "group_no_wrapper": "Sans enveloppe"
   },
   "action": {
     "add": "Ajouter",

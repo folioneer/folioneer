@@ -158,7 +158,17 @@
     "frequency_manual_month": "Monthly",
     "frequency_manual_year": "Yearly",
     "open_account": "Open account {{name}}",
-    "inconsistent_holding": "Contains an inconsistent holding after a sync merge"
+    "inconsistent_holding": "Contains an inconsistent holding after a sync merge",
+    "form_country_label": "Country",
+    "form_country_portfolio": "{{country}} (the portfolio's)",
+    "form_wrapper_label": "Wrapper",
+    "form_wrapper_none": "None",
+    "form_wrapper_hint": "The tax wrapper the account sits in. A label only: no tax is computed.",
+    "column_wrapper": "Wrapper",
+    "group_by_label": "Group by",
+    "group_by_none": "Nothing",
+    "group_by_wrapper": "Wrapper",
+    "group_no_wrapper": "No wrapper"
   },
   "action": {
     "add": "Add",

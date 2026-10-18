@@ -1157,8 +1157,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
+export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 
 /** user-defined types **/
 
@@ -1606,6 +1606,11 @@ currency: string;
  * Manual / Automatic update cadence (purely informational, ACC-004).
  */
 update_frequency: UpdateFrequency; 
+/**
+ * ACC-046 — the identifier of the account's tax wrapper (ACC-043), for the list's column
+ * and grouping; none when unset.
+ */
+wrapper: string | null; 
 /**
  * Total economic value in account-currency micros (CSH-094 / FXR-041): cash
  * quantity plus the sum of `quantity × latest_price` over priced active non-cash
@@ -2436,6 +2441,18 @@ total_amount: number | null;
  * Optional user note.
  */
 note: string | null }
+/**
+ * ACC-045 — the wrappers one country is offered, in order.
+ */
+export type CountryWrappers = { 
+/**
+ * The country (ISO 3166-1 alpha-2).
+ */
+country: string; 
+/**
+ * Its wrappers' identifiers: its own list, then the generic one.
+ */
+wrapper_ids: string[] }
 /**
  * Parameters for creating a new account.
  */
@@ -5595,9 +5612,22 @@ export type WrapperLists = {
  */
 portfolio_country: string; 
 /**
- * Every wrapper, the generic list and each country's.
+ * Every wrapper, the generic list and each country's, in the lists' order (ACC-045).
  */
-wrappers: Wrapper[] }
+wrappers: Wrapper[]; 
+/**
+ * ACC-045 — the countries the form offers, the portfolio's first.
+ */
+countries: string[]; 
+/**
+ * ACC-045 — for each country with a list of its own (and the portfolio's), its wrappers in
+ * the order the form offers them; any other country takes `generic`.
+ */
+offered: CountryWrappers[]; 
+/**
+ * ACC-045 — what a country with no list of its own is offered: the generic list.
+ */
+generic: string[] }
 
 /** tauri-specta globals **/
 

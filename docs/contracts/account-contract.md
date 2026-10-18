@@ -15,14 +15,14 @@
 
 ### Account CRUD
 
-| Command                        | Args                 | Return                   | Errors                                                                                                                                                                                                                                                                                                                            |
-| ------------------------------ | -------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_accounts`                 | —                    | `Vec<Account>`           | `DatabaseError`                                                                                                                                                                                                                                                                                                                   |
-| `add_account`                  | `CreateAccountDTO`   | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043), `DatabaseError`                                                                                          |
-| `update_account`               | `UpdateAccountDTO`   | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set; editing other fields of an account whose name already clashes after a merge is accepted, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043), `DatabaseError` |
-| `get_wrapper_lists`            | —                    | `WrapperLists`           | _(infallible — the lists are the application's own, ACC-040)_                                                                                                                                                                                                                                                                     |
-| `delete_account`               | `id: String`         | `()`                     | `DatabaseError` _(ACC-005, ACC-006 — plain DELETE, silent on missing row)_                                                                                                                                                                                                                                                        |
-| `get_account_deletion_summary` | `account_id: String` | `AccountDeletionSummary` | `DatabaseError` _(read-only; counts are 0 if account has no data — no NotFound raised)_                                                                                                                                                                                                                                           |
+| Command                        | Args                 | Return                   | Errors                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------ | -------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_accounts`                 | —                    | `Vec<Account>`           | `DatabaseError`                                                                                                                                                                                                                                                                                                                                                             |
+| `add_account`                  | `CreateAccountDTO`   | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists), `DatabaseError`                                                                                                                 |
+| `update_account`               | `UpdateAccountDTO`   | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set; editing other fields of an account whose name already clashes after a merge is accepted, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists, nor the account's own), `DatabaseError` |
+| `get_wrapper_lists`            | —                    | `WrapperLists`           | _(infallible — the lists are the application's own, ACC-040)_                                                                                                                                                                                                                                                                                                               |
+| `delete_account`               | `id: String`         | `()`                     | `DatabaseError` _(ACC-005, ACC-006 — plain DELETE, silent on missing row)_                                                                                                                                                                                                                                                                                                  |
+| `get_account_deletion_summary` | `account_id: String` | `AccountDeletionSummary` | `DatabaseError` _(read-only; counts are 0 if account has no data — no NotFound raised)_                                                                                                                                                                                                                                                                                     |
 
 ### Account Details
 
@@ -202,7 +202,7 @@ struct Account {
     currency: String,                    // ISO 4217 currency code (TRX-021)
     update_frequency: UpdateFrequency,   // how often the user plans to update data
     management_fees_enabled: bool,       // whether one-off fees and fee schedules are available on this account (FEE-075); a new account starts disabled
-    country: Option<String>,             // the account's own country (ISO 3166-1 alpha-2) when it differs from the portfolio's (ACC-041)
+    country: Option<String>,             // the account's own country (ISO 3166-1 alpha-2) when one is set, kept even if it equals the portfolio's (ACC-041, ACC-045)
     wrapper: Option<String>,             // identifier of its tax wrapper (ACC-040/043); none when unset
 }
 
@@ -230,7 +230,15 @@ struct UpdateAccountDTO {
 // ACC-040 — the wrapper lists and the portfolio's country (France until TODO-092).
 struct WrapperLists {
     portfolio_country: String,
-    wrappers: Vec<Wrapper>,
+    wrappers: Vec<Wrapper>,                 // in the lists' order
+    countries: Vec<String>,                 // every country, in the form's order, the portfolio's first (ACC-040)
+    offered: Vec<CountryWrappers>,          // the portfolio's and each listed country's wrappers in order (ACC-040)
+    generic: Vec<String>,                   // what any other country is offered (ACC-040)
+}
+
+struct CountryWrappers {
+    country: String,
+    wrapper_ids: Vec<String>,               // its own list, then the generic one
 }
 
 struct Wrapper {
@@ -481,6 +489,7 @@ struct AccountSummary {
     name: String,
     currency: String,                          // ISO 4217 currency code; same as Account.currency
     update_frequency: UpdateFrequency,
+    wrapper: Option<String>,                   // identifier of the account's tax wrapper, for the list's column and grouping (ACC-046, ACC-047)
     total_global_value: i64,                   // micros, account currency: same algorithm as AccountDetailsResponse.total_global_value (CSH-094)
     total_unrealized_pnl: Option<i64>,         // micros, account currency: account-wide unrealized P&L, same algorithm as AccountDetailsResponse.total_unrealized_pnl (MKT-040 / ACC-023); None when no holding qualifies
     ytd_performance_pct: Option<i64>,          // micro-percent: year-to-date net-of-flows performance since Jan 1, reusing PRF-034 (ACC-024); first-year accounts use an inception baseline (present, not None); None only when the Simple-Dietz denominator is 0 (PRF-032)
@@ -741,6 +750,8 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-10-18 — TODO-091 (ACC-040, ACC-043): `WrapperLists.countries` holds every country; `offered` only the portfolio's and the listed countries; `WrapperNotAvailable` now means a wrapper the lists do not hold, any known wrapper fitting any country.
+- 2026-10-18 — TODO-091 (ACC-046): `AccountSummary.wrapper`, for the accounts list; `WrapperLists` gains `countries`, `offered` and `generic`, with the new `CountryWrappers` type. No command added.
 - 2026-10-18 — TODO-091 (ACC-040–044): `Account`, `CreateAccountDTO` and `UpdateAccountDTO` gain `country` and `wrapper`; `add_account` / `update_account` gain `InvalidCountry` and `WrapperNotAvailable`; new `get_wrapper_lists` and the `WrapperLists` / `Wrapper` types.
 - 2026-10-18 — TODO-084: `AccountDetailsResponse.total_capital_brought_in` (ACD-058); a holding's windowed return is `None` for a window it was not held through (ACD-057). No command changed.
 - 2026-10-18 — TODO-085: `HoldingDetail.price_outdated`, `AccountDetailsResponse.outdated_price_count`, `AccountSummary.outdated_price_count`, `PortfolioTotal.outdated_price_count` (MKT-205, MKT-206). No command changed.

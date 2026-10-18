@@ -8,7 +8,8 @@
         "outdated_price_count": 0,
         "total_global_value": 24136700000,
         "total_unrealized_pnl": 3774200040,
-        "update_frequency": "Automatic"
+        "update_frequency": "Automatic",
+        "wrapper": null
       },
       {
         "currency": "USD",
@@ -17,7 +18,8 @@
         "outdated_price_count": 0,
         "total_global_value": 7898737960,
         "total_unrealized_pnl": -45838882,
-        "update_frequency": "ManualMonth"
+        "update_frequency": "ManualMonth",
+        "wrapper": null
       }
     ],
     "total": {

@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { WrapperLists } from "@/bindings";
 import { setDisplayLocale } from "@/lib/microUnits";
 import {
   accountMutationErrorToI18n,
+  countryOptions,
   fetchPriceErrorToI18n,
   formatAccountRowTotalUnrealizedPnl,
   formatAccountRowYtdPerformancePct,
@@ -9,6 +11,9 @@ import {
   formatPriceMovementDate,
   formatPriceMovementPct,
   formatPriceMovementValue,
+  groupByWrapper,
+  wrapperLabel,
+  wrapperOptions,
 } from "./presenter";
 
 // F27 layer-3 presenter — covers the reachable `AccountError` codes for the
@@ -233,5 +238,86 @@ describe("formatPriceMovementDate", () => {
   it("formats the date in the given locale", () => {
     expect(formatPriceMovementDate("2026-09-09", "fr")).toBe("09/09/2026");
     expect(formatPriceMovementDate("2026-09-11", "en")).toBe("9/11/2026");
+  });
+});
+
+// ACC-045 — the wrapper lists as the window shows them.
+const lists: WrapperLists = {
+  portfolio_country: "FR",
+  wrappers: [
+    {
+      id: "brokerage",
+      country: null,
+      label_en: "Brokerage",
+      label_fr: "Compte-titres",
+      label_de: "Depot",
+    },
+    { id: "fr_pea", country: "FR", label_en: "PEA", label_fr: "PEA", label_de: "PEA" },
+    { id: "de_bav", country: "DE", label_en: "bAV", label_fr: "bAV", label_de: "bAV" },
+  ],
+  countries: ["FR", "DE"],
+  offered: [
+    { country: "FR", wrapper_ids: ["fr_pea", "brokerage"] },
+    { country: "DE", wrapper_ids: ["de_bav", "brokerage"] },
+  ],
+  generic: ["brokerage"],
+};
+
+describe("wrapperLabel (ACC-045)", () => {
+  it("names a wrapper in the window's language, and an unknown one by its identifier", () => {
+    expect(wrapperLabel(lists, "brokerage", "fr-FR")).toBe("Compte-titres");
+    expect(wrapperLabel(lists, "brokerage", "de")).toBe("Depot");
+    expect(wrapperLabel(lists, "brokerage", "en-GB")).toBe("Brokerage");
+    expect(wrapperLabel(lists, "uk_isa", "en")).toBe("uk_isa");
+    expect(wrapperLabel(lists, null, "en")).toBeNull();
+    expect(wrapperLabel(null, "fr_pea", "en")).toBeNull();
+  });
+});
+
+describe("wrapperOptions (ACC-048)", () => {
+  it("offers the country's wrappers first, then the generic ones", () => {
+    const ids = (country: string, current: string) =>
+      wrapperOptions(lists, country, current, "en").map((o) => o.value);
+    expect(ids("", "")).toEqual(["fr_pea", "brokerage"]);
+    expect(ids("DE", "")).toEqual(["de_bav", "brokerage"]);
+    expect(ids("ES", "")).toEqual(["brokerage"]);
+  });
+
+  // ACC-043 — the account's wrapper stays offered under another country, and by its
+  // identifier when the lists do not know it, so an edit keeps it.
+  it("keeps the account's own wrapper after the suggested ones", () => {
+    const options = wrapperOptions(lists, "ES", "fr_pea", "en");
+    expect(options.map((o) => o.value)).toEqual(["brokerage", "fr_pea"]);
+    expect(options[1]?.label).toBe("PEA");
+    const unknown = wrapperOptions(lists, "", "es_plan", "en");
+    expect(unknown.map((o) => o.value)).toEqual(["fr_pea", "brokerage", "es_plan"]);
+    expect(unknown[2]?.label).toBe("es_plan");
+    expect(wrapperOptions(lists, "", "brokerage", "en")).toHaveLength(2);
+  });
+});
+
+describe("countryOptions (ACC-045)", () => {
+  it("offers the portfolio's country first, then each other country with a list", () => {
+    const options = countryOptions(lists, "en");
+    expect(options.map((o) => o.value)).toEqual(["", "DE"]);
+    expect(options[0]?.country).toBe("France");
+    expect(options[1]?.label).toBe("Germany");
+  });
+});
+
+describe("groupByWrapper (ACC-047)", () => {
+  it("groups the rows in the lists' order, the accounts without one last", () => {
+    const rows = [
+      { name: "A", wrapper: "brokerage" },
+      { name: "B", wrapper: null },
+      { name: "C", wrapper: "fr_pea" },
+      { name: "D", wrapper: "brokerage" },
+    ];
+    const groups = groupByWrapper(rows, lists, (id) => wrapperLabel(lists, id, "en"));
+    expect(groups.map((g) => [g.wrapper, g.label, g.rows.map((r) => r.name)])).toEqual([
+      ["brokerage", "Brokerage", ["A", "D"]],
+      ["fr_pea", "PEA", ["C"]],
+      [null, null, ["B"]],
+    ]);
   });
 });

@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { Button } from "@/ui/components/button/Button";
 import { Dialog } from "@/ui/components/modal/Dialog";
 import { AccountForm } from "../shared/AccountForm";
+import { useWrapperLists } from "../useWrapperLists";
 import { useEditAccountModal } from "./useEditAccountModal";
 
 interface EditAccountModalProps {
@@ -15,11 +16,12 @@ interface EditAccountModalProps {
 
 export function EditAccountModal({ isOpen, onClose, account }: EditAccountModalProps) {
   const { t } = useTranslation();
+  const wrapperLists = useWrapperLists();
   useEffect(() => {
     logger.info("[EditAccountModal] mounted");
   }, []);
 
-  const { formData, error, isSubmitting, handleChange, handleSubmit, frequencies } =
+  const { formData, error, isSubmitting, handleChange, setCountry, handleSubmit, frequencies } =
     useEditAccountModal({ account, onClose });
 
   const actions = (
@@ -52,7 +54,9 @@ export function EditAccountModal({ isOpen, onClose, account }: EditAccountModalP
         <AccountForm
           formData={formData}
           handleChange={handleChange}
+          setCountry={setCountry}
           frequencies={frequencies}
+          wrapperLists={wrapperLists}
           idPrefix="edit-account"
         />
         {/* R13 — inline error, modal stays open */}

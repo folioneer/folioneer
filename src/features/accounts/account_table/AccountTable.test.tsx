@@ -59,11 +59,31 @@ vi.mock("@/lib/microUnits", () => ({
     }),
 }));
 
+vi.mock("../useWrapperLists", () => ({
+  useWrapperLists: () => ({
+    portfolio_country: "FR",
+    wrappers: [
+      {
+        id: "brokerage",
+        country: null,
+        label_en: "Brokerage",
+        label_fr: "Compte-titres",
+        label_de: "Depot",
+      },
+      { id: "fr_pea", country: "FR", label_en: "PEA", label_fr: "PEA", label_de: "PEA" },
+    ],
+    countries: ["FR"],
+    offered: [{ country: "FR", wrapper_ids: ["fr_pea", "brokerage"] }],
+    generic: ["brokerage"],
+  }),
+}));
+
 const makeSummary = (overrides: Partial<AccountSummary> = {}): AccountSummary => ({
   id: "acc-1",
   name: "Main EUR",
   currency: "EUR",
   update_frequency: "ManualMonth",
+  wrapper: null,
   total_global_value: 100_000_000,
   total_unrealized_pnl: null,
   ytd_performance_pct: null,
@@ -154,6 +174,7 @@ describe("AccountTable — Bank column (ACC-026)", () => {
     bank_name,
     currency: "EUR",
     update_frequency: "ManualMonth",
+    wrapper: null,
     management_fees_enabled: false,
   });
 
@@ -397,5 +418,36 @@ describe("AccountTable — portfolio total row (ACC-027–032)", () => {
       expect(total.closest("tbody")).toBeNull();
       expect(total).not.toHaveAttribute("tabindex");
     }
+  });
+});
+
+// ACC-046/047 — the accounts list by wrapper.
+describe("AccountTable — wrapper (ACC-046, ACC-047)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIsLoading.mockReturnValue(false);
+    mockError.mockReturnValue(null);
+    mockTotal.mockReturnValue(null);
+    mockSummaries.mockReturnValue([
+      makeSummary({ id: "a", name: "Plain", wrapper: null }),
+      makeSummary({ id: "b", name: "PEA Fortuneo", wrapper: "fr_pea" }),
+      makeSummary({ id: "c", name: "IBKR", wrapper: "brokerage" }),
+    ]);
+  });
+
+  it("shows each account's wrapper in its column, a dash without one", () => {
+    render(<AccountTable searchTerm="" onAccountClick={vi.fn()} />);
+    expect(screen.getByTestId("account-wrapper-b")).toHaveTextContent("PEA");
+    expect(screen.getByTestId("account-wrapper-a")).toHaveTextContent("—");
+  });
+
+  it("groups the accounts by wrapper on demand, the ones without last", () => {
+    render(<AccountTable searchTerm="" onAccountClick={vi.fn()} />);
+    expect(document.querySelectorAll("[id^='account-wrapper-group-']")).toHaveLength(0);
+    fireEvent.change(screen.getByTestId("account-group-by"), { target: { value: "wrapper" } });
+    const headings = [...document.querySelectorAll("[id^='account-wrapper-group-']")].map(
+      (row) => row.textContent,
+    );
+    expect(headings).toEqual(["Brokerage", "PEA", "account.group_no_wrapper"]);
   });
 });

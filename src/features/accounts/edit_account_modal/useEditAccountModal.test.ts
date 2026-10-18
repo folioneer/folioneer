@@ -159,3 +159,30 @@ describe("useEditAccountModal — management fees parameter (FEE-075)", () => {
     );
   });
 });
+
+describe("useEditAccountModal — country and wrapper (ACC-043, ACC-044)", () => {
+  beforeEach(() => {
+    mockUpdateAccount.mockReset();
+  });
+
+  // A rename sends the stored country and wrapper back, a wrapper this device's lists do not
+  // know included, so the edit keeps them.
+  it("sends the stored country and wrapper back with a rename", async () => {
+    const planned: Account = { ...mockAccount, country: "ES", wrapper: "es_plan" };
+    mockUpdateAccount.mockResolvedValue({ data: planned, error: null });
+    const { result } = renderHook(() =>
+      useEditAccountModal({ account: planned, onClose: vi.fn() }),
+    );
+    act(() => {
+      result.current.handleChange({
+        target: { name: "name", value: "Plan pensiones" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(mockUpdateAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Plan pensiones", country: "ES", wrapper: "es_plan" }),
+    );
+  });
+});

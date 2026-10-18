@@ -3,7 +3,7 @@ use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot, StockS
 use super::holding_note::HoldingNote;
 use super::journal::CashEffect;
 use super::transaction::{EnteredAmount, Transaction, TransactionType};
-use super::wrapper::{country_well_formed, wrapper_available, PORTFOLIO_COUNTRY};
+use super::wrapper::{country_well_formed, wrapper_known, PORTFOLIO_COUNTRY};
 use crate::context::account::error::AccountError;
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
 use anyhow::{anyhow, Result};
@@ -257,13 +257,15 @@ impl Account {
         }
     }
 
-    /// ACC-041 — the account with its country and wrapper, both optional: a country is two
-    /// upper-case letters, and the wrapper one of the generic list or of the account's country's
-    /// list, that country being its own or the portfolio's. A blank value is none.
+    /// ACC-041/043 — the account with its country and wrapper, both optional: a country is two
+    /// upper-case letters; a wrapper is one the lists hold, for an account of any country, or
+    /// `stored_wrapper` — the one the account already has, kept though this device's lists do
+    /// not know it (ACC-040). A blank value is none.
     pub fn classified(
         mut self,
         country: Option<String>,
         wrapper: Option<String>,
+        stored_wrapper: Option<&str>,
     ) -> StdResult<Self, AccountError> {
         let country = country
             .map(|country| country.trim().to_string())
@@ -278,14 +280,14 @@ impl Account {
                 });
             }
         }
-        self.country = country;
         if let Some(wrapper) = &wrapper {
-            if !wrapper_available(wrapper, self.effective_country()) {
+            if !wrapper_known(wrapper) && stored_wrapper != Some(wrapper.as_str()) {
                 return Err(AccountError::WrapperNotAvailable {
                     wrapper: wrapper.clone(),
                 });
             }
         }
+        self.country = country;
         self.wrapper = wrapper;
         Ok(self)
     }

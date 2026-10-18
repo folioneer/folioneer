@@ -3,6 +3,8 @@ import type {
   FetchAccountAssetPricesError,
   FetchAllAssetPricesError,
   UpdateFrequency,
+  Wrapper,
+  WrapperLists,
 } from "@/bindings";
 import { microToFormatted } from "@/lib/microUnits";
 import { formatIsoDateNumeric } from "@/ui/format/date";
@@ -145,4 +147,94 @@ export function formatPriceMovementAmount(micros: number | null, currency: strin
  */
 export function formatPriceMovementDate(isoDate: string | null, locale: string): string {
   return isoDate === null ? "—" : formatIsoDateNumeric(isoDate, locale);
+}
+
+/** The label of a wrapper in the window's language: French, German, else English (ACC-040). */
+function labelIn(wrapper: Wrapper, language: string): string {
+  if (language.startsWith("fr")) return wrapper.label_fr;
+  if (language.startsWith("de")) return wrapper.label_de;
+  return wrapper.label_en;
+}
+
+/**
+ * ACC-045/046 — a wrapper as the window names it; a wrapper the lists do not know (another
+ * device's newer lists, ACC-040) is shown by its identifier. Null without a wrapper, and
+ * until the lists are read.
+ */
+export function wrapperLabel(
+  lists: WrapperLists | null,
+  wrapperId: string | null,
+  language: string,
+): string | null {
+  if (wrapperId === null || lists === null) return null;
+  const wrapper = lists.wrappers.find((candidate) => candidate.id === wrapperId);
+  return wrapper ? labelIn(wrapper, language) : wrapperId;
+}
+
+/**
+ * ACC-048 — the wrappers the form suggests to an account of `country` ("" for the portfolio's),
+ * in the order the core gives them: its country's list, then the generic one; the account's
+ * `current` wrapper, when it is from another list or one the lists do not know, follows them,
+ * so an edit keeps it (ACC-043).
+ */
+export function wrapperOptions(
+  lists: WrapperLists,
+  country: string,
+  current: string,
+  language: string,
+): { value: string; label: string }[] {
+  const effective = country || lists.portfolio_country;
+  const ids =
+    lists.offered.find((offer) => offer.country === effective)?.wrapper_ids ?? lists.generic;
+  const suggested = current === "" || ids.includes(current) ? ids : [...ids, current];
+  return suggested.map((id) => ({ value: id, label: wrapperLabel(lists, id, language) ?? id }));
+}
+
+/** A country's name in the window's language, by its two-letter code. */
+function countryName(code: string, language: string): string {
+  return new Intl.DisplayNames([language], { type: "region" }).of(code) ?? code;
+}
+
+/**
+ * ACC-045 — the countries the form offers, every one, in the core's order: the portfolio's
+ * first (value "", the account takes the portfolio's, ACC-041), named in `country` for its
+ * label; then the countries with a list of their own; then the others.
+ */
+export function countryOptions(
+  lists: WrapperLists,
+  language: string,
+): { value: string; label: string; country: string }[] {
+  return lists.countries.map((code) => {
+    const name = countryName(code, language);
+    return { value: code === lists.portfolio_country ? "" : code, label: name, country: name };
+  });
+}
+
+/**
+ * ACC-047 — rows grouped by wrapper in the lists' order (the core's), wrappers the lists do
+ * not know after them in the order the rows meet them, the rows without a wrapper last
+ * (wrapper and label null); rows keep their order within a group. A group's heading is its
+ * wrapper's label, or the identifier of one the lists do not know.
+ */
+export function groupByWrapper<T extends { wrapper: string | null }>(
+  rows: T[],
+  lists: WrapperLists | null,
+  labelOf: (wrapperId: string | null) => string | null,
+): { wrapper: string | null; label: string | null; rows: T[] }[] {
+  const buckets = new Map<string | null, T[]>();
+  for (const wrapper of lists?.wrappers ?? []) buckets.set(wrapper.id, []);
+  const unknown = new Map<string | null, T[]>();
+  for (const row of rows) {
+    const bucket = buckets.get(row.wrapper) ?? unknown.get(row.wrapper) ?? [];
+    if (!buckets.has(row.wrapper)) unknown.set(row.wrapper, bucket);
+    bucket.push(row);
+  }
+  const groups: { wrapper: string | null; label: string | null; rows: T[] }[] = [];
+  const withoutWrapper = unknown.get(null);
+  unknown.delete(null);
+  for (const [wrapper, groupRows] of [...buckets, ...unknown]) {
+    if (groupRows.length > 0) groups.push({ wrapper, label: labelOf(wrapper), rows: groupRows });
+  }
+  if (withoutWrapper) groups.push({ wrapper: null, label: null, rows: withoutWrapper });
+  return groups;
 }
