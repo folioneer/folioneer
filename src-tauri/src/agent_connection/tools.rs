@@ -727,19 +727,57 @@ fn today() -> String {
 /// AGT-048 — a figure as an agent sends it: a decimal with a dot and at most six decimals,
 /// as text or as a JSON number.
 fn figure(arguments: &Value, name: &str) -> Result<Option<i64>, Refusal> {
-    let typed = match arguments.get(name) {
+    let (typed, plain) = match arguments.get(name) {
         None | Some(Value::Null) => return Ok(None),
-        Some(Value::String(text)) => text.clone(),
-        Some(Value::Number(number)) => number.to_string(),
-        Some(_) => String::new(),
+        Some(Value::String(text)) => (text.clone(), text.clone()),
+        Some(Value::Number(number)) => {
+            let typed = number.to_string();
+            let plain = without_exponent(&typed);
+            (typed, plain)
+        }
+        Some(_) => (String::new(), String::new()),
     };
-    decimal_to_micro(&typed).map(Some).ok_or_else(|| Refusal {
+    decimal_to_micro(&plain).map(Some).ok_or_else(|| Refusal {
         code: "InvalidFigure".to_string(),
         message: format!(
             "{name} is not a decimal with a dot and at most six decimals: \"{}\"",
             typed.escape_debug()
         ),
     })
+}
+
+/// AGT-048 — a JSON number as its plain decimal: below 0.00001 or very large, it is written
+/// in exponent form (`2e-6`, `1.5e-5`, `1e21`), which is moved into the digits by moving the
+/// dot. Anything else is returned as it came, for `decimal_to_micro` to judge.
+fn without_exponent(number: &str) -> String {
+    let Some((mantissa, exponent)) = number.split_once(['e', 'E']) else {
+        return number.to_string();
+    };
+    let Ok(exponent) = exponent.parse::<i32>() else {
+        return number.to_string();
+    };
+    let (sign, mantissa) = match mantissa.strip_prefix('-') {
+        Some(rest) => ("-", rest),
+        None => ("", mantissa),
+    };
+    let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    let digits = format!("{whole}{fraction}");
+    // Where the dot falls in `digits` once the exponent has moved it.
+    let dot = whole.len() as i32 + exponent;
+    // A position past the figures `decimal_to_micro` can hold is refused there, without
+    // writing out thousands of zeros.
+    if !(-20..=40).contains(&dot) {
+        return number.to_string();
+    }
+    let plain = if dot <= 0 {
+        format!("0.{}{digits}", "0".repeat(dot.unsigned_abs() as usize))
+    } else if dot as usize >= digits.len() {
+        format!("{digits}{}", "0".repeat(dot as usize - digits.len()))
+    } else {
+        let (before, after) = digits.split_at(dot as usize);
+        format!("{before}.{after}")
+    };
+    format!("{sign}{plain}")
 }
 
 fn amount(arguments: &Value, name: &str) -> Result<i64, Refusal> {
@@ -1161,6 +1199,26 @@ mod tests {
         }
         assert_eq!(code(amount(&arguments, "absent")), "MissingArgument");
         assert_eq!(amount(&arguments, "whole"), Ok(3 * M));
+    }
+
+    // AGT-048 — a JSON number below 0.00001 reaches the server in exponent form (`2e-6`);
+    // it is read as the decimal it stands for, and more than six decimals stay refused.
+    #[test]
+    fn agt_048_a_small_number_in_exponent_form_is_read_as_its_decimal() {
+        let arguments = json!({
+            "tiny": 2e-6, "small": 1.5e-5, "negative": -3e-6, "seven_decimals": 1e-7,
+            "large": 1e21, "as_text": "2e-6",
+        });
+        assert_eq!(figure(&arguments, "tiny"), Ok(Some(2)));
+        assert_eq!(figure(&arguments, "small"), Ok(Some(15)));
+        assert_eq!(figure(&arguments, "negative"), Ok(Some(-3)));
+        for refused in ["seven_decimals", "large", "as_text"] {
+            assert_eq!(
+                code(figure(&arguments, refused)),
+                "InvalidFigure",
+                "{refused}"
+            );
+        }
     }
 
     // AGT-048 / AGT-044 — a purchase or a sale takes a unit price or a total, never both and never
