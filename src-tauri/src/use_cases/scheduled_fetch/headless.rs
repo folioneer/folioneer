@@ -19,6 +19,7 @@ use crate::shared::infrastructure::scheduler::platform_scheduler;
 
 use super::orchestrator::ScheduledFetchOrchestrator;
 use super::repository::SqliteScheduledFetchRepository;
+use crate::use_cases::shared::price_fetch_failures::SqlitePriceFetchFailureRepository;
 use crate::use_cases::shared::price_fetch_log::SqlitePriceFetchLogRepository;
 
 /// SYN-068 — after the scheduled fetch, verifies the passphrase check (SYN-055) and
@@ -121,6 +122,7 @@ pub async fn run(build_providers: impl FnOnce() -> anyhow::Result<HeadlessProvid
     );
     let sync_pool = pool.clone();
     let fetch_log = Arc::new(SqlitePriceFetchLogRepository::new(pool.clone()));
+    let fetch_failures = Arc::new(SqlitePriceFetchFailureRepository::new(pool.clone()));
     let repository = Arc::new(SqliteScheduledFetchRepository::new(pool));
 
     let orchestrator = ScheduledFetchOrchestrator::new(
@@ -132,7 +134,8 @@ pub async fn run(build_providers: impl FnOnce() -> anyhow::Result<HeadlessProvid
         platform_scheduler(),
         Arc::new(|| chrono::Local::now().naive_local()),
     )
-    .with_fetch_log(fetch_log);
+    .with_fetch_log(fetch_log)
+    .with_fetch_failures(fetch_failures);
 
     let exit_code = match orchestrator.run_scheduled_fetch().await {
         Ok(run) => {

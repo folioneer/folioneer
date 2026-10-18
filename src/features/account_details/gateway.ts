@@ -23,6 +23,8 @@ import type {
   OpenHoldingError,
   OpeningBalanceDraft,
   OpeningBalancePreview,
+  PriceFetchFailure,
+  PriceFetchFailuresError,
   PriceHistoryBackfillError,
   PriceHistoryBackfillOutcome,
   RecordInterestDTO,
@@ -51,6 +53,11 @@ export const accountDetailsGateway = {
     asOfDate?: string | null,
   ): Promise<Result<AccountDetailsResponse, AccountError>> {
     return commands.getAccountDetails(accountId, asOfDate ?? null);
+  },
+
+  // MKT-221 — why this device's last fetch left each asset unpriced.
+  async getPriceFetchFailures(): Promise<Result<PriceFetchFailure[], PriceFetchFailuresError>> {
+    return commands.getPriceFetchFailures();
   },
 
   async recordAssetPrice(

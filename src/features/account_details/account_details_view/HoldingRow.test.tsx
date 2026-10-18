@@ -57,6 +57,8 @@ const baseRow: HoldingRowViewModel = {
   inconsistency: null,
   inconsistencyLabel: null,
   priceOutdated: false,
+  fetchFailure: null,
+  fetchFailedOn: null,
 };
 
 const renderInTable = (
@@ -441,6 +443,32 @@ describe("HoldingRow — outdated price (MKT-207)", () => {
     renderInTable({ ...baseRow, priceOutdated: false });
     expect(document.getElementById("holding-price-outdated-asset-1")).toBeNull();
     expect(screen.getByText("mkt.staleness_today")).toBeInTheDocument();
+  });
+});
+
+describe("HoldingRow — why a price was not updated (MKT-222)", () => {
+  beforeEach(() => {
+    useAppStore.setState({ assets: [], accounts: [] });
+  });
+
+  it("says why under the price, and under a missing one", () => {
+    const failure = { key: "mkt.fetch_failure.ProviderUnreachable" };
+    const { unmount } = renderInTable({ ...baseRow, fetchFailure: failure });
+    expect(document.getElementById("holding-price-fetch-failure-asset-1")).toHaveTextContent(
+      "mkt.fetch_failure.ProviderUnreachable",
+    );
+    unmount();
+    renderInTable({
+      ...baseRow,
+      currentPrice: { kind: "no_price_available" },
+      fetchFailure: failure,
+    });
+    expect(document.getElementById("holding-price-fetch-failure-asset-1")).toBeInTheDocument();
+  });
+
+  it("says nothing when the last fetch priced it", () => {
+    renderInTable(baseRow);
+    expect(document.getElementById("holding-price-fetch-failure-asset-1")).toBeNull();
   });
 });
 

@@ -32,6 +32,8 @@ pub mod global_performance;
 pub mod holding_transaction;
 /// Portfolio Sync: cross-context orchestration for the seven cross-BC sync commands (SYN + CFR, D3).
 pub mod portfolio_sync;
+/// Why this installation's last fetch left each asset unpriced (MKT-221).
+pub mod price_fetch_failures;
 /// Price freshness: newest price date among held assets and the last fetch on this device (MKT-200–203).
 pub mod price_freshness;
 /// Price history backfill of one holding over the period the account held it (MKT-190–199).

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM price_fetch_failures WHERE asset_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "e42047f08b0838bf288ca7316356552030539415bd3f62881d84d359cbaf9bc6"
+}

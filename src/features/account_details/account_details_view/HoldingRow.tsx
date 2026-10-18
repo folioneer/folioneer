@@ -471,6 +471,20 @@ export function HoldingRow({
               {t("mkt.price_state.no_price_available")}
             </span>
           )}
+          {/* MKT-222 — why this device's last fetch did not update the price */}
+          {row.fetchFailure && (
+            <span
+              id={`holding-price-fetch-failure-${row.assetId}`}
+              title={
+                row.fetchFailedOn
+                  ? t("mkt.fetch_failure.tooltip", { date: row.fetchFailedOn })
+                  : undefined
+              }
+              className="max-w-56 text-right text-[10px] text-m3-warning"
+            >
+              {t(row.fetchFailure.key)}
+            </span>
+          )}
           {/* MKT-158 — a price typed by hand says so, under the price or under the
             diagnostic of a missing one */}
           {isPriceRefreshBlocked && (

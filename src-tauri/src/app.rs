@@ -38,6 +38,7 @@ use crate::use_cases::portfolio_sync::{
     PortfolioSyncDependencies, PortfolioSyncOrchestrator, ServicePortfolioSnapshot,
     ServiceRankStamper,
 };
+use crate::use_cases::price_fetch_failures::PriceFetchFailuresUseCase;
 use crate::use_cases::price_freshness::PriceFreshnessUseCase;
 use crate::use_cases::price_history_backfill::PriceHistoryBackfillUseCase;
 use crate::use_cases::rate_history_backfill::RateHistoryBackfillUseCase;
@@ -45,6 +46,9 @@ use crate::use_cases::rate_refresh::RateRefreshUseCase;
 use crate::use_cases::scheduled_fetch::orchestrator::drop_schedule_without_provider;
 use crate::use_cases::scheduled_fetch::{
     ScheduledFetchOrchestrator, SqliteScheduledFetchRepository,
+};
+use crate::use_cases::shared::price_fetch_failures::{
+    PriceFetchFailureRepository, SqlitePriceFetchFailureRepository,
 };
 use crate::use_cases::shared::price_fetch_log::{
     PriceFetchLogRepository, SqlitePriceFetchLogRepository,
@@ -311,6 +315,14 @@ pub fn run() {
                     asset_service.clone(),
                     Arc::clone(&price_fetch_log),
                 )));
+                // MKT-220 — why this device's last fetch left each asset unpriced,
+                // written by both fetch paths and read whether or not anything can fetch.
+                let price_fetch_failures: Arc<dyn PriceFetchFailureRepository> =
+                    Arc::new(SqlitePriceFetchFailureRepository::new(db.pool.clone()));
+                app_handle.manage(Arc::new(PriceFetchFailuresUseCase::new(
+                    asset_service.clone(),
+                    Arc::clone(&price_fetch_failures),
+                )));
 
                 // MKT-211, UPD-030 — what the interface is told about this build.
                 app_handle.manage(Capabilities::of_build(
@@ -328,6 +340,7 @@ pub fn run() {
                         currency_service: Arc::clone(&currency_service),
                         event_bus: Arc::clone(&event_bus),
                         price_fetch_log,
+                        price_fetch_failures,
                     },
                 );
 
@@ -393,6 +406,7 @@ struct PriceFetchingParts {
     currency_service: Arc<CurrencyService>,
     event_bus: Arc<SideEffectEventBus>,
     price_fetch_log: Arc<dyn PriceFetchLogRepository>,
+    price_fetch_failures: Arc<dyn PriceFetchFailureRepository>,
 }
 
 /// MKT-210, SPF-070 — the three paths that fetch prices exist only with an External
@@ -416,6 +430,7 @@ fn manage_price_fetching<R: tauri::Runtime>(
         currency_service,
         event_bus,
         price_fetch_log,
+        price_fetch_failures,
     } = parts;
 
     let fetch_guard = Arc::new(FetchGuard::new());
@@ -430,6 +445,10 @@ fn manage_price_fetching<R: tauri::Runtime>(
         )
         .with_fetch_log(
             Arc::clone(&price_fetch_log),
+            Arc::new(|| chrono::Local::now().naive_local()),
+        )
+        .with_fetch_failures(
+            Arc::clone(&price_fetch_failures),
             Arc::new(|| chrono::Local::now().naive_local()),
         ),
     );
@@ -452,7 +471,8 @@ fn manage_price_fetching<R: tauri::Runtime>(
             platform_scheduler(),
             Arc::new(|| chrono::Local::now().naive_local()),
         )
-        .with_fetch_log(price_fetch_log),
+        .with_fetch_log(price_fetch_log)
+        .with_fetch_failures(price_fetch_failures),
     );
     // SPF-015 — verify/repair the OS schedule against the stored configuration on every
     // app start; failures are logged, never surfaced.
@@ -549,6 +569,7 @@ mod tests {
         } = AppContainer::build(pool.clone(), None, None, None, recorder);
         PriceFetchingParts {
             price_fetch_log: Arc::new(SqlitePriceFetchLogRepository::new(pool.clone())),
+            price_fetch_failures: Arc::new(SqlitePriceFetchFailureRepository::new(pool.clone())),
             pool,
             account_service,
             asset_service,

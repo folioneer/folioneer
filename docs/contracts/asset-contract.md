@@ -88,6 +88,12 @@
 | --------------------- | ---- | ---------------- | --------------- |
 | `get_price_freshness` | —    | `PriceFreshness` | `DatabaseError` |
 
+> `get_price_fetch_failures` is implemented in `use_cases/price_fetch_failures/`. It reads, for each asset, why this installation's last fetch could not price it — device-local data, never synced — leaving out the assets whose price is typed by hand (MKT-220, MKT-221).
+
+| Command                    | Args | Return                   | Errors          |
+| -------------------------- | ---- | ------------------------ | --------------- |
+| `get_price_fetch_failures` | —    | `Vec<PriceFetchFailure>` | `DatabaseError` |
+
 ### Capabilities
 
 > `get_capabilities` is implemented in `use_cases/capabilities/`. It returns the answer the composition root settled for the run (MKT-211): whether the build has an External provider, and the distribution channel it belongs to (UPD-030). Infallible — the value exists before any window opens.
@@ -220,6 +226,20 @@ struct AssetPrice {
 struct PriceFreshness {
     newest_price_date: Option<String>, // YYYY-MM-DD; None without a held, priced asset
     last_fetch_at: Option<String>,     // local wall-clock YYYY-MM-DDTHH:MM:SS; None if this device never fetched
+}
+
+// MKT-220/221 — why this device's last fetch could not price one asset.
+struct PriceFetchFailure {
+    asset_id: String,
+    reason: PriceFetchFailureReason,
+    failed_at: String, // local wall-clock YYYY-MM-DDTHH:MM:SS of that fetch
+}
+
+// MKT-220
+enum PriceFetchFailureReason {
+    NoData,              // the provider answered with no price
+    ProviderUnreachable, // the provider could not be reached, or its answer read
+    NotSaved,            // the price it gave could not be saved
 }
 ```
 
@@ -379,6 +399,7 @@ struct AssetClassDefault {
 
 ## Changelog
 
+- 2026-10-18 — TODO-085 (MKT-220, MKT-221): new `get_price_fetch_failures` command and the `PriceFetchFailure` / `PriceFetchFailureReason` types. No event added; the holding row re-reads after `AssetPriceFetchCompleted`.
 - 2026-10-11 — TODO-059: `AssetPriceSource` gains `Agent` (MKT-103), read by `get_asset_prices`; `AssetPriceUpdated` is also published when an agent or the command line records a price. No command added.
 - 2026-10-10 — DEBT-096: read against the code. `UnknownError` leaves the two fetch rows: neither command returns it. The events `AssetPriceFetchProgress { done, total }` (MKT-180) and `CategoryUpdated` are listed. `Asset`, `CreateAssetDTO` and `AssetClass` give their fields and variants in the generated order. `risk_level` is `u8` on the inputs and in `InvalidRiskLevel`, as in the code. The archive and delete note gives the order the checks run in. Rule references name the rules as the spec numbers them.
 - 2026-10-10 — DEBT-096: `Exchange` is defined (`code`, `label`); it was named by three rows and by `Asset`, and defined nowhere.

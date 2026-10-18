@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT asset_id, reason, failed_at FROM price_fetch_failures ORDER BY asset_id",
+  "describe": {
+    "columns": [
+      {
+        "name": "asset_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "reason",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "failed_at",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6ace28b132004e7f119f7379fe9ff43546b42a66c11946d50389d3d3d0ae4d84"
+}

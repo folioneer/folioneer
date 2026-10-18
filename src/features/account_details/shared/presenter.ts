@@ -11,6 +11,7 @@ import type {
   HoldingPeriodPerformance,
   InterestError,
   ManagementFeeError,
+  PriceFetchFailure,
   PriceHistoryBackfillError,
   PriceHistoryBackfillOutcome,
   SplitError,
@@ -287,6 +288,10 @@ export interface HoldingRowViewModel {
   staleness: StalenessLabel | null;
   /** MKT-207 — the current price is outdated for the asset (MKT-205). */
   priceOutdated: boolean;
+  /** MKT-222 — why this device's last fetch did not update the price; null when it did. */
+  fetchFailure: I18nMessage | null;
+  /** MKT-222 — the date (`YYYY-MM-DD`) of that fetch; null with no failure. */
+  fetchFailedOn: string | null;
   /** i18n key for the price source badge (MKT-142), or null when no price is recorded. */
   sourceLabel: string | null;
   /** FX-rate staleness label (FXR-090); null/absent unless a converted value is shown. */
@@ -539,6 +544,8 @@ export function toHoldingRow(detail: HoldingDetail): HoldingRowViewModel {
       isCash: true,
       staleness: null,
       priceOutdated: false,
+      fetchFailure: null,
+      fetchFailedOn: null,
       sourceLabel: null,
       fxStaleness: null,
       // HNO-011 — the cash line never carries a note (NoteOnCashAsset).
@@ -584,6 +591,8 @@ export function toHoldingRow(detail: HoldingDetail): HoldingRowViewModel {
     isCash: false,
     staleness: formatStaleness(detail.current_price_date, new Date()),
     priceOutdated: detail.price_outdated,
+    fetchFailure: null,
+    fetchFailedOn: null,
     sourceLabel: formatSource(detail.current_price_source),
     // FXR-090 — staleness of the FX rate used to value this holding; null for
     // same-currency / no-rate holdings (fx_rate_date is None).
@@ -639,5 +648,21 @@ export function toAccountSummary(response: AccountDetailsResponse): AccountSumma
     totalManagementFeesRaw: response.total_management_fees,
     totalNetCashInput: microToFormatted(response.total_net_cash_input, 2),
     outdatedPriceCount: response.outdated_price_count,
+  };
+}
+
+/**
+ * MKT-222 — the row with the reason this device's last fetch gave for not updating its
+ * price, when it gave one.
+ */
+export function withFetchFailure(
+  row: HoldingRowViewModel,
+  failure: PriceFetchFailure | undefined,
+): HoldingRowViewModel {
+  if (!failure) return row;
+  return {
+    ...row,
+    fetchFailure: { key: `mkt.fetch_failure.${failure.reason}` },
+    fetchFailedOn: failure.failed_at.slice(0, 10),
   };
 }

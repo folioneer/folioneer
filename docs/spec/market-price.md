@@ -38,6 +38,16 @@ The two figures behind the header's price item (MKT-202). A read model, never pe
 | `newest_price_date` | Latest observation date among the prices of the held assets (ISO 8601 date, e.g. `2026-09-15`); absent without a held, priced asset (MKT-200).                |
 | `last_fetch_at`     | Moment this device last fetched prices, as a local date and time without offset (e.g. `2026-09-19T08:14:00`); absent when the device never fetched (MKT-201). |
 
+### PriceFetchFailure
+
+Why this device's last fetch could not price one asset (MKT-220, MKT-221). Device-local, never synced.
+
+| Field       | Business meaning                                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `asset_id`  | The asset the fetch could not price.                                                                                              |
+| `reason`    | `NoData` (the provider had no price), `ProviderUnreachable` (it could not be reached), `NotSaved` (the price could not be saved). |
+| `failed_at` | Moment of that fetch, as a local date and time without offset (e.g. `2026-10-18T08:00:00`).                                       |
+
 ### Capabilities
 
 What the interface is told about this build: what it can do and which distribution channel it belongs to (MKT-211). A read model, settled when the application starts and constant for the run; never persisted.
@@ -136,7 +146,7 @@ The `Asset` entity (owned by the AST spec) gains one field for this feature.
 - **"Missing ticker"** — when `asset_reference` is empty (no identifier the price-fetch path can query). Signals that adding a ticker is the action that would unlock price fetch.
 - **"No price available"** — when `asset_reference` is non-empty but `current_price` is `None`. The two upstream causes ("provider returned N/D" and "no fetch has run yet under a manual-update-frequency account") are intentionally merged into this single state in this phase; `update_frequency` is not consulted by the presenter. Disambiguation is deferred — see Open Questions.
 
-**Cell composition.** The diagnostic string occupies the primary price slot. No secondary staleness label (MKT-140 is skipped — there is no `current_price_date` to label) and no source badge (MKT-142 is skipped — there is no `AssetPrice.source` to badge) are rendered alongside it; only the "Price typed by hand" line of MKT-158 may follow it. Both states render as subdued text.
+**Cell composition.** The diagnostic string occupies the primary price slot. No secondary staleness label (MKT-140 is skipped — there is no `current_price_date` to label) and no source badge (MKT-142 is skipped — there is no `AssetPrice.source` to badge) are rendered alongside it; only the "Not updated: …" line of MKT-222 and the "Price typed by hand" line of MKT-158 may follow it. Both states render as subdued text.
 
 **Interactivity.** The "Missing ticker" diagnostic is clickable — activating it opens the Edit Asset modal with the reference (ticker) input focused (other fields pre-filled per AST-012), so the user can supply the missing identifier and unlock price fetch without leaving the holdings view. After save, `AssetUpdated` fires and the holdings view re-fetches per ACD-040; the diagnostic transitions to a real price or to "No price available" on the next fetch cycle. The "No price available" diagnostic is non-interactive (no user action would change the outcome — both identifiers are present and fetch has yielded no data). The Edit Asset modal is mounted by a shell-mounted `AssetEditModalMount` that watches the URL for an `edit-asset` request; the click handler only mutates URL search params, keeping it inside `account_details` and avoiding a direct import of the `assets` feature.
 
@@ -282,7 +292,7 @@ In all branches a class-share `/` separator in the reference is translated to Ya
 
 **MKT-113 — In-flight guard, one fetch at a time (backend)**: Only one fetch task may run at a time across all three paths (launch MKT-122, global refresh MKT-130, account refresh MKT-132). If a fetch task is already running, a subsequent task call is rejected with a specific error.
 
-**MKT-114 — Asset silently skipped on per-asset failure (backend)**: In a fetch task (launch MKT-122, global refresh MKT-130, account refresh MKT-132), an individual asset is silently skipped (no row written, no error surfaced) when either its symbol cannot be derived OR the provider fetch fails (network/HTTP/parse error, logged as warning). The task continues with the remaining assets.
+**MKT-114 — Asset silently skipped on per-asset failure (backend)**: In a fetch task (launch MKT-122, global refresh MKT-130, account refresh MKT-132), an individual asset is silently skipped (no row written, no error surfaced during the task; its reason is kept per MKT-220) when either its symbol cannot be derived OR the provider fetch fails (network/HTTP/parse error, logged as warning). The task continues with the remaining assets.
 
 **MKT-115 — Manual refresh feedback (frontend)**: For user-triggered fetch actions (global refresh MKT-130, account refresh MKT-131), the frontend surfaces feedback via snackbar:
 
@@ -439,6 +449,16 @@ A build may be composed without an External provider ([ADR-020](../adr/020-one-e
 **MKT-213 — What remains, and what cannot be reached (frontend + backend)**: Everything computed from prices already recorded is unchanged, and so is recording a price by hand (MKT-020) and editing its history (MKT-070). What answers a fetch task cannot be reached, since none runs: the manual fill of unpriced assets (MKT-172), the fetch progress in the shell (MKT-180), the fetch-outcome snackbar (MKT-145) and the price-movement report (PMV-010). Exchange rates are unaffected: they refresh on their own, at launch (FXR-075) and through "Update rates" (FXR-110).
 
 ---
+
+### Why a Price Was Not Updated (220–229)
+
+A fetch that cannot price an asset is silent while it runs (MKT-114, SPF-041); what it learned is kept on the device so that the asset's row can tell why its price is old or missing.
+
+**MKT-220 — The reason is recorded where the fetch ran (backend)**: This device keeps, for each asset its last fetch could not price, why — the provider had no price for it, the provider could not be reached, or the price it gave could not be saved — and the moment of that fetch: device-local data, never synced (SYN-023). An in-app fetch task (MKT-122, MKT-130, MKT-132) records it for every asset in its scope it asked the provider for and could not price, and clears it for every asset it priced, before it announces its completion (MKT-119); a scheduled download (SPF-050) does the same once its last attempt is over, except that an empty answer — a window with no close to give (SPF-032, SPF-033) — leaves the asset's reason as it was. Nothing else records or clears it: an asset no fetch asks the provider for — typed by hand (MKT-151), cash, or with no symbol to derive (MKT-110), which MKT-114 counts as skipped all the same — keeps what it had, and so does an asset whose price is entered by hand, by an agent or by a price history backfill (MKT-190).
+
+**MKT-221 — The reasons are read without the prices typed by hand (backend)**: The read of the reasons gives, for each asset, the reason and the moment its last fetch on this device recorded, and leaves out an asset whose price is typed by hand (MKT-150): no fetch attempts it, and its row says so instead (MKT-158). Switching "typed by hand" on clears nothing: switched off again, the asset shows its old reason until a fetch attempts it.
+
+**MKT-222 — The reason on the row (frontend)**: On an active holding row of the live view of Account Details — not in the view of a date (MKT-206), not on a closed position — a line under the price, or under either diagnostic of MKT-032 ("No price available", "Missing ticker"), says why the last fetch on this device did not update it: "Not updated: no price from the provider" / "Not updated: the provider could not be reached" / "Not updated: the price could not be saved" ("Non mis à jour : aucun prix du fournisseur" / "… le fournisseur est injoignable" / "… le prix n'a pas pu être enregistré"), in the warning colour, both themes; on hover it gives the date of the fetch that could not price it ("Fetch that could not price it: 2026-10-18" / "Récupération qui n'a pas trouvé son prix : 2026-10-18"). The reasons are read again with the account's details (ACD-039 and the events of MKT-036, `AssetPriceFetchCompleted` included); a scheduled download raises no event, so its reasons show at the next of them or at the next start, as MKT-203 says of the header. When the reasons cannot be read, no line shows and the rest of the view is unchanged.
 
 ## Workflow
 
@@ -908,10 +928,11 @@ A "Fill missing price history" icon button in the actions of each active, non-ca
 - **Holding row**: next to the source badge, the staleness label of an outdated price turns into "⚠ Outdated price · 71d" in the warning colour (MKT-207); "Price typed by hand" (MKT-158) still follows under it when it applies.
 - **Account header**: after Global Value, Net Cash Input and the management fees, a warning chip "⚠ 2 outdated prices" (MKT-208); absent at zero and in a view with a date, today included.
 - **Accounts list**: the total row carries the same chip with the portfolio's count (MKT-208); absent at zero, and with the row itself while a search filters the list (ACC-032).
+- **Why not updated**: under the price, or under "No price available", "Not updated: …" in the warning colour; its tooltip gives the date of the failed fetch (MKT-222).
 
 ## Open Questions / Deferred
 
-**Deferred on MKT-032 — disambiguating the "No price available" state.** The current rule merges two upstream causes (provider returned N/D vs no fetch has run yet under a manual-update-frequency account) into one diagnostic. Distinguishing them requires BE telemetry (per-asset last-fetch-attempt + outcome) not currently exposed on `HoldingDetail`. Defer until a real user-pain signal warrants the BE surface change.
+**Deferred on MKT-032 — disambiguating the "No price available" state.** The current rule merges two upstream causes (provider returned N/D vs no fetch has run yet under a manual-update-frequency account) into one diagnostic. Distinguishing them requires BE telemetry (per-asset last-fetch-attempt + outcome) not currently exposed on `HoldingDetail`. Defer until a real user-pain signal warrants the BE surface change. — Partly answered by MKT-220–222: the row now says why the last fetch on this device left the asset unpriced; "no fetch has run yet" still shows nothing.
 
 **Deferred on MKT-153 — the toggle in the Asset management table.** This phase exposes the toggle only from the Account Details holding row, where the price discrepancy is observed. Surfacing the same toggle in the Asset management table (assets view) — so an asset's price can be typed by hand without holding it in an open account — is deferred until a need surfaces; the flag and commands (MKT-150, MKT-156) already support it.
 
