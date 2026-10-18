@@ -49,7 +49,7 @@ interface UseGlobalPerformanceResult {
   lifetimeNote: I18nMessage | null;
   /** Value-over-time series for the line chart, chronological (oldest→newest). */
   chartPoints: ValueChartPoint[];
-  /** Reporting currency of the response — EUR for cross-account scopes (GPF-011). */
+  /** Reporting currency of the response — the reference currency for cross-account scopes (GPF-011). */
   currency: string | null;
   /** Every account of the catalog, selectable as an account scope. */
   accountOptions: AccountScopeOption[];
