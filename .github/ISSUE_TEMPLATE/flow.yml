@@ -1,0 +1,49 @@
+name: Flow
+description: How the work moves — guides, scripts, hooks, workflows, the agent setup
+labels: ["flow"]
+projects: ["folioneer/1"]
+body:
+  - type: markdown
+    attributes:
+      value: The title is one plain sentence stating what was observed — no kind prefix, no id.
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      description: "By facts, not effort. S: one pull request, one layer, nothing from the owner. M: any other single pull request. L: two or three pull requests, or mocks or a spec interview. XL: a programme, sliced before it is queued."
+      options: [S, M, L, XL]
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed
+      description: What happened, when, with the pull request or the figure.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The change proposed.
+    validations:
+      required: true
+  - type: textarea
+    id: costs
+    attributes:
+      label: Costs
+      description: What it costs, and what it protects.
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision
+      description: Left empty when filed; the owner decides in a comment and the agent copies the decision here with its date.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Personal data
+      options:
+        - label: "This issue holds no real portfolio data: no account, holding or amount from a real record; screenshots and mocks show invented data only."
+          required: true

@@ -143,15 +143,13 @@ jobs:
               merged missed.txt | awk 'NR <= 150 { print "- " $0 }'
               [[ "$missed" -gt 150 ]] && echo "- … $((missed - 150)) more in the artifacts"
               echo
-              echo "### Ready to file in \`docs/work/debt/\`"
+              echo "### Ready to file as a \`task\` issue"
               echo
               echo '```'
-              echo "# $today — DEBT-NNN — $missed surviving mutants in the logic code"
-              echo
-              echo "- Found by: mutation sweep ($run_url)"
-              echo "- Where: the files listed in the sweep issue"
-              echo "- Context: branch \`main\` @ \`${GITHUB_SHA::7}\`"
-              echo "- Observation: each missed mutant is a change the suite does not notice; the test that should catch it is missing or asserts too little."
+              echo "Title: $missed surviving mutants in the logic code"
+              echo "Found by: mutation sweep ($run_url)"
+              echo "Where: the files listed in the sweep issue, branch \`main\` @ \`${GITHUB_SHA::7}\`"
+              echo "Observation: each missed mutant is a change the suite does not notice; the test that should catch it is missing or asserts too little."
               echo '```'
             fi
           } > body.md

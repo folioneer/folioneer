@@ -14,7 +14,7 @@ All monetary values are `i64` micro-units per [ADR-001](../adr/001-use-i64-for-m
 
 ## Computed Concepts
 
-> This feature persists no new entity. The concepts below are computed read-only views, defined here in business terms; their wire shape is `/contract`'s concern.
+> This feature persists no new entity. The concepts below are computed read-only views, defined here in business terms; their wire shape is the contract's concern.
 
 ### Performance Period
 

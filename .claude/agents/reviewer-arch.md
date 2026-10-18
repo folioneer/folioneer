@@ -1,7 +1,7 @@
 ---
 name: reviewer-arch
 description: Reviews DDD layering in changed .rs/.ts/.tsx files: context isolation, gateway, factories, data flow, dead code. Use with reviewer-backend or reviewer-frontend.
-tools: Read, Grep, Glob, Bash, Write
+tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
 

@@ -19,4 +19,4 @@ ADR-003, ADR-004, ADR-005 and ADR-007 are withdrawn; the rules docs are their on
 ## Guard
 
 - **Reversal looks like**: a new ADR that records a code-organisation or testing pattern, or a rule restated in an ADR.
-- **Guard**: `adr-reviewer` (the gate in `adr-writer`: technical choices only).
+- **Guard**: `adr-reviewer` (the gate in `docs/adr/README.md`: technical choices only).

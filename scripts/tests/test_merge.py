@@ -104,20 +104,20 @@ class FoldingFixups(unittest.TestCase):
         self.commit("feat: show the total", {"total.txt": "total\n"})
         self.commit("fixup! feat: show the total", {"total.txt": "total, fixed\n"})
         self.run_git("checkout", "--quiet", "main")
-        self.commit("docs: queue an entry", {"docs/work/todo/TODO-001.md": "entry\n"})
+        self.commit("docs: record a decision", {"docs/adr/001-a-decision.md": "decision\n"})
         self.run_git("checkout", "--quiet", "work")
 
         result = merge.rebase_folding_fixups("main")
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.titles(), ["feat: show the total"])
-        self.assertTrue(Path("docs/work/todo/TODO-001.md").exists())
+        self.assertTrue(Path("docs/adr/001-a-decision.md").exists())
 
     def test_a_fixup_that_names_no_commit_is_refused_and_the_branch_goes_back(self):
         self.commit("feat: show the total", {"total.txt": "total\n"})
         before = self.commit("fixup! feat: something else", {"other.txt": "other\n"})
         self.run_git("checkout", "--quiet", "main")
-        self.commit("docs: queue an entry", {"docs/work/todo/TODO-001.md": "entry\n"})
+        self.commit("docs: record a decision", {"docs/adr/001-a-decision.md": "decision\n"})
         self.run_git("checkout", "--quiet", "work")
         self.assertEqual(merge.rebase_folding_fixups("main").returncode, 0)
         self.assertNotEqual(self.run_git("rev-parse", "HEAD"), before)
@@ -157,10 +157,10 @@ class FoldingFixups(unittest.TestCase):
     def test_the_checks_stand_for_record_files_and_fall_for_anything_else(self):
         tested = self.commit("feat: show the total", {"total.txt": "total\n"})
         records = self.commit(
-            "docs: close the entry",
+            "docs: record a decision",
             {
-                "docs/work/todo/TODO-001.md": "closed\n",
-                "docs/work/queue.md": "closed\n",
+                "docs/adr/001-a-decision.md": "decided\n",
+                "docs/lessons.md": "learned\n",
                 "docs/plan/a-plan.md": "x\n",
             },
         )
@@ -176,14 +176,14 @@ class FoldingFixups(unittest.TestCase):
         self.assertEqual(merge.merge_method("main", before, "work"), ["--rebase"])
 
     def test_a_branch_whose_fixups_were_folded_is_squashed_under_its_commit(self):
-        self.run_git("commit", "--quiet", "--allow-empty", "-m", "feat: show the total", "-m", "TODO-001.")
+        self.run_git("commit", "--quiet", "--allow-empty", "-m", "feat: show the total", "-m", "Closes #401.")
         before = self.commit("fixup! feat: show the total", {"total.txt": "fixed\n"})
         merge.rebase_folding_fixups("main")
 
         self.assertEqual(
             merge.merge_method("main", before, "work"),
             [
-                "--squash", "--subject", "feat: show the total", "--body", "TODO-001.",
+                "--squash", "--subject", "feat: show the total", "--body", "Closes #401.",
                 "--author-email", "test@example.invalid",
             ],
         )

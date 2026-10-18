@@ -1,143 +1,117 @@
 ---
 name: run-entry
-description: Runs the first ready entry left in the human's queue (docs/work/queue.md) end to end under the project workflow — branch, design gate, acceptance tests, implementation, harness, reviewers, PR, merge on green, closure — without asking the human anything; questions go into the entry. Use to advance the backlog autonomously, one entry per invocation.
-argument-hint: "[TODO-NNN | DEBT-NNN]"
+description: Runs one task end to end under docs/workflow.md — branch, design gate, acceptance tests, implementation, harness, reviewers, PR, merge on green, closure. The task is the first ready Queued item of the Project (headless, no argument), an issue the human names (#123), or a plain request typed in chat. One task per invocation.
+argument-hint: "[#123 | a request]"
 ---
 
 # Skill — `run-entry`
 
-One invocation, one entry, from `docs/work/queue.md` to a merged pull request. The
-rules are `docs/workflow.md`; this file is the checklist.
+One invocation, one task, through the ceremony to `main`. The rules are `docs/workflow.md`;
+this file is the checklist.
 
-## Step 0 — Preconditions
+## Step 0 — Preconditions and mode
 
-- `git status --short` is empty and the branch is `main`, fresh (`git pull --ff-only`).
-  Otherwise stop and report; never work on a dirty tree.
-- With an argument (`/run-entry TODO-NNN` or `/run-entry DEBT-NNN`): that entry, and the
-  human is in the chat — **chat mode**. Without one: `just queue remaining` and
-  take references in order — **headless mode**, nobody to ask. Load the entry's file
-  (`docs/work/todo/TODO-NNN.md`, `docs/work/debt/DEBT-NNN.md` or
-  `docs/work/flow/FLOW-NNN.md`).
-- **Ready** = has a `**Done when:**`, `**Open questions:** none` (or every box ticked
-  with its answer written after it), and `**Design:**` is `none` or `validated`.
-  Headless: skip entries that are not ready; if none is ready, print which questions
-  block which entries and stop. Chat: ask the open questions before anything else,
-  one at a time, each with the context needed to answer it; write the answers into the
-  entry (they land in the same PR as the change), then continue. In a batch the
-  questions were asked in its opening block (`docs/workflow.md` § 3): one that appears
-  now is written on the entry with what made it unknowable then.
+- `git status --short` is empty and `main` is fresh (`git pull --ff-only`). Otherwise
+  stop and report; never work on a dirty tree.
+- **Headless** (no argument): `gh project item-list 1 --owner folioneer --format json --limit 500`;
+  take the first Queued item, in row order, that is ready. Nobody to ask: a
+  question becomes a comment on the issue with `needs-owner` (`docs/workflow.md` § 2).
+- **Chat, named issue** (`#123`): `gh issue view 123 --comments`.
+- **Chat, plain request**: the request is the task; no issue is created — the PR body
+  is its record. Write its Done when into the opening brief.
+- **Decision scan**, for an issue (a pull request has none), before the branch exists:
+  run it as `docs/workflow.md` § 3 states it. Chat: the questions it leaves are asked
+  then, and the answers written on the issue. Headless: each becomes a comment with
+  `needs-owner`, and the issue is no longer ready.
+- **Ready** as `docs/workflow.md` § 2 defines it; a flow issue's Decision and a task's
+  Observation are their Done when. Headless: skip what is not ready; if nothing is, say
+  what blocks each issue and stop. Chat: ask each open question alone, with the context
+  to answer it cold, and wait for the answer before the next; write the answers on the
+  issue. For an issue with a spec: spec draft, `spec-reviewer`, then the questions.
 
-## Step 1 — Opening brief, branch and task list
+## Step 1 — Opening brief, branch, task list
 
-- The opening brief first (CLAUDE.md § Opening and closing a piece of work): Task,
-  Scope, Design, Touching. Chat: the first message. Headless: the top of the PR body.
-
-- `git checkout -b <type>/todo-NNN-<slug>` (or `<type>/debt-NNN-<slug>`, `<type>/flow-NNN-<slug>`), `<type>` being the commit
-  type the change will carry (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `ci`).
-- Outside a batch, `TaskCreate` one task per step below; mark each `in_progress` /
-  `completed` as you go. In a batch (`/run-queue`) the entry's one task is the record.
+- Opening brief (chat: first message; headless: top of the PR body):
+  **Task** — the issue or the request in one line · **Scope** — commit type and layers ·
+  **Design** — none / validated / needed · **Touching** — the paths.
+- `git checkout -b <type>/123-<slug>` (`<type>/<slug>` for a plain request), `<type>`
+  being the commit type the change will carry; the item's Status becomes In progress
+  (`gh project item-edit`; the field and option ids from `gh project field-list 1
+--owner folioneer --format json`).
+- `TaskCreate` one task per step below, each `in_progress` / `completed` (none under `/run-batch`).
 
 ## Step 2 — Design gate
 
-If the entry changes what the user sees (a new screen, a moved or added control, a
-changed layout or wording pattern) and `Design` is `none`: run `/design-proposal NNN`,
-which renders the mocks and flips the line to `proposed (…)`.
+If the task changes anything the user sees and `Design` is not `validated`: run
+`/design-proposal <id>`.
 
-- Headless: commit the mocks, merge that docs change through a PR, then go back to
-  Step 0 for the next ready entry. Do not implement.
-- Chat: show the mocks in the conversation and ask. On a yes, set the line to
-  `validated` and continue; the mocks and the line land in the same PR as the change.
-  On a no, write what the human wants as an open question, commit, stop.
+- Chat: show the mocks and ask. Nothing is built before a yes; on a yes, set the issue's
+  Design to `validated`. On a no, write what the human wants on the issue and stop.
+- Headless: post the proposal on the issue (`docs/workflow.md` § 4), then back to Step 0
+  for the next ready item. Do not implement.
 
 ## Step 3 — Acceptance first
 
-- Read the convention docs the entry's layers require (CLAUDE.md § Where things are).
-- Translate every clause of Done when into a failing test: Rust for logic, Vitest for
-  rendering, E2E for what a user does. Name each test with the ref (`TODO-NNN`) or the spec
-  rule (`TRIGRAM-NNN`); when the domain has a spec and the entry adds a rule, write the
-  rule in `docs/spec/<feature>.md` in the same commit. A domain without a spec gets one,
-  its trigram registered in `docs/spec-index.md`.
-- A new or changed Tauri command updates `docs/contracts/<domain>-contract.md` (created
-  with the domain's first command) in the same commit: a new command or a new contract
-  with `/contract`, loaded with the `Skill` tool; a row or a type amended by hand.
-  `spec-reviewer` and `contract-reviewer` run on those files in Step 6.
-- Run the suites; confirm the new tests are red, before the code that makes them green
-  is written. The pull request's body says so per Done-when clause (Step 8): the test,
-  and `seen red` — or why it could not be (a clause that only removes, a record). If a clause cannot become a test
-  because it needs a decision, write it as an open question on the entry, commit that, and
-  stop; if it only needs someone at the screen, it is never left to the owner: file the
-  missing test as a `DEBT-NNN` entry and go on (`docs/workflow.md` § 1).
+- A new or changed business rule goes into its spec, a changed command into its contract,
+  with their reviewer, before the code (their folder's `README.md`).
+- Every Done-when clause becomes a failing test (`docs/workflow.md` § 3, step 3).
+- A fault met in production: ask for the input that shows it before designing a fix,
+  and reproduce it in a failing test first (`docs/workflow.md` § 3).
+- Run the suites; confirm the new tests are red. A clause the agent cannot run becomes
+  a test of the harness — an E2E scenario when it needs the real window — or a `task`
+  issue that asks for it (`docs/workflow.md` § 1).
 
 ## Step 4 — Implement
 
-Smallest change to green. Logic in Rust; the frontend renders. Stable ids on every
-control; i18n for every string; one event per action. Gold layout for new files.
+Smallest change to green, the right way (`docs/workflow.md` § 6). Never the live portfolio
+database (`CLAUDE.md` § Core rules 1).
 
 ## Step 5 — Harness
 
-`just harness` while working; `just harness --coverage` before the first push, so the
-coverage CI judges holds. The coverage run holds the foreground: detached on a machine
-with 8 GiB of memory or less it is stopped before it gives a verdict, and the harness
-refuses to start it. A foreground run without a terminal says so:
-`HARNESS_FOREGROUND=1 just harness --coverage`. Fix until green. A coverage floor under its value is fixed with
-tests, never by editing `coverage-gates.json` downward; an architecture violation is
-fixed in code, never by editing `arch-allowlist.json` upward.
+`just harness` until green, `just harness --coverage` before the first push: a coverage floor met with tests, an architecture violation fixed
+in code — never `coverage-gates.json` lowered nor `arch-allowlist.json` raised.
 
 ## Step 6 — Reviewers
 
-Launch the reviewer agents that match the diff (`docs/workflow.md` § 7) in one
-batch. `reviewer-arch` is in that batch whenever `reviewer-backend` or
-`reviewer-frontend` is: a `.rs`, `.ts` or `.tsx` change launches both lanes, every time. Grade every finding by the four questions of `docs/workflow.md` § 7, one row
-each, and apply the policy: (a) fix,
-(b) `DEBT-NNN` entry, (c) one-off inline comment, (c) pattern → edit the reviewer prompt,
-`[DECISION]` → open question on the entry. Re-run the reviewers until no 🔴 remains on the files as they will be pushed: a file
-edited in answer to a finding goes back to its lane, the spec lane above all
-(`docs/workflow.md` § 7).
-No question to the human. CI runs the same reviewers on every push (Step 8).
+Exactly the lanes `bash scripts/branch.sh files | bash scripts/review-lanes.sh` prints, in
+one call, each given the branch, the spec and the vocabulary; every finding graded
+(`docs/workflow.md` § 7); again on the fixes until no 🔴 remains.
 
-## Step 7 — Evidence
+## Step 7 — Evidence and commit
 
-`/visual-proof`, loaded with the `Skill` tool, for every changed `.tsx`/`.css`; stage the
-screenshots. Write the
-commit: conventional title as the changelog line (≤ 72 characters, user-facing words
-for `feat`/`fix`), body ≤ 2 lines with the ref.
+`/visual-proof` for every changed `.tsx` / `.css`. One commit (`docs/commit-rules.md`).
 
 ## Step 8 — Pull request and merge
 
-- Commit, push, `gh pr create`. Body under 20 lines: the entry ref and title, each
-  Done when clause with the test that proves it and whether it was seen red (Step 3),
-  findings that changed something,
-  techdebt filed, the visual proofs. Nothing else.
-- Watch the checks with `just watch-pr` under a `Monitor` (30 minutes; re-arm on
-  expiry): it prints a failure when it lands and ends with the verdict, by exit code —
-  green, failed, GitHub unreachable, timed out, not open. No hand-written polling loop.
-- A red `reviewer-<lane>` check: read its sticky comment on the PR (`gh api
-repos/{owner}/{repo}/issues/<n>/comments`), grade every finding with
-  the four questions of `docs/workflow.md` § 7 and apply the policy — (a) fix, (b) `DEBT-NNN` entry, (c)
-  one-off inline comment, (c) pattern → edit the reviewer prompt, `[DECISION]` → open
-  question on the entry — then record the table in the PR body, push, and watch again.
-- A test that fails for a reason the change cannot explain is a flaky test, and is never
-  accepted by re-running it: skip that one test in its own pull request, file a `DEBT-NNN`
-  with the failure text and the run's link to find out why, and continue; the fix that
-  re-enables it closes the entry. Any other red: fix, commit with `git commit --fixup <sha>` (the entry lands as one
-  commit — `just merge` folds it), push, watch again. The same gate red
-  three times, whatever the three causes: open question on the entry, leave the PR open, stop.
-- All green: `just merge`.
+- Push, `gh pr create --body-file`: the body of `docs/workflow.md` § 3, step 8.
+- `just watch-pr` in the background: exit 0 is green; `scripts/watch-pr.py` lists the others.
+- A red reviewer lane: read its newest comment; grade, apply and re-read locally as
+  `docs/workflow.md` § 7 says; push.
+- A lane whose comment says "did not run (usage limit)": nothing to fix. Wait for the reset
+  time it names (a wake-up in chat, a sleep headless; outside Rule 4), then
+  `just rerun-failed <the run id>` and watch again.
+- Any other red: read the log first. If it shows the cause, fix it; if not, the next
+  push adds observation and makes the failure cheap, never a fix (`docs/workflow.md`
+  § 8). Fix with `git commit --fixup <sha>` (never a new titled commit, never a
+  force-push), push, watch again. The same gate red three times: open question, leave
+  the PR open, stop.
+- All green: every lane's newest comment, green or not, graded in a PR comment
+  (`docs/workflow.md` § 3, step 9); `just merge` folds the fixups.
 
 ## Step 9 — Closure
 
-On the same branch before the merge, or as a follow-up docs PR if forgotten: the
-entry's file is deleted (`just queue close <id>`) and the queue is left as written; a layer
-the coverage run of Step 5 measured more than a point above its floor has that floor raised to
-half a point under the figure (`coverage-gates.json`, `docs/workflow.md` § 3, step 10); the debt entries the work resolved are deleted the same way; `ARCHITECTURE.md` if a
-module appeared; design proposal images deleted. Then the closing brief (CLAUDE.md §
-Opening and closing a piece of work): what changed for the user, what the project
-accumulated; the PR number and where anything still owed was filed.
+In the same PR, before the merge, then the closing brief (`CLAUDE.md`) with the PR number:
+
+- **The source docs still match the code**: spec, contract, an ADR for a hard technical
+  choice, `ARCHITECTURE.md` for a new module. The PR body says which changed, or "docs:
+  none needed".
+- A spec touched or named: `spec-checker` on it, and what it reports fixed.
+- What the task met and did not fix is filed as issues (`docs/workflow.md` § 2, headless
+  too), never left in chat; a task issue the work resolved is `Closes #NN` too.
 
 ## Rules
 
-1. Never ask the human. Questions are lines in the entry.
-2. Never lower a floor, never raise an allowlist, never bypass a hook, never
-   force-push, never touch the live database, never cut a release, never edit the queue.
-3. One entry per invocation. Stop after Step 9.
-4. Three hours wall-clock per entry; over that, open question and stop.
+1. Headless never asks the human; questions are comments on the issue.
+2. `CLAUDE.md` § Core rules 1 and Step 5 hold, and the batch is never edited.
+3. One task per invocation. Stop after Step 9.
+4. Three hours of wall clock per task; over that, open question and stop.

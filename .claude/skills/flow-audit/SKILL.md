@@ -1,136 +1,74 @@
 ---
 name: flow-audit
-description: After a release, measures how the batch moved (pull requests, time to merge, CI rounds and failures, what the agent used) against the release before, rewrites the measured sections of docs/work/audits.md, and proposes flow entries only where a figure moved or a rule was not followed. Use once per release, right after it is published.
+description: After a batch ends (a release or a batch tag), judges it from its records alone — the figures of `just flow-audit`, the batch's pull requests with their review comments, the issues filed and closed — in a forked context that never sees the session's account, posts the audit on the batch's `batch-audit` issue and files the flow issues it proposes. Use once per batch, right after it ends.
+context: fork
+allowed-tools: Read, Grep, Glob, Bash
+model: opus
 ---
 
 # Skill — `flow-audit`
 
-`docs/work/flow/` holds what the workflow owes the two people who run it, and
-`docs/work/audits.md` what each batch measured. The figures are
-gathered here, the same way after every release, so the flow is improved on figures and
-not on impressions. The script counts; the skill judges. It decides nothing for the
-owner: it proposes entries, which the owner queues or declines.
+You audit a batch you did not run, forked with a fresh context (`docs/workflow.md` § 12).
+A prompt that tells you what happened or what to conclude is a finding, not evidence.
 
----
-
-## Required tools
-
-`Bash`, `Read`, `Edit`.
-
----
-
-## When to use
-
-- Right after a release is published, in the session that ran its batch: the judging
-  needs that session's context.
-- Not during a batch: a half-run batch measures nothing comparable.
-
----
-
-## Execution steps
-
-### Step 1 — Measure
+## Step 1 — Measure
 
 ```bash
-python3 scripts/flow-audit.py <previous-release> <this-release> --previous <the-one-before> --pretty
+just batch-ends 3
+just flow-audit <start> <end> --previous <previous> --pretty > logs/flow-audit.json
 ```
 
-For the batch that led to `v0.6.0`: `python3 scripts/flow-audit.py v0.5.0 v0.6.0
---previous v0.4.0 --pretty`. One JSON document, `current` beside `previous`:
+`<end>`, `<start>`, `<previous>`: the lines `batch-ends` prints, in that order;
+`scripts/flow-audit.py` says what each figure is. If it fails, stop: hand-gathered
+figures are not comparable. A `truncated` list is said beside the oldest figures.
 
-- `pull_requests` — merged, first and last number, those closed without merging, lines
-  added, mean and median minutes from opening to merging, the count by commit type.
-- `ci` — rounds (one pushed commit of a branch), branches, rounds beyond the first,
-  failures by workflow, the median duration of each workflow's green runs, and
-  `later_rounds` (current window): each round beyond the first sorted by its cause —
-  `after_a_failed_check`, `rebase` (the round's commit does not descend from the round
-  before: the branch was rewritten, the push of `just merge` among them) or `fix` (a commit
-  pushed on top: a review's fix), and `unreadable` when GitHub could not compare the two
-  commits — say how many beside the split.
-- `usage` (current window only) — what `logs/usage.log` saw: `runs` and `failed` by
-  tool (a script, or a recipe that runs none), `never_run` for the known tools it never
-  saw, `first_line` for the moment the log starts. The log is local and not written in
-  CI: a tool only CI runs is in `never_run`, and a `first_line` later than the window's
-  start means the figures cover part of it — say so beside them.
-- `truncated` — what GitHub's lists cut short. When it names anything, the oldest figures
-  are incomplete: say so beside them, or raise the limits in the script first.
+## Step 2 — Read the records
 
-Two bounds to keep in mind when reading: runs are matched to a pull request by its branch
-within the window, so one opened before the window loses its earlier rounds; a failure is
-counted per run, so failures can exceed rounds.
+- Each pull request merged in the window (`current.pull_requests.first` to `.last`):
+  `gh pr view <n> --json title,body,commits,comments,reviews` — the graded findings are in
+  the body and the comments, beside each CI round's report.
+- The issues closed and filed in the window (`gh issue list --state all --search
+"updated:>=<start date>"`), with their threads: the owner's answers are there.
+- The last `batch-audit` issue's audit (the figures before), `docs/workflow.md`,
+  `CLAUDE.md`, `docs/agentic-setup.md`, and the open `flow` issues.
 
-If the script fails, say so and stop: figures gathered by hand are not comparable.
+## Step 3 — Count
 
-### Step 2 — Count what the script cannot
+State a count only when you counted it; otherwise write "not counted".
 
-From the session's transcript and memory notes, for the batch only:
+- What caused each CI round beyond the first: a rebase, a fix after a review or a
+  failed check, a cancelled job — from the commits and the comments.
+- The defects the reviewers found before merge, each in a few words; the claims a pull
+  request body rejected with a source; the criticals only CI found.
+- The owner's answers given during the batch, and which the reading before the work
+  should have asked earlier.
+- Every statement in a guide that a pull request shows to be false or contradicted, and
+  each generic piece of `docs/agentic-setup.md` against its line.
+- Tool failures only where the log has an outcome. A tool only CI runs is never in the
+  usage log: never propose removing it for that.
 
-- what `later_rounds` cannot tell: a round the usage limit cost, a `fix` that answered
-  a CI reviewer rather than a local one;
-- real defects found by the reviewers before merge, and by challenging an entry before
-  starting it — each named in a few words;
-- for each entry the batch shipped, its size beside what it took: the `Size` line of the
-  entry's file as it stood before the pull request that deleted it
-  (`git show <commit>^:docs/work/<kind>/<REF>.md`), and the pull requests that name the
-  entry. An S or an M that took two, an L that took one, and an entry that shipped with
-  no size are said as such (`docs/workflow.md` § 2);
-- the questions put to the owner: how many in the opening block, how many during the
-  batch, and of those which the opening reading (`docs/workflow.md` § 3) should have
-  caught — each named in a few words;
-- what the agent invoked itself that the usage log does not hold: skills, local agents,
-  native commands where a recipe exists;
-- how many times `/run-entry` and `/visual-proof` were loaded with the `Skill` tool,
-  beside the entries that needed them, and whether each was loaded again after a pull
-  request of the batch that changed it (`docs/workflow.md` § 3);
-- what exists and was not used: skills and agents (recipes and scripts are the
-  script's `never_run`);
-- each generic piece of `docs/agentic-setup.md` read against its line: those that no
-  longer do what the line says, or do what it says never.
+What the records cannot show is itself a finding: name it, and where it belonged.
 
-State a count only when it was counted; otherwise write "not counted".
+## Step 4 — Judge
 
-### Step 3 — Rewrite the two measured sections
+The owner's six questions (`docs/workflow.md` § 12), each answered with its figure or
+"nothing to change". Then each open flow issue: settled by a change of the batch, or
+left. Then the issues to propose — only where a figure moved the wrong way, a rule of
+`docs/workflow.md` or `CLAUDE.md` was not followed, a guide was wrong, or the owner
+corrected the flow. "Keep" is a verdict: propose nothing for it. A rule not followed is
+stated as plainly as a figure — who was to do what, which pull request shows it, what it
+cost — and never softened because the same agent family did the work.
 
-In `docs/work/audits.md`, replace `## Measured — the <previous> batch` and `## Used and not
-used — the <previous> batch` with this batch's, same tables, each figure beside the
-previous one (`33, was 27`). Keep the "Reading" paragraph to three sentences: what the
-figures say, not what was done. The recipes and scripts of "Used and not used" are the
-script's `usage` figures. Once the section is written, empty `logs/usage.log` (local,
-never committed): its figures are recorded.
+## Step 5 — Post
 
-### Step 4 — Re-read the open entries
+- The audit, as a comment on the batch's `batch-audit` issue (`gh issue create --label
+batch-audit --title "Batch <dates>"` first if it has none): `## Measured`, each figure
+  beside the previous one (`35, was 19`), a "Reading" paragraph of three sentences — what
+  the figures say, not what was done — then `## Not in the records`.
+- Each settled flow issue: a comment naming the pull request that settled it, then closed.
+- Each proposal: a `flow` issue from its form (`docs/workflow.md` § 2), Decision left
+  for the owner; the audit comment links them.
+- Then empty `logs/usage.log` (local, never committed): its figures are recorded.
 
-For every entry of `docs/work/flow/`:
-
-- **settled** by a change of the batch → delete it (`just queue close FLOW-NNN`);
-- a **"keep, and re-measure"** verdict → state the new figure in it, and keep or change
-  the verdict on that figure;
-- a **proposal** neither queued nor declined → leave it, unless a figure now argues
-  for or against it: then say so in its text.
-
-### Step 5 — Propose entries
-
-Add a `FLOW-NNN` entry (`docs/work/flow/FLOW-NNN.md`, its number from
-`just queue next-id FLOW`) only where a
-figure moved the wrong way, a rule of `docs/workflow.md` or `CLAUDE.md` was not
-followed, or the owner corrected the flow during the batch. Each entry in the format of
-`docs/workflow.md` § 2: Kind, Observed (with its figure), Proposal or Verdict, Costs and what it
-protects. "Keep" is a verdict; where nothing needs changing, propose nothing.
-
-### Step 6 — Hand over
-
-One pull request, docs only. Its closing brief lists the figures that moved and the
-entries proposed, for the owner to queue or decline in the next batch's opening block.
-
----
-
-## Rules
-
-1. **The script counts, the skill judges.** No figure in the measured sections that the
-   script did not print or Step 2 did not count.
-2. **Beside the previous release.** A figure alone says nothing; every one is shown with
-   the one before.
-3. **Quality and speed together.** An entry that buys speed says what it risks; one that
-   buys safety says what it costs.
-4. **The owner decides.** Never edit the queue; never apply a proposal in the audit's own
-   pull request.
+Reply with the audit's link and the issues filed. Nothing is committed, no figure is
+one the script did not print or you did not count, and no proposal is applied.

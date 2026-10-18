@@ -118,4 +118,4 @@ See: `src-tauri/src/use_cases/asset_price_fetch/orchestrator.rs`, `src-tauri/src
 - **Not a substitute for `docs/backend-rules.md`**, which carries generic DDD rules (B0–B43). This file carries this codebase's idiomatic shapes for applying them.
 - **Not for divergences from textbook DDD** — those go to `docs/ddd-divergences.md`.
 - **Not for architectural layout** — that's `ARCHITECTURE.md`.
-- **Not for tech debt** — that's `docs/work/debt/`.
+- **Not for tech debt** — that's a `task` issue.

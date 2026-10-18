@@ -1,63 +1,60 @@
 ---
 name: design-proposal
-description: Produces the design proposal a todo entry needs before anything the user sees changes — rendered mocks of the target state in light and dark under screenshots/design/NNN-*.png plus a five-line note — and flips the entry's Design line to proposed. Invoked as `/design-proposal NNN`. The human validates by editing the entry.
-argument-hint: "[NNN]"
+description: Produces the design proposal required before anything the user sees changes — rendered mocks of the target state in light and dark under screenshots/design/, plus a five-line note — for an issue or a chat request. Invoked as `/design-proposal <id>` (an issue number, or a short slug for a chat request). The human validates; nothing visible is built before that.
+argument-hint: "[123 | slug]"
 ---
 
 # Skill — `design-proposal`
 
-Invocation: `/design-proposal NNN` (a `TODO-NNN` todo reference).
+The proposal is what the human validates instead of the pull request (`docs/workflow.md`
+§ 4). It shows the target state with the real components and tokens, so what they
+approve is what ships.
 
-The proposal is what the human validates instead of the pull request. It shows the
-target state with the real components and tokens, so what they approve is what ships.
+## Step 1 — Read the task
 
-## Step 1 — Read the entry
-
-Load `docs/work/todo/TODO-NNN.md`. From its text and Done when, list the screens and
-states that change. One state per distinct thing the human must see (the row with the
-new column, the dialog with the moved buttons, the empty case if it changes).
+Load the issue (`gh issue view <id> --comments`) or take the chat request. From it and
+its Done when, list the screens and states that change: one state per distinct thing the
+human must see (the row with the new column, the dialog with the moved buttons, the
+empty case if it changes).
 
 ## Step 2 — Build the target state as a preview
 
-Load `/visual-proof` with the `Skill` tool — its steps are followed as loaded, never from
-memory — and follow its Steps 0 (config), 3 (write `preview.html` and
-`src/__preview__/main.tsx`) and 4 (capture script and Playwright present) with one
-difference: the preview renders the **proposed** component tree, not the current one. Copy the current component into the
-preview where the change is layout-only, or compose the target from existing `ui/`
-components with sample data when it is a new surface. Never modify the real component
-for a proposal; the preview is disposable.
+Follow `/visual-proof` Steps 0 (config) and 3 (write `preview.html` and
+`src/__preview__/main.tsx`), with one difference: the preview renders the **proposed**
+component tree, not the current one. Copy the current component into the preview where
+the change is layout-only, or compose the target from existing `ui/` components with
+sample data for a new surface. Sample data is invented, never copied from the installed
+app. Never modify the real component for a proposal; the preview is disposable.
 
 ## Step 3 — Capture into the design folder
 
-`/visual-proof` Step 5, with the output directory changed: start the Vite server in
-the background, wait until the preview answers, capture, stop the server.
+`/visual-proof` Step 4 with the output directory changed: start Vite in the background,
+wait until the preview answers, capture, stop Vite.
 
 ```bash
-npx vite --port {port} --host {host} > /dev/null 2>&1 &
-until curl -sf http://{host}:{port}/preview.html > /dev/null; do sleep 1; done
-VP_PORT={port} VP_HOST={host} VP_NAME={NNN} VP_STATES={state1,state2} VP_OUT_DIR=screenshots/design node scripts/visual-proof-capture.mjs
-lsof -ti tcp:{port} | xargs kill
+VP_PORT={port} VP_HOST={host} VP_NAME={id} VP_STATES={state1,state2} VP_OUT_DIR=screenshots/design node scripts/visual-proof-capture.mjs
 ```
 
-Produces `screenshots/design/NNN-{light|dark}-{state}.png`. Delete `preview.html` and
-`src/__preview__/` afterwards, as `/visual-proof` does.
+Produces `screenshots/design/{id}-{light|dark}-{state}.png`. Delete `preview.html` and
+`src/__preview__/` afterwards.
 
 ## Step 4 — Write the note
 
-`screenshots/design/NNN.md`, five lines at most: what moves, what is added, what is
+`screenshots/design/{id}.md`, five lines at most: what moves, what is added, what is
 removed, what stays the same, one open point if any.
 
-## Step 5 — Flip the entry
+## Step 5 — Ask, or record
 
-In the entry's file, the line becomes
-`**Design:** proposed (screenshots/design/NNN-*.png)`. Commit the images, the note and
-the entry edit as one `docs:` commit, open the PR, merge on green. Report the image
-paths in one line. The human validates by editing the line to `validated`, or adds an
-open question.
+- **Chat:** show the images and the note, and ask. On a yes, set the issue's Design to
+  `validated` (`gh issue edit`; a chat request has no issue: say so in the PR body) and
+  continue the task. On a no, write what the human wants on the issue and stop.
+- **Headless:** commit the images and the note on a `design/{id}` branch, push it, and
+  post the note on the issue with each image linked from that branch, with
+  `needs-owner`. The human validates in the thread.
 
 ## Rules
 
 1. Real components and tokens only; no drawing tools, no hand-made images.
 2. Both themes for every state.
 3. The proposal never touches production code.
-4. Delete the proposal images in the closure commit of the work that ships them.
+4. The proposal never reaches `main`: the issue holds it; the visual proofs are the record.

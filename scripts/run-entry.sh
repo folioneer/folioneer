@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# run-entry.sh — run one ready entry of the queue (docs/work/queue.md) headless.
+# run-entry.sh — run the first Queued item of the Project headless.
 #
-# The local form of the scheduled runner (docs/workflow.md § 9): one entry per
+# The local form of the scheduled runner (docs/workflow.md § 9): one task per
 # run, three hours of wall clock, nothing asked of a human. Edits are accepted
 # (`--permission-mode acceptEdits`); a print-mode run has nobody to answer a
 # prompt, so a command outside .claude/settings.json's allow list is denied and
@@ -42,10 +42,11 @@ if [[ "$(git branch --show-current)" != "main" ]]; then
 fi
 git pull --ff-only --quiet origin main || { log "main could not be fast-forwarded"; exit 1; }
 
-# What is left of the queue: the references not shipped yet (the queue file itself is never edited by a run).
-queued=$(python3 scripts/work-queue.py remaining) || { log "the queue could not be read"; exit 1; }
+# What is left of the batch: the Project's Queued items (docs/workflow.md § 2). The token needs the `project` scope.
+queued=$(gh project item-list 1 --owner folioneer --format json --limit 500 \
+    --jq '.items[] | select(.status == "Queued" and .content.number != null) | "#\(.content.number)"') || { log "the Project could not be read"; exit 1; }
 if [[ -z "$queued" ]]; then
-    log "nothing left in the queue"
+    log "nothing Queued"
     exit 0
 fi
 log "queued: $(tr '\n' ' ' <<<"$queued")"

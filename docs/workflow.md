@@ -1,240 +1,203 @@
 # Workflow — the human sets expectations, the harness holds the line
 
-The operating manual for how work moves from an entry of `docs/work/` to a release. Decided
-on 2026-09-12; this document is the rule set, the git history records how it was built.
+How work moves from a request or an issue to a batch end, and the conventions the
+agents and skills rely on. This document is the rule set; git history records how it
+was built.
 
 ## 1. Who owns what
 
-| Who     | Owns                                                                                                        |
-| ------- | ----------------------------------------------------------------------------------------------------------- |
-| Human   | `docs/work/todo/`: what is worth doing, its user value, its done-when; and the queue, `docs/work/queue.md`. |
-| Human   | Validating a **design** before anything the user sees changes.                                              |
-| Human   | Cutting a **release**. Several merged branches may wait for one.                                            |
-| Agent   | `docs/work/debt/`: every observation, smell and proposal. The human queues from it.                         |
-| Agent   | `docs/work/flow/`: what the workflow itself owes. The human queues from it.                                 |
-| Agent   | The task, end to end: tests, code, review, merge. **No pull request is validated by a human.**              |
-| Agent   | Coding the right way: logic in Rust, dumb frontend, gold layouts, typed errors, stable ids.                 |
-| Harness | Proving it, mechanically, on every pull request. Nothing merges that the harness has not passed.            |
+- **Shared** — the feature and bug issues, each what a user will see; the human confirms
+  its user value and done-when, and approves the batch (§ 2).
+- **Human** — validating a **design** before anything the user sees changes.
+- **Human** — cutting a **release**; several merged branches may wait for one.
+- **Agent** — the task issues: every observation, smell and proposal about the code. The
+  human queues from them.
+- **Agent** — the flow issues: the same about the workflow itself (checks, waits, tools,
+  the human's part), audited after each batch (§ 12).
+- **Agent** — the task, end to end: tests, code, review, merge. **No pull request is
+  validated by a human.**
+- **Harness** — proving it, mechanically, on every pull request. Nothing merges that
+  the harness has not passed.
 
-Four human touchpoints. Everything else is either the agent's job or a machine gate.
+Three human touchpoints, plus answering open questions. Everything else is the agent's
+job or a machine gate.
 
-The human is not the QA (owner, 2026-10-11): no entry waits for the owner to check by hand that what was built works. A Done-when clause the agent cannot run becomes a test of the harness — an E2E scenario when it needs the real window — or, when that test is larger than the entry, a `DEBT-NNN` entry that asks for it, and the entry closes on what the harness proves. What the owner notices while using the application is welcome and is no gate.
+The human is not the QA (owner, 2026-10-11): no issue waits for the owner to check by
+hand that what was built works. A Done-when clause the agent cannot run becomes a test of
+the harness — an E2E scenario when it needs the real window — or, when that test is
+larger than the issue, a `task` issue that asks for it, and the issue closes on what the
+harness proves. What the owner notices while using the application is welcome and is no
+gate.
 
-## 2. Ids, entries and the queue
+## 2. Issues and the Project (owner, 2026-10-18)
 
-A reference says what it points at: a todo entry is `TODO-NNN`, a tech-debt entry
-`DEBT-NNN`, a flow entry `FLOW-NNN`, a GitHub issue `ghNN`. A pull request keeps GitHub's
-own `#NN`. The forms these replaced are refused in every tracked file by
-`scripts/reference-forms.py` (harness and CI); `CHANGELOG.md` keeps what was released
-under them.
+The backlog is on GitHub, never in git: the issues and the organisation's Project
+(github.com/orgs/folioneer/projects/1). No commit touches it. In prose an issue is
+"ticket #123", a pull request "PR #123"; a pull request says `Closes #123`, so its merge
+closes the issue. An old `TODO-NNN`, `DEBT-NNN` or `FLOW-NNN` is found by searching the
+issues for `Migrated from <id>`. A spec rule is `TRIGRAM-NNN` (Conventions).
 
-### Entries — one file each (owner, 2026-10-11)
+### Filing an issue
 
-- An entry is one file named by its id, in the folder of its kind:
-  `docs/work/todo/TODO-NNN.md`, `docs/work/debt/DEBT-NNN.md`,
-  `docs/work/flow/FLOW-NNN.md`. Its first line is its heading; `just rule-homes` fails
-  when the name, the folder and the heading do not say the same id.
-- An entry that ships is deleted (`just queue close <id>`), so two pull requests never
-  meet in a file when each closes or files an entry.
-- Ids are permanent and never reused: `just queue next-id <TODO|DEBT|FLOW>` prints the
-  next free one, counting the entries already deleted. Two branches that take the same
-  id conflict at the merge; the later one takes the next id.
-- The overview is `just queue`: one JSON document, every entry by kind.
-- An entry carries a `Size` line (owner, 2026-10-11), by facts and not by effort:
-  **S** — one pull request, one layer, nothing from the owner; **M** — any other single
-  pull request: several lanes, a spec or a contract, an answer from the owner; **L** —
-  two or three pull requests, or mock-ups or a spec interview with the owner; **XL** — a
-  programme, sliced before it is queued. The line opens with the letter and says why
-  (`**Size:** M — one pull request: a read tool and a rule of the spec.`; `- Size: …` on
-  a debt or a flow entry). The agent sets it on a debt or a flow entry; on a todo entry
-  `/plan-queue` proposes it and the owner confirms it. An entry gets its size when it is
-  proposed for the queue or enters it: `just rule-homes` fails on a queued entry without
-  one, or queued as XL, and asks nothing of the others.
-- `just queue` adds the queued entries still to work up to pull requests (`queue_size`:
-  S and M count one, L two to three) and names those the sum leaves out; `/plan-queue`
-  shows it beside what the last batches merged (`docs/work/audits.md`).
+- **Four kinds, one label each**: `feature` and `bug`, what a user will see (a `feat`, a
+  `fix`); `task`, what a user will not (`refactor`, `chore` on the application, an
+  enabler for a feature); `flow`, how the work moves (guides, `scripts/`, `justfile`,
+  hooks, workflows). A spec, contract, glossary, ADR or `ARCHITECTURE.md` drifting from
+  right code is a task gated "when next touched", alone only when it blocks something.
+- **From its form** (`.github/ISSUE_TEMPLATE/`), the CLI included: `gh issue create` with
+  its labels (`--label <kind> --label size:<S|M|L|XL>`) and the form's fields as
+  `### <field>` sections, then `gh project item-add 1 --owner folioneer --url <url>`. Its
+  title is one plain sentence stating the observation, no kind prefix; it carries its
+  evidence (what was seen, where, a figure or a pull request), one observation only.
+- **Size** (the `size:` label), by facts and not by effort — **S**: one pull request, one
+  layer, nothing from the owner; **M**: any other single pull request — several lanes, a
+  spec or a contract, an answer from the owner; **L**: two or three pull requests, or
+  mocks or a spec interview with the owner; **XL**: a programme, sliced into sub-issues
+  before it is queued. The agent sets it on a task or a flow issue; on a feature or a bug
+  `/plan-batch` proposes it and the owner confirms it. A Design needing a mock: `mock`.
+- **What waits on the owner** is a comment on the issue and the `needs-owner` label; the
+  owner answers in the thread and the label goes once nothing is open. A feature or bug
+  the agent files waits for the owner to confirm its User value; a flow issue waits for
+  its Decision. The agent does not change, without asking, what the owner confirmed.
+- **A bug is always filed**, even when fixed in the same session: its pull request
+  closes it. A chat request that is not a bug needs no issue: the pull request is its
+  record. An issue someone else opens is given its label, its form's fields and its size.
+- **A dependency** is GitHub's "blocked by"; the slices of a programme are its
+  sub-issues. A roadmap stage (MVP, Phase 2, Phase 3) is a milestone.
+- **A gate** an issue carries ("when next touched", "not as a sweep", "when a third
+  consumer appears") is honoured, or the override is put to the owner — never swept
+  silently. A task the agent files is an observation, not a commitment.
 
-### Todo entries — human-owned
+### The Project — Status and Batch
 
-- Every entry is `# TODO-NNN — (domain) — title` and ends with `**User value:**`,
-  `**Done when:**`, `**Design:**` and `**Open questions:**`. Design is `none` until the
-  agent proposes one, then `proposed (screenshots/design/NNN-*.png)`, then `validated`
-  once the human has looked. Open questions are `none` or a `- [ ]` list; either side
-  may add one, and the human answers by editing the entry.
-- The agent writes to an entry in two places only: it flips `Design` to `proposed (…)`,
-  and it adds open questions. It deletes the entry in the pull request that ships it. It
-  never creates or renumbers one.
+- **Status**: Inbox (filed) → Ready → Queued (in the batch) → In progress (its branch
+  exists) → In review (a pull request is linked) → Done (closed). GitHub sets the last two.
+- **Ready** (owner, 2026-10-18): its `size:` label is set, its mock is made when it
+  changes what a user sees, and its open questions are answered — no `needs-owner`. A
+  flow issue is ready once it carries its Decision.
+- **A batch** is the Queued items in row order, their Batch field its date. `/plan-batch`
+  proposes it in chat; the owner's yes sets Batch, order and Status, and nothing else
+  makes an item Queued. A cut during a batch is the owner's.
+- **Sized by its work**, not its number of items: `/plan-batch` sums the sizes of what it
+  proposes and stops at what the last batches merged (their `batch-audit` issues), saying
+  both figures. A programme enters as its first slice.
+- **The order `/plan-batch` proposes**: what changes the tools first; a dependency
+  before what depends on it; items that touch the same files next to each other, so one
+  can be prepared on the other; small fixes a user notices early; what needs the owner
+  flagged at the top. Where two of these disagree, the proposal says so in one line.
+- **Nothing open is passed over**: every open issue and every open Dependabot pull
+  request is on the Project, queued or named as left out with its reason.
 
-### The queue — `docs/work/queue.md`, human-owned
+## 3. The loop — one run, one task
 
-- The file is the queue of one batch: `TODO-NNN`, `DEBT-NNN` and `FLOW-NNN` references
-  in the order to work them, one per line as a plain list (`- TODO-NNN`). Empty, or
-  absent, nothing is queued. A GitHub issue is never queued (owner,
-  2026-10-11): an issue worth doing gets a todo entry that names it (`ghNN`), and the
-  entry is queued.
-- Order and additions are the human's. No pull request that ships an entry edits it, so
-  two closures never meet in the file.
-- It is written in `/plan-queue` (owner, 2026-10-11): the proposal is refined with the
-  owner in conversation — the open questions answered, a design or a choice of code
-  aside; each entry sized; an entry too large split, what leaves staying ready for the
-  next queue — and, once the owner says it is decided, one pull request holds the
-  answers, the sizes, the entries split or filed, and the queue.
-- A queued reference whose entry file is gone has shipped, and a flow entry that is a
-  verdict with no proposal is nothing to run: `just queue remaining` prints what is left. The agent takes the first remaining reference that is **ready**.
-- **Ready** means: queued, has a Done when, `Open questions: none`, and `Design` is
-  `none` (no proposal needed yet) or `validated`.
+A task — a Queued item (`/run-entry`, headless), an issue the human names, or a chat
+request (its record is the pull request body) — lands on `main` through the **ceremony**:
+here a pull request, every check green, merged by `just merge` (steps 8–10).
 
-### Debt entries — agent-owned
+1. **Pick and brief.** In chat, a question to the human goes through `AskUserQuestion`,
+   one per call: what happened, what each option changes and costs, the recommended one
+   first; the next waits for its answer. Headless, a question is a comment with
+   `needs-owner` (§ 2) and the run moves on.
+   - **The questions come before the work — the decision scan**: the agent reads the
+     issue and the code it names, lists every choice that is the owner's — what a user
+     sees, a term, a rule's scope, where a programme stops — and asks each once and at
+     its widest, writing the answers into the issue. `/plan-batch` runs it while
+     refining, leaving what a user sees (§ 4) and the code to the run, which asks what is
+     still open before its branch exists. Two readings are named, because the code an
+     issue changes shows neither: **the sentences that list** — for an issue that adds or
+     changes what an interface can do, the locales (`src/i18n/locales/`), the specs and
+     the `README.md` are searched for the sentences that list what it can do (a consent
+     dialog, a description, a help page); one that would say less than what is allowed is
+     a question — and **the ADRs of the records** — for every record the issue writes,
+     the ADRs that name it (`docs/adr/`); a Done when that stands against one is a
+     question.
+   - A choice with a standing answer is not asked: when one option keeps what a user
+     sees today, it is taken and stated in the pull request; a release-sweep finding
+     that is not critical and predates the batch is filed and reported (Conventions).
+   - **Banked**: a question is asked alone, with its context, only where the options
+     differ in cost, risk or what is seen — an ambiguity or a deep choice; a trivial one
+     is the agent's. A flow issue's proposal so answered is recorded as accepted
+     ("banked" in its Decision, § 12) and reported in one line.
+   - Each queued size is checked against the code the issue names and corrected on it
+     before the branch (a feature's or a bug's as a question); one that changes during
+     the work is written before closure.
+   - During the work, a question remains right for what that reading could not show — a
+     reviewer's finding, a failing machine, a behaviour found in the code — and the
+     agent asks rather than guess, for a spec point as for a vocabulary term.
+   - For an issue with a spec the order is: spec draft, `spec-reviewer`, then the
+     questions, new vocabulary included, so a decision is taken once, knowing its
+     consequences.
 
-- Every entry is `# YYYY-MM-DD — DEBT-NNN — title`.
-- The agent files here: reviewer findings it did not fix, smells met on the way,
-  proposals for new work, surviving mutants, coverage holes, frozen architecture debt.
-- Entries are observations, not commitments: an entry says what is odd, not what to do.
-  The human promotes one by queuing its reference.
-- An entry is `Found by`, `Where`, `Severity` (🔴 🟡 🔵, omitted when unknown),
-  `Observation`, `User value` and `Done when`. Nothing in it is invented: a missing fact
-  is left out.
-- A queued entry that needs the owner's answer carries `**Open questions:**` like a todo
-  entry; while a box is unticked it is not ready and the agent skips it.
+   The opening brief states Task, Scope, Design, Touching. Branch `<type>/123-slug`, the
+   issue's number leading the slug, or `<type>/slug`, off a fresh `main`, where `<type>`
+   is the commit type the change will carry; the item moves to In progress.
 
-### Flow entries — agent-owned
-
-- What the workflow itself owes: observations about the harness, the checks, the waits
-  and the human's part, each with its figure, what is proposed (or the verdict to keep
-  things as they are), what it costs and what it protects. Every entry is
-  `# FLOW-NNN — title`.
-- The rules for an entry (owner, 2026-10-03): quality and speed are weighed together — a
-  change that buys speed says what it risks, a change that buys safety says what it
-  costs; where no change is needed, none is proposed, and "keep" is a verdict; human
-  review is a last resort and never forgotten — when only the owner can judge, the
-  questions come in one block for the batch, with what to look at and what a yes means.
-- The human promotes one by queuing its reference, like any other. An entry is removed
-  once it is settled.
-- What each batch measured is in `docs/work/audits.md`, written by `/flow-audit` after a
-  release.
-
-## 3. The loop — one run, one entry
-
-1. **Pick** — headless: the first ready entry left in the queue. In chat: the entry the human
-   names (`/run-entry TODO-NNN`); the sentence is the queue, and open questions are asked
-   before anything starts — one at a time, each with its context — their answers
-   written into the entry.
-   Branch `<type>/todo-NNN-slug` (or `<type>/debt-NNN-slug`, `<type>/flow-NNN-slug`) off fresh `main`, where `<type>` is
-   the commit type the change will carry (`feat`, `fix`, `refactor`, `chore`, `docs`, `test`,
-   `ci`); work outside an entry is `<type>/slug`.
-2. **Design gate** — if the entry changes what the user sees (a new screen, a moved or
-   added control, a changed layout or wording pattern): produce the proposal (§ 4).
-   Headless: set `Design: proposed (screenshots/design/NNN-*.png)`, merge that as a
-   docs change, and **move on to the next ready entry**; the human validates by editing
-   the line. In chat: show the mocks, ask, and on a yes set the line to `validated`
-   and continue in the same run.
-3. **Acceptance first** — turn Done when into failing tests: Rust for logic, Vitest for
-   rendering, E2E for what a user does. Test names carry `TODO-NNN` (or the `TRIGRAM-NNN`
-   rule when the domain has a spec; the agent writes the rule from Done when in the
-   same commit). A feature in a domain without a spec starts one (`docs/spec/<feature>.md`,
-   its trigram registered in `docs/spec-index.md`). A new or changed command updates the
-   domain's contract (`docs/contracts/<domain>-contract.md`, created with the domain's
-   first command) in the same commit: a new command or a new contract with `/contract`; a
-   row or a type amended by hand. Either way `contract-reviewer` judges it. Confirm red,
-   before the code: the pull request's body says per clause whether its test was seen red.
+2. **Design gate** (§ 4) for anything the user sees.
+3. **Acceptance first.** Each Done-when clause becomes a failing test: Rust for logic,
+   Vitest for rendering, E2E for what a user does. Test names carry the issue number or the
+   spec rule. A new business rule goes into `docs/spec/<feature>.md` in the same commit;
+   a new or changed command updates `docs/contracts/<domain>-contract.md`
+   (`docs/contracts/README.md`). Confirm red.
+   - **A fault met in production**: the input that shows it is asked for before any fix
+     is designed — a log says what failed, not why — and a failing test that reproduces
+     it is the acceptance test of the fix.
 4. **Implement** to green, the right way (§ 6). Logic that lands in the frontend is a
    harness failure, not a style remark.
-5. **Self-check** — while working, the recipes take a scope: `just test <paths>`,
-   `just test-rust <filter>`, `just check --frontend` or `--backend` for lint and types;
-   never the native command.
-   Then `just harness`: architecture rules, lint, type-check, build, both suites;
-   `just harness --coverage` adds the coverage floors, run before the first push.
-   A run is judged by its exit code, never by a line picked out of its output: a suite
-   can report every test passing and still fail. `just quiet <recipe>` (so `just quiet
-harness`) prints that
-   verdict in one line, keeps the whole output in `tmp/<recipe>.log` and shows its end
-   on a failure.
-6. **Self-review** — run the reviewer agents that match the diff (§ 7); apply the
-   triage policy; run them again until no 🔴 remains. CI runs them again on every
-   push as the enforced record.
-7. **Evidence** — `/visual-proof` for every changed component; the E2E run in CI
-   captures the real app and links the screenshots from the pull request.
-8. **PR** — opened for the record, not for approval. Body under 20 lines: the entry,
-   each Done when clause with the test that proves it, findings that changed
-   something, techdebt filed, screenshots. The commit title is the changelog line.
-9. **Merge**: `just merge`, which refuses until every check on the pull request is green.
-10. **Closure** in the same PR: the entry's file deleted (`just queue close <id>`), the
-    queue left as written; a coverage floor the run measured more than a point above
-    rises to half a point under that figure (`coverage-gates.json`, never down); the debt entries the work resolved deleted too; `ARCHITECTURE.md` if a module appeared; the spec if a rule changed.
-11. **Next** entry, or stop (§ 8).
+5. **Self-check:** while working, the recipes take a scope (`just test <paths>`,
+   `just test-rust <filter>`, `just check --frontend` or `--backend`); then `just harness`,
+   and `just harness --coverage` before the first push (§ 5). A run is judged by its exit
+   code, never by a line picked out of its output; `just quiet <recipe>` prints that
+   verdict in one line and keeps the output in `tmp/<recipe>.log`.
+6. **Self-review:** the reviewer lanes the diff needs (§ 7), again on the fixes until no
+   🔴 remains.
+7. **Evidence:** `/visual-proof` for every changed component; the E2E run in CI captures
+   the real app and links its screenshots from the pull request.
+8. **PR**, opened for the record, not for approval. Body under 20 lines: `Closes #123`, the
+   task, each Done-when clause with the test that proves it and where that test was seen
+   red (or why it could not be), findings that changed something, issues filed,
+   screenshots. The commit title is the changelog line.
+9. **Merge:** `just watch-pr` waits for the checks; each lane's newest comment, green or
+   not, is read and its findings graded (§ 7); then `just merge` — it refuses until every
+   check is green and folds `fixup!` commits, so the task lands as one commit.
+10. **Closure** in the same PR: on an issue that touched a spec, `spec-checker` runs
+    first and what it finds is fixed; a coverage floor the run measured more than a point
+    above rises to half a point under that figure (`coverage-gates.json`, never down);
+    what the task met and did not fix is filed as issues; `ARCHITECTURE.md` if a module
+    appeared, the spec if a rule changed. The merge closes the issue. The closing brief
+    says what changed for the user and what the project gained.
 
-**A batch in chat** — when the human says go to several queued entries, the agent runs
-`/run-queue`: one task per queued entry, so the queue is seen advancing, then `/run-entry`
-for each rather than re-deriving its steps. A skill is loaded with the `Skill` tool at the
-first entry of the batch and again after any pull request of the batch that changes it,
-never followed from memory; `/flow-audit` counts the loads beside the entries. The human
-is asked twice, not once per entry:
-
-- **Opening block**, before the first entry starts: the open questions of every queued
-  entry, and the mock-ups (§ 4) of every queued entry that changes what the user sees,
-  in one docs pull request. For each: what to look at, what a yes means, and what is
-  assumed if nothing is said. A mock-up drawn this early may be redrawn once the code is
-  read; the change is said in the entry's pull request.
-- **Closing block**, in the release brief: the vocabulary terms added or widened, the
-  reviewer findings declined and why, the debt filed, and the screenshots of what
-  shipped. It blocks nothing; it is what the human reads to disagree.
-
-The opening block is built by reading, before the first branch, every queued entry and
-the code it touches for four things, asked together:
-
-- the words the entry brings to a screen, the code or a spec that
-  `docs/ubiquitous-language.md` does not hold;
-- a technical choice that will need an ADR;
-- a platform, or a part of the Done when, that may be left out;
-- an entry large enough to be split.
-
-Two steps of that reading are named, because the code an entry changes shows neither:
-
-- **The sentences that list** — for every entry that adds or changes what an interface
-  can do (a tool, a command, a setting, an action), search the locales
-  (`src/i18n/locales/`), the specs and the `README.md` for the sentences that list what
-  it can do: a consent dialog, a description, a help page. A sentence that would say
-  less than what is allowed is a question of the block.
-- **The ADRs of the records** — for every record the entry writes, read the ADRs that
-  name it (`docs/adr/`). A Done when that stands against one is a question of the block.
-
-A queued `DEBT-NNN` is challenged against the current code in the same reading, so that
-what the challenge asks is in the block. A question is asked once, at its widest ("the
-term for every aggregate edited from a form", not one aggregate at a time). A choice
-that has a standing answer is not asked again: the answer is written where its rule
-lives, and read there.
-
-A question that only appears mid-batch is written on its entry, the entry is skipped,
-and the question joins the closing block — unless nothing else in the queue can run. It
-is right only for what the reading could not show, and it says what made it unknowable
-at the start (what CI found, what an answer of the block opened).
-
-**Release** — when the queue empties the agent runs `spec-checker` once on every spec the batch touched — `bash scripts/batch-specs.sh`
-lists them — and files what it finds as tech debt: a promise the code does not keep is
-not fixed in the release it was found in. Then `just release-check` runs on `main` what the release itself validates before it versions anything — every test, the build, the full query check, a few minutes — so that what would stop the release stops the hand-over; a failure is fixed in a pull request of its own, or filed when it is not the batch's. Last, once every pull request of the hand-over has merged and the workflow runs of `main`'s head commit have ended green, the agent runs `/dep-audit` without being asked on that `main`, as it will be released (a known vulnerability in what ships blocks the release; the agent fixes it or files it, and audits again after the fix merges). It hands over a clean `main` with the audit's verdict, naming the runs. The release itself is the human's only part: they run
-`just release -y` when they choose, and publish the draft. After
-it, `/prune` runs once on the production files the release changed — a full scan is
-asked for by name — and what it recommends is filed as one tech-debt entry, like what the
-spec checks find; an audit with no finding files nothing. Then `/flow-audit` measures the
-batch against the release before (`docs/work/audits.md`). The release refuses to start while a workflow run of the head
-commit is unfinished or failed, naming the run; then it re-runs the full
-harness on `main`, computes the version from the merged titles, writes the changelog,
-tags and pushes; CI builds and leaves the draft; the human publishes it. The
-changelog and the git history are the record of what shipped.
+**Ending a batch** — every batch ends alike: the closing brief, then the release sweep
+(Conventions) with `spec-checker` on every spec the batch touched (`bash
+scripts/batch-specs.sh` lists them), what they find filed as `task` issues; a security
+issue that puts users at risk is a `fix` instead: a `bug` issue put to the owner, worked
+before the batch ends, swept again on what it changed, released. A batch with a `feat` or
+`fix` is released: `just release-check` runs on `main` what the release validates before
+it versions anything, a failure fixed in a pull request of its own; once every pull
+request of the batch, and the `release-check` fix if any, has merged and the workflow runs of `main`'s head are green, the
+agent runs `/dep-audit` on that `main` (a known vulnerability in what ships blocks the
+release) and hands over with its verdict, naming the runs. The human runs `just release
+-y`; CI builds the draft, which the human publishes once both platforms attached their
+assets; the private build follows the public release (its `follow.yml`). Any other batch
+the agent closes with `just batch-end` (a `batch/<date>` tag): it publishes nothing, its
+chores ride in the next release, no fix is picked to fill a changelog. `/flow-audit`
+audits the range it closes (§ 12). A batch is named by its dates, never a version number.
 
 ## 4. Design proposal
 
-Before any change to what the user sees, the agent commits rendered mocks of the
-target state, built with the real components and tokens, under
-`screenshots/design/NNN-{state}-{light|dark}.png`, plus `screenshots/design/NNN.md`
-(five lines: what moves, what is added, what is removed, what stays). The
-`/design-proposal` skill drives it: the same preview pipeline as `/visual-proof`,
-written to the design folder instead of the proof folder.
+Before **any** change to what the user sees — a new screen, a moved or added control, a
+changed layout or wording pattern — the agent renders mocks of the target state with
+the real components and tokens (`/design-proposal`):
+`screenshots/design/{id}-{light|dark}-{state}.png` plus a five-line note (what moves,
+is added, is removed, stays).
 
-The human validates by editing the entry's `Design` line to `validated`, or writes an
-open question; in a chat run, a yes in the conversation is the validation and the
-agent writes the line. Nothing else is needed. Once the work ships, the proposal images are
-deleted in the closure commit; the visual proofs are the record.
+- **In chat:** the mocks are shown; nothing is built until the human says yes. The yes
+  sets the issue's Design field to `validated`.
+- **Headless:** the run pushes the mocks on a `design/123` branch, posts them and the note
+  on the issue with `needs-owner` (§ 2), and moves on to the next Queued item; the human
+  validates in the thread.
+
+The mocks show invented data only and never reach `main`: the issue holds them, the
+visual proofs of the pull request are the record.
 
 ## 5. The harness
 
@@ -248,38 +211,40 @@ rebuild the crate, and the local offline build already fails on a query missing 
 run only the fast checks for the same scope; a Markdown-only change costs Prettier
 and nothing else.
 
-| Check                     | Where                                                                                         | Gate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Lint, format, type-check  | `scripts/check.py`, Quality                                                                   | any error                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Architecture rules A1–A11 | `scripts/arch-check.py`, Quality                                                              | any violation; frozen debt may only shrink (`arch-allowlist.json`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Unit and integration      | Vitest, cargo test, Quality                                                                   | any failure                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Windows build             | Quality `windows`, a pull request that touches `src-tauri/`                                   | the application does not compile for Windows, or a test of the agent connection fails there                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Coverage floors           | `scripts/coverage-gate.py`, Quality                                                           | frontend features or backend logic under its floor (`coverage-gates.json`, a ratchet: § 3, step 10); the backend report comes from `cargo llvm-cov` with inline test modules stripped (`scripts/coverage-strip-tests.py`)                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Golden portfolio          | `src-tauri/tests/golden_portfolio.rs`, Quality                                                | any drift in a pinned figure (`tests/golden/expected.json`); a change that moves one names it in its entry's Done when and regenerates with `GOLDEN_UPDATE=1`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Sync written form         | `src-tauri/tests/sync_two_devices.rs` (`syn_038_*`) + `scripts/sync-format-check.sh`, Quality | what this build writes for any synced record, enum, folder header, manifest or segment differs from `tests/sync_format/v{DATA_FORMAT_VERSION}.json`, or a diff edits a snapshot already on main — a new written form arrives as a bumped version with its own snapshot (SYN-038)                                                                                                                                                                                                                                                                                                                                                                         |
-| Contracts and bindings    | `scripts/contract-check.py` + `contract-gaps.json`, Quality                                   | a command of `src/bindings.ts` without a row in a contract, a row without a command, arguments, a return type, a struct or an enum that are not the generated ones, or a row promising an error code its command's error type cannot carry; the gaps known when the check arrived are listed and the list only shrinks. Which codes a command returns is not in the bindings: that half is read (`/contract` or a hand amendment, then `contract-reviewer`)                                                                                                                                                                                              |
-| Dependency licences       | `scripts/licence-check.py` + `licence-allowlist.json`, Quality                                | a crate reached without a dev-dependency, or an npm package not flagged dev, carries a licence outside the allow-list and is not accepted there by name under that exact licence; an exception nothing uses any more fails too                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| E2E on the real app       | `.github/workflows/e2e.yml`, every PR (records-only PRs skip it, `scripts/e2e-scope.py`)      | any failure; screenshots linked                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Reviewer prompts          | `.github/workflows/review.yml`, every PR                                                      | any 🔴 in a lane the diff touches; the report is a sticky PR comment; fails closed without the `CLAUDE_CODE_OAUTH_TOKEN` subscription secret                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Visual regression         | `.github/workflows/e2e.yml`, every PR                                                         | a screen differing from main's last green run beyond 0.3 % of pixels while the PR touched no frontend file; expected differences are listed in the PR comment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Commit hygiene            | Quality `pr-checks`, and `main-commits` on a push to main (`scripts/commit-check.sh`)         | title > 72, wrong type, trailer, an author other than the owner                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Merge guard               | `scripts/merge.py`, `required-checks.json`                                                    | `just merge` refuses unless the branch is the head of an open pull request with every check green and every required check present; a rebase that moves the commits pushes them and stops until CI has run on them, unless the rebase left the tested tree as it was, record files (the entries and the queue, lessons, plans, ADRs) aside, so a branch stacked on merged commits lands without one; the rebase folds `fixup!` commits into the commits they name, so an entry lands as one commit whatever was pushed after review; GitHub merges the tested head, squashed under the folded commit when there were `fixup!` commits, rebased otherwise |
-| Security audit            | `security-audit.yml`                                                                          | new advisory                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Mutation sweep            | `.github/workflows/mutants.yml`, monthly                                                      | none; cargo-mutants on the logic code (`src-tauri/.cargo/mutants.toml`), survivors listed in the sticky issue "Mutation sweep — surviving mutants" in the techdebt entry format, `mutants.out` kept 90 days                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Check                     | Where                                                                                         | Gate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lint, format, type-check  | `scripts/check.py`, Quality                                                                   | any error                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Architecture rules A1–A11 | `scripts/arch-check.py`, Quality                                                              | any violation; frozen debt may only shrink (`arch-allowlist.json`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Unit and integration      | Vitest, cargo test, Quality                                                                   | any failure                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Windows build             | Quality `windows`, a pull request that touches `src-tauri/`                                   | the application does not compile for Windows, or a test of the agent connection fails there                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Coverage floors           | `scripts/coverage-gate.py`, Quality                                                           | frontend features or backend logic under its floor (`coverage-gates.json`, a ratchet: § 3, step 10); the backend report comes from `cargo llvm-cov` with inline test modules stripped (`scripts/coverage-strip-tests.py`)                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Golden portfolio          | `src-tauri/tests/golden_portfolio.rs`, Quality                                                | any drift in a pinned figure (`tests/golden/expected.json`); a change that moves one names it in its issue's Done when and regenerates with `GOLDEN_UPDATE=1`                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Sync written form         | `src-tauri/tests/sync_two_devices.rs` (`syn_038_*`) + `scripts/sync-format-check.sh`, Quality | what this build writes for any synced record, enum, folder header, manifest or segment differs from `tests/sync_format/v{DATA_FORMAT_VERSION}.json`, or a diff edits a snapshot already on main — a new written form arrives as a bumped version with its own snapshot (SYN-038)                                                                                                                                                                                                                                                                                                                                            |
+| Contracts and bindings    | `scripts/contract-check.py` + `contract-gaps.json`, Quality                                   | a command of `src/bindings.ts` without a row in a contract, a row without a command, arguments, a return type, a struct or an enum that are not the generated ones, or a row promising an error code its command's error type cannot carry; the gaps known when the check arrived are listed and the list only shrinks. Which codes a command returns is not in the bindings: that half is read (a hand amendment per `docs/contracts/README.md`, then `contract-reviewer`)                                                                                                                                                 |
+| Dependency licences       | `scripts/licence-check.py` + `licence-allowlist.json`, Quality                                | a crate reached without a dev-dependency, or an npm package not flagged dev, carries a licence outside the allow-list and is not accepted there by name under that exact licence; an exception nothing uses any more fails too                                                                                                                                                                                                                                                                                                                                                                                              |
+| E2E on the real app       | `.github/workflows/e2e.yml`, every PR (records-only PRs skip it, `scripts/e2e-scope.py`)      | any failure; screenshots linked                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Reviewer prompts          | `.github/workflows/review.yml`, every PR                                                      | any 🔴 in a lane the diff touches; the report is a sticky PR comment; fails closed without the `CLAUDE_CODE_OAUTH_TOKEN` subscription secret                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Visual regression         | `.github/workflows/e2e.yml`, every PR                                                         | a screen differing from main's last green run beyond 0.3 % of pixels while the PR touched no frontend file; expected differences are listed in the PR comment                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Commit hygiene            | Quality `pr-checks`, and `main-commits` on a push to main (`scripts/commit-check.sh`)         | title > 72, wrong type, trailer, an author other than the owner                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Merge guard               | `scripts/merge.py`, `required-checks.json`                                                    | `just merge` refuses unless the branch is the head of an open pull request with every check green and every required check present; a rebase that moves the commits pushes them and stops until CI has run on them, unless the rebase left the tested tree as it was, record files (lessons, plans, ADRs) aside, so a branch stacked on merged commits lands without one; the rebase folds `fixup!` commits into the commits they name, so a task lands as one commit whatever was pushed after review; GitHub merges the tested head, squashed under the folded commit when there were `fixup!` commits, rebased otherwise |
+| Security audit            | `security-audit.yml`                                                                          | new advisory                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Mutation sweep            | `.github/workflows/mutants.yml`, monthly                                                      | none; cargo-mutants on the logic code (`src-tauri/.cargo/mutants.toml`), survivors listed in the sticky issue "Mutation sweep — surviving mutants", filed as `task` issues, `mutants.out` kept 90 days                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 The `main-protection` ruleset requires the same checks of every update of `main`: `just merge`
 and `just release` land through a pull request GitHub merges, and neither pushes to `main`.
 
-**The usage log.** The audit after a release reads `logs/usage.log`: one line per run of
+**The usage log.** The audit after a batch reads `logs/usage.log`: one line per run of
 a script or a recipe (time, tool, duration, result), written by `scripts/usage_log.py`.
 The file is local, never committed, capped at 5 000 lines, and emptied once its figures
-are in `docs/work/audits.md`. A new Python or shell script logs itself
+are in the batch's audit. A new Python or shell script logs itself
 (`usage_log.start()` first thing in its `__main__` block, `. scripts/usage-log.sh` after
 its `set` line); a recipe that runs no script depends on `(_used "<recipe>")`. Nothing
 is logged in CI, nor by the script tests (`USAGE_LOG=off`). A script that only CI
 runs does not log. A script that runs another logs both (`harness.sh` and each check it
 calls), and a worktree keeps its own file: the audit reads the main checkout's. Skills and agents are
 counted from the session's transcript.
+
+**Heavy runs.** A mutation sweep runs in CI only (`mutants.yml`): the local machine cannot carry it beside the hooks and other builds. A background job is stopped by its task or process id, never by name.
 
 ## 6. The right way to code
 
@@ -291,129 +256,200 @@ counted from the session's transcript.
 - **Stable ids** on every interactive element; text from i18n; one event per action on
   the bus.
 - **Ubiquitous language** in every identifier (`docs/ubiquitous-language.md`).
-- **Surgical**: touch the file set the entry needs. Boyscout inside it, never beyond.
+- **Surgical**: touch the file set the task needs. Boyscout inside it, never beyond.
+
+- **Read the gold first.** Before changing a pattern that has a named reference (B0, F0,
+  the error model), open and read it; if it contradicts the design in mind, the gold wins.
+- **Check the ADRs before writing "cannot".** Before stating that something cannot be
+  done, tested or automated, grep `docs/adr/`: a solved constraint is recorded there.
 
 ## 7. Reviewers and the triage policy
 
-Reviewers run locally on the diff before the PR, until no 🔴 remains on the files as
-they will be pushed: a file edited in answer to a finding goes back to its lane before
-the push — a spec above all, whose text a fix rewrites. CI runs them
-again on every push (`.github/workflows/review.yml`, one check per lane the diff
-touches; the report is a sticky comment on the PR and any 🔴 fails the check). The
-lanes: `reviewer-backend` and `reviewer-arch` for
-`.rs`, `reviewer-frontend` and `reviewer-arch` for `.ts`/`.tsx`, `reviewer-sql` for
-migrations, `reviewer-infra` for scripts, hooks, config and workflows,
-`reviewer-security` for commands, capabilities and secret handling, `reviewer-e2e` for
-`e2e/**`, `spec-reviewer` and `contract-reviewer` when `docs/spec/` or `docs/contracts/`
-change (the checks `reviewer-spec` and `reviewer-contract` in CI), `adr-reviewer` when an
-ADR changes and `spec-checker` before closing an entry that carries spec rules — these
-two locally only.
+Before the PR, run exactly the lanes
+`bash scripts/branch.sh files | bash scripts/review-lanes.sh` prints (none for documents
+that are not guides, specs or contracts), and again on every fix before its push, until
+no 🔴 remains: a file edited in answer to a finding goes back to its lane — a spec above
+all, whose text a fix rewrites. CI runs the same code lanes on every push
+(`.github/workflows/review.yml`, one check per lane, the report a sticky comment, any 🔴
+fails), prompts from `main`; `reviewer-guides` runs locally only. A local reviewer gets
+the branch, the spec and the vocabulary, never a description of the change. Also:
+`adr-reviewer` when an ADR changes, `spec-checker` before closing an issue with spec
+rules. What every reviewer does is in `.claude/agents/review-protocol.md`.
 
-What every reviewer does is in `.claude/agents/review-protocol.md`; a reviewer's own file
-is its lane. A reviewer judges the lines the branch changed and lists what was there
-before without a severity — the two document reviewers included, though they read the
-whole file. The exhaustive reading is a release sweep (`release-sweep` in the prompt),
-`spec-checker` before a release, and `scripts/contract-check.py` on every pull request.
+Every finding, local or from CI, is graded before any is applied; one line per finding that
+changed something or was rejected goes in the PR body, or in a PR comment once pushed:
 
-Every finding, local or from a lane's CI comment, is graded and the outcome recorded
-in the PR body. The grade comes from four questions, in order; the one that settles it
-is the row's reason:
-
-1. **Did this branch introduce it?** Yes → (a), unless question 3 or 4 says otherwise.
-2. **If it was there before: is it in a file the pull request touches, small (about ten
-   lines) and mechanical?** All three → (a). Otherwise → (b).
-3. **Does it need a design judgment, or reach files outside the pull request?** → (b).
-4. **Is it wrong on the facts, outside the entry, speculative, or a taste no rule
-   states?** → (c), whatever the earlier answers. It is a pattern only when it recurs
-   across the batch or would bind later work; in doubt, one-off.
-
-Each finding gets its own row — never a silent fix, never a silent pass.
+- **(a)** in scope → fix in the PR.
+- **(b)** bigger, or outside the file set → a `task` issue, linked from that line.
+- **(c)** is never "pre-existing" alone: a rejection cites what overrides the finding —
+  a rule, a file, an ADR, a measurement, the owner's decision.
+- **(c) one-off** false positive → inline comment `<reviewer> FP: <reason> — see PR #NN`.
+- **(c) pattern** → a "not a finding" rule in the reviewer's prompt, same PR.
+- **A CI finding the local run missed** → a rule in that reviewer's prompt, same PR.
+- **`[DECISION]`** → see Conventions below.
+- **A 🔴 security finding on the agent's own change** is fixed, or put to the human with
+  its options. The agent never clears it with a "not a finding" rule it writes itself:
+  that would soften the gate that grades its own work.
+- **A 🔴 security finding that already exists on `main`**, outside the task: shown to the
+  human with that context and three options — file it as a `task` issue and ship the scoped
+  change (the default), widen this pull request, or block. Never deferred silently. A
+  finding the pull request introduces blocks.
 
 The CI reviewers run on the subscription the chat session uses. A lane stopped by its
 usage limit says "did not run (usage limit)" in its comment and in `just merge`'s
 refusal, and fails: an unreviewed pull request does not merge. It is re-run once the
-limit has reset (`gh run rerun <run> --failed`). Late in a long session, a first push
-waits for the reset rather than spend a round on it.
-
-| Grade        | Action                                                            |
-| ------------ | ----------------------------------------------------------------- |
-| (a)          | Fix in the PR                                                     |
-| (b)          | `DEBT-NNN` entry in `docs/work/debt/`, linked from the PR body    |
-| (c) one-off  | Inline comment `// <reviewer> FP: <reason> — see PR #NN`          |
-| (c) pattern  | Edit the reviewer prompt in the same PR; note it in the PR body   |
-| `[DECISION]` | Open question on the entry; the PR stays open; the agent moves on |
-
-No halt for the human. A review comment from the human on a merged or open PR is
-treated as a new open question on the entry.
+limit has reset (`just rerun-failed <run>`).
 
 ## 8. Budget and stop rules
 
-- One entry, one run, a wall-clock budget of three hours. Over budget → open question
-  "larger than estimated: split?", move on.
-- The same gate failing three times on one entry, whatever the three causes → open
-  question, move on.
+- One task, one run, three hours of wall clock; a wait for the usage limit to reset is
+  not the task's time. Over budget → open question "larger than estimated: split?", stop.
+- A gate fails → read its log. If the log shows the cause, fix it. If it does not, the
+  next push adds observation and makes the failure cheap to reproduce, never a fix.
+- The same gate failing three times on one task → open question, stop (a trivial one is
+  the agent's, § 3).
 - A test fails for a reason the change cannot explain → it is flaky, and is never
   accepted by re-running it: that one test is skipped in its own pull request and a
-  `DEBT-NNN` is filed with the failure text and the run's link, to find out why; the fix
-  that re-enables it closes the entry. The run continues.
-- Never touch the live portfolio database, never force-push, never bypass a hook,
-  never edit a released changelog line, never reorder the queue, never cut a release.
+  `task` issue is filed with the failure text and the run's link; the fix that re-enables
+  it closes the issue. The run continues.
+- **Never:** what `CLAUDE.md` § Core rules 1 forbids; nor change the batch without the
+  human's yes (§ 2), nor edit `.claude/settings.json` (the human edits it; the agent
+  commits that edit through a pull request).
 
 ## 9. Where the loop runs
 
-The chat session is for writing entries together, design conversations and answering
-open questions. The loop runs headless, one entry per run, never asks, and keeps its
-state in git and the two files.
+The chat session is for filing issues together, design conversations and answering
+open questions. The loop runs one task per run and keeps its state in git and the Project.
 
-- **Cloud routine** `run-entry` on claude.ai/code, created disabled: weekdays at 05:37
-  UTC, the repository's environment, the `/run-entry` prompt. E2E and screenshots
-  come from CI, so the sandbox needs no display. The human switches it on.
-- **Laptop**: `just run-entry` (`scripts/run-entry.sh`): one run at a time, a clean
-  and fresh `main`, a queue with something left, three hours of wall clock
-  (`RUN_ENTRY_BUDGET`), the log under `logs/run-entry/`. It runs
-  `claude -p "/run-entry" --permission-mode acceptEdits`: nobody answers a prompt in a
-  print-mode run, so a command outside the allow list in `.claude/settings.json` is
-  denied and the run fails instead of waiting. The allow list scopes the flow, it is
-  not a sandbox; the deny list refuses the usual spellings of the absolute rules (push
-  to `main`, force push, hook bypass, release, tag, `gh pr merge`, editing the list
-  itself) as a reminder, not a proof. What is enforced is the harness and the merge
-  guard. The run shares the plan's session limit with any open session. A crontab
-  line: `37 7 * * 1-5 cd ~/project/folioneer && just run-entry`.
+- **In chat:** `/run-entry #123`, or a plain request; `/run-batch` for a whole batch:
+  the questions first, each remaining item through `/run-entry`, the batch's end
+  (§ 3), then `/flow-audit`.
+- **Laptop:** `just run-entry` (`scripts/run-entry.sh`) — the first Queued item, headless,
+  three hours of budget (`RUN_ENTRY_BUDGET`), the log under `logs/run-entry/`. It runs
+  `claude -p "/run-entry" --permission-mode acceptEdits`: a command outside the allow list
+  in `.claude/settings.json` is denied, so the run fails instead of waiting. The allow
+  list scopes the flow, it is not a sandbox; the deny list refuses the usual spellings of
+  the absolute rules as a reminder, not a proof. What is enforced is the harness and the
+  merge guard.
+- **Cloud routine** `run-entry` on claude.ai/code, created disabled; the human switches
+  it on.
 
-Until a runner is switched on, a human types `/run-entry` in a session and the same
-rules apply.
+---
 
-## 10. Gold layouts, bit by bit
+## 10. Gold for new code, bit by bit for existing
 
-Three gold targets exist: the backend layout (B0, B37–B43), the frontend layout (F0, F28; the
-remaining crossings frozen in `arch-allowlist.json`) and the error model (landed,
-`docs/error-model.md`). New code follows them. Existing code touched by a task is brought to gold
-in the same pull request only when all three hold — otherwise it keeps the standard around it:
+Three golds: the backend layout (`backend-rules.md` B0, B37–B43), the frontend layout
+(`frontend-rules.md` F0, F28; the remaining crossings frozen in `arch-allowlist.json`)
+and the error model (`error-model.md`). New code follows them. Existing code touched by a
+task is made conformant in the same PR only when all three hold:
 
-- **Size**: about 50 lines of conformance change at most.
-- **Locality**: inside the files the task already touches.
-- **Mechanical**: a rename, an import, a signature or type swap; any design judgement ("which
-  layer?", "what name?") is its own entry.
+- **Size** — at most about 50 lines of conformance changes.
+- **Locality** — inside the files the task already touches.
+- **Mechanical** — a rename, an import, a signature or type swap; any design judgement
+  (which layer, what name) defers it.
 
-The "two stories" check overrides the number: a pull request that tells the feature and a layout
-migration tells two stories, and the migration waits. A mixed-standard codebase is acceptable; a
-half-done migration that leaves neither standard intact is not. The larger migrations are
-tracked in `docs/work/debt/` (DEBT-008, DEBT-009) and run when queued.
+Otherwise the touched code keeps its current standard; a mixed codebase is fine, a
+half-migrated file is not. The deciding test is **two stories**: if a reviewer would
+read the PR as the task plus a migration, the migration is a separate issue.
 
-## 11. Splitting a feature by layer
+## 11. PR size and split
 
-A feature touching backend and frontend ships as one pull request per layer when either layer
-exceeds about 20 files or 500 lines, in this order: spec, contract, migration, backend and the
-generated bindings (mergeable alone — the bindings are unused); then gateway, hooks, presenter,
-components and strings, branched off the merged backend; then E2E and closure. Each diff stays
-one story and CI signs each off on its own.
+One story per pull request. The target is about 400 hand-written lines per reviewer
+lane; above about 800 in a lane, split. Generated files, lockfiles, screenshots and spec
+documents are not counted, and the total has no limit: a mechanical change that one
+check proves is one story whatever its size. A feature whose backend or frontend exceeds
+about 20 files or 500 lines ships as one PR per layer, in order: spec, contract,
+migration, backend and bindings; then the frontend; then E2E and closure. Each is
+mergeable on its own.
 
-**A branch behind one in review.** Two pull requests opened side by side send each other
-round: each is green, then rebased by `just merge` because the other merged, and waits
-for a second run. So while a pull request is in CI, the next entry is not pushed: its
-branch is cut from the branch in review, worked, checked by the harness and reviewed
-there — the reviewers are given its last commit, not the branch
-(`.claude/agents/review-protocol.md`). Once the one below has merged it is rebased onto
-`main` — a local rebase of commits nobody has, never a force-push — pushed, and gets its
-one CI round. Entries on disjoint files may still be open side by side, from a worktree
-(`just worktree`); each closes its own entry file, so their records never meet.
+While a pull request waits for its checks, the next task may be prepared on a branch
+not pushed yet, so pull requests that change the same file do not conflict: its harness
+and reviewers run there, the reviewers given its last commit only, and it is rebased
+onto `main` before its first push — a local rebase, never a force-push.
+
+## 12. The flow audit
+
+After a batch ends (§ 3), `/flow-audit` audits it once, as a comment on that batch's
+`batch-audit` issue: quality first, weighed against speed and effort. Nothing of it runs
+during a batch.
+
+- **An auditor of its own** — the skill runs forked, with a fresh context, and judges
+  from the figures, the batch's pull requests and the issues filed and closed during it —
+  never the session agent's account. What it cannot rebuild from those records is a
+  finding; the questions put to the owner are the dated answers in the issue threads.
+- **Measures** — `just flow-audit` counts every figure beside the batch before: the
+  pull requests, CI and its rounds, the usage log. The auditor counts from the pull
+  requests what the reviewers caught, got wrong and left to CI, and reads each generic
+  piece of `docs/agentic-setup.md` against its line.
+- **Six questions**, asked of every batch: what would have avoided a conflict; where it
+  waited, and what would shorten it without costing quality; what can be simplified;
+  which script, recipe, skill or agent went unused (keep, fold or remove); where a guide
+  was false, contradicted another, or grew without earning it; what was done by hand that
+  a tool should do, and which finding belongs to another repository.
+- **Hard points** — every difficulty met becomes a `flow` issue with its evidence
+  and a proposal; where nothing should change, "keep" is a verdict said in the audit,
+  and no issue is filed.
+
+A flow issue (its form) carries `Observed` with its evidence — a count, a duration, a
+pull request — then a `Proposal` with what it `Costs` and what it protects. A change that
+buys speed says what it risks; one that buys safety says what it costs. A tool nobody
+used is named, with a verdict: keep, fold or remove. The human decides each in its
+thread, or has banked it (§ 3); the agent copies the decision, dated, into its Decision
+field, and it can be queued. One done, or whose verdict is to keep things as they are, is
+closed.
+
+## Conventions
+
+### Spec rule numbering (TRIGRAM-NNN)
+
+The scheme and the registered trigrams live in [`spec/README.md`](spec/README.md).
+
+### `[DECISION]` criticals
+
+A reviewer critical tagged `[DECISION]` needs an architectural choice, not a mechanical
+fix. It is never fixed unilaterally: it becomes a `needs-owner` question on the issue, or goes
+to the human in chat, and the PR stays open. The choice made is recorded before the fix: a
+technical one as an ADR (`docs/adr/README.md`), a domain one in the spec or the glossary.
+
+### Reviewer reports
+
+Locally a reviewer's reply is its report; nothing is written. In CI the reviewer saves
+its output to `.review/{slug}-{date}-{NN}.md` (`bash scripts/review-path.sh {slug}`) and
+the workflow posts it as the lane's sticky pull request comment. `.review/` is gitignored
+and safe to delete.
+
+### Tools the flow needs
+
+A tool the flow needs is added for good — a script under `scripts/` with its tests, a
+recipe in the `justfile` — never rewritten in a session's scratch folder. Each is
+judged again at the audit that follows a batch: keep, fold or remove. The usage log is
+§ 5's.
+
+### Shell calls
+
+A headless run has nobody to approve a command, so every shell call is one command the
+allow list in `.claude/settings.json` names:
+
+- no `cd … &&`, no `&&`, `||`, `;` or `$(...)` chain, in a prompt as in a call (the
+  allow list matches a literal prefix): `git -C <path>` reaches another directory, a
+  multi-line edit goes through `python3 - <<'EOF'`, more logic into a script by name;
+- a message or a body goes in a file (`gh pr create --body-file`), never on the command
+  line;
+- calls that depend on each other run one after another, never in one parallel batch:
+  the first failure cancels the rest;
+- an empty result is read as a result, not probed again with `echo` or `pwd`;
+- a command the list lacks is named to the human, who adds it; the agent does not.
+
+### Release sweep
+
+Before a batch ends (§ 3), run in `release-sweep` mode the lanes
+`git diff --name-only <tag>...HEAD | bash scripts/review-lanes.sh` prints, `<tag>` the last
+batch end (`just batch-ends`), plus `reviewer-security`, and
+`spec-checker` on every spec the batch touched (`bash scripts/batch-specs.sh`); `/dep-audit`
+runs at a release's hand-over, on the final `main` (§ 3). `reviewer-security` reads the whole
+command surface; every other lane reads what changed since the last batch end's tag
+(`just batch-ends`); each lane's `## Files read` goes into the hand-over, or into the closing brief of a batch
+that ends with `just batch-end`. What
+they find is filed as `task` issues, not fixed in the batch, but for § 3's user-risk case;
+one not critical and older than the batch is filed and reported, not asked (§ 7 keeps a
+🔴 security finding for the owner).

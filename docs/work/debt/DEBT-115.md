@@ -1,9 +1,0 @@
-# 2026-10-11 — DEBT-115 — What the spec check of the agent connection found after TODO-059
-
-- Found by: `spec-checker` on `docs/spec/agent-connection.md`, at the hand-over of the batch (2026-10-11), on the tree of TODO-059's second pull request before an agent's price became a plain upsert; it ran `just test-rust --lib -- agt_0` (35 passed) and read the rest. Split from DEBT-113 on 2026-10-11. Only the comments of `connections.rs` were read again by the main agent
-- Where: `src-tauri/src/agent_connection/end_to_end_tests.rs`; `src-tauri/src/agent_connection/connections.rs` (`may_record_one_more`, `count_recording`); `src/features/shell/agent_connection/AgentConnection.test.tsx`
-- Severity: 🟡
-- Size: M — one pull request: backend tests and one frontend test.
-- Observation: every rule the batch touched is implemented. **A clause without a test.** AGT-060: a deposit cancelled; a deposit, a withdrawal or a dividend removed with the session's recordings (AGT-053) or undone when it cannot be marked (AGT-049); a withdrawal refused for a later point; a dividend without a rate and a recording without a date, read back as 1 and as today. AGT-062: a text date that is not a date (`InvalidDateFormat`), an archived asset and a default date through `record_price`; that a refused price takes no place of the limit; a price left by "Remove everything it recorded". AGT-047: a read on a session at its limit. AGT-032: the text of the consent sentence in each language (the test holds the key). **Words behind the code.** Two comments of `connections.rs` say the session's counter holds transactions; it counts prices too.
-- User value: None directly — what an agent is promised for its four new recordings is each held by a test.
-- Done when: each clause above has a test that fails when the clause is broken; the two comments say what is.
