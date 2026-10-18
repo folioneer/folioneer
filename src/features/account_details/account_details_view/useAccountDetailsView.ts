@@ -17,7 +17,7 @@ import { accountDetailsGateway, useCachedAssets } from "../gateway";
 import {
   priceHistoryBackfillErrorToI18n,
   priceHistoryBackfillOutcomeToMessage,
-  priceRefreshLockErrorToI18n,
+  priceRefreshBlockedErrorToI18n,
   toPriceableAssets,
 } from "../shared/presenter";
 import type { HoldingNoteTarget, ModalTarget, SellTarget, SplitTarget } from "../shared/types";
@@ -282,11 +282,11 @@ export function useAccountDetailsView(accountId: string) {
     data.retry();
   }, [data]);
 
-  // MKT-153/156/157 — toggle the price-refresh lock on an asset. Calls the
-  // block/unblock command, then re-reads the asset list (so the row's lock
+  // MKT-153/156/157 — toggle whether an asset's price is typed by hand. Calls the
+  // block/unblock command, then re-reads the asset list (so the row's typed-by-hand
   // icon flips from the store, mirroring archive/unarchive) and confirms
   // with a snackbar. Errors surface via the snackbar's i18n pipeline.
-  const handleTogglePriceRefreshLock = useCallback(
+  const handleTogglePriceRefreshBlocked = useCallback(
     async (assetId: string, currentlyBlocked: boolean) => {
       if (isAsOf) return;
       try {
@@ -296,15 +296,19 @@ export function useAccountDetailsView(accountId: string) {
         if (res.status === "ok") {
           await fetchAssets();
           showSnackbar(
-            t(currentlyBlocked ? "mkt.lock.success_unblocked" : "mkt.lock.success_blocked"),
+            t(
+              currentlyBlocked
+                ? "mkt.typed_by_hand.success_fetched_automatically"
+                : "mkt.typed_by_hand.success_typed_by_hand",
+            ),
             "success",
           );
         } else {
-          const msg = priceRefreshLockErrorToI18n(res.error);
+          const msg = priceRefreshBlockedErrorToI18n(res.error);
           showSnackbar(t(msg.key, msg.vars), "error");
         }
       } catch (e) {
-        logger.error("Failed to toggle price-refresh lock", { error: e, assetId });
+        logger.error("Failed to toggle price typed by hand", { error: e, assetId });
         showSnackbar(t("error.Unknown"), "error");
       }
     },
@@ -469,7 +473,7 @@ export function useAccountDetailsView(accountId: string) {
     handleHoldingNoteOpen,
     handleHoldingNoteClose,
     handleHoldingNoteSuccess,
-    handleTogglePriceRefreshLock,
+    handleTogglePriceRefreshBlocked,
     backfillingAssetIds,
     handleBackfillPriceHistory,
   };

@@ -99,7 +99,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 ### Scope & Skips (040–049)
 
-**SPF-040 — Scope mirrors the in-app fetch tasks (backend)**: The run's scope is every active holding across all accounts with a derivable provider symbol (MKT-110), excluding system cash assets (MKT-116) and refresh-locked assets (MKT-151).
+**SPF-040 — Scope mirrors the in-app fetch tasks (backend)**: The run's scope is every active holding across all accounts with a derivable provider symbol (MKT-110), excluding system cash assets (MKT-116) and assets whose price is typed by hand (MKT-151).
 
 **SPF-041 — Per-asset silent skip (backend)**: An in-scope asset is silently skipped — nothing written, no error surfaced — when its symbol cannot be derived, the provider has no data for it, the provider call fails, or the write fails (same skip set as MKT-114). The run continues with the remaining assets, and the skip is counted in the run record.
 
@@ -145,7 +145,7 @@ Settings page
 Every day at trigger time (app open or closed)
     → OS launches the application invisibly                              (SPF-020)
         ├─ once-per-day guard: already settled today? → record skip, exit (SPF-021)
-        ├─ scope = active holdings, minus cash + locked                  (SPF-040)
+        ├─ scope = active holdings, minus cash + typed by hand            (SPF-040)
         ├─ for each asset: fetch daily closes missing since last
         │  successful run (≤ 30 days), dated to their trading day        (SPF-030, SPF-031)
         │    ├─ non-trading days: no row                                 (SPF-032)

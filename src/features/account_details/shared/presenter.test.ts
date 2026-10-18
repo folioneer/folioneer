@@ -19,7 +19,7 @@ import {
   performanceColumnKey,
   priceHistoryBackfillErrorToI18n,
   priceHistoryBackfillOutcomeToMessage,
-  priceRefreshLockErrorToI18n,
+  priceRefreshBlockedErrorToI18n,
   selectPerformanceCell,
   toAccountSummary,
   toClosedHoldingRow,
@@ -604,9 +604,9 @@ describe("assetPriceMutationErrorToI18n", () => {
 });
 
 // MKT-156 — F27 presenter for the price-refresh lock commands' error surface
-describe("priceRefreshLockErrorToI18n", () => {
+describe("priceRefreshBlockedErrorToI18n", () => {
   it("AssetNotFound (carries id payload) maps to its flat key", () => {
-    expect(priceRefreshLockErrorToI18n({ code: "AssetNotFound", id: "asset-1" })).toEqual({
+    expect(priceRefreshBlockedErrorToI18n({ code: "AssetNotFound", id: "asset-1" })).toEqual({
       key: "error.AssetNotFound",
     });
   });
@@ -615,7 +615,7 @@ describe("priceRefreshLockErrorToI18n", () => {
     "CashAssetNotEditable",
     "DatabaseError",
   ] as const)("%s unit variant maps to its flat error key", (code) => {
-    expect(priceRefreshLockErrorToI18n({ code })).toEqual({ key: `error.${code}` });
+    expect(priceRefreshBlockedErrorToI18n({ code })).toEqual({ key: `error.${code}` });
   });
 });
 

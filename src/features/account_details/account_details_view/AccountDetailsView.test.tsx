@@ -168,7 +168,7 @@ const makeView = (overrides: Record<string, unknown> = {}) => ({
   handleFeeScheduleOpen: vi.fn(),
   handleFeeScheduleClose: vi.fn(),
   handleFeeScheduleSuccess: vi.fn(),
-  handleTogglePriceRefreshLock: vi.fn(),
+  handleTogglePriceRefreshBlocked: vi.fn(),
   handleBackfillPriceHistory: vi.fn(),
   backfillingAssetIds: [],
   ...overrides,
@@ -670,7 +670,7 @@ describe("AccountDetailsView — without an External provider (MKT-212)", () => 
 
     expect(document.querySelector("#account-details-refresh-prices")).toBeInTheDocument();
     expect(rowProps.at(-1)?.onBackfillPriceHistory).toBeTypeOf("function");
-    expect(rowProps.at(-1)?.onTogglePriceRefreshLock).toBeTypeOf("function");
+    expect(rowProps.at(-1)?.onTogglePriceRefreshBlocked).toBeTypeOf("function");
     expect(closedRowProps.at(-1)?.onBackfillPriceHistory).toBeTypeOf("function");
   });
 
@@ -681,7 +681,7 @@ describe("AccountDetailsView — without an External provider (MKT-212)", () => 
 
     expect(document.querySelector("#account-details-refresh-prices")).toBeNull();
     expect(rowProps.at(-1)?.onBackfillPriceHistory).toBeUndefined();
-    expect(rowProps.at(-1)?.onTogglePriceRefreshLock).toBeUndefined();
+    expect(rowProps.at(-1)?.onTogglePriceRefreshBlocked).toBeUndefined();
     expect(closedRowProps.at(-1)?.onBackfillPriceHistory).toBeUndefined();
   });
 });
