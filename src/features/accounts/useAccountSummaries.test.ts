@@ -193,6 +193,8 @@ describe("useAccountSummaries", () => {
   it.each([
     "CurrencyRateUpdated",
     "CurrencyPairUpdated",
+    // FXR-126 — the total is in the reference currency chosen.
+    "ReferenceCurrencyUpdated",
   ])("re-fetches summaries when %s arrives", async (eventType) => {
     let capturedCallback: ((type: string) => void) | null = null;
     mockSubscribeToEvents.mockImplementation((cb: (type: string) => void) => {

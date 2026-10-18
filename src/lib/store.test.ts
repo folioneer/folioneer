@@ -31,7 +31,13 @@ vi.mock("../features/categories/gateway", () => ({
 const mockGetCapabilities = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ external_provider: true }),
 );
-vi.mock("../features/shell/gateway", () => ({ getCapabilities: mockGetCapabilities }));
+const mockGetReferenceCurrency = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ status: "ok", data: { currency: "CHF", choices: ["CHF", "EUR"] } }),
+);
+vi.mock("../features/shell/gateway", () => ({
+  getCapabilities: mockGetCapabilities,
+  getReferenceCurrency: mockGetReferenceCurrency,
+}));
 
 vi.mock("./logger", () => ({
   logger: { error: vi.fn(), info: vi.fn(), debug: mockDebug },
@@ -474,6 +480,14 @@ describe("store — the build's capabilities (MKT-211)", () => {
     await vi.waitFor(() => expect(useAppStore.getState().isInitialized).toBe(true));
 
     expect(useAppStore.getState().hasExternalProvider).toBe(false);
+    cleanup();
+  });
+  // FXR-128 — the reference currency is read at launch, for the forms to preselect.
+  it("holds the reference currency once initialised", async () => {
+    const cleanup = useAppStore.getState().init();
+    await vi.waitFor(() => expect(useAppStore.getState().isInitialized).toBe(true));
+
+    expect(useAppStore.getState().referenceCurrency).toBe("CHF");
     cleanup();
   });
   // UPD-030 — the channel the build belongs to is held for the version display.

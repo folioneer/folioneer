@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAppStore } from "@/lib/store";
 import type { I18nMessage } from "@/ui/format/i18n";
 import type { AccountFormData } from "../shared/AccountForm";
 import { FREQUENCIES } from "../shared/presenter";
@@ -11,11 +12,13 @@ interface UseAddAccountProps {
 
 export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
   const { addAccount } = useAccounts();
+  // FXR-128 — a new account's currency starts as the reference currency.
+  const referenceCurrency = useAppStore((s) => s.referenceCurrency);
 
   const [formData, setFormData] = useState<AccountFormData>({
     name: "",
     bank_name: "",
-    currency: "EUR",
+    currency: referenceCurrency,
     update_frequency: "ManualMonth",
     management_fees_enabled: false,
     country: "",
@@ -70,7 +73,7 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
     setFormData({
       name: "",
       bank_name: "",
-      currency: "EUR",
+      currency: referenceCurrency,
       update_frequency: "ManualMonth",
       management_fees_enabled: false,
       country: "",

@@ -1,5 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useAppStore } from "@/lib/store";
 import { useAddAccount } from "./useAddAccount";
 
 const mockAddAccount = vi.fn();
@@ -226,5 +227,14 @@ describe("useAddAccount — management fees opt-in (FEE-075)", () => {
     expect(mockAddAccount).toHaveBeenCalledWith(
       expect.objectContaining({ management_fees_enabled: false }),
     );
+  });
+});
+
+describe("useAddAccount — reference currency (FXR-128)", () => {
+  it("starts a new account in the reference currency", () => {
+    useAppStore.setState({ referenceCurrency: "CHF" });
+    const { result } = renderHook(() => useAddAccount());
+    expect(result.current.formData.currency).toBe("CHF");
+    useAppStore.setState({ referenceCurrency: "EUR" });
   });
 });

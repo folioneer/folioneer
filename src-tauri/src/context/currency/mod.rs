@@ -21,8 +21,8 @@ pub use application::{CurrencyService, ResolvedRate};
 pub use domain::{
     CurrencyPair, CurrencyPairRepository, CurrencyPairSummary, CurrencyRate,
     CurrencyRateRepository, CurrencyRateSource, EurSnapshot, PortfolioSetting,
-    PortfolioSettingRepository, RateHistoryProvider, RateProvider, DEFAULT_REFERENCE_CURRENCY,
-    REFERENCE_CURRENCY_SETTING,
+    PortfolioSettingRepository, RateHistoryProvider, RateProvider, ReferenceCurrency,
+    DEFAULT_REFERENCE_CURRENCY, REFERENCE_CURRENCY_SETTING,
 };
 pub use error::CurrencyError;
 pub use infrastructure::{

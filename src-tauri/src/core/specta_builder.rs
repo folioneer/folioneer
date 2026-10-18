@@ -52,6 +52,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .typ::<currency::CurrencyRate>()
         .typ::<currency::CurrencyRateSource>()
         .typ::<currency::CurrencyPairSummary>()
+        .typ::<currency::ReferenceCurrency>()
         .typ::<currency::CurrencyError>()
         // ----- sync BC (SYN/CFR) -----
         .typ::<sync::SyncFolderState>()
@@ -157,6 +158,8 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             currency::update_currency_rate,
             currency::delete_currency_rate,
             currency::get_currency_pairs,
+            currency::get_reference_currency,
+            currency::set_reference_currency,
             currency::get_currency_rates,
             // ----- sync BC (SYN/CFR) -----
             sync::pause_sync,

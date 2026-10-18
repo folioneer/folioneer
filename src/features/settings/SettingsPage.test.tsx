@@ -25,6 +25,11 @@ vi.mock("./scheduled_fetch/ScheduledFetchSection", () => ({
   ScheduledFetchSection: () => <div data-testid="scheduled-fetch-section-mounted" />,
 }));
 
+// The reference currency reads its own state (ReferenceCurrencySection.test.tsx).
+vi.mock("./reference_currency/ReferenceCurrencySection", () => ({
+  ReferenceCurrencySection: () => <div data-testid="reference-currency-section-mounted" />,
+}));
+
 // The sync line reads the sync status on its own (SyncSummary.test.tsx): stubbed here too.
 vi.mock("./sync/SyncSummary", () => ({
   SyncSummary: () => <div data-testid="sync-summary-mounted" />,

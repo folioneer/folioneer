@@ -30,7 +30,7 @@ Free-form grouping defined by the user (e.g. "US Stocks", "European Real Estate"
 
 ### `currency`
 
-**Quotation** currency of the security (ISO 4217: USD, EUR, BTC…). It is the currency in which the asset price is expressed — distinct from the account's reference currency. E.g. an Apple stock quoted in USD in an account whose reference currency is EUR.
+**Quotation** currency of the security (ISO 4217: USD, EUR, BTC…). It is the currency in which the asset price is expressed — distinct from the account currency. E.g. an Apple stock quoted in USD in an account whose currency is EUR.
 
 ### `risk_level`
 

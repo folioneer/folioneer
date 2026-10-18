@@ -6,7 +6,7 @@ The Foreign Exchange Rate feature gives the system a representation of a **curre
 
 A rate is recorded per **directed currency pair** (`from_currency → to_currency`) and is timestamped: multiple entries accumulate over time, one per pair per date. Rates can be entered manually and fetched from an external provider. The Account Details and Account Performance read models use the most recently dated rate to convert foreign-currency market prices into the account currency.
 
-The `currency` context also owns the **portfolio settings**, starting with the reference currency every cross-account figure is reported in (GPF-011): see the PortfolioSetting entity and FXR-120 to FXR-125.
+The `currency` context also owns the **portfolio settings**, starting with the reference currency every cross-account figure is reported in (GPF-011): see the PortfolioSetting entity and FXR-120 to FXR-131.
 
 A currency pair is a **persisted, durable entity** once it exists. A pair starts being followed automatically — the moment a live holding (`quantity > 0`) exists whose asset currency differs from its account currency (FXR-013), or an account exists whose currency differs from the reference currency (FXR-015) — or by manual declaration in the Currency Rates view. Buying a USD asset inside a EUR account auto-creates and follows the `USD → EUR` pair (FXR-013). Once created a pair is **maintained even if nothing currently uses it** (e.g. the position later closes); it is not auto-removed. Pairs are few, so keeping them costs little; an explicit archive affordance is deferred to a later iteration.
 
@@ -84,7 +84,7 @@ This feature does not add fields to `HoldingDetail`; it changes the **conditions
 
 **FXR-014 — Pairs persist once created (backend)**: A `CurrencyPair` is retained once created, whether it arose by auto-follow (FXR-013, FXR-015) or manual declaration (FXR-012). It is **not** removed when the holdings that demanded it close (`quantity → 0`) or are deleted; the pair and its recorded rates remain available. V1 provides no removal or archive of a pair; an archive affordance is deferred to a later iteration. The one removal is not the user's: a device joining a shared portfolio has its pairs replaced by the portfolio's (SYN-083).
 
-**FXR-015 — Auto-follow an account's pair to the reference currency (backend)**: Every account whose currency differs from the reference currency (GPF-011) has the directed pair `(account_currency → reference_currency)` ensured as a persisted `CurrencyPair`, like a holding's pair (FXR-013): idempotent, kept once created (FXR-014). An account holding only its own currency therefore gets its rate to the reference currency, and the portfolio total does not stay partial for want of a pair nobody declared. The pair is ensured by every rate refresh — at launch, through "Update rates" and in the scheduled fetch (FXR-071, FXR-112, SPF-035); a change of the reference currency ensures its pairs when it is made (TODO-032, the choice in Settings).
+**FXR-015 — Auto-follow an account's pair to the reference currency (backend)**: Every account whose currency differs from the reference currency (GPF-011) has the directed pair `(account_currency → reference_currency)` ensured as a persisted `CurrencyPair`, like a holding's pair (FXR-013): idempotent, kept once created (FXR-014). An account holding only its own currency therefore gets its rate to the reference currency, and the portfolio total does not stay partial for want of a pair nobody declared. The pair is ensured by every rate refresh — at launch, through "Update rates" and in the scheduled fetch (FXR-071, FXR-112, SPF-035); a change of the reference currency fetches them when it is made (FXR-130).
 
 ### Recording a Rate Manually (020–029)
 
@@ -210,7 +210,7 @@ Historical valuations (yearly/monthly performance, as-of-date views) need a rate
 
 **FXR-102 — source: provider on fetched paths (backend)**: A write produced by the Frankfurter tier sets `source = Frankfurter`; a write produced by the ECB XML fallback sets `source = Ecb` (FXR-070).
 
-### Portfolio Settings (120–129)
+### Portfolio Settings and the Reference Currency (120–139)
 
 **FXR-120 — A setting is replaced (backend)**: Setting a portfolio setting replaces its value.
 
@@ -223,6 +223,18 @@ Historical valuations (yearly/monthly performance, as-of-date views) need a rate
 **FXR-124 — A malformed synced value (backend)**: A reference currency another device synced that is not a recognised ISO 4217 code (as FXR-023) is read as the default (FXR-122), so no total breaks on it.
 
 **FXR-125 — An unknown setting is kept (backend)**: A setting whose name this device does not know is kept as it arrived.
+
+**FXR-126 — A choice is announced (backend + frontend)**: Choosing the reference currency publishes `ReferenceCurrencyUpdated`; the portfolio total of the account table (ACC-030) and the global performance view (GPF-011) re-read on it, so every figure that spans accounts is given in the currency chosen; a price movement report already shown stays as it was (PMV-017), the next one is in the new currency. A device that receives the choice by sync re-reads the same views on the sync's own signal (SYN-064) and fetches the new pairs at its next rate refresh (FXR-015, FXR-071).
+
+**FXR-127 — The choices (backend)**: Every ISO 4217 code is offered for the reference currency, in code order.
+
+**FXR-128 — New forms start in it (frontend)**: The new-account form starts with the reference currency as its currency, and so does the new-asset form when no lookup gave one; either can be changed before saving.
+
+**FXR-129 — The reference currency in Settings (frontend)**: Settings shows the reference currency as a list of the codes FXR-127 offers, each with its name in the window's language ("CHF — Swiss franc"), the current one selected, and the help line "The portfolio's totals, performance and price movements are given in this currency, on every computer of the sync."
+
+**FXR-130 — Choosing another (frontend)**: Choosing another code stores it (FXR-120), then fetches every followed pair's rate history from the earliest transaction to today, as "Update rates" does (FXR-111, FXR-112) — the new pairs of FXR-015 included —, saying "Fetching the rate histories…" meanwhile; the list accepts no other choice until both are done, then simply shows the new currency.
+
+**FXR-131 — A choice that fails (frontend)**: A refused choice (FXR-123) puts the previous currency back and says why; a fetch that fails (FXR-114) says so and keeps the choice.
 
 ---
 
@@ -280,7 +292,7 @@ Update rates (FXR-110)
 
 ### Entry Point
 
-A dedicated **Currency Rates** view (FXR-051) lets the user view, add, edit, and delete rates, mirroring the asset-price history surface. The conversion itself is invisible — foreign-currency holdings simply start showing real numbers in Account Details instead of "—". A foreign-currency holding row's "—" is also a shortcut into a pre-filled manual-entry form (FXR-012). Rates refresh silently at every launch (FXR-075); "Update rates" fills every day up to today on demand (FXR-110).
+A dedicated **Currency Rates** view (FXR-051) lets the user view, add, edit, and delete rates, mirroring the asset-price history surface. The conversion itself is invisible — foreign-currency holdings simply start showing real numbers in Account Details instead of "—". A foreign-currency holding row's "—" is also a shortcut into a pre-filled manual-entry form (FXR-012). Rates refresh silently at every launch (FXR-075); "Update rates" fills every day up to today on demand (FXR-110). The reference currency is chosen in Settings (FXR-129); the new-account and new-asset forms start in it (FXR-128).
 
 ### Main Component
 
@@ -291,6 +303,7 @@ The Currency Rates view (a page), structured like the Asset catalog: a list of d
 - **Empty**: foreign-currency holdings show "—" until a rate exists (FXR-034); a hint points to recording or fetching a rate.
 - **Loading**: "Update rates" shows a pending indicator while it runs (FXR-110).
 - **Error**: inline validation errors on the manual form (FXR-029); a failed "Update rates" surfaces via snackbar (FXR-114).
+- **Reference currency**: while a new choice's rate histories are fetched, Settings says so and takes no other choice (FXR-130); a refused choice reverts with its reason, a failed fetch is said (FXR-131).
 - **Success**: foreign-currency holdings show converted P&L, performance %, total return, and contribute to Global Value; a staleness label indicates the rate's age (FXR-090).
 
 ### User Flow

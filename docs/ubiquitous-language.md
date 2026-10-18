@@ -222,7 +222,7 @@ A system-seeded `Asset` of `class = AssetClass::Cash`, one per ISO currency, wit
 
 > Status: confirmed
 
-A `Holding` whose asset is a Cash Asset. Represents the cash balance held in the account in the account's reference currency. Exactly one Cash Holding per account, created together with the account at a zero balance and kept for the account's lifetime — when the account holds no cash it stays at zero rather than disappearing.
+A `Holding` whose asset is a Cash Asset. Represents the cash balance held in the account in the account currency. Exactly one Cash Holding per account, created together with the account at a zero balance and kept for the account's lifetime — when the account holds no cash it stays at zero rather than disappearing.
 
 ### Global Value
 
@@ -254,7 +254,7 @@ The share of an account's Global Value that one holding represents, as a percent
 
 > Status: confirmed
 
-Cumulative cash dividend income attributed to a holding, in the account's reference currency. Per-holding (`HoldingDetail.dividends_received`, Σ of `Dividend` total_amount for the `(account, asset)` pair, DIV-070) and per-account (`AccountDetailsResponse.total_dividends_received`, Σ across all dividends, DIV-073). Reported separately from realized P&L — a dividend is income, not a capital gain.
+Cumulative cash dividend income attributed to a holding, in the account currency. Per-holding (`HoldingDetail.dividends_received`, Σ of `Dividend` total_amount for the `(account, asset)` pair, DIV-070) and per-account (`AccountDetailsResponse.total_dividends_received`, Σ across all dividends, DIV-073). Reported separately from realized P&L — a dividend is income, not a capital gain.
 
 ### Total Return
 
@@ -297,6 +297,12 @@ Where a currency rate came from: `Manual` (entered by the user), or `Frankfurter
 > Status: confirmed
 
 ---
+
+### Account currency
+
+The currency an account is kept in, chosen when the account is created: its holdings, cash and figures are valued in it. Distinct from the portfolio's "reference currency". In French: "devise du compte" (owner, 2026-10-17).
+
+> Status: confirmed
 
 ### Reference currency
 
@@ -379,7 +385,7 @@ A recurring rule, one per `(account, asset)`, that generates Management Fee Dedu
 
 > Status: confirmed
 
-The cumulative cost of Management Fee Deductions attributed to a holding, in the account's reference currency — each deduction valued at the market price as of its own date. Per-holding and per-account figures shown on Account Details. Named to distinguish it from the brokerage-commission `fees` field on a `Transaction`.
+The cumulative cost of Management Fee Deductions attributed to a holding, in the account currency — each deduction valued at the market price as of its own date. Per-holding and per-account figures shown on Account Details. Named to distinguish it from the brokerage-commission `fees` field on a `Transaction`.
 
 ---
 

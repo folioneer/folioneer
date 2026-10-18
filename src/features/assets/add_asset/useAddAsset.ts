@@ -31,14 +31,19 @@ interface AddAssetFields {
   interest_bearing: boolean;
 }
 
-function emptyFields(kind: AssetKind, prefill?: AssetLookupResult): AddAssetFields {
+/** FXR-128 — a new asset's currency is the lookup's, else the reference currency. */
+function emptyFields(
+  kind: AssetKind,
+  referenceCurrency: string,
+  prefill?: AssetLookupResult,
+): AddAssetFields {
   const assetClass = classForKind(kind, prefill?.asset_class);
   return {
     name: prefill?.name ?? "",
     reference: prefill?.reference ?? "",
     isin: prefill?.isin ?? "",
     class: assetClass,
-    currency: prefill?.currency ?? "EUR",
+    currency: prefill?.currency ?? referenceCurrency,
     risk_level: defaultRiskOf(assetClass),
     category_id: DEFAULT_CATEGORY_ID,
     exchange: prefill?.exchange ?? null,
@@ -55,7 +60,10 @@ export function useAddAsset({ kind, onSubmitSuccess, prefill }: UseAddAssetProps
   const categories = useAppStore((s) => s.categories);
   const kindForm = kindFormOf(kind);
 
-  const [fields, setFields] = useState<AddAssetFields>(() => emptyFields(kind, prefill));
+  const referenceCurrency = useAppStore((s) => s.referenceCurrency);
+  const [fields, setFields] = useState<AddAssetFields>(() =>
+    emptyFields(kind, referenceCurrency, prefill),
+  );
   const [referenceTyped, setReferenceTyped] = useState(!!prefill?.reference);
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -155,7 +163,7 @@ export function useAddAsset({ kind, onSubmitSuccess, prefill }: UseAddAssetProps
       onSubmitSuccess(result.data.id);
     }
 
-    setFields(emptyFields(kind));
+    setFields(emptyFields(kind, referenceCurrency));
     setReferenceTyped(false);
   };
 

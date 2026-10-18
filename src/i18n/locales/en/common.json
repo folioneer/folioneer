@@ -249,7 +249,10 @@
     },
     "agents_allowed_label": "Allow agents to connect",
     "agents_allowed_description": "An agent on this computer (Claude Code, Claude Desktop) may ask to read and record in your portfolio while Folioneer is open. Each connection waits for your answer. Off: nothing can connect.",
-    "agents_unavailable_description": "Not available on this system yet. Nothing can connect."
+    "agents_unavailable_description": "Not available on this system yet. Nothing can connect.",
+    "reference_currency_label": "Reference currency",
+    "reference_currency_help": "The portfolio's totals, performance and price movements are given in this currency, on every computer of the sync.",
+    "reference_currency_fetching": "Fetching the rate histories…"
   },
   "agent": {
     "connection_title": "An agent asks to connect",

@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Asset, AssetKind, AssetLookupResult, Exchange } from "@/bindings";
+import { useAppStore } from "@/lib/store";
 import { DEFAULT_CATEGORY_ID, defaultRiskOf, kindFormOf } from "../shared/creationDefaults";
 import { useAddAsset } from "./useAddAsset";
 
@@ -281,5 +282,14 @@ describe("useAddAsset", () => {
     expect(result.current.formData.name).toBe("");
     expect(result.current.formData.exchange).toBeNull();
     expect(result.current.formData.interest_bearing).toBe(false);
+  });
+});
+
+describe("useAddAsset — reference currency (FXR-128)", () => {
+  it("starts a new asset in the reference currency when no lookup gave one", () => {
+    useAppStore.setState({ referenceCurrency: "CHF" });
+    const { result } = renderHook(() => useAddAsset({ kind: "Custom" }));
+    expect(result.current.formData.currency).toBe("CHF");
+    useAppStore.setState({ referenceCurrency: "EUR" });
   });
 });

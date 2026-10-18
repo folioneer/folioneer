@@ -1,4 +1,5 @@
 use crate::context::currency::domain::cross_rate::cross_rate_micros;
+use crate::context::currency::domain::currency_codes;
 use crate::context::currency::domain::currency_pair::validate_iso4217;
 use crate::context::currency::domain::rate_provider::{
     EurSnapshot, RateHistoryProvider, RateProvider,
@@ -6,7 +7,7 @@ use crate::context::currency::domain::rate_provider::{
 use crate::context::currency::domain::{
     CurrencyPair, CurrencyPairRepository, CurrencyPairSummary, CurrencyRate,
     CurrencyRateRepository, CurrencyRateSource, PortfolioSetting, PortfolioSettingRepository,
-    DEFAULT_REFERENCE_CURRENCY, REFERENCE_CURRENCY_SETTING,
+    ReferenceCurrency, DEFAULT_REFERENCE_CURRENCY, REFERENCE_CURRENCY_SETTING,
 };
 use crate::context::currency::error::CurrencyError;
 use crate::core::{Event, SideEffectEventBus, BACKEND};
@@ -100,6 +101,19 @@ impl CurrencyService {
         .map_err(|e| {
             tracing::error!(target: BACKEND, err = ?e, "set_reference_currency: repository failure");
             CurrencyError::DatabaseError
+        })?;
+        // FXR-126 — every total re-reads in the currency chosen.
+        if let Some(bus) = &self.event_bus {
+            bus.publish(Event::ReferenceCurrencyUpdated);
+        }
+        Ok(())
+    }
+
+    /// FXR-127 — the reference currency, with every code it may be set to.
+    pub async fn reference_currency_choice(&self) -> StdResult<ReferenceCurrency, CurrencyError> {
+        Ok(ReferenceCurrency {
+            currency: self.reference_currency().await?,
+            choices: currency_codes(),
         })
     }
 
@@ -2552,6 +2566,56 @@ mod tests {
             .pop()
             .expect("CurrencyPairUpdated not received within 200ms");
         assert_eq!(event, Event::CurrencyPairUpdated);
+    }
+
+    // FXR-126 — choosing the reference currency announces it, so every total re-reads.
+    #[tokio::test]
+    async fn fxr_126_setting_the_reference_currency_publishes_reference_currency_updated() {
+        let mut settings = crate::context::currency::domain::MockPortfolioSettingRepository::new();
+        settings.expect_set().times(1).returning(|_| Ok(()));
+        let bus = Arc::new(SideEffectEventBus::new());
+        let mut rx = bus.subscribe();
+        let svc = make_service(
+            MockCurrencyPairRepository::new(),
+            MockCurrencyRateRepository::new(),
+        )
+        .with_setting_repo(Box::new(settings))
+        .with_event_bus(Arc::clone(&bus));
+
+        svc.set_reference_currency("CHF")
+            .await
+            .expect("a valid code is stored");
+
+        let event = rx
+            .drain()
+            .pop()
+            .expect("ReferenceCurrencyUpdated published");
+        assert_eq!(event, Event::ReferenceCurrencyUpdated);
+    }
+
+    // FXR-127 — the read gives the reference currency and every ISO 4217 code to choose from,
+    // in code order.
+    #[tokio::test]
+    async fn fxr_127_the_reference_currency_comes_with_every_code_to_choose_from() {
+        let mut settings = crate::context::currency::domain::MockPortfolioSettingRepository::new();
+        settings
+            .expect_get()
+            .returning(|_| Ok(Some("CHF".to_string())));
+        let svc = make_service(
+            MockCurrencyPairRepository::new(),
+            MockCurrencyRateRepository::new(),
+        )
+        .with_setting_repo(Box::new(settings));
+
+        let choice = svc.reference_currency_choice().await.expect("read");
+        assert_eq!(choice.currency, "CHF");
+        assert!(choice.choices.len() > 150, "every ISO 4217 code is offered");
+        assert!(["CHF", "EUR", "GBP", "USD"]
+            .iter()
+            .all(|code| choice.choices.iter().any(|choice| choice == code)));
+        let mut sorted = choice.choices.clone();
+        sorted.sort();
+        assert_eq!(choice.choices, sorted);
     }
 
     // FXR-054 — a rejected pair announces nothing: the bus never fires.
