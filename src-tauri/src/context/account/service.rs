@@ -2240,6 +2240,16 @@ pub trait AccountServiceContract: Send + Sync {
         reason: WriteOffReason,
         note: Option<String>,
     ) -> StdResult<Transaction, AccountError>;
+    /// Corrects a write-off's date, quantity, reason and note, the holding replayed (WOF-030).
+    async fn correct_write_off(
+        &self,
+        account_id: &str,
+        tx_id: &str,
+        date: String,
+        quantity: i64,
+        reason: WriteOffReason,
+        note: Option<String>,
+    ) -> StdResult<Transaction, AccountError>;
     /// Records a stock split rescaling a held position (SPL-010/020).
     async fn record_split(
         &self,
@@ -2688,6 +2698,19 @@ impl AccountServiceContract for AccountService {
         note: Option<String>,
     ) -> StdResult<Transaction, AccountError> {
         AccountService::record_write_off(self, account_id, asset_id, date, quantity, reason, note)
+            .await
+    }
+
+    async fn correct_write_off(
+        &self,
+        account_id: &str,
+        tx_id: &str,
+        date: String,
+        quantity: i64,
+        reason: WriteOffReason,
+        note: Option<String>,
+    ) -> StdResult<Transaction, AccountError> {
+        AccountService::correct_write_off(self, account_id, tx_id, date, quantity, reason, note)
             .await
     }
 

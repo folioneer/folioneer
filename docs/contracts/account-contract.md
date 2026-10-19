@@ -127,6 +127,20 @@
 | -------------------- | --------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `record_free_shares` | `FreeSharesDTO` | `Transaction` | `AccountNotFound { account_id }` (FSD-011), `AssetNotFound` (FSD-011), `AssetNotHeld` (FSD-011 — no active holding, `quantity = 0` or never held), `FreeSharesOnCashAsset` (FSD-011 — asset is a Cash Asset), `QuantityNotPositive` (FSD-021), `InvalidDate` (FSD-021), `DateInFuture` (FSD-021), `DateTooOld` (FSD-021), `DatabaseError` |
 
+### Write-off
+
+> `record_write_off` takes a quantity out of a held asset without proceeds, at its cost, no cash
+> moving (WOF-020/021); it runs the same use case as the agent connection's tool (WOF-056,
+> AGT-065), its error `WriteOffError` being `AccountError` plus the use case's `AssetNotFound`
+> and `ArchivedAsset`. `correct_write_off` corrects a write-off's date, quantity, reason and note
+> (WOF-030); the reason is one of `NetworkFee`, `Dust`, `Lost`, `Other` (`WriteOffReason`).
+> Delete reuses `cancel_transaction` (WOF-040).
+
+| Command             | Args                 | Return        | Errors                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------- | -------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `record_write_off`  | `WriteOffDTO`        | `Transaction` | `AccountNotFound { account_id }` (WOF-010), `AssetNotFound` (WOF-010 — unknown asset), `ArchivedAsset` (WOF-010), `TradeOnCashAsset` (WOF-010 — a Cash Asset), `ClosedPosition` (WOF-010 — nothing held on the date), `Oversell { available, requested }` (WOF-010 — `available` is held on the date), `CascadingOversell` (WOF-012), `SplitCollapsesPosition` (SPL-021 — before a later reverse split), `QuantityNotPositive` (WOF-011), `InvalidDate` (WOF-011), `DateInFuture` (WOF-011), `DateTooOld` (WOF-011), `DatabaseError` |
+| `correct_write_off` | `CorrectWriteOffDTO` | `Transaction` | `AccountNotFound { account_id }` (WOF-030), `TransactionNotFound` (WOF-030 — unknown id, or not a write-off), `CascadingOversell` (WOF-030, WOF-012 — a quantity above what is held, a date on which the asset is not held, or a later sale or write-off left short), `ClosedPosition` / `SplitCollapsesPosition` (SPL-030 — before a later split), `QuantityNotPositive`, `InvalidDate`, `DateInFuture`, `DateTooOld` (WOF-011), `DatabaseError`                                                                                    |
+
 > `record_split` rescales the position of a held asset by a factor (SPL-010/020): the quantity
 > is multiplied, the cost basis is unchanged, no cash moves. Edit / delete reuse
 > `correct_transaction` / `cancel_transaction` (SPL-030).
@@ -365,6 +379,27 @@ struct FreeSharesDTO {
     asset_id: String,       // the distributing asset (must be an active, non-cash holding — FSD-011)
     date: String,           // ISO date YYYY-MM-DD; same TRX-020 / FSD-021 bounds as buy/sell
     quantity: i64,          // micro-units; free shares received; strictly positive (FSD-021)
+    note: Option<String>,
+}
+
+// A quantity that leaves a holding without proceeds (WOF-020). No amount, no unit price, no
+// exchange rate, no fees; the backend takes it out at its cost and touches no cash.
+struct WriteOffDTO {
+    account_id: String,
+    asset_id: String,       // held on the date, not a Cash Asset, not archived (WOF-010)
+    date: String,           // ISO date YYYY-MM-DD; TRX-020 bounds (WOF-011)
+    quantity: i64,          // micro-units; strictly positive (WOF-011)
+    reason: WriteOffReason, // NetworkFee | Dust | Lost | Other
+    note: Option<String>,
+}
+
+// The corrected fields of a write-off (WOF-030); its asset is fixed.
+struct CorrectWriteOffDTO {
+    account_id: String,
+    transaction_id: String, // a write-off of the account
+    date: String,           // ISO date YYYY-MM-DD (WOF-011)
+    quantity: i64,          // micro-units; strictly positive (WOF-011)
+    reason: WriteOffReason,
     note: Option<String>,
 }
 ```
@@ -769,6 +804,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-10-19 — #551 (WOF-056): `record_write_off` (`WriteOffDTO`, `WriteOffError`) and `correct_write_off` (`CorrectWriteOffDTO`), over the agent connection's use case.
 - 2026-10-19 — #550 (WOF): `TransactionType` gains `WriteOff`, `Transaction` gains `write_off_reason` with the new `WriteOffReason` type, `HoldingDetail` gains `realized_lost`. No command added: the window's commands and their rows come with #551, the agent's with #552; `correct_transaction` and `cancel_transaction` cite WOF-032 / WOF-040.
 - 2026-10-19 — #529 (MKT-231): `HoldingDetail.unrecorded_splits` and the `UnrecordedSplit { date: String, new: i64, old: i64 }` type, a read model of the split factor new : old (SPL-062). No command changed.
 - 2026-10-18 — TODO-091 (ACC-040, ACC-043): `WrapperLists.countries` holds every country; `offered` only the portfolio's and the listed countries; `WrapperNotAvailable` now means a wrapper the lists do not hold, any known wrapper fitting any country.

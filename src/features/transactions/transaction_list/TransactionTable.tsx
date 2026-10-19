@@ -75,16 +75,17 @@ export function TransactionTable({
         </thead>
         <tbody>
           {rows.map((row) => {
-            // FSD-050 / FEE-055 / SPL-060 / INT-030 — a free-share distribution, a
-            // management-fee deduction, a stock split, or an interest credit moves no
-            // money: the unit-price and total-amount columns render the neutral
+            // FSD-050 / FEE-055 / SPL-060 / INT-030 / WOF-057 — a free-share distribution,
+            // a management-fee deduction, a stock split, an interest credit or a write-off
+            // moves no money: the unit-price and total-amount columns render the neutral
             // placeholder (the quantity column still shows the credited/removed
             // units, or the ×N ratio label for a split).
             const isQuantityOnly =
               row.type === "FreeShares" ||
               row.type === "ManagementFee" ||
               row.type === "Split" ||
-              row.type === "Interest";
+              row.type === "Interest" ||
+              row.type === "WriteOff";
             const moneyDash = (
               <span className="text-m3-on-surface-variant">
                 {t("account_details.pnl_placeholder")}
@@ -92,7 +93,11 @@ export function TransactionTable({
             );
             return (
               <tr key={row.id} id={`txl-row-${row.id}`} className="m3-tr">
-                <td className="m3-td">{t(`transaction.type_${row.type.toLowerCase()}`)}</td>
+                <td id={`txl-type-${row.id}`} className="m3-td">
+                  {t(`transaction.type_${row.type.toLowerCase()}`)}
+                  {/* WOF-057 — a write-off reads with its reason */}
+                  {row.writeOffReason && ` · ${t(`write_off.short_reason_${row.writeOffReason}`)}`}
+                </td>
                 {showAssetColumn && (
                   <td id={`txl-asset-${row.id}`} className="m3-td">
                     {row.assetName}

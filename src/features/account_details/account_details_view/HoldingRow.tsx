@@ -9,6 +9,7 @@ import {
   Hand,
   History,
   Minus,
+  PackageMinus,
   Percent,
   Plus,
   RefreshCw,
@@ -30,13 +31,15 @@ import {
   hasNoPeriodFigure,
   selectPerformanceCell,
 } from "../shared/presenter";
-import type { ModalTarget, SellTarget, SplitTarget } from "../shared/types";
+import type { ModalTarget, SellTarget, SplitTarget, WriteOffTarget } from "../shared/types";
 
 type HoldingRowProps = {
   row: HoldingRowViewModel;
   accountId: string;
   onBuy: (target: ModalTarget) => void;
   onSell: (target: SellTarget) => void;
+  /** WOF-050 — open the write-off form for this holding. */
+  onWriteOff?: (target: WriteOffTarget) => void;
   onPriceHistory: (assetId: string) => void;
   /** Cash variant — open Deposit modal (CSH-091). */
   onDeposit?: () => void;
@@ -68,6 +71,7 @@ export function HoldingRow({
   accountId,
   onBuy,
   onSell,
+  onWriteOff,
   onPriceHistory,
   onDeposit,
   onWithdraw,
@@ -105,6 +109,16 @@ export function HoldingRow({
   const handleSell = useCallback(() => {
     onSell({ ...buildTarget(), holdingQuantityMicro: row.quantityMicro });
   }, [onSell, buildTarget, row.quantityMicro]);
+
+  const handleWriteOff = useCallback(() => {
+    onWriteOff?.({
+      assetId: row.assetId,
+      assetName: row.assetName,
+      assetReference: row.assetReference,
+      quantityMicro: row.quantityMicro,
+      averagePriceMicro: row.averagePriceMicro,
+    });
+  }, [onWriteOff, row]);
 
   const handleViewTransactions = useCallback(() => {
     navigate({
@@ -291,6 +305,16 @@ export function HoldingRow({
                 onClick={handleSell}
                 disabled={isArchived}
               />
+              {/* WOF-050 — Write-off action, after Sell (non-cash active rows; hidden for archived assets) */}
+              {onWriteOff && !isArchived && (
+                <IconButton
+                  icon={<PackageMinus size={16} />}
+                  size="sm"
+                  id={`action-write-off-${row.assetId}`}
+                  aria-label={t("transaction.action_write_off")}
+                  onClick={handleWriteOff}
+                />
+              )}
               {/* SPL-061 — Split action (non-cash active rows; hidden for archived assets) */}
               {onSplit && !isArchived && (
                 <IconButton
@@ -451,6 +475,15 @@ export function HoldingRow({
       {/* SEL-042 — Realized P&L */}
       <td className="m3-td text-right">
         <PnlCell value={row.realizedPnl} raw={row.realizedPnlRaw} />
+        {/* WOF-059 — the lost part of the realized P&L, when there is one */}
+        {row.realizedLost !== null && (
+          <div
+            id={`holding-realized-lost-${row.assetId}`}
+            className="text-xs text-m3-on-surface-variant"
+          >
+            {t("account_details.realized_lost", { amount: row.realizedLost })}
+          </div>
+        )}
       </td>
       {/* MKT-030 — Current price; MKT-032 diagnostic states; MKT-140 staleness; MKT-142 source badge */}
       <td id={`holding-current-price-${row.assetId}`} className="m3-td text-right tabular-nums">

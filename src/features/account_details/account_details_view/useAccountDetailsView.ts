@@ -20,7 +20,13 @@ import {
   priceRefreshBlockedErrorToI18n,
   toPriceableAssets,
 } from "../shared/presenter";
-import type { HoldingNoteTarget, ModalTarget, SellTarget, SplitTarget } from "../shared/types";
+import type {
+  HoldingNoteTarget,
+  ModalTarget,
+  SellTarget,
+  SplitTarget,
+  WriteOffTarget,
+} from "../shared/types";
 import { useAccountDetails } from "./useAccountDetails";
 
 /**
@@ -90,6 +96,7 @@ export function useAccountDetailsView(accountId: string) {
     assetName: string;
   } | null>(null);
   const [splitTarget, setSplitTarget] = useState<SplitTarget | null>(null);
+  const [writeOffTarget, setWriteOffTarget] = useState<WriteOffTarget | null>(null);
   const [holdingNoteTarget, setHoldingNoteTarget] = useState<HoldingNoteTarget | null>(null);
 
   // ---------------------------------------------------------------------------
@@ -250,6 +257,20 @@ export function useAccountDetailsView(accountId: string) {
   const handleSplitClose = useCallback(() => setSplitTarget(null), []);
   const handleSplitSuccess = useCallback(() => {
     setSplitTarget(null);
+    data.retry();
+  }, [data]);
+
+  // WOF-050 — write-off form, opened per holding from its row action.
+  const handleWriteOffOpen = useCallback(
+    (target: WriteOffTarget) => {
+      if (isAsOf) return;
+      setWriteOffTarget(target);
+    },
+    [isAsOf],
+  );
+  const handleWriteOffClose = useCallback(() => setWriteOffTarget(null), []);
+  const handleWriteOffSuccess = useCallback(() => {
+    setWriteOffTarget(null);
     data.retry();
   }, [data]);
 
@@ -433,6 +454,7 @@ export function useAccountDetailsView(accountId: string) {
     interestOpen,
     feeScheduleTarget,
     splitTarget,
+    writeOffTarget,
     holdingNoteTarget,
     // Handlers
     handleAddTransaction,
@@ -472,6 +494,9 @@ export function useAccountDetailsView(accountId: string) {
     handleSplitOpen,
     handleSplitClose,
     handleSplitSuccess,
+    handleWriteOffOpen,
+    handleWriteOffClose,
+    handleWriteOffSuccess,
     handleHoldingNoteOpen,
     handleHoldingNoteClose,
     handleHoldingNoteSuccess,

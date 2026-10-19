@@ -3,6 +3,7 @@ import type {
   OpenHoldingError,
   Transaction,
   TransactionDraftError,
+  WriteOffReason,
 } from "@/bindings";
 import { microToFormatted, microToFormattedFactor } from "@/lib/microUnits";
 import type { I18nMessage } from "@/ui/format/i18n";
@@ -108,6 +109,8 @@ export interface TransactionRowViewModel {
   accountName: string;
   /** Transaction type label (e.g. "Purchase"). */
   type: string;
+  /** WOF-057 — a write-off's reason, read with its type; null or undefined for other types. */
+  writeOffReason?: WriteOffReason | null;
   date: string;
   /** Formatted quantity string (3 decimal places). */
   quantity: string;
@@ -163,6 +166,7 @@ export function toTransactionRow(
     assetName,
     accountName,
     type: tx.transaction_type,
+    writeOffReason: tx.write_off_reason ?? null,
     date: tx.date,
     quantity:
       tx.transaction_type === "Split"

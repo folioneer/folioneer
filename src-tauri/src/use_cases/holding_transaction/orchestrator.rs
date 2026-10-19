@@ -875,6 +875,25 @@ impl HoldingTransactionUseCase {
             .map_err(WriteOffError::Account)
     }
 
+    /// Corrects a write-off's date, quantity, reason and note (WOF-030); seeds the system
+    /// Cash Asset, as `correct_transaction` does, since the replay re-evaluates the cash
+    /// holding; the account BC checks the corrected history again.
+    pub async fn correct_write_off(
+        &self,
+        account_id: &str,
+        transaction_id: &str,
+        date: String,
+        quantity: i64,
+        reason: WriteOffReason,
+        note: Option<String>,
+    ) -> Result<Transaction, AccountError> {
+        self.ensure_cash_for(account_id, "correct_write_off")
+            .await?;
+        self.account_service
+            .correct_write_off(account_id, transaction_id, date, quantity, reason, note)
+            .await
+    }
+
     /// AGT-072 — what recording a write-off would do, nothing written, with its checks.
     pub async fn preview_write_off(
         &self,
@@ -2476,6 +2495,78 @@ mod tests {
         assert!(
             matches!(err, WriteOffError::UseCase(WriteOffTask::AssetNotFound)),
             "expected UseCase(AssetNotFound), got: {err:?}"
+        );
+    }
+
+    // WOF-030 / WOF-056 — the window corrects a write-off's quantity and reason through
+    // the use case, the holding replayed.
+    #[tokio::test]
+    async fn wof_056_a_write_off_is_corrected_with_its_reason() {
+        let pool = setup_pool().await;
+        let (account_svc, asset_svc) = make_services(&pool);
+        let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
+        let account = account_svc
+            .create(
+                "Acc".to_string(),
+                String::new(),
+                "USD".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .unwrap();
+        let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
+        uc.open_holding(
+            &account.id,
+            asset.id.clone(),
+            "2024-01-10".to_string(),
+            micro(10),
+            micro(1000),
+        )
+        .await
+        .unwrap();
+        let written_off = uc
+            .record_write_off(
+                &account.id,
+                asset.id.clone(),
+                "2024-06-15".to_string(),
+                micro(1),
+                WriteOffReason::Dust,
+                None,
+            )
+            .await
+            .unwrap();
+
+        let corrected = uc
+            .correct_write_off(
+                &account.id,
+                &written_off.id,
+                "2024-06-16".to_string(),
+                micro(2),
+                WriteOffReason::Lost,
+                Some("seed lost".to_string()),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(corrected.id, written_off.id);
+        assert_eq!(corrected.quantity, micro(2));
+        assert_eq!(corrected.write_off_reason, Some(WriteOffReason::Lost));
+        assert_eq!(corrected.realized_pnl, Some(-micro(200)));
+        let refused = uc
+            .correct_write_off(
+                &account.id,
+                &written_off.id,
+                "2024-06-16".to_string(),
+                micro(11),
+                WriteOffReason::Lost,
+                None,
+            )
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(refused, AccountError::CascadingOversell),
+            "expected CascadingOversell, got: {refused:?}"
         );
     }
 

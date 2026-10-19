@@ -188,6 +188,8 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             holding_transaction::record_withdrawal,
             holding_transaction::record_dividend,
             holding_transaction::record_free_shares,
+            holding_transaction::record_write_off,
+            holding_transaction::correct_write_off,
             holding_transaction::record_split,
             holding_transaction::record_management_fee,
             holding_transaction::preview_management_fee,

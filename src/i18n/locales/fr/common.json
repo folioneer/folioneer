@@ -588,7 +588,8 @@
     "error_load_assets": "Erreur lors du chargement de la liste des actifs.",
     "column_recorded_by": "Enregistré par",
     "recorded_by_agent": "{{agent}} · session du {{when}}",
-    "recorded_by_session": "session du {{when}}"
+    "recorded_by_session": "session du {{when}}",
+    "action_write_off": "Sortie sans contrepartie"
   },
   "account_details": {
     "title": "Détails du compte",
@@ -612,7 +613,6 @@
     "error_load": "Erreur lors du chargement des détails",
     "loading": "Chargement...",
     "closed_positions_header": "Positions clôturées",
-    "column_last_sold_date": "Dernière vente",
     "column_current_price": "Prix actuel",
     "column_unrealized_pnl": "P&L latent",
     "column_performance_pct": "Performance",
@@ -651,7 +651,9 @@
     "as_of_date_label": "À la date du",
     "as_of_today_placeholder": "Aujourd'hui",
     "as_of_banner": "Affichage à la date du {{date}}",
-    "as_of_back_to_today": "Revenir à aujourd'hui"
+    "as_of_back_to_today": "Revenir à aujourd'hui",
+    "column_closed_on": "Clôturée le",
+    "realized_lost": "dont perdu : {{amount}}"
   },
   "account_performance": {
     "title": "Performance",
@@ -826,6 +828,29 @@
     "form_quantity_placeholder": "0",
     "action_record": "Enregistrer les actions gratuites",
     "recorded": "Actions gratuites enregistrées."
+  },
+  "write_off": {
+    "modal_title": "Sortie sans contrepartie",
+    "holding_line": "détenu {{quantity}} {{reference}} à un prix moyen de {{price}}",
+    "asset_label": "Actif :",
+    "form_reason_label": "Motif",
+    "reason_NetworkFee": "Frais de réseau payés dans l'actif",
+    "reason_Dust": "Reste d'une conversion",
+    "reason_Lost": "Perdu ou envoyé vers un portefeuille non suivi",
+    "reason_Other": "Autre",
+    "short_reason_NetworkFee": "Frais de réseau",
+    "short_reason_Dust": "Reste",
+    "short_reason_Lost": "Perdu",
+    "short_reason_Other": "Autre",
+    "form_quantity_label": "Quantité sortie",
+    "estimate": "Sort {{quantity}} {{reference}} à son coût, {{cost}}. Aucun mouvement d'espèces ; le résultat réalisé est −{{cost}}.",
+    "estimate_lost": "Sort {{quantity}} {{reference}} à son coût, {{cost}}. Aucun mouvement d'espèces ; le résultat réalisé est −{{cost}}, montré à part comme perdu.",
+    "error_over_held": "Plus que les {{held}} {{reference}} détenus à cette date.",
+    "error_over_holding": "Plus que les {{held}} {{reference}} détenus.",
+    "error_closed_position": "Rien de cet actif n'est détenu à cette date.",
+    "error_archived": "L'actif est archivé : désarchivez-le pour enregistrer la sortie.",
+    "action_record": "Enregistrer la sortie",
+    "recorded": "Sortie enregistrée."
   },
   "interest": {
     "modal_title": "Enregistrer des intérêts",

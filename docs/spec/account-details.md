@@ -177,7 +177,7 @@ UPDATE holdings SET
 
 **ACD-047 — Closed positions section visibility (frontend)**: A "Closed positions" section is rendered below the active holdings table only when `closed_holdings` is non-empty. When the list is empty, no section header or table is rendered.
 
-**ACD-048 — Closed positions table columns (frontend)**: The closed positions table displays three columns: Asset (name + ticker), Realized P&L, Last sold date. Quantity, average price, and cost basis columns are omitted — they carry no meaning for a position with `quantity = 0`.
+**ACD-048 — Closed positions table columns (frontend)**: The closed positions table displays three columns: Asset (name + ticker), Realized P&L, Closed on (FR « Clôturée le ») — the date of the last sale or write-off (ACD-043, WOF-021; owner, 2026-10-19). Quantity, average price, and cost basis columns are omitted — they carry no meaning for a position with `quantity = 0`.
 
 **ACD-049 — Closed positions row actions (frontend)**: Each closed position row exposes two actions: the inspect action (per ACD-042) to navigate to the transaction history for that asset, and the price history backfill action (MKT-190). Buy (+) and Sell (−) action buttons are not shown for closed positions.
 
@@ -223,14 +223,14 @@ UPDATE holdings SET
   - Asset (Name + Ticker)
   - Quantity
   - Avg. Price
-  - Realized P&L (`—` when zero or no sells)
+  - Realized P&L (`—` when zero or no sells or write-offs), with "of which lost:" under it (WOF-059)
   - Current Price (MKT-031)
   - Current Value (current price × quantity, asset currency; `—` when no price — MKT-143)
   - Weight % (share of the Global Value; `—` when none — ACD-052)
-  - Actions: Buy, Sell, Inspect
+  - Actions: Buy, Sell, Write off (WOF-050), Inspect
 - **Closed Positions Section** (rendered only when `closed_holdings` non-empty, per ACD-047):
   - Section heading "Closed positions"
-  - Table columns: Asset (Name + Ticker), Realized P&L, Last sold date
+  - Table columns: Asset (Name + Ticker), Realized P&L, Closed on
   - Actions: Inspect, Fill missing price history (per ACD-049)
 
 ### States
@@ -245,7 +245,7 @@ UPDATE holdings SET
 1. User clicks on an account row in the Account Table.
 2. Route navigates to `/accounts/:id`; loading skeletons appear.
 3. Data loads: user sees active positions with cost basis and the account totals.
-4. If closed positions exist, they appear below the active table with realized P&L and last sold date.
+4. If closed positions exist, they appear below the active table with realized P&L and the date they closed on.
 5. User can add a transaction via the FAB or "Add Transaction" button.
 
 ## Cross-amendments

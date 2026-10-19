@@ -15,8 +15,10 @@ import type {
   PriceHistoryBackfillError,
   PriceHistoryBackfillOutcome,
   SplitError,
+  Transaction,
   TransactionDraftError,
   UnrecordedSplit,
+  WriteOffError,
 } from "@/bindings";
 import { isCashAsset } from "@/lib/cashAsset";
 import {
@@ -257,6 +259,10 @@ export interface HoldingRowViewModel {
   realizedPnl: string;
   /** Raw realized P&L in micro-units — used for sign-based color styling (SEL-043). */
   realizedPnlRaw: number;
+  /** WOF-059 — the formatted lost part of the realized P&L, or null when it is zero. */
+  realizedLost: string | null;
+  /** Average price in raw micro-units, account currency — the write-off form's estimate (WOF-052). */
+  averagePriceMicro: number;
   /** Always true — active holding rows can trigger the price entry modal (MKT-010). */
   canEnterPrice: boolean;
   /** Current price state — formatted price or typed diagnostic (MKT-030, MKT-032). */
@@ -535,9 +541,11 @@ export function toHoldingRow(detail: HoldingDetail): HoldingRowViewModel {
       quantity: microToFormatted(detail.quantity, 2),
       quantityMicro: detail.quantity,
       averagePrice: "",
+      averagePriceMicro: 0,
       currentValue: "",
       realizedPnl: "",
       realizedPnlRaw: 0,
+      realizedLost: null,
       canEnterPrice: false,
       currentPrice: { kind: "present", formatted: "" },
       currentPriceDate: null,
@@ -575,10 +583,12 @@ export function toHoldingRow(detail: HoldingDetail): HoldingRowViewModel {
     quantity: microToFormattedQuantity(detail.quantity),
     quantityMicro: detail.quantity,
     averagePrice: microToFormattedPrice(detail.average_price),
+    averagePriceMicro: detail.average_price,
     // MKT-143 — the backend's current price × quantity, asset currency.
     currentValue: detail.current_value !== null ? microToFormatted(detail.current_value, 2) : DASH,
     realizedPnl: microToFormatted(detail.realized_pnl, 2),
     realizedPnlRaw: detail.realized_pnl,
+    realizedLost: detail.realized_lost !== 0 ? microToFormatted(detail.realized_lost, 2) : null,
     canEnterPrice: true,
     currentPrice: derivePriceState(detail),
     currentPriceDate: detail.current_price_date,
@@ -678,4 +688,54 @@ export function withFetchFailure(
     fetchFailure: { key: `mkt.fetch_failure.${failure.reason}` },
     fetchFailedOn: failure.failed_at.slice(0, 10),
   };
+}
+
+/** A write-off refusal (WOF-055): its message and whether it shows under the quantity. */
+export interface WriteOffRefusal {
+  message: I18nMessage;
+  onQuantity: boolean;
+}
+
+/**
+ * F27 — Maps the write-off surfaces to an i18n message (WOF-055): the create path
+ * (`WriteOffError`) and the edit path (`AccountError`, via `correct_write_off`).
+ * `Oversell` names what was held on that date, under the quantity; the
+ * holding-internal codes that never reach the wire fall back to `error.Unknown`.
+ */
+export function writeOffErrorToI18n(
+  err: WriteOffError | AccountError,
+  reference: string,
+): WriteOffRefusal {
+  switch (err.code) {
+    case "Oversell":
+      return {
+        message: {
+          key: "write_off.error_over_held",
+          vars: { held: microToFormattedQuantity(err.available), reference },
+        },
+        onQuantity: true,
+      };
+    case "CascadingOversell":
+    case "QuantityNotPositive":
+      return { message: { key: `error.${err.code}` }, onQuantity: true };
+    case "ClosedPosition":
+      return { message: { key: "write_off.error_closed_position" }, onQuantity: false };
+    case "ArchivedAsset":
+      return { message: { key: "write_off.error_archived" }, onQuantity: false };
+    case "NegativeQuantity":
+    case "NegativeAveragePrice":
+      return { message: { key: "error.Unknown" }, onQuantity: false };
+    default:
+      return { message: { key: `error.${err.code}` }, onQuantity: false };
+  }
+}
+
+/**
+ * WOF-058 — the average price a recorded write-off left at: the cost it took out over its
+ * quantity, micro-units, rounded down; 0 for no quantity.
+ */
+export function writeOffAveragePriceMicro(tx: Transaction): number {
+  if (tx.quantity <= 0) return 0;
+  const costMicro = -(tx.realized_pnl ?? 0);
+  return Number((BigInt(costMicro) * 1_000_000n) / BigInt(tx.quantity));
 }
