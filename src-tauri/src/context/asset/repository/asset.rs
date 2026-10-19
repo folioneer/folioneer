@@ -582,12 +582,7 @@ impl AssetRepository for SqliteAssetRepository {
                 .await
                 .with_context(|| format!("Failed to read synced reported split {}", identity))?;
                 row.map(|row| {
-                    let split = ReportedSplit {
-                        asset_id: row.asset_id,
-                        date: row.date,
-                        new: row.new,
-                        old: row.old,
-                    };
+                    let split = ReportedSplit::restore(row.asset_id, row.date, row.new, row.old);
                     Ok(SyncedRecord {
                         rank: rank_from_columns(
                             row.sync_logical_timestamp,

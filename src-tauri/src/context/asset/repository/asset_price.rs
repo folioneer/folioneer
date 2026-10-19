@@ -207,12 +207,7 @@ struct ReportedSplitRow {
 
 impl From<ReportedSplitRow> for ReportedSplit {
     fn from(row: ReportedSplitRow) -> Self {
-        Self {
-            asset_id: row.asset_id,
-            date: row.date,
-            new: row.new,
-            old: row.old,
-        }
+        ReportedSplit::restore(row.asset_id, row.date, row.new, row.old)
     }
 }
 

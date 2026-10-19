@@ -17,6 +17,16 @@ pub struct ReportedSplit {
 }
 
 impl ReportedSplit {
+    /// Restores a reported split from storage without validation (B1 — restore factory).
+    pub fn restore(asset_id: String, date: String, new: i64, old: i64) -> Self {
+        Self {
+            asset_id,
+            date,
+            new,
+            old,
+        }
+    }
+
     /// The reported split of `asset_id` a provider's dated split factor stands for.
     pub fn of_asset(asset_id: &str, factor: &DatedSplitFactor) -> Self {
         Self {
