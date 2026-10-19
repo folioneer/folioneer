@@ -1,6 +1,6 @@
 use crate::context::account::{
     Account, AccountError, AccountServiceContract, HoldingNote, ThresholdDirection, Transaction,
-    TransactionType,
+    TransactionType, WriteOffReason,
 };
 use crate::context::asset::{is_price_outdated, AssetPriceSource, AssetServiceContract};
 use crate::context::currency::CurrencyService;
@@ -55,6 +55,9 @@ pub struct HoldingDetail {
     pub cost_basis: i64,
     /// Sum of realized P&L from all Sell transactions for this asset (i64 micro-units, SEL-042).
     pub realized_pnl: i64,
+    /// WOF-022 — the realized P&L of the holding's write-offs whose reason is Lost, included
+    /// in `realized_pnl` (account currency, ≤ 0); 0 for cash and in the past-date view.
+    pub realized_lost: i64,
     /// ISO 4217 currency code of the asset's native currency (MKT-023).
     pub asset_currency: String,
     /// Most recently dated price for this asset in asset currency (i64 micros). None if no price recorded (MKT-031).
@@ -547,6 +550,7 @@ impl AccountDetailsUseCase {
                     })?;
                 unrecorded_splits(&all_txs, &holding.asset_id, &reported, today_date)
             };
+            let realized_lost = realized_lost_of(&all_txs, &holding.asset_id, None); // WOF-022
             details.push(HoldingDetail {
                 asset_id: holding.asset_id,
                 asset_name: asset.name,
@@ -555,6 +559,7 @@ impl AccountDetailsUseCase {
                 average_price: holding.average_price,
                 cost_basis,
                 realized_pnl: holding.total_realized_pnl,
+                realized_lost,
                 asset_currency: asset.currency,
                 current_price,
                 current_price_date,
@@ -936,6 +941,7 @@ impl AccountDetailsUseCase {
                 average_price: reconstruction.average_price,
                 cost_basis,
                 realized_pnl,
+                realized_lost: realized_lost_of(&all_txs, asset_id, Some(as_of_date)), // WOF-022
                 asset_currency: asset.currency,
                 current_price,
                 current_price_date,
@@ -990,6 +996,7 @@ impl AccountDetailsUseCase {
                 average_price: 1_000_000,
                 cost_basis: 0,
                 realized_pnl: 0,
+                realized_lost: 0,
                 asset_currency: account.currency.clone(),
                 current_price: None,
                 current_price_date: None,
@@ -1207,6 +1214,21 @@ fn window_position_pct(
         flow_window_start,
         inputs.today,
     )
+}
+
+/// WOF-022 — the realized P&L of the write-offs of `asset_id` whose reason is Lost, dated on
+/// or before `as_of` when given.
+fn realized_lost_of(transactions: &[Transaction], asset_id: &str, as_of: Option<&str>) -> i64 {
+    transactions
+        .iter()
+        .filter(|transaction| {
+            transaction.asset_id == asset_id
+                && as_of.is_none_or(|date| transaction.date.as_str() <= date)
+                && transaction.transaction_type == TransactionType::WriteOff
+                && transaction.write_off_reason == Some(WriteOffReason::Lost)
+        })
+        .filter_map(|transaction| transaction.realized_pnl)
+        .sum()
 }
 
 #[cfg(test)]
@@ -2384,6 +2406,85 @@ mod tests {
             .await
             .unwrap();
         asset.id
+    }
+
+    // WOF-022 / WOF-030 (#550) — a Lost write-off is kept apart as the holding's lost amount,
+    // inside its realized P&L, read back through storage; corrected to Dust, it is not.
+    #[tokio::test]
+    async fn wof_022_a_lost_write_off_is_kept_apart_and_its_reason_corrected() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        asset_svc.seed_cash_asset("EUR").await.unwrap();
+        let account = make_eur_account(&account_svc).await;
+        let asset_id = make_stock(&asset_svc, "COIN", "EUR").await;
+        account_svc
+            .open_holding(
+                &account.id,
+                asset_id.clone(),
+                "2024-01-02".into(),
+                10_000_000,
+                1_000_000_000,
+            )
+            .await
+            .unwrap();
+        let lost = account_svc
+            .record_write_off(
+                &account.id,
+                asset_id.clone(),
+                "2024-03-01".into(),
+                2_000_000,
+                crate::context::account::WriteOffReason::Lost,
+                None,
+            )
+            .await
+            .unwrap();
+        account_svc
+            .record_write_off(
+                &account.id,
+                asset_id.clone(),
+                "2024-03-02".into(),
+                1_000_000,
+                crate::context::account::WriteOffReason::NetworkFee,
+                None,
+            )
+            .await
+            .unwrap();
+
+        let uc = AccountDetailsUseCase::new(
+            Arc::clone(&account_svc) as Arc<dyn AccountServiceContract>,
+            Arc::clone(&asset_svc) as Arc<dyn AssetServiceContract>,
+            make_currency_service_with_no_rate(),
+        );
+        let read = |resp: &AccountDetailsResponse| {
+            let h = resp
+                .holdings
+                .iter()
+                .find(|h| h.asset_name == "COIN")
+                .unwrap();
+            (h.quantity, h.realized_pnl, h.realized_lost)
+        };
+        let resp = uc.get_account_details(&account.id, None).await.unwrap();
+        assert_eq!(read(&resp), (7_000_000, -300_000_000, -200_000_000));
+        // The dated view counts the write-offs dated on or before its date.
+        let resp = uc
+            .get_account_details(&account.id, Some("2024-03-01"))
+            .await
+            .unwrap();
+        assert_eq!(read(&resp), (8_000_000, -200_000_000, -200_000_000));
+
+        account_svc
+            .correct_write_off(
+                &account.id,
+                &lost.id,
+                "2024-03-01".into(),
+                2_000_000,
+                crate::context::account::WriteOffReason::Dust,
+                None,
+            )
+            .await
+            .unwrap();
+        let resp = uc.get_account_details(&account.id, None).await.unwrap();
+        assert_eq!(read(&resp), (7_000_000, -300_000_000, 0));
     }
 
     // MKT-231 (#529) — a holding lists the reported splits the account held through without

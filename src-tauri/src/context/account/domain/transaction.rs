@@ -46,6 +46,33 @@ pub enum TransactionType {
     /// Interest credited at zero cost: quantity rises, cost basis unchanged (INT-024);
     /// on the account's cash line it credits the balance directly (INT-023).
     Interest,
+    /// A quantity leaving the holding without proceeds, at its weighted-average cost; no
+    /// cash moves, its realised result is the cost taken out, negated (WOF-020/021).
+    WriteOff,
+}
+
+/// Why a write-off's quantity left the holding (WOF entity).
+#[derive(
+    Debug,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Type,
+    PartialEq,
+    Eq,
+    strum_macros::Display,
+    strum_macros::EnumString,
+)]
+pub enum WriteOffReason {
+    /// A fee paid in the asset itself, such as a network fee.
+    NetworkFee,
+    /// A remainder too small to use, left by a conversion.
+    Dust,
+    /// Sent to a wallet the portfolio does not track, or lost for good (WOF-022).
+    Lost,
+    /// Any other reason; the note says which.
+    Other,
 }
 
 impl TransactionType {
@@ -93,6 +120,10 @@ pub struct Transaction {
     pub realized_pnl: Option<i64>,
     /// ISO 8601 timestamp of record creation — used for same-date tie-breaking (SEL-024).
     pub created_at: String,
+    /// Why a write-off's quantity left (WOF entity); `None` on every other type. Absent
+    /// from a change written before data format 7, read as `None` (SYN-038).
+    #[serde(default)]
+    pub write_off_reason: Option<WriteOffReason>,
 }
 
 impl Transaction {
@@ -142,6 +173,7 @@ impl Transaction {
             created_at: chrono::Utc::now()
                 .format("%Y-%m-%dT%H:%M:%S%.6fZ")
                 .to_string(),
+            write_off_reason: None,
         })
     }
 
@@ -186,6 +218,7 @@ impl Transaction {
             note,
             realized_pnl,
             created_at,
+            write_off_reason: None,
         })
     }
 
@@ -332,6 +365,7 @@ impl Transaction {
             created_at: chrono::Utc::now()
                 .format("%Y-%m-%dT%H:%M:%S%.6fZ")
                 .to_string(),
+            write_off_reason: None,
         })
     }
 
@@ -395,6 +429,7 @@ impl Transaction {
             created_at: chrono::Utc::now()
                 .format("%Y-%m-%dT%H:%M:%S%.6fZ")
                 .to_string(),
+            write_off_reason: None,
         })
     }
 
@@ -452,6 +487,7 @@ impl Transaction {
             created_at: chrono::Utc::now()
                 .format("%Y-%m-%dT%H:%M:%S%.6fZ")
                 .to_string(),
+            write_off_reason: None,
         })
     }
 
@@ -528,6 +564,7 @@ impl Transaction {
             created_at: chrono::Utc::now()
                 .format("%Y-%m-%dT%H:%M:%S%.6fZ")
                 .to_string(),
+            write_off_reason: None,
         })
     }
 
@@ -547,6 +584,67 @@ impl Transaction {
         tx.id = id;
         tx.created_at = created_at;
         Ok(tx)
+    }
+
+    /// Factory for a write-off (WOF-011): a quantity leaving without proceeds — no unit
+    /// price, no proceeds, no fees, an exchange rate of one; its realized P&L is set by the
+    /// replay (WOF-021). Validates the date bounds and `quantity > 0` itself, the generic
+    /// validator rejecting a zero total.
+    pub fn write_off(
+        account_id: String,
+        asset_id: String,
+        date: String,
+        quantity: i64,
+        reason: WriteOffReason,
+        note: Option<String>,
+    ) -> StdResult<Self, AccountError> {
+        Self::validate_date(&date)?;
+        if quantity <= 0 {
+            return Err(AccountError::QuantityNotPositive);
+        }
+        Ok(Self {
+            id: Uuid::new_v4().to_string(),
+            account_id,
+            asset_id,
+            transaction_type: TransactionType::WriteOff,
+            date,
+            quantity,
+            unit_price: 0,
+            exchange_rate: 1_000_000,
+            fees: 0,
+            total_amount: 0,
+            note,
+            realized_pnl: None,
+            created_at: chrono::Utc::now()
+                .format("%Y-%m-%dT%H:%M:%S%.6fZ")
+                .to_string(),
+            write_off_reason: Some(reason),
+        })
+    }
+
+    /// Rebuilds a write-off with its identity kept (WOF-030 correction).
+    #[allow(clippy::too_many_arguments)]
+    pub fn write_off_with_id(
+        id: String,
+        account_id: String,
+        asset_id: String,
+        date: String,
+        quantity: i64,
+        reason: WriteOffReason,
+        note: Option<String>,
+        created_at: String,
+    ) -> StdResult<Self, AccountError> {
+        let mut tx = Self::write_off(account_id, asset_id, date, quantity, reason, note)?;
+        tx.id = id;
+        tx.created_at = created_at;
+        Ok(tx)
+    }
+
+    /// The same transaction with its write-off reason as stored (WOF entity): `restore`
+    /// leaves it `None`, the repository sets it from its column.
+    pub fn with_write_off_reason(mut self, reason: Option<WriteOffReason>) -> Self {
+        self.write_off_reason = reason;
+        self
     }
 
     /// Reconstructs a Transaction from storage without validation.
@@ -580,6 +678,7 @@ impl Transaction {
             note,
             realized_pnl,
             created_at,
+            write_off_reason: None,
         }
     }
 

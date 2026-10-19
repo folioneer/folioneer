@@ -143,6 +143,7 @@ const makeHolding = (overrides: Partial<HoldingDetail> = {}): HoldingDetail => (
   current_price_source: null,
   price_outdated: false,
   unrecorded_splits: [],
+  realized_lost: 0,
   unrealized_pnl: null,
   performance_pct: null,
   dividends_received: 0,

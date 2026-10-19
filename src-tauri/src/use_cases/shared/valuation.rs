@@ -465,7 +465,8 @@ pub(crate) fn end_value_as_of(
             TransactionType::OpeningBalance
             | TransactionType::FreeShares
             | TransactionType::ManagementFee
-            | TransactionType::Split => {}
+            | TransactionType::Split
+            | TransactionType::WriteOff => {}
         }
         match transaction.transaction_type {
             // FSD-070 — free shares enter the as-of-date unit reconstruction like a
@@ -481,7 +482,7 @@ pub(crate) fn end_value_as_of(
                     .or_insert(0) += transaction.quantity as i128;
             }
             // FEE-046/050 — a management fee reduces the position quantity like a sell.
-            TransactionType::Sell | TransactionType::ManagementFee => {
+            TransactionType::Sell | TransactionType::ManagementFee | TransactionType::WriteOff => {
                 *quantity_by_asset
                     .entry(transaction.asset_id.as_str())
                     .or_insert(0) -= transaction.quantity as i128;
@@ -584,7 +585,8 @@ pub(crate) fn external_cash_flows(transactions: &[Transaction]) -> Vec<DatedFlow
             | TransactionType::FreeShares
             | TransactionType::ManagementFee
             | TransactionType::Interest
-            | TransactionType::Split => continue,
+            | TransactionType::Split
+            | TransactionType::WriteOff => continue,
         };
         flows.push(DatedFlow { date, amount });
     }
@@ -619,7 +621,8 @@ pub(crate) fn external_cash_flows_windowed(
             | TransactionType::FreeShares
             | TransactionType::ManagementFee
             | TransactionType::Interest
-            | TransactionType::Split => continue,
+            | TransactionType::Split
+            | TransactionType::WriteOff => continue,
         };
         flows.push(DatedFlow { date, amount });
     }
@@ -777,7 +780,8 @@ pub(crate) fn position_flows(asset_transactions: &[&Transaction]) -> PositionFlo
             | TransactionType::FreeShares
             | TransactionType::ManagementFee
             | TransactionType::Interest
-            | TransactionType::Split => {}
+            | TransactionType::Split
+            | TransactionType::WriteOff => {}
         }
     }
     PositionFlows { trades, dividends }
@@ -826,7 +830,8 @@ pub(crate) fn position_flows_windowed(
             | TransactionType::FreeShares
             | TransactionType::ManagementFee
             | TransactionType::Interest
-            | TransactionType::Split => {}
+            | TransactionType::Split
+            | TransactionType::WriteOff => {}
         }
     }
     PositionFlows { trades, dividends }
@@ -1013,7 +1018,8 @@ pub(crate) fn holding_close_date_as_of(
             | TransactionType::Interest => quantity += transaction.quantity as i128,
             TransactionType::Sell
             | TransactionType::Withdrawal
-            | TransactionType::ManagementFee => quantity -= transaction.quantity as i128,
+            | TransactionType::ManagementFee
+            | TransactionType::WriteOff => quantity -= transaction.quantity as i128,
             // SPL-020 — a split rescales the running quantity (factor in `quantity`).
             TransactionType::Split => {
                 quantity = quantity * transaction.quantity as i128 / 1_000_000
@@ -1446,6 +1452,24 @@ mod tests {
             class: AssetClass::Stocks,
             prices,
         }
+    }
+
+    // WOF-023 (#550) — a write-off is neither an external cash flow nor a position flow:
+    // the value it takes out is a loss of the position.
+    #[test]
+    fn wof_023_a_write_off_is_no_flow() {
+        let write_off = Transaction::write_off(
+            "acc".into(),
+            "asset-1".into(),
+            "2024-03-01".into(),
+            2_000_000,
+            crate::context::account::WriteOffReason::Lost,
+            None,
+        )
+        .expect("write-off");
+        assert!(external_cash_flows(std::slice::from_ref(&write_off)).is_empty());
+        let flows = position_flows(&[&write_off]);
+        assert!(flows.trades.is_empty() && flows.dividends.is_empty());
     }
 
     // MKT-193A (#528) — closes recorded as traded (not adjusted for a later split) and the

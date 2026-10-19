@@ -2,7 +2,7 @@ use super::fee_schedule::{FeeCatchUpPosition, FeeSchedule};
 use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot, StockSplitPosition};
 use super::holding_note::HoldingNote;
 use super::journal::CashEffect;
-use super::transaction::{EnteredAmount, Transaction, TransactionType};
+use super::transaction::{EnteredAmount, Transaction, TransactionType, WriteOffReason};
 use super::wrapper::{country_well_formed, wrapper_known, PORTFOLIO_COUNTRY};
 use crate::context::account::error::AccountError;
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
@@ -548,6 +548,20 @@ impl Account {
                 note,
                 created_at,
             )?
+        } else if tx_type == TransactionType::WriteOff {
+            // WOF-030 — a write-off keeps its zero-proceeds packing and its reason; the
+            // reason itself is corrected by `correct_write_off`.
+            let reason = existing.write_off_reason.unwrap_or(WriteOffReason::Other);
+            Transaction::write_off_with_id(
+                tx_id.to_string(),
+                self.id.clone(),
+                asset_id.clone(),
+                date,
+                quantity,
+                reason,
+                note,
+                created_at,
+            )?
         } else if tx_type == TransactionType::Interest {
             // INT-040 — like FreeShares, total_amount = 0 trips the generic validator;
             // rebuild via the identity-preserving interest factory (INT-021).
@@ -616,7 +630,8 @@ impl Account {
                     TransactionType::FreeShares
                     | TransactionType::ManagementFee
                     | TransactionType::Interest
-                    | TransactionType::Split,
+                    | TransactionType::Split
+                    | TransactionType::WriteOff,
                     _,
                 ) => (unit_price, 0),
             };
@@ -667,18 +682,23 @@ impl Account {
             }
         };
 
-        // Attach updated realized_pnl to all sells in the pair (excluding the corrected tx itself,
-        // which is handled unconditionally below to cover the Purchase case too)
+        // Attach updated realized_pnl to every sale and write-off of the pair, the corrected
+        // one included (WOF-030); the corrected transaction is recorded once, below.
         if let Some((_, pnl_map)) = &recalculated {
             for tx in self
                 .transactions
                 .iter_mut()
-                .filter(|t| t.asset_id == asset_id && t.id != tx_id)
+                .filter(|t| t.asset_id == asset_id)
             {
-                if tx.transaction_type == TransactionType::Sell {
+                if matches!(
+                    tx.transaction_type,
+                    TransactionType::Sell | TransactionType::WriteOff
+                ) {
                     tx.realized_pnl = pnl_map.get(&tx.id).copied();
-                    self.pending_changes
-                        .push(AccountChange::TransactionUpdated(tx.clone()));
+                    if tx.id != tx_id {
+                        self.pending_changes
+                            .push(AccountChange::TransactionUpdated(tx.clone()));
+                    }
                 }
             }
         }
@@ -766,11 +786,13 @@ impl Account {
         } else {
             // SEL-033 — full recalculation updates realized_pnl on remaining sells
             let (holding, pnl_map) = self.recalculate_holding(&asset_id, &remaining)?;
-            for tx in self
-                .transactions
-                .iter_mut()
-                .filter(|t| t.asset_id == asset_id && t.transaction_type == TransactionType::Sell)
-            {
+            for tx in self.transactions.iter_mut().filter(|t| {
+                t.asset_id == asset_id
+                    && matches!(
+                        t.transaction_type,
+                        TransactionType::Sell | TransactionType::WriteOff
+                    )
+            }) {
                 tx.realized_pnl = pnl_map.get(&tx.id).copied();
                 self.pending_changes
                     .push(AccountChange::TransactionUpdated(tx.clone()));
@@ -971,6 +993,81 @@ impl Account {
         Ok(tx)
     }
 
+    /// Aggregate-root method: applies a pre-built write-off (WOF-010/012/020/021), built
+    /// via `Transaction::write_off`. Refused on the cash line, on a position not held on
+    /// the write-off's date, and above what is held then; the replay refuses a backdated
+    /// one that leaves a later sale or write-off oversold. Its realized P&L is the cost it
+    /// takes out, negated, set from the replay.
+    pub fn apply_write_off(&mut self, tx: Transaction) -> Result<Transaction> {
+        Self::ensure_tradable(&tx.asset_id)?;
+        let held =
+            Self::reconstruct_holding_as_of(&self.transactions, &tx.asset_id, &tx.date).quantity;
+        if held <= 0 {
+            return Err(AccountError::ClosedPosition.into());
+        }
+        if tx.quantity > held {
+            return Err(AccountError::Oversell {
+                available: held,
+                requested: tx.quantity,
+            }
+            .into());
+        }
+        self.transactions.push(tx.clone());
+        let pair_txs: Vec<&Transaction> = self
+            .transactions
+            .iter()
+            .filter(|t| t.asset_id == tx.asset_id)
+            .collect();
+        let (holding, pnl_map) = match self.recalculate_holding(&tx.asset_id, &pair_txs) {
+            Ok(result) => result,
+            Err(e) => {
+                self.transactions.pop();
+                return Err(e);
+            }
+        };
+        let tx_ref = self
+            .transactions
+            .last_mut()
+            .ok_or_else(|| anyhow!("BUG: tx list empty after push in account {}", self.id))?;
+        tx_ref.realized_pnl = pnl_map.get(&tx_ref.id).copied();
+        let recorded = tx_ref.clone();
+
+        self.pending_changes
+            .push(AccountChange::TransactionInserted(recorded.clone()));
+        self.pending_changes
+            .push(AccountChange::HoldingUpserted(holding.clone()));
+        self.upsert_holding_in_memory(holding);
+        Ok(recorded)
+    }
+
+    /// WOF-030 — corrects a write-off's date, quantity, reason and note, checked again on
+    /// the corrected history as a recording is; any other transaction is refused as not
+    /// found. A refusal leaves the write-off as it was.
+    pub fn correct_write_off(
+        &mut self,
+        tx_id: &str,
+        date: String,
+        quantity: i64,
+        reason: WriteOffReason,
+        note: Option<String>,
+    ) -> Result<Transaction> {
+        let existing = self
+            .transactions
+            .iter_mut()
+            .find(|t| t.id == tx_id && t.transaction_type == TransactionType::WriteOff)
+            .ok_or(AccountError::TransactionNotFound)?;
+        let previous = existing.write_off_reason.replace(reason);
+        match self.correct_transaction(tx_id, date, quantity, 0, 1_000_000, 0, None, note) {
+            Ok(corrected) => Ok(corrected.clone()),
+            Err(error) => {
+                if let Some(existing) = self.transactions.iter_mut().find(|t| t.id == tx_id) {
+                    existing.write_off_reason = previous;
+                }
+                Err(error)
+            }
+        }
+    }
+
     /// Aggregate-root method: applies a pre-built Split transaction to this
     /// account (SPL-020). The transaction must have been built via
     /// `Transaction::split`.
@@ -1124,11 +1221,13 @@ impl Account {
         else {
             return;
         };
-        for tx in self
-            .transactions
-            .iter_mut()
-            .filter(|t| t.asset_id == asset_id && t.transaction_type == TransactionType::Sell)
-        {
+        for tx in self.transactions.iter_mut().filter(|t| {
+            t.asset_id == asset_id
+                && matches!(
+                    t.transaction_type,
+                    TransactionType::Sell | TransactionType::WriteOff
+                )
+        }) {
             let realized_pnl = pnl_map.get(&tx.id).copied();
             if tx.realized_pnl != realized_pnl {
                 tx.realized_pnl = realized_pnl;
@@ -1379,7 +1478,8 @@ impl Account {
                     total_quantity += qty;
                     vwap_numerator += t.total_amount as i128 * MICRO;
                 }
-                TransactionType::Sell => {
+                // WOF-020/021 — a write-off leaves as a sale does, with no proceeds.
+                TransactionType::Sell | TransactionType::WriteOff => {
                     if enforced && t.quantity as i128 > total_quantity {
                         return Err(AccountError::CascadingOversell.into());
                     }
@@ -1602,7 +1702,8 @@ impl Account {
                     total_quantity += t.quantity as i128;
                     vwap_numerator += t.total_amount as i128 * MICRO;
                 }
-                TransactionType::Sell => {
+                // WOF-020/021 — a write-off leaves as a sale does, with no proceeds.
+                TransactionType::Sell | TransactionType::WriteOff => {
                     let vwap_before: i64 = if total_quantity > 0 {
                         (vwap_numerator / total_quantity) as i64
                     } else {
@@ -1683,7 +1784,8 @@ impl Account {
             | TransactionType::OpeningBalance
             | TransactionType::FreeShares
             | TransactionType::ManagementFee
-            | TransactionType::Split => CashEffect::None,
+            | TransactionType::Split
+            | TransactionType::WriteOff => CashEffect::None,
         }
     }
 
@@ -6936,5 +7038,275 @@ mod preview_trade_tests {
             first("2026-01-02", M, 0, 0),
             Err(AccountError::ExchangeRateNotPositive)
         ));
+    }
+}
+
+#[cfg(test)]
+mod write_off_tests {
+    use super::*;
+
+    const COIN: &str = "asset-coin";
+
+    fn micro(v: i64) -> i64 {
+        v * 1_000_000
+    }
+
+    fn funded() -> Account {
+        let mut acc = Account::restore_with_positions(
+            "acc-1".to_string(),
+            "Wallet".to_string(),
+            String::new(),
+            "EUR".to_string(),
+            UpdateFrequency::ManualMonth,
+            false,
+            vec![],
+            vec![],
+        );
+        acc.record_deposit("2020-01-01".to_string(), micro(1_000_000), None)
+            .unwrap();
+        acc
+    }
+
+    fn buy(acc: &mut Account, date: &str, quantity: i64, price: i64) {
+        acc.buy_holding(
+            COIN.to_string(),
+            date.to_string(),
+            micro(quantity),
+            micro(price),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .unwrap();
+    }
+
+    fn write_off(
+        acc: &mut Account,
+        date: &str,
+        quantity: i64,
+        reason: WriteOffReason,
+    ) -> Result<Transaction> {
+        let tx = Transaction::write_off(
+            acc.id.clone(),
+            COIN.to_string(),
+            date.to_string(),
+            quantity,
+            reason,
+            Some("to a hardware wallet".to_string()),
+        )?;
+        acc.apply_write_off(tx)
+    }
+
+    fn holding(acc: &Account) -> Holding {
+        acc.holdings
+            .iter()
+            .find(|h| h.asset_id == COIN)
+            .cloned()
+            .expect("the coin is held")
+    }
+
+    fn error_of(result: Result<Transaction>) -> AccountError {
+        result
+            .unwrap_err()
+            .downcast::<AccountError>()
+            .expect("an account error")
+    }
+
+    // WOF-020/021 (#550) — 10 bought at 100: writing off 2 leaves 8 at an average of 100,
+    // takes 200 out of the cost, moves no cash, and its realized P&L is −200.
+    #[test]
+    fn wof_020_a_write_off_leaves_at_its_cost_without_cash() {
+        let mut acc = funded();
+        buy(&mut acc, "2024-01-02", 10, 100);
+        let cash_before = acc.holding_quantity(&acc.cash_asset_id());
+
+        let tx = write_off(&mut acc, "2024-03-01", micro(2), WriteOffReason::NetworkFee).unwrap();
+
+        assert_eq!(tx.transaction_type, TransactionType::WriteOff);
+        assert_eq!(tx.write_off_reason, Some(WriteOffReason::NetworkFee));
+        assert_eq!((tx.total_amount, tx.unit_price, tx.fees), (0, 0, 0));
+        assert_eq!(tx.realized_pnl, Some(-micro(200)));
+        let coin = holding(&acc);
+        assert_eq!(coin.quantity, micro(8));
+        assert_eq!(coin.average_price, micro(100));
+        assert_eq!(coin.total_realized_pnl, -micro(200));
+        assert_eq!(acc.holding_quantity(&acc.cash_asset_id()), cash_before);
+    }
+
+    // WOF-021 — a holding at zero cost realizes nothing.
+    #[test]
+    fn wof_021_a_write_off_of_a_zero_cost_holding_realizes_nothing() {
+        let mut acc = funded();
+        acc.apply_free_shares(
+            Transaction::free_shares(
+                acc.id.clone(),
+                COIN.into(),
+                "2024-01-02".into(),
+                micro(5),
+                None,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let tx = write_off(&mut acc, "2024-03-01", micro(1), WriteOffReason::Dust).unwrap();
+        assert_eq!(tx.realized_pnl, Some(0));
+    }
+
+    // WOF-010 — refused on the cash line, on a position not held on its date, and above
+    // what is held then.
+    #[test]
+    fn wof_010_a_write_off_is_refused_where_nothing_or_too_little_is_held() {
+        let mut acc = funded();
+        let cash = Transaction::write_off(
+            acc.id.clone(),
+            acc.cash_asset_id(),
+            "2024-03-01".into(),
+            micro(1),
+            WriteOffReason::Other,
+            None,
+        )
+        .unwrap();
+        assert!(matches!(
+            acc.apply_write_off(cash)
+                .unwrap_err()
+                .downcast::<AccountError>(),
+            Ok(AccountError::TradeOnCashAsset)
+        ));
+        buy(&mut acc, "2024-01-02", 10, 100);
+        assert!(matches!(
+            error_of(write_off(
+                &mut acc,
+                "2023-12-31",
+                micro(1),
+                WriteOffReason::Lost
+            )),
+            AccountError::ClosedPosition
+        ));
+        assert!(matches!(
+            error_of(write_off(
+                &mut acc,
+                "2024-03-01",
+                micro(11),
+                WriteOffReason::Lost
+            )),
+            AccountError::Oversell { .. }
+        ));
+        assert_eq!(
+            holding(&acc).quantity,
+            micro(10),
+            "a refusal changes nothing"
+        );
+    }
+
+    // WOF-012 — a backdated write-off that leaves a later sale oversold is refused.
+    #[test]
+    fn wof_012_a_backdated_write_off_that_oversells_a_later_sale_is_refused() {
+        let mut acc = funded();
+        buy(&mut acc, "2024-01-02", 10, 100);
+        acc.sell_holding(
+            COIN.into(),
+            "2024-06-01".into(),
+            micro(8),
+            micro(120),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(matches!(
+            error_of(write_off(
+                &mut acc,
+                "2024-03-01",
+                micro(5),
+                WriteOffReason::Lost
+            )),
+            AccountError::CascadingOversell
+        ));
+        assert_eq!(holding(&acc).quantity, micro(2));
+    }
+
+    // WOF-032 — correcting or removing the purchase a later write-off draws on is refused
+    // when the replay leaves that write-off above what is held at its date.
+    #[test]
+    fn wof_032_an_edit_that_oversells_a_later_write_off_is_refused() {
+        let mut acc = funded();
+        buy(&mut acc, "2024-01-02", 10, 100);
+        write_off(&mut acc, "2024-03-01", micro(8), WriteOffReason::Lost).unwrap();
+        let purchase = acc
+            .transactions
+            .iter()
+            .find(|t| t.transaction_type == TransactionType::Purchase)
+            .unwrap()
+            .id
+            .clone();
+        let corrected = acc.correct_transaction(
+            &purchase,
+            "2024-01-02".into(),
+            micro(5),
+            micro(100),
+            micro(1),
+            0,
+            None,
+            None,
+        );
+        assert!(matches!(
+            corrected.unwrap_err().downcast_ref::<AccountError>(),
+            Some(AccountError::CascadingOversell)
+        ));
+        assert!(acc.cancel_transaction(&purchase).is_err());
+        assert_eq!(holding(&acc).quantity, micro(2));
+    }
+
+    // WOF-040 — removing a write-off restores the holding exactly.
+    #[test]
+    fn wof_040_removing_a_write_off_restores_the_holding() {
+        let mut acc = funded();
+        buy(&mut acc, "2024-01-02", 10, 100);
+        let before = holding(&acc);
+        let tx = write_off(&mut acc, "2024-03-01", micro(3), WriteOffReason::Lost).unwrap();
+        acc.cancel_transaction(&tx.id).unwrap();
+        let after = holding(&acc);
+        assert_eq!(
+            (
+                after.quantity,
+                after.average_price,
+                after.total_realized_pnl
+            ),
+            (
+                before.quantity,
+                before.average_price,
+                before.total_realized_pnl
+            )
+        );
+    }
+
+    // WOF-030 — a write-off's quantity and reason are corrected, the holding replayed.
+    #[test]
+    fn wof_030_a_write_off_is_corrected_reason_included() {
+        let mut acc = funded();
+        buy(&mut acc, "2024-01-02", 10, 100);
+        let tx = write_off(&mut acc, "2024-03-01", micro(2), WriteOffReason::Lost).unwrap();
+        let corrected = acc
+            .correct_write_off(
+                &tx.id,
+                "2024-03-01".into(),
+                micro(3),
+                WriteOffReason::Dust,
+                None,
+            )
+            .unwrap();
+        assert_eq!(corrected.write_off_reason, Some(WriteOffReason::Dust));
+        assert_eq!(corrected.realized_pnl, Some(-micro(300)));
+        assert_eq!(holding(&acc).quantity, micro(7));
+        let recorded = acc
+            .pending_changes
+            .iter()
+            .filter(
+                |change| matches!(change, AccountChange::TransactionUpdated(t) if t.id == tx.id),
+            )
+            .count();
+        assert_eq!(recorded, 1, "the corrected write-off is recorded once");
     }
 }

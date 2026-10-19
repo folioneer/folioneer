@@ -1179,8 +1179,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
+export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 
 /** user-defined types **/
 
@@ -3291,6 +3291,11 @@ cost_basis: number;
  */
 realized_pnl: number; 
 /**
+ * WOF-022 — the realized P&L of the holding's write-offs whose reason is Lost, included
+ * in `realized_pnl` (account currency, ≤ 0); 0 for cash and in the past-date view.
+ */
+realized_lost: number; 
+/**
  * ISO 4217 currency code of the asset's native currency (MKT-023).
  */
 asset_currency: string; 
@@ -5170,7 +5175,12 @@ realized_pnl: number | null;
 /**
  * ISO 8601 timestamp of record creation — used for same-date tie-breaking (SEL-024).
  */
-created_at: string }
+created_at: string; 
+/**
+ * Why a write-off's quantity left (WOF entity); `None` on every other type. Absent
+ * from a change written before data format 7, read as `None` (SYN-038).
+ */
+write_off_reason?: WriteOffReason | null }
 /**
  * A transaction draft: a purchase or sale as the user is still entering it (TRX-062).
  * Empty strings are fields not filled yet; amounts are in micros.
@@ -5361,7 +5371,12 @@ export type TransactionType =
  * Interest credited at zero cost: quantity rises, cost basis unchanged (INT-024);
  * on the account's cash line it credits the balance directly (INT-023).
  */
-"Interest"
+"Interest" | 
+/**
+ * A quantity leaving the holding without proceeds, at its weighted-average cost; no
+ * cash moves, its realised result is the cost taken out, negated (WOF-020/021).
+ */
+"WriteOff"
 /**
  * One asset a price-fetch task could not price (MKT-170/171), carried in the
  * `AssetPriceFetchCompleted` payload so the frontend can list it for manual entry.
@@ -5696,6 +5711,26 @@ offered: CountryWrappers[];
  * ACC-045 — what a country with no list of its own is offered: the generic list.
  */
 generic: string[] }
+/**
+ * Why a write-off's quantity left the holding (WOF entity).
+ */
+export type WriteOffReason = 
+/**
+ * A fee paid in the asset itself, such as a network fee.
+ */
+"NetworkFee" | 
+/**
+ * A remainder too small to use, left by a conversion.
+ */
+"Dust" | 
+/**
+ * Sent to a wallet the portfolio does not track, or lost for good (WOF-022).
+ */
+"Lost" | 
+/**
+ * Any other reason; the note says which.
+ */
+"Other"
 
 /** tauri-specta globals **/
 

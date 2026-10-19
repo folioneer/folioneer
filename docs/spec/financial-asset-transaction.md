@@ -98,7 +98,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 ### Lifecycle Management
 
-**TRX-040 — Zero quantity handling (backend)**: If a `Holding.quantity` reaches zero due to `Sell` transactions, the `Holding` entity remains in the database to accommodate potential future purchase transactions. The `average_price` is maintained at its last known value until the next purchase transaction initiates a new VWAP calculation. _(Activated by the SEL spec.)_
+**TRX-040 — Zero quantity handling (backend)**: If a `Holding.quantity` reaches zero due to `Sell` or write-off (WOF-020) transactions, the `Holding` entity remains in the database to accommodate potential future purchase transactions. The `average_price` is maintained at its last known value until the next purchase transaction initiates a new VWAP calculation. _(Activated by the SEL spec.)_
 
 **TRX-041 — Buy-from-holding-row modal (frontend)**: When a purchase is initiated from a holding row (TRX-010 entry point 3), the form opens as a `BuyTransactionModal`. Account and asset are pre-filled from the holding row context and are read-only (TRX-011). Default values follow TRX-023 (date=today, exchange_rate=1.0, fees=0). The exchange rate field is visible only when the asset currency differs from the account currency (consistent with SEL-036). On success the modal closes and a success snackbar is shown; the holdings view refreshes via the existing `TransactionUpdated` event (TRX-038).
 
