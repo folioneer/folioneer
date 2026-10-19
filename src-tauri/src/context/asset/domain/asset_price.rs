@@ -133,7 +133,8 @@ pub trait PriceProvider: Send + Sync {
     /// inclusive (ISO dates), for the scheduled-fetch backfill window
     /// (SPF-030/031) and the price history backfill (MKT-193). Non-trading days
     /// (weekends, holidays) are simply absent from the series (SPF-032) — not an
-    /// error.
+    /// error. Each close is the price as traded on its date: a provider whose history
+    /// is adjusted for later splits multiplies it back before returning it (MKT-193A).
     ///
     /// - `Ok(Some(closes))` — the provider knows the symbol; the series may be
     ///   empty when the window holds no trading day (MKT-196).

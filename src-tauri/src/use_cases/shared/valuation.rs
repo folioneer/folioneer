@@ -1448,6 +1448,47 @@ mod tests {
         }
     }
 
+    // MKT-193A (#528) — closes recorded as traded (not adjusted for a later split) and the
+    // split recorded as a transaction value the position without a jump across the split
+    // date: 10 shares at 2,000 before a 20-for-1 split are 200 shares at 100 after it.
+    #[test]
+    fn a_split_recorded_with_closes_as_traded_values_the_holding_without_a_jump() {
+        let transactions = vec![
+            test_fixtures::transaction_on(
+                "asset-1",
+                TransactionType::Purchase,
+                "2022-01-10",
+                10_000_000,
+            ),
+            test_fixtures::transaction_on(
+                "asset-1",
+                TransactionType::Split,
+                "2022-07-18",
+                20_000_000,
+            ),
+        ];
+        let priced = HashMap::from([(
+            "asset-1".to_string(),
+            priced_with(vec![
+                price_at("2022-07-15", 2_000_000_000),
+                price_at("2022-07-18", 100_000_000),
+            ]),
+        )]);
+        let value_on = |date: &str| {
+            holding_end_value_as_of(
+                &transactions,
+                "asset-1",
+                &priced,
+                &RateMap::new(),
+                "USD",
+                day(date),
+            )
+        };
+
+        assert_eq!(value_on("2022-07-15"), 20_000_000_000);
+        assert_eq!(value_on("2022-07-18"), 20_000_000_000);
+    }
+
     // PRF-022 carry-forward: the reverse scan over an ascending-sorted price vec
     // returns the latest price dated on or before the query date.
     #[test]

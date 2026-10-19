@@ -77,7 +77,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 ### Values Recorded (030–039)
 
-**SPF-030 — Close-of-day semantics (backend)**: The scheduled download records **daily closing prices**, never a live intraday quote. Each recorded price is dated to the trading day it closes — including during catch-up: a run executing the morning after a missed trigger records the previous day's close, not the morning's price.
+**SPF-030 — Close-of-day semantics (backend)**: The scheduled download records **daily closing prices**, never a live intraday quote. Each recorded price is dated to the trading day it closes — including during catch-up: a run executing the morning after a missed trigger records the previous day's close, not the morning's price. A close is recorded as traded on its date, never adjusted for a later split (MKT-193A): the run requests its window's splits beside the closes, a failed or malformed split request skipping the asset (MKT-193B, SPF-041).
 
 **SPF-031 — Backfill window (backend)**: Each run retrieves, per asset, the **daily close series** covering the days missing since the last successful scheduled run — a capability the External provider already exposes (its chart data carries dated daily history, MKT-117) — and records every completed trading-day close in that window, up to a maximum of 30 days back. Gaps older than 30 days are left untouched.
 
@@ -85,7 +85,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-033 — Markets still open at the trigger (backend)**: An asset whose trading day is not yet complete when the run executes contributes only closes up to its previous completed day. The in-progress day's close is written by the next run through the backfill window — the schedule self-corrects regardless of the chosen trigger time.
 
-**SPF-034 — Writes follow the established price-write model (backend)**: Every price written by a scheduled run uses the `(asset, date)` upsert (MKT-025, latest-write-wins per ADR-012), carries the provider source (MKT-102), and applies sub-unit normalization (MKT-125).
+**SPF-034 — Writes follow the established price-write model (backend)**: Every price written by a scheduled run uses the `(asset, date)` upsert (MKT-025, latest-write-wins per ADR-012), carries the provider source (MKT-102), and applies sub-unit normalization (MKT-125), and records closes as traded (MKT-193A).
 
 **SPF-035 — Exchange rates in the same run (backend)**: The run also records **daily reference exchange rates** for every persisted currency pair (the same scope as the in-app rate refresh, FXR-071), each rate dated to its day — never a live snapshot re-dated to the run day.
 
