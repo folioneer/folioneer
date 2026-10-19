@@ -77,7 +77,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 ### Values Recorded (030–039)
 
-**SPF-030 — Close-of-day semantics (backend)**: The scheduled download records **daily closing prices**, never a live intraday quote. Each recorded price is dated to the trading day it closes — including during catch-up: a run executing the morning after a missed trigger records the previous day's close, not the morning's price. A close is recorded as traded on its date, never adjusted for a later split (MKT-193A).
+**SPF-030 — Close-of-day semantics (backend)**: The scheduled download records **daily closing prices**, never a live intraday quote. Each recorded price is dated to the trading day it closes — including during catch-up: a run executing the morning after a missed trigger records the previous day's close, not the morning's price. A close is recorded as traded on its date, never adjusted for a later split (MKT-193A): the run requests its window's splits beside the closes, a failed or malformed split request skipping the asset (MKT-193B, SPF-041).
 
 **SPF-031 — Backfill window (backend)**: Each run retrieves, per asset, the **daily close series** covering the days missing since the last successful scheduled run — a capability the External provider already exposes (its chart data carries dated daily history, MKT-117) — and records every completed trading-day close in that window, up to a maximum of 30 days back. Gaps older than 30 days are left untouched.
 
