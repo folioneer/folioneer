@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE reported_splits SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n                 WHERE asset_id = ? AND date = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "f939bd7b08290d0fbba14435b819d3b5bd85dc1d3fe947397d37e02c76b5d066"
+}

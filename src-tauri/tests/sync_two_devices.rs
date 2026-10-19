@@ -966,6 +966,79 @@ async fn syn_021_the_reference_currency_chosen_on_one_device_is_the_others() {
     );
 }
 
+// SYN-021 / MKT-230 (#529) — the reported splits a device keeps travel to the other: those
+// kept before sync with the first publish, a later reading's change and its removal after.
+#[tokio::test]
+async fn syn_021_the_reported_splits_kept_on_one_device_are_the_others() {
+    use folioneer_lib::context::asset::DatedSplitFactor;
+    let factor = |date: &str, new: i64, old: i64| DatedSplitFactor {
+        date: date.into(),
+        new,
+        old,
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let desktop = build_ctx(dir.path()).await;
+    let (_account_id, asset_id) = seed_small_portfolio(&desktop).await;
+    desktop
+        .asset_service
+        .record_reported_splits(&asset_id, "2019-01-01", &[factor("2022-07-18", 20, 1)])
+        .await
+        .unwrap();
+    desktop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Desktop".into(),
+        )
+        .await
+        .expect("Desktop must enable as the first device");
+    let laptop = build_ctx(dir.path()).await;
+    laptop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Laptop".into(),
+        )
+        .await
+        .expect("Laptop must join the shared portfolio");
+    let dates_on = |splits: Vec<folioneer_lib::context::asset::ReportedSplit>| {
+        splits
+            .into_iter()
+            .map(|split| (split.date, split.new, split.old))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        dates_on(
+            laptop
+                .asset_service
+                .reported_splits(&asset_id)
+                .await
+                .unwrap()
+        ),
+        vec![("2022-07-18".to_string(), 20, 1)]
+    );
+
+    desktop
+        .asset_service
+        .record_reported_splits(&asset_id, "2019-01-01", &[factor("2024-03-04", 1, 10)])
+        .await
+        .unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+    assert_eq!(
+        dates_on(
+            laptop
+                .asset_service
+                .reported_splits(&asset_id)
+                .await
+                .unwrap()
+        ),
+        vec![("2024-03-04".to_string(), 1, 10)]
+    );
+}
+
 // SYN-083 / DEBT-152 — a device joining with a reference currency of its own takes the shared
 // portfolio's: its own is replaced, whether the shared portfolio chose one or not.
 #[tokio::test]
@@ -1697,6 +1770,18 @@ async fn written_form_of_every_record_kind() -> serde_json::Value {
         .record_asset_price(&asset.id, "2026-01-05", 150.0)
         .await
         .unwrap();
+    ctx.asset_service
+        .record_reported_splits(
+            &asset.id,
+            "2026-01-01",
+            &[folioneer_lib::context::asset::DatedSplitFactor {
+                date: "2026-02-02".into(),
+                new: 2,
+                old: 1,
+            }],
+        )
+        .await
+        .unwrap();
     ctx.currency_service
         .declare_currency_pair("USD".into(), "EUR".into())
         .await
@@ -1743,7 +1828,7 @@ fn written_values_of_every_synced_enum() -> serde_json::Value {
             RecordKind::Account, RecordKind::Category, RecordKind::Asset,
             RecordKind::Transaction, RecordKind::FeeSchedule, RecordKind::FeeCatchUpPosition,
             RecordKind::AssetPrice, RecordKind::CurrencyPair, RecordKind::CurrencyRate,
-            RecordKind::HoldingNote, RecordKind::PortfolioSetting,
+            RecordKind::HoldingNote, RecordKind::PortfolioSetting, RecordKind::ReportedSplit,
         ]),
         "Operation": written_values!(Operation, [
             Operation::Created, Operation::Updated, Operation::Removed,

@@ -158,6 +158,19 @@ impl PortfolioSnapshot for ServicePortfolioSnapshot {
             }
         }
 
+        let splits = self
+            .asset_service
+            .all_reported_splits()
+            .await
+            .map_err(|error| SyncError::database("snapshot: reported splits", error))?;
+        for split in &splits {
+            records.push(record(
+                RecordKind::ReportedSplit,
+                &[&split.asset_id, &split.date],
+                split,
+            )?);
+        }
+
         let pairs = self
             .currency_service
             .list_currency_pairs()

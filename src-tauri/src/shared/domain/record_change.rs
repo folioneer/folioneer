@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-/// The eleven synced record kinds (SYN-021). `holdings`, performance figures, and device-local
+/// The twelve synced record kinds (SYN-021). `holdings`, performance figures, and device-local
 /// data (scheduled fetch config, window state, the sync configuration itself) are deliberately
 /// absent (SYN-022/023).
 #[derive(
@@ -46,6 +46,8 @@ pub enum RecordKind {
     HoldingNote,
     /// A portfolio-wide setting, identified by its name: the reference currency (FXR-120).
     PortfolioSetting,
+    /// A split a price provider reports for an asset, identified by (asset_id, date) (MKT-230).
+    ReportedSplit,
 }
 
 /// Whether the user made the change or the application generated it on its own (CFR-016).
@@ -261,9 +263,9 @@ impl ChangeDraft {
 mod tests {
     use super::*;
 
-    // SYN-021 — exactly the eleven synced record kinds, pairwise distinct.
+    // SYN-021 — exactly the twelve synced record kinds, pairwise distinct.
     #[test]
-    fn record_kind_has_exactly_eleven_pairwise_distinct_synced_kinds() {
+    fn record_kind_has_exactly_twelve_pairwise_distinct_synced_kinds() {
         let kinds = [
             RecordKind::Account,
             RecordKind::Category,
@@ -276,12 +278,13 @@ mod tests {
             RecordKind::CurrencyRate,
             RecordKind::HoldingNote,
             RecordKind::PortfolioSetting,
+            RecordKind::ReportedSplit,
         ];
         let unique: std::collections::HashSet<_> = kinds.iter().collect();
         assert_eq!(
             unique.len(),
-            11,
-            "SYN-021 lists exactly eleven synced record kinds"
+            12,
+            "SYN-021 lists exactly twelve synced record kinds"
         );
     }
 

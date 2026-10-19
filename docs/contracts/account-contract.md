@@ -437,6 +437,7 @@ struct HoldingDetail {
     inconsistency: Option<HoldingInconsistency>, // derived on read; Some when the merged ledger oversells the position or overdraws cash (SYN-040, CFR-042); None otherwise — see sync-contract.md
     current_price_source: Option<AssetPriceSource>, // where current_price comes from (asset contract); None when there is no price (MKT-142)
     price_outdated: bool,                      // the latest price is outdated for the asset (MKT-205); false without a price, for cash and in a read with a date (MKT-206)
+    unrecorded_splits: Vec<UnrecordedSplit>,   // the reported splits the account held through without recording one, oldest first (MKT-231); empty for cash and in a read with a date, today included (MKT-206); a closed position (ClosedHoldingDetail) carries none
     fx_rate_date: Option<String>,       // ISO date of the rate that converted a foreign holding; None for a same-currency holding, cash, or when no rate is usable (FXR-090)
     fee_rate_percent_micros: Option<i64>, // annual rate of the active fee schedule of this pair, micro-percent; None without one, and always in the as-of view (FEE-074)
     period_performance: HoldingPeriodPerformance, // windowed position returns ending today (ACD-054–057)
@@ -444,6 +445,13 @@ struct HoldingDetail {
     note_threshold_price: Option<i64>,  // the note's alarm threshold, micros, asset currency (HNO-031)
     note_threshold_direction: Option<ThresholdDirection>, // HNO-030
     note_alarm_triggered: bool,         // computed from current_price on every live read; false without a note, an alarm or a price (HNO-030)
+}
+
+// MKT-231 — a reported split (MKT-230) the account held through without recording one. Read model.
+struct UnrecordedSplit {
+    date: String,   // the reported split's date, ISO yyyy-mm-dd
+    new: i64,       // new shares of its split factor (SPL-062)
+    old: i64,       // old shares of its split factor (SPL-062)
 }
 
 // Simple Dietz returns of one position over standard windows ending today, micro-percent; every
@@ -750,6 +758,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-10-19 — #529 (MKT-231): `HoldingDetail.unrecorded_splits` and the `UnrecordedSplit { date: String, new: i64, old: i64 }` type, a read model of the split factor new : old (SPL-062). No command changed.
 - 2026-10-18 — TODO-091 (ACC-040, ACC-043): `WrapperLists.countries` holds every country; `offered` only the portfolio's and the listed countries; `WrapperNotAvailable` now means a wrapper the lists do not hold, any known wrapper fitting any country.
 - 2026-10-18 — TODO-091 (ACC-046): `AccountSummary.wrapper`, for the accounts list; `WrapperLists` gains `countries`, `offered` and `generic`, with the new `CountryWrappers` type. No command added.
 - 2026-10-18 — TODO-091 (ACC-040–044): `Account`, `CreateAccountDTO` and `UpdateAccountDTO` gain `country` and `wrapper`; `add_account` / `update_account` gain `InvalidCountry` and `WrapperNotAvailable`; new `get_wrapper_lists` and the `WrapperLists` / `Wrapper` types.

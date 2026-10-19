@@ -67,6 +67,7 @@
         "realized_pnl": -55423145,
         "total_return_pct": -2186367,
         "unrealized_pnl": -45838882,
+        "unrecorded_splits": [],
         "weight_pct": 25962855
       },
       {
@@ -102,6 +103,7 @@
         "realized_pnl": 0,
         "total_return_pct": null,
         "unrealized_pnl": null,
+        "unrecorded_splits": [],
         "weight_pct": 74037144
       }
     ],
@@ -153,6 +155,7 @@
         "realized_pnl": 287000000,
         "total_return_pct": 49799757,
         "unrealized_pnl": 1963800040,
+        "unrecorded_splits": [],
         "weight_pct": 25102023
       },
       {
@@ -188,6 +191,7 @@
         "realized_pnl": 0,
         "total_return_pct": 1776367,
         "unrealized_pnl": 22400000,
+        "unrecorded_splits": [],
         "weight_pct": 5317214
       },
       {
@@ -223,6 +227,7 @@
         "realized_pnl": 0,
         "total_return_pct": null,
         "unrealized_pnl": null,
+        "unrecorded_splits": [],
         "weight_pct": 55527474
       },
       {
@@ -258,6 +263,7 @@
         "realized_pnl": 0,
         "total_return_pct": 111471321,
         "unrealized_pnl": 1788000000,
+        "unrecorded_splits": [],
         "weight_pct": 14053288
       }
     ],

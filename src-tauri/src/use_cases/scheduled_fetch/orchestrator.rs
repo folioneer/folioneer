@@ -402,11 +402,34 @@ impl ScheduledFetchOrchestrator {
                     .await
                 {
                     Ok(Some(closes)) if !closes.is_empty() => {
-                        match self
+                        // MKT-230 — the window's reported splits are read beside its closes;
+                        // a failed reading skips the asset as a failed close request does
+                        // (MKT-193B, SPF-041).
+                        let splits = match self.price_provider.fetch_splits(symbol, &from).await {
+                            Ok(splits) => splits,
+                            Err(error) => {
+                                outcomes.push((
+                                    asset.id.clone(),
+                                    Some(PriceFetchFailureReason::ProviderUnreachable),
+                                ));
+                                tracing::warn!(target: crate::core::logger::BACKEND, symbol = %symbol, err = ?error, "scheduled run: split fetch failed");
+                                provider_errors += 1;
+                                continue;
+                            }
+                        };
+                        let recorded = match self
                             .asset_service
-                            .record_daily_closes(&asset.id, closes)
+                            .record_reported_splits(&asset.id, &from, &splits)
                             .await
                         {
+                            Ok(()) => {
+                                self.asset_service
+                                    .record_daily_closes(&asset.id, closes)
+                                    .await
+                            }
+                            Err(error) => Err(error),
+                        };
+                        match recorded {
                             Ok(_) => {
                                 updated_count += 1;
                                 outcomes.push((asset.id.clone(), None));
@@ -591,14 +614,22 @@ mod tests {
     }
 
     #[allow(clippy::too_many_arguments)]
+    /// Builds the orchestrator; a test that sets no expectation of its own on the splits
+    /// gets a provider reporting none and a service keeping them (MKT-230).
     fn make_orchestrator(
         account_service: MockAccountServiceContract,
-        asset_service: MockAssetServiceContract,
-        price_provider: MockPriceProvider,
+        mut asset_service: MockAssetServiceContract,
+        mut price_provider: MockPriceProvider,
         repository: MockScheduledFetchRepository,
         scheduler: MockDailyFetchScheduler,
         now: NaiveDateTime,
     ) -> ScheduledFetchOrchestrator {
+        price_provider
+            .expect_fetch_splits()
+            .returning(|_, _| Ok(Vec::new()));
+        asset_service
+            .expect_record_reported_splits()
+            .returning(|_, _, _| Ok(()));
         ScheduledFetchOrchestrator::new(
             Arc::new(account_service),
             Arc::new(asset_service),
@@ -1368,6 +1399,12 @@ mod tests {
             .withf(|moment| *moment == now_after_trigger())
             .returning(|_| Ok(()));
 
+        price_provider
+            .expect_fetch_splits()
+            .returning(|_, _| Ok(Vec::new()));
+        asset_service
+            .expect_record_reported_splits()
+            .returning(|_, _, _| Ok(()));
         let orchestrator = ScheduledFetchOrchestrator::new(
             Arc::new(account_service),
             Arc::new(asset_service),
@@ -1467,6 +1504,16 @@ mod tests {
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .returning(|| Ok(vec![]));
+        // MKT-230 — the asset SPLITDOWN's split reading fails; the others report none.
+        price_provider
+            .expect_fetch_splits()
+            .returning(|symbol, _| match symbol {
+                "SPLITDOWN" => Err(anyhow::anyhow!("split request failed")),
+                _ => Ok(Vec::new()),
+            });
+        asset_service
+            .expect_record_reported_splits()
+            .returning(|_, _, _| Ok(()));
         ScheduledFetchOrchestrator::new(
             Arc::new(account_service),
             Arc::new(asset_service),
@@ -1508,6 +1555,17 @@ mod tests {
         assert_eq!(run.outcome, ScheduledFetchOutcome::Succeeded);
         assert_eq!(run.updated_count, 1);
         assert_eq!(run.skipped_count, 4);
+    }
+
+    // MKT-230 / MKT-193B (#529) — a failed split reading skips the asset as a failed close
+    // request does: its closes are not recorded, the others' are.
+    #[tokio::test]
+    async fn mkt_230_a_failed_split_reading_skips_the_asset() {
+        let orchestrator =
+            sweeping_orchestrator(&["UPDATED", "SPLITDOWN"], |_| Ok(Some(one_close())));
+        let run = orchestrator.run_scheduled_fetch().await.unwrap();
+        assert_eq!(run.updated_count, 1);
+        assert_eq!(run.skipped_count, 1);
     }
 
     // MKT-220 — a run records why each asset it could not price was left, and clears the

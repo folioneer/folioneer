@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT asset_id, date, new, old FROM reported_splits ORDER BY asset_id, date",
+  "describe": {
+    "columns": [
+      {
+        "name": "asset_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "date",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "new",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "old",
+        "ordinal": 3,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5ec0bd031d6749da190cadcab88be225f11fef0d78728c19989dd244680a0ab8"
+}

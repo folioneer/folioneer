@@ -8,6 +8,7 @@ use crate::context::sync::HoldingInconsistency;
 use crate::core::cash::{is_cash_asset, system_cash_asset_id};
 use crate::core::logger::BACKEND;
 use crate::use_cases::shared::inconsistency::holding_inconsistency;
+use crate::use_cases::shared::unrecorded_split::{unrecorded_splits, UnrecordedSplit};
 use crate::use_cases::shared::valuation::{
     at_rate, convert_at_rate, holding_metric_for_span, load_priced_assets, load_rate_map_for_dates,
     market_valued_flow_dates, PricedAsset, RateMap, MICRO,
@@ -65,6 +66,9 @@ pub struct HoldingDetail {
     /// MKT-205/206 — whether the latest price is outdated for this asset; false without a
     /// price, for cash, and in the read-only view of a past date.
     pub price_outdated: bool,
+    /// MKT-231 — the holding's unrecorded splits, oldest first; empty for cash and in the
+    /// read-only view of a past date.
+    pub unrecorded_splits: Vec<UnrecordedSplit>,
     /// Unrealized gain/loss in account currency (i64 micros). None when no price exists, or
     /// when a foreign holding has no usable rate (MKT-033/034, FXR-031/034).
     /// 0 (not None) when current price equals average price (MKT-033).
@@ -529,6 +533,20 @@ impl AccountDetailsUseCase {
                 .as_deref()
                 .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
                 .is_some_and(|date| is_price_outdated(&asset.kind, &asset.class, date, today_date));
+            // MKT-231 — the reported splits this account held through without recording.
+            let unrecorded_splits = if is_cash {
+                Vec::new()
+            } else {
+                let reported = self
+                    .asset_service
+                    .reported_splits(&holding.asset_id)
+                    .await
+                    .map_err(|e| {
+                        tracing::error!(target: BACKEND, asset_id = %holding.asset_id, err = ?e, "get_account_details: reported_splits failed");
+                        AccountError::DatabaseError
+                    })?;
+                unrecorded_splits(&all_txs, &holding.asset_id, &reported, today_date)
+            };
             details.push(HoldingDetail {
                 asset_id: holding.asset_id,
                 asset_name: asset.name,
@@ -541,7 +559,8 @@ impl AccountDetailsUseCase {
                 current_price,
                 current_price_date,
                 current_price_source,
-                price_outdated, // MKT-206
+                price_outdated,    // MKT-206
+                unrecorded_splits, // MKT-231
                 unrealized_pnl,
                 performance_pct,
                 dividends_received,
@@ -922,6 +941,7 @@ impl AccountDetailsUseCase {
                 current_price_date,
                 current_price_source,
                 price_outdated: false, // MKT-206 — none in the past-date view
+                unrecorded_splits: Vec::new(), // MKT-231 — none in the past-date view
                 unrealized_pnl,
                 performance_pct,
                 dividends_received,
@@ -975,6 +995,7 @@ impl AccountDetailsUseCase {
                 current_price_date: None,
                 current_price_source: None,
                 price_outdated: false, // MKT-206 — none in the past-date view
+                unrecorded_splits: Vec::new(), // MKT-231 — none in the past-date view
                 unrealized_pnl: None,
                 performance_pct: None,
                 dividends_received: 0,
@@ -2363,6 +2384,78 @@ mod tests {
             .await
             .unwrap();
         asset.id
+    }
+
+    // MKT-231 (#529) — a holding lists the reported splits the account held through without
+    // recording one; the past-date view lists none.
+    #[tokio::test]
+    async fn mkt_231_a_holding_lists_its_unrecorded_splits_in_the_live_view_only() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let account = make_eur_account(&account_svc).await;
+        let asset_id = make_stock(&asset_svc, "SPLIT", "EUR").await;
+        account_svc
+            .open_holding(
+                &account.id,
+                asset_id.clone(),
+                "2020-01-02".into(),
+                10_000_000,
+                1_000_000_000,
+            )
+            .await
+            .unwrap();
+        asset_svc
+            .record_reported_splits(
+                &asset_id,
+                "2000-01-01",
+                &[crate::context::asset::DatedSplitFactor {
+                    date: "2099-01-01".into(),
+                    new: 3,
+                    old: 1,
+                }],
+            )
+            .await
+            .unwrap();
+        let today = Local::now().date_naive();
+        let split_date = today.format("%Y-%m-%d").to_string();
+        asset_svc
+            .record_reported_splits(
+                &asset_id,
+                &split_date,
+                &[crate::context::asset::DatedSplitFactor {
+                    date: split_date.clone(),
+                    new: 2,
+                    old: 1,
+                }],
+            )
+            .await
+            .unwrap();
+
+        let uc = AccountDetailsUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let live = uc.get_account_details(&account.id, None).await.unwrap();
+        let holding = live
+            .holdings
+            .iter()
+            .find(|h| h.asset_name == "SPLIT")
+            .unwrap();
+        assert_eq!(
+            holding.unrecorded_splits,
+            vec![UnrecordedSplit {
+                date: split_date,
+                new: 2,
+                old: 1
+            }],
+            "today's split is unrecorded, a split dated after today not yet"
+        );
+        let past = uc
+            .get_account_details(&account.id, Some(&today.format("%Y-%m-%d").to_string()))
+            .await
+            .unwrap();
+        assert!(past.holdings.iter().all(|h| h.unrecorded_splits.is_empty()));
     }
 
     // MKT-205/206 — each holding says whether its price is outdated, and the account counts

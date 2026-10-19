@@ -2,6 +2,7 @@ use super::asset_price::AssetPrice;
 use super::category::AssetCategory;
 use super::exchange::{self, Exchange};
 use super::isin::validate_isin;
+use super::reported_split::ReportedSplit;
 use crate::context::asset::error::AssetError;
 use crate::shared::domain::{Rank, RecordKind, SyncedRecord};
 use anyhow::Result;
@@ -1566,7 +1567,14 @@ pub trait AssetRepository: Send + Sync {
         kind: RecordKind,
         identity: &str,
     ) -> Result<()>;
-    /// SYN-083 — deletes every asset price, on `conn`.
+    /// Writes a reported split verbatim, stamped with `rank`, on `conn` (MKT-230, CFR-050).
+    async fn apply_reported_split(
+        &self,
+        conn: &mut SqliteConnection,
+        split: &ReportedSplit,
+        rank: &Rank,
+    ) -> Result<()>;
+    /// SYN-083 — deletes every asset price and every reported split, on `conn`.
     async fn discard_asset_prices(&self, conn: &mut SqliteConnection) -> Result<()>;
     /// Ensures the system-seeded `category` and `asset` exist, on `conn` (SYN-027/CSH-010);
     /// rows already present are left untouched.

@@ -1968,6 +1968,97 @@ async fn agt_070_a_session_lists_the_transactions_of_an_account() {
     assert!(past["transactions"].as_array().expect("rows").is_empty());
 }
 
+// AGT-071 / AGT-040 / MKT-230/231 (#529) — get_price lists every reported split of the asset,
+// whatever the date asked; list_holdings lists a holding's unrecorded splits, and a split
+// recorded on that date ends it.
+#[tokio::test]
+async fn agt_071_an_agent_reads_the_reported_and_the_unrecorded_splits() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+    let asset = bench
+        .assets
+        .get_non_cash_assets()
+        .await
+        .expect("assets")
+        .remove(0);
+    call(
+        "record_opening_balance",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": "10", "total_cost": 4000, "date": "2020-01-06" }),
+    )
+    .await
+    .expect("recorded");
+    bench
+        .assets
+        .record_reported_splits(
+            &asset.id,
+            "2019-01-01",
+            &[
+                crate::context::asset::DatedSplitFactor {
+                    date: "2022-07-18".into(),
+                    new: 20,
+                    old: 1,
+                },
+                crate::context::asset::DatedSplitFactor {
+                    date: "2024-03-04".into(),
+                    new: 1,
+                    old: 10,
+                },
+            ],
+        )
+        .await
+        .expect("kept");
+
+    let read = call("get_price", json!({ "asset": "CW8", "date": "2020-01-06" }))
+        .await
+        .expect("answered");
+    assert_eq!(
+        read["reported_splits"],
+        json!([
+            { "date": "2022-07-18", "new": 20, "old": 1 },
+            { "date": "2024-03-04", "new": 1, "old": 10 },
+        ])
+    );
+    assert_eq!(read.as_object().expect("an object").len(), 6);
+
+    let unrecorded = |holdings: &Value| {
+        holdings["holdings"]
+            .as_array()
+            .expect("holdings")
+            .iter()
+            .find(|holding| holding["asset_reference"] == "CW8")
+            .expect("CW8 is held")["unrecorded_splits"]
+            .clone()
+    };
+    let holdings = call("list_holdings", json!({ "account": "PEA" }))
+        .await
+        .expect("answered");
+    assert_eq!(
+        unrecorded(&holdings),
+        json!([
+            { "date": "2022-07-18", "new": 20, "old": 1 },
+            { "date": "2024-03-04", "new": 1, "old": 10 },
+        ])
+    );
+    call(
+        "record_split",
+        json!({ "account": "PEA", "asset": "CW8", "new": 20, "old": 1, "date": "2022-07-18" }),
+    )
+    .await
+    .expect("recorded");
+    let holdings = call("list_holdings", json!({ "account": "PEA" }))
+        .await
+        .expect("answered");
+    assert_eq!(
+        unrecorded(&holdings),
+        json!([{ "date": "2024-03-04", "new": 1, "old": 10 }])
+    );
+}
+
 // AGT-071 — a session reads the price the application holds for an asset at a date: the
 // price of that date or the closest earlier one, with its own date and its source, or
 // plainly that there is none. It is a read.

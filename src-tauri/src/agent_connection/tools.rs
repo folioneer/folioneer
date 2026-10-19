@@ -389,7 +389,8 @@ impl AgentTools {
     }
 
     /// AGT-071 — the price an asset has at a date, or the closest earlier one, with its own
-    /// date and its source; `no_price` when it has none up to that date.
+    /// date and its source; `no_price` when it has none up to that date. Beside it, every
+    /// reported split of the asset (MKT-230), whatever the date.
     async fn get_price(&self, arguments: &Value) -> Result<Value, Refusal> {
         let asset = text(arguments, "asset")?;
         // A date that is not text is refused, never read as today (AGT-043).
@@ -405,6 +406,11 @@ impl AgentTools {
                 code: refusal.code,
                 message: refusal.message,
             })?;
+        let reported_splits = self
+            .asset_service
+            .reported_splits(&read.asset.id)
+            .await
+            .map_err(|error| unreadable("get_price", &error))?;
         Ok(serde_json::json!({
             "status": if read.price.is_some() { "priced" } else { "no_price" },
             "asset": read.asset.reference,
@@ -416,6 +422,11 @@ impl AgentTools {
                 "price": price.price,
                 "source": price.source,
             })),
+            "reported_splits": reported_splits.iter().map(|split| serde_json::json!({
+                "date": split.date,
+                "new": split.new,
+                "old": split.old,
+            })).collect::<Vec<_>>(),
         }))
     }
 

@@ -24,7 +24,7 @@ Out of scope here: how anything is shown (SYN-063/066 own the status surface), h
 
 > _Scenario._ Desktop renames "PEA" to "PEA Boursorama" (timestamp 1 010). Laptop syncs, sees it, and renames it to "PEA Bourso" — based on 1 010: sequential, applies, nobody is told. Office receives Laptop's rename before Desktop's: it is based on a state Office has not seen, so it waits; Desktop's arrives, then Laptop's applies as sequential. Had Laptop renamed before syncing, its change would be based on the older state: concurrent, and Desktop is told.
 
-**CFR-012 — Record identity per kind (backend)**: Two changes concern the same record when they have the same kind and the same identity: accounts, categories, assets, and transactions by their identifier; fee schedules by their account and asset (CFR-034); currency pairs by their two currencies (CFR-034); asset prices by asset and observed date; currency rates by pair and observed date; holding notes by account and asset; portfolio settings by their name. Identity here means identity _between devices_ — whatever key a device stores a record under locally is its own business.
+**CFR-012 — Record identity per kind (backend)**: Two changes concern the same record when they have the same kind and the same identity: accounts, categories, assets, and transactions by their identifier; fee schedules by their account and asset (CFR-034); currency pairs by their two currencies (CFR-034); asset prices by asset and observed date; reported splits by asset and date (MKT-230); currency rates by pair and observed date; holding notes by account and asset; portfolio settings by their name. Identity here means identity _between devices_ — whatever key a device stores a record under locally is its own business.
 
 > _Scenario._ Desktop records the TotalEnergies price for 2026-08-20; Laptop records the TotalEnergies price for 2026-08-21. Different identities — both prices exist afterwards, no conflict.
 
@@ -116,7 +116,7 @@ Out of scope here: how anything is shown (SYN-063/066 own the status surface), h
 
 ### Observations (050–059)
 
-**CFR-050 — Observations: latest write wins, whatever the source (backend)**: Asset prices and currency rates are observations of a value on a date (CFR-012). Between two changes to the same observation, the later per CFR-010 prevails — **origin is not considered** (ADR-012: latest write wins, source is metadata) — and nothing is reported: an observation has no authorship worth defending. Observations on different dates are different records; both survive.
+**CFR-050 — Observations: latest write wins, whatever the source (backend)**: Asset prices, reported splits (MKT-230) and currency rates are observations of a value on a date (CFR-012). Between two changes to the same observation, the later per CFR-010 prevails — **origin is not considered** (ADR-012: latest write wins, source is metadata) — and nothing is reported: an observation has no authorship worth defending. Observations on different dates are different records; both survive.
 
 > _Scenario._ Desktop's user hand-corrects Friday's TotalEnergies close to 58.10 (1 000); Laptop's scheduled download records 58.25 for the same Friday (1 300). Result: 58.25 everywhere — the later write, as ADR-012 decides for a single device too. Nothing is reported.
 

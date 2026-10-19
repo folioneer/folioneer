@@ -1324,7 +1324,7 @@ export type AccountError =
  */
 { code: "InvalidCountry"; country: string } | 
 /**
- * ACC-043 — the wrapper is neither in the generic list nor in the account's country's list.
+ * ACC-043 — the wrapper is not in the wrapper lists, nor the one the account already has.
  */
 { code: "WrapperNotAvailable"; wrapper: string } | 
 /**
@@ -3312,6 +3312,11 @@ current_price_source: AssetPriceSource | null;
  */
 price_outdated: boolean; 
 /**
+ * MKT-231 — the holding's unrecorded splits, oldest first; empty for cash and in the
+ * read-only view of a past date.
+ */
+unrecorded_splits: UnrecordedSplit[]; 
+/**
  * Unrealized gain/loss in account currency (i64 micros). None when no price exists, or
  * when a foreign holding has no usable rate (MKT-033/034, FXR-031/034).
  * 0 (not None) when current price equals average price (MKT-033).
@@ -4318,7 +4323,7 @@ quantity_micros: number | null;
  */
 note: string | null }
 /**
- * The eleven synced record kinds (SYN-021). `holdings`, performance figures, and device-local
+ * The twelve synced record kinds (SYN-021). `holdings`, performance figures, and device-local
  * data (scheduled fetch config, window state, the sync configuration itself) are deliberately
  * absent (SYN-022/023).
  */
@@ -4364,9 +4369,13 @@ export type RecordKind =
  */
 "HoldingNote" | 
 /**
- * A portfolio-wide setting, identified by its name (TODO-032: the reference currency).
+ * A portfolio-wide setting, identified by its name: the reference currency (FXR-120).
  */
-"PortfolioSetting"
+"PortfolioSetting" | 
+/**
+ * A split a price provider reports for an asset, identified by (asset_id, date) (MKT-230).
+ */
+"ReportedSplit"
 /**
  * Parameters for recording a stock split on a held asset (SPL-010).
  */
@@ -5389,6 +5398,23 @@ last_price: number | null;
  * ISO 8601 date of `last_price`; absent when there is no recorded price.
  */
 last_price_date: string | null }
+/**
+ * A reported split an account holding the asset has not recorded (MKT-231). A read
+ * model, never persisted.
+ */
+export type UnrecordedSplit = { 
+/**
+ * The reported split's date, ISO `yyyy-mm-dd`.
+ */
+date: string; 
+/**
+ * New shares of its split factor (SPL-062).
+ */
+new: number; 
+/**
+ * Old shares of its split factor (SPL-062).
+ */
+old: number }
 /**
  * Parameters for updating an existing account.
  */

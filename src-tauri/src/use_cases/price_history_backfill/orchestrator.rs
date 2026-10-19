@@ -100,6 +100,21 @@ impl PriceHistoryBackfillUseCase {
             });
         }
 
+        // MKT-230 — the splits the provider reports from the held period's start, read
+        // before anything is kept: a failed reading rejects the backfill as a failed
+        // close request does (MKT-193B, MKT-195).
+        let from = from.to_string();
+        let splits = self
+            .price_provider
+            .fetch_splits(&symbol, &from)
+            .await
+            .map_err(|error| {
+                tracing::warn!(target: BACKEND, symbol = %symbol, from = %from, err = ?error, "price history backfill: split request failed");
+                PriceHistoryBackfillTask::ProviderUnreachable
+            })?;
+        self.asset_service
+            .record_reported_splits(asset_id, &from, &splits)
+            .await?;
         Ok(self
             .asset_service
             .record_missing_daily_closes(asset_id, closes)
@@ -316,11 +331,19 @@ mod tests {
         asset_service
     }
 
+    /// Builds the use case; a test that sets no expectation of its own on the splits gets
+    /// a provider reporting none and a service keeping them (MKT-230).
     fn make_use_case(
         account_service: MockAccountServiceContract,
-        asset_service: MockAssetServiceContract,
-        price_provider: MockPriceProvider,
+        mut asset_service: MockAssetServiceContract,
+        mut price_provider: MockPriceProvider,
     ) -> PriceHistoryBackfillUseCase {
+        price_provider
+            .expect_fetch_splits()
+            .returning(|_, _| Ok(Vec::new()));
+        asset_service
+            .expect_record_reported_splits()
+            .returning(|_, _, _| Ok(()));
         PriceHistoryBackfillUseCase::new(
             Arc::new(account_service),
             Arc::new(asset_service),
@@ -876,5 +899,82 @@ mod tests {
             held_period_windows(date("2024-06-30"), date("2024-06-30")),
             vec![(date("2024-06-30"), date("2024-06-30"))]
         );
+    }
+
+    // MKT-230 (#529) — the splits the provider reports from the held period's start are
+    // read and kept as the asset's reported splits, beside the closes.
+    #[tokio::test]
+    async fn mkt_230_a_backfill_keeps_the_splits_reported_since_the_held_period_starts() {
+        let mut price_provider = MockPriceProvider::new();
+        price_provider
+            .expect_fetch_daily_closes()
+            .returning(|_, _, _| Ok(Some(vec![close("2024-02-02")])));
+        price_provider
+            .expect_fetch_splits()
+            .withf(|symbol, from| symbol == "AI" && from == "2024-02-01")
+            .times(1)
+            .returning(|_, _| {
+                Ok(vec![crate::context::asset::DatedSplitFactor {
+                    date: "2024-04-02".into(),
+                    new: 2,
+                    old: 1,
+                }])
+            });
+        let mut asset_service = asset_service_serving(make_asset("AI", false, false));
+        asset_service
+            .expect_record_reported_splits()
+            .withf(|asset_id, from, splits| {
+                asset_id == ASSET
+                    && from == "2024-02-01"
+                    && splits.len() == 1
+                    && splits[0].date == "2024-04-02"
+                    && (splits[0].new, splits[0].old) == (2, 1)
+            })
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+        asset_service
+            .expect_record_missing_daily_closes()
+            .times(1)
+            .returning(|_, _| Ok(filled(1)));
+
+        make_use_case(
+            account_holding(vec![make_transaction(ASSET, "2024-02-01")], 1_000_000),
+            asset_service,
+            price_provider,
+        )
+        .backfill(ACCOUNT, ASSET)
+        .await
+        .unwrap();
+    }
+
+    // MKT-230 / MKT-193B (#529) — a failed split reading rejects the backfill as a failed
+    // close request does, and nothing of the reading is kept.
+    #[tokio::test]
+    async fn mkt_230_a_failed_split_reading_rejects_the_backfill_and_keeps_nothing() {
+        let mut price_provider = MockPriceProvider::new();
+        price_provider
+            .expect_fetch_daily_closes()
+            .returning(|_, _, _| Ok(Some(vec![close("2024-02-02")])));
+        price_provider
+            .expect_fetch_splits()
+            .times(1)
+            .returning(|_, _| Err(anyhow::anyhow!("split request failed")));
+        let mut asset_service = asset_service_serving(make_asset("AI", false, false));
+        asset_service.expect_record_reported_splits().times(0);
+        asset_service.expect_record_missing_daily_closes().times(0);
+
+        let error = make_use_case(
+            account_holding(vec![make_transaction(ASSET, "2024-02-01")], 1_000_000),
+            asset_service,
+            price_provider,
+        )
+        .backfill(ACCOUNT, ASSET)
+        .await
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            PriceHistoryBackfillError::Task(PriceHistoryBackfillTask::ProviderUnreachable)
+        ));
     }
 }

@@ -1,3 +1,4 @@
+use super::reported_split::{DatedSplitFactor, ReportedSplit};
 use crate::context::asset::error::AssetError;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -156,6 +157,24 @@ pub trait PriceProvider: Send + Sync {
             "daily close series not supported by this provider for symbol: {symbol}"
         ))
     }
+
+    /// Fetches the splits the provider reports for `symbol` from `from` (ISO date)
+    /// through today, oldest first (MKT-230).
+    ///
+    /// - `Ok(splits)` — what the provider reports; empty when it reports none.
+    /// - `Err(_)` — transport or parse failure, or a split it reports that is not two
+    ///   positive whole numbers: the backfill is rejected (MKT-195), the scheduled run
+    ///   skips the asset (SPF-041), as for the closes (MKT-193B).
+    ///
+    /// Defaulted to no split: a provider that knows none reports none.
+    async fn fetch_splits(
+        &self,
+        symbol: &str,
+        from: &str,
+    ) -> anyhow::Result<Vec<DatedSplitFactor>> {
+        let _ = (symbol, from);
+        Ok(Vec::new())
+    }
 }
 
 /// Interface for AssetPrice persistence (upsert by (asset_id, date), MKT-025).
@@ -173,6 +192,20 @@ pub trait AssetPriceRepository: Send + Sync {
         -> Result<Option<AssetPrice>>;
     /// Deletes the price record for the given (asset_id, date) pair; no-op if absent (MKT-090).
     async fn delete(&self, asset_id: &str, date: &str) -> Result<()>;
+    /// MKT-230 — makes `splits` the reported splits of `asset_id` dated from `from` on, in
+    /// one transaction: an unchanged split writes nothing, a changed one is overwritten, one
+    /// no longer reported is removed — an application change each (CFR-016). Returns whether
+    /// anything changed.
+    async fn record_reported_splits(
+        &self,
+        asset_id: &str,
+        from: &str,
+        splits: &[DatedSplitFactor],
+    ) -> Result<bool>;
+    /// MKT-230 — the reported splits of `asset_id`, oldest first.
+    async fn get_reported_splits(&self, asset_id: &str) -> Result<Vec<ReportedSplit>>;
+    /// MKT-230 — every reported split, by asset then date (the sync snapshot, SYN-013).
+    async fn get_all_reported_splits(&self) -> Result<Vec<ReportedSplit>>;
     /// Atomically deletes the record at `original_date` and upserts `new_price` (MKT-084).
     async fn replace_atomic(
         &self,
