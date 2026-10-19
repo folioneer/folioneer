@@ -859,7 +859,6 @@ impl HoldingTransactionUseCase {
     /// Records a write-off of a held asset (WOF-010/020): the asset exists and is not
     /// archived here; the account, the Cash Asset, what is held on the date and the replay
     /// are the account BC's. Returns `WriteOffError`.
-    #[allow(clippy::too_many_arguments)]
     pub async fn record_write_off(
         &self,
         account_id: &str,
@@ -877,7 +876,6 @@ impl HoldingTransactionUseCase {
     }
 
     /// AGT-072 — what recording a write-off would do, nothing written, with its checks.
-    #[allow(clippy::too_many_arguments)]
     pub async fn preview_write_off(
         &self,
         account_id: &str,
