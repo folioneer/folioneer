@@ -296,7 +296,7 @@
     "session_removed_other": "{{count}} transactions removed.",
     "session_kept_one": "{{count}} kept: a transaction recorded since depends on it.",
     "session_kept_other": "{{count}} kept: a transaction recorded since depends on them.",
-    "connection_covers_record": "record opening balances, purchases, sales, deposits, withdrawals, dividends, splits, free shares and prices — up to 500 in a session — each marked as recorded by it.",
+    "connection_covers_record": "record transactions and prices — up to 500 in a session — each marked as recorded by it.",
     "removal_title": "{{client}} asks to remove a transaction you typed",
     "transaction_date": "Date",
     "transaction_account": "Account",

@@ -278,6 +278,69 @@ pub enum OpenHoldingError {
     UseCase(#[from] OpenHoldingTask),
 }
 
+/// Application-layer rejections specific to the `record_write_off` use case —
+/// cross-BC asset checks performed by the orchestrator before delegating to
+/// `AccountService::record_write_off`.
+///
+/// Tagged with `#[serde(tag = "code")]` so it serializes verbatim across the
+/// Tauri boundary into a flat `{ code: "..." }` shape.
+#[derive(Debug, thiserror::Error, serde::Serialize, specta::Type, Clone)]
+#[serde(tag = "code")]
+pub enum WriteOffTask {
+    /// No asset exists with the requested ID (WOF-010).
+    #[error("Asset not found")]
+    AssetNotFound,
+    /// Target asset is archived — nothing of it is written off (WOF-010, as SEL-037).
+    #[error("Cannot write off an archived asset")]
+    ArchivedAsset,
+}
+
+/// Use-case composite for the **record write-off** failure surface.
+///
+/// - `AccountError` — every account-BC rejection (lookup, infrastructure, the
+///   factory's date / quantity validation WOF-011, the Cash Asset and the replay
+///   guards WOF-010/012).
+/// - `WriteOffTask` — use-case-owned (this file), the cross-BC asset checks.
+#[derive(Debug, thiserror::Error, serde::Serialize, specta::Type)]
+#[serde(untagged)]
+pub enum WriteOffError {
+    /// Account-BC rejection (lookup, infra, factory + replay validation).
+    #[error(transparent)]
+    Account(#[from] AccountError),
+    /// Use-case-layer rejection (cross-BC asset checks).
+    #[error(transparent)]
+    UseCase(#[from] WriteOffTask),
+}
+
+#[cfg(test)]
+mod write_off_error_wire_tests {
+    use super::*;
+
+    /// error-model.md — every `WriteOffError` variant must serialize to a flat
+    /// object carrying a string `code`.
+    #[test]
+    fn each_variant_emits_a_code() {
+        let cases: Vec<WriteOffError> = vec![
+            AccountError::AccountNotFound {
+                account_id: "acc-1".to_string(),
+            }
+            .into(),
+            WriteOffTask::AssetNotFound.into(),
+            WriteOffTask::ArchivedAsset.into(),
+            AccountError::TradeOnCashAsset.into(),
+            AccountError::ClosedPosition.into(),
+            AccountError::CascadingOversell.into(),
+        ];
+        for err in cases {
+            let value = serde_json::to_value(&err).expect("serialize WriteOffError");
+            assert!(
+                value.get("code").and_then(|c| c.as_str()).is_some(),
+                "WriteOffError variant did not emit a string `code`: {value}"
+            );
+        }
+    }
+}
+
 /// Application-layer rejections specific to the `record_management_fee` use case —
 /// cross-BC asset and holding checks performed by the orchestrator before
 /// delegating to `AccountService::record_management_fee`.
