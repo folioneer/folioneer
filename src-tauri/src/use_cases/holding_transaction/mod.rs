@@ -33,9 +33,10 @@ pub use named_listing::{
 };
 pub use named_recording::{
     code_of, decimal, decimal_to_micro, AccountAsOf, AsShown, CashAmount, Change, ChangeAsked,
-    Correction, CorrectionFields, DividendAmount, FreeShares, HeldAsOf, Previewed, PriceAt,
-    Recorded, RecordedPrice, Recording, Refusal, SessionRecordings, SessionRemoval, StockSplit,
-    Target, Trade, TradeAmount, TypedTransaction, WriteOff,
+    Correction, CorrectionFields, DividendAmount, FreeShares, HeldAsOf, InterestCredit,
+    ManagementFee, Previewed, PriceAt, Recorded, RecordedPrice, Recording, Refusal,
+    SessionRecordings, SessionRemoval, StockSplit, Target, Trade, TradeAmount, TypedTransaction,
+    WriteOff,
 };
 pub use orchestrator::{
     DraftKind, HoldingTransactionUseCase, NamedTarget, OpeningBalanceDraft, OpeningBalancePreview,

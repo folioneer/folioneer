@@ -214,6 +214,44 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "record_interest",
+            title: "Record interest",
+            only_reads: false,
+            description: "Record interest credited in an account: in units to an interest-bearing asset held there, or, with no asset, to the account's cash in its currency. Give exactly one of percent, the share of what is held on the date that is credited, and quantity, what is credited. The recording follows the application's rules and is marked as recorded by this agent; it is not previewed. Figures are decimals with a dot (2.5 for 2.5 %), not millionths.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "account": { "type": "string", "description": "The account's name, as list_accounts gives it." },
+                    "asset": { "type": "string", "description": "The asset's name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared. Leave it out for interest on the account's cash." },
+                    "percent": { "type": ["string", "number"], "description": "The percent of what is held on the date that is credited, 2.5 for 2.5 %." },
+                    "quantity": { "type": ["string", "number"], "description": "What is credited: units of the asset, or an amount in the account's currency for its cash." },
+                    "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." },
+                    "note": { "type": "string", "description": "A note kept with the transaction." }
+                },
+                "required": ["account"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "record_management_fee",
+            title: "Record a management fee",
+            only_reads: false,
+            description: "Record a management fee taken in units of an asset held in an account, as an insurance contract takes it: the quantity held falls, its cost stays and no cash moves. Give exactly one of percent, the share of what is held on the date that is removed, and resulting_quantity, what the holding holds after the fee. A fee the holding's fee schedule already generated for that period is refused: ask to change that one with request_change instead. The recording follows the application's rules and is marked as recorded by this agent; it is not previewed. Figures are decimals with a dot (0.5 for 0.5 %), not millionths.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "account": { "type": "string", "description": "The account's name, as list_accounts gives it." },
+                    "asset": { "type": "string", "description": "The asset's name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
+                    "percent": { "type": ["string", "number"], "description": "The percent of what is held on the date that is removed, 0.5 for 0.5 %." },
+                    "resulting_quantity": { "type": ["string", "number"], "description": "What the holding holds after the fee." },
+                    "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." },
+                    "note": { "type": "string", "description": "A note kept with the transaction." }
+                },
+                "required": ["account", "asset"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
             name: "record_price",
             title: "Record a price",
             only_reads: false,

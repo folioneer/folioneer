@@ -1328,7 +1328,11 @@ impl HoldingTransactionUseCase {
     /// - **Cross-BC asset-side failure** (`ensure_cash_asset` failure):
     ///   surfaced as `DatabaseError` after `tracing::error!` preserves the
     ///   asset-side diagnostic chain server-side.
-    async fn ensure_cash_for(&self, account_id: &str, op: &str) -> Result<(), AccountError> {
+    pub(super) async fn ensure_cash_for(
+        &self,
+        account_id: &str,
+        op: &str,
+    ) -> Result<(), AccountError> {
         let account = self
             .account_service
             .get_by_id(account_id)

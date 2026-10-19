@@ -1,9 +1,9 @@
 use super::domain::{
-    Account, AccountJournal, AccountRepository, AgentRecording, FeeCatchUpPosition,
-    FeeCatchUpRepository, FeeSchedule, FeeScheduleRepository, Holding, HoldingNote,
-    HoldingNoteRepository, HoldingRepository, HoldingSnapshot, JournalFilter, ManagementFeeRemoval,
-    SessionRecording, StockSplitPosition, ThresholdDirection, Transaction, TransactionRepository,
-    UpdateFrequency, WriteOffReason,
+    generated_deduction_id, Account, AccountJournal, AccountRepository, AgentRecording,
+    FeeCatchUpPosition, FeeCatchUpRepository, FeeSchedule, FeeScheduleRepository, Holding,
+    HoldingNote, HoldingNoteRepository, HoldingRepository, HoldingSnapshot, JournalFilter,
+    ManagementFeeRemoval, SessionRecording, StockSplitPosition, ThresholdDirection, Transaction,
+    TransactionRepository, UpdateFrequency, WriteOffReason,
 };
 use super::error::AccountError;
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
@@ -1593,6 +1593,36 @@ impl AccountService {
             })
     }
 
+    /// AGT-066 — whether the holding's fee schedule has generated the deduction of the
+    /// period `date` falls in (FEE-042, FEE-048). False without a schedule, and for a date
+    /// that does not parse: the recording refuses that one itself.
+    pub async fn has_generated_fee_for_period(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        date: &str,
+    ) -> Result<bool, AccountError> {
+        let Some(schedule) = self.get_fee_schedule(account_id, asset_id).await? else {
+            return Ok(false);
+        };
+        let Some(boundary) = NaiveDate::parse_from_str(date, "%Y-%m-%d")
+            .ok()
+            .and_then(|day| schedule.frequency.period_end_containing(day))
+        else {
+            return Ok(false);
+        };
+        let id = generated_deduction_id(
+            account_id,
+            asset_id,
+            &boundary.format("%Y-%m-%d").to_string(),
+        );
+        let generated = self.transaction_repo.get_by_id(&id).await.map_err(|e| {
+            tracing::error!(target: BACKEND, account_id = %account_id, err = ?e, "has_generated_fee_for_period: lookup failed");
+            AccountError::DatabaseError
+        })?;
+        Ok(generated.is_some_and(|tx| tx.account_id == account_id))
+    }
+
     /// Returns every active fee schedule across all accounts (FEE-040 catch-up).
     pub async fn list_active_fee_schedules(&self) -> Result<Vec<FeeSchedule>, AccountError> {
         let repo = self.fee_schedule_repo()?;
@@ -2315,6 +2345,13 @@ pub trait AccountServiceContract: Send + Sync {
     async fn has_holding_entries_for_asset(&self, asset_id: &str) -> StdResult<bool, AccountError>;
     /// Returns the count of active holdings and total transactions for an account (ACC-020).
     async fn get_deletion_summary(&self, account_id: &str) -> StdResult<(u32, u32), AccountError>;
+    /// AGT-066 — whether the holding's schedule generated the fee of `date`'s period.
+    async fn has_generated_fee_for_period(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        date: &str,
+    ) -> StdResult<bool, AccountError>;
     /// Returns every active fee schedule across all accounts (FEE-040 catch-up).
     async fn list_active_fee_schedules(&self) -> StdResult<Vec<FeeSchedule>, AccountError>;
     /// Returns the active fee schedules of one account (FEE-074).
@@ -2828,6 +2865,15 @@ impl AccountServiceContract for AccountService {
 
     async fn get_deletion_summary(&self, account_id: &str) -> StdResult<(u32, u32), AccountError> {
         AccountService::get_deletion_summary(self, account_id).await
+    }
+
+    async fn has_generated_fee_for_period(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        date: &str,
+    ) -> StdResult<bool, AccountError> {
+        AccountService::has_generated_fee_for_period(self, account_id, asset_id, date).await
     }
 
     async fn list_active_fee_schedules(&self) -> StdResult<Vec<FeeSchedule>, AccountError> {

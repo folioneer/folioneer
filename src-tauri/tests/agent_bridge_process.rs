@@ -80,6 +80,8 @@ fn agt_010_the_program_started_with_mcp_lists_its_tools() {
             "record_split",
             "record_free_shares",
             "record_write_off",
+            "record_interest",
+            "record_management_fee",
             "record_price",
             "add_asset",
             "correct_recording",

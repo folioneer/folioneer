@@ -61,6 +61,18 @@ impl FeeFrequency {
     }
 }
 
+/// FEE-048 — the deterministic identity of a generated deduction: derived from the holding
+/// it charges (account, asset) and its period boundary, never from the schedule's own id, so
+/// two devices generating the same period converge on one transaction record (CFR-034/043).
+/// One-off deductions (FEE-02x) keep a freshly generated uuid v4 — this function is never
+/// called for them.
+pub fn generated_deduction_id(account_id: &str, asset_id: &str, period_boundary: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(format!("{account_id}|{asset_id}|{period_boundary}"));
+    let hex = format!("{digest:x}");
+    format!("fee-{}", &hex[..32])
+}
+
 /// Last calendar day of `year`/`month`. `None` only at the ceiling of representable dates.
 fn last_day_of_month(year: i32, month: u32) -> Option<NaiveDate> {
     let (next_year, next_month) = if month == 12 {
@@ -276,6 +288,32 @@ pub trait FeeCatchUpRepository: Send + Sync {
 #[cfg(test)]
 mod rate_bound_tests {
     use super::*;
+
+    // FEE-048/CFR-034/043 — same (account, asset, period) always yields the same id, so two
+    // devices generating the same period independently converge on one transaction.
+    #[test]
+    fn generated_deduction_id_is_stable_for_the_same_holding_and_period() {
+        let first = generated_deduction_id("acc-1", "asset-1", "2026-08-31");
+        let second = generated_deduction_id("acc-1", "asset-1", "2026-08-31");
+        assert_eq!(first, second);
+    }
+
+    // FEE-048 — a different period boundary yields a different id.
+    #[test]
+    fn generated_deduction_id_differs_for_a_different_period() {
+        let august = generated_deduction_id("acc-1", "asset-1", "2026-08-31");
+        let september = generated_deduction_id("acc-1", "asset-1", "2026-09-30");
+        assert_ne!(august, september);
+    }
+
+    // FEE-048 — a different holding (account or asset) yields a different id for the same
+    // period.
+    #[test]
+    fn generated_deduction_id_differs_for_a_different_holding() {
+        let one = generated_deduction_id("acc-1", "asset-1", "2026-08-31");
+        let other = generated_deduction_id("acc-2", "asset-1", "2026-08-31");
+        assert_ne!(one, other);
+    }
 
     // FEE-040 / FEE-061 — the last period completed on a day: its own when the day ends a
     // period, otherwise the one before, across a year's start.
