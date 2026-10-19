@@ -26,9 +26,11 @@ const baseRow: HoldingRowViewModel = {
   quantity: "2.000000",
   quantityMicro: 2_000_000,
   averagePrice: "100.00",
+  averagePriceMicro: 100_000_000,
   currentValue: "300.00",
   realizedPnl: "0.00",
   realizedPnlRaw: 0,
+  realizedLost: null,
   canEnterPrice: true,
   currentPrice: { kind: "present", formatted: "150.00" },
   currentPriceDate: "2024-01-15",
@@ -122,6 +124,57 @@ describe("HoldingRow — price cell (MKT-030, MKT-140, MKT-142)", () => {
   it("renders no fee rate marker without a schedule", () => {
     const { container } = renderInTable({ ...baseRow, managementFees: "12,34" });
     expect(container.querySelector("#holding-fee-rate-asset-1")).toBeNull();
+  });
+
+  // WOF-050 — the write-off action opens the form with the holding's figures; the
+  // as-of view and an archived asset have none.
+  it("offers the write-off action with the holding's figures", () => {
+    const onWriteOff = vi.fn();
+    const row = (readOnly: boolean) => (
+      <table>
+        <tbody>
+          <HoldingRow
+            row={baseRow}
+            accountId="account-1"
+            onBuy={vi.fn()}
+            onSell={vi.fn()}
+            onWriteOff={onWriteOff}
+            onPriceHistory={vi.fn()}
+            readOnly={readOnly}
+          />
+        </tbody>
+      </table>
+    );
+    const live = render(row(false));
+    fireEvent.click(live.container.querySelector("#action-write-off-asset-1") as Element);
+    expect(onWriteOff).toHaveBeenCalledWith({
+      assetId: "asset-1",
+      assetName: "Apple Inc",
+      assetReference: "AAPL",
+      quantityMicro: 2_000_000,
+      averagePriceMicro: 100_000_000,
+    });
+    live.unmount();
+    const asOf = render(row(true));
+    expect(asOf.container.querySelector("#action-write-off-asset-1")).toBeNull();
+    asOf.unmount();
+    useAppStore.setState({
+      assets: [{ id: "asset-1", is_archived: true } as Asset],
+      accounts: [],
+    });
+    const archived = render(row(false));
+    expect(archived.container.querySelector("#action-write-off-asset-1")).toBeNull();
+  });
+
+  // WOF-059 — the lost part of the realized P&L shows under it only when there is one.
+  it("shows the lost amount under the realized P&L when there is one", () => {
+    const none = renderInTable(baseRow);
+    expect(none.container.querySelector("#holding-realized-lost-asset-1")).toBeNull();
+    none.unmount();
+    const lost = renderInTable({ ...baseRow, realizedLost: "-1 072,50" });
+    expect(lost.container.querySelector("#holding-realized-lost-asset-1")?.textContent).toBe(
+      "account_details.realized_lost",
+    );
   });
 
   // FEE-011 — the row offers "Manage fee" only when it is given a handler (the view gives
@@ -541,6 +594,12 @@ describe("HoldingRow — price history backfill (MKT-190)", () => {
   it("disables the button while the backfill runs", () => {
     renderWithBackfill({ onBackfillPriceHistory: vi.fn(), isBackfillingPriceHistory: true });
     expect(document.querySelector("#action-backfill-price-history-asset-1")).toBeDisabled();
+  });
+
+  // WOF-050 — the Cash Holding row has no write-off action.
+  it("renders no write-off action on the cash row", () => {
+    renderInTable({ ...baseRow, isCash: true, assetName: "Cash", assetReference: "EUR" });
+    expect(document.querySelector("#action-write-off-asset-1")).toBeNull();
   });
 
   it("renders no button on the cash row", () => {

@@ -3,6 +3,7 @@ import type {
   AccountError,
   AssetError,
   AssetPrice,
+  CorrectWriteOffDTO,
   CreateFeeScheduleDTO,
   DeleteHoldingNoteDTO,
   DepositDTO,
@@ -40,6 +41,8 @@ import type {
   UpdateFeeScheduleDTO,
   UpsertHoldingNoteDTO,
   WithdrawalDTO,
+  WriteOffDTO,
+  WriteOffError,
 } from "@/bindings";
 import { commands, events } from "@/bindings";
 import type { CorrectTransactionFields } from "@/features/transactions/shared/types";
@@ -104,6 +107,14 @@ export const accountDetailsGateway = {
   // FSD-022 — record a zero-cost free-share distribution attributed to a held asset.
   async recordFreeShares(dto: FreeSharesDTO): Promise<Result<Transaction, FreeSharesError>> {
     return commands.recordFreeShares(dto);
+  },
+
+  async recordWriteOff(dto: WriteOffDTO): Promise<Result<Transaction, WriteOffError>> {
+    return commands.recordWriteOff(dto);
+  },
+
+  async correctWriteOff(dto: CorrectWriteOffDTO): Promise<Result<Transaction, AccountError>> {
+    return commands.correctWriteOff(dto);
   },
 
   // SPL-010/020 — record a stock split rescaling a held position at its date.

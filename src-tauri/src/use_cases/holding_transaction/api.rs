@@ -6,7 +6,7 @@ use super::{
     HoldingTransactionUseCase, OpeningBalanceDraft, OpeningBalancePreview, StockSplitDraft,
     StockSplitPreview, TransactionDraft, TransactionDraftError, TransactionPreview,
 };
-use crate::context::account::{AccountError, ManagementFeeRemoval, Transaction};
+use crate::context::account::{AccountError, ManagementFeeRemoval, Transaction, WriteOffReason};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;
@@ -340,6 +340,81 @@ pub async fn record_free_shares(
         dto.asset_id,
         dto.date,
         dto.quantity,
+        dto.note,
+    )
+    .await
+}
+
+// =============================================================================
+// Write-off — DTOs + commands (WOF-056)
+// =============================================================================
+
+/// Parameters for recording a write-off: a quantity that leaves a holding without
+/// proceeds (WOF-056). No amount, no unit price, no exchange rate, no fees.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct WriteOffDTO {
+    /// Account whose holding the quantity leaves.
+    pub account_id: String,
+    /// The asset written off — held on the date, not a Cash Asset, not archived (WOF-010).
+    pub asset_id: String,
+    /// Business date the quantity left (YYYY-MM-DD, WOF-011).
+    pub date: String,
+    /// Quantity written off (micro-units, strictly positive, WOF-011).
+    pub quantity: i64,
+    /// Why it left (WOF entity).
+    pub reason: WriteOffReason,
+    /// Optional user note.
+    pub note: Option<String>,
+}
+
+/// Records a write-off through the use case the agent connection uses (WOF-056, AGT-065).
+#[tauri::command]
+#[specta::specta]
+pub async fn record_write_off(
+    uc: State<'_, HoldingTransactionUseCase>,
+    dto: WriteOffDTO,
+) -> Result<Transaction, super::error::WriteOffError> {
+    uc.record_write_off(
+        &dto.account_id,
+        dto.asset_id,
+        dto.date,
+        dto.quantity,
+        dto.reason,
+        dto.note,
+    )
+    .await
+}
+
+/// Parameters for correcting a write-off (WOF-030, WOF-058); the asset is fixed.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct CorrectWriteOffDTO {
+    /// Account owning the write-off.
+    pub account_id: String,
+    /// The write-off corrected.
+    pub transaction_id: String,
+    /// Corrected business date (YYYY-MM-DD, WOF-011).
+    pub date: String,
+    /// Corrected quantity (micro-units, strictly positive, WOF-011).
+    pub quantity: i64,
+    /// Corrected reason (WOF entity).
+    pub reason: WriteOffReason,
+    /// Corrected note.
+    pub note: Option<String>,
+}
+
+/// Corrects a write-off's date, quantity, reason and note, the holding replayed (WOF-030).
+#[tauri::command]
+#[specta::specta]
+pub async fn correct_write_off(
+    uc: State<'_, HoldingTransactionUseCase>,
+    dto: CorrectWriteOffDTO,
+) -> Result<Transaction, AccountError> {
+    uc.correct_write_off(
+        &dto.account_id,
+        &dto.transaction_id,
+        dto.date,
+        dto.quantity,
+        dto.reason,
         dto.note,
     )
     .await

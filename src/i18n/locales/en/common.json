@@ -588,7 +588,8 @@
     "error_load_assets": "Failed to load asset list.",
     "column_recorded_by": "Recorded by",
     "recorded_by_agent": "{{agent}} · session of {{when}}",
-    "recorded_by_session": "session of {{when}}"
+    "recorded_by_session": "session of {{when}}",
+    "action_write_off": "Write off"
   },
   "account_details": {
     "title": "Account Details",
@@ -612,7 +613,6 @@
     "error_load": "Failed to load account details",
     "loading": "Loading...",
     "closed_positions_header": "Closed Positions",
-    "column_last_sold_date": "Last Sold",
     "column_current_price": "Current Price",
     "column_unrealized_pnl": "Unrealized P&L",
     "column_performance_pct": "Performance",
@@ -651,7 +651,9 @@
     "as_of_date_label": "As of date",
     "as_of_today_placeholder": "Today",
     "as_of_banner": "Viewing as of {{date}}",
-    "as_of_back_to_today": "Back to today"
+    "as_of_back_to_today": "Back to today",
+    "column_closed_on": "Closed on",
+    "realized_lost": "of which lost: {{amount}}"
   },
   "account_performance": {
     "title": "Performance",
@@ -826,6 +828,29 @@
     "form_quantity_placeholder": "0",
     "action_record": "Record free shares",
     "recorded": "Free shares recorded."
+  },
+  "write_off": {
+    "modal_title": "Write off",
+    "holding_line": "held {{quantity}} {{reference}} at an average price of {{price}}",
+    "asset_label": "Asset:",
+    "form_reason_label": "Reason",
+    "reason_NetworkFee": "Network fee paid in the asset",
+    "reason_Dust": "Dust left by a conversion",
+    "reason_Lost": "Lost or sent to an untracked wallet",
+    "reason_Other": "Other",
+    "short_reason_NetworkFee": "Network fee",
+    "short_reason_Dust": "Dust",
+    "short_reason_Lost": "Lost",
+    "short_reason_Other": "Other",
+    "form_quantity_label": "Quantity written off",
+    "estimate": "Takes {{quantity}} {{reference}} out at its cost, {{cost}}. No cash moves; the realized result is −{{cost}}.",
+    "estimate_lost": "Takes {{quantity}} {{reference}} out at its cost, {{cost}}. No cash moves; the realized result is −{{cost}}, shown apart as lost.",
+    "error_over_held": "More than the {{held}} {{reference}} held on that date.",
+    "error_over_holding": "More than the {{held}} {{reference}} held.",
+    "error_closed_position": "Nothing of this asset is held on that date.",
+    "error_archived": "The asset is archived: unarchive it to write it off.",
+    "action_record": "Record the write-off",
+    "recorded": "Write-off recorded."
   },
   "interest": {
     "modal_title": "Record interest",

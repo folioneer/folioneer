@@ -5,6 +5,7 @@ import type {
   ClosedHoldingDetail,
   HoldingDetail,
 } from "@/bindings";
+import { microToFormatted } from "@/lib/microUnits";
 import {
   assetPriceMutationErrorToI18n,
   dividendErrorToI18n,
@@ -27,6 +28,8 @@ import {
   toHoldingRow,
   toPriceableAssets,
   transactionDraftErrorToI18n,
+  writeOffAveragePriceMicro,
+  writeOffErrorToI18n,
 } from "./presenter";
 
 const makeHolding = (overrides: Partial<HoldingDetail> = {}): HoldingDetail => ({
@@ -97,6 +100,21 @@ const makeResponse = (overrides: Partial<AccountDetailsResponse> = {}): AccountD
 });
 
 describe("toHoldingRow", () => {
+  // WOF-059 — the lost part, formatted, only when it is not zero.
+  it("gives the lost amount only when it is not zero", () => {
+    expect(toHoldingRow(makeHolding({ realized_lost: 0 })).realizedLost).toBeNull();
+    expect(toHoldingRow(makeHolding({ realized_lost: -1_072_500_000 })).realizedLost).toBe(
+      microToFormatted(-1_072_500_000, 2),
+    );
+  });
+
+  // WOF-052 — the write-off form's estimate takes the raw average price.
+  it("carries the raw average price", () => {
+    expect(toHoldingRow(makeHolding({ average_price: 7_125_000 })).averagePriceMicro).toBe(
+      7_125_000,
+    );
+  });
+
   it("carries the holding's unrecorded splits (MKT-233)", () => {
     const splits = [{ date: "2022-07-18", new: 20, old: 1 }];
     expect(toHoldingRow(makeHolding({ unrecorded_splits: splits })).unrecordedSplits).toEqual(
@@ -1227,5 +1245,53 @@ describe("hasNoPeriodFigure (ACD-057)", () => {
       periodPerformance: { ...row.periodPerformance, ytd: { formatted: "5,00%", raw: 5_000_000 } },
     };
     expect(hasNoPeriodFigure(full, "ytd")).toBe(false);
+  });
+});
+
+// WOF-055 — Oversell and CascadingOversell under the quantity; the rest below the form.
+describe("writeOffErrorToI18n", () => {
+  it("names what was held on that date for an oversell", () => {
+    const refusal = writeOffErrorToI18n(
+      { code: "Oversell", available: 200_000, requested: 300_000 },
+      "BTC",
+    );
+    expect(refusal.onQuantity).toBe(true);
+    expect(refusal.message.key).toBe("write_off.error_over_held");
+    expect(refusal.message.vars).toEqual({ held: "0,2", reference: "BTC" });
+  });
+
+  it.each([
+    "CascadingOversell",
+    "QuantityNotPositive",
+  ] as const)("%s shows under the quantity", (code) => {
+    expect(writeOffErrorToI18n({ code } as never, "BTC")).toEqual({
+      message: { key: `error.${code}` },
+      onQuantity: true,
+    });
+  });
+
+  it.each([
+    ["ClosedPosition", "write_off.error_closed_position"],
+    ["ArchivedAsset", "write_off.error_archived"],
+    ["NegativeQuantity", "error.Unknown"],
+    ["DateInFuture", "error.DateInFuture"],
+    ["AssetNotFound", "error.AssetNotFound"],
+  ] as const)("%s shows below the form", (code, key) => {
+    expect(writeOffErrorToI18n({ code } as never, "BTC")).toEqual({
+      message: { key },
+      onQuantity: false,
+    });
+  });
+});
+
+// WOF-058 — the edit form shows the write-off's own average price.
+describe("writeOffAveragePriceMicro", () => {
+  it("is the cost taken out over the quantity", () => {
+    const tx = { quantity: 100_000, realized_pnl: -2_000_000_000 } as never;
+    expect(writeOffAveragePriceMicro(tx)).toBe(20_000_000_000);
+  });
+
+  it("is zero for no quantity", () => {
+    expect(writeOffAveragePriceMicro({ quantity: 0, realized_pnl: 0 } as never)).toBe(0);
   });
 });

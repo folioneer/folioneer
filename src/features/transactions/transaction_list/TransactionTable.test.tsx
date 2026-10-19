@@ -35,6 +35,22 @@ const baseProps = {
 };
 
 describe("TransactionTable", () => {
+  // WOF-057 — a write-off's type reads with its reason; no unit price nor total.
+  it("reads a write-off's type with its reason and shows no unit price", () => {
+    render(
+      <TransactionTable
+        rows={[row({ id: "wof", type: "WriteOff", writeOffReason: "Lost", realizedPnl: "-2,000" })]}
+        {...baseProps}
+      />,
+    );
+    expect(document.querySelector("#txl-type-wof")?.textContent).toBe(
+      "transaction.type_writeoff · write_off.short_reason_Lost",
+    );
+    expect(document.querySelector("#txl-unit-price-wof")?.textContent).toBe(
+      "account_details.pnl_placeholder",
+    );
+  });
+
   it("hides the Asset column by default", () => {
     render(<TransactionTable rows={[row()]} {...baseProps} />);
     expect(screen.queryByText("transaction.column_asset")).not.toBeInTheDocument();

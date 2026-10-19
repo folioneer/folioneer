@@ -128,6 +128,57 @@ describe("toTransactionRow — FreeShares (FSD-022/050)", () => {
   });
 });
 
+// WOF-057 — a write-off row carries its reason and its realized P&L.
+describe("toTransactionRow — WriteOff (WOF-057)", () => {
+  it("carries the reason and the realized P&L", () => {
+    const row = toTransactionRow(
+      {
+        id: "tx-wof-1",
+        account_id: "account-1",
+        asset_id: "asset-btc",
+        transaction_type: "WriteOff",
+        date: "2026-06-12",
+        quantity: 100_000,
+        unit_price: 0,
+        exchange_rate: 1_000_000,
+        fees: 0,
+        total_amount: 0,
+        note: null,
+        realized_pnl: -2_000_000_000,
+        created_at: "2026-06-12T10:00:00Z",
+        write_off_reason: "Lost",
+      },
+      "Bitcoin",
+      "Wallet",
+    );
+    expect(row.writeOffReason).toBe("Lost");
+    expect(row.realizedPnlRaw).toBe(-2_000_000_000);
+  });
+
+  it("carries no reason for another type", () => {
+    const row = toTransactionRow(
+      {
+        id: "tx-1",
+        account_id: "account-1",
+        asset_id: "asset-1",
+        transaction_type: "Purchase",
+        date: "2026-06-12",
+        quantity: 1_000_000,
+        unit_price: 1_000_000,
+        exchange_rate: 1_000_000,
+        fees: 0,
+        total_amount: 1_000_000,
+        note: null,
+        realized_pnl: null,
+        created_at: "2026-06-12T10:00:00Z",
+      },
+      "Apple",
+      "Wallet",
+    );
+    expect(row.writeOffReason).toBeNull();
+  });
+});
+
 // SPL-060 — a split row shows the micro-scaled factor riding in `quantity`
 // as a trimmed "×N" ratio label.
 describe("toTransactionRow — Split (SPL-060)", () => {

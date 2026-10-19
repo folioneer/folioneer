@@ -41,6 +41,7 @@ import { PINNED_ACTIONS_HEADER, PINNED_ASSET_HEADER } from "../shared/pinnedColu
 import { performanceColumnKey } from "../shared/presenter";
 import { SplitModal } from "../split_transaction/SplitModal";
 import { WithdrawalTransactionModal } from "../withdrawal_transaction/WithdrawalTransactionModal";
+import { WriteOffModal } from "../write_off_transaction/WriteOffModal";
 import { ClosedHoldingRow } from "./ClosedHoldingRow";
 import { HoldingRow } from "./HoldingRow";
 import { useAccountDetailsView } from "./useAccountDetailsView";
@@ -403,6 +404,7 @@ export function AccountDetailsView() {
                         accountId={accountId}
                         onBuy={view.handleBuyOpen}
                         onSell={view.handleSellOpen}
+                        onWriteOff={view.handleWriteOffOpen}
                         onPriceHistory={view.handlePriceHistory}
                         onDeposit={view.handleDepositOpen}
                         onWithdraw={view.handleWithdrawalOpen}
@@ -497,7 +499,7 @@ export function AccountDetailsView() {
                             {t("account_details.column_total_revenues")}
                           </th>
                           <th className="m3-th text-right">
-                            {t("account_details.column_last_sold_date")}
+                            {t("account_details.column_closed_on")}
                           </th>
                         </tr>
                       </thead>
@@ -673,6 +675,17 @@ export function AccountDetailsView() {
           accountId={accountId}
           target={view.splitTarget}
           onSubmitSuccess={view.handleSplitSuccess}
+        />
+      )}
+
+      {/* WOF-050 — write-off form for a specific holding (opened from its row action) */}
+      {view.writeOffTarget && (
+        <WriteOffModal
+          isOpen
+          onClose={view.handleWriteOffClose}
+          accountId={accountId}
+          target={view.writeOffTarget}
+          onSubmitSuccess={view.handleWriteOffSuccess}
         />
       )}
 

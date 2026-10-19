@@ -43,3 +43,14 @@ export interface PriceableAsset {
   assetName: string;
   assetCurrency: string;
 }
+
+/** The holding a write-off takes a quantity out of (WOF-050/051). */
+export type WriteOffTarget = {
+  assetId: string;
+  assetName: string;
+  assetReference: string;
+  /** Quantity held today, micro-units — the form's line and its pre-check (WOF-053). */
+  quantityMicro: number;
+  /** Average price in account currency, micro-units — the form's estimate (WOF-052). */
+  averagePriceMicro: number;
+};

@@ -769,6 +769,28 @@ async recordFreeShares(dto: FreeSharesDTO) : Promise<Result<Transaction, FreeSha
 }
 },
 /**
+ * Records a write-off through the use case the agent connection uses (WOF-056, AGT-065).
+ */
+async recordWriteOff(dto: WriteOffDTO) : Promise<Result<Transaction, WriteOffError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("record_write_off", { dto }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Corrects a write-off's date, quantity, reason and note, the holding replayed (WOF-030).
+ */
+async correctWriteOff(dto: CorrectWriteOffDTO) : Promise<Result<Transaction, AccountError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("correct_write_off", { dto }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Records a stock split rescaling a held position at its date (SPL-010/020).
  */
 async recordSplit(dto: RecordSplitDTO) : Promise<Result<Transaction, SplitError>> {
@@ -2461,6 +2483,34 @@ fees: number;
 total_amount: number | null; 
 /**
  * Optional user note.
+ */
+note: string | null }
+/**
+ * Parameters for correcting a write-off (WOF-030, WOF-058); the asset is fixed.
+ */
+export type CorrectWriteOffDTO = { 
+/**
+ * Account owning the write-off.
+ */
+account_id: string; 
+/**
+ * The write-off corrected.
+ */
+transaction_id: string; 
+/**
+ * Corrected business date (YYYY-MM-DD, WOF-011).
+ */
+date: string; 
+/**
+ * Corrected quantity (micro-units, strictly positive, WOF-011).
+ */
+quantity: number; 
+/**
+ * Corrected reason (WOF entity).
+ */
+reason: WriteOffReason; 
+/**
+ * Corrected note.
  */
 note: string | null }
 /**
@@ -5712,6 +5762,52 @@ offered: CountryWrappers[];
  */
 generic: string[] }
 /**
+ * Parameters for recording a write-off: a quantity that leaves a holding without
+ * proceeds (WOF-056). No amount, no unit price, no exchange rate, no fees.
+ */
+export type WriteOffDTO = { 
+/**
+ * Account whose holding the quantity leaves.
+ */
+account_id: string; 
+/**
+ * The asset written off — held on the date, not a Cash Asset, not archived (WOF-010).
+ */
+asset_id: string; 
+/**
+ * Business date the quantity left (YYYY-MM-DD, WOF-011).
+ */
+date: string; 
+/**
+ * Quantity written off (micro-units, strictly positive, WOF-011).
+ */
+quantity: number; 
+/**
+ * Why it left (WOF entity).
+ */
+reason: WriteOffReason; 
+/**
+ * Optional user note.
+ */
+note: string | null }
+/**
+ * Use-case composite for the **record write-off** failure surface.
+ * 
+ * - `AccountError` — every account-BC rejection (lookup, infrastructure, the
+ * factory's date / quantity validation WOF-011, the Cash Asset and the replay
+ * guards WOF-010/012).
+ * - `WriteOffTask` — use-case-owned (this file), the cross-BC asset checks.
+ */
+export type WriteOffError = 
+/**
+ * Account-BC rejection (lookup, infra, factory + replay validation).
+ */
+AccountError | 
+/**
+ * Use-case-layer rejection (cross-BC asset checks).
+ */
+WriteOffTask
+/**
  * Why a write-off's quantity left the holding (WOF entity).
  */
 export type WriteOffReason = 
@@ -5731,6 +5827,23 @@ export type WriteOffReason =
  * Any other reason; the note says which.
  */
 "Other"
+/**
+ * Application-layer rejections specific to the `record_write_off` use case —
+ * cross-BC asset checks performed by the orchestrator before delegating to
+ * `AccountService::record_write_off`.
+ * 
+ * Tagged with `#[serde(tag = "code")]` so it serializes verbatim across the
+ * Tauri boundary into a flat `{ code: "..." }` shape.
+ */
+export type WriteOffTask = 
+/**
+ * No asset exists with the requested ID (WOF-010).
+ */
+{ code: "AssetNotFound" } | 
+/**
+ * Target asset is archived — nothing of it is written off (WOF-010, as SEL-037).
+ */
+{ code: "ArchivedAsset" }
 
 /** tauri-specta globals **/
 

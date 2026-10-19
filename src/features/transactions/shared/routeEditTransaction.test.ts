@@ -55,6 +55,14 @@ describe("routeEditTransaction", () => {
     );
   });
 
+  it("routes a WriteOff to the write-off form (WOF-058)", () => {
+    routeEditTransaction(navigate, tx("WriteOff"), vi.fn());
+    expect(patchModalSearch).toHaveBeenCalledWith(
+      navigate,
+      expect.objectContaining({ modal: "edit-write-off" }),
+    );
+  });
+
   it("routes ManagementFee to the management-fee edit modal (FEE-063)", () => {
     routeEditTransaction(navigate, tx("ManagementFee"), vi.fn());
     expect(patchModalSearch).toHaveBeenCalledWith(
