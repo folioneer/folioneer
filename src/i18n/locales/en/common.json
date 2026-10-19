@@ -568,6 +568,7 @@
     "type_managementfee": "Management fee",
     "type_split": "Split",
     "type_interest": "Interest",
+    "type_writeoff": "Write-off",
     "action_sell": "Sell",
     "action_split": "Split",
     "buy_modal_title": "Buy position",

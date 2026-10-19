@@ -536,7 +536,8 @@ fn period_bridge(
             TransactionType::Purchase
             | TransactionType::Sell
             | TransactionType::ManagementFee
-            | TransactionType::Split => {}
+            | TransactionType::Split
+            | TransactionType::WriteOff => {}
         }
     }
 
@@ -787,7 +788,8 @@ fn holding_period_bridge(
             TransactionType::Deposit
             | TransactionType::Withdrawal
             | TransactionType::ManagementFee
-            | TransactionType::Split => {}
+            | TransactionType::Split
+            | TransactionType::WriteOff => {}
         }
     }
 

@@ -84,7 +84,7 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 
 **SEL-041 — Realized P&L per sell row in Transaction List (frontend)**: Each sell transaction row in the Transaction List displays its `realized_pnl` value formatted as a decimal amount in account currency.
 
-**SEL-042 — Cumulative realized P&L in Account Details (frontend + backend)**: The Account Details holdings table includes a "Realized P&L" column showing the sum of `realized_pnl` across all sell transactions for the current account and each asset. The `use_cases/account_details/` use case fetches this aggregation via `TransactionService` and includes it in `AccountDetailsResponse` per holding (per B18). When no sell exists for a holding, the value is zero and the cell displays a neutral placeholder (e.g., "—").
+**SEL-042 — Cumulative realized P&L in Account Details (frontend + backend)**: The Account Details holdings table includes a "Realized P&L" column showing the sum of `realized_pnl` across all sell and write-off transactions (WOF-021) for the current account and each asset. The `use_cases/account_details/` use case fetches this aggregation via `TransactionService` and includes it in `AccountDetailsResponse` per holding (per B18). When no sell exists for a holding, the value is zero and the cell displays a neutral placeholder (e.g., "—").
 
 **SEL-043 — P&L visual differentiation (frontend)**: A positive `realized_pnl` is displayed using the success/gain color token; a negative `realized_pnl` using the error/loss color token. A zero `realized_pnl` — whether from no sells or from gains and losses that cancel exactly — displays as a neutral placeholder (`—`), identical to the no-sells case (SEL-042).
 

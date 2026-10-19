@@ -3,7 +3,7 @@ use super::domain::{
     FeeCatchUpRepository, FeeSchedule, FeeScheduleRepository, Holding, HoldingNote,
     HoldingNoteRepository, HoldingRepository, HoldingSnapshot, JournalFilter, ManagementFeeRemoval,
     SessionRecording, StockSplitPosition, ThresholdDirection, Transaction, TransactionRepository,
-    UpdateFrequency,
+    UpdateFrequency, WriteOffReason,
 };
 use super::error::AccountError;
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
@@ -106,6 +106,19 @@ pub enum RecordingOp {
         date: String,
         /// The factor (micro-units).
         factor: i64,
+        /// The note.
+        note: Option<String>,
+    },
+    /// A write-off of `quantity` of `asset_id` (WOF-020).
+    WriteOff {
+        /// The asset written off.
+        asset_id: String,
+        /// The date.
+        date: String,
+        /// The quantity written off (micro-units).
+        quantity: i64,
+        /// Why it left.
+        reason: WriteOffReason,
         /// The note.
         note: Option<String>,
     },
@@ -770,6 +783,26 @@ impl AccountService {
         Ok(tx)
     }
 
+    /// Corrects a write-off's date, quantity, reason and note (WOF-030), the holding replayed.
+    pub async fn correct_write_off(
+        &self,
+        account_id: &str,
+        tx_id: &str,
+        date: String,
+        quantity: i64,
+        reason: WriteOffReason,
+        note: Option<String>,
+    ) -> Result<Transaction, AccountError> {
+        info!(target: BACKEND, account_id = %account_id, tx_id = %tx_id, reason = %reason, "correct_write_off");
+        let mut account = load_account(&*self.account_repo, account_id).await?;
+        let tx = account
+            .correct_write_off(tx_id, date, quantity, reason, note)
+            .map_err(to_holding_tx_error)?;
+        save_account(&*self.account_repo, &mut account).await?;
+        self.emit_transaction_updated();
+        Ok(tx)
+    }
+
     /// The transaction as `correct_transaction` would make it, with its refusals, and the
     /// account's transactions without and with the correction; nothing written: the
     /// corrected account is dropped (AGT-072, AGT-087).
@@ -1072,6 +1105,34 @@ impl AccountService {
                 asset_id,
                 date,
                 quantity,
+                note,
+            },
+        )?;
+        save_account(&*self.account_repo, &mut account).await?;
+        self.emit_transaction_updated();
+        Ok(tx)
+    }
+
+    /// Records a write-off of a held asset (WOF-010/020/021): the quantity leaves at its
+    /// cost, no cash moves, its realized P&L is the cost taken out, negated.
+    pub async fn record_write_off(
+        &self,
+        account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity: i64,
+        reason: WriteOffReason,
+        note: Option<String>,
+    ) -> Result<Transaction, AccountError> {
+        info!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, quantity = quantity, reason = %reason, "record_write_off");
+        let mut account = load_account(&*self.account_repo, account_id).await?;
+        let tx = apply(
+            &mut account,
+            RecordingOp::WriteOff {
+                asset_id,
+                date,
+                quantity,
+                reason,
                 note,
             },
         )?;
@@ -2948,6 +3009,17 @@ fn apply(account: &mut Account, op: RecordingOp) -> Result<Transaction, AccountE
         } => {
             let tx = Transaction::split(account.id.clone(), asset_id, date, factor, note)?;
             account.apply_split(tx).map_err(to_holding_tx_error)
+        }
+        RecordingOp::WriteOff {
+            asset_id,
+            date,
+            quantity,
+            reason,
+            note,
+        } => {
+            let tx =
+                Transaction::write_off(account.id.clone(), asset_id, date, quantity, reason, note)?;
+            account.apply_write_off(tx).map_err(to_holding_tx_error)
         }
     }
 }

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use crate::context::account::domain::{
     Account, AccountChange, AccountRepository, FeeCatchUpPosition, FeeFrequency, FeeSchedule,
     Holding, HoldingNote, ThresholdDirection, Transaction, TransactionType, UpdateFrequency,
+    WriteOffReason,
 };
 use crate::context::account::repository::fee_schedule::schedule_content;
 use crate::core::logger::BACKEND;
@@ -87,6 +88,7 @@ struct TransactionRow {
     note: Option<String>,
     realized_pnl: Option<i64>,
     created_at: String,
+    write_off_reason: Option<String>,
 }
 
 impl TryFrom<TransactionRow> for Transaction {
@@ -96,6 +98,14 @@ impl TryFrom<TransactionRow> for Transaction {
         let transaction_type = TransactionType::from_str(&row.transaction_type).map_err(|_| {
             anyhow::anyhow!("unknown transaction_type in DB: '{}'", row.transaction_type)
         })?;
+        let write_off_reason = row
+            .write_off_reason
+            .as_deref()
+            .map(|raw| {
+                WriteOffReason::from_str(raw)
+                    .map_err(|_| anyhow::anyhow!("unknown write_off_reason in DB: '{}'", raw))
+            })
+            .transpose()?;
         Ok(Transaction::restore(
             row.id,
             row.account_id,
@@ -110,7 +120,8 @@ impl TryFrom<TransactionRow> for Transaction {
             row.note,
             row.realized_pnl,
             row.created_at,
-        ))
+        )
+        .with_write_off_reason(write_off_reason))
     }
 }
 
@@ -217,15 +228,16 @@ impl SqliteAccountRepository {
                 }
                 AccountChange::TransactionUpdated(tx) => {
                     let tx_type = tx.transaction_type.to_string();
+                    let write_off_reason = tx.write_off_reason.map(|reason| reason.to_string());
                     // created_at is immutable after creation (SEL-024)
                     sqlx::query!(
                         r#"UPDATE transactions SET account_id = ?, asset_id = ?, transaction_type = ?,
                                date = ?, quantity = ?, unit_price = ?, exchange_rate = ?, fees = ?,
-                               total_amount = ?, note = ?, realized_pnl = ?
+                               total_amount = ?, note = ?, realized_pnl = ?, write_off_reason = ?
                            WHERE id = ?"#,
                         tx.account_id, tx.asset_id, tx_type, tx.date, tx.quantity,
                         tx.unit_price, tx.exchange_rate, tx.fees, tx.total_amount,
-                        tx.note, tx.realized_pnl, tx.id
+                        tx.note, tx.realized_pnl, write_off_reason, tx.id
                     )
                     .execute(&mut *conn)
                     .await
@@ -438,10 +450,12 @@ async fn current_transaction_timestamp(
 
 async fn insert_transaction(conn: &mut SqliteConnection, tx: &Transaction) -> Result<()> {
     let tx_type = tx.transaction_type.to_string();
+    let write_off_reason = tx.write_off_reason.map(|reason| reason.to_string());
     sqlx::query!(
         r#"INSERT INTO transactions (id, account_id, asset_id, transaction_type, date, quantity,
-               unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+               unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at,
+               write_off_reason)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
         tx.id,
         tx.account_id,
         tx.asset_id,
@@ -454,7 +468,8 @@ async fn insert_transaction(conn: &mut SqliteConnection, tx: &Transaction) -> Re
         tx.total_amount,
         tx.note,
         tx.realized_pnl,
-        tx.created_at
+        tx.created_at,
+        write_off_reason
     )
     .execute(conn)
     .await
@@ -494,7 +509,7 @@ async fn load_aggregate_on(conn: &mut SqliteConnection, id: &str) -> Result<Opti
     let tx_rows = sqlx::query_as!(
         TransactionRow,
         r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price,
-                  exchange_rate, fees, total_amount, note, realized_pnl, created_at
+                  exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason
            FROM transactions WHERE account_id = ?
            ORDER BY date ASC, created_at ASC, id ASC"#,
         id
@@ -813,7 +828,7 @@ impl AccountRepository for SqliteAccountRepository {
                 let row = sqlx::query!(
                     r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price,
                               exchange_rate, fees, total_amount, note, realized_pnl, created_at,
-                              sync_logical_timestamp, sync_origin, sync_device_id
+                              write_off_reason, sync_logical_timestamp, sync_origin, sync_device_id
                        FROM transactions WHERE id = ?"#,
                     identity
                 )
@@ -840,6 +855,7 @@ impl AccountRepository for SqliteAccountRepository {
                         note: row.note,
                         realized_pnl: row.realized_pnl,
                         created_at: row.created_at,
+                        write_off_reason: row.write_off_reason,
                     })?;
                     Ok(SyncedRecord {
                         rank,

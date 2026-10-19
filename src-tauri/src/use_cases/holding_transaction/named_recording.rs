@@ -370,7 +370,8 @@ fn changes_taken(kind: TransactionType) -> &'static [&'static str] {
         TransactionType::Split => &["new", "old"],
         TransactionType::FreeShares
         | TransactionType::ManagementFee
-        | TransactionType::Interest => &["quantity"],
+        | TransactionType::Interest
+        | TransactionType::WriteOff => &["quantity"],
     }
 }
 

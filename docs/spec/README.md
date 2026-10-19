@@ -51,6 +51,7 @@ Once assigned, a rule number never changes; a removed rule leaves its number vac
 | NUM     | Numbers by language         | The decimal separator typed and shown follows the application's language; the command line keeps the dot                                                                                         | active  |
 | AGT     | Agent Connection            | An agent reads the portfolio and records in it through the open application: a bridge started with `--mcp`, a local channel, the owner's consent in the window, read tools and marked recordings | active  |
 | TDI     | Trade Dialog Insights       | Figures derived while recording a buy or a sell, shown in the trade dialog                                                                                                                       | active  |
+| WOF     | Write-off                   | A quantity leaving a holding without proceeds — a network fee, dust, coins lost — at its cost, no cash moved, lost kept apart                                                                    | active  |
 
 ---
 

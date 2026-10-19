@@ -68,6 +68,15 @@ rename) never creates a new one. A reverse split uses a factor below one.
 
 > Status: confirmed
 
+### Write-off
+
+A quantity that leaves a holding without proceeds — a network fee paid in the asset, dust,
+coins sent away or lost — taken out at its weighted-average cost, moving no cash; its
+realized result is the cost taken out, negated, and a write-off whose reason is Lost is
+also counted apart (WOF). Its reason is one of `NetworkFee`, `Dust`, `Lost`, `Other`. In French: "Sortie sans contrepartie" (owner, 2026-10-19).
+
+> Status: confirmed
+
 ### Reported split
 
 A split the price provider reports for an asset, with its date and its split factor (new :
@@ -208,6 +217,7 @@ An asset that breaks a rule of its kind, or is the same as another, because it e
 | `FreeShares`     | Shares of a held asset received at no cost (bonus issue); quantity rises, cost basis unchanged (FSD-022)                 | confirmed |
 | `ManagementFee`  | A fee paid by removing shares of a held asset; quantity falls, cost basis unchanged, no cash (FEE-022)                   | confirmed |
 | `Interest`       | Capitalized interest credited at no cost to a fund line or the cash line; quantity rises, cost basis unchanged (INT-024) | confirmed |
+| `WriteOff`       | A quantity of a held asset leaving without proceeds; quantity and cost basis fall at cost, no cash (WOF-020)             | confirmed |
 
 ### Total-Entry Mode
 

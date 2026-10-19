@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::context::account::domain::{
     AgentRecording, SessionRecording, Transaction, TransactionRepository, TransactionType,
+    WriteOffReason,
 };
 use crate::shared::domain::{
     ChangeDraft, LogicalTimestamp, Operation, Origin, RecordIdentity, RecordKind,
@@ -27,6 +28,7 @@ struct TransactionRow {
     note: Option<String>,
     realized_pnl: Option<i64>,
     created_at: String,
+    write_off_reason: Option<String>,
 }
 
 impl TryFrom<TransactionRow> for Transaction {
@@ -36,6 +38,14 @@ impl TryFrom<TransactionRow> for Transaction {
         let transaction_type = TransactionType::from_str(&row.transaction_type).map_err(|_| {
             anyhow::anyhow!("unknown transaction_type in DB: '{}'", row.transaction_type)
         })?;
+        let write_off_reason = row
+            .write_off_reason
+            .as_deref()
+            .map(|raw| {
+                WriteOffReason::from_str(raw)
+                    .map_err(|_| anyhow::anyhow!("unknown write_off_reason in DB: '{}'", raw))
+            })
+            .transpose()?;
         Ok(Transaction::restore(
             row.id,
             row.account_id,
@@ -50,7 +60,8 @@ impl TryFrom<TransactionRow> for Transaction {
             row.note,
             row.realized_pnl,
             row.created_at,
-        ))
+        )
+        .with_write_off_reason(write_off_reason))
     }
 }
 
@@ -82,7 +93,7 @@ impl TransactionRepository for SqliteTransactionRepository {
     async fn get_by_id(&self, id: &str) -> Result<Option<Transaction>> {
         let row = sqlx::query_as!(
             TransactionRow,
-            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at FROM transactions WHERE id = ?"#,
+            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason FROM transactions WHERE id = ?"#,
             id
         )
         .fetch_optional(&self.pool)
@@ -99,7 +110,7 @@ impl TransactionRepository for SqliteTransactionRepository {
     ) -> Result<Vec<Transaction>> {
         let rows = sqlx::query_as!(
             TransactionRow,
-            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at
+            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason
                FROM transactions
                WHERE account_id = ? AND asset_id = ?
                ORDER BY date ASC, created_at ASC, id ASC"#,
@@ -123,7 +134,7 @@ impl TransactionRepository for SqliteTransactionRepository {
     async fn get_all_for_account(&self, account_id: &str) -> Result<Vec<Transaction>> {
         let rows = sqlx::query_as!(
             TransactionRow,
-            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at
+            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason
                FROM transactions
                WHERE account_id = ?
                ORDER BY date ASC, created_at ASC, id ASC"#,

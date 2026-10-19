@@ -568,6 +568,7 @@
     "type_managementfee": "Frais de gestion",
     "type_split": "Division",
     "type_interest": "Intérêts",
+    "type_writeoff": "Sortie sans contrepartie",
     "action_sell": "Vendre",
     "action_split": "Division d'actions",
     "buy_modal_title": "Acheter la position",

@@ -20,13 +20,13 @@ This feature consumes data from two bounded contexts: `account` (for Holding dat
 
 Represents the current state of a financial position within the account. Persisted in the `holdings` table; all financial fields are computed by `RecordTransactionUseCase` via a full chronological replay of transactions on every create/edit/delete.
 
-| Field                | Business meaning                                                                                                 |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `asset_id`           | The financial asset held.                                                                                        |
-| `quantity`           | Current number of units held (i64 micros). Zero when the position is closed.                                     |
-| `average_price`      | Volume-weighted average purchase price in account currency (i64 micros). Preserved at closure (TRX-040).         |
-| `last_sold_date`     | ISO date of the most recent Sell transaction for this holding. NULL if no sell has ever occurred.                |
-| `total_realized_pnl` | Cumulative realized profit or loss across all Sell transactions for this holding (i64 micros). Zero if no sells. |
+| Field                | Business meaning                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `asset_id`           | The financial asset held.                                                                                                           |
+| `quantity`           | Current number of units held (i64 micros). Zero when the position is closed.                                                        |
+| `average_price`      | Volume-weighted average purchase price in account currency (i64 micros). Preserved at closure (TRX-040).                            |
+| `last_sold_date`     | ISO date of the most recent Sell transaction for this holding. NULL if no sell has ever occurred.                                   |
+| `total_realized_pnl` | Cumulative realized profit or loss across all Sell and write-off transactions for this holding (i64 micros, WOF-021). Zero if none. |
 
 ### HoldingDetail (Backend DTO)
 
@@ -40,7 +40,8 @@ Read projection for **open** positions (`quantity > 0`). Enriched by `AccountDet
 | `quantity`        | `Holding`                    | Current number of units held (i64 micros). Always > 0.                                                                                        |
 | `average_price`   | `Holding`                    | VWAP purchase price in account currency (i64 micros).                                                                                         |
 | `cost_basis`      | computed                     | `quantity × average_price` (i128 intermediate, per ACD-023/ACD-024). Not stored in DB.                                                        |
-| `realized_pnl`    | `Holding.total_realized_pnl` | Cumulative realized P&L from partial sells (i64 micros). Zero if none. See SEL-042.                                                           |
+| `realized_pnl`    | `Holding.total_realized_pnl` | Cumulative realized P&L from partial sells and write-offs (i64 micros, WOF-021). Zero if none. See SEL-042.                                   |
+| `realized_lost`   | computed                     | The part of `realized_pnl` from write-offs whose reason is `Lost` (i64 micros, zero or less, WOF-022).                                        |
 | `market_value`    | computed                     | Value in account currency (i64 micros), the holding's contribution to `total_global_value`; `None` when unpriced or no usable rate (ACD-052). |
 | `weight_pct`      | computed                     | Share of `total_global_value` in micro-percent; `None` when `market_value` is `None` or the Global Value is not positive (ACD-052).           |
 
@@ -121,7 +122,7 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 
 **ACD-055 — Window-start definitions (backend)**: The `ytd` window starts at 31 December of the prior year; the `one_year` / `two_years` / `five_years` / `ten_years` windows start at today minus 1/2/5/10 calendar years (a 29 February start clamps to 28 February in a non-leap target year). The window start is the baseline valuation date: the position standing at the end of that day forms the start value, and flows are counted strictly after it, through today. A window that opens while the position is not held has no figure (ACD-057): the since-start figure covers the holding's whole life.
 
-**ACD-056 — Windowed metric formula (backend)**: For one holding and one window, `start_value` = quantity held at the window start × carry-forward recorded price as of the window start (PRF-022) × FX rate as of the window start (FXR-035), in account-currency micros with i128 intermediates; `end_value` = the holding's `market_value` (ACD-052). The position's external flows are its own `Purchase` (+`total_amount`), `Sell` (−`total_amount`) and `OpeningBalance` (+ entry-date market value, fallback `total_amount`, per PRF-086) transactions dated inside the flow window; `Deposit`, `Withdrawal`, `Dividend`, `FreeShares`, `ManagementFee` and `Interest` are not flows. Dividends received for the asset inside the flow window are added to the gain (DIV-071 semantics): `gain = end_value − start_value − net_flow + dividends`. The percentage is `gain × 100_000_000 / (start_value + Σ flow × days_remaining / days_in_window)`, truncated toward zero (micro-percent, PRF-032 scaling).
+**ACD-056 — Windowed metric formula (backend)**: For one holding and one window, `start_value` = quantity held at the window start × carry-forward recorded price as of the window start (PRF-022) × FX rate as of the window start (FXR-035), in account-currency micros with i128 intermediates; `end_value` = the holding's `market_value` (ACD-052). The position's external flows are its own `Purchase` (+`total_amount`), `Sell` (−`total_amount`) and `OpeningBalance` (+ entry-date market value, fallback `total_amount`, per PRF-086) transactions dated inside the flow window; `Deposit`, `Withdrawal`, `Dividend`, `FreeShares`, `ManagementFee` and `Interest` are not flows. Dividends received for the asset inside the flow window are added to the gain (DIV-071 semantics): `gain = end_value − start_value − net_flow + dividends`. The percentage is `gain × 100_000_000 / (start_value + Σ flow × days_remaining / days_in_window)`, truncated toward zero (micro-percent, PRF-032 scaling). A write-off is no flow of the position (WOF-023).
 
 **ACD-057 — Windowed metric None conditions (backend)**: A window's value is `None` when any of: the holding's `market_value` is `None` (no recorded price or no usable FX rate today, FXR-034); the position was held at the window start but has no recorded price on or before it, or is foreign with no usable FX rate at the window start (FXR-034); the position was not held at the window start — bought inside the window, or held before it and sold out by its start (gh245); or the Dietz denominator is not positive.
 
@@ -149,7 +150,7 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 
 ### Closed Position History
 
-**ACD-043 — Holding persistence fields (backend)**: The `holdings` table is extended with two new columns computed during the chronological replay in `RecordTransactionUseCase`: `last_sold_date TEXT` (nullable — NULL when no Sell transaction has ever occurred for this holding) and `total_realized_pnl INTEGER NOT NULL DEFAULT 0` (cumulative sum of `realized_pnl` across all Sell transactions for this holding). Both are updated on every transaction create, edit, and delete via the full replay — including the delete case, where removing a Sell transaction recalculates `last_sold_date` from the remaining Sells (or sets it to NULL if none remain).
+**ACD-043 — Holding persistence fields (backend)**: The `holdings` table is extended with two new columns computed during the chronological replay in `RecordTransactionUseCase`: `last_sold_date TEXT` (nullable — NULL when no Sell or write-off has ever occurred for this holding, WOF-021) and `total_realized_pnl INTEGER NOT NULL DEFAULT 0` (cumulative sum of `realized_pnl` across all Sell and write-off transactions for this holding, WOF-021). Both are updated on every transaction create, edit, and delete via the full replay — including the delete case, where removing a Sell or a write-off recalculates `last_sold_date` from the remaining ones (or sets it to NULL if none remain).
 
 The `Holding` domain entity gains both fields: `last_sold_date: Option<String>` and `total_realized_pnl: i64`. All three factory methods (`new()`, `with_id()`, `restore()`) must be updated to accept and carry these fields. `SqliteHoldingRepository.upsert()` must write both columns; its row mapping must read them.
 
