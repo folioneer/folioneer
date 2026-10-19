@@ -85,7 +85,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-033 — Markets still open at the trigger (backend)**: An asset whose trading day is not yet complete when the run executes contributes only closes up to its previous completed day. The in-progress day's close is written by the next run through the backfill window — the schedule self-corrects regardless of the chosen trigger time.
 
-**SPF-034 — Writes follow the established price-write model (backend)**: Every price written by a scheduled run uses the `(asset, date)` upsert (MKT-025, latest-write-wins per ADR-012), carries the provider source (MKT-102), and applies sub-unit normalization (MKT-125).
+**SPF-034 — Writes follow the established price-write model (backend)**: Every price written by a scheduled run uses the `(asset, date)` upsert (MKT-025, latest-write-wins per ADR-012), carries the provider source (MKT-102), and applies sub-unit normalization (MKT-125), and records closes as traded (MKT-193A).
 
 **SPF-035 — Exchange rates in the same run (backend)**: The run also records **daily reference exchange rates** for every persisted currency pair (the same scope as the in-app rate refresh, FXR-071), each rate dated to its day — never a live snapshot re-dated to the run day.
 
