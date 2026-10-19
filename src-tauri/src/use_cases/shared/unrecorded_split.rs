@@ -8,6 +8,10 @@ use specta::Type;
 use crate::context::account::{Account, Transaction, TransactionType};
 use crate::context::asset::ReportedSplit;
 
+/// MKT-231 — how many days either side of the reported date a recorded split still counts
+/// as recording it: a broker's date can differ from the exchange's (owner, 2026-10-19).
+const MATCHING_DAYS: i64 = 5;
+
 /// A reported split an account holding the asset has not recorded (MKT-231). A read
 /// model, never persisted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
@@ -23,7 +27,8 @@ pub struct UnrecordedSplit {
 /// MKT-231 — the reported splits of `asset_id` that the account whose `transactions`
 /// these are has not recorded, oldest first: dated on or before `today`, held the day
 /// before (its transactions dated before the split replayed to a quantity above zero),
-/// and no split of the asset recorded on that date, whatever its factor.
+/// and no split of the asset recorded within [`MATCHING_DAYS`] of that date, whatever its
+/// factor.
 pub fn unrecorded_splits(
     transactions: &[Transaction],
     asset_id: &str,
@@ -39,7 +44,8 @@ pub fn unrecorded_splits(
             let recorded = transactions.iter().any(|transaction| {
                 transaction.asset_id == asset_id
                     && transaction.transaction_type == TransactionType::Split
-                    && transaction.date == split.date
+                    && NaiveDate::parse_from_str(&transaction.date, "%Y-%m-%d")
+                        .is_ok_and(|recorded| (recorded - date).num_days().abs() <= MATCHING_DAYS)
             });
             let held = Account::reconstruct_holding_as_of(transactions, asset_id, &day_before)
                 .quantity
@@ -113,6 +119,30 @@ mod tests {
             day("2026-10-19"),
         );
         assert!(found.is_empty());
+    }
+
+    // MKT-231 (owner, 2026-10-19) — a split recorded within 5 days either side of the reported
+    // date ends it; 6 days away it does not.
+    #[test]
+    fn a_split_recorded_within_five_days_of_the_reported_date_ends_it() {
+        for (recorded_on, ends_it) in [
+            ("2022-07-13", true),
+            ("2022-07-23", true),
+            ("2022-07-12", false),
+            ("2022-07-24", false),
+        ] {
+            let transactions = vec![
+                bought_on("2019-03-01"),
+                transaction_on(ASSET, TransactionType::Split, recorded_on, 20_000_000),
+            ];
+            let found = unrecorded_splits(
+                &transactions,
+                ASSET,
+                &[reported("2022-07-18", 20, 1)],
+                day("2026-10-19"),
+            );
+            assert_eq!(found.is_empty(), ends_it, "recorded on {recorded_on}");
+        }
     }
 
     // MKT-231 — not held the day before: bought on the split's date or later, or not yet.
