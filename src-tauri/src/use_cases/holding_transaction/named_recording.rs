@@ -8,14 +8,14 @@ use serde::Serialize;
 
 use crate::context::account::{
     Account, AccountError, AgentRecording, RecordingOp, RecordingPreview, TradeOp, Transaction,
-    TransactionType,
+    TransactionType, WriteOffReason,
 };
 use crate::context::asset::{Asset, AssetClass, AssetError, AssetPrice};
 use crate::core::BACKEND;
 
 use super::error::{
     DividendError, DividendTask, FreeSharesError, FreeSharesTask, NameLookupError,
-    OpenHoldingError, OpenHoldingTask, SplitError, SplitTask,
+    OpenHoldingError, OpenHoldingTask, SplitError, SplitTask, WriteOffError, WriteOffTask,
 };
 use super::orchestrator::{HoldingTransactionUseCase, NamedTarget, OpeningBalanceDraft, SplitSize};
 
@@ -125,6 +125,23 @@ pub struct FreeShares {
     pub note: Option<String>,
 }
 
+/// A write-off as typed: a quantity that left a holding without proceeds (WOF-020).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WriteOff {
+    /// The account's name as typed.
+    pub account: String,
+    /// The asset's name or reference as typed.
+    pub asset: String,
+    /// The date, or `None` for today.
+    pub date: Option<String>,
+    /// The quantity that left (micro-units).
+    pub quantity: i64,
+    /// Why it left.
+    pub reason: WriteOffReason,
+    /// Optional note.
+    pub note: Option<String>,
+}
+
 /// A price of an asset at a date, as typed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PriceAt {
@@ -181,6 +198,8 @@ pub enum Recording {
     Split(StockSplit),
     /// Free shares of a held asset (FSD-022).
     FreeShares(FreeShares),
+    /// A write-off of a held asset (WOF-020).
+    WriteOff(WriteOff),
 }
 
 /// Which way cash moves.
@@ -467,7 +486,7 @@ fn agent_correction(
     ) {
         return Err(Refusal {
             code: "InvalidArguments".to_string(),
-            message: "a deposit, a withdrawal, a dividend, a split or free shares is not corrected: cancel it and record it again".to_string(),
+            message: "a deposit, a withdrawal, a dividend, a split, free shares or a write-off is not corrected: cancel it and record it again".to_string(),
         });
     }
     // TRX-047 — an opening balance has a quantity, a total cost and a date, nothing else.
@@ -954,6 +973,7 @@ impl HoldingTransactionUseCase {
             Recording::FreeShares(free_shares) => {
                 self.record_free_shares_named(free_shares, today).await
             }
+            Recording::WriteOff(write_off) => self.record_write_off_named(write_off, today).await,
         }
     }
 
@@ -1092,6 +1112,28 @@ impl HoldingTransactionUseCase {
                         )
                         .await
                         .map_err(|error| refusal_from_free_shares(&error))
+                    },
+                )
+                .await
+            }
+            Recording::WriteOff(write_off) => {
+                let (account, asset) = (write_off.account.clone(), write_off.asset.clone());
+                self.preview_found(
+                    &account,
+                    &asset,
+                    write_off.date.clone(),
+                    today,
+                    |found, date| async move {
+                        self.preview_write_off(
+                            &found.account_id,
+                            found.asset_id.clone(),
+                            date,
+                            write_off.quantity,
+                            write_off.reason,
+                            write_off.note,
+                        )
+                        .await
+                        .map_err(|error| refusal_from_write_off(&error))
                     },
                 )
                 .await
@@ -1277,6 +1319,37 @@ impl HoldingTransactionUseCase {
             zero_cost: false,
         })
         .map_err(|error| refusal_from_free_shares(&error))
+    }
+
+    /// AGT-065 — a write-off: the account and the asset found by what was typed, the
+    /// write-off recorded through the rules of the window.
+    async fn record_write_off_named(
+        &self,
+        write_off: WriteOff,
+        today: &str,
+    ) -> Result<Recorded, Refusal> {
+        let found = self
+            .find_by_name(&write_off.account, &write_off.asset)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let date = write_off.date.unwrap_or_else(|| today.to_string());
+        self.record_write_off(
+            &found.account_id,
+            found.asset_id.clone(),
+            date,
+            write_off.quantity,
+            write_off.reason,
+            write_off.note,
+        )
+        .await
+        .map(|transaction| Recorded {
+            transaction: Box::new(transaction),
+            account_name: found.account_name,
+            currency: found.currency,
+            asset_reference: Some(found.asset_reference),
+            zero_cost: false,
+        })
+        .map_err(|error| refusal_from_write_off(&error))
     }
 
     /// CLI-027 — a deposit or a withdrawal: the account found by its name, the cash moved
@@ -1657,6 +1730,22 @@ fn refusal_from_free_shares(error: &FreeSharesError) -> Refusal {
                 }
                 FreeSharesTask::FreeSharesOnCashAsset => {
                     "free shares cannot be recorded on cash".to_string()
+                }
+            },
+        },
+    }
+}
+
+/// AGT-065 — a rejection of a write-off keeps its code.
+fn refusal_from_write_off(error: &WriteOffError) -> Refusal {
+    match error {
+        WriteOffError::Account(error) => refusal_from_account(error),
+        WriteOffError::UseCase(task) => Refusal {
+            code: code_of(task),
+            message: match task {
+                WriteOffTask::AssetNotFound => "the asset no longer exists".to_string(),
+                WriteOffTask::ArchivedAsset => {
+                    "the asset is archived: unarchive it to write it off".to_string()
                 }
             },
         },

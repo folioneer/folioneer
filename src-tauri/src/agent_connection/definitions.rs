@@ -77,7 +77,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     "asset": { "type": "string", "description": "Only this asset's transactions: its name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
                     "from": { "type": "string", "description": "Only from this date on, YYYY-MM-DD." },
                     "to": { "type": "string", "description": "Only up to this date, YYYY-MM-DD." },
-                    "transaction_type": { "type": "string", "description": "Only this type: Purchase, Sell, OpeningBalance, Deposit, Withdrawal, Dividend, FreeShares, ManagementFee, Split or Interest." },
+                    "transaction_type": { "type": "string", "description": "Only this type: Purchase, Sell, OpeningBalance, Deposit, Withdrawal, Dividend, FreeShares, ManagementFee, Split, Interest or WriteOff." },
                     "recorded_by": { "type": "string", "description": "Only what the owner typed (owner), what an agent recorded (agent), or what this session recorded (session)." },
                     "page": { "type": "integer", "description": "The page, from 1. Default: 1." }
                 },
@@ -195,6 +195,25 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "record_write_off",
+            title: "Record a write-off",
+            only_reads: false,
+            description: "Record a quantity of an asset held in an account that left without proceeds — a network fee paid in the asset, dust, coins sent away or lost: the quantity held falls at its average cost, the cost taken out is a realized loss and no cash moves. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "account": { "type": "string", "description": "The account's name, as list_accounts gives it." },
+                    "asset": { "type": "string", "description": "The asset's name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
+                    "quantity": { "type": ["string", "number"], "description": "How much of the asset left." },
+                    "reason": { "type": "string", "enum": ["NetworkFee", "Dust", "Lost", "Other"], "description": "Why it left: NetworkFee (a fee paid in the asset), Dust (a remainder too small to use), Lost (sent away or lost for good), Other." },
+                    "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." },
+                    "note": { "type": "string", "description": "A note kept with the transaction." }
+                },
+                "required": ["account", "asset", "quantity", "reason"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
             name: "record_price",
             title: "Record a price",
             only_reads: false,
@@ -269,7 +288,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "preview_recording",
             title: "Preview a recording",
             only_reads: true,
-            description: "Preview what a recording, a correction or a price would do, writing nothing: give tool, one of record_purchase, record_sale, record_opening_balance, record_split, record_deposit, record_withdrawal, record_dividend, record_free_shares, record_price, correct_recording, and arguments, the object that tool takes. Answered with the refusal the real call would give, or with the transaction as it would be recorded and the account on the evening of its date without it (before) and with it (after): each asset held, by reference and name, with its quantity and average price, and the cash. A price is answered with the price it would replace at that date, or null. Read the account today with list_holdings once it is recorded.",
+            description: "Preview what a recording, a correction or a price would do, writing nothing: give tool, one of record_purchase, record_sale, record_opening_balance, record_split, record_deposit, record_withdrawal, record_dividend, record_free_shares, record_write_off, record_price, correct_recording, and arguments, the object that tool takes. Answered with the refusal the real call would give, or with the transaction as it would be recorded and the account on the evening of its date without it (before) and with it (after): each asset held, by reference and name, with its quantity and average price, and the cash. A price is answered with the price it would replace at that date, or null. Read the account today with list_holdings once it is recorded.",
             input_schema: json!({
                 "type": "object",
                 "properties": {

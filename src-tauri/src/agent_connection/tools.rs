@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use crate::context::account::{
     AccountError, AccountServiceContract, AgentRecording, Transaction, TransactionType,
+    WriteOffReason,
 };
 use crate::context::asset::{
     Asset, AssetClass, AssetCreationDefaults, AssetError, AssetKind, AssetServiceContract,
@@ -19,7 +20,7 @@ use crate::use_cases::account_summary::AccountSummaryUseCase;
 use crate::use_cases::holding_transaction::{
     code_of, decimal_to_micro, CashAmount, Change, Correction, DividendAmount, FreeShares,
     HoldingTransactionUseCase, PriceAt, RecordedBy, Recording, StockSplit, Target, Trade,
-    TradeAmount, TransactionsAsked, TypedTransaction,
+    TradeAmount, TransactionsAsked, TypedTransaction, WriteOff,
 };
 
 use super::connections::{
@@ -162,7 +163,8 @@ impl AgentTools {
             | "record_deposit"
             | "record_withdrawal"
             | "record_dividend"
-            | "record_free_shares" => {
+            | "record_free_shares"
+            | "record_write_off" => {
                 let recording =
                     previewable(tool, arguments).unwrap_or_else(|| unreachable_recording(tool))?;
                 self.record(granted, recording).await
@@ -373,6 +375,7 @@ impl AgentTools {
                     "fees": transaction.fees,
                     "exchange_rate": transaction.exchange_rate,
                     "note": transaction.note,
+                    "write_off_reason": transaction.write_off_reason,
                     "recorded_by": recorded_by,
                 })
             })
@@ -843,7 +846,7 @@ fn price_of(arguments: &Value) -> Result<PriceAt, Refusal> {
 }
 
 /// AGT-072 — the calls `preview_recording` previews.
-const PREVIEWED: [&str; 10] = [
+const PREVIEWED: [&str; 11] = [
     "record_purchase",
     "record_sale",
     "record_opening_balance",
@@ -852,12 +855,13 @@ const PREVIEWED: [&str; 10] = [
     "record_withdrawal",
     "record_dividend",
     "record_free_shares",
+    "record_write_off",
     "record_price",
     "correct_recording",
 ];
 
 /// The recordings among the calls `preview_recording` previews.
-const RECORDINGS: [&str; 8] = [
+const RECORDINGS: [&str; 9] = [
     "record_purchase",
     "record_sale",
     "record_opening_balance",
@@ -866,9 +870,10 @@ const RECORDINGS: [&str; 8] = [
     "record_withdrawal",
     "record_dividend",
     "record_free_shares",
+    "record_write_off",
 ];
 
-/// AGT-044 / AGT-063 / AGT-072 — the recording `tool` makes of `arguments`, read as that
+/// AGT-044 / AGT-063 / AGT-065 / AGT-072 — the recording `tool` makes of `arguments`, read as that
 /// tool reads them; `None` for a tool `preview_recording` does not preview.
 fn previewable(tool: &str, arguments: &Value) -> Option<Result<Recording, Refusal>> {
     let read = || -> Result<Recording, Refusal> {
@@ -896,6 +901,14 @@ fn previewable(tool: &str, arguments: &Value) -> Option<Result<Recording, Refusa
                 quantity: amount(arguments, "quantity")?,
                 note: note(arguments)?,
             }),
+            "record_write_off" => Recording::WriteOff(WriteOff {
+                account: text(arguments, "account")?.to_string(),
+                asset: text(arguments, "asset")?.to_string(),
+                date: optional_text(arguments, "date")?,
+                quantity: amount(arguments, "quantity")?,
+                reason: write_off_reason(arguments)?,
+                note: note(arguments)?,
+            }),
             "record_split" => Recording::Split(StockSplit {
                 account: text(arguments, "account")?.to_string(),
                 asset: text(arguments, "asset")?.to_string(),
@@ -908,6 +921,17 @@ fn previewable(tool: &str, arguments: &Value) -> Option<Result<Recording, Refusa
         })
     };
     RECORDINGS.contains(&tool).then(read)
+}
+
+/// AGT-065 — a write-off's reason: one of the four, by its name.
+fn write_off_reason(arguments: &Value) -> Result<WriteOffReason, Refusal> {
+    text(arguments, "reason")?
+        .trim()
+        .parse()
+        .map_err(|_| Refusal {
+            code: "InvalidArguments".to_string(),
+            message: "reason is one of NetworkFee, Dust, Lost, Other".to_string(),
+        })
 }
 
 /// Every tool in `RECORDINGS` has a reading in `previewable`: this is never reached.

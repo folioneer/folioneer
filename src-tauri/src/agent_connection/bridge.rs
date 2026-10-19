@@ -331,6 +331,7 @@ mod tests {
                 "record_dividend",
                 "record_split",
                 "record_free_shares",
+                "record_write_off",
                 "record_price",
                 "add_asset",
                 "correct_recording",

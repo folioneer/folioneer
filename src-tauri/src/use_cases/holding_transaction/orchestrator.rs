@@ -1,12 +1,14 @@
 use super::error::{
     DividendError, DividendTask, FreeSharesError, FreeSharesTask, InterestError, InterestTask,
     ManagementFeeError, ManagementFeeTask, NameLookupError, OpenHoldingError, OpenHoldingTask,
-    SplitError, SplitTask, TransactionDraftError, TransactionDraftTask,
+    SplitError, SplitTask, TransactionDraftError, TransactionDraftTask, WriteOffError,
+    WriteOffTask,
 };
 use super::shared::ensure_cash_asset;
 use crate::context::account::{
     Account, AccountError, AccountServiceContract, EnteredAmount, ManagementFeeRemoval,
     RecordingOp, RecordingPreview, StockSplitPosition, TradeOp, Transaction, TransactionType,
+    WriteOffReason,
 };
 use crate::context::asset::{Asset, AssetClass, AssetServiceContract};
 use crate::core::logger::BACKEND;
@@ -852,6 +854,73 @@ impl HoldingTransactionUseCase {
             .record_free_shares(account_id, asset_id, date, quantity, note)
             .await
             .map_err(FreeSharesError::Account)
+    }
+
+    /// Records a write-off of a held asset (WOF-010/020): the asset exists and is not
+    /// archived here; the account, the Cash Asset, what is held on the date and the replay
+    /// are the account BC's. Returns `WriteOffError`.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn record_write_off(
+        &self,
+        account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity: i64,
+        reason: WriteOffReason,
+        note: Option<String>,
+    ) -> Result<Transaction, WriteOffError> {
+        self.ensure_writable_off(account_id, &asset_id).await?;
+        self.account_service
+            .record_write_off(account_id, asset_id, date, quantity, reason, note)
+            .await
+            .map_err(WriteOffError::Account)
+    }
+
+    /// AGT-072 — what recording a write-off would do, nothing written, with its checks.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn preview_write_off(
+        &self,
+        account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity: i64,
+        reason: WriteOffReason,
+        note: Option<String>,
+    ) -> Result<RecordingPreview, WriteOffError> {
+        self.ensure_writable_off(account_id, &asset_id).await?;
+        let op = RecordingOp::WriteOff {
+            asset_id,
+            date,
+            quantity,
+            reason,
+            note,
+        };
+        self.account_service
+            .preview_recording(account_id, op)
+            .await
+            .map_err(WriteOffError::Account)
+    }
+
+    /// WOF-010 — the account exists, the asset exists and is not archived.
+    async fn ensure_writable_off(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+    ) -> Result<(), WriteOffError> {
+        self.ensure_account(account_id).await?;
+        let asset = self
+            .asset_service
+            .get_asset_by_id(asset_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "record_write_off: get_asset_by_id failed");
+                AccountError::DatabaseError
+            })?;
+        match asset {
+            None => Err(WriteOffTask::AssetNotFound.into()),
+            Some(asset) if asset.is_archived => Err(WriteOffTask::ArchivedAsset.into()),
+            Some(_) => Ok(()),
+        }
     }
 
     /// Records a stock split rescaling a held position (SPL-010/012).
@@ -2371,6 +2440,43 @@ mod tests {
         use crate::use_cases::holding_transaction::{FreeSharesError, FreeSharesTask};
         assert!(
             matches!(err, FreeSharesError::UseCase(FreeSharesTask::AssetNotFound)),
+            "expected UseCase(AssetNotFound), got: {err:?}"
+        );
+    }
+
+    // WOF-010 — an unknown asset is refused with an error of its own, before the account
+    // BC's checks.
+    #[tokio::test]
+    async fn wof_010_a_write_off_of_an_unknown_asset_is_refused() {
+        let pool = setup_pool().await;
+        let (account_svc, asset_svc) = make_services(&pool);
+        let account = account_svc
+            .create(
+                "Acc".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                UpdateFrequency::ManualMonth,
+                false,
+            )
+            .await
+            .unwrap();
+        let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
+
+        let err = uc
+            .record_write_off(
+                &account.id,
+                "nonexistent-asset".to_string(),
+                "2024-06-15".to_string(),
+                micro(1),
+                WriteOffReason::Dust,
+                None,
+            )
+            .await
+            .unwrap_err();
+
+        use crate::use_cases::holding_transaction::{WriteOffError, WriteOffTask};
+        assert!(
+            matches!(err, WriteOffError::UseCase(WriteOffTask::AssetNotFound)),
             "expected UseCase(AssetNotFound), got: {err:?}"
         );
     }

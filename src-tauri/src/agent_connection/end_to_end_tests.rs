@@ -1028,7 +1028,7 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
         assert_eq!(refusal.code, "InvalidArguments");
         assert_eq!(
             refusal.message,
-            "a deposit, a withdrawal, a dividend, a split or free shares is not corrected: cancel it and record it again"
+            "a deposit, a withdrawal, a dividend, a split, free shares or a write-off is not corrected: cancel it and record it again"
         );
     }
     let cancelled = call(
@@ -1370,6 +1370,185 @@ async fn agt_053_the_owner_removes_everything_a_session_recorded() {
     assert_eq!(bench.connections.key_of(granted.session_id + 100), None);
 }
 
+// AGT-065 — a session records a write-off through the window's rules (WOF): at its cost
+// without cash, its reason kept, refused as the window refuses it, previewed, marked,
+// counted, cancelled like any recording and never corrected.
+#[tokio::test]
+async fn agt_065_a_session_records_a_write_off() {
+    use crate::context::account::TransactionType;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+
+    call(
+        "record_deposit",
+        json!({ "account": "PEA", "amount": 2000, "date": "2019-01-15" }),
+    )
+    .await
+    .expect("deposited");
+    // Nothing is held on the date yet.
+    assert_eq!(
+        call(
+            "record_write_off",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "reason": "Dust", "date": "2019-06-01" }),
+        )
+        .await
+        .expect_err("refused")
+        .code,
+        "ClosedPosition"
+    );
+    call(
+        "record_purchase",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 10, "price": 100, "date": "2019-03-01" }),
+    )
+    .await
+    .expect("bought");
+
+    // Previewed first: the quantity falls, the average price and the cash stay.
+    let previewed = call(
+        "preview_recording",
+        json!({ "tool": "record_write_off", "arguments": { "account": "PEA", "asset": "CW8", "quantity": "0.5", "reason": "NetworkFee", "date": "2019-06-01" } }),
+    )
+    .await
+    .expect("previewed");
+    assert_eq!(previewed["status"], "previewed");
+    assert_eq!(previewed["transaction"]["transaction_type"], "WriteOff");
+    assert_eq!(previewed["after"]["holdings"][0]["quantity"], 9_500_000_i64);
+    assert_eq!(previewed["after"]["holdings"][0]["average_price"], 100 * M);
+    assert_eq!(previewed["after"]["cash"], previewed["before"]["cash"]);
+
+    let written_off = call(
+        "record_write_off",
+        json!({ "account": "pea", "asset": "cw8", "quantity": "0.5", "reason": "NetworkFee", "date": "2019-06-01", "note": "transfer fee" }),
+    )
+    .await
+    .expect("written off");
+    assert_eq!(written_off["status"], "recorded");
+    assert_eq!(written_off["transaction"]["transaction_type"], "WriteOff");
+    assert_eq!(written_off["transaction"]["quantity"], 500_000_i64);
+    assert_eq!(written_off["transaction"]["total_amount"], 0);
+    assert_eq!(written_off["transaction"]["write_off_reason"], "NetworkFee");
+    assert_eq!(written_off["transaction"]["realized_pnl"], -50 * M);
+    assert_eq!(written_off["transaction"]["note"], "transfer fee");
+    assert_eq!(written_off["account"], "PEA");
+    assert_eq!(written_off["asset"], "CW8");
+
+    for (arguments, code) in [
+        (
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 1 }),
+            "MissingArgument",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "reason": "Stolen" }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "CW8", "reason": "Dust" }),
+            "MissingArgument",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 0, "reason": "Dust" }),
+            "QuantityNotPositive",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 20, "reason": "Lost", "date": "2019-07-01" }),
+            "Oversell",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "NOPE", "quantity": 1, "reason": "Dust" }),
+            "AssetNotFound",
+        ),
+        (
+            json!({ "account": "NOPE", "asset": "CW8", "quantity": 1, "reason": "Dust" }),
+            "AccountNotFound",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "reason": "Dust", "date": "2999-01-01" }),
+            "DateInFuture",
+        ),
+    ] {
+        assert_eq!(
+            call("record_write_off", arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{arguments}"
+        );
+    }
+
+    // Marked with the session; the last one is what the window names.
+    let mark = bench
+        .accounts
+        .agent_recording_of(&recorded_id(&written_off))
+        .await
+        .expect("read")
+        .expect("a mark");
+    assert_eq!(mark.session, granted.key);
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.recordings, 3);
+    let last = told.last_recording.expect("a last recording");
+    assert_eq!(last.kind, TransactionType::WriteOff);
+
+    // Listed by its type, with its reason (AGT-070).
+    let listed = call(
+        "list_transactions",
+        json!({ "account": "PEA", "transaction_type": "writeoff" }),
+    )
+    .await
+    .expect("listed");
+    assert_eq!(listed["total"], 1);
+    assert_eq!(listed["transactions"][0]["write_off_reason"], "NetworkFee");
+    assert_eq!(previewed["transaction"]["write_off_reason"], "NetworkFee");
+
+    // Never corrected: cancelled and recorded again (AGT-061).
+    let refusal = call(
+        "correct_recording",
+        json!({ "transaction": recorded_id(&written_off), "date": "2019-06-15" }),
+    )
+    .await
+    .expect_err("refused");
+    assert_eq!(refusal.code, "InvalidArguments");
+    let cancelled = call(
+        "cancel_recording",
+        json!({ "transaction": recorded_id(&written_off) }),
+    )
+    .await
+    .expect("cancelled");
+    assert_eq!(cancelled["status"], "cancelled");
+    assert_eq!(bench.connections.sessions().remove(0).recordings, 2);
+
+    // An archived asset is not written off.
+    let asset = bench
+        .assets
+        .get_non_cash_assets()
+        .await
+        .expect("assets")
+        .into_iter()
+        .find(|asset| asset.reference == "CW8")
+        .expect("CW8");
+    bench
+        .assets
+        .archive_asset(&asset.id)
+        .await
+        .expect("archived");
+    assert_eq!(
+        call(
+            "record_write_off",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "reason": "Dust" }),
+        )
+        .await
+        .expect_err("refused")
+        .code,
+        "ArchivedAsset"
+    );
+}
+
 // AGT-063 — a session records a split and free shares through the window's rules (SPL,
 // FSD): each is marked, counted against the session's limit, told to the window,
 // cancelled like any recording and never corrected.
@@ -1570,7 +1749,7 @@ async fn agt_063_a_session_records_a_split_and_free_shares() {
         assert_eq!(refusal.code, "InvalidArguments");
         assert_eq!(
             refusal.message,
-            "a deposit, a withdrawal, a dividend, a split or free shares is not corrected: cancel it and record it again"
+            "a deposit, a withdrawal, a dividend, a split, free shares or a write-off is not corrected: cancel it and record it again"
         );
     }
     let cancelled = call(

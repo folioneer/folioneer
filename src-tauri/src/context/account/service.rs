@@ -2230,6 +2230,16 @@ pub trait AccountServiceContract: Send + Sync {
         quantity: i64,
         note: Option<String>,
     ) -> StdResult<Transaction, AccountError>;
+    /// Records a write-off of a held asset, at its cost and without cash (WOF-020).
+    async fn record_write_off(
+        &self,
+        account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity: i64,
+        reason: WriteOffReason,
+        note: Option<String>,
+    ) -> StdResult<Transaction, AccountError>;
     /// Records a stock split rescaling a held position (SPL-010/020).
     async fn record_split(
         &self,
@@ -2666,6 +2676,19 @@ impl AccountServiceContract for AccountService {
         note: Option<String>,
     ) -> StdResult<Transaction, AccountError> {
         AccountService::record_free_shares(self, account_id, asset_id, date, quantity, note).await
+    }
+
+    async fn record_write_off(
+        &self,
+        account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity: i64,
+        reason: WriteOffReason,
+        note: Option<String>,
+    ) -> StdResult<Transaction, AccountError> {
+        AccountService::record_write_off(self, account_id, asset_id, date, quantity, reason, note)
+            .await
     }
 
     async fn record_split(
