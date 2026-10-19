@@ -1,12 +1,8 @@
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
 import type { Transaction } from "@/bindings";
-import { logger } from "@/lib/logger";
 import { microToFieldDecimal } from "@/lib/microUnits";
-import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
-import { accountDetailsGateway } from "../gateway";
-import { writeOffAveragePriceMicro, writeOffErrorToI18n } from "../shared/presenter";
+import { writeOffAveragePriceMicro } from "../shared/presenter";
 import type { WriteOffTarget } from "../shared/types";
+import { useWriteOffEdit } from "./useWriteOffEdit";
 import { WriteOffModal } from "./WriteOffModal";
 
 interface WriteOffEditModalProps {
@@ -32,29 +28,7 @@ export function WriteOffEditModal({
   onClose,
   onSubmitSuccess,
 }: WriteOffEditModalProps) {
-  const { t } = useTranslation();
-  const showSnackbar = useSnackbar();
-  const [heldMicro, setHeldMicro] = useState<number | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const result = await accountDetailsGateway.getAccountDetails(accountId);
-      if (cancelled) return;
-      if (result.status === "error") {
-        logger.error("[WriteOffEditModal] failed to load the holding", { error: result.error });
-        const { message } = writeOffErrorToI18n(result.error, assetReference);
-        showSnackbar(t(message.key, message.vars), "error");
-        onClose();
-        return;
-      }
-      const holding = result.data.holdings.find((h) => h.asset_id === transaction.asset_id);
-      setHeldMicro(holding?.quantity ?? 0);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [accountId, transaction.asset_id, assetReference, onClose, showSnackbar, t]);
+  const heldMicro = useWriteOffEdit(accountId, transaction, assetReference, onClose);
 
   if (heldMicro === null) return null;
 
