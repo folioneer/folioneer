@@ -19,8 +19,8 @@ use crate::use_cases::account_details::AccountDetailsUseCase;
 use crate::use_cases::account_summary::AccountSummaryUseCase;
 use crate::use_cases::holding_transaction::{
     code_of, decimal_to_micro, CashAmount, Change, Correction, DividendAmount, FreeShares,
-    HoldingTransactionUseCase, PriceAt, RecordedBy, Recording, StockSplit, Target, Trade,
-    TradeAmount, TransactionsAsked, TypedTransaction, WriteOff,
+    HoldingTransactionUseCase, InterestCredit, ManagementFee, PriceAt, RecordedBy, Recording,
+    StockSplit, Target, Trade, TradeAmount, TransactionsAsked, TypedTransaction, WriteOff,
 };
 
 use super::connections::{
@@ -167,6 +167,10 @@ impl AgentTools {
             | "record_write_off" => {
                 let recording =
                     previewable(tool, arguments).unwrap_or_else(|| unreachable_recording(tool))?;
+                self.record(granted, recording).await
+            }
+            "record_interest" | "record_management_fee" => {
+                let recording = interest_or_fee(tool, arguments)?;
                 self.record(granted, recording).await
             }
             "record_price" => self.record_price(granted, arguments).await,
@@ -921,6 +925,54 @@ fn previewable(tool: &str, arguments: &Value) -> Option<Result<Recording, Refusa
         })
     };
     RECORDINGS.contains(&tool).then(read)
+}
+
+/// AGT-066 — interest or a management fee, read as its tool reads it; neither is previewed.
+fn interest_or_fee(tool: &str, arguments: &Value) -> Result<Recording, Refusal> {
+    match tool {
+        "record_interest" => {
+            let (percent, quantity) = one_of(arguments, "percent", "quantity")?;
+            Ok(Recording::Interest(InterestCredit {
+                account: text(arguments, "account")?.to_string(),
+                asset: optional_text(arguments, "asset")?,
+                date: optional_text(arguments, "date")?,
+                percent,
+                quantity,
+                note: note(arguments)?,
+            }))
+        }
+        "record_management_fee" => {
+            let (percent, resulting_quantity) = one_of(arguments, "percent", "resulting_quantity")?;
+            Ok(Recording::ManagementFee(ManagementFee {
+                account: text(arguments, "account")?.to_string(),
+                asset: text(arguments, "asset")?.to_string(),
+                date: optional_text(arguments, "date")?,
+                percent,
+                resulting_quantity,
+                note: note(arguments)?,
+            }))
+        }
+        _ => unreachable_recording(tool),
+    }
+}
+
+/// AGT-066 — exactly one of two figures, refused as a price and a total are (AGT-048).
+fn one_of(
+    arguments: &Value,
+    first: &str,
+    second: &str,
+) -> Result<(Option<i64>, Option<i64>), Refusal> {
+    match (figure(arguments, first)?, figure(arguments, second)?) {
+        (None, None) => Err(Refusal {
+            code: "InvalidArguments".to_string(),
+            message: format!("give {first} or {second}"),
+        }),
+        (Some(_), Some(_)) => Err(Refusal {
+            code: "InvalidArguments".to_string(),
+            message: format!("give either {first} or {second}, not both"),
+        }),
+        figures => Ok(figures),
+    }
 }
 
 /// AGT-065 — a write-off's reason: one of the four, by its name.

@@ -14,8 +14,9 @@ use crate::context::asset::{Asset, AssetClass, AssetError, AssetPrice};
 use crate::core::BACKEND;
 
 use super::error::{
-    DividendError, DividendTask, FreeSharesError, FreeSharesTask, NameLookupError,
-    OpenHoldingError, OpenHoldingTask, SplitError, SplitTask, WriteOffError, WriteOffTask,
+    DividendError, DividendTask, FreeSharesError, FreeSharesTask, InterestError, InterestTask,
+    ManagementFeeError, ManagementFeeTask, NameLookupError, OpenHoldingError, OpenHoldingTask,
+    SplitError, SplitTask, WriteOffError, WriteOffTask,
 };
 use super::orchestrator::{HoldingTransactionUseCase, NamedTarget, OpeningBalanceDraft, SplitSize};
 
@@ -142,6 +143,41 @@ pub struct WriteOff {
     pub note: Option<String>,
 }
 
+/// Interest as typed: a credit to a held asset, or to the account's cash when no asset is
+/// named (INT-023); exactly one of the two figures is given.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InterestCredit {
+    /// The account's name as typed.
+    pub account: String,
+    /// The asset's name or reference as typed; `None` for the account's cash.
+    pub asset: Option<String>,
+    /// The date, or `None` for today.
+    pub date: Option<String>,
+    /// The share of what is held credited (micro-percent, INT-022).
+    pub percent: Option<i64>,
+    /// The quantity credited (micro-units).
+    pub quantity: Option<i64>,
+    /// Optional note.
+    pub note: Option<String>,
+}
+
+/// A management fee as typed; exactly one of the two figures is given (FEE-021).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManagementFee {
+    /// The account's name as typed.
+    pub account: String,
+    /// The charged asset's name or reference as typed.
+    pub asset: String,
+    /// The date, or `None` for today.
+    pub date: Option<String>,
+    /// The share of what is held removed (micro-percent, FEE-022).
+    pub percent: Option<i64>,
+    /// What the holding holds after the fee (micro-units, FEE-028).
+    pub resulting_quantity: Option<i64>,
+    /// Optional note.
+    pub note: Option<String>,
+}
+
 /// A price of an asset at a date, as typed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PriceAt {
@@ -200,6 +236,10 @@ pub enum Recording {
     FreeShares(FreeShares),
     /// A write-off of a held asset (WOF-020).
     WriteOff(WriteOff),
+    /// Interest credited to a holding or to the cash (INT-023, INT-024).
+    Interest(InterestCredit),
+    /// A one-off management fee taken in units (FEE-022).
+    ManagementFee(ManagementFee),
 }
 
 /// Which way cash moves.
@@ -486,7 +526,7 @@ fn agent_correction(
     ) {
         return Err(Refusal {
             code: "InvalidArguments".to_string(),
-            message: "a deposit, a withdrawal, a dividend, a split, free shares or a write-off is not corrected: cancel it and record it again".to_string(),
+            message: "a deposit, a withdrawal, a dividend, a split, free shares, a write-off, interest or a management fee is not corrected: cancel it and record it again".to_string(),
         });
     }
     // TRX-047 — an opening balance has a quantity, a total cost and a date, nothing else.
@@ -974,6 +1014,8 @@ impl HoldingTransactionUseCase {
                 self.record_free_shares_named(free_shares, today).await
             }
             Recording::WriteOff(write_off) => self.record_write_off_named(write_off, today).await,
+            Recording::Interest(interest) => self.record_interest_named(interest, today).await,
+            Recording::ManagementFee(fee) => self.record_management_fee_named(fee, today).await,
         }
     }
 
@@ -1138,6 +1180,11 @@ impl HoldingTransactionUseCase {
                 )
                 .await
             }
+            // AGT-066 — `preview_recording` does not preview interest or a fee (AGT-072).
+            Recording::Interest(_) | Recording::ManagementFee(_) => Err(Refusal {
+                code: "InvalidArguments".to_string(),
+                message: "interest and management fees are not previewed".to_string(),
+            }),
         }
     }
 
@@ -1319,6 +1366,104 @@ impl HoldingTransactionUseCase {
             zero_cost: false,
         })
         .map_err(|error| refusal_from_free_shares(&error))
+    }
+
+    /// AGT-066 — interest: the account and the asset found by what was typed, or the
+    /// account's cash when no asset is named (INT-023), credited through the rules of the
+    /// window.
+    async fn record_interest_named(
+        &self,
+        interest: InterestCredit,
+        today: &str,
+    ) -> Result<Recorded, Refusal> {
+        let (account_id, account_name, currency, asset_id, asset_reference) = match &interest.asset
+        {
+            Some(asset) => {
+                let found = self
+                    .find_by_name(&interest.account, asset)
+                    .await
+                    .map_err(|error| refusal_from_lookup(&error))?;
+                (
+                    found.account_id,
+                    found.account_name,
+                    found.currency,
+                    found.asset_id,
+                    Some(found.asset_reference),
+                )
+            }
+            None => {
+                let account = self
+                    .find_account_by_name(&interest.account)
+                    .await
+                    .map_err(|error| refusal_from_lookup(&error))?;
+                self.ensure_cash_for(&account.id, "record_interest")
+                    .await
+                    .map_err(|error| refusal_from_account(&error))?;
+                let cash = account.cash_asset_id();
+                (account.id, account.name, account.currency, cash, None)
+            }
+        };
+        let date = interest.date.unwrap_or_else(|| today.to_string());
+        self.record_interest(
+            &account_id,
+            asset_id,
+            date,
+            interest.percent,
+            interest.quantity,
+            interest.note,
+        )
+        .await
+        .map(|transaction| Recorded {
+            transaction: Box::new(transaction),
+            account_name,
+            currency,
+            asset_reference,
+            zero_cost: false,
+        })
+        .map_err(|error| refusal_from_interest(&error))
+    }
+
+    /// AGT-066 — a management fee: the account and the asset found by what was typed, the
+    /// fee recorded through the rules of the window, unless the holding's schedule already
+    /// generated the fee of its period (AGT-067).
+    async fn record_management_fee_named(
+        &self,
+        fee: ManagementFee,
+        today: &str,
+    ) -> Result<Recorded, Refusal> {
+        let found = self
+            .find_by_name(&fee.account, &fee.asset)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let date = fee.date.unwrap_or_else(|| today.to_string());
+        let generated = self
+            .account_service
+            .has_generated_fee_for_period(&found.account_id, &found.asset_id, &date)
+            .await
+            .map_err(|error| refusal_from_account(&error))?;
+        if generated {
+            return Err(Refusal {
+                code: "GeneratedFeeExists".to_string(),
+                message: "the holding's fee schedule already generated the fee of this period: ask to change that fee with request_change instead".to_string(),
+            });
+        }
+        self.record_management_fee_entry(
+            &found.account_id,
+            found.asset_id.clone(),
+            date,
+            fee.percent,
+            fee.resulting_quantity,
+            fee.note,
+        )
+        .await
+        .map(|transaction| Recorded {
+            transaction: Box::new(transaction),
+            account_name: found.account_name,
+            currency: found.currency,
+            asset_reference: Some(found.asset_reference),
+            zero_cost: false,
+        })
+        .map_err(|error| refusal_from_management_fee(&error))
     }
 
     /// AGT-065 — a write-off: the account and the asset found by what was typed, the
@@ -1736,6 +1881,44 @@ fn refusal_from_free_shares(error: &FreeSharesError) -> Refusal {
     }
 }
 
+/// AGT-066 — a rejection of interest keeps its code.
+fn refusal_from_interest(error: &InterestError) -> Refusal {
+    match error {
+        InterestError::Account(error) => refusal_from_account(error),
+        InterestError::UseCase(task) => Refusal {
+            code: code_of(task),
+            message: match task {
+                InterestTask::AssetNotFound => "the asset no longer exists".to_string(),
+                InterestTask::InterestNotEligible => {
+                    "the asset bears no interest: only an interest-bearing asset or the cash is credited".to_string()
+                }
+                InterestTask::AssetNotHeld => {
+                    "nothing of this asset is held in the account".to_string()
+                }
+            },
+        },
+    }
+}
+
+/// AGT-066 — a rejection of a management fee keeps its code.
+fn refusal_from_management_fee(error: &ManagementFeeError) -> Refusal {
+    match error {
+        ManagementFeeError::Account(error) => refusal_from_account(error),
+        ManagementFeeError::UseCase(task) => Refusal {
+            code: code_of(task),
+            message: match task {
+                ManagementFeeTask::AssetNotFound => "the asset no longer exists".to_string(),
+                ManagementFeeTask::AssetNotHeld => {
+                    "nothing of this asset is held in the account".to_string()
+                }
+                ManagementFeeTask::ManagementFeeOnCashAsset => {
+                    "a management fee cannot be taken from cash".to_string()
+                }
+            },
+        },
+    }
+}
+
 /// AGT-065 — a rejection of a write-off keeps its code.
 fn refusal_from_write_off(error: &WriteOffError) -> Refusal {
     match error {
@@ -1834,6 +2017,19 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
         AccountError::SplitCollapsesPosition => {
             "this split would leave nothing of the position".to_string()
         }
+        // AGT-066 — interest and management fees (INT-021, FEE-021, FEE-028, FEE-077).
+        AccountError::PercentageNotPositive => "the percent must be above zero".to_string(),
+        AccountError::PercentageAboveHundred => "the percent cannot be above 100".to_string(),
+        AccountError::ResultingQuantityNegative => {
+            "the resulting quantity cannot be negative".to_string()
+        }
+        AccountError::ResultingQuantityNotBelowHeld { held_quantity } => format!(
+            "the resulting quantity must be below the {} held on that date",
+            decimal(*held_quantity)
+        ),
+        AccountError::ManagementFeesDisabled => {
+            "management fees are turned off for this account".to_string()
+        }
         AccountError::AccountNotFound { .. } => "the account no longer exists".to_string(),
         AccountError::DatabaseError | AccountError::ApplicationWriteOutranked => {
             "the portfolio could not be read or written".to_string()
@@ -1846,18 +2042,13 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
         | AccountError::NegativeQuantity
         | AccountError::NegativeAveragePrice
         | AccountError::TransactionNotFound
-        | AccountError::PercentageNotPositive
-        | AccountError::PercentageAboveHundred
         | AccountError::ManagementFeeAmountInvalid
-        | AccountError::ResultingQuantityNegative
-        | AccountError::ResultingQuantityNotBelowHeld { .. }
         | AccountError::InterestAmountInvalid
         | AccountError::RateNotPositive
         | AccountError::RateAboveHundred
         | AccountError::EndBeforeStart
         | AccountError::ScheduleAlreadyExists
         | AccountError::ScheduleNotFound
-        | AccountError::ManagementFeesDisabled
         | AccountError::NoteTextEmpty
         | AccountError::NoteTextTooLong
         | AccountError::ThresholdNotPositive

@@ -1028,7 +1028,7 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
         assert_eq!(refusal.code, "InvalidArguments");
         assert_eq!(
             refusal.message,
-            "a deposit, a withdrawal, a dividend, a split, free shares or a write-off is not corrected: cancel it and record it again"
+            "a deposit, a withdrawal, a dividend, a split, free shares, a write-off, interest or a management fee is not corrected: cancel it and record it again"
         );
     }
     let cancelled = call(
@@ -1549,6 +1549,306 @@ async fn agt_065_a_session_records_a_write_off() {
     );
 }
 
+// AGT-066 / AGT-067 — a session records interest and a management fee through the window's
+// rules (INT, FEE): interest on a holding or on the cash, a fee by percent or by what is left,
+// refused as the window refuses them, a fee the schedule generated for the period refusing
+// the agent's, each marked, counted, cancelled like any recording, never corrected nor
+// previewed.
+#[tokio::test]
+async fn agt_066_a_session_records_interest_and_a_management_fee() {
+    use crate::context::account::{generated_deduction_id, FeeFrequency, TransactionType};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+    let fund = bench
+        .assets
+        .create_asset(CreateAssetDTO {
+            kind: None,
+            name: "Fonds euros".to_string(),
+            reference: "FEUR".to_string(),
+            isin: None,
+            class: AssetClass::Bonds,
+            currency: "EUR".to_string(),
+            risk_level: 1,
+            category_id: "default-uncategorized".to_string(),
+            exchange: None,
+            interest_bearing: true,
+        })
+        .await
+        .expect("fund");
+    call(
+        "record_purchase",
+        json!({ "account": "PEA", "asset": "FEUR", "quantity": 10, "price": 100, "date": "2026-02-01" }),
+    )
+    .await
+    .expect("bought");
+
+    // Interest on the holding, by percent and by quantity, at no cost (INT-022, INT-024).
+    let by_percent = call(
+        "record_interest",
+        json!({ "account": "pea", "asset": "feur", "percent": "2.5", "date": "2026-03-01", "note": "2025 statement" }),
+    )
+    .await
+    .expect("credited");
+    assert_eq!(by_percent["status"], "recorded");
+    assert_eq!(by_percent["transaction"]["transaction_type"], "Interest");
+    assert_eq!(by_percent["transaction"]["quantity"], 250_000_i64);
+    assert_eq!(by_percent["transaction"]["total_amount"], 0);
+    assert_eq!(by_percent["asset"], "FEUR");
+    call(
+        "record_interest",
+        json!({ "account": "PEA", "asset": "FEUR", "quantity": 1, "date": "2026-03-02" }),
+    )
+    .await
+    .expect("credited");
+    // Without an asset, the account's cash, in its currency (INT-023).
+    let on_cash = call(
+        "record_interest",
+        json!({ "account": "PEA", "quantity": "12.5", "date": "2026-03-03" }),
+    )
+    .await
+    .expect("credited");
+    assert_eq!(on_cash["transaction"]["quantity"], 12_500_000_i64);
+    assert_eq!(on_cash["asset"], Value::Null);
+    assert_eq!(on_cash["transaction"]["asset_id"], "system-cash-eur");
+
+    for (arguments, code) in [
+        (
+            json!({ "account": "PEA", "asset": "FEUR" }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "FEUR", "percent": 1, "quantity": 1 }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 1 }),
+            "InterestNotEligible",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "FEUR", "percent": 101 }),
+            "PercentageAboveHundred",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "FEUR", "percent": 0 }),
+            "PercentageNotPositive",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "FEUR", "quantity": 0 }),
+            "QuantityNotPositive",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "NOPE", "quantity": 1 }),
+            "AssetNotFound",
+        ),
+    ] {
+        assert_eq!(
+            call("record_interest", arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{arguments}"
+        );
+    }
+
+    // A management fee needs the account's fee parameter (FEE-077).
+    let fee = |date: &'static str| json!({ "account": "PEA", "asset": "FEUR", "percent": 1, "date": date });
+    assert_eq!(
+        call("record_management_fee", fee("2026-03-20"))
+            .await
+            .expect_err("refused")
+            .code,
+        "ManagementFeesDisabled"
+    );
+    let account = bench
+        .accounts
+        .get_all()
+        .await
+        .expect("accounts")
+        .into_iter()
+        .find(|account| account.name == "PEA")
+        .expect("PEA");
+    bench
+        .accounts
+        .update(
+            account.id.clone(),
+            account.name.clone(),
+            account.bank_name.clone(),
+            account.currency.clone(),
+            account.update_frequency,
+            true,
+        )
+        .await
+        .expect("fees enabled");
+
+    // By percent and by what is left; the quantity falls and no cash moves (FEE-022, FEE-028).
+    let charged = call("record_management_fee", fee("2026-03-20"))
+        .await
+        .expect("charged");
+    assert_eq!(charged["status"], "recorded");
+    assert_eq!(charged["transaction"]["transaction_type"], "ManagementFee");
+    assert_eq!(charged["transaction"]["quantity"], 112_500_i64);
+    call(
+        "record_management_fee",
+        json!({ "account": "PEA", "asset": "FEUR", "resulting_quantity": 11, "date": "2026-03-25" }),
+    )
+    .await
+    .expect("charged");
+    for (arguments, code) in [
+        (
+            json!({ "account": "PEA", "asset": "FEUR" }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "FEUR", "percent": 1, "resulting_quantity": 1 }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "FEUR", "resulting_quantity": 50, "date": "2026-03-26" }),
+            "ResultingQuantityNotBelowHeld",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "CW8", "percent": 1 }),
+            "AssetNotHeld",
+        ),
+        (
+            json!({ "account": "PEA", "asset": "FEUR", "percent": 0 }),
+            "PercentageNotPositive",
+        ),
+        // The cash is never named.
+        (
+            json!({ "account": "PEA", "asset": "EUR", "percent": 1 }),
+            "AssetNotFound",
+        ),
+    ] {
+        assert_eq!(
+            call("record_management_fee", arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{arguments}"
+        );
+    }
+
+    // AGT-067 — the schedule's generated fee of April refuses the agent's for April; a
+    // one-off fee of March refused nothing, and once the generated fee is deleted, nothing
+    // refuses April's.
+    bench
+        .accounts
+        .create_fee_schedule(
+            &account.id,
+            fund.id.clone(),
+            1_200_000,
+            FeeFrequency::Monthly,
+            "2026-01-01".to_string(),
+            None,
+        )
+        .await
+        .expect("schedule");
+    let generated = bench
+        .accounts
+        .record_generated_management_fee(
+            &account.id,
+            fund.id.clone(),
+            "2026-04-30".to_string(),
+            1_200_000,
+            12,
+            generated_deduction_id(&account.id, &fund.id, "2026-04-30"),
+        )
+        .await
+        .expect("generated");
+    let refusal = call("record_management_fee", fee("2026-04-10"))
+        .await
+        .expect_err("refused");
+    assert_eq!(refusal.code, "GeneratedFeeExists");
+    assert!(
+        refusal.message.contains("request_change"),
+        "{}",
+        refusal.message
+    );
+    // A date that is no date is the window's refusal, not a generated fee's.
+    assert_eq!(
+        call(
+            "record_management_fee",
+            json!({ "account": "PEA", "asset": "FEUR", "percent": 1, "date": "2026-04-31" }),
+        )
+        .await
+        .expect_err("refused")
+        .code,
+        "InvalidDate"
+    );
+    call("record_management_fee", fee("2026-03-28"))
+        .await
+        .expect("another one-off of March");
+    bench
+        .accounts
+        .cancel_transaction(&account.id, &generated.id)
+        .await
+        .expect("deleted");
+    call("record_management_fee", fee("2026-04-10"))
+        .await
+        .expect("nothing generated for April any more");
+
+    // Marked, counted and told; never corrected nor previewed; cancelled (AGT-061, AGT-072).
+    let mark = bench
+        .accounts
+        .agent_recording_of(&recorded_id(&charged))
+        .await
+        .expect("read")
+        .expect("a mark");
+    assert_eq!(mark.session, granted.key);
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.recordings, 8);
+    assert_eq!(
+        told.last_recording.expect("a last recording").kind,
+        TransactionType::ManagementFee
+    );
+    for recorded in [&by_percent, &charged] {
+        assert_eq!(
+            call(
+                "correct_recording",
+                json!({ "transaction": recorded_id(recorded), "note": "again" }),
+            )
+            .await
+            .expect_err("refused")
+            .code,
+            "InvalidArguments"
+        );
+    }
+    assert_eq!(
+        call(
+            "preview_recording",
+            json!({ "tool": "record_interest", "arguments": { "account": "PEA", "quantity": 1 } }),
+        )
+        .await
+        .expect_err("refused")
+        .code,
+        "InvalidArguments"
+    );
+    let cancelled = call(
+        "cancel_recording",
+        json!({ "transaction": recorded_id(&on_cash) }),
+    )
+    .await
+    .expect("cancelled");
+    assert_eq!(cancelled["status"], "cancelled");
+    let cancelled = call(
+        "cancel_recording",
+        json!({ "transaction": recorded_id(&charged) }),
+    )
+    .await
+    .expect("cancelled");
+    assert_eq!(cancelled["status"], "cancelled");
+    assert_eq!(bench.connections.sessions().remove(0).recordings, 6);
+}
+
 // AGT-063 — a session records a split and free shares through the window's rules (SPL,
 // FSD): each is marked, counted against the session's limit, told to the window,
 // cancelled like any recording and never corrected.
@@ -1749,7 +2049,7 @@ async fn agt_063_a_session_records_a_split_and_free_shares() {
         assert_eq!(refusal.code, "InvalidArguments");
         assert_eq!(
             refusal.message,
-            "a deposit, a withdrawal, a dividend, a split, free shares or a write-off is not corrected: cancel it and record it again"
+            "a deposit, a withdrawal, a dividend, a split, free shares, a write-off, interest or a management fee is not corrected: cancel it and record it again"
         );
     }
     let cancelled = call(
