@@ -41,7 +41,6 @@ Read projection for **open** positions (`quantity > 0`). Enriched by `AccountDet
 | `average_price`   | `Holding`                    | VWAP purchase price in account currency (i64 micros).                                                                                         |
 | `cost_basis`      | computed                     | `quantity × average_price` (i128 intermediate, per ACD-023/ACD-024). Not stored in DB.                                                        |
 | `realized_pnl`    | `Holding.total_realized_pnl` | Cumulative realized P&L from partial sells and write-offs (i64 micros, WOF-021). Zero if none. See SEL-042.                                   |
-| `realized_lost`   | computed                     | The part of `realized_pnl` from write-offs whose reason is `Lost` (i64 micros, zero or less, WOF-022).                                        |
 | `market_value`    | computed                     | Value in account currency (i64 micros), the holding's contribution to `total_global_value`; `None` when unpriced or no usable rate (ACD-052). |
 | `weight_pct`      | computed                     | Share of `total_global_value` in micro-percent; `None` when `market_value` is `None` or the Global Value is not positive (ACD-052).           |
 
@@ -73,6 +72,8 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 | `total_capital_brought_in` | Net cash input plus every opening balance at its recorded cost, account-currency micros (ACD-058).                                              |
 
 > **MKT extension**: `docs/spec/market-price.md` adds `total_unrealized_pnl: Option<i64>` to this response and six new fields to `HoldingDetail` (`asset_currency`, `current_price`, `current_price_date`, `unrealized_pnl`, `performance_pct`, `current_value`). See the MKT spec for definitions.
+
+> **WOF extension**: `docs/spec/write-off.md` adds `realized_lost: i64` to `HoldingDetail` (WOF-022).
 
 > **CSH extension**: `docs/spec/cash-tracking.md` adds `total_global_value: i64` to this response (CSH-094) and amends ACD-034 with a cash-specific exception (CSH-098). The Cash Holding is **always** included in `holdings` (CSH-090), exempt from ACD-020's `quantity > 0` filter — it appears even at `quantity = 0` (CSH-097) and is never placed in `closed_holdings`. Asset metadata is enriched via `AssetService` like any other asset (ACD-022).
 

@@ -53,7 +53,7 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 
 **WOF-022 — Lost, kept apart (backend)**: The realized P&L of the holding's write-offs whose reason is `Lost` is also given apart, as the holding's **lost** amount (account currency, zero or less), so the owner sees what disappeared apart from what fees and dust cost. It is included in the holding's realized P&L, not added to it. In a read with a date, both count the write-offs dated on or before it. There is no account-level total of it.
 
-**WOF-023 — Not a cash flow (backend)**: A write-off is no external flow of the performance figures, of the account (PRF-031) or of the position (ACD-056, PRF-083, GPF-030): the value it takes out is a loss of the position, as a fall in price is.
+**WOF-023 — Not a cash flow (backend)**: A write-off is no external flow of the performance figures, of the account (PRF-030) or of the position (ACD-056, PRF-083, GPF-030): the value it takes out is a loss of the position, as a fall in price is.
 
 ### Correction (030–039)
 
@@ -61,7 +61,7 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 
 **WOF-031 — Synced (backend)**: A write-off is a transaction like any other for sync (SYN-021); the write-off type and its reason are values of data format version 7 (SYN-038).
 
-**WOF-032 — An edit that oversells a later write-off (backend)**: The correction or deletion of another transaction of the asset in the account is refused when the replay would then leave a later write-off above what is held at its date, as one that leaves a later sale so is (SEL-032, SEL-033).
+**WOF-032 — An edit that oversells a later write-off (backend)**: The correction or deletion of another transaction of the asset in the account is refused when the replay would then leave a later write-off above what is held at its date, as one that leaves a later sale so is (SEL-032, FSD-041).
 
 ### Removal (040–049)
 
