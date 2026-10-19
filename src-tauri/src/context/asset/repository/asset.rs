@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use super::super::domain::{
     exchange, Asset, AssetCategory, AssetClass, AssetKind, AssetPrice, AssetRepository,
+    ReportedSplit,
 };
 use super::asset_price::source_from_storage;
 use crate::core::logger::BACKEND;
@@ -569,6 +570,30 @@ impl AssetRepository for SqliteAssetRepository {
                 })
                 .transpose()
             }
+            RecordKind::ReportedSplit => {
+                let (asset_id, date) = split_price_identity(identity)?;
+                let row = sqlx::query!(
+                    r#"SELECT asset_id, date, new, old, sync_logical_timestamp, sync_origin, sync_device_id
+                       FROM reported_splits WHERE asset_id = ? AND date = ?"#,
+                    asset_id,
+                    date
+                )
+                .fetch_optional(conn)
+                .await
+                .with_context(|| format!("Failed to read synced reported split {}", identity))?;
+                row.map(|row| {
+                    let split = ReportedSplit::restore(row.asset_id, row.date, row.new, row.old);
+                    Ok(SyncedRecord {
+                        rank: rank_from_columns(
+                            row.sync_logical_timestamp,
+                            row.sync_origin,
+                            row.sync_device_id,
+                        ),
+                        content: serde_json::to_string(&split)?,
+                    })
+                })
+                .transpose()
+            }
             RecordKind::Account
             | RecordKind::Transaction
             | RecordKind::FeeSchedule
@@ -748,6 +773,17 @@ impl AssetRepository for SqliteAssetRepository {
                 .await
                 .with_context(|| format!("Failed to remove asset price {}", identity))?;
             }
+            RecordKind::ReportedSplit => {
+                let (asset_id, date) = split_price_identity(identity)?;
+                sqlx::query!(
+                    "DELETE FROM reported_splits WHERE asset_id = ? AND date = ?",
+                    asset_id,
+                    date
+                )
+                .execute(conn)
+                .await
+                .with_context(|| format!("Failed to remove reported split {}", identity))?;
+            }
             RecordKind::Account
             | RecordKind::Transaction
             | RecordKind::FeeSchedule
@@ -760,11 +796,45 @@ impl AssetRepository for SqliteAssetRepository {
         Ok(())
     }
 
+    async fn apply_reported_split(
+        &self,
+        conn: &mut SqliteConnection,
+        split: &ReportedSplit,
+        rank: &Rank,
+    ) -> Result<()> {
+        let columns = RankColumns::from(rank.clone());
+        sqlx::query!(
+            r#"INSERT INTO reported_splits (asset_id, date, new, old, sync_logical_timestamp, sync_origin, sync_device_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(asset_id, date) DO UPDATE SET
+                   new = excluded.new,
+                   old = excluded.old,
+                   sync_logical_timestamp = excluded.sync_logical_timestamp,
+                   sync_origin = excluded.sync_origin,
+                   sync_device_id = excluded.sync_device_id"#,
+            split.asset_id,
+            split.date,
+            split.new,
+            split.old,
+            columns.logical_timestamp,
+            columns.origin,
+            columns.device_id
+        )
+        .execute(conn)
+        .await
+        .context("Failed to apply reported split")?;
+        Ok(())
+    }
+
     async fn discard_asset_prices(&self, conn: &mut SqliteConnection) -> Result<()> {
         sqlx::query!("DELETE FROM asset_prices")
-            .execute(conn)
+            .execute(&mut *conn)
             .await
             .context("Failed to discard asset prices")?;
+        sqlx::query!("DELETE FROM reported_splits")
+            .execute(conn)
+            .await
+            .context("Failed to discard reported splits")?;
         Ok(())
     }
 

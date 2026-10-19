@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO reported_splits (asset_id, date, new, old, sync_logical_timestamp, sync_origin, sync_device_id)\n               VALUES (?, ?, ?, ?, ?, ?, ?)\n               ON CONFLICT(asset_id, date) DO UPDATE SET\n                   new = excluded.new,\n                   old = excluded.old,\n                   sync_logical_timestamp = excluded.sync_logical_timestamp,\n                   sync_origin = excluded.sync_origin,\n                   sync_device_id = excluded.sync_device_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "8ff69b4d8a41981694f07f7bff96efd6d300764a2c836100083e610e89d251d2"
+}

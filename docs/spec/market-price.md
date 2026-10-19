@@ -29,6 +29,29 @@ Represents a manually recorded market price for a financial asset on a specific 
 
 > The combination `(asset_id, date)` is unique: only one price per asset per day. Recording a second price for the same `(asset_id, date)` pair overwrites the first (MKT-025), regardless of source (per ADR-012) — except in a price history backfill, which fills only dates without a price (MKT-192). Correction by re-recording remains valid. Standalone edit and delete of individual entries are also supported via the price history view (MKT-070+).
 
+### ReportedSplit
+
+A split the price provider reports for an asset (MKT-230). Owned by the `asset` bounded context; synced like an asset price (SYN-021).
+
+| Field      | Business meaning                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------- |
+| `asset_id` | The asset the provider reports the split for.                                                                 |
+| `date`     | The split's date as the provider reports it, on the exchange's calendar (ISO 8601).                           |
+| `new`      | New shares of the split factor, new : old (SPL-062): 20 for a 20-for-1 split, 1 for a 1-for-10 reverse split. |
+| `old`      | Old shares of the split factor (SPL-062): 1 for a 20-for-1 split, 10 for a 1-for-10 reverse split.            |
+
+> The combination `(asset_id, date)` is unique. A reported split is an observation (CFR-050): a new reading of its range replaces it (MKT-230), and it never changes a holding, a price or a transaction.
+
+### UnrecordedSplit
+
+A reported split that an account holding the asset has not recorded (MKT-231). A read model, never persisted.
+
+| Field  | Business meaning                          |
+| ------ | ----------------------------------------- |
+| `date` | The reported split's date.                |
+| `new`  | New shares of its split factor (SPL-062). |
+| `old`  | Old shares of its split factor (SPL-062). |
+
 ### PriceFreshness
 
 The two figures behind the header's price item (MKT-202). A read model, never persisted as such.
@@ -71,6 +94,7 @@ The `HoldingDetail` DTO defined in the ACD spec gains these fields, populated by
 | `performance_pct`      | `unrealized_pnl / cost_basis × 100`, expressed as i64 micros (e.g. 5.25 % = 5 250 000). `None` when `unrealized_pnl` is `None` or `cost_basis` is zero. `0` when `unrealized_pnl` is zero.                              |
 | `current_value`        | `current_price × quantity` in asset currency (i64 micros, i128 intermediate), independent of any exchange rate (MKT-143). `None` when `current_price` is `None`.                                                        |
 | `price_outdated`       | Whether `current_price` is outdated for the asset (MKT-205). `false` without a price, for cash, and in a read with a date, today included (MKT-206).                                                                    |
+| `unrecorded_splits`    | The holding's unrecorded splits, oldest first (MKT-231); empty for cash, a closed position and a read with a date, today included.                                                                                      |
 
 ### AccountDetailsResponse (extended)
 
@@ -463,6 +487,14 @@ A fetch that cannot price an asset is silent while it runs (MKT-114, SPF-041); w
 **MKT-221 — The reasons are read without the prices typed by hand (backend)**: The read of the reasons gives, for each asset, the reason and the moment its last fetch on this device recorded, and leaves out an asset whose price is typed by hand (MKT-150): no fetch attempts it, and its row says so instead (MKT-158). Switching "typed by hand" on clears nothing: switched off again, the asset shows its old reason until a fetch attempts it.
 
 **MKT-222 — The reason on the row (frontend)**: On an active holding row of the live view of Account Details — not in the view of a date (MKT-206), not on a closed position — a line under the price, or under either diagnostic of MKT-032 ("No price available", "Missing ticker"), says why the last fetch on this device did not update it: "Not updated: no price from the provider" / "Not updated: the provider could not be reached" / "Not updated: the price could not be saved" ("Non mis à jour : aucun prix du fournisseur" / "… le fournisseur est injoignable" / "… le prix n'a pas pu être enregistré"), in the warning colour, both themes; on hover it gives the date of the fetch that could not price it ("Fetch that could not price it: 2026-10-18" / "Récupération qui n'a pas trouvé son prix : 2026-10-18"). The reasons are read again with the account's details (ACD-039 and the events of MKT-036, `AssetPriceFetchCompleted` included); a scheduled download raises no event, so its reasons show at the next of them or at the next start, as MKT-203 says of the header. When the reasons cannot be read, no line shows and the rest of the view is unchanged.
+
+### Reported and Unrecorded Splits (230–239)
+
+**MKT-230 — Reported splits (backend)**: When a price history backfill or a scheduled run reads an asset's daily closes, it also reads the splits the provider reports for the asset — from the start of the held period for a backfill (MKT-191), from the start of its window for a scheduled run (SPF-031), through today — and keeps them as the **reported splits** of the asset over that range: each with its date and its split factor as new : old (SPL-062). A reported split is an observation (CFR-050), synced like an asset price (SYN-021) and identified by asset and date, its changes the application's own (CFR-016). The reading replaces what the range held: a split read again unchanged writes nothing and records no change, one whose factor moved is overwritten, one the provider no longer reports in that range is removed, and two on one date are one, the last reported; no other action on this device removes a reported split, and only a joiner's rebuild replaces them all (SYN-083). It never changes a holding, a price or a transaction. The fetch tasks (MKT-122, MKT-130, MKT-132) read no splits. A provider that reports no splits reports none; a build without an External provider reads none (MKT-210).
+
+**MKT-231 — Unrecorded split (backend)**: In an account, a reported split of an asset is **unrecorded** when the split's date is on or before today, the account held the asset the day before it — a quantity above zero once its transactions dated before the split are replayed — and the account records no split of the asset within 5 days either side of that date (SPL-010), whatever that split's factor — a broker's date can differ from the exchange's by a settlement or a weekend (owner, 2026-10-19). Each active holding of the read of an account's details lists its unrecorded splits with their date and factor, oldest first; a closed position lists none, since a split can no longer be recorded on it (SPL-012), and a read with a date lists none (MKT-206). Recording a split within those days ends it; nothing is ever recorded automatically.
+
+**MKT-232 — Reading reported splits fails, or changes them (backend)**: A split reading fails as the closes' does (MKT-193B) — the backfill is rejected per MKT-195, the scheduled run skips the asset as provider-unreachable (SPF-041) — and nothing of that reading is kept; a failure to keep the splits rejects the backfill or skips the asset as a failure to keep a close does (MKT-195, SPF-041). The splits are kept before the closes, their replacement all or nothing; a failure to keep a close afterwards leaves them kept. A backfill whose reading changed the reported splits publishes `AssetPriceUpdated` (MKT-112) — beside MKT-194's when it also wrote a close — so a holding view reads them again; a scheduled run raises no event (MKT-203), and its changes show at the next read.
 
 ## Workflow
 

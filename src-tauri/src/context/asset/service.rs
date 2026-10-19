@@ -1,8 +1,8 @@
 use super::domain::{
     proposed_reference, Asset, AssetCategory, AssetCategoryRepository, AssetClass, AssetKind,
     AssetListings, AssetPrice, AssetPriceRepository, AssetPriceSource, AssetRepository,
-    AssetToSettle, DatedClose, KindProblem, OtherListing, PriceHistoryBackfillOutcome,
-    SYSTEM_CATEGORY_ID,
+    AssetToSettle, DatedClose, DatedSplitFactor, KindProblem, OtherListing,
+    PriceHistoryBackfillOutcome, ReportedSplit, SYSTEM_CATEGORY_ID,
 };
 use super::error::AssetError;
 use crate::{
@@ -854,6 +854,54 @@ impl AssetService {
         Ok(fill)
     }
 
+    /// MKT-230 — makes `splits` the reported splits of `asset_id` from `from` on: what the
+    /// provider no longer reports in that range is removed, an unchanged split writes
+    /// nothing. Publishes one `AssetPriceUpdated` when anything changed.
+    pub async fn record_reported_splits(
+        &self,
+        asset_id: &str,
+        from: &str,
+        splits: &[DatedSplitFactor],
+    ) -> StdResult<(), AssetError> {
+        let changed = self
+            .price_repo
+            .record_reported_splits(asset_id, from, splits)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, asset_id = %asset_id, err = ?e, "record_reported_splits: write failure");
+                AssetError::DatabaseError
+            })?;
+        if let Some(bus) = self.event_bus.as_ref().filter(|_| changed) {
+            bus.publish(Event::AssetPriceUpdated);
+        }
+        Ok(())
+    }
+
+    /// MKT-230 — the reported splits of `asset_id`, oldest first.
+    pub async fn reported_splits(
+        &self,
+        asset_id: &str,
+    ) -> StdResult<Vec<ReportedSplit>, AssetError> {
+        self.price_repo
+            .get_reported_splits(asset_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, asset_id = %asset_id, err = ?e, "reported_splits: read failure");
+                AssetError::DatabaseError
+            })
+    }
+
+    /// Every reported split (MKT-230), by asset then date: the sync snapshot (SYN-013).
+    pub async fn all_reported_splits(&self) -> StdResult<Vec<ReportedSplit>, AssetError> {
+        self.price_repo
+            .get_all_reported_splits()
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, err = ?e, "all_reported_splits: read failure");
+                AssetError::DatabaseError
+            })
+    }
+
     // -------------------------------------------------------------------------
     // Apply entry points (CFR-017) — merge executor writes; no entry guards run
     // -------------------------------------------------------------------------
@@ -975,6 +1023,20 @@ impl AssetService {
             .map_err(|e| applied_write_error("apply_asset_price", e))
     }
 
+    /// Applies an incoming reported split verbatim, stamped with `rank` (CFR-050, MKT-230).
+    pub async fn apply_reported_split(
+        &self,
+        conn: &mut SqliteConnection,
+        content: &str,
+        rank: Rank,
+    ) -> StdResult<(), AssetError> {
+        let split: ReportedSplit = synced_content(content)?;
+        self.asset_repo
+            .apply_reported_split(conn, &split, &rank)
+            .await
+            .map_err(|e| applied_write_error("apply_reported_split", e))
+    }
+
     /// Applies an incoming removal of `kind`/`identity` (CFR-017/CFR-030): an asset or a
     /// category is removed as it is removed locally, its assets left on the removed
     /// category — shown in the default category on read (CFR-030) — never a cascade
@@ -991,7 +1053,7 @@ impl AssetService {
             .map_err(|e| applied_write_error("apply_removal", e))
     }
 
-    /// SYN-083 — discards every asset price this installation holds, on the rebuild
+    /// SYN-083 — discards every asset price and reported split this installation holds, on the rebuild
     /// transaction's connection, before the shared history's observations replace them.
     pub async fn discard_asset_prices(
         &self,
@@ -1127,6 +1189,15 @@ pub trait AssetServiceContract: Send + Sync {
         asset_id: &str,
         closes: Vec<DatedClose>,
     ) -> StdResult<PriceHistoryBackfillOutcome, AssetError>;
+    /// Makes `splits` the reported splits of `asset_id` from `from` on (MKT-230).
+    async fn record_reported_splits(
+        &self,
+        asset_id: &str,
+        from: &str,
+        splits: &[DatedSplitFactor],
+    ) -> StdResult<(), AssetError>;
+    /// The reported splits of `asset_id`, oldest first (MKT-230).
+    async fn reported_splits(&self, asset_id: &str) -> StdResult<Vec<ReportedSplit>, AssetError>;
 }
 
 #[async_trait]
@@ -1216,6 +1287,19 @@ impl AssetServiceContract for AssetService {
         closes: Vec<DatedClose>,
     ) -> StdResult<PriceHistoryBackfillOutcome, AssetError> {
         AssetService::record_missing_daily_closes(self, asset_id, closes).await
+    }
+
+    async fn record_reported_splits(
+        &self,
+        asset_id: &str,
+        from: &str,
+        splits: &[DatedSplitFactor],
+    ) -> StdResult<(), AssetError> {
+        AssetService::record_reported_splits(self, asset_id, from, splits).await
+    }
+
+    async fn reported_splits(&self, asset_id: &str) -> StdResult<Vec<ReportedSplit>, AssetError> {
+        AssetService::reported_splits(self, asset_id).await
     }
 }
 

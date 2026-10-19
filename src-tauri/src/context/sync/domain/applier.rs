@@ -46,7 +46,7 @@ pub trait ChangeApplier: Send + Sync {
     /// refers to first (SYN-027/CFR-033).
     async fn write(&self, conn: &mut SqliteConnection, change: &Change) -> Result<(), SyncError>;
 
-    /// SYN-083 — discards every asset price, currency pair, and currency rate this
+    /// SYN-083 — discards every asset price, reported split, currency pair, and currency rate this
     /// installation fetched before joining, so the rebuild replaces them.
     async fn discard_observations(&self, conn: &mut SqliteConnection) -> Result<(), SyncError>;
 }

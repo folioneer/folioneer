@@ -138,6 +138,7 @@ enum RecordKind {
     CurrencyRate,
     HoldingNote,
     PortfolioSetting,   // a portfolio-wide setting by its name: the reference currency (GPF-011)
+    ReportedSplit,      // a split a price provider reports for an asset, by asset and date (MKT-230)
 }
 
 // A holding whose merged ledger breaks an invariant (CFR-042). Derived on read, never stored.
@@ -177,7 +178,7 @@ struct SyncReportView {
 }
 ```
 
-Record identity per kind follows CFR-012: accounts, categories, assets, transactions by id; fee schedules and catch-up positions by `account_id + asset_id`; currency pairs by `from + to`; prices by `asset_id + date`; rates by `pair + date`; holding notes by `account_id + asset_id`; portfolio settings by `name`. On the wire `record_identity` is the canonical string form of that key.
+Record identity per kind follows CFR-012: accounts, categories, assets, transactions by id; fee schedules and catch-up positions by `account_id + asset_id`; currency pairs by `from + to`; prices by `asset_id + date`; rates by `pair + date`; holding notes by `account_id + asset_id`; portfolio settings by `name`; reported splits by `asset_id + date`. On the wire `record_identity` is the canonical string form of that key.
 
 ---
 
@@ -200,6 +201,7 @@ Record identity per kind follows CFR-012: accounts, categories, assets, transact
 
 ## Changelog
 
+- 2026-10-19 — #529 (SYN-021, SYN-038, MKT-230): `RecordKind` gains `ReportedSplit`; data format version 6. No command changed.
 - 2026-10-18 — TODO-032 (SYN-021, SYN-038): `RecordKind` gains `PortfolioSetting`; data format version 5. No command changed.
 - 2026-10-17 — DEBT-131 (SYN-074): the `HeaderRejected` note of `change_sync_folder` says it reads the folder it leaves only for a device that keeps no derivation parameters. No command or type changes.
 - 2026-10-11 — DEBT-106 (SYN-074): `change_sync_folder` answers `InstallationHoldsUserData` for a folder that holds the portfolio as another device moved it there. No shape change.

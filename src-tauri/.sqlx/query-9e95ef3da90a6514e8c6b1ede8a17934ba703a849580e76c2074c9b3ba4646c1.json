@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM reported_splits WHERE asset_id = ? AND date = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "9e95ef3da90a6514e8c6b1ede8a17934ba703a849580e76c2074c9b3ba4646c1"
+}

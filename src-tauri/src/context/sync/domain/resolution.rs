@@ -388,7 +388,9 @@ pub fn decide(
     current_content: Option<&str>,
 ) -> Decision {
     let outcome = match incoming.record_kind {
-        RecordKind::AssetPrice | RecordKind::CurrencyRate => resolve_observation(incoming, current),
+        RecordKind::AssetPrice | RecordKind::ReportedSplit | RecordKind::CurrencyRate => {
+            resolve_observation(incoming, current)
+        }
         RecordKind::FeeCatchUpPosition
             if incoming.operation != Operation::Removed
                 && !matches!(current, Some(RecordState::Tombstone(_))) =>
@@ -495,7 +497,9 @@ pub fn parent_references(change: &Change) -> Vec<(RecordKind, String)> {
             reference(RecordKind::Account, change.content_field("account_id"));
             reference(RecordKind::Asset, change.content_field("asset_id"));
         }
-        RecordKind::AssetPrice => reference(RecordKind::Asset, change.content_field("asset_id")),
+        RecordKind::AssetPrice | RecordKind::ReportedSplit => {
+            reference(RecordKind::Asset, change.content_field("asset_id"))
+        }
         RecordKind::Asset => reference(
             RecordKind::Category,
             change.content_value().and_then(|value| {
@@ -664,7 +668,10 @@ pub fn local_write_allowed(
 ) -> bool {
     if matches!(
         kind,
-        RecordKind::AssetPrice | RecordKind::CurrencyRate | RecordKind::FeeCatchUpPosition
+        RecordKind::AssetPrice
+            | RecordKind::ReportedSplit
+            | RecordKind::CurrencyRate
+            | RecordKind::FeeCatchUpPosition
     ) {
         return true;
     }

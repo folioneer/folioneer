@@ -1398,6 +1398,18 @@ mod tests {
             .record_asset_price(&asset.id, "2026-08-20", 150.0)
             .await
             .unwrap();
+        ctx.asset_service
+            .record_reported_splits(
+                &asset.id,
+                "2020-01-01",
+                &[crate::context::asset::DatedSplitFactor {
+                    date: "2022-07-18".into(),
+                    new: 20,
+                    old: 1,
+                }],
+            )
+            .await
+            .unwrap();
         ctx.orchestrator
             .currency_service
             .declare_currency_pair("USD".into(), "EUR".into())
@@ -1424,6 +1436,14 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+        assert!(
+            ctx.asset_service
+                .reported_splits(&asset.id)
+                .await
+                .unwrap()
+                .is_empty(),
+            "SYN-083 — a joiner's reported splits are replaced too"
+        );
         assert!(ctx
             .orchestrator
             .currency_service

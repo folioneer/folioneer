@@ -23,4 +23,7 @@ pub mod price_fetch_log;
 pub mod price_movement;
 /// Shared fetch-scope builder (SPF-040) reused by `asset_price_fetch` and `scheduled_fetch`.
 pub mod scope;
+/// MKT-231 — the reported splits an account holding the asset has not recorded, read by
+/// `account_details` and the agent connection.
+pub mod unrecorded_split;
 pub mod valuation;

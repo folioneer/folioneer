@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT date, new, old, sync_logical_timestamp AS \"sync_logical_timestamp?: String\"\n               FROM reported_splits WHERE asset_id = ? AND date >= ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "date",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "new",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "old",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "sync_logical_timestamp?: String",
+        "ordinal": 3,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "9f21e5e866ac252210958f9d24c78d0d17ddc9ee0599b6c85bf3db401542d3f4"
+}

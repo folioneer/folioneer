@@ -79,7 +79,10 @@ impl ChangeApplier for ServiceChangeApplier {
                 .synced_record(conn, kind, identity)
                 .await
                 .map_err(|error| SyncError::database("apply: account record not read", error)),
-            RecordKind::Category | RecordKind::Asset | RecordKind::AssetPrice => self
+            RecordKind::Category
+            | RecordKind::Asset
+            | RecordKind::AssetPrice
+            | RecordKind::ReportedSplit => self
                 .asset_service
                 .synced_record(conn, kind, identity)
                 .await
@@ -144,7 +147,10 @@ impl ChangeApplier for ServiceChangeApplier {
                     .map_err(|error| {
                         SyncError::database("apply: account removal not written", error)
                     }),
-                RecordKind::Category | RecordKind::Asset | RecordKind::AssetPrice => self
+                RecordKind::Category
+                | RecordKind::Asset
+                | RecordKind::AssetPrice
+                | RecordKind::ReportedSplit => self
                     .asset_service
                     .apply_removal(conn, kind, identity)
                     .await
@@ -219,6 +225,15 @@ impl ChangeApplier for ServiceChangeApplier {
                     .apply_asset_price(conn, content, rank)
                     .await
                     .map_err(|error| SyncError::database("apply: asset price not written", error));
+            }
+            RecordKind::ReportedSplit => {
+                return self
+                    .asset_service
+                    .apply_reported_split(conn, content, rank)
+                    .await
+                    .map_err(|error| {
+                        SyncError::database("apply: reported split not written", error)
+                    });
             }
             RecordKind::CurrencyPair => {
                 return self

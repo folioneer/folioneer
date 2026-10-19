@@ -1,4 +1,6 @@
-use super::super::domain::{AssetPrice, AssetPriceRepository, AssetPriceSource};
+use super::super::domain::{
+    AssetPrice, AssetPriceRepository, AssetPriceSource, DatedSplitFactor, ReportedSplit,
+};
 use crate::core::logger::BACKEND;
 use crate::shared::domain::{
     ChangeDraft, LogicalTimestamp, Operation, Origin, RecordIdentity, RecordKind,
@@ -191,6 +193,100 @@ fn identity(asset_id: &str, date: &str) -> RecordIdentity {
     RecordIdentity::canonical(RecordKind::AssetPrice, &[asset_id, date])
 }
 
+fn split_identity(asset_id: &str, date: &str) -> RecordIdentity {
+    RecordIdentity::canonical(RecordKind::ReportedSplit, &[asset_id, date])
+}
+
+#[derive(sqlx::FromRow)]
+struct ReportedSplitRow {
+    asset_id: String,
+    date: String,
+    new: i64,
+    old: i64,
+}
+
+impl From<ReportedSplitRow> for ReportedSplit {
+    fn from(row: ReportedSplitRow) -> Self {
+        ReportedSplit::restore(row.asset_id, row.date, row.new, row.old)
+    }
+}
+
+impl SqliteAssetPriceRepository {
+    /// Writes `split` on `conn` and records its `operation` — Created, or Updated based on
+    /// `based_on` (MKT-230): the provider's reading is the application's own (CFR-016).
+    async fn write_reported_split(
+        &self,
+        conn: &mut SqliteConnection,
+        split: &ReportedSplit,
+        operation: Operation,
+        based_on: Option<LogicalTimestamp>,
+    ) -> Result<()> {
+        sqlx::query!(
+            "INSERT INTO reported_splits (asset_id, date, new, old) VALUES (?, ?, ?, ?)
+             ON CONFLICT(asset_id, date) DO UPDATE SET new = excluded.new, old = excluded.old",
+            split.asset_id,
+            split.date,
+            split.new,
+            split.old,
+        )
+        .execute(&mut *conn)
+        .await
+        .context("Failed to write reported split")?;
+        let draft = ChangeDraft::new(
+            RecordKind::ReportedSplit,
+            split_identity(&split.asset_id, &split.date),
+            operation,
+            Origin::Application,
+            based_on,
+            Some(serde_json::to_string(split)?),
+        );
+        if let Some(rank) = self.change_recorder.record(conn, draft).await? {
+            let columns = RankColumns::from(rank);
+            sqlx::query!(
+                "UPDATE reported_splits SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?
+                 WHERE asset_id = ? AND date = ?",
+                columns.logical_timestamp,
+                columns.origin,
+                columns.device_id,
+                split.asset_id,
+                split.date
+            )
+            .execute(conn)
+            .await
+            .context("Failed to stamp rank on reported split")?;
+        }
+        Ok(())
+    }
+
+    /// Removes the reported split of `asset_id` on `date` and records its removal (MKT-230).
+    async fn remove_reported_split(
+        &self,
+        conn: &mut SqliteConnection,
+        asset_id: &str,
+        date: &str,
+        based_on: Option<LogicalTimestamp>,
+    ) -> Result<()> {
+        sqlx::query!(
+            "DELETE FROM reported_splits WHERE asset_id = ? AND date = ?",
+            asset_id,
+            date
+        )
+        .execute(&mut *conn)
+        .await
+        .context("Failed to remove reported split")?;
+        let draft = ChangeDraft::new(
+            RecordKind::ReportedSplit,
+            split_identity(asset_id, date),
+            Operation::Removed,
+            Origin::Application,
+            based_on,
+            None,
+        );
+        self.change_recorder.record(conn, draft).await?;
+        Ok(())
+    }
+}
+
 #[async_trait]
 impl AssetPriceRepository for SqliteAssetPriceRepository {
     async fn upsert(&self, price: AssetPrice) -> Result<()> {
@@ -261,6 +357,95 @@ impl AssetPriceRepository for SqliteAssetPriceRepository {
             .await
             .context("Failed to commit asset price delete")?;
         Ok(())
+    }
+
+    async fn record_reported_splits(
+        &self,
+        asset_id: &str,
+        from: &str,
+        splits: &[DatedSplitFactor],
+    ) -> Result<bool> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .context("Failed to begin reported splits write")?;
+        let held = sqlx::query!(
+            r#"SELECT date, new, old, sync_logical_timestamp AS "sync_logical_timestamp?: String"
+               FROM reported_splits WHERE asset_id = ? AND date >= ?"#,
+            asset_id,
+            from
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .context("Failed to read reported splits")?;
+        let mut changed = false;
+        for row in &held {
+            if !splits.iter().any(|split| split.date == row.date) {
+                let based_on = row
+                    .sync_logical_timestamp
+                    .as_deref()
+                    .and_then(LogicalTimestamp::from_wire);
+                self.remove_reported_split(&mut tx, asset_id, &row.date, based_on)
+                    .await?;
+                changed = true;
+            }
+        }
+        // One split per date, the last reported winning: a record is written once.
+        let mut read: Vec<&DatedSplitFactor> = Vec::new();
+        // A split dated before the range is not the range's to keep: a later reading of
+        // that range could not remove it.
+        for factor in splits.iter().filter(|factor| factor.date.as_str() >= from) {
+            read.retain(|kept| kept.date != factor.date);
+            read.push(factor);
+        }
+        for factor in read {
+            let split = ReportedSplit::of_asset(asset_id, factor);
+            let existing = held.iter().find(|row| row.date == split.date);
+            match existing {
+                Some(row) if row.new == split.new && row.old == split.old => continue,
+                Some(row) => {
+                    let based_on = row
+                        .sync_logical_timestamp
+                        .as_deref()
+                        .and_then(LogicalTimestamp::from_wire);
+                    self.write_reported_split(&mut tx, &split, Operation::Updated, based_on)
+                        .await?;
+                }
+                None => {
+                    self.write_reported_split(&mut tx, &split, Operation::Created, None)
+                        .await?;
+                }
+            }
+            changed = true;
+        }
+        tx.commit()
+            .await
+            .context("Failed to commit reported splits write")?;
+        Ok(changed)
+    }
+
+    async fn get_reported_splits(&self, asset_id: &str) -> Result<Vec<ReportedSplit>> {
+        let rows = sqlx::query_as!(
+            ReportedSplitRow,
+            "SELECT asset_id, date, new, old FROM reported_splits WHERE asset_id = ? ORDER BY date",
+            asset_id,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch reported splits")?;
+        Ok(rows.into_iter().map(ReportedSplit::from).collect())
+    }
+
+    async fn get_all_reported_splits(&self) -> Result<Vec<ReportedSplit>> {
+        let rows = sqlx::query_as!(
+            ReportedSplitRow,
+            "SELECT asset_id, date, new, old FROM reported_splits ORDER BY asset_id, date",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch every reported split")?;
+        Ok(rows.into_iter().map(ReportedSplit::from).collect())
     }
 
     async fn replace_atomic(
@@ -869,5 +1054,117 @@ mod tests {
             0,
             "SYN-020: a failed write records no change"
         );
+    }
+
+    fn factor(date: &str, new: i64, old: i64) -> DatedSplitFactor {
+        DatedSplitFactor {
+            date: date.into(),
+            new,
+            old,
+        }
+    }
+
+    async fn changes_of_reported_splits(pool: &Pool<Sqlite>) -> Vec<(String, String, String)> {
+        sqlx::query_as(
+            "SELECT record_identity, operation, origin FROM changes
+             WHERE record_kind = 'ReportedSplit' ORDER BY sequence",
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap()
+    }
+
+    // MKT-230 (#529) — a reading keeps each split, an application change each; read again
+    // unchanged it writes nothing; a moved factor is overwritten; a split no longer
+    // reported in the range is removed, one before the range is left alone.
+    #[tokio::test]
+    async fn mkt_230_a_reading_replaces_the_reported_splits_of_its_range() {
+        let pool = make_pool().await;
+        seed_sync_device(&pool).await;
+        seed_asset(&pool, "asset-1").await;
+        let recorder = Arc::new(SqliteChangeRecorder::new(pool.clone()));
+        let repo = SqliteAssetPriceRepository::new(pool.clone()).with_change_recorder(recorder);
+
+        let first = [factor("2019-06-03", 3, 1), factor("2022-07-18", 20, 1)];
+        assert!(repo
+            .record_reported_splits("asset-1", "2019-01-01", &first)
+            .await
+            .unwrap());
+        assert!(!repo
+            .record_reported_splits("asset-1", "2019-01-01", &first)
+            .await
+            .unwrap());
+        let changed = [factor("2022-07-18", 10, 1), factor("2024-03-04", 1, 10)];
+        assert!(repo
+            .record_reported_splits("asset-1", "2022-01-01", &changed)
+            .await
+            .unwrap());
+
+        let kept = repo.get_reported_splits("asset-1").await.unwrap();
+        let kept: Vec<(&str, i64, i64)> = kept
+            .iter()
+            .map(|split| (split.date.as_str(), split.new, split.old))
+            .collect();
+        assert_eq!(
+            kept,
+            vec![
+                ("2019-06-03", 3, 1),
+                ("2022-07-18", 10, 1),
+                ("2024-03-04", 1, 10)
+            ]
+        );
+        let changes = changes_of_reported_splits(&pool).await;
+        let changes: Vec<(&str, &str, &str)> = changes
+            .iter()
+            .map(|(identity, operation, origin)| {
+                (identity.as_str(), operation.as_str(), origin.as_str())
+            })
+            .collect();
+        assert_eq!(
+            changes,
+            vec![
+                ("asset-1:2019-06-03", "Created", "Application"),
+                ("asset-1:2022-07-18", "Created", "Application"),
+                ("asset-1:2022-07-18", "Updated", "Application"),
+                ("asset-1:2024-03-04", "Created", "Application"),
+            ]
+        );
+
+        assert!(repo
+            .record_reported_splits("asset-1", "2023-01-01", &[])
+            .await
+            .unwrap());
+        let dates: Vec<String> = repo
+            .get_reported_splits("asset-1")
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|split| split.date)
+            .collect();
+        assert_eq!(dates, vec!["2019-06-03", "2022-07-18"]);
+        assert_eq!(changes_with_operation(&pool, "Removed").await, 1);
+    }
+
+    // MKT-230 (#529) — two splits on one date in a reading are one record, the last winning.
+    #[tokio::test]
+    async fn mkt_230_two_splits_on_one_date_are_one_record_the_last_winning() {
+        let pool = make_pool().await;
+        seed_sync_device(&pool).await;
+        seed_asset(&pool, "asset-1").await;
+        let recorder = Arc::new(SqliteChangeRecorder::new(pool.clone()));
+        let repo = SqliteAssetPriceRepository::new(pool.clone()).with_change_recorder(recorder);
+
+        repo.record_reported_splits(
+            "asset-1",
+            "2019-01-01",
+            &[factor("2022-07-18", 10, 1), factor("2022-07-18", 20, 1)],
+        )
+        .await
+        .unwrap();
+
+        let kept = repo.get_reported_splits("asset-1").await.unwrap();
+        assert_eq!(kept.len(), 1);
+        assert_eq!((kept[0].new, kept[0].old), (20, 1));
+        assert_eq!(changes_with_operation(&pool, "Created").await, 1);
     }
 }

@@ -68,6 +68,23 @@ rename) never creates a new one. A reverse split uses a factor below one.
 
 > Status: confirmed
 
+### Reported split
+
+A split the price provider reports for an asset, with its date and its split factor (new :
+old), kept and synced as an observation (MKT-230). It changes nothing by itself: only a
+recorded Stock Split rescales a position. In French: "Division signalée" (owner,
+2026-10-19).
+
+> Status: confirmed
+
+### Unrecorded split
+
+A reported split that an account holding the asset on the day before it has not recorded
+as a Stock Split within 5 days of that date (MKT-231); the holding row and an agent say so. In French:
+"Division non enregistrée" (owner, 2026-10-19).
+
+> Status: confirmed
+
 ### Holding Note
 
 A free-text reminder the user pins to a position they hold, optionally carrying a price

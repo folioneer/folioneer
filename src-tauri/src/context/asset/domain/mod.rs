@@ -12,6 +12,8 @@ pub mod isin;
 pub mod openfigi_exchange_mapper;
 /// MKT-205 — whether a held asset's price is outdated.
 pub mod outdated_price;
+/// The splits a price provider reports for an asset (MKT-230).
+pub mod reported_split;
 /// Yahoo outbound exchange mapper — `Exchange` → Yahoo suffix (MKT-110).
 pub mod yahoo_exchange_mapper;
 /// Provider symbol derivation from asset reference, in Yahoo Finance's convention (MKT-110):
@@ -26,6 +28,7 @@ pub use asset_price::{
 pub use category::*;
 pub use exchange::Exchange;
 pub use outdated_price::is_price_outdated;
+pub use reported_split::{DatedSplitFactor, ReportedSplit};
 pub use yahoo_symbol::{derive_yahoo_symbol, derive_yahoo_symbol_with_exchange};
 
 #[cfg(test)]

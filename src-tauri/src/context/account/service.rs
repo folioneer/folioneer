@@ -1901,6 +1901,7 @@ impl AccountService {
             RecordKind::Category
             | RecordKind::Asset
             | RecordKind::AssetPrice
+            | RecordKind::ReportedSplit
             | RecordKind::CurrencyPair
             | RecordKind::CurrencyRate
             | RecordKind::PortfolioSetting => {}
