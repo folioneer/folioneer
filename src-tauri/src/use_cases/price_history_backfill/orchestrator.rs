@@ -977,4 +977,33 @@ mod tests {
             PriceHistoryBackfillError::Task(PriceHistoryBackfillTask::ProviderUnreachable)
         ));
     }
+
+    // MKT-232 (#529) — a failure to keep the splits rejects the backfill, no close recorded.
+    #[tokio::test]
+    async fn mkt_232_a_failure_to_keep_the_splits_rejects_the_backfill() {
+        let mut price_provider = MockPriceProvider::new();
+        price_provider
+            .expect_fetch_daily_closes()
+            .returning(|_, _, _| Ok(Some(vec![close("2024-02-02")])));
+        let mut asset_service = asset_service_serving(make_asset("AI", false, false));
+        asset_service
+            .expect_record_reported_splits()
+            .times(1)
+            .returning(|_, _, _| Err(crate::context::asset::AssetError::DatabaseError));
+        asset_service.expect_record_missing_daily_closes().times(0);
+
+        let error = make_use_case(
+            account_holding(vec![make_transaction(ASSET, "2024-02-01")], 1_000_000),
+            asset_service,
+            price_provider,
+        )
+        .backfill(ACCOUNT, ASSET)
+        .await
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            PriceHistoryBackfillError::Asset(crate::context::asset::AssetError::DatabaseError)
+        ));
+    }
 }

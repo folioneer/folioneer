@@ -398,7 +398,9 @@ impl AssetPriceRepository for SqliteAssetPriceRepository {
         }
         // One split per date, the last reported winning: a record is written once.
         let mut read: Vec<&DatedSplitFactor> = Vec::new();
-        for factor in splits {
+        // A split dated before the range is not the range's to keep: a later reading of
+        // that range could not remove it.
+        for factor in splits.iter().filter(|factor| factor.date.as_str() >= from) {
             read.retain(|kept| kept.date != factor.date);
             read.push(factor);
         }

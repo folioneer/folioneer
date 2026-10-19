@@ -1053,7 +1053,7 @@ impl AssetService {
             .map_err(|e| applied_write_error("apply_removal", e))
     }
 
-    /// SYN-083 — discards every asset price this installation holds, on the rebuild
+    /// SYN-083 — discards every asset price and reported split this installation holds, on the rebuild
     /// transaction's connection, before the shared history's observations replace them.
     pub async fn discard_asset_prices(
         &self,

@@ -1511,9 +1511,13 @@ mod tests {
                 "SPLITDOWN" => Err(anyhow::anyhow!("split request failed")),
                 _ => Ok(Vec::new()),
             });
+        // MKT-232 — keeping KEEPFAIL's splits fails.
         asset_service
             .expect_record_reported_splits()
-            .returning(|_, _, _| Ok(()));
+            .returning(|asset_id, _, _| match asset_id {
+                "asset-keepfail" => Err(crate::context::asset::AssetError::DatabaseError),
+                _ => Ok(()),
+            });
         ScheduledFetchOrchestrator::new(
             Arc::new(account_service),
             Arc::new(asset_service),
@@ -1563,6 +1567,17 @@ mod tests {
     async fn mkt_230_a_failed_split_reading_skips_the_asset() {
         let orchestrator =
             sweeping_orchestrator(&["UPDATED", "SPLITDOWN"], |_| Ok(Some(one_close())));
+        let run = orchestrator.run_scheduled_fetch().await.unwrap();
+        assert_eq!(run.updated_count, 1);
+        assert_eq!(run.skipped_count, 1);
+    }
+
+    // MKT-232 (#529) — a failure to keep the splits skips the asset as a failure to keep a
+    // close does.
+    #[tokio::test]
+    async fn mkt_232_a_failure_to_keep_the_splits_skips_the_asset() {
+        let orchestrator =
+            sweeping_orchestrator(&["UPDATED", "KEEPFAIL"], |_| Ok(Some(one_close())));
         let run = orchestrator.run_scheduled_fetch().await.unwrap();
         assert_eq!(run.updated_count, 1);
         assert_eq!(run.skipped_count, 1);

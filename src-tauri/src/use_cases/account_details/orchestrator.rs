@@ -2404,29 +2404,24 @@ mod tests {
             )
             .await
             .unwrap();
-        asset_svc
-            .record_reported_splits(
-                &asset_id,
-                "2000-01-01",
-                &[crate::context::asset::DatedSplitFactor {
-                    date: "2099-01-01".into(),
-                    new: 3,
-                    old: 1,
-                }],
-            )
-            .await
-            .unwrap();
         let today = Local::now().date_naive();
         let split_date = today.format("%Y-%m-%d").to_string();
         asset_svc
             .record_reported_splits(
                 &asset_id,
-                &split_date,
-                &[crate::context::asset::DatedSplitFactor {
-                    date: split_date.clone(),
-                    new: 2,
-                    old: 1,
-                }],
+                "2000-01-01",
+                &[
+                    crate::context::asset::DatedSplitFactor {
+                        date: split_date.clone(),
+                        new: 2,
+                        old: 1,
+                    },
+                    crate::context::asset::DatedSplitFactor {
+                        date: "2099-01-01".into(),
+                        new: 3,
+                        old: 1,
+                    },
+                ],
             )
             .await
             .unwrap();
