@@ -57,6 +57,7 @@ const baseRow: HoldingRowViewModel = {
   inconsistency: null,
   inconsistencyLabel: null,
   priceOutdated: false,
+  unrecordedSplits: [],
   fetchFailure: null,
   fetchFailedOn: null,
 };
@@ -1121,5 +1122,63 @@ describe("HoldingRow — split action (SPL-061)", () => {
     expect(actionsCell).toHaveClass("sticky", "left-0");
     expect(assetCell).toHaveClass("sticky", "left-[224px]");
     expect(document.querySelector("tr > td:nth-child(3)")).not.toHaveClass("sticky");
+  });
+});
+
+describe("HoldingRow — an unrecorded split (MKT-233)", () => {
+  beforeEach(() => {
+    useAppStore.setState({ assets: [], accounts: [] });
+    navigateMock.mockClear();
+  });
+
+  const withSplits: HoldingRowViewModel = {
+    ...baseRow,
+    unrecordedSplits: [
+      { date: "2022-07-18", new: 20, old: 1 },
+      { date: "2024-03-04", new: 1, old: 10 },
+    ],
+  };
+
+  const renderWithSplit = (row: HoldingRowViewModel, onSplit = vi.fn(), readOnly = false) =>
+    render(
+      <table>
+        <tbody>
+          <HoldingRow
+            row={row}
+            accountId="account-1"
+            onBuy={vi.fn()}
+            onSell={vi.fn()}
+            onPriceHistory={vi.fn()}
+            onSplit={onSplit}
+            readOnly={readOnly}
+          />
+        </tbody>
+      </table>,
+    );
+
+  it("says each unrecorded split under the asset name", () => {
+    renderWithSplit(withSplits);
+    expect(document.getElementById("holding-unrecorded-split-asset-1-2022-07-18")).toBeTruthy();
+    expect(document.getElementById("holding-unrecorded-split-asset-1-2024-03-04")).toBeTruthy();
+  });
+
+  it("opens the split form filled with the split's date and ratio", () => {
+    const onSplit = vi.fn();
+    renderWithSplit(withSplits, onSplit);
+    const record = document.getElementById("action-record-unrecorded-split-asset-1-2024-03-04");
+    if (!record) throw new Error("the record action is missing");
+    fireEvent.click(record);
+    expect(onSplit).toHaveBeenCalledWith("asset-1", { date: "2024-03-04", new: 1, old: 10 });
+  });
+
+  it("says nothing without an unrecorded split", () => {
+    renderWithSplit(baseRow);
+    expect(document.querySelector("[id^='holding-unrecorded-split-']")).toBeNull();
+  });
+
+  it("keeps the line but offers no shortcut in the read-only past view", () => {
+    renderWithSplit(withSplits, vi.fn(), true);
+    expect(document.getElementById("holding-unrecorded-split-asset-1-2022-07-18")).toBeTruthy();
+    expect(document.querySelector("[id^='action-record-unrecorded-split-']")).toBeNull();
   });
 });

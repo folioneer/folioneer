@@ -107,6 +107,19 @@ describe("useSplitTransaction — create mode (SPL-061/062/040)", () => {
     expect(result.current.isEditMode).toBe(false);
   });
 
+  // MKT-233 — opened from an unrecorded split, the form is filled with its date and ratio.
+  it("opens filled with an unrecorded split's date and ratio", () => {
+    const { result } = renderHook(() =>
+      useSplitTransaction({
+        ...BASE_PROPS,
+        target: { ...target, prefill: { date: "2024-03-04", new: 1, old: 10 } },
+      }),
+    );
+    expect(result.current.formData.date).toBe("2024-03-04");
+    expect(result.current.formData.ratioNew).toBe("1");
+    expect(result.current.formData.ratioOld).toBe("10");
+  });
+
   // SPL-062 — the form sends the ratio as typed and shows what the core returns: the
   // position before and after, and the price to carry across the split.
   it("sends the ratio as typed and shows the core's preview", async () => {

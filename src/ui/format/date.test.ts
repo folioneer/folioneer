@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  formatIsoDateMedium,
   formatIsoDateNumeric,
   formatIsoDateTime,
   formatIsoDateTimeNumeric,
@@ -45,6 +46,17 @@ describe("todayIso", () => {
     expect(sources.length).toBeGreaterThan(100);
     const offenders = sources.filter(([, text]) => utcDay.test(text)).map(([path]) => path);
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("formatIsoDateMedium", () => {
+  it("formats an ISO date as a medium date with the month named", () => {
+    expect(formatIsoDateMedium("2022-07-15", "en-GB")).toBe("15 Jul 2022");
+    expect(formatIsoDateMedium("2022-07-15", "fr")).toBe("15 juil. 2022");
+  });
+
+  it("returns an unparseable input unchanged", () => {
+    expect(formatIsoDateMedium("not-a-date", "en")).toBe("not-a-date");
   });
 });
 

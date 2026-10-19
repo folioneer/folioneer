@@ -496,6 +496,10 @@ A fetch that cannot price an asset is silent while it runs (MKT-114, SPF-041); w
 
 **MKT-232 — Reading reported splits fails, or changes them (backend)**: A split reading fails as the closes' does (MKT-193B) — the backfill is rejected per MKT-195, the scheduled run skips the asset as provider-unreachable (SPF-041) — and nothing of that reading is kept; a failure to keep the splits rejects the backfill or skips the asset as a failure to keep a close does (MKT-195, SPF-041). The splits are kept before the closes, their replacement all or nothing; a failure to keep a close afterwards leaves them kept. A backfill whose reading changed the reported splits publishes `AssetPriceUpdated` (MKT-112) — beside MKT-194's when it also wrote a close — so a holding view reads them again; a scheduled run raises no event (MKT-203), and its changes show at the next read.
 
+**MKT-233 — Unrecorded split on the holding row (frontend)**: On an active holding row of Account Details, each unrecorded split of the holding (MKT-231) shows under the asset's name, after the inconsistency line (SYN-040) and before the note (HNO-041), as a warning line naming the provider, the split factor as new-for-old and the date as a medium date of the interface's language — "Yahoo reports a 20-for-1 split on 18 Jul 2022, not recorded", a reverse split reading "a 1-for-10 split" — Yahoo Finance being the one provider a build plugs in today (MKT-110). The view of a date (MKT-206) lists none (MKT-231), so the line is absent there. In French: « Yahoo signale une division 20 pour 1 le 18 juil. 2022, non enregistrée ».
+
+**MKT-234 — Recording an unrecorded split from its line (frontend)**: The line ends with "Record the split", which opens the split form (SPL-061) filled with the split's date and its split factor new : old, the rest of the form as the stock-split UX Draft defaults it, for the owner to check and record (in French « Enregistrer la division »); recording it ends the line (MKT-231). The shortcut is absent wherever the split action is hidden — on an archived asset (stock-split UX Draft, entry point) — and nothing is ever recorded automatically.
+
 ## Workflow
 
 ```

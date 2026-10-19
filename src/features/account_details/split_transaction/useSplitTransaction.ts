@@ -76,9 +76,9 @@ export function useSplitTransaction({
   const hasCurrentPrice = target.currentPriceMicro !== null;
 
   const [formData, setFormData] = useState<SplitFormData>(() => ({
-    date: editMode?.initialDate ?? getLastOperationDate(accountId),
-    ratioNew: "2",
-    ratioOld: "1",
+    date: editMode?.initialDate ?? target.prefill?.date ?? getLastOperationDate(accountId),
+    ratioNew: String(target.prefill?.new ?? 2),
+    ratioOld: String(target.prefill?.old ?? 1),
     factor: editMode?.initialFactor ?? "",
     note: editMode?.initialNote ?? "",
   }));

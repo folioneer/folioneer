@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import { patchModalSearch } from "@/lib/modalSearch";
 import type { StoredPerfPeriod } from "@/lib/perfPeriodStorage";
 import { IconButton } from "@/ui/components/button/IconButton";
+import { formatIsoDateMedium } from "@/ui/format/date";
 import { useCachedAccounts, useCachedAssets } from "../gateway";
 import { PnlCell } from "../shared/PnlCell";
 import { PINNED_ACTIONS_CELL, PINNED_ASSET_CELL } from "../shared/pinnedColumns";
@@ -29,7 +30,7 @@ import {
   hasNoPeriodFigure,
   selectPerformanceCell,
 } from "../shared/presenter";
-import type { ModalTarget, SellTarget } from "../shared/types";
+import type { ModalTarget, SellTarget, SplitTarget } from "../shared/types";
 
 type HoldingRowProps = {
   row: HoldingRowViewModel;
@@ -49,8 +50,9 @@ type HoldingRowProps = {
   isBackfillingPriceHistory?: boolean;
   /** FEE-011 — open the recurring fee-schedule modal for this holding. */
   onManageFee?: (assetId: string, assetName: string) => void;
-  /** SPL-061 — open the stock-split modal for this holding. */
-  onSplit?: (assetId: string) => void;
+  /** SPL-061 — open the stock-split modal for this holding; MKT-233 — filled with an
+   *  unrecorded split's date and ratio when one is given. */
+  onSplit?: (assetId: string, prefill?: SplitTarget["prefill"]) => void;
   /** HNO-042 — open the holding-note modal for this holding. */
   onNote?: (assetId: string) => void;
   /** FEE-076 — render the Management Fees column; false when the account has the mechanism disabled. */
@@ -79,7 +81,7 @@ export function HoldingRow({
   perfPeriod = "since_start",
   readOnly = false,
 }: HoldingRowProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const assets = useCachedAssets();
   const accounts = useCachedAccounts();
@@ -381,6 +383,34 @@ export function HoldingRow({
               {t(row.inconsistencyLabel.key, row.inconsistencyLabel.vars)}
             </span>
           )}
+          {/* MKT-233 — each split the provider reports that the account has not recorded;
+              MKT-234 — with a shortcut to record it; nothing is recorded automatically. */}
+          {row.unrecordedSplits.map((split) => (
+            <span
+              key={split.date}
+              id={`holding-unrecorded-split-${row.assetId}-${split.date}`}
+              className="flex items-center gap-1 text-xs text-m3-warning"
+            >
+              <AlertTriangle size={12} className="shrink-0" aria-hidden="true" />
+              {t("mkt.unrecorded_split.row_label", {
+                new: split.new,
+                old: split.old,
+                date: formatIsoDateMedium(split.date, i18n.language),
+              })}
+              {!readOnly && onSplit && !isArchived && (
+                <button
+                  type="button"
+                  id={`action-record-unrecorded-split-${row.assetId}-${split.date}`}
+                  onClick={() =>
+                    onSplit(row.assetId, { date: split.date, new: split.new, old: split.old })
+                  }
+                  className="ml-1 text-m3-primary underline-offset-2 hover:underline focus:outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-m3-primary"
+                >
+                  {t("mkt.unrecorded_split.action_record")}
+                </button>
+              )}
+            </span>
+          ))}
           {/* HNO-041 — pinned note: optional bell (armed / triggered) + single
               truncated line, full text as tooltip */}
           {row.noteText !== null && (
@@ -461,7 +491,7 @@ export function HoldingRow({
                 type="button"
                 id={`action-edit-missing-ticker-${row.assetId}`}
                 onClick={handleEditMissingTicker}
-                className="text-m3-primary text-sm underline-offset-2 hover:underline focus:underline focus:outline-none"
+                className="text-m3-primary text-sm underline-offset-2 hover:underline focus:outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-m3-primary"
               >
                 {t("mkt.price_state.missing_ticker")}
               </button>
@@ -529,7 +559,7 @@ export function HoldingRow({
             type="button"
             data-testid={`action-record-fx-rate-${row.assetId}`}
             onClick={handleRecordFxRate}
-            className="text-m3-primary text-sm underline-offset-2 hover:underline focus:underline focus:outline-none"
+            className="text-m3-primary text-sm underline-offset-2 hover:underline focus:outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-m3-primary"
           >
             {t("currency.action_record_fx_rate")}
           </button>

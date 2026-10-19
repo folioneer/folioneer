@@ -16,6 +16,7 @@ import type {
   PriceHistoryBackfillOutcome,
   SplitError,
   TransactionDraftError,
+  UnrecordedSplit,
 } from "@/bindings";
 import { isCashAsset } from "@/lib/cashAsset";
 import {
@@ -288,6 +289,8 @@ export interface HoldingRowViewModel {
   staleness: StalenessLabel | null;
   /** MKT-207 — the current price is outdated for the asset (MKT-205). */
   priceOutdated: boolean;
+  /** MKT-233 — the splits the provider reports that the account has not recorded (MKT-231). */
+  unrecordedSplits: UnrecordedSplit[];
   /** MKT-222 — why this device's last fetch did not update the price; null when it did. */
   fetchFailure: I18nMessage | null;
   /** MKT-222 — the date (`YYYY-MM-DD`) of that fetch; null with no failure. */
@@ -551,6 +554,7 @@ export function toHoldingRow(detail: HoldingDetail): HoldingRowViewModel {
       isCash: true,
       staleness: null,
       priceOutdated: false,
+      unrecordedSplits: [],
       fetchFailure: null,
       fetchFailedOn: null,
       sourceLabel: null,
@@ -598,6 +602,7 @@ export function toHoldingRow(detail: HoldingDetail): HoldingRowViewModel {
     isCash: false,
     staleness: formatStaleness(detail.current_price_date, new Date()),
     priceOutdated: detail.price_outdated,
+    unrecordedSplits: detail.unrecorded_splits,
     fetchFailure: null,
     fetchFailedOn: null,
     sourceLabel: formatSource(detail.current_price_source),

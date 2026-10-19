@@ -755,6 +755,10 @@
         "TickerNotResolved": "Aucun historique de prix trouvé pour cet actif — vérifiez son ticker",
         "ProviderUnreachable": "Le fournisseur de prix est injoignable — rien n'a été enregistré"
       }
+    },
+    "unrecorded_split": {
+      "row_label": "Yahoo signale une division {{new}} pour {{old}} le {{date}}, non enregistrée",
+      "action_record": "Enregistrer la division"
     }
   },
   "pmv": {

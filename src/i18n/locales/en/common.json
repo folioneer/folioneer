@@ -755,6 +755,10 @@
         "TickerNotResolved": "No price history found for this asset — check its ticker",
         "ProviderUnreachable": "The price provider could not be reached — nothing was written"
       }
+    },
+    "unrecorded_split": {
+      "row_label": "Yahoo reports a {{new}}-for-{{old}} split on {{date}}, not recorded",
+      "action_record": "Record the split"
     }
   },
   "pmv": {
