@@ -18,6 +18,8 @@ export type SplitTarget = {
   assetName: string;
   /** Latest recorded price in micro-units, or null when none exists (SPL-040). */
   currentPriceMicro: number | null;
+  /** MKT-233 — an unrecorded split the form opens filled with: its date and ratio. */
+  prefill?: { date: string; new: number; old: number };
 };
 
 /** The holding a note is pinned to; `existing` prefills the modal when a note is already stored (HNO-020/042). */

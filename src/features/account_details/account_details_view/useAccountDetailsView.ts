@@ -231,9 +231,10 @@ export function useAccountDetailsView(accountId: string) {
     data.retry();
   }, [data]);
 
-  // SPL-061 — split modal, opened per holding from its row action.
+  // SPL-061 — split modal, opened per holding from its row action; MKT-233 — or from an
+  // unrecorded split, filled with its date and ratio.
   const handleSplitOpen = useCallback(
-    (assetId: string) => {
+    (assetId: string, prefill?: SplitTarget["prefill"]) => {
       if (isAsOf) return;
       const holding = data.holdingDetails.find((h) => h.asset_id === assetId);
       if (!holding) return;
@@ -241,6 +242,7 @@ export function useAccountDetailsView(accountId: string) {
         assetId: holding.asset_id,
         assetName: holding.asset_name,
         currentPriceMicro: holding.current_price,
+        prefill,
       });
     },
     [isAsOf, data.holdingDetails],

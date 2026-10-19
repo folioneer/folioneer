@@ -96,6 +96,13 @@ const makeResponse = (overrides: Partial<AccountDetailsResponse> = {}): AccountD
 });
 
 describe("toHoldingRow", () => {
+  it("carries the holding's unrecorded splits (MKT-233)", () => {
+    const splits = [{ date: "2022-07-18", new: 20, old: 1 }];
+    expect(toHoldingRow(makeHolding({ unrecorded_splits: splits })).unrecordedSplits).toEqual(
+      splits,
+    );
+  });
+
   it("says whether the price is outdated (MKT-207)", () => {
     expect(toHoldingRow(makeHolding({ price_outdated: true })).priceOutdated).toBe(true);
     expect(toHoldingRow(makeHolding({ price_outdated: false })).priceOutdated).toBe(false);
