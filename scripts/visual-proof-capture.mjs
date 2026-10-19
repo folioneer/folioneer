@@ -14,8 +14,8 @@
  *   VP_NAME   — component name for output filenames (required)
  *   VP_STATES — comma-separated state names matching `#state-{name}` ids (default: "idle")
  *   VP_MASK   — comma-separated CSS selectors to mask in screenshots (optional)
- *   VP_OUT_DIR — output directory (optional, default "screenshots"; design
- *               proposals use "screenshots/design")
+ *   VP_OUT_DIR — output directory (optional, default "screenshots"; a design
+ *               proposal uses its folder in a folioneer-design clone)
  *
  * Outputs (stdout reserved for future machine-readable output; progress and
  * warnings go to stderr):

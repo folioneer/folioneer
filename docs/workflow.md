@@ -186,18 +186,18 @@ audits the range it closes (§ 12). A batch is named by its dates, never a versi
 
 Before **any** change to what the user sees — a new screen, a moved or added control, a
 changed layout or wording pattern — the agent renders mocks of the target state with
-the real components and tokens (`/design-proposal`):
-`screenshots/design/{id}-{light|dark}-{state}.png` plus a five-line note (what moves,
-is added, is removed, stays).
+the real components and tokens (`/design-proposal`): `{id}-{light|dark}-{state}.png`
+plus a five-line note (what moves, is added, is removed, stays), pushed to
+`folioneer/folioneer-design` (owner, 2026-10-19) — one folder per issue, straight to its
+`main`, no pull request, review or CI — and posted on the issue with each image inline.
 
-- **In chat:** the mocks are shown; nothing is built until the human says yes. The yes
-  sets the issue's Design field to `validated`.
-- **Headless:** the run pushes the mocks on a `design/123` branch, posts them and the note
-  on the issue with `needs-owner` (§ 2), and moves on to the next Queued item; the human
-  validates in the thread.
+- **In chat:** the human is pointed to the issue; nothing is built until they say yes.
+  The yes sets the issue's Design field to `validated`.
+- **Headless:** the issue gets `needs-owner` (§ 2) and the run moves on to the next
+  Queued item; the human validates in the thread.
 
-The mocks show invented data only and never reach `main`: the issue holds them, the
-visual proofs of the pull request are the record.
+The mocks show invented data only and never enter this repository, not even on a
+branch: the issue links them, the visual proofs of the pull request are the record.
 
 ## 5. The harness
 

@@ -1,6 +1,6 @@
 ---
 name: design-proposal
-description: Produces the design proposal required before anything the user sees changes — rendered mocks of the target state in light and dark under screenshots/design/, plus a five-line note — for an issue or a chat request. Invoked as `/design-proposal <id>` (an issue number, or a short slug for a chat request). The human validates; nothing visible is built before that.
+description: Produces the design proposal required before anything the user sees changes — rendered mocks of the target state in light and dark, plus a five-line note, published in the folioneer/folioneer-design repository and posted on the issue — for an issue or a chat request. Invoked as `/design-proposal <id>` (an issue number, or a short slug for a chat request). The human validates; nothing visible is built before that.
 argument-hint: "[123 | slug]"
 ---
 
@@ -26,35 +26,44 @@ the change is layout-only, or compose the target from existing `ui/` components 
 sample data for a new surface. Sample data is invented, never copied from the installed
 app. Never modify the real component for a proposal; the preview is disposable.
 
-## Step 3 — Capture into the design folder
+## Step 3 — Capture into the design repository
 
-`/visual-proof` Step 4 with the output directory changed: start Vite in the background,
-wait until the preview answers, capture, stop Vite.
+The mocks live in `folioneer/folioneer-design`, one folder per issue number (a chat
+request's slug when it has no issue). Clone it into the scratchpad
+(`gh repo clone folioneer/folioneer-design <scratchpad>/folioneer-design`, or `git pull`
+an existing clone), then run `/visual-proof` Step 4 with the output directory in that
+clone: start Vite in the background, wait until the preview answers, capture, stop Vite.
 
 ```bash
-VP_PORT={port} VP_HOST={host} VP_NAME={id} VP_STATES={state1,state2} VP_OUT_DIR=screenshots/design node scripts/visual-proof-capture.mjs
+VP_PORT={port} VP_HOST={host} VP_NAME={id} VP_STATES={state1,state2} VP_OUT_DIR={clone}/{id} node scripts/visual-proof-capture.mjs
 ```
 
-Produces `screenshots/design/{id}-{light|dark}-{state}.png`. Delete `preview.html` and
+Produces `{clone}/{id}/{id}-{light|dark}-{state}.png`. Delete `preview.html` and
 `src/__preview__/` afterwards.
 
 ## Step 4 — Write the note
 
-`screenshots/design/{id}.md`, five lines at most: what moves, what is added, what is
-removed, what stays the same, one open point if any.
+`{clone}/{id}/{id}.md`, five lines at most: what moves, what is added, what is removed,
+what stays the same, one open point if any.
 
-## Step 5 — Ask, or record
+## Step 5 — Publish, then ask or record
 
-- **Chat:** show the images and the note, and ask. On a yes, set the issue's Design to
+Commit the folder in the clone and push it straight to its `main`: the repository holds
+only mocks and their notes — no pull request, review, CI or hooks. Post the note on the
+issue with each image inline, linked from the pushed commit
+(`https://raw.githubusercontent.com/folioneer/folioneer-design/<sha>/<id>/<file>`), so
+the link never moves.
+
+A chat request without an issue gets the links in chat instead.
+
+- **Chat:** point the human to the issue (or the links) and ask. On a yes, set the issue's Design to
   `validated` (`gh issue edit`; a chat request has no issue: say so in the PR body) and
   continue the task. On a no, write what the human wants on the issue and stop.
-- **Headless:** commit the images and the note on a `design/{id}` branch, push it, and
-  post the note on the issue with each image linked from that branch, with
-  `needs-owner`. The human validates in the thread.
+- **Headless:** add `needs-owner` to the issue. The human validates in the thread.
 
 ## Rules
 
 1. Real components and tokens only; no drawing tools, no hand-made images.
 2. Both themes for every state.
 3. The proposal never touches production code.
-4. The proposal never reaches `main`: the issue holds it; the visual proofs are the record.
+4. The proposal never enters this repository (`docs/workflow.md` § 4).

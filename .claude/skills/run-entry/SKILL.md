@@ -45,7 +45,7 @@ this file is the checklist.
 If the task changes anything the user sees and `Design` is not `validated`: run
 `/design-proposal <id>`.
 
-- Chat: show the mocks and ask. Nothing is built before a yes; on a yes, set the issue's
+- Chat: point the human to the mocks posted on the issue and ask. Nothing is built before a yes; on a yes, set the issue's
   Design to `validated`. On a no, write what the human wants on the issue and stop.
 - Headless: post the proposal on the issue (`docs/workflow.md` § 4), then back to Step 0
   for the next ready item. Do not implement.
