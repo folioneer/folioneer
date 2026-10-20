@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-10-20
+
+### Added
+
+- an agent records interest and a management fee
+- record and correct a write-off from the holding's row
+- an agent records a write-off with its reason
+- a write-off takes a quantity out of a holding at its cost
+
+### Fixed
+
+- a holding says when Yahoo reports a split it has not recorded
+- an agent reads the splits Yahoo reports that an account lacks
+- prices filled from Yahoo are no longer divided by later splits
+
 ## [0.13.0] - 2026-10-18
 
 ### Added
