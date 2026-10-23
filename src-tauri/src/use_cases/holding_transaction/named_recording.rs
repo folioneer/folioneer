@@ -823,9 +823,12 @@ impl HoldingTransactionUseCase {
         let recorded = self.recorded_by(transaction_id, session).await?;
         let fields = change_fields(&recorded, &change, reason, true)?;
         let corrected = if recorded.transaction_type == TransactionType::WriteOff {
-            let reason = reason
-                .or(recorded.write_off_reason)
-                .ok_or_else(|| refusal_from_account(&AccountError::DatabaseError))?;
+            // A stored write-off always carries its reason (WOF entity): one without is a
+            // portfolio that cannot be read as written.
+            let reason = reason.or(recorded.write_off_reason).ok_or_else(|| {
+                tracing::error!(target: BACKEND, transaction = %recorded.id, "agent correcting: a write-off without its reason");
+                refusal_from_account(&AccountError::DatabaseError)
+            })?;
             self.correct_write_off(
                 &recorded.account_id,
                 &recorded.id,
@@ -877,7 +880,7 @@ impl HoldingTransactionUseCase {
                 })
             })?;
         let date = fields.date.clone();
-        let previewed = self
+        let mut previewed = self
             .account_service
             .preview_correction(
                 &recorded.account_id,
@@ -892,7 +895,6 @@ impl HoldingTransactionUseCase {
             )
             .await
             .map_err(|error| refusal_from_account(&error))?;
-        let mut previewed = previewed;
         // WOF-030 — the reason moves no figure: the write-off shows the one it would carry.
         if reason.is_some() {
             previewed.transaction.write_off_reason = reason;

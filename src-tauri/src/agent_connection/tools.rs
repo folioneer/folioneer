@@ -926,7 +926,11 @@ fn previewable(tool: &str, arguments: &Value) -> Option<Result<Recording, Refusa
 fn interest_or_fee(tool: &str, arguments: &Value) -> Result<Recording, Refusal> {
     match tool {
         "record_interest" => {
-            let (percent, quantity) = one_of(arguments, "percent", "quantity")?;
+            // AGT-066 — neither and both figures are refused by the window's rules (INT-021).
+            let (percent, quantity) = (
+                figure(arguments, "percent")?,
+                figure(arguments, "quantity")?,
+            );
             Ok(Recording::Interest(InterestCredit {
                 account: text(arguments, "account")?.to_string(),
                 asset: optional_text(arguments, "asset")?,
@@ -937,7 +941,11 @@ fn interest_or_fee(tool: &str, arguments: &Value) -> Result<Recording, Refusal> 
             }))
         }
         "record_management_fee" => {
-            let (percent, resulting_quantity) = one_of(arguments, "percent", "resulting_quantity")?;
+            // AGT-066 — neither and both figures are refused by the window's rules (FEE-021).
+            let (percent, resulting_quantity) = (
+                figure(arguments, "percent")?,
+                figure(arguments, "resulting_quantity")?,
+            );
             Ok(Recording::ManagementFee(ManagementFee {
                 account: text(arguments, "account")?.to_string(),
                 asset: text(arguments, "asset")?.to_string(),
@@ -949,16 +957,6 @@ fn interest_or_fee(tool: &str, arguments: &Value) -> Result<Recording, Refusal> 
         }
         _ => unreachable_recording(tool),
     }
-}
-
-/// AGT-066 — the two figures of which the window takes exactly one; neither and both are
-/// refused by the window's rules (INT-021, FEE-021).
-fn one_of(
-    arguments: &Value,
-    first: &str,
-    second: &str,
-) -> Result<(Option<i64>, Option<i64>), Refusal> {
-    Ok((figure(arguments, first)?, figure(arguments, second)?))
 }
 
 /// AGT-065 — a write-off's reason: one of the four, by its name.
