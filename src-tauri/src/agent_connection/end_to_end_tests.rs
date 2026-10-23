@@ -1034,6 +1034,14 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
     .await
     .expect("corrected");
     assert_eq!(paid_more["transaction"]["total_amount"], 6 * M);
+    // DIV-040 — the rate changes what the amount comes to in the account's currency.
+    let at_par = call(
+        "correct_recording",
+        json!({ "transaction": recorded_id(&dividend), "rate": 1 }),
+    )
+    .await
+    .expect("corrected");
+    assert_eq!(at_par["transaction"]["total_amount"], 12 * M);
     for (recorded, arguments, code) in [
         (&withdrawal, json!({ "amount": 2000 }), "InsufficientCash"),
         (&withdrawal, json!({ "quantity": 1 }), "InvalidArguments"),
@@ -1740,6 +1748,17 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
             "{arguments}"
         );
     }
+    // The agent reads the reason, not the code (AGT-020): it names the figures to give.
+    assert_eq!(
+        call(
+            "record_interest",
+            json!({ "account": "PEA", "asset": "FEUR" })
+        )
+        .await
+        .expect_err("refused")
+        .message,
+        "give either percent or quantity"
+    );
 
     // A management fee needs the account's fee parameter (FEE-077).
     let fee = |date: &'static str| json!({ "account": "PEA", "asset": "FEUR", "percent": 1, "date": date });
@@ -1820,6 +1839,16 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
             "{arguments}"
         );
     }
+    assert_eq!(
+        call(
+            "record_management_fee",
+            json!({ "account": "PEA", "asset": "FEUR" })
+        )
+        .await
+        .expect_err("refused")
+        .message,
+        "give either percent or resulting_quantity"
+    );
 
     // AGT-067 — the schedule's generated fee of April refuses the agent's for April; a
     // one-off fee of March refused nothing, and once the generated fee is deleted, nothing
@@ -1912,6 +1941,23 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
     .expect("corrected");
     assert_eq!(fee_corrected["transaction"]["quantity"], 200_000_i64);
     assert_eq!(fee_corrected["transaction"]["note"], "again");
+    // AGT-073 — their correction is previewed, nothing written.
+    for (recorded, quantity) in [(&by_percent, "0.4"), (&charged, "0.3")] {
+        let previewed = call(
+            "preview_recording",
+            json!({ "tool": "correct_recording", "arguments": { "transaction": recorded_id(recorded), "quantity": quantity } }),
+        )
+        .await
+        .expect("previewed");
+        assert_eq!(previewed["status"], "previewed");
+    }
+    let unchanged = bench
+        .accounts
+        .get_transaction_by_id(&recorded_id(&by_percent))
+        .await
+        .expect("read")
+        .expect("stored");
+    assert_eq!(unchanged.quantity, 500_000);
     // An argument the tool does not know is ignored (AGT-040): a percent changes nothing.
     for (recorded, arguments, code) in [
         (&by_percent, json!({ "percent": 1 }), "MissingArgument"),
@@ -2167,6 +2213,11 @@ async fn agt_063_a_session_records_a_split_and_free_shares() {
         (&split, json!({ "quantity": 4 }), "InvalidArguments"),
         // Ten shares become five: the sale of fifteen is left short.
         (&split, json!({ "new": 1, "old": 2 }), "CascadingOversell"),
+        (
+            &split,
+            json!({ "new": 0, "old": 1 }),
+            "SplitFactorNotPositive",
+        ),
         (&free_shares, json!({ "price": 1 }), "InvalidArguments"),
     ] {
         let mut arguments = arguments;

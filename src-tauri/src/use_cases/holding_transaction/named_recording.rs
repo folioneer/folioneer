@@ -2028,6 +2028,10 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
             "the resulting quantity must be below the {} held on that date",
             decimal(*held_quantity)
         ),
+        AccountError::InterestAmountInvalid => "give either percent or quantity".to_string(),
+        AccountError::ManagementFeeAmountInvalid => {
+            "give either percent or resulting_quantity".to_string()
+        }
         AccountError::ManagementFeesDisabled => {
             "management fees are turned off for this account".to_string()
         }
@@ -2043,8 +2047,6 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
         | AccountError::NegativeQuantity
         | AccountError::NegativeAveragePrice
         | AccountError::TransactionNotFound
-        | AccountError::ManagementFeeAmountInvalid
-        | AccountError::InterestAmountInvalid
         | AccountError::RateNotPositive
         | AccountError::RateAboveHundred
         | AccountError::EndBeforeStart
