@@ -512,41 +512,86 @@ pub struct PricePreviewed {
     pub replaced: Option<RecordedPrice>,
 }
 
-/// AGT-050 / AGT-061 — what an agent's correction of a transaction its session recorded gives
-/// the window's correction: refused for a type it does not correct and, for an opening
-/// balance, for a price, fees or a rate; what is given replaces what was recorded.
-fn agent_correction(
-    recorded: &Transaction,
-    correction: Correction,
+/// AGT-050 / AGT-087 — what the window's correction is given for a change an agent asks of
+/// `stored`: refused for an argument its type does not take (a write-off's reason taken only
+/// when `takes_reason`), for both a price and a total and for one part of a split's ratio;
+/// what is given replaces what is stored, the rest stays.
+fn change_fields(
+    stored: &Transaction,
+    change: &Change,
+    reason: Option<WriteOffReason>,
+    takes_reason: bool,
 ) -> Result<CorrectionFields, Refusal> {
-    // AGT-061 — anything else is cancelled and recorded again.
-    if !matches!(
-        recorded.transaction_type,
-        TransactionType::OpeningBalance | TransactionType::Purchase | TransactionType::Sell
-    ) {
-        return Err(Refusal {
-            code: "InvalidArguments".to_string(),
-            message: "a deposit, a withdrawal, a dividend, a split, free shares, a write-off, interest or a management fee is not corrected: cancel it and record it again".to_string(),
-        });
+    let kind = stored.transaction_type;
+    let c = &change.correction;
+    let given = [
+        ("quantity", c.quantity.is_some()),
+        ("price", c.price.is_some()),
+        ("total", c.total.is_some()),
+        ("fees", c.fees.is_some()),
+        ("rate", c.rate.is_some()),
+        ("amount", change.amount.is_some()),
+        ("new", change.new.is_some()),
+        ("old", change.old.is_some()),
+        ("reason", reason.is_some()),
+    ];
+    let mut taken = changes_taken(kind).to_vec();
+    if takes_reason && kind == TransactionType::WriteOff {
+        taken.push("reason");
     }
-    // TRX-047 — an opening balance has a quantity, a total cost and a date, nothing else.
-    if recorded.transaction_type == TransactionType::OpeningBalance
-        && (correction.price.is_some() || correction.fees.is_some() || correction.rate.is_some())
+    if given
+        .iter()
+        .any(|(name, is_given)| *is_given && !taken.contains(name))
     {
         return Err(Refusal {
             code: "InvalidArguments".to_string(),
-            message: "an opening balance has no price, fees or rate: give its quantity, its total or its date".to_string(),
+            message: format!(
+                "this transaction takes date, note, {} and nothing else",
+                taken.join(", ")
+            ),
         });
     }
-    let (unit_price, total) = price_and_total(recorded, &correction);
+    if c.price.is_some() && c.total.is_some() {
+        return Err(Refusal {
+            code: "InvalidArguments".to_string(),
+            message: "give either price or total, not both".to_string(),
+        });
+    }
+    let quantity = match kind {
+        TransactionType::Deposit | TransactionType::Withdrawal | TransactionType::Dividend => {
+            change.amount.unwrap_or(stored.quantity)
+        }
+        TransactionType::Split => match (change.new, change.old) {
+            (None, None) => stored.quantity,
+            (Some(new), Some(old)) => SplitSize::Ratio {
+                new: Some(new),
+                old: Some(old),
+            }
+            .factor()
+            .map_err(|error| refusal_from_account(&error))?,
+            _ => {
+                return Err(Refusal {
+                    code: "InvalidArguments".to_string(),
+                    message: "a split's ratio takes both new and old".to_string(),
+                })
+            }
+        },
+        _ => c.quantity.unwrap_or(stored.quantity),
+    };
+    let (unit_price, total) = match kind {
+        TransactionType::Purchase | TransactionType::Sell | TransactionType::OpeningBalance => {
+            price_and_total(stored, c)
+        }
+        _ => (stored.unit_price, None),
+    };
     Ok(CorrectionFields {
-        date: correction.date.unwrap_or_else(|| recorded.date.clone()),
-        quantity: correction.quantity.unwrap_or(recorded.quantity),
+        date: c.date.clone().unwrap_or_else(|| stored.date.clone()),
+        quantity,
         unit_price,
-        exchange_rate: correction.rate.unwrap_or(recorded.exchange_rate),
-        fees: correction.fees.unwrap_or(recorded.fees),
+        exchange_rate: c.rate.unwrap_or(stored.exchange_rate),
+        fees: c.fees.unwrap_or(stored.fees),
         total,
-        note: correction.note.or_else(|| recorded.note.clone()),
+        note: c.note.clone().or_else(|| stored.note.clone()),
     })
 }
 
@@ -705,73 +750,7 @@ impl HoldingTransactionUseCase {
         }
         let typed = self.typed_by_owner(transaction_id).await?;
         let stored = &typed.transaction;
-        let kind = stored.transaction_type;
-        let c = &change.correction;
-        let given = [
-            ("quantity", c.quantity.is_some()),
-            ("price", c.price.is_some()),
-            ("total", c.total.is_some()),
-            ("fees", c.fees.is_some()),
-            ("rate", c.rate.is_some()),
-            ("amount", change.amount.is_some()),
-            ("new", change.new.is_some()),
-            ("old", change.old.is_some()),
-        ];
-        let taken = changes_taken(kind);
-        if given
-            .iter()
-            .any(|(name, is_given)| *is_given && !taken.contains(name))
-        {
-            return Err(Refusal {
-                code: "InvalidArguments".to_string(),
-                message: format!(
-                    "this transaction takes date, note, {} and nothing else",
-                    taken.join(", ")
-                ),
-            });
-        }
-        if c.price.is_some() && c.total.is_some() {
-            return Err(Refusal {
-                code: "InvalidArguments".to_string(),
-                message: "give either price or total, not both".to_string(),
-            });
-        }
-        let quantity = match kind {
-            TransactionType::Deposit | TransactionType::Withdrawal | TransactionType::Dividend => {
-                change.amount.unwrap_or(stored.quantity)
-            }
-            TransactionType::Split => match (change.new, change.old) {
-                (None, None) => stored.quantity,
-                (Some(new), Some(old)) => SplitSize::Ratio {
-                    new: Some(new),
-                    old: Some(old),
-                }
-                .factor()
-                .map_err(|error| refusal_from_account(&error))?,
-                _ => {
-                    return Err(Refusal {
-                        code: "InvalidArguments".to_string(),
-                        message: "a split's ratio takes both new and old".to_string(),
-                    })
-                }
-            },
-            _ => c.quantity.unwrap_or(stored.quantity),
-        };
-        let (unit_price, total) = match kind {
-            TransactionType::Purchase | TransactionType::Sell | TransactionType::OpeningBalance => {
-                price_and_total(stored, c)
-            }
-            _ => (stored.unit_price, None),
-        };
-        let fields = CorrectionFields {
-            date: c.date.clone().unwrap_or_else(|| stored.date.clone()),
-            quantity,
-            unit_price,
-            exchange_rate: c.rate.unwrap_or(stored.exchange_rate),
-            fees: c.fees.unwrap_or(stored.fees),
-            total,
-            note: c.note.clone().or_else(|| stored.note.clone()),
-        };
+        let fields = change_fields(stored, &change, None, false)?;
         let becomes = self
             .account_service
             .preview_correction(
@@ -831,45 +810,63 @@ impl HoldingTransactionUseCase {
         .map_err(|error| refusal_from_account(&error))
     }
 
-    /// AGT-050 — an agent corrects a transaction its session recorded, through the rules of
-    /// the window: what `correction` gives replaces what was recorded. A total that was
-    /// recorded is kept while nothing it is made of changes; a quantity, fees or a rate
-    /// that changes without a new price or total makes the total follow the unit price —
-    /// except for an opening balance, whose total cost only a new total changes.
+    /// AGT-050 — an agent corrects a transaction its session recorded, whatever its type,
+    /// through the correction the window calls for it (TRX-031; WOF-030 for a write-off,
+    /// whose reason it alone takes): what `change` gives replaces what was recorded.
     pub async fn correct_recorded_by_agent(
         &self,
         transaction_id: &str,
         session: &str,
-        correction: Correction,
+        change: Change,
+        reason: Option<WriteOffReason>,
     ) -> Result<Transaction, Refusal> {
         let recorded = self.recorded_by(transaction_id, session).await?;
-        let fields = agent_correction(&recorded, correction)?;
-        self.correct_transaction(
-            &recorded.account_id,
-            &recorded.id,
-            fields.date,
-            fields.quantity,
-            fields.unit_price,
-            fields.exchange_rate,
-            fields.fees,
-            fields.total,
-            fields.note,
-        )
-        .await
-        .map_err(|error| refusal_from_account(&error))
+        let fields = change_fields(&recorded, &change, reason, true)?;
+        let corrected = if recorded.transaction_type == TransactionType::WriteOff {
+            // A stored write-off always carries its reason (WOF entity): one without is a
+            // portfolio that cannot be read as written.
+            let reason = reason.or(recorded.write_off_reason).ok_or_else(|| {
+                tracing::error!(target: BACKEND, transaction = %recorded.id, "agent correcting: a write-off without its reason");
+                refusal_from_account(&AccountError::DatabaseError)
+            })?;
+            self.correct_write_off(
+                &recorded.account_id,
+                &recorded.id,
+                fields.date,
+                fields.quantity,
+                reason,
+                fields.note,
+            )
+            .await
+        } else {
+            self.correct_transaction(
+                &recorded.account_id,
+                &recorded.id,
+                fields.date,
+                fields.quantity,
+                fields.unit_price,
+                fields.exchange_rate,
+                fields.fees,
+                fields.total,
+                fields.note,
+            )
+            .await
+        };
+        corrected.map_err(|error| refusal_from_account(&error))
     }
 
-    /// AGT-072 — what `correct_recorded_by_agent` would do, nothing written: the same
+    /// AGT-073 — what `correct_recorded_by_agent` would do, nothing written: the same
     /// refusals, and the account on the evening of the corrected date without the
     /// correction and with it.
     pub async fn preview_correction_by_agent(
         &self,
         transaction_id: &str,
         session: &str,
-        correction: Correction,
+        change: Change,
+        reason: Option<WriteOffReason>,
     ) -> Result<Previewed, Refusal> {
         let recorded = self.recorded_by(transaction_id, session).await?;
-        let fields = agent_correction(&recorded, correction)?;
+        let fields = change_fields(&recorded, &change, reason, true)?;
         // Read for its name and currency only: the preview loads the account again, and its
         // own load decides what the correction makes of it.
         let account = self
@@ -883,7 +880,7 @@ impl HoldingTransactionUseCase {
                 })
             })?;
         let date = fields.date.clone();
-        let previewed = self
+        let mut previewed = self
             .account_service
             .preview_correction(
                 &recorded.account_id,
@@ -898,6 +895,10 @@ impl HoldingTransactionUseCase {
             )
             .await
             .map_err(|error| refusal_from_account(&error))?;
+        // WOF-030 — the reason moves no figure: the write-off shows the one it would carry.
+        if reason.is_some() {
+            previewed.transaction.write_off_reason = reason;
+        }
         Ok(self
             .told(previewed, account.name, account.currency, date)
             .await)
@@ -2027,6 +2028,10 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
             "the resulting quantity must be below the {} held on that date",
             decimal(*held_quantity)
         ),
+        AccountError::InterestAmountInvalid => "give either percent or quantity".to_string(),
+        AccountError::ManagementFeeAmountInvalid => {
+            "give either percent or resulting_quantity".to_string()
+        }
         AccountError::ManagementFeesDisabled => {
             "management fees are turned off for this account".to_string()
         }
@@ -2042,8 +2047,6 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
         | AccountError::NegativeQuantity
         | AccountError::NegativeAveragePrice
         | AccountError::TransactionNotFound
-        | AccountError::ManagementFeeAmountInvalid
-        | AccountError::InterestAmountInvalid
         | AccountError::RateNotPositive
         | AccountError::RateAboveHundred
         | AccountError::EndBeforeStart
