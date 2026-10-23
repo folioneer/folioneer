@@ -879,9 +879,8 @@ async fn agt_050_a_session_corrects_and_cancels_what_it_recorded() {
     assert_eq!(told.last_recording, None);
 }
 
-// AGT-060 / AGT-061 — a session records a deposit, a withdrawal and a dividend through the
-// rules of the window: each is marked and counted, cancelled like any recording, never
-// corrected.
+// AGT-060 / AGT-050 — a session records a deposit, a withdrawal and a dividend through the
+// rules of the window: each is marked and counted, corrected and cancelled like any recording.
 #[tokio::test]
 async fn agt_060_a_session_records_cash_and_a_dividend() {
     use crate::context::account::TransactionType;
@@ -1017,20 +1016,47 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
         ("CW8", "2019-06-01")
     );
 
-    // Never corrected: cancelled and recorded again.
-    for recorded in [&deposit, &withdrawal, &dividend] {
-        let refusal = call(
+    // AGT-050 — corrected as the window corrects them (CSH-023, CSH-033, DIV-040): what
+    // each takes, with the window's refusals.
+    let more = call(
+        "correct_recording",
+        json!({ "transaction": recorded_id(&deposit), "amount": 1600 }),
+    )
+    .await
+    .expect("corrected");
+    assert_eq!(more["status"], "corrected");
+    assert_eq!(more["transaction"]["total_amount"], 1600 * M);
+    assert_eq!(more["transaction"]["note"], "statement 2019");
+    let paid_more = call(
+        "correct_recording",
+        json!({ "transaction": recorded_id(&dividend), "amount": 12 }),
+    )
+    .await
+    .expect("corrected");
+    assert_eq!(paid_more["transaction"]["total_amount"], 6 * M);
+    for (recorded, arguments, code) in [
+        (&withdrawal, json!({ "amount": 2000 }), "InsufficientCash"),
+        (&withdrawal, json!({ "quantity": 1 }), "InvalidArguments"),
+        (&deposit, json!({ "rate": 1 }), "InvalidArguments"),
+        (&dividend, json!({ "price": 1 }), "InvalidArguments"),
+    ] {
+        let mut arguments = arguments;
+        arguments["transaction"] = json!(recorded_id(recorded));
+        let refused = call("correct_recording", arguments)
+            .await
+            .expect_err("refused");
+        assert_eq!(refused.code, code);
+    }
+    assert_eq!(
+        call(
             "correct_recording",
-            json!({ "transaction": recorded_id(recorded), "date": "2019-07-01" }),
+            json!({ "transaction": recorded_id(&withdrawal), "quantity": 1 }),
         )
         .await
-        .expect_err("refused");
-        assert_eq!(refusal.code, "InvalidArguments");
-        assert_eq!(
-            refusal.message,
-            "a deposit, a withdrawal, a dividend, a split, free shares, a write-off, interest or a management fee is not corrected: cancel it and record it again"
-        );
-    }
+        .expect_err("refused")
+        .message,
+        "this transaction takes date, note, amount and nothing else"
+    );
     let cancelled = call(
         "cancel_recording",
         json!({ "transaction": recorded_id(&dividend) }),
@@ -1372,10 +1398,10 @@ async fn agt_053_the_owner_removes_everything_a_session_recorded() {
 
 // AGT-065 — a session records a write-off through the window's rules (WOF): at its cost
 // without cash, its reason kept, refused as the window refuses it, previewed, marked,
-// counted, cancelled like any recording and never corrected.
+// counted, corrected and cancelled like any recording.
 #[tokio::test]
 async fn agt_065_a_session_records_a_write_off() {
-    use crate::context::account::TransactionType;
+    use crate::context::account::{TransactionType, WriteOffReason};
 
     let data_dir = tempfile::tempdir().expect("tempdir");
     let bench = workbench(data_dir.path()).await;
@@ -1506,14 +1532,72 @@ async fn agt_065_a_session_records_a_write_off() {
     assert_eq!(listed["transactions"][0]["write_off_reason"], "NetworkFee");
     assert_eq!(previewed["transaction"]["write_off_reason"], "NetworkFee");
 
-    // Never corrected: cancelled and recorded again (AGT-061).
-    let refusal = call(
+    // AGT-050 — corrected as the window corrects it (WOF-030): its quantity, its reason,
+    // its date and its note; nothing it does not take.
+    let corrected = call(
+        "correct_recording",
+        json!({ "transaction": recorded_id(&written_off), "quantity": 1, "reason": "Dust" }),
+    )
+    .await
+    .expect("corrected");
+    assert_eq!(corrected["status"], "corrected");
+    assert_eq!(corrected["transaction"]["quantity"], M);
+    assert_eq!(corrected["transaction"]["write_off_reason"], "Dust");
+    assert_eq!(corrected["transaction"]["note"], "transfer fee");
+    let kept = call(
         "correct_recording",
         json!({ "transaction": recorded_id(&written_off), "date": "2019-06-15" }),
     )
     .await
-    .expect_err("refused");
-    assert_eq!(refusal.code, "InvalidArguments");
+    .expect("corrected");
+    assert_eq!(kept["transaction"]["write_off_reason"], "Dust");
+    // AGT-073 — previewed with the reason it would carry, nothing written.
+    let previewed_reason = call(
+        "preview_recording",
+        json!({ "tool": "correct_recording", "arguments": { "transaction": recorded_id(&written_off), "reason": "Lost" } }),
+    )
+    .await
+    .expect("previewed");
+    assert_eq!(previewed_reason["transaction"]["write_off_reason"], "Lost");
+    assert_eq!(previewed_reason["after"]["holdings"][0]["quantity"], 9 * M);
+    let stored = bench
+        .accounts
+        .get_transaction_by_id(&recorded_id(&written_off))
+        .await
+        .expect("read")
+        .expect("stored");
+    assert_eq!(stored.write_off_reason, Some(WriteOffReason::Dust));
+    for (arguments, code) in [
+        (json!({ "reason": "Gift" }), "InvalidArguments"),
+        (json!({ "price": 1 }), "InvalidArguments"),
+        (json!({ "quantity": 0 }), "QuantityNotPositive"),
+    ] {
+        let mut arguments = arguments;
+        arguments["transaction"] = json!(recorded_id(&written_off));
+        let refused = call("correct_recording", arguments)
+            .await
+            .expect_err("refused");
+        assert_eq!(refused.code, code);
+    }
+    // A reason is a write-off's only.
+    let other = bench
+        .accounts
+        .recorded_in_session(&granted.key)
+        .await
+        .expect("read")
+        .into_iter()
+        .find(|recording| recording.transaction_id != recorded_id(&written_off))
+        .expect("another recording");
+    assert_eq!(
+        call(
+            "correct_recording",
+            json!({ "transaction": other.transaction_id, "reason": "Dust" }),
+        )
+        .await
+        .expect_err("refused")
+        .code,
+        "InvalidArguments"
+    );
     let cancelled = call(
         "cancel_recording",
         json!({ "transaction": recorded_id(&written_off) }),
@@ -1552,7 +1636,7 @@ async fn agt_065_a_session_records_a_write_off() {
 // AGT-066 / AGT-067 — a session records interest and a management fee through the window's
 // rules (INT, FEE): interest on a holding or on the cash, a fee by percent or by what is left,
 // refused as the window refuses them, a fee the schedule generated for the period refusing
-// the agent's, each marked, counted, cancelled like any recording, never corrected nor
+// the agent's, each marked, counted, corrected and cancelled like any recording, not
 // previewed.
 #[tokio::test]
 async fn agt_066_a_session_records_interest_and_a_management_fee() {
@@ -1620,11 +1704,11 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
     for (arguments, code) in [
         (
             json!({ "account": "PEA", "asset": "FEUR" }),
-            "InvalidArguments",
+            "InterestAmountInvalid",
         ),
         (
             json!({ "account": "PEA", "asset": "FEUR", "percent": 1, "quantity": 1 }),
-            "InvalidArguments",
+            "InterestAmountInvalid",
         ),
         (
             json!({ "account": "PEA", "asset": "CW8", "quantity": 1 }),
@@ -1703,11 +1787,11 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
     for (arguments, code) in [
         (
             json!({ "account": "PEA", "asset": "FEUR" }),
-            "InvalidArguments",
+            "ManagementFeeAmountInvalid",
         ),
         (
             json!({ "account": "PEA", "asset": "FEUR", "percent": 1, "resulting_quantity": 1 }),
-            "InvalidArguments",
+            "ManagementFeeAmountInvalid",
         ),
         (
             json!({ "account": "PEA", "asset": "FEUR", "resulting_quantity": 50, "date": "2026-03-26" }),
@@ -1796,7 +1880,7 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
         .await
         .expect("nothing generated for April any more");
 
-    // Marked, counted and told; never corrected nor previewed; cancelled (AGT-061, AGT-072).
+    // Marked, counted and told; corrected, not previewed; cancelled (AGT-050, AGT-072).
     let mark = bench
         .accounts
         .agent_recording_of(&recorded_id(&charged))
@@ -1810,16 +1894,38 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
         told.last_recording.expect("a last recording").kind,
         TransactionType::ManagementFee
     );
-    for recorded in [&by_percent, &charged] {
+    // Corrected as the window corrects them (INT-040, FEE-063): a quantity, a date, a note.
+    let less = call(
+        "correct_recording",
+        json!({ "transaction": recorded_id(&by_percent), "quantity": "0.5" }),
+    )
+    .await
+    .expect("corrected");
+    assert_eq!(less["status"], "corrected");
+    assert_eq!(less["transaction"]["quantity"], 500_000_i64);
+    assert_eq!(less["transaction"]["note"], "2025 statement");
+    let fee_corrected = call(
+        "correct_recording",
+        json!({ "transaction": recorded_id(&charged), "quantity": "0.2", "note": "again" }),
+    )
+    .await
+    .expect("corrected");
+    assert_eq!(fee_corrected["transaction"]["quantity"], 200_000_i64);
+    assert_eq!(fee_corrected["transaction"]["note"], "again");
+    // An argument the tool does not know is ignored (AGT-040): a percent changes nothing.
+    for (recorded, arguments, code) in [
+        (&by_percent, json!({ "percent": 1 }), "MissingArgument"),
+        (&by_percent, json!({ "rate": 1 }), "InvalidArguments"),
+        (&charged, json!({ "amount": 1 }), "InvalidArguments"),
+    ] {
+        let mut arguments = arguments;
+        arguments["transaction"] = json!(recorded_id(recorded));
         assert_eq!(
-            call(
-                "correct_recording",
-                json!({ "transaction": recorded_id(recorded), "note": "again" }),
-            )
-            .await
-            .expect_err("refused")
-            .code,
-            "InvalidArguments"
+            call("correct_recording", arguments)
+                .await
+                .expect_err("refused")
+                .code,
+            code
         );
     }
     assert_eq!(
@@ -1851,7 +1957,7 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
 
 // AGT-063 — a session records a split and free shares through the window's rules (SPL,
 // FSD): each is marked, counted against the session's limit, told to the window,
-// cancelled like any recording and never corrected.
+// corrected and cancelled like any recording.
 #[tokio::test]
 async fn agt_063_a_session_records_a_split_and_free_shares() {
     use crate::context::account::TransactionType;
@@ -2038,19 +2144,37 @@ async fn agt_063_a_session_records_a_split_and_free_shares() {
         ("CW8", "2019-08-01")
     );
 
-    // Never corrected: cancelled and recorded again (AGT-061).
-    for recorded in [&split, &free_shares] {
-        let refusal = call(
-            "correct_recording",
-            json!({ "transaction": recorded_id(recorded), "date": "2019-08-15" }),
-        )
-        .await
-        .expect_err("refused");
-        assert_eq!(refusal.code, "InvalidArguments");
-        assert_eq!(
-            refusal.message,
-            "a deposit, a withdrawal, a dividend, a split, free shares, a write-off, interest or a management fee is not corrected: cancel it and record it again"
-        );
+    // AGT-050 — corrected as the window corrects them (SPL-030, FSD-040): a split by its
+    // ratio, both parts; free shares by their quantity.
+    let three_for_one = call(
+        "correct_recording",
+        json!({ "transaction": recorded_id(&split), "new": 3, "old": 1 }),
+    )
+    .await
+    .expect("corrected");
+    assert_eq!(three_for_one["status"], "corrected");
+    assert_eq!(three_for_one["transaction"]["quantity"], 3 * M);
+    assert_eq!(three_for_one["transaction"]["note"], "statement 2019");
+    let two = call(
+        "correct_recording",
+        json!({ "transaction": recorded_id(&free_shares), "quantity": 2 }),
+    )
+    .await
+    .expect("corrected");
+    assert_eq!(two["transaction"]["quantity"], 2 * M);
+    for (recorded, arguments, code) in [
+        (&split, json!({ "new": 4 }), "InvalidArguments"),
+        (&split, json!({ "quantity": 4 }), "InvalidArguments"),
+        // Ten shares become five: the sale of fifteen is left short.
+        (&split, json!({ "new": 1, "old": 2 }), "CascadingOversell"),
+        (&free_shares, json!({ "price": 1 }), "InvalidArguments"),
+    ] {
+        let mut arguments = arguments;
+        arguments["transaction"] = json!(recorded_id(recorded));
+        let refused = call("correct_recording", arguments)
+            .await
+            .expect_err("refused");
+        assert_eq!(refused.code, code);
     }
     let cancelled = call(
         "cancel_recording",

@@ -564,20 +564,7 @@ impl AgentTools {
     /// waits for the answer. What the window's correction would refuse is refused first.
     async fn request_change(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
         let transaction_id = text(arguments, "transaction")?;
-        let change = Change {
-            correction: Correction {
-                date: optional_text(arguments, "date")?,
-                quantity: figure(arguments, "quantity")?,
-                price: figure(arguments, "price")?,
-                total: figure(arguments, "total")?,
-                fees: figure(arguments, "fees")?,
-                rate: figure(arguments, "rate")?,
-                note: note(arguments)?,
-            },
-            amount: figure(arguments, "amount")?,
-            new: optional_whole(arguments, "new")?,
-            old: optional_whole(arguments, "old")?,
-        };
+        let change = change_of(arguments)?;
         let asked = self
             .recorder
             .ask_change_of_typed(transaction_id, change)
@@ -644,10 +631,10 @@ impl AgentTools {
             }));
         }
         let (previewed, keeps_its_id) = if tool == "correct_recording" {
-            let (transaction_id, correction) = correction_of(inner)?;
+            let (transaction_id, change, reason) = correction_of(inner)?;
             let previewed = self
                 .recorder
-                .preview_correction_by_agent(&transaction_id, &granted.key, correction)
+                .preview_correction_by_agent(&transaction_id, &granted.key, change, reason)
                 .await
                 .map_err(refused)?;
             (previewed, true)
@@ -680,12 +667,12 @@ impl AgentTools {
 
     /// AGT-050 — the session corrects a transaction it recorded itself.
     async fn correct(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
-        let (transaction_id, correction) = correction_of(arguments)?;
+        let (transaction_id, change, reason) = correction_of(arguments)?;
         let recorder = Arc::clone(&self.recorder);
         let session = granted.key.clone();
         let corrected = tokio::spawn(async move {
             recorder
-                .correct_recorded_by_agent(&transaction_id, &session, correction)
+                .correct_recorded_by_agent(&transaction_id, &session, change, reason)
                 .await
         })
         .await
@@ -811,33 +798,41 @@ fn amount(arguments: &Value, name: &str) -> Result<i64, Refusal> {
     })
 }
 
-/// AGT-050 — the transaction `correct_recording` names and what it changes.
-fn correction_of(arguments: &Value) -> Result<(String, Correction), Refusal> {
+/// AGT-050 / AGT-087 — what a correction or a change request gives, as the window's
+/// correction of each type takes it; what a type does not take is refused by the recorder.
+fn change_of(arguments: &Value) -> Result<Change, Refusal> {
+    Ok(Change {
+        correction: Correction {
+            date: optional_text(arguments, "date")?,
+            quantity: figure(arguments, "quantity")?,
+            price: figure(arguments, "price")?,
+            total: figure(arguments, "total")?,
+            fees: figure(arguments, "fees")?,
+            rate: figure(arguments, "rate")?,
+            note: note(arguments)?,
+        },
+        amount: figure(arguments, "amount")?,
+        new: optional_whole(arguments, "new")?,
+        old: optional_whole(arguments, "old")?,
+    })
+}
+
+/// AGT-050 — the transaction `correct_recording` names and what it changes, a write-off's
+/// reason included (WOF-030).
+fn correction_of(arguments: &Value) -> Result<(String, Change, Option<WriteOffReason>), Refusal> {
     let transaction_id = text(arguments, "transaction")?.to_string();
-    let price = figure(arguments, "price")?;
-    let total = figure(arguments, "total")?;
-    if price.is_some() && total.is_some() {
-        return Err(Refusal {
-            code: "InvalidArguments".to_string(),
-            message: "give either price or total, not both".to_string(),
-        });
-    }
-    let correction = Correction {
-        date: optional_text(arguments, "date")?,
-        quantity: figure(arguments, "quantity")?,
-        price,
-        total,
-        fees: figure(arguments, "fees")?,
-        rate: figure(arguments, "rate")?,
-        note: note(arguments)?,
+    let change = change_of(arguments)?;
+    let reason = match arguments.get("reason") {
+        None | Some(Value::Null) => None,
+        Some(_) => Some(write_off_reason(arguments)?),
     };
-    if correction == Correction::default() {
+    if change == Change::default() && reason.is_none() {
         return Err(Refusal {
             code: "MissingArgument".to_string(),
             message: "nothing to correct: give what changes".to_string(),
         });
     }
-    Ok((transaction_id, correction))
+    Ok((transaction_id, change, reason))
 }
 
 /// AGT-062 — the price `record_price` records.
@@ -956,23 +951,14 @@ fn interest_or_fee(tool: &str, arguments: &Value) -> Result<Recording, Refusal> 
     }
 }
 
-/// AGT-066 — exactly one of two figures, refused as a price and a total are (AGT-048).
+/// AGT-066 — the two figures of which the window takes exactly one; neither and both are
+/// refused by the window's rules (INT-021, FEE-021).
 fn one_of(
     arguments: &Value,
     first: &str,
     second: &str,
 ) -> Result<(Option<i64>, Option<i64>), Refusal> {
-    match (figure(arguments, first)?, figure(arguments, second)?) {
-        (None, None) => Err(Refusal {
-            code: "InvalidArguments".to_string(),
-            message: format!("give {first} or {second}"),
-        }),
-        (Some(_), Some(_)) => Err(Refusal {
-            code: "InvalidArguments".to_string(),
-            message: format!("give either {first} or {second}, not both"),
-        }),
-        figures => Ok(figures),
-    }
+    Ok((figure(arguments, first)?, figure(arguments, second)?))
 }
 
 /// AGT-065 — a write-off's reason: one of the four, by its name.

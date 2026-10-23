@@ -291,7 +291,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "correct_recording",
             title: "Correct a recording",
             only_reads: false,
-            description: "Correct a transaction this session recorded: give its id, as the recording returned it, and only what changes. A transaction the owner typed, or one another session recorded, is refused. Figures are decimals with a dot (12.5), not millionths.",
+            description: "Correct a transaction this session recorded, of any type, as the window corrects it: give its id, as the recording returned it, and only what changes; the rest stays. Every type takes date and note; a purchase or a sale quantity, price or total (not both), fees and rate; an opening balance quantity and total (its total cost); a deposit or a withdrawal amount; a dividend amount (in the asset's currency) and rate; a split new and old, its ratio; free shares, interest or a management fee quantity; a write-off quantity and reason. A transaction the owner typed, or one another session recorded, is refused. Figures are decimals with a dot (12.5), not millionths.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -301,6 +301,10 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     "total": { "type": ["string", "number"], "description": "The right all-in amount, in the account's currency; for an opening balance, its total cost. Not with price." },
                     "fees": { "type": ["string", "number"], "description": "The right fees, in the account's currency." },
                     "rate": { "type": ["string", "number"], "description": "The right exchange rate from the asset's currency to the account's." },
+                    "amount": { "type": ["string", "number"], "description": "The right amount of a deposit, a withdrawal or a dividend." },
+                    "new": { "type": ["string", "integer"], "description": "A split's shares after, for old shares before." },
+                    "old": { "type": ["string", "integer"], "description": "A split's shares before." },
+                    "reason": { "type": "string", "enum": ["NetworkFee", "Dust", "Lost", "Other"], "description": "A write-off's right reason." },
                     "date": { "type": "string", "description": "The right date, YYYY-MM-DD, today or earlier." },
                     "note": { "type": "string", "description": "The right note." }
                 },
