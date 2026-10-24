@@ -43,7 +43,7 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 
 **WOF-011 — Its inputs (backend)**: The quantity must be strictly positive; the date a well-formed ISO date, neither in the future nor before the TRX lower bound (TRX-020); the reason one of the four of the entity. These replace TRX-020's figure checks for a write-off, which carries no proceeds (its total is 0). The note is free text, absent when empty. Each failure is refused with an error of its own.
 
-**WOF-012 — A backdated write-off (backend)**: A write-off dated before later transactions of the asset is refused when the replay would then leave a later sale or write-off above what is held at its own date, as an edit that does so is (SEL-032).
+**WOF-012 — A backdated write-off (backend)**: A write-off dated before later transactions of the asset is refused when the replay would then leave a later sale, write-off or management fee above what is held at its own date, as an edit that does so is (SEL-032).
 
 ### Effect (020–029)
 

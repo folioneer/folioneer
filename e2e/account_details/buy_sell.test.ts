@@ -182,8 +182,10 @@ describe("buy_sell", () => {
     await quantityError.waitForExist({ timeout: 5000 });
     const message = await quantityError.getText();
     assert.ok(
-      /(^|\D)2([.,]0+)?\s/.test(message) && message.includes("E2E-ASSET-TRX030"),
-      `The oversell message must name the 2 held of the asset (SEL-046), got: "${message}"`,
+      /(^|\D)2([.,]0+)?\s/.test(message) &&
+        message.includes("E2E-ASSET-TRX030") &&
+        /\b0?6\/0?1\/2019\b/.test(message),
+      `The oversell message must name the 2 held of the asset on 2019-06-01 (SEL-046), got: "${message}"`,
     );
   });
 });
