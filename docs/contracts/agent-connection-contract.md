@@ -120,7 +120,7 @@ struct TransferShown {
     asset_name: String,
     asset_reference: String,
     quantity_sent: i64,           // micro-units: the sale's quantity
-    quantity_received: i64,       // micro-units: the purchase's quantity
+    quantity_received: i64,       // micro-units: the purchase's quantity; less than quantity_sent, the difference is the quantity not received, the fee in kind (TRF-021) the dialog names by its quantity alone (AGT-092)
     cost: i64,                    // micro-units, in `from_currency`: the cost the transfer moves
     from_currency: String,        // the sending account's currency
     exchange_rate: Option<i64>,   // micro-units; None between accounts of one currency

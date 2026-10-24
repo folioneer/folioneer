@@ -138,11 +138,17 @@ pub async fn answer_replacement(
             tracing::info!(target: BACKEND, session, "the owner replaced four transactions with a transfer");
             let transfer_id = parts.first().and_then(|part| part.transfer_id.clone());
             let view = match transfer_id {
-                Some(transfer_id) => transfers.get_transfer(&transfer_id).await.ok(),
-                None => None,
+                Some(transfer_id) => transfers
+                    .get_transfer(&transfer_id)
+                    .await
+                    .inspect_err(|err| tracing::error!(target: BACKEND, session, err = ?err, "answer_replacement_request: the transfer recorded could not be read"))
+                    .ok(),
+                None => {
+                    tracing::error!(target: BACKEND, session, "answer_replacement_request: the transfer recorded has no parts");
+                    None
+                }
             };
             let Some(view) = view else {
-                tracing::error!(target: BACKEND, session, "answer_replacement_request: the transfer recorded could not be read");
                 answered.tell(ReplacementAnswer::NotReplaced {
                     code: "DatabaseError".to_string(),
                     message: "the transfer was recorded, but could not be read: list_transactions shows it".to_string(),
