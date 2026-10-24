@@ -2,6 +2,7 @@
   "account_summaries": {
     "summaries": [
       {
+        "created_by": null,
         "currency": "EUR",
         "has_inconsistent_holding": false,
         "name": "Main EUR",
@@ -11,6 +12,7 @@
         "wrapper": null
       },
       {
+        "created_by": null,
         "currency": "USD",
         "has_inconsistent_holding": false,
         "name": "Growth USD",

@@ -33,6 +33,15 @@ export function AgentSessionDialog({
     [t("agent.session_since"), formatIsoTime(session.started_at, i18n.language)],
     [t("agent.session_read"), t("agent.session_read_count", { count: session.reads })],
     [
+      t("agent.session_accounts"),
+      session.last_account
+        ? t("agent.session_accounts_count", {
+            count: session.accounts_added,
+            name: session.last_account,
+          })
+        : t("agent.session_none"),
+    ],
+    [
       t("agent.session_assets"),
       lastAsset
         ? t("agent.session_assets_count", {

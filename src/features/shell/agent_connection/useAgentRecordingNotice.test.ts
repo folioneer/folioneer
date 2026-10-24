@@ -23,6 +23,8 @@ const session = (overrides: Partial<AgentSession> = {}): AgentSession => ({
   recordings: 1,
   transactions_recorded: 1,
   last_recording: { kind: "Purchase", asset: "CW8", date: "2019-03-14" },
+  accounts_added: 0,
+  last_account: null,
   assets_added: 0,
   last_asset: null,
   ...overrides,

@@ -1,6 +1,7 @@
-import { AlertTriangle, ChevronRight, Edit2, Trash2, X } from "lucide-react";
+import { AlertTriangle, Bot, ChevronRight, Edit2, Trash2, X } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { AgentRecording } from "@/bindings";
 import { logger } from "@/lib/logger";
 import { microToFormatted } from "@/lib/microUnits";
 import { Button } from "@/ui/components/button/Button";
@@ -9,6 +10,7 @@ import { WarningChip } from "@/ui/components/chip/WarningChip";
 import { SelectField } from "@/ui/components/field/SelectField";
 import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { SortIcon } from "@/ui/components/SortIcon";
+import { formatIsoDateTime } from "@/ui/format/date";
 import { EditAccountModal } from "../edit_account_modal/EditAccountModal";
 import {
   formatAccountRowTotalUnrealizedPnl,
@@ -29,6 +31,11 @@ interface AccountTableProps {
 
 export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) {
   const { t, i18n } = useTranslation();
+  const createdByHint = (createdBy: AgentRecording) =>
+    t("account.created_by_agent", {
+      agent: createdBy.agent,
+      when: formatIsoDateTime(createdBy.session_started_at, i18n.language),
+    });
   // ACC-046/047 — the wrapper lists name each account's wrapper; the list groups on demand.
   const wrapperLists = useWrapperLists();
   const [groupBy, setGroupBy] = useState<"none" | "wrapper">("none");
@@ -105,6 +112,18 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
       <td className="m3-td">
         <div className="flex items-center gap-2">
           <span className="font-medium text-m3-on-surface">{account.name}</span>
+          {/* AGT-069 — an agent created this account on this computer */}
+          {account.created_by && (
+            <span
+              id={`account-created-by-${account.id}`}
+              role="img"
+              title={createdByHint(account.created_by)}
+              aria-label={createdByHint(account.created_by)}
+              className="inline-flex shrink-0 text-m3-on-surface-variant"
+            >
+              <Bot size={14} aria-hidden="true" />
+            </span>
+          )}
           {/* SYN-040 — the account holds an inconsistent holding after a merge */}
           {account.has_inconsistent_holding && (
             <AlertTriangle

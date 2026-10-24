@@ -1,4 +1,4 @@
-use crate::context::account::{Account, AccountError, AccountServiceContract};
+use crate::context::account::{Account, AccountError, AccountServiceContract, AgentRecording};
 use crate::context::asset::AssetServiceContract;
 use crate::core::logger::BACKEND;
 use std::result::Result as StdResult;
@@ -94,6 +94,37 @@ impl AccountCreationUseCase {
             )
             .await?;
         // CSH-012 — eager 0-balance Cash Holding.
+        self.account_service.seed_cash_holding(&account.id).await?;
+        Ok(account)
+    }
+
+    /// AGT-068 — creates the account an agent asked for as the window creates one, its cash
+    /// line included (ACC-025), marked with the agent and its session (AGT-069).
+    pub async fn create_by_agent(
+        &self,
+        name: String,
+        bank_name: String,
+        currency: String,
+        country: Option<String>,
+        wrapper: Option<String>,
+        mark: AgentRecording,
+    ) -> StdResult<Account, AccountError> {
+        Account::new(name.clone(), bank_name.clone(), currency.clone(), false)?.classified(
+            country.clone(),
+            wrapper.clone(),
+            None,
+        )?;
+        self.asset_service
+            .seed_cash_asset(&currency)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, currency = %currency, err = ?e, "create_by_agent: seed_cash_asset failed");
+                AccountError::DatabaseError
+            })?;
+        let account = self
+            .account_service
+            .create_by_agent(name, bank_name, currency, country, wrapper, mark)
+            .await?;
         self.account_service.seed_cash_holding(&account.id).await?;
         Ok(account)
     }

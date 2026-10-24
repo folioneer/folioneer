@@ -88,6 +88,7 @@ const makeSummary = (overrides: Partial<AccountSummary> = {}): AccountSummary =>
   ytd_performance_pct: null,
   has_inconsistent_holding: false,
   outdated_price_count: 0,
+  created_by: null,
   ...overrides,
 });
 
@@ -102,6 +103,31 @@ describe("AccountTable — Global Value column (ACC-021)", () => {
     mockSummaries.mockReturnValue([makeSummary()]);
     render(<AccountTable searchTerm="" onAccountClick={vi.fn()} />);
     expect(screen.getByText("account.column_global_value")).toBeInTheDocument();
+  });
+
+  // AGT-069 — an account an agent created carries a robot mark after its name, its hint
+  // naming the agent and the session; the owner's carries none.
+  it("marks the account an agent created, and only it", () => {
+    mockSummaries.mockReturnValue([
+      makeSummary({
+        id: "a",
+        name: "Hardware wallet",
+        created_by: {
+          agent: "claude-code",
+          session: "s-1",
+          session_started_at: "2026-10-24T10:12:00+02:00",
+        },
+      }),
+      makeSummary({ id: "b", name: "PEA" }),
+    ]);
+    render(<AccountTable searchTerm="" onAccountClick={vi.fn()} />);
+    const mark = document.getElementById("account-created-by-a");
+    expect(mark).not.toBeNull();
+    const hint = mark?.getAttribute("title") ?? "";
+    expect(hint).toMatch(/^account\.created_by_agent /);
+    expect(hint).toContain('"agent":"claude-code"');
+    expect(mark).toHaveAccessibleName(hint);
+    expect(document.getElementById("account-created-by-b")).toBeNull();
   });
 
   // ACC-004 / ACC-008 — the table has no Frequency column

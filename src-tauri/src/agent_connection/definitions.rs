@@ -288,6 +288,24 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "add_account",
+            title: "Create an account",
+            only_reads: false,
+            description: "Create an account the portfolio does not have yet — a brokerage account, a savings plan, a crypto wallet — so that it can be recorded in, as the window creates one: its cash line is created with it and its management fees are off. Look for it with list_accounts first: a name another account has is refused, case ignored. It is usable at once by its name and takes one place of the session's limit.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string", "description": "The account's name, as the owner will see it. At most 100 characters." },
+                    "currency": { "type": "string", "description": "The ISO code of its currency: EUR, USD." },
+                    "bank": { "type": "string", "description": "The bank or broker that holds it. Optional; at most 100 characters." },
+                    "country": { "type": "string", "description": "Its country, two upper-case letters (FR, DE), when it is not the portfolio's. Optional." },
+                    "wrapper": { "type": "string", "description": "The identifier of its tax wrapper (fr_pea, brokerage), as list_accounts gives them. Optional." }
+                },
+                "required": ["name", "currency"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
             name: "correct_recording",
             title: "Correct a recording",
             only_reads: false,
