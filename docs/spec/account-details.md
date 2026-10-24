@@ -227,7 +227,7 @@ UPDATE holdings SET
   - Current Price (MKT-031)
   - Current Value (current price × quantity, asset currency; `—` when no price — MKT-143)
   - Weight % (share of the Global Value; `—` when none — ACD-052)
-  - Actions: Buy, Sell, Write off (WOF-050), Inspect
+  - Actions: Buy, Sell, Write off (WOF-050), Transfer (TRF-050), Inspect
 - **Closed Positions Section** (rendered only when `closed_holdings` non-empty, per ACD-047):
   - Section heading "Closed positions"
   - Table columns: Asset (Name + Ticker), Realized P&L, Closed on
