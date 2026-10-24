@@ -68,7 +68,7 @@ get_global_performance(account_id?, asset_id?)
                 │     ├─ resolve account-currency → reference-currency rates at valued dates + transaction dates
                 │     └─ convert the account's Dietz flows at their transaction dates (GPF-030)
                 │
-                └─ Per period in the global span (year rows; month rows when eligible):
+                └─ Per period in the global span (year rows and month rows):
                       ├─ end_value = Σ converted per-account end values at period end (GPF-020)
                       ├─ metrics over aggregated values + converted flows (GPF-031)
                       └─ bridge terms Σ converted per account; pnl = residual (GPF-040/041)

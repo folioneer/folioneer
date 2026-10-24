@@ -44,7 +44,7 @@ The total of every account, read together with the account summaries (ACC-027). 
 
 **ACC-003 — Name uniqueness (backend + frontend)** _(formerly R3)_: No two accounts may share the same name (comparison is performed on the normalised name per ACC-001, case-insensitive). Any create or edit operation resulting in a duplicate is rejected by the backend with an explicit error. ACC-001, ACC-002, and ACC-003 apply to both creation and modification.
 
-**ACC-004 — No update frequency (backend + frontend)** _(formerly R4)_: An account carries no update frequency: nothing in the application depends on how often its figures are updated. An account change written before data format version 8 carries one, which is ignored (SYN-038).
+**ACC-004 — No update frequency (backend + frontend)** _(formerly R4)_: An account carries no update frequency: nothing in the application depends on how often its figures are updated, so the account form asks for none and the account table shows none (ACC-008, ACC-016, ACC-017). An account change written before data format version 8 carries one, which is ignored (SYN-038).
 
 ### Deletion
 

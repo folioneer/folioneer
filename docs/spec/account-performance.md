@@ -190,7 +190,7 @@ A "Performance" action in the Account Details header (alongside the existing "Re
 
 A full-page table at `/accounts/:id/performance`.
 
-- **Header**: account name, a view-mode toggle (Month / Year, PRF-013), and, in month view, a year selector (PRF-015).
+- **Header**: account name, a view-mode toggle (Month / Year, PRF-011), and, in month view, a year selector (PRF-015).
 - **Table columns**:
   - Period (month label in month view, year in year view)
   - End value (account currency)
