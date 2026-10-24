@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import type { Account } from "@/bindings";
 import type { I18nMessage } from "@/ui/format/i18n";
 import type { AccountFormData } from "../shared/AccountForm";
-import { FREQUENCIES } from "../shared/presenter";
 import { validateAccountCurrency, validateAccountName } from "../shared/validateAccount";
 import { useAccounts } from "../useAccounts";
 
@@ -18,7 +17,6 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
     name: "",
     bank_name: "",
     currency: "EUR",
-    update_frequency: "ManualMonth",
     management_fees_enabled: false,
     country: "",
     wrapper: "",
@@ -33,7 +31,6 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
         name: account.name,
         bank_name: account.bank_name,
         currency: account.currency,
-        update_frequency: account.update_frequency,
         management_fees_enabled: account.management_fees_enabled,
         country: account.country ?? "",
         wrapper: account.wrapper ?? "",
@@ -72,7 +69,6 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
       name: formData.name,
       bank_name: formData.bank_name,
       currency: formData.currency,
-      update_frequency: formData.update_frequency,
       management_fees_enabled: formData.management_fees_enabled,
       country: formData.country || null,
       wrapper: formData.wrapper || null,
@@ -96,6 +92,5 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
     handleChange,
     setCountry,
     handleSubmit,
-    frequencies: FREQUENCIES,
   };
 }

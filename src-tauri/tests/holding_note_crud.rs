@@ -8,7 +8,7 @@
 
 use folioneer_lib::context::account::{
     AccountError, AccountService, SqliteAccountRepository, SqliteHoldingNoteRepository,
-    SqliteHoldingRepository, SqliteTransactionRepository, ThresholdDirection, UpdateFrequency,
+    SqliteHoldingRepository, SqliteTransactionRepository, ThresholdDirection,
 };
 use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
@@ -96,7 +96,6 @@ async fn seed_held_position(ctx: &Ctx) -> (String, String) {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await

@@ -11,7 +11,7 @@ use common::micro;
 use folioneer_lib::context::account::AccountService;
 use folioneer_lib::context::account::{
     AccountError, JournalFilter, SqliteAccountRepository, SqliteHoldingRepository,
-    SqliteTransactionRepository, TransactionType, UpdateFrequency,
+    SqliteTransactionRepository, TransactionType,
 };
 use sqlx::sqlite::SqlitePoolOptions;
 
@@ -102,7 +102,6 @@ async fn test_delete_account_removes_it_from_get_all() {
             "ToDelete".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -121,23 +120,11 @@ async fn test_get_all_returns_created_accounts() {
     let svc = make_service(&pool).await;
 
     let a = svc
-        .create(
-            "Alpha".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Alpha".to_string(), String::new(), "EUR".to_string(), false)
         .await
         .unwrap();
     let b = svc
-        .create(
-            "Beta".to_string(),
-            String::new(),
-            "USD".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Beta".to_string(), String::new(), "USD".to_string(), false)
         .await
         .unwrap();
 
@@ -158,7 +145,6 @@ async fn test_get_by_id_returns_some_or_none() {
             "Existing".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -183,7 +169,6 @@ async fn bank_name_round_trips_through_create_update_and_read() {
             "Branded".to_string(),
             "Maple Bank".to_string(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -196,7 +181,6 @@ async fn bank_name_round_trips_through_create_update_and_read() {
         "Branded".to_string(),
         String::new(),
         "EUR".to_string(),
-        UpdateFrequency::ManualMonth,
         false,
     )
     .await
@@ -216,7 +200,6 @@ async fn test_get_holdings_for_account_returns_empty_before_any_transaction() {
             "NoHoldings".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -238,7 +221,6 @@ async fn test_get_holding_by_account_asset_returns_none_then_some() {
             "HoldingTest".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -284,7 +266,6 @@ async fn test_get_transactions_returns_chronological_order() {
             "TxOrder".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -361,13 +342,7 @@ async fn test_get_all_transactions_for_account_spans_assets_chronologically() {
     .expect("seed second asset");
 
     let account = svc
-        .create(
-            "AllTx".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("AllTx".to_string(), String::new(), "EUR".to_string(), false)
         .await
         .unwrap();
     seed_cash_for_account(&pool, &svc, &account.id, "EUR").await;
@@ -446,7 +421,6 @@ async fn test_get_transaction_by_id_returns_some_or_none() {
             "TxLookup".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -498,7 +472,6 @@ async fn test_get_asset_ids_for_account_deduplicates() {
             "AssetIds".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -552,7 +525,6 @@ async fn test_get_deletion_summary_counts_holdings_and_transactions() {
             "Summary".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -622,7 +594,6 @@ async fn correct_transaction_rejects_moving_sell_before_buy_end_to_end() {
             "ReorderGuard".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -701,7 +672,6 @@ async fn txl_060_account_journal_reads_the_stored_transactions() {
             "Journal".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await

@@ -229,7 +229,7 @@ mod tests {
     use crate::context::account::{
         Account, AccountService, SqliteAccountRepository, SqliteFeeCatchUpRepository,
         SqliteFeeScheduleRepository, SqliteHoldingRepository, SqliteTransactionRepository,
-        TransactionType, UpdateFrequency,
+        TransactionType,
     };
     use crate::context::asset::{
         AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
@@ -280,7 +280,6 @@ mod tests {
             account.name.clone(),
             String::new(),
             account.currency.clone(),
-            account.update_frequency,
             true,
         )
         .await
@@ -346,13 +345,7 @@ mod tests {
         let pool = setup_pool().await;
         let account_svc = make_account_service(&pool);
         let account = account_svc
-            .create(
-                "Test".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Test".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
 
@@ -387,7 +380,6 @@ mod tests {
                 "FEE-041".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -453,7 +445,6 @@ mod tests {
                 "FEE-041-floor".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -529,7 +520,6 @@ mod tests {
                 "FEE-043".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -576,7 +566,6 @@ mod tests {
                 "FEE-047".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -627,7 +616,6 @@ mod tests {
                 "FEE-070".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -704,7 +692,6 @@ mod tests {
                 "FEE-044".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -804,7 +791,6 @@ mod tests {
                 "FEE-045-end".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -892,7 +878,6 @@ mod tests {
                 "FEE-045-inactive".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -973,7 +958,6 @@ mod tests {
                 "FEE-047-oversell".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -1095,7 +1079,6 @@ mod tests {
                 "FEE-047-refused".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -1193,14 +1176,8 @@ mod tests {
             .expect_list_active_fee_schedules()
             .returning(move || Ok(schedules.clone()));
         account_service.expect_get_by_id().returning(|_| {
-            let mut account = Account::new(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                true,
-            )
-            .expect("account");
+            let mut account = Account::new("A".to_string(), String::new(), "EUR".to_string(), true)
+                .expect("account");
             account.id = "account-1".to_string();
             Ok(Some(account))
         });
@@ -1252,7 +1229,6 @@ mod tests {
                 "FEE-061".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -1342,13 +1318,7 @@ mod tests {
         let asset_svc = make_asset_service(pool);
         let stock_id = seed_stock(&asset_svc).await;
         let account = account_svc
-            .create(
-                name.to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create(name.to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let account = enable_management_fees(&account_svc, &account).await;
@@ -1561,7 +1531,6 @@ mod tests {
                 account.name.clone(),
                 String::new(),
                 account.currency.clone(),
-                account.update_frequency,
                 false,
             )
             .await
@@ -1837,7 +1806,6 @@ mod tests {
                 "FEE-078".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -1877,7 +1845,6 @@ mod tests {
                 account.name.clone(),
                 String::new(),
                 account.currency.clone(),
-                account.update_frequency,
                 false,
             )
             .await
@@ -2016,7 +1983,6 @@ mod tests {
                 "Origin Test".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -2118,7 +2084,6 @@ mod tests {
                 "Outranked".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await

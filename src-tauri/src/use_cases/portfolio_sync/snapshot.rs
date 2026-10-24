@@ -225,7 +225,6 @@ mod tests {
     use crate::context::account::{
         SqliteAccountRepository, SqliteFeeCatchUpRepository, SqliteFeeScheduleRepository,
         SqliteHoldingNoteRepository, SqliteHoldingRepository, SqliteTransactionRepository,
-        UpdateFrequency,
     };
     use crate::context::asset::SYSTEM_CATEGORY_ID;
     use crate::context::asset::{
@@ -305,13 +304,7 @@ mod tests {
             .unwrap();
         asset_service.seed_cash_asset("USD").await.unwrap();
         let account = account_service
-            .create(
-                "Portfolio".into(),
-                String::new(),
-                "USD".into(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Portfolio".into(), String::new(), "USD".into(), false)
             .await
             .unwrap();
         account_service

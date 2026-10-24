@@ -64,22 +64,13 @@ const makeMonthRow = (overrides: Partial<PerformancePeriod> = {}): PerformancePe
 // ---- resolveViewMode (PRF-014 / GPF-016) ------------------------------------
 
 describe("resolveViewMode", () => {
-  it("returns the remembered mode when still valid", () => {
-    expect(resolveViewMode("year", true)).toBe("year");
-    expect(resolveViewMode("month", true)).toBe("month");
-    expect(resolveViewMode("year", false)).toBe("year");
+  it("returns the remembered mode", () => {
+    expect(resolveViewMode("year")).toBe("year");
+    expect(resolveViewMode("month")).toBe("month");
   });
 
-  it("clamps a remembered month view to year when month view is unavailable", () => {
-    expect(resolveViewMode("month", false)).toBe("year");
-  });
-
-  it("defaults to month when available and nothing is remembered", () => {
-    expect(resolveViewMode(null, true)).toBe("month");
-  });
-
-  it("defaults to year when month view is unavailable and nothing is remembered", () => {
-    expect(resolveViewMode(null, false)).toBe("year");
+  it("defaults to month when nothing is remembered", () => {
+    expect(resolveViewMode(null)).toBe("month");
   });
 });
 

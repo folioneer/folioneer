@@ -12,7 +12,7 @@ use std::sync::Arc;
 use folioneer_lib::context::account::{
     AccountService, SqliteAccountRepository, SqliteFeeCatchUpRepository,
     SqliteFeeScheduleRepository, SqliteHoldingNoteRepository, SqliteHoldingRepository,
-    SqliteTransactionRepository, UpdateFrequency,
+    SqliteTransactionRepository,
 };
 use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
@@ -193,13 +193,7 @@ async fn seed_small_portfolio(ctx: &Ctx) -> (String, String) {
     ctx.asset_service.seed_cash_asset("USD").await.unwrap();
     let account = ctx
         .account_service
-        .create(
-            "Portfolio".into(),
-            String::new(),
-            "USD".into(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Portfolio".into(), String::new(), "USD".into(), false)
         .await
         .unwrap();
     ctx.account_service
@@ -414,7 +408,6 @@ async fn concurrent_rename_of_the_same_account_produces_one_notice_on_the_losing
             "Renamed on Desktop".into(),
             String::new(),
             "USD".into(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -426,7 +419,6 @@ async fn concurrent_rename_of_the_same_account_produces_one_notice_on_the_losing
             "Renamed on Laptop".into(),
             String::new(),
             "USD".into(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -686,7 +678,6 @@ async fn fee_catch_up_positions_converge_by_maximum() {
             "Portfolio".into(),
             String::new(),
             "USD".into(),
-            UpdateFrequency::ManualMonth,
             true,
         )
         .await
@@ -1724,7 +1715,6 @@ async fn written_form_of_every_record_kind() -> serde_json::Value {
             "Portfolio".into(),
             "Bank".into(),
             "EUR".into(),
-            UpdateFrequency::ManualMonth,
             true,
             Some("DE".into()),
             Some("de_depot".into()),
@@ -1834,10 +1824,6 @@ fn written_values_of_every_synced_enum() -> serde_json::Value {
             Operation::Created, Operation::Updated, Operation::Removed,
         ]),
         "Origin": written_values!(Origin, [Origin::Application, Origin::User]),
-        "UpdateFrequency": written_values!(UpdateFrequency, [
-            UpdateFrequency::Automatic, UpdateFrequency::ManualDay, UpdateFrequency::ManualWeek,
-            UpdateFrequency::ManualMonth, UpdateFrequency::ManualYear,
-        ]),
         "AssetClass": written_values!(AssetClass, [
             AssetClass::RealEstate, AssetClass::Cash, AssetClass::Stocks, AssetClass::Bonds,
             AssetClass::ETF, AssetClass::ETP, AssetClass::MutualFunds, AssetClass::DigitalAsset,

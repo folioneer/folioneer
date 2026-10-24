@@ -66,7 +66,6 @@ mod tests {
     use super::*;
     use crate::context::account::{
         SqliteAccountRepository, SqliteHoldingRepository, SqliteTransactionRepository,
-        UpdateFrequency,
     };
     use crate::context::asset::{
         AssetClass, CreateAssetDTO, SqliteAssetCategoryRepository, SqliteAssetPriceRepository,
@@ -148,13 +147,7 @@ mod tests {
             .unwrap();
         let account = stamper
             .account_service
-            .create(
-                "Portfolio".into(),
-                String::new(),
-                "USD".into(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Portfolio".into(), String::new(), "USD".into(), false)
             .await
             .unwrap();
         stamper

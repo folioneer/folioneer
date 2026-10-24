@@ -16,17 +16,11 @@ const DASH = "—";
 export type PerformanceViewMode = "month" | "year";
 
 /**
- * PRF-014 / GPF-016 — resolves the view mode to open with: the remembered choice when
- * still valid, clamped to year view when a remembered month view is no longer available,
- * else the default (month when available, otherwise year).
+ * PRF-014 / GPF-016 — resolves the view mode to open with: the remembered choice, else
+ * the month view.
  */
-export function resolveViewMode(
-  remembered: PerformanceViewMode | null,
-  monthAvailable: boolean,
-): PerformanceViewMode {
-  if (remembered === "month" && !monthAvailable) return "year";
-  if (remembered !== null) return remembered;
-  return monthAvailable ? "month" : "year";
+export function resolveViewMode(remembered: PerformanceViewMode | null): PerformanceViewMode {
+  return remembered ?? "month";
 }
 
 const MONTH_LABEL_KEYS = [

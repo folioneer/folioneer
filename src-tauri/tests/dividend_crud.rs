@@ -8,7 +8,7 @@
 use folioneer_lib::context::account::{
     AccountService, SqliteAccountRepository, SqliteFeeScheduleRepository,
     SqliteHoldingNoteRepository, SqliteHoldingRepository, SqliteTransactionRepository,
-    TransactionType, UpdateFrequency,
+    TransactionType,
 };
 use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
@@ -124,7 +124,6 @@ async fn record_dividend_end_to_end_persists_correct_fields() {
             "My Account".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -191,7 +190,6 @@ async fn record_dividend_leaves_paying_asset_holding_unchanged() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -280,7 +278,6 @@ async fn record_dividend_does_not_create_asset_price_row() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -377,7 +374,6 @@ async fn record_dividend_asset_not_held_propagates() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -456,7 +452,6 @@ async fn record_dividend_publishes_transaction_updated_event() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -529,7 +524,6 @@ async fn dividends_received_is_zero_when_no_dividend() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -586,7 +580,6 @@ async fn dividends_received_sums_all_dividends_for_the_holding() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -673,7 +666,6 @@ async fn dividends_received_scoped_to_account_asset_pair() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -761,7 +753,6 @@ async fn total_return_pct_is_none_when_no_price_recorded() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -837,7 +828,6 @@ async fn total_return_pct_combines_unrealized_pnl_and_dividends() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -923,7 +913,6 @@ async fn total_dividends_received_is_zero_when_none() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -961,7 +950,6 @@ async fn total_dividends_received_sums_all_account_dividends() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await

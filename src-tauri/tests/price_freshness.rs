@@ -3,7 +3,6 @@
 
 use folioneer_lib::context::account::{
     AccountService, SqliteAccountRepository, SqliteHoldingRepository, SqliteTransactionRepository,
-    UpdateFrequency,
 };
 use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, PriceProvider, Quote, SqliteAssetCategoryRepository,
@@ -90,13 +89,7 @@ async fn freshness_read_on_completion(provider: Arc<dyn PriceProvider>) -> Price
         .await
         .expect("seed asset");
     let account = account_service
-        .create(
-            "Test".to_string(),
-            String::new(),
-            "USD".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Test".to_string(), String::new(), "USD".to_string(), false)
         .await
         .expect("seed account");
     account_service

@@ -3,7 +3,7 @@ use super::domain::{
     FeeCatchUpPosition, FeeCatchUpRepository, FeeSchedule, FeeScheduleRepository, Holding,
     HoldingNote, HoldingNoteRepository, HoldingRepository, HoldingSnapshot, JournalFilter,
     ManagementFeeRemoval, SessionRecording, StockSplitPosition, ThresholdDirection, Transaction,
-    TransactionRepository, UpdateFrequency, WriteOffReason,
+    TransactionRepository, WriteOffReason,
 };
 use super::error::AccountError;
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
@@ -240,16 +240,9 @@ impl AccountService {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
     ) -> Result<Account, AccountError> {
-        let account = Account::new(
-            name,
-            bank_name,
-            currency,
-            update_frequency,
-            management_fees_enabled,
-        )?;
+        let account = Account::new(name, bank_name, currency, management_fees_enabled)?;
         self.create_account(account).await
     }
 
@@ -262,19 +255,12 @@ impl AccountService {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
         country: Option<String>,
         wrapper: Option<String>,
     ) -> Result<Account, AccountError> {
-        let account = Account::new(
-            name,
-            bank_name,
-            currency,
-            update_frequency,
-            management_fees_enabled,
-        )?
-        .classified(country, wrapper, None)?;
+        let account = Account::new(name, bank_name, currency, management_fees_enabled)?
+            .classified(country, wrapper, None)?;
         self.create_account(account).await
     }
 
@@ -334,17 +320,9 @@ impl AccountService {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
     ) -> Result<Account, AccountError> {
-        let account = Account::with_id(
-            id,
-            name,
-            bank_name,
-            currency,
-            update_frequency,
-            management_fees_enabled,
-        )?;
+        let account = Account::with_id(id, name, bank_name, currency, management_fees_enabled)?;
         let account = match self.get_by_id(&account.id).await? {
             Some(current) => account.with_stored_classification(current.country, current.wrapper),
             None => account,
@@ -362,7 +340,6 @@ impl AccountService {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
         country: Option<String>,
         wrapper: Option<String>,
@@ -370,15 +347,8 @@ impl AccountService {
         // ACC-043 — read apart from the write: a sync landing in between is a single-user race
         // whose worst case keeps a wrapper another device set, which ACC-040 allows anyway.
         let stored_wrapper = self.get_by_id(&id).await?.and_then(|stored| stored.wrapper);
-        let account = Account::with_id(
-            id,
-            name,
-            bank_name,
-            currency,
-            update_frequency,
-            management_fees_enabled,
-        )?
-        .classified(country, wrapper, stored_wrapper.as_deref())?;
+        let account = Account::with_id(id, name, bank_name, currency, management_fees_enabled)?
+            .classified(country, wrapper, stored_wrapper.as_deref())?;
         self.update_account(account).await
     }
 
@@ -2088,7 +2058,6 @@ pub trait AccountServiceContract: Send + Sync {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
     ) -> StdResult<Account, AccountError>;
     /// ACC-041 — creates a new account with its country and wrapper.
@@ -2100,7 +2069,6 @@ pub trait AccountServiceContract: Send + Sync {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
         country: Option<String>,
         wrapper: Option<String>,
@@ -2444,18 +2412,9 @@ impl AccountServiceContract for AccountService {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
     ) -> StdResult<Account, AccountError> {
-        AccountService::create(
-            self,
-            name,
-            bank_name,
-            currency,
-            update_frequency,
-            management_fees_enabled,
-        )
-        .await
+        AccountService::create(self, name, bank_name, currency, management_fees_enabled).await
     }
 
     async fn create_classified(
@@ -2463,7 +2422,6 @@ impl AccountServiceContract for AccountService {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
         country: Option<String>,
         wrapper: Option<String>,
@@ -2473,7 +2431,6 @@ impl AccountServiceContract for AccountService {
             name,
             bank_name,
             currency,
-            update_frequency,
             management_fees_enabled,
             country,
             wrapper,
@@ -3325,7 +3282,6 @@ mod tests {
                 "PEA".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
                 None,
                 Some("fr_pea".to_string()),
@@ -3347,7 +3303,6 @@ mod tests {
                 "Depot".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 true,
                 Some("DE".to_string()),
                 Some("de_depot".to_string()),
@@ -3371,7 +3326,6 @@ mod tests {
                 name.to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
                 country.map(str::to_string),
                 wrapper.map(str::to_string),
@@ -3402,7 +3356,6 @@ mod tests {
                 "Plan".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
                 Some("ES".to_string()),
                 None,
@@ -3425,7 +3378,6 @@ mod tests {
                 "Plan pensiones".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
                 Some("DE".to_string()),
                 Some("es_plan".to_string()),
@@ -3443,7 +3395,6 @@ mod tests {
                 "Plan pensiones".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
                 None,
                 Some("it_pir".to_string()),
@@ -3459,7 +3410,6 @@ mod tests {
             account.name.clone(),
             String::new(),
             account.currency.clone(),
-            account.update_frequency,
             true,
         )
         .await
@@ -3472,13 +3422,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Gated".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Gated".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let err = svc
@@ -3504,13 +3448,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Gated".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Gated".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let err = svc
@@ -3559,20 +3497,13 @@ mod tests {
                 "Target".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
             .unwrap();
         let target = enable_management_fees(&svc, &target).await;
         let other = svc
-            .create(
-                "Other".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Other".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let other = enable_management_fees(&svc, &other).await;
@@ -3666,23 +3597,11 @@ mod tests {
     #[tokio::test]
     async fn test_create_rejects_duplicate_name_case_insensitive() {
         let svc = setup_service().await;
-        svc.create(
-            "Alpha".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
-        .await
-        .unwrap();
+        svc.create("Alpha".to_string(), String::new(), "EUR".to_string(), false)
+            .await
+            .unwrap();
         let err = svc
-            .create(
-                "alpha".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("alpha".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap_err();
         assert!(
@@ -3695,23 +3614,11 @@ mod tests {
     #[tokio::test]
     async fn test_update_rejects_name_collision_with_other_account() {
         let svc = setup_service().await;
-        svc.create(
-            "Alpha".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
-        .await
-        .unwrap();
+        svc.create("Alpha".to_string(), String::new(), "EUR".to_string(), false)
+            .await
+            .unwrap();
         let beta = svc
-            .create(
-                "Beta".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Beta".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let err = svc
@@ -3720,7 +3627,6 @@ mod tests {
                 "ALPHA".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -3736,13 +3642,7 @@ mod tests {
     async fn test_update_allows_same_name_on_same_account() {
         let svc = setup_service().await;
         let account = svc
-            .create(
-                "Alpha".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Alpha".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let result = svc
@@ -3751,7 +3651,6 @@ mod tests {
                 "Alpha".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualDay,
                 false,
             )
             .await;
@@ -3768,13 +3667,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         seed_cash_for_account(&pool, &svc, &account.id, "EUR").await;
@@ -3809,13 +3702,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         seed_cash_for_account(&pool, &svc, &account.id, "EUR").await;
@@ -3858,13 +3745,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         seed_cash_for_account(&pool, &svc, &account.id, "EUR").await;
@@ -3901,13 +3782,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         seed_cash_for_account(&pool, &svc, &account.id, "EUR").await;
@@ -3952,13 +3827,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         seed_cash_for_account(&pool, &svc, &account.id, "EUR").await;
@@ -4017,14 +3886,9 @@ mod tests {
             .expect_get_with_holdings_and_transactions()
             .once()
             .returning(|_| {
-                let mut acc = Account::new(
-                    "Test".to_string(),
-                    String::new(),
-                    "EUR".to_string(),
-                    UpdateFrequency::ManualMonth,
-                    false,
-                )
-                .unwrap();
+                let mut acc =
+                    Account::new("Test".to_string(), String::new(), "EUR".to_string(), false)
+                        .unwrap();
                 // Seed enough cash so CSH-041 doesn't short-circuit before save() is called.
                 acc.record_deposit("2020-01-01".to_string(), 1_000_000_000_000, None)
                     .unwrap();
@@ -4183,14 +4047,8 @@ mod tests {
             .expect_get_with_holdings_and_transactions()
             .once()
             .returning(|_| {
-                let acc = Account::new(
-                    "Test".to_string(),
-                    String::new(),
-                    "EUR".to_string(),
-                    UpdateFrequency::ManualMonth,
-                    false,
-                )
-                .unwrap();
+                let acc = Account::new("Test".to_string(), String::new(), "EUR".to_string(), false)
+                    .unwrap();
                 Ok(Some(acc))
             });
         mock_ar
@@ -4288,13 +4146,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
 
@@ -4328,13 +4180,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, _asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
 
@@ -4366,13 +4212,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
 
@@ -4402,13 +4242,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
 
@@ -4447,13 +4281,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         seed_cash_for_account(&pool, &svc, &account.id, "EUR").await;
@@ -4504,13 +4332,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
 
@@ -4546,13 +4368,7 @@ mod tests {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         seed_cash_for_account(&pool, &svc, &account.id, "EUR").await;
@@ -4619,13 +4435,7 @@ mod tests {
         )
         .with_event_bus(Arc::clone(&bus));
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         seed_cash_for_account(&pool, &svc, &account.id, "EUR").await;
@@ -4653,13 +4463,7 @@ mod tests {
         )
         .with_event_bus(Arc::clone(&bus));
         let account = svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         seed_cash_for_account(&pool, &svc, &account.id, "EUR").await;
@@ -4701,14 +4505,8 @@ mod tests {
             .once()
             .returning(|_| {
                 Ok(Some(
-                    Account::new(
-                        "Test".to_string(),
-                        String::new(),
-                        "EUR".to_string(),
-                        UpdateFrequency::ManualMonth,
-                        false,
-                    )
-                    .unwrap(),
+                    Account::new("Test".to_string(), String::new(), "EUR".to_string(), false)
+                        .unwrap(),
                 ))
             });
         let svc = mock_cash_svc(mock_ar);
@@ -4767,14 +4565,8 @@ mod tests {
             .expect_get_with_holdings_and_transactions()
             .once()
             .returning(|_| {
-                let acc = Account::new(
-                    "Test".to_string(),
-                    String::new(),
-                    "EUR".to_string(),
-                    UpdateFrequency::ManualMonth,
-                    false,
-                )
-                .unwrap();
+                let acc = Account::new("Test".to_string(), String::new(), "EUR".to_string(), false)
+                    .unwrap();
                 Ok(Some(acc))
             });
         mock_ar
@@ -4799,14 +4591,8 @@ mod tests {
             .once()
             .returning(|_| {
                 Ok(Some(
-                    Account::new(
-                        "Test".to_string(),
-                        String::new(),
-                        "EUR".to_string(),
-                        UpdateFrequency::ManualMonth,
-                        false,
-                    )
-                    .unwrap(),
+                    Account::new("Test".to_string(), String::new(), "EUR".to_string(), false)
+                        .unwrap(),
                 ))
             });
         let svc = mock_cash_svc(mock_ar);
@@ -4872,14 +4658,8 @@ mod tests {
                 // rebuilds the running balance from `transactions`). A holding
                 // without a corresponding deposit would pass the snapshot check
                 // but trip the chronological replay.
-                let acc = Account::new(
-                    "Test".to_string(),
-                    String::new(),
-                    "EUR".to_string(),
-                    UpdateFrequency::ManualMonth,
-                    false,
-                )
-                .unwrap();
+                let acc = Account::new("Test".to_string(), String::new(), "EUR".to_string(), false)
+                    .unwrap();
                 // CSH-080 only fails when current cash < requested amount. Seed
                 // micro(1_000) (≈ €1,000) — comfortably above the test's micro(100)
                 // withdrawal. Exact value isn't load-bearing; only the inequality.
@@ -4905,7 +4685,6 @@ mod tests {
                     acc.name,
                     acc.bank_name,
                     acc.currency,
-                    acc.update_frequency,
                     acc.management_fees_enabled,
                     vec![cash_holding],
                     vec![seed_deposit],
@@ -4941,13 +4720,7 @@ mod tests {
             Box::new(MockTransactionRepository::new()),
         );
         let err = svc
-            .create(
-                "Test".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Test".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap_err();
         assert!(matches!(err, AccountError::DatabaseError), "got: {err:?}");
@@ -4969,13 +4742,7 @@ mod tests {
             Box::new(MockTransactionRepository::new()),
         );
         let err = svc
-            .create(
-                "Test".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Test".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap_err();
         assert!(matches!(err, AccountError::DatabaseError), "got: {err:?}");
@@ -5052,7 +4819,6 @@ mod tests {
                 "FSD Account".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5150,7 +4916,6 @@ mod tests {
                 "FSD Acc".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5215,7 +4980,6 @@ mod tests {
                 "INT Acc".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5270,14 +5034,9 @@ mod tests {
             .once()
             .returning(|_| {
                 // Seed a holding so the apply_free_shares call reaches save()
-                let mut acc = Account::new(
-                    "Test".to_string(),
-                    String::new(),
-                    "EUR".to_string(),
-                    UpdateFrequency::ManualMonth,
-                    false,
-                )
-                .unwrap();
+                let mut acc =
+                    Account::new("Test".to_string(), String::new(), "EUR".to_string(), false)
+                        .unwrap();
                 // Seed cash first (CSH-041 — a buy needs sufficient cash), then a buy
                 // so the holding exists.
                 acc.record_deposit("2024-01-01".to_string(), micro(1_000), None)
@@ -5341,7 +5100,6 @@ mod tests {
                 "FEE Account".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5416,7 +5174,6 @@ mod tests {
                 "FEE-050".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5507,7 +5264,6 @@ mod tests {
                 "FEE Zero".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5539,7 +5295,6 @@ mod tests {
                 "FEE Above100".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5591,14 +5346,9 @@ mod tests {
             .expect_get_with_holdings_and_transactions()
             .once()
             .returning(|_| {
-                let mut acc = Account::new(
-                    "Test".to_string(),
-                    String::new(),
-                    "EUR".to_string(),
-                    UpdateFrequency::ManualMonth,
-                    false,
-                )
-                .unwrap();
+                let mut acc =
+                    Account::new("Test".to_string(), String::new(), "EUR".to_string(), false)
+                        .unwrap();
                 acc.management_fees_enabled = true;
                 acc.record_deposit("2024-01-01".to_string(), micro(1_000), None)
                     .expect("seed deposit");
@@ -5654,7 +5404,6 @@ mod tests {
                 "FEE-027".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5718,13 +5467,7 @@ mod tests {
         quantity: i64,
     ) -> Account {
         let account = svc
-            .create(
-                name.to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create(name.to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let account = enable_management_fees(svc, &account).await;
@@ -5868,7 +5611,6 @@ mod tests {
                 "INT Account".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5958,7 +5700,6 @@ mod tests {
                 "INT Qty".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6013,7 +5754,6 @@ mod tests {
                 "INT XOR".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6063,7 +5803,6 @@ mod tests {
                 "INT Cash".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6124,7 +5863,6 @@ mod tests {
                 "Schedule Acct".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6164,7 +5902,6 @@ mod tests {
                 "FEE-033".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6236,7 +5973,6 @@ mod tests {
                 "Dup Sched".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6282,7 +6018,6 @@ mod tests {
                 "Rate Zero".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6317,7 +6052,6 @@ mod tests {
                 "Rate High".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6352,7 +6086,6 @@ mod tests {
                 "End Before".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6391,7 +6124,6 @@ mod tests {
                 "Update Sched".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6438,7 +6170,6 @@ mod tests {
                 "NoSched".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6469,7 +6200,6 @@ mod tests {
                 "Del Sched".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6505,7 +6235,6 @@ mod tests {
                 "Del None".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6531,7 +6260,6 @@ mod tests {
                 "Get None".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6552,7 +6280,6 @@ mod tests {
                 "Get Present".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6589,13 +6316,7 @@ mod tests {
         asset_id: &str,
     ) -> Account {
         let account = svc
-            .create(
-                "Noted".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Noted".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         seed_cash_for_account(pool, svc, &account.id, "EUR").await;
@@ -6831,7 +6552,6 @@ mod tests {
                 "Unheld".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6997,13 +6717,7 @@ mod tests {
         let (svc, asset_id) = setup(&pool).await;
         seed_cash_asset_row(&pool, "EUR").await;
         let account = svc
-            .create(
-                "Oversold".into(),
-                String::new(),
-                "EUR".into(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Oversold".into(), String::new(), "EUR".into(), false)
             .await
             .unwrap();
         let content = format!(
@@ -7039,13 +6753,7 @@ mod tests {
             Box::new(SqliteTransactionRepository::new(pool.clone())),
         );
         let account = svc
-            .create(
-                "To Remove".into(),
-                String::new(),
-                "EUR".into(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("To Remove".into(), String::new(), "EUR".into(), false)
             .await
             .unwrap();
         let mut conn = pool.acquire().await.unwrap();
@@ -7077,7 +6785,6 @@ mod tests {
                 "Livret A".into(),
                 String::new(),
                 "EUR".into(),
-                UpdateFrequency::ManualMonth,
                 false,
             )))
         });
@@ -7089,7 +6796,6 @@ mod tests {
                 "Livret A".into(),
                 String::new(),
                 "EUR".into(),
-                UpdateFrequency::ManualMonth,
                 false,
             )))
         });
@@ -7106,7 +6812,6 @@ mod tests {
                 "Livret A".into(), // unchanged name — still clashes with account-clash
                 "Fortuneo".into(), // only the bank name changes
                 "EUR".into(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await;
@@ -7126,23 +6831,11 @@ mod tests {
             Box::new(SqliteHoldingRepository::new(pool.clone())),
             Box::new(SqliteTransactionRepository::new(pool.clone())),
         );
-        svc.create(
-            "Existing".into(),
-            String::new(),
-            "EUR".into(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
-        .await
-        .unwrap();
+        svc.create("Existing".into(), String::new(), "EUR".into(), false)
+            .await
+            .unwrap();
         let renaming = svc
-            .create(
-                "Renaming".into(),
-                String::new(),
-                "EUR".into(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Renaming".into(), String::new(), "EUR".into(), false)
             .await
             .unwrap();
 
@@ -7152,7 +6845,6 @@ mod tests {
                 "Existing".into(),
                 String::new(),
                 "EUR".into(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await;

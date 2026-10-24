@@ -1232,10 +1232,6 @@ bank_name: string;
  */
 currency: string; 
 /**
- * How often this account is updated.
- */
-update_frequency: UpdateFrequency; 
-/**
  * Whether the % management-fee mechanism (one-off fees + schedules) is
  * available on this account (FEE-075). New accounts start disabled.
  */
@@ -1602,16 +1598,11 @@ account_name: string;
  */
 currency: string; 
 /**
- * True only for Automatic/ManualDay/ManualWeek (PRF-013).
- */
-month_view_available: boolean; 
-/**
  * One row per year, most-recent first (PRF-041). month is None for each row.
  */
 yearly: PerformancePeriod[]; 
 /**
- * One row per month over the full span, most-recent first.
- * Empty when month_view_available is false (PRF-013, PRF-015).
+ * One row per month over the full span, most-recent first (PRF-013, PRF-015).
  */
 monthly: PerformancePeriod[]; 
 /**
@@ -1650,10 +1641,6 @@ name: string;
  * ISO 4217 currency code; matches `Account.currency`.
  */
 currency: string; 
-/**
- * Manual / Automatic update cadence (purely informational, ACC-004).
- */
-update_frequency: UpdateFrequency; 
 /**
  * ACC-046 — the identifier of the account's tax wrapper (ACC-043), for the list's column
  * and grouping; none when unset.
@@ -2545,10 +2532,6 @@ bank_name: string;
  * ISO 4217 currency code.
  */
 currency: string; 
-/**
- * Update frequency.
- */
-update_frequency: UpdateFrequency; 
 /**
  * Whether the % management-fee mechanism is enabled (FEE-075). New accounts
  * default to false; the creation form can opt in.
@@ -5504,10 +5487,6 @@ bank_name: string;
  */
 currency: string; 
 /**
- * New update frequency.
- */
-update_frequency: UpdateFrequency; 
-/**
  * Whether the % management-fee mechanism is enabled (FEE-075).
  */
 management_fees_enabled: boolean; 
@@ -5615,30 +5594,6 @@ end_date: string | null;
  * Whether the schedule is active; `false` pauses generation (FEE-061).
  */
 active: boolean }
-/**
- * Defines how often an account's data should be updated.
- */
-export type UpdateFrequency = 
-/**
- * Automatic updates (e.g. via API)
- */
-"Automatic" | 
-/**
- * Manual update daily
- */
-"ManualDay" | 
-/**
- * Manual update weekly
- */
-"ManualWeek" | 
-/**
- * Manual update monthly
- */
-"ManualMonth" | 
-/**
- * Manual update yearly
- */
-"ManualYear"
 /**
  * Information about an available application update.
  */

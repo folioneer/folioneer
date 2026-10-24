@@ -1246,7 +1246,6 @@ mod tests {
                 "Portfolio".to_string(),
                 String::new(),
                 "USD".to_string(),
-                crate::context::account::UpdateFrequency::Automatic,
                 false,
             )])
         });
@@ -1339,7 +1338,6 @@ mod tests {
                 "Portfolio".to_string(),
                 String::new(),
                 "USD".to_string(),
-                crate::context::account::UpdateFrequency::Automatic,
                 false,
             )])
         });
@@ -1445,7 +1443,6 @@ mod tests {
                 "Portfolio".to_string(),
                 String::new(),
                 "USD".to_string(),
-                crate::context::account::UpdateFrequency::Automatic,
                 false,
             )])
         });

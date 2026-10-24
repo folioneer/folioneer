@@ -353,7 +353,6 @@ mod tests {
     use super::*;
     use crate::context::account::{
         SqliteAccountRepository, SqliteHoldingRepository, SqliteTransactionRepository,
-        UpdateFrequency,
     };
     use crate::context::asset::SYSTEM_CATEGORY_ID;
     use crate::context::asset::{
@@ -482,13 +481,7 @@ mod tests {
             Box::new(SqliteTransactionRepository::new(pool.clone())),
         );
         account_service
-            .create(
-                "Portfolio".into(),
-                String::new(),
-                "USD".into(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Portfolio".into(), String::new(), "USD".into(), false)
             .await
             .unwrap();
 
@@ -727,13 +720,7 @@ mod tests {
             .returning(|| Ok(Some(b"{\"data_format_version\":1}".to_vec())));
         let ctx = build_ctx_with_state_repo(&pool, Arc::new(state_repo), Arc::new(folder_store));
         ctx.account_service
-            .create(
-                "Mine".into(),
-                String::new(),
-                "EUR".into(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Mine".into(), String::new(), "EUR".into(), false)
             .await
             .unwrap();
 
@@ -1310,13 +1297,7 @@ mod tests {
         );
         let account = ctx
             .account_service
-            .create(
-                "Inconsistent".into(),
-                String::new(),
-                "EUR".into(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Inconsistent".into(), String::new(), "EUR".into(), false)
             .await
             .unwrap();
         ctx.asset_service.seed_cash_asset("EUR").await.unwrap();

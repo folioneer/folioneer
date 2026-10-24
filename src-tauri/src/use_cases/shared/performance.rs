@@ -3,9 +3,7 @@
 //! read. Composed by both the `account_performance` and `global_performance` use
 //! cases, so neither imports from the other (B18).
 
-use crate::context::account::{
-    AccountError, AccountServiceContract, Transaction, TransactionType, UpdateFrequency,
-};
+use crate::context::account::{AccountError, AccountServiceContract, Transaction, TransactionType};
 use crate::context::asset::{AssetClass, AssetServiceContract};
 use crate::context::currency::CurrencyService;
 use crate::use_cases::shared::valuation::{
@@ -92,12 +90,9 @@ pub struct AccountPerformanceResponse {
     pub account_name: String,
     /// ISO 4217 currency code every figure is reported in.
     pub currency: String,
-    /// True only for Automatic/ManualDay/ManualWeek (PRF-013).
-    pub month_view_available: bool,
     /// One row per year, most-recent first (PRF-041). month is None for each row.
     pub yearly: Vec<PerformancePeriod>,
-    /// One row per month over the full span, most-recent first.
-    /// Empty when month_view_available is false (PRF-013, PRF-015).
+    /// One row per month over the full span, most-recent first (PRF-013, PRF-015).
     pub monthly: Vec<PerformancePeriod>,
     /// Why the lifetime metrics cannot be computed, when a row's since-inception
     /// percentage is absent (PRF-087); None otherwise.
@@ -121,11 +116,6 @@ pub(crate) async fn account_performance_series(
         .ok_or_else(|| AccountError::AccountNotFound {
             account_id: account_id.to_string(),
         })?;
-
-    let month_view_available = matches!(
-        account.update_frequency,
-        UpdateFrequency::Automatic | UpdateFrequency::ManualDay | UpdateFrequency::ManualWeek
-    );
 
     let transactions = account_service
         .get_all_transactions_for_account(account_id)
@@ -152,7 +142,6 @@ pub(crate) async fn account_performance_series(
             return Ok(AccountPerformanceResponse {
                 account_name: account.name,
                 currency: account.currency,
-                month_view_available,
                 yearly: Vec::new(),
                 monthly: Vec::new(),
                 lifetime_unavailable: None,
@@ -170,7 +159,6 @@ pub(crate) async fn account_performance_series(
         &priced_assets,
         &account.currency,
         &transactions,
-        month_view_available,
         earliest_date,
         today,
     )
@@ -184,25 +172,20 @@ pub(crate) async fn account_performance_series(
         today,
         asset_id,
     );
-    let monthly = if month_view_available {
-        build_monthly(
-            &transactions,
-            &priced_assets,
-            &rate_map,
-            &account.currency,
-            earliest_date,
-            today,
-            asset_id,
-        )
-    } else {
-        Vec::new()
-    };
+    let monthly = build_monthly(
+        &transactions,
+        &priced_assets,
+        &rate_map,
+        &account.currency,
+        earliest_date,
+        today,
+        asset_id,
+    );
 
     let lifetime_unavailable = lifetime_unavailable(yearly.iter().chain(&monthly), &transactions);
     Ok(AccountPerformanceResponse {
         account_name: account.name,
         currency: account.currency,
-        month_view_available,
         yearly,
         monthly,
         lifetime_unavailable,

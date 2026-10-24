@@ -58,7 +58,6 @@ const makeResponse = (
 ): AccountPerformanceResponse => ({
   account_name: "My Portfolio",
   currency: "EUR",
-  month_view_available: false,
   lifetime_unavailable: null,
   yearly: [makeYearRow()],
   monthly: [],
@@ -199,7 +198,7 @@ describe("useAccountPerformance — asset scope", () => {
       capturedCallback = cb;
       return Promise.resolve(() => {});
     });
-    const month = (year: number) => ({ year, month: 1 }) as PerformancePeriod;
+    const month = (year: number) => makeYearRow({ year, month: 1 });
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
       data: makeResponse({ monthly: [month(2026), month(2021), month(2020)] }),
@@ -231,7 +230,7 @@ describe("useAccountPerformance — asset scope", () => {
   // most recent year, even when it carries the year chosen on the first, and whatever
   // order the months arrive in.
   it("opens another account on its own most recent year (PRF-015)", async () => {
-    const month = (year: number) => ({ year, month: 1 }) as PerformancePeriod;
+    const month = (year: number) => makeYearRow({ year, month: 1 });
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
       data: makeResponse({ monthly: [month(2021), month(2026), month(2020)] }),
@@ -330,6 +329,7 @@ describe("useAccountPerformance — asset scope", () => {
 
   // Stale-response guard — an older in-flight read never overwrites a newer one
   it("ignores a stale response that resolves after a newer fetch", async () => {
+    localStorage.setItem("perf_view_mode_account-1", "year");
     let resolveStale: (value: { status: "ok"; data: AccountPerformanceResponse }) => void =
       () => {};
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance)

@@ -24,11 +24,11 @@
  *     rendered table, not the exact computed figures.
  *
  * Seed strategy:
- *   - Populated path (PRF-010 / PRF-013 / PRF-037): account seeded via IPC with
- *     update_frequency="Automatic" so month_view_available is true; one deposit gives the
- *     backend a data span to compute. Navigation mirrors the buy_sell / cash test pattern.
- *   - Empty path (PRF-043 / PRF-051): account seeded via IPC with default ManualMonth
- *     frequency; no transactions → empty state.
+ *   - Populated path (PRF-010 / PRF-013 / PRF-037): account seeded via IPC; one deposit
+ *     gives the backend a data span to compute. Navigation mirrors the buy_sell / cash
+ *     test pattern.
+ *   - Empty path (PRF-043 / PRF-051): account seeded via IPC; no transactions → empty
+ *     state.
  *
  * Note on selectors:
  *   All elements selected here carry a stable `id`; the test selects exclusively by `#id`
@@ -65,16 +65,15 @@ describe("account_performance", () => {
   // -------------------------------------------------------------------------
   // PRF-010 / PRF-013 / PRF-037 — populated path
   //
-  // Critical-path IPC → UI handshake: account with Automatic frequency + one
-  // deposit → navigate to Performance page → table renders with at least one
+  // Critical-path IPC → UI handshake: an account with one deposit → navigate to Performance page → table renders with at least one
   // row; in month view the YTD column (PRF-037) is present; toggling to year
   // view makes the YTD column disappear.
   // -------------------------------------------------------------------------
   it("PRF-010/013/037: populated account shows performance table; YTD column present in month view and absent in year view", async () => {
     const ACCOUNT_NAME = "E2E PRF-010 Populated";
 
-    // Seed an account with Automatic frequency (month view available, PRF-013).
-    const accountId = await seedAccount(ACCOUNT_NAME, "EUR", "Automatic");
+    // Seed an account: every account offers the month view (PRF-013).
+    const accountId = await seedAccount(ACCOUNT_NAME, "EUR");
 
     // Seed one deposit so the backend has a data span to compute (PRF-040).
     await seedDeposit(accountId, FIXTURE_DATES.deposit, 1_000_000_000); // 1 000 EUR
@@ -102,7 +101,7 @@ describe("account_performance", () => {
     await firstRow.waitForExist({ timeout: 8000 });
     assert.ok(await firstRow.isExisting(), "At least one period row must render (PRF-040)");
 
-    // PRF-013: account has Automatic frequency → month view is the default (PRF-014).
+    // PRF-013: the month view is the default (PRF-014).
     // The view-mode toggle fieldset must be present.
     const viewToggle = await $("#account-performance-view-toggle");
     await viewToggle.waitForExist({ timeout: 8000 });
@@ -167,7 +166,6 @@ describe("account_performance", () => {
   it("PRF-043/051: account with no transactions shows empty state", async () => {
     const ACCOUNT_NAME = "E2E PRF-043 Empty";
 
-    // Default ManualMonth frequency is fine here — we only need the empty state.
     const accountId = await seedAccount(ACCOUNT_NAME);
 
     await navigateToAccounts();

@@ -237,8 +237,8 @@ mod tests {
 
     async fn seed_account_and_asset(pool: &Pool<Sqlite>) {
         sqlx::query!(
-            "INSERT INTO accounts (id, name, bank_name, currency, update_frequency, management_fees_enabled)
-             VALUES ('acc-1', 'Test Account', '', 'EUR', 'ManualMonth', 1)"
+            "INSERT INTO accounts (id, name, bank_name, currency, management_fees_enabled)
+             VALUES ('acc-1', 'Test Account', '', 'EUR', 1)"
         )
         .execute(pool)
         .await

@@ -8,7 +8,6 @@
         "outdated_price_count": 0,
         "total_global_value": 24136700000,
         "total_unrealized_pnl": 3774200040,
-        "update_frequency": "Automatic",
         "wrapper": null
       },
       {
@@ -18,7 +17,6 @@
         "outdated_price_count": 0,
         "total_global_value": 7898737960,
         "total_unrealized_pnl": -45838882,
-        "update_frequency": "ManualMonth",
         "wrapper": null
       }
     ],
@@ -288,8 +286,557 @@
     "account_name": "",
     "currency": "EUR",
     "lifetime_unavailable": null,
-    "month_view_available": false,
-    "monthly": [],
+    "monthly": [
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 31482526302,
+        "month": 12,
+        "period_over_period": {
+          "gain": 103264904,
+          "pct": 329086
+        },
+        "pnl": 103264904,
+        "previous_value": 31379261398,
+        "since_inception": {
+          "gain": 4282526302,
+          "pct": 16089268
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": 2400957861,
+          "pct": 8255943
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 31379261398,
+        "month": 11,
+        "period_over_period": {
+          "gain": 103264905,
+          "pct": 330173
+        },
+        "pnl": 103264905,
+        "previous_value": 31275996493,
+        "since_inception": {
+          "gain": 4179261398,
+          "pct": 15716587
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": 2297692957,
+          "pct": 7900856
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 31275996493,
+        "month": 10,
+        "period_over_period": {
+          "gain": 151264905,
+          "pct": 485995
+        },
+        "pnl": 151264905,
+        "previous_value": 31124731588,
+        "since_inception": {
+          "gain": 4075996493,
+          "pct": 15344019
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": 2194428052,
+          "pct": 7545769
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 31124731588,
+        "month": 9,
+        "period_over_period": {
+          "gain": 55264904,
+          "pct": 177875
+        },
+        "pnl": 55264904,
+        "previous_value": 31069466684,
+        "since_inception": {
+          "gain": 3924731588,
+          "pct": 14791818
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": 2043163147,
+          "pct": 7025629
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 31069466684,
+        "month": 8,
+        "period_over_period": {
+          "gain": -185560095,
+          "pct": -593696
+        },
+        "pnl": -185560095,
+        "previous_value": 31255026779,
+        "since_inception": {
+          "gain": 3869466684,
+          "pct": 14601670
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": 1987898243,
+          "pct": 6835595
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 31255026779,
+        "month": 7,
+        "period_over_period": {
+          "gain": -87226480,
+          "pct": -278303
+        },
+        "pnl": -87226480,
+        "previous_value": 31342253259,
+        "since_inception": {
+          "gain": 4055026779,
+          "pct": 15323672
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": 2173458338,
+          "pct": 7473662
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 31342253259,
+        "month": 6,
+        "period_over_period": {
+          "gain": 44166301,
+          "pct": 141115
+        },
+        "pnl": 44166301,
+        "previous_value": 31298086958,
+        "since_inception": {
+          "gain": 4142253259,
+          "pct": 15678148
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": 2260684818,
+          "pct": 7773600
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 31298086958,
+        "month": 5,
+        "period_over_period": {
+          "gain": 101316300,
+          "pct": 324765
+        },
+        "pnl": 101316300,
+        "previous_value": 31196770658,
+        "since_inception": {
+          "gain": 4098086958,
+          "pct": 15537684
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": 2216518517,
+          "pct": 7621729
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 31196770658,
+        "month": 4,
+        "period_over_period": {
+          "gain": 101316301,
+          "pct": 325823
+        },
+        "pnl": 101316301,
+        "previous_value": 31095454357,
+        "since_inception": {
+          "gain": 3996770658,
+          "pct": 15183963
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": 2115202217,
+          "pct": 7273342
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 31095454357,
+        "month": 3,
+        "period_over_period": {
+          "gain": -103683700,
+          "pct": -332328
+        },
+        "pnl": -103683700,
+        "previous_value": 31199138057,
+        "since_inception": {
+          "gain": 3895454357,
+          "pct": 14831736
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": 2013885916,
+          "pct": 6924956
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 31199138057,
+        "month": 2,
+        "period_over_period": {
+          "gain": 1740316301,
+          "pct": 5907623
+        },
+        "pnl": 1740316301,
+        "previous_value": 29458821756,
+        "since_inception": {
+          "gain": 3999138057,
+          "pct": 15266365
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": 2117569616,
+          "pct": 7281483
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 29458821756,
+        "month": 1,
+        "period_over_period": {
+          "gain": 377253315,
+          "pct": 1297224
+        },
+        "pnl": 377253315,
+        "previous_value": 29081568441,
+        "since_inception": {
+          "gain": 2258821756,
+          "pct": 8646354
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": 377253315,
+          "pct": 1297224
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 29081568441,
+        "month": 12,
+        "period_over_period": {
+          "gain": 90121359,
+          "pct": 310854
+        },
+        "pnl": 90121359,
+        "previous_value": 28991447082,
+        "since_inception": {
+          "gain": 1881568441,
+          "pct": 7227637
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 1881568441,
+          "pct": 7247493
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 28991447082,
+        "month": 11,
+        "period_over_period": {
+          "gain": 90100402,
+          "pct": 311751
+        },
+        "pnl": 90100402,
+        "previous_value": 28901346680,
+        "since_inception": {
+          "gain": 1791447082,
+          "pct": 6910294
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 1791447082,
+          "pct": 6931045
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 28901346680,
+        "month": 10,
+        "period_over_period": {
+          "gain": -29920583,
+          "pct": -103419
+        },
+        "pnl": -29920583,
+        "previous_value": 28931267263,
+        "since_inception": {
+          "gain": 1701346680,
+          "pct": 6594873
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 1701346680,
+          "pct": 6616638
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 560000000,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 28931267263,
+        "month": 9,
+        "period_over_period": {
+          "gain": 650058404,
+          "pct": 2298552
+        },
+        "pnl": 90058404,
+        "previous_value": 28281208859,
+        "since_inception": {
+          "gain": 1731267263,
+          "pct": 6752677
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 1731267263,
+          "pct": 6777503
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 28281208859,
+        "month": 8,
+        "period_over_period": {
+          "gain": 106537364,
+          "pct": 378131
+        },
+        "pnl": 106537364,
+        "previous_value": 28174671495,
+        "since_inception": {
+          "gain": 1081208859,
+          "pct": 4249261
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 1081208859,
+          "pct": 4266820
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 28174671495,
+        "month": 7,
+        "period_over_period": {
+          "gain": 250617495,
+          "pct": 897496
+        },
+        "pnl": 250617495,
+        "previous_value": 27924054000,
+        "since_inception": {
+          "gain": 974671495,
+          "pct": 3869781
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 974671495,
+          "pct": 3888122
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 75500000,
+        "end_value": 27924054000,
+        "month": 6,
+        "period_over_period": {
+          "gain": 158354000,
+          "pct": 570322
+        },
+        "pnl": 82854000,
+        "previous_value": 27765700000,
+        "since_inception": {
+          "gain": 724054000,
+          "pct": 2914871
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 724054000,
+          "pct": 2931064
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 27765700000,
+        "month": 5,
+        "period_over_period": {
+          "gain": -34500000,
+          "pct": -124099
+        },
+        "pnl": -34500000,
+        "previous_value": 27800200000,
+        "since_inception": {
+          "gain": 565700000,
+          "pct": 2321487
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 565700000,
+          "pct": 2336963
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 27800200000,
+        "month": 4,
+        "period_over_period": {
+          "gain": 161000000,
+          "pct": 582506
+        },
+        "pnl": 161000000,
+        "previous_value": 27639200000,
+        "since_inception": {
+          "gain": 600200000,
+          "pct": 2539964
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 600200000,
+          "pct": 2561308
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 7200000000,
+        "dividends": 0,
+        "end_value": 27639200000,
+        "month": 3,
+        "period_over_period": {
+          "gain": 250200000,
+          "pct": 913505
+        },
+        "pnl": 250200000,
+        "previous_value": 20189000000,
+        "since_inception": {
+          "gain": 439200000,
+          "pct": 1958356
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 439200000,
+          "pct": 1980360
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 20189000000,
+        "month": 2,
+        "period_over_period": {
+          "gain": 119000000,
+          "pct": 592924
+        },
+        "pnl": 119000000,
+        "previous_value": 20070000000,
+        "since_inception": {
+          "gain": 189000000,
+          "pct": 945000
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 189000000,
+          "pct": 961293
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 20000000000,
+        "dividends": 0,
+        "end_value": 20070000000,
+        "month": 1,
+        "period_over_period": null,
+        "pnl": 70000000,
+        "previous_value": 0,
+        "since_inception": {
+          "gain": 70000000,
+          "pct": 350000
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 70000000,
+          "pct": 362068
+        }
+      }
+    ],
     "yearly": [
       {
         "annualized_yield": {
@@ -340,8 +887,511 @@
     "account_name": "Growth USD",
     "currency": "USD",
     "lifetime_unavailable": null,
-    "month_view_available": false,
-    "monthly": [],
+    "monthly": [
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 7898737960,
+        "month": 12,
+        "period_over_period": {
+          "gain": -7430210,
+          "pct": -93979
+        },
+        "pnl": -7430210,
+        "previous_value": 7906168170,
+        "since_inception": {
+          "gain": -101262040,
+          "pct": -1265775
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": -159162520,
+          "pct": -1975235
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 7906168170,
+        "month": 11,
+        "period_over_period": {
+          "gain": -7430210,
+          "pct": -93891
+        },
+        "pnl": -7430210,
+        "previous_value": 7913598380,
+        "since_inception": {
+          "gain": -93831830,
+          "pct": -1172897
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": -151732310,
+          "pct": -1883025
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 7913598380,
+        "month": 10,
+        "period_over_period": {
+          "gain": -7430210,
+          "pct": -93803
+        },
+        "pnl": -7430210,
+        "previous_value": 7921028590,
+        "since_inception": {
+          "gain": -86401620,
+          "pct": -1080020
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": -144302100,
+          "pct": -1790815
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 7921028590,
+        "month": 9,
+        "period_over_period": {
+          "gain": -7430210,
+          "pct": -93715
+        },
+        "pnl": -7430210,
+        "previous_value": 7928458800,
+        "since_inception": {
+          "gain": -78971410,
+          "pct": -987142
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": -136871890,
+          "pct": -1698604
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 7928458800,
+        "month": 8,
+        "period_over_period": {
+          "gain": -59930210,
+          "pct": -750216
+        },
+        "pnl": -59930210,
+        "previous_value": 7988389010,
+        "since_inception": {
+          "gain": -71541200,
+          "pct": -894265
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": -129441680,
+          "pct": -1606394
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 7988389010,
+        "month": 7,
+        "period_over_period": {
+          "gain": -9930210,
+          "pct": -124153
+        },
+        "pnl": -9930210,
+        "previous_value": 7998319220,
+        "since_inception": {
+          "gain": -11610990,
+          "pct": -145137
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": -69511470,
+          "pct": -862649
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 7998319220,
+        "month": 6,
+        "period_over_period": {
+          "gain": -9930210,
+          "pct": -123999
+        },
+        "pnl": -9930210,
+        "previous_value": 8008249430,
+        "since_inception": {
+          "gain": -1680780,
+          "pct": -21009
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": -59581260,
+          "pct": -739414
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8008249430,
+        "month": 5,
+        "period_over_period": {
+          "gain": -9930210,
+          "pct": -123846
+        },
+        "pnl": -9930210,
+        "previous_value": 8018179640,
+        "since_inception": {
+          "gain": 8249430,
+          "pct": 103117
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": -49651050,
+          "pct": -616178
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8018179640,
+        "month": 4,
+        "period_over_period": {
+          "gain": -9930210,
+          "pct": -123693
+        },
+        "pnl": -9930210,
+        "previous_value": 8028109850,
+        "since_inception": {
+          "gain": 18179640,
+          "pct": 227245
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": -39720840,
+          "pct": -492942
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8028109850,
+        "month": 3,
+        "period_over_period": {
+          "gain": -9930210,
+          "pct": -123540
+        },
+        "pnl": -9930210,
+        "previous_value": 8038040060,
+        "since_inception": {
+          "gain": 28109850,
+          "pct": 351373
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": -29790630,
+          "pct": -369707
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8038040060,
+        "month": 2,
+        "period_over_period": {
+          "gain": -9930210,
+          "pct": -123387
+        },
+        "pnl": -9930210,
+        "previous_value": 8047970270,
+        "since_inception": {
+          "gain": 38040060,
+          "pct": 475500
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": -19860420,
+          "pct": -246471
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8047970270,
+        "month": 1,
+        "period_over_period": {
+          "gain": -9930210,
+          "pct": -123235
+        },
+        "pnl": -9930210,
+        "previous_value": 8057900480,
+        "since_inception": {
+          "gain": 47970270,
+          "pct": 599628
+        },
+        "year": 2025,
+        "year_to_date": {
+          "gain": -9930210,
+          "pct": -123235
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8057900480,
+        "month": 12,
+        "period_over_period": {
+          "gain": -12802870,
+          "pct": -158633
+        },
+        "pnl": -12802870,
+        "previous_value": 8070703350,
+        "since_inception": {
+          "gain": 57900480,
+          "pct": 723756
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 57900480,
+          "pct": 866134
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8070703350,
+        "month": 11,
+        "period_over_period": {
+          "gain": -12825650,
+          "pct": -158663
+        },
+        "pnl": -12825650,
+        "previous_value": 8083529000,
+        "since_inception": {
+          "gain": 70703350,
+          "pct": 883791
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 70703350,
+          "pct": 1077322
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8083529000,
+        "month": 10,
+        "period_over_period": {
+          "gain": -12848460,
+          "pct": -158693
+        },
+        "pnl": -12848460,
+        "previous_value": 8096377460,
+        "since_inception": {
+          "gain": 83529000,
+          "pct": 1044112
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 83529000,
+          "pct": 1300861
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8096377460,
+        "month": 9,
+        "period_over_period": {
+          "gain": -12871300,
+          "pct": -158723
+        },
+        "pnl": -12871300,
+        "previous_value": 8109248760,
+        "since_inception": {
+          "gain": 96377460,
+          "pct": 1204718
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 96377460,
+          "pct": 1544075
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8109248760,
+        "month": 8,
+        "period_over_period": {
+          "gain": -12894170,
+          "pct": -158753
+        },
+        "pnl": -12894170,
+        "previous_value": 8122142930,
+        "since_inception": {
+          "gain": 109248760,
+          "pct": 1365609
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 109248760,
+          "pct": 1813350
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8122142930,
+        "month": 7,
+        "period_over_period": {
+          "gain": -12917070,
+          "pct": -158782
+        },
+        "pnl": -12917070,
+        "previous_value": 8135060000,
+        "since_inception": {
+          "gain": 122142930,
+          "pct": 1526786
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 122142930,
+          "pct": 2129465
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8135060000,
+        "month": 6,
+        "period_over_period": {
+          "gain": -12940000,
+          "pct": -158811
+        },
+        "pnl": -12940000,
+        "previous_value": 8148000000,
+        "since_inception": {
+          "gain": 135060000,
+          "pct": 1688250
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 135060000,
+          "pct": 2525398
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8148000000,
+        "month": 5,
+        "period_over_period": {
+          "gain": -10000000,
+          "pct": -122579
+        },
+        "pnl": -10000000,
+        "previous_value": 8158000000,
+        "since_inception": {
+          "gain": 148000000,
+          "pct": 1850000
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 148000000,
+          "pct": 3069780
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 0,
+        "dividends": 0,
+        "end_value": 8158000000,
+        "month": 4,
+        "period_over_period": {
+          "gain": -10000000,
+          "pct": -122428
+        },
+        "pnl": -10000000,
+        "previous_value": 8168000000,
+        "since_inception": {
+          "gain": 158000000,
+          "pct": 1975000
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 158000000,
+          "pct": 3950000
+        }
+      },
+      {
+        "annualized_yield": null,
+        "asset_flow": 0,
+        "cash_flow": 8000000000,
+        "dividends": 0,
+        "end_value": 8168000000,
+        "month": 3,
+        "period_over_period": null,
+        "pnl": 168000000,
+        "previous_value": 0,
+        "since_inception": {
+          "gain": 168000000,
+          "pct": 2100000
+        },
+        "year": 2024,
+        "year_to_date": {
+          "gain": 168000000,
+          "pct": 6300000
+        }
+      }
+    ],
     "yearly": [
       {
         "annualized_yield": {
@@ -392,7 +1442,6 @@
     "account_name": "Main EUR",
     "currency": "EUR",
     "lifetime_unavailable": null,
-    "month_view_available": true,
     "monthly": [
       {
         "annualized_yield": null,

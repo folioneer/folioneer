@@ -214,7 +214,6 @@ struct Account {
     name: String,                        // user-defined display name (normalised; unique among names set on this device — after a multi-device merge two accounts may share a name until the user renames one, CFR-035)
     bank_name: String,                   // bank brand name, free text; empty when unset (ACC-026)
     currency: String,                    // ISO 4217 currency code (TRX-021)
-    update_frequency: UpdateFrequency,   // how often the user plans to update data
     management_fees_enabled: bool,       // whether one-off fees and fee schedules are available on this account (FEE-075); a new account starts disabled
     country: Option<String>,             // the account's own country (ISO 3166-1 alpha-2) when one is set, kept even if it equals the portfolio's (ACC-041, ACC-045)
     wrapper: Option<String>,             // identifier of its tax wrapper (ACC-040/043); none when unset
@@ -224,7 +223,6 @@ struct CreateAccountDTO {
     name: String,
     bank_name: String,                   // empty when unset (ACC-026)
     currency: String,
-    update_frequency: UpdateFrequency,
     management_fees_enabled: bool,       // FEE-075
     country: Option<String>,             // ACC-041
     wrapper: Option<String>,             // ACC-043
@@ -235,7 +233,6 @@ struct UpdateAccountDTO {
     name: String,
     bank_name: String,
     currency: String,
-    update_frequency: UpdateFrequency,
     management_fees_enabled: bool,
     country: Option<String>,             // ACC-041 — the window sends the account's current value until it edits it
     wrapper: Option<String>,             // ACC-043
@@ -261,14 +258,6 @@ struct Wrapper {
     label_en: String,
     label_fr: String,
     label_de: String,
-}
-
-enum UpdateFrequency {
-    Automatic,
-    ManualDay,
-    ManualWeek,
-    ManualMonth,
-    ManualYear,
 }
 
 struct AccountDeletionSummary {
@@ -542,7 +531,6 @@ struct AccountSummary {
     id: String,
     name: String,
     currency: String,                          // ISO 4217 currency code; same as Account.currency
-    update_frequency: UpdateFrequency,
     wrapper: Option<String>,                   // identifier of the account's tax wrapper, for the list's column and grouping (ACC-046, ACC-047)
     total_global_value: i64,                   // micros, account currency: same algorithm as AccountDetailsResponse.total_global_value (CSH-094)
     total_unrealized_pnl: Option<i64>,         // micros, account currency: account-wide unrealized P&L, same algorithm as AccountDetailsResponse.total_unrealized_pnl (MKT-040 / ACC-023); None when no holding qualifies
@@ -594,9 +582,8 @@ struct PerformancePeriod {
 struct AccountPerformanceResponse {
     account_name: String,
     currency: String,                   // account's own ISO 4217 currency
-    month_view_available: bool,         // true only for Automatic/ManualDay/ManualWeek (PRF-013)
     yearly: Vec<PerformancePeriod>,     // one per year, most-recent first (PRF-041); month is None
-    monthly: Vec<PerformancePeriod>,    // one per month over the full span, most-recent first; empty when month_view_available is false (PRF-013, PRF-015)
+    monthly: Vec<PerformancePeriod>,    // one per month over the full span, most-recent first (PRF-013, PRF-015)
     lifetime_unavailable: Option<LifetimeUnavailable>, // why a since-inception percentage is absent; None when all are present (PRF-087)
 }
 
@@ -804,6 +791,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-10-24 — #405 (ACC-004, PRF-013, GPF-014): `Account`, `CreateAccountDTO`, `UpdateAccountDTO` and `AccountSummary` lose `update_frequency`, and the `UpdateFrequency` type goes; `AccountPerformanceResponse` loses `month_view_available`, its `monthly` series always filled.
 - 2026-10-24 — #599 (WOF-033): `correct_transaction` gains `WriteOffWithoutReason` — a stored write-off without a reason is refused, never given `Other`.
 - 2026-10-24 — #607 (SEL-012, SEL-021, SEL-030, SEL-032, TRX-062, WOF-030): a sale or a write-off is refused against what was held on its date — for a correction, what was held just before it, itself left out — with `ClosedPosition` or `Oversell { available, requested }`, `available` the quantity held then; `CascadingOversell` only for a later transaction left short. `sell_holding` reads the sale's date instead of today's holding; `validate_transaction_draft` records a new sale in memory, so it returns what `sell_holding` would. No type changed.
 - 2026-10-19 — #551 (WOF-056): `record_write_off` (`WriteOffDTO`, `WriteOffError`) and `correct_write_off` (`CorrectWriteOffDTO`), over the agent connection's use case.

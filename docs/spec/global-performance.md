@@ -25,15 +25,15 @@ This is a **feature spec** spanning the `account`, `asset`, and `currency` bound
 
 **GPF-011 — Reference currency and label (backend + frontend)**: Every cross-account aggregation is reported in the portfolio's **reference currency**: a setting of the portfolio, the same on every device (SYN-021), resolved as FXR-120 to FXR-125 say — EUR when none was chosen. The response reuses the `get_account_performance` shape with `currency` set to it and an empty `account_name`; the backend carries no display label (no i18n in the backend) — the frontend resolves the aggregation's label (e.g. "All accounts").
 
-**GPF-012 — Included accounts (backend)**: An account participates in an aggregation only when it has at least one dated in-scope transaction — any transaction for the all-accounts read, a transaction of the scoped asset for the asset-scoped read. Accounts with no in-scope transactions are excluded from the aggregation and from the month-view eligibility (GPF-014).
+**GPF-012 — Included accounts (backend)**: An account participates in an aggregation only when it has at least one dated in-scope transaction — any transaction for the all-accounts read, a transaction of the scoped asset for the asset-scoped read. Accounts with no in-scope transactions are excluded from the aggregation.
 
 **GPF-013 — Data span (backend)**: Rows span from the period containing the earliest in-scope transaction across the included accounts through the current period (PRF-040 applied to the union). An account whose own history starts later contributes `0` end values before its first transaction.
 
-**GPF-014 — Month view eligibility (backend)**: The yearly series is always computed. The monthly series is computed only when **every** included account satisfies the per-account month-view eligibility (PRF-013: `Automatic`, `ManualDay`, or `ManualWeek`); one ineligible included account disables the month view for the whole aggregation.
+**GPF-014 — Both series (backend)**: The yearly and the monthly series are always computed, over every included account (PRF-012, PRF-013).
 
-**GPF-015 — Empty portfolio (backend)**: When no account is included (no accounts, no in-scope transactions, or an asset scope no account holds), the read succeeds with the PRF-043-shaped empty result: empty yearly and monthly series, `currency` the reference currency (GPF-011), empty `account_name`, `month_view_available = false`.
+**GPF-015 — Empty portfolio (backend)**: When no account is included (no accounts, no in-scope transactions, or an asset scope no account holds), the read succeeds with the PRF-043-shaped empty result: empty yearly and monthly series, `currency` the reference currency (GPF-011), empty `account_name`.
 
-**GPF-016 — Remembered view granularity (frontend)**: The global view's month/year selection persists on the device (the global twin of PRF-014): the last choice is restored on the next visit, clamped to the year view when the month view is unavailable (GPF-014), and defaults to the month view when available and nothing is stored.
+**GPF-016 — Remembered view granularity (frontend)**: The global view's month/year selection persists on the device (the global twin of PRF-014): the last choice is restored on the next visit, and the month view is the default when nothing is stored.
 
 ### Aggregated Values and Metrics (020–039)
 
@@ -61,7 +61,7 @@ get_global_performance(account_id?, asset_id?)
           └─ account_id absent:
                 ├─ [load all accounts; keep those with in-scope transactions (GPF-012)]
                 ├─ [derive the global span from the earliest in-scope transaction (GPF-013)]
-                ├─ [month view = AND of per-account eligibility (GPF-014); none included → empty (GPF-015)]
+                ├─ [both series (GPF-014); none included → empty (GPF-015)]
                 ├─ Per included account:
                 │     ├─ load transactions (scoped when asset_id present) + priced assets
                 │     ├─ resolve asset-currency → account-currency rates at valued dates (FXR-035/042)

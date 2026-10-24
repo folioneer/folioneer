@@ -53,7 +53,7 @@ mod tests {
     use super::*;
     use crate::context::account::{
         AccountService, SqliteAccountRepository, SqliteHoldingRepository,
-        SqliteTransactionRepository, UpdateFrequency,
+        SqliteTransactionRepository,
     };
     use crate::context::asset::{
         AssetService, CreateAssetDTO, SqliteAssetCategoryRepository, SqliteAssetPriceRepository,
@@ -119,13 +119,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Empty".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Empty".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = AccountPerformanceUseCase::new(
@@ -138,152 +132,16 @@ mod tests {
         assert!(resp.monthly.is_empty(), "no transactions → empty monthly");
     }
 
-    // PRF-013 — month_view_available is true for Automatic
+    // PRF-013 — every account with transactions has its monthly series.
     #[tokio::test]
-    async fn month_view_available_for_automatic_frequency() {
+    async fn every_account_has_its_monthly_series() {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
             .create(
-                "Auto".to_string(),
+                "Account".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
-            .await
-            .unwrap();
-        let uc = AccountPerformanceUseCase::new(
-            account_svc,
-            asset_svc,
-            make_currency_service_with_no_rate(),
-        );
-        let resp = uc.get_account_performance(&account.id, None).await.unwrap();
-        assert!(
-            resp.month_view_available,
-            "Automatic → month_view_available must be true"
-        );
-    }
-
-    // PRF-013 — month_view_available is true for ManualDay
-    #[tokio::test]
-    async fn month_view_available_for_manual_day_frequency() {
-        let pool = make_pool().await;
-        let (account_svc, asset_svc) = setup(&pool).await;
-        let account = account_svc
-            .create(
-                "Day".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualDay,
-                false,
-            )
-            .await
-            .unwrap();
-        let uc = AccountPerformanceUseCase::new(
-            account_svc,
-            asset_svc,
-            make_currency_service_with_no_rate(),
-        );
-        let resp = uc.get_account_performance(&account.id, None).await.unwrap();
-        assert!(
-            resp.month_view_available,
-            "ManualDay → month_view_available must be true"
-        );
-    }
-
-    // PRF-013 — month_view_available is true for ManualWeek
-    #[tokio::test]
-    async fn month_view_available_for_manual_week_frequency() {
-        let pool = make_pool().await;
-        let (account_svc, asset_svc) = setup(&pool).await;
-        let account = account_svc
-            .create(
-                "Week".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualWeek,
-                false,
-            )
-            .await
-            .unwrap();
-        let uc = AccountPerformanceUseCase::new(
-            account_svc,
-            asset_svc,
-            make_currency_service_with_no_rate(),
-        );
-        let resp = uc.get_account_performance(&account.id, None).await.unwrap();
-        assert!(
-            resp.month_view_available,
-            "ManualWeek → month_view_available must be true"
-        );
-    }
-
-    // PRF-013 — month_view_available is false for ManualMonth
-    #[tokio::test]
-    async fn month_view_not_available_for_manual_month_frequency() {
-        let pool = make_pool().await;
-        let (account_svc, asset_svc) = setup(&pool).await;
-        let account = account_svc
-            .create(
-                "Month".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
-            .await
-            .unwrap();
-        let uc = AccountPerformanceUseCase::new(
-            account_svc,
-            asset_svc,
-            make_currency_service_with_no_rate(),
-        );
-        let resp = uc.get_account_performance(&account.id, None).await.unwrap();
-        assert!(
-            !resp.month_view_available,
-            "ManualMonth → month_view_available must be false"
-        );
-    }
-
-    // PRF-013 — month_view_available is false for ManualYear
-    #[tokio::test]
-    async fn month_view_not_available_for_manual_year_frequency() {
-        let pool = make_pool().await;
-        let (account_svc, asset_svc) = setup(&pool).await;
-        let account = account_svc
-            .create(
-                "Year".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualYear,
-                false,
-            )
-            .await
-            .unwrap();
-        let uc = AccountPerformanceUseCase::new(
-            account_svc,
-            asset_svc,
-            make_currency_service_with_no_rate(),
-        );
-        let resp = uc.get_account_performance(&account.id, None).await.unwrap();
-        assert!(
-            !resp.month_view_available,
-            "ManualYear → month_view_available must be false"
-        );
-    }
-
-    // PRF-013 — monthly vec is empty when month_view_available is false
-    #[tokio::test]
-    async fn monthly_vec_empty_when_month_view_unavailable() {
-        let pool = make_pool().await;
-        let (account_svc, asset_svc) = setup(&pool).await;
-        let account = account_svc
-            .create(
-                "ManualMonth Account".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -299,9 +157,9 @@ mod tests {
             make_currency_service_with_no_rate(),
         );
         let resp = uc.get_account_performance(&account.id, None).await.unwrap();
-        assert!(
-            resp.monthly.is_empty(),
-            "ManualMonth → monthly must be empty even with transactions"
+        assert_eq!(
+            resp.monthly.last().map(|row| (row.year, row.month)),
+            Some((2024, Some(1)))
         );
     }
 
@@ -315,7 +173,6 @@ mod tests {
                 "Deposit Test".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -354,7 +211,6 @@ mod tests {
                 "Span Test".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -398,7 +254,6 @@ mod tests {
                 "Order Test".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -437,7 +292,6 @@ mod tests {
                 "Monthly Order".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -486,7 +340,6 @@ mod tests {
                 "YTD Test".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await
@@ -522,7 +375,6 @@ mod tests {
                 "Gain Zero".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -566,13 +418,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Dietz".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
+            .create("Dietz".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -670,7 +516,6 @@ mod tests {
                 "DenomZero".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -715,7 +560,6 @@ mod tests {
                 "First Period".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -749,7 +593,6 @@ mod tests {
                 "Two Years".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -791,7 +634,6 @@ mod tests {
                 "YTD January".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -831,7 +673,6 @@ mod tests {
                 "Inception".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -871,7 +712,6 @@ mod tests {
                 "Snapshot".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -981,7 +821,6 @@ mod tests {
                 "Per Period Cash".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -1023,13 +862,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Open".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
+            .create("Open".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -1096,7 +929,6 @@ mod tests {
                 "Transferred".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await
@@ -1183,13 +1015,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Split".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualYear,
-                false,
-            )
+            .create("Split".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -1291,7 +1117,6 @@ mod tests {
                 "Transferred".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await
@@ -1372,7 +1197,6 @@ mod tests {
                 "Unpriced Transfer".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await
@@ -1436,13 +1260,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Free".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
+            .create("Free".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -1538,7 +1356,6 @@ mod tests {
                 "Unpriced".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -1607,7 +1424,6 @@ mod tests {
                 "FX Test".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -1683,7 +1499,6 @@ mod tests {
                 "Flow Test".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -1771,7 +1586,6 @@ mod tests {
                 "Dividend Flow".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -1860,7 +1674,6 @@ mod tests {
                 "Free Shares Flow".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -1954,7 +1767,6 @@ mod tests {
                 "Opening Balance Test".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -2021,7 +1833,6 @@ mod tests {
                 "Carry Forward".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -2099,7 +1910,6 @@ mod tests {
                 "Gap Period".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -2178,7 +1988,6 @@ mod tests {
                 "Replay Test".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -2213,7 +2022,7 @@ mod tests {
 
     // PRF-012 — year view is always built (yearly vec non-empty when there are transactions)
     #[tokio::test]
-    async fn yearly_vec_always_built_regardless_of_frequency() {
+    async fn yearly_vec_always_built() {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
@@ -2221,7 +2030,6 @@ mod tests {
                 "Year Always".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await
@@ -2253,7 +2061,6 @@ mod tests {
                 "Month Field".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -2292,7 +2099,6 @@ mod tests {
                 "My Portfolio".to_string(),
                 String::new(),
                 "CHF".to_string(),
-                UpdateFrequency::ManualWeek,
                 false,
             )
             .await
@@ -2381,7 +2187,6 @@ mod tests {
                 "FX Perf".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await
@@ -2467,7 +2272,6 @@ mod tests {
                 "No FX Rate Perf".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await
@@ -2550,13 +2354,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "CAGR".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualYear,
-                false,
-            )
+            .create("CAGR".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -2745,7 +2543,6 @@ mod tests {
                 "Denom Zero Year".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await
@@ -2793,7 +2590,6 @@ mod tests {
                 "Total Loss".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await
@@ -2880,7 +2676,6 @@ mod tests {
                 "Two Assets".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await
@@ -2962,7 +2757,6 @@ mod tests {
                 "Closed Position".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -3082,7 +2876,6 @@ mod tests {
                 "Reopened Position".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await
@@ -3292,7 +3085,6 @@ mod tests {
                 "Scoped Dividends".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )
             .await
@@ -3438,7 +3230,6 @@ mod tests {
                 "Scoped Free Shares".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await
@@ -3541,7 +3332,6 @@ mod tests {
                 "Disposed Credit".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await
@@ -3704,7 +3494,6 @@ mod tests {
                 "Cash Scope".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualYear,
                 false,
             )
             .await

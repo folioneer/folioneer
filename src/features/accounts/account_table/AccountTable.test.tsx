@@ -82,7 +82,6 @@ const makeSummary = (overrides: Partial<AccountSummary> = {}): AccountSummary =>
   id: "acc-1",
   name: "Main EUR",
   currency: "EUR",
-  update_frequency: "ManualMonth",
   wrapper: null,
   total_global_value: 100_000_000,
   total_unrealized_pnl: null,
@@ -173,7 +172,6 @@ describe("AccountTable — Bank column (ACC-026)", () => {
     name: "Main EUR",
     bank_name,
     currency: "EUR",
-    update_frequency: "ManualMonth",
     wrapper: null,
     management_fees_enabled: false,
   });

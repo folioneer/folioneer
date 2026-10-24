@@ -238,8 +238,8 @@ mod tests {
     /// Seeds an account and an asset so the FK on fee_catch_up_positions is satisfied.
     async fn seed_account_and_asset(pool: &Pool<Sqlite>, account_id: &str, asset_id: &str) {
         sqlx::query!(
-            "INSERT INTO accounts (id, name, bank_name, currency, update_frequency, management_fees_enabled)
-             VALUES (?, 'Test Account', '', 'EUR', 'ManualMonth', 1)",
+            "INSERT INTO accounts (id, name, bank_name, currency, management_fees_enabled)
+             VALUES (?, 'Test Account', '', 'EUR', 1)",
             account_id,
         )
         .execute(pool)

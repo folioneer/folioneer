@@ -21,7 +21,7 @@ export function EditAccountModal({ isOpen, onClose, account }: EditAccountModalP
     logger.info("[EditAccountModal] mounted");
   }, []);
 
-  const { formData, error, isSubmitting, handleChange, setCountry, handleSubmit, frequencies } =
+  const { formData, error, isSubmitting, handleChange, setCountry, handleSubmit } =
     useEditAccountModal({ account, onClose });
 
   const actions = (
@@ -55,7 +55,6 @@ export function EditAccountModal({ isOpen, onClose, account }: EditAccountModalP
           formData={formData}
           handleChange={handleChange}
           setCountry={setCountry}
-          frequencies={frequencies}
           wrapperLists={wrapperLists}
           idPrefix="edit-account"
         />

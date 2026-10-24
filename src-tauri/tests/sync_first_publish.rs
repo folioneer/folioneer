@@ -10,7 +10,7 @@ use std::sync::Arc;
 use folioneer_lib::context::account::{
     AccountService, SqliteAccountRepository, SqliteFeeCatchUpRepository,
     SqliteFeeScheduleRepository, SqliteHoldingNoteRepository, SqliteHoldingRepository,
-    SqliteTransactionRepository, UpdateFrequency,
+    SqliteTransactionRepository,
 };
 use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
@@ -160,13 +160,7 @@ async fn seed_small_portfolio(ctx: &Ctx) -> (String, String) {
     ctx.asset_service.seed_cash_asset("USD").await.unwrap();
     let account = ctx
         .account_service
-        .create(
-            "Portfolio".into(),
-            String::new(),
-            "USD".into(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Portfolio".into(), String::new(), "USD".into(), false)
         .await
         .unwrap();
     ctx.account_service

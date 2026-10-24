@@ -101,7 +101,7 @@ impl PriceFreshnessUseCase {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::account::{Account, Holding, MockAccountServiceContract, UpdateFrequency};
+    use crate::context::account::{Account, Holding, MockAccountServiceContract};
     use crate::context::asset::{AssetPrice, AssetPriceSource, MockAssetServiceContract};
     use crate::use_cases::shared::price_fetch_log::MockPriceFetchLogRepository;
 
@@ -119,7 +119,6 @@ mod tests {
                 "Alpha".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )])
         });
@@ -225,7 +224,6 @@ mod tests {
                 "Alpha".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )])
         });

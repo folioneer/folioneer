@@ -6,7 +6,7 @@
 
 use folioneer_lib::context::account::{
     AccountError, AccountService, SqliteAccountRepository, SqliteHoldingRepository,
-    SqliteTransactionRepository, UpdateFrequency,
+    SqliteTransactionRepository,
 };
 use folioneer_lib::context::asset::{
     AssetService, CreateAssetDTO, SqliteAssetCategoryRepository, SqliteAssetPriceRepository,
@@ -79,7 +79,6 @@ async fn get_account_performance_deposit_end_to_end() {
             "E2E Account".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::Automatic,
             false,
         )
         .await
@@ -95,10 +94,6 @@ async fn get_account_performance_deposit_end_to_end() {
         .unwrap();
     assert_eq!(resp.account_name, "E2E Account");
     assert_eq!(resp.currency, "EUR");
-    assert!(
-        resp.month_view_available,
-        "Automatic → month_view_available"
-    );
     let year_2024 = resp
         .yearly
         .iter()
@@ -152,7 +147,6 @@ async fn get_account_performance_priced_stock_included_in_end_value() {
             "Stock Account".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::Automatic,
             false,
         )
         .await
@@ -241,7 +235,6 @@ async fn zero_cost_opening_balance_suppresses_lifetime_metrics_until_corrected()
             "Granted Shares Account".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::Automatic,
             false,
         )
         .await

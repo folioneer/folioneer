@@ -218,7 +218,7 @@ fn held_period_windows(from: NaiveDate, to: NaiveDate) -> Vec<(NaiveDate, NaiveD
 mod tests {
     use super::*;
     use crate::context::account::{
-        Account, Holding, MockAccountServiceContract, Transaction, TransactionType, UpdateFrequency,
+        Account, Holding, MockAccountServiceContract, Transaction, TransactionType,
     };
     use crate::context::asset::{
         Asset, AssetCategory, AssetClass, MockAssetServiceContract, MockPriceProvider,
@@ -243,7 +243,6 @@ mod tests {
             "Portfolio".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::Automatic,
             false,
         )
     }

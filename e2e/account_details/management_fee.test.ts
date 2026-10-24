@@ -80,7 +80,7 @@ describe("management_fee", () => {
   before(async () => {
     const catId = await seedCategory("E2E Cat FEE022");
     // FEE-075 — new accounts default to fees-disabled; this suite needs the gate open.
-    accId = await seedAccount(ACCOUNT_NAME, "EUR", "ManualMonth", true);
+    accId = await seedAccount(ACCOUNT_NAME, "EUR", true);
     astId = await seedAsset(ASSET_NAME, catId);
     // seedBuy seeds a deposit on the prior day (CSH-041) then buys 10 units.
     await seedBuy(accId, astId, "2020-09-01", 10_000_000); // 10 units in micros
@@ -163,7 +163,7 @@ describe("management_fee", () => {
   // -------------------------------------------------------------------------
   it("FEE-028/029: a fee entered as a resulting quantity of 9.5 leaves exactly 9.5 units", async () => {
     const catId = await seedCategory("E2E Cat FEE028");
-    const accId = await seedAccount("E2E ManagementFee FEE-028", "EUR", "ManualMonth", true);
+    const accId = await seedAccount("E2E ManagementFee FEE-028", "EUR", true);
     const astId = await seedAsset("E2E Asset FEE028", catId);
     await seedBuy(accId, astId, "2020-09-01", 10_000_000);
 

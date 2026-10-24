@@ -37,7 +37,6 @@ const formData = (overrides: Partial<AccountFormData> = {}): AccountFormData => 
   name: "PEA Fortuneo",
   bank_name: "",
   currency: "EUR",
-  update_frequency: "ManualMonth",
   management_fees_enabled: false,
   country: "",
   wrapper: "",
@@ -57,7 +56,6 @@ describe("AccountForm — country and wrapper (ACC-045, ACC-048)", () => {
         formData={formData()}
         handleChange={vi.fn()}
         setCountry={setCountry}
-        frequencies={[]}
         wrapperLists={{ ...lists, countries: ["FR", "DE", "ES"] }}
       />,
     );
@@ -77,7 +75,6 @@ describe("AccountForm — country and wrapper (ACC-045, ACC-048)", () => {
         formData={formData()}
         handleChange={vi.fn()}
         setCountry={vi.fn()}
-        frequencies={[]}
         wrapperLists={lists}
       />,
     );
@@ -88,7 +85,6 @@ describe("AccountForm — country and wrapper (ACC-045, ACC-048)", () => {
         formData={formData({ country: "DE" })}
         handleChange={vi.fn()}
         setCountry={vi.fn()}
-        frequencies={[]}
         wrapperLists={lists}
       />,
     );
@@ -101,7 +97,6 @@ describe("AccountForm — country and wrapper (ACC-045, ACC-048)", () => {
         formData={formData()}
         handleChange={vi.fn()}
         setCountry={vi.fn()}
-        frequencies={[]}
         wrapperLists={null}
       />,
     );

@@ -6,7 +6,7 @@ The Account Performance feature presents how a single account's value has evolve
 
 Performance is measured **net of the user's own cash flows**: a deposit or withdrawal moves the account's value but is not itself performance. Period values are **reconstructed on demand** from the account's transaction history (which determines the units held and the cash balance at any past date) and the asset price history (which determines each asset's value at any past date) — no period value is persisted. This mirrors the project's existing model, where holdings are always rebuilt by chronological transaction replay rather than cached.
 
-This is a **feature spec** spanning two bounded contexts: the `account` context owns transactions, holdings, and cash; the `asset` context owns recorded prices. Because the two contexts must not import each other (B2), the cross-context read is orchestrated by a dedicated use case in `use_cases/`, injecting `AccountService` and `AssetService` per B18 and B24. It builds on [`docs/spec/account-details.md`](account-details.md) (Global Value, holdings) and [`docs/spec/market-price.md`](market-price.md) (AssetPrice history), and reuses the account `update_frequency` defined in [`docs/spec/account.md`](account.md) (ACC-004).
+This is a **feature spec** spanning two bounded contexts: the `account` context owns transactions, holdings, and cash; the `asset` context owns recorded prices. Because the two contexts must not import each other (B2), the cross-context read is orchestrated by a dedicated use case in `use_cases/`, injecting `AccountService` and `AssetService` per B18 and B24. It builds on [`docs/spec/account-details.md`](account-details.md) (Global Value, holdings) and [`docs/spec/market-price.md`](market-price.md) (AssetPrice history).
 
 All monetary values are `i64` micro-units per [ADR-001](../adr/001-use-i64-for-monetary-amounts.md).
 
@@ -42,11 +42,11 @@ Money entering or leaving the account from outside the tracked world: a `Deposit
 
 **PRF-011 — Two view modes (frontend)**: The page offers two mutually exclusive view modes: **month view** (one row per calendar month) and **year view** (one row per calendar year). A control lets the user switch between the available modes. "Month view" and "year view" are the canonical names used throughout this spec.
 
-**PRF-012 — Year view always available (frontend + backend)**: The backend always computes the yearly series for any account, and the frontend offers the year view for every account regardless of its `update_frequency`.
+**PRF-012 — Year view always available (frontend + backend)**: The backend always computes the yearly series for any account, and the frontend offers the year view for every account.
 
-**PRF-013 — Month view eligibility by frequency (frontend + backend)**: The month view is available only when the account's `update_frequency` (ACC-004) is `Automatic`, `ManualDay`, or `ManualWeek` (cadences of at most one week, which produce enough observations for monthly rows). For `ManualMonth` and `ManualYear`, the month view is not offered and the page presents only the year view; the view-mode control is hidden or disabled.
+**PRF-013 — Month view for every account (frontend + backend)**: The backend always computes the monthly series for any account, and the frontend offers the month view and the view-mode control for every account.
 
-**PRF-014 — Default view mode (frontend)**: The page restores the account's last-used view mode (remembered per account in local storage), clamped to availability — a remembered month view falls back to year view when the month view is no longer available (PRF-013). When the account has no remembered preference, the page opens in month view showing the current calendar year if the month view is available, otherwise in year view.
+**PRF-014 — Default view mode (frontend)**: The page restores the account's last-used view mode (remembered per account in local storage). When the account has no remembered preference, the page opens in month view showing the current calendar year.
 
 **PRF-015 — Year selector in month view (frontend)**: The month view displays the twelve months of a single calendar year and exposes a year selector to change which year is shown. The selector defaults to the current calendar year and offers every year from the account's first data year (PRF-040) through the current calendar year inclusive — the current year is always selectable even when the latest transaction falls in an earlier year. The year the user selects stays selected while the page is open: a refresh of its figures (a recorded transaction, a price update, a sync) or a change of asset scope (PRF-080) keeps it as long as the data still carries that year, and falls back to the default otherwise. Another account opens on its own default.
 
@@ -138,7 +138,7 @@ The performance read optionally narrows to one asset's position within the accou
 
 **PRF-080 — Optional asset scope (backend)**: `get_account_performance` accepts an optional `asset_id`. When absent, the whole-account behaviour of PRF-010–074 applies unchanged. When present, the yearly and monthly series describe that one asset's position: every downstream figure derives from the account's transactions filtered to that asset.
 
-**PRF-081 — Scoped data span and empty behaviour (backend)**: The scoped data span runs from the period containing the asset's earliest transaction in this account through the current period (PRF-040 applied to the filtered set). An asset with no transactions in this account — including an unknown asset id — has no data span and produces the same empty result as PRF-043; only an unknown account yields not-found (PRF-016). `month_view_available` remains the account-level eligibility (PRF-013), unaffected by the scope.
+**PRF-081 — Scoped data span and empty behaviour (backend)**: The scoped data span runs from the period containing the asset's earliest transaction in this account through the current period (PRF-040 applied to the filtered set). An asset with no transactions in this account — including an unknown asset id — has no data span and produces the same empty result as PRF-043; only an unknown account yields not-found (PRF-016).
 
 **PRF-082 — Scoped period end value (backend)**: A scoped row's end value is the position's market value as of the period end: the asset's quantity reconstructed by replaying its transactions dated on or before the period end (PRF-021 semantics), valued at the carry-forward price (PRF-022) and the FX rate as of the period end (FXR-042); an unheld position, a missing usable price, or a missing usable rate contributes `0`. The cash line is never valued as a position — consistent with the Global Value computation, where cash is a balance, not a priced holding — so a Cash-class scope reports `0` end values; the frontend asset selector does not offer the cash line.
 
@@ -162,8 +162,7 @@ The performance read optionally narrows to one asset's position within the accou
 [Account Details header → "Performance"]
   → Route: /accounts/:id/performance
           │
-          ├─ [use_cases/account_performance/: load account (currency, update_frequency)]
-          ├─ [decide available view modes by update_frequency (PRF-012, PRF-013)]
+          ├─ [use_cases/account_performance/: load account (currency)]
           ├─ [load all transactions for the account → derive data span (PRF-040)]
           ├─ [load price history for each held asset (AssetService)]
           │
@@ -191,7 +190,7 @@ A "Performance" action in the Account Details header (alongside the existing "Re
 
 A full-page table at `/accounts/:id/performance`.
 
-- **Header**: account name, a view-mode toggle (Month / Year — Month hidden or disabled when ineligible per PRF-013), and, in month view, a year selector (PRF-015).
+- **Header**: account name, a view-mode toggle (Month / Year, PRF-013), and, in month view, a year selector (PRF-015).
 - **Table columns**:
   - Period (month label in month view, year in year view)
   - End value (account currency)

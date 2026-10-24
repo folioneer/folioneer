@@ -2,7 +2,6 @@ import type {
   AccountError,
   FetchAccountAssetPricesError,
   FetchAllAssetPricesError,
-  UpdateFrequency,
   Wrapper,
   WrapperLists,
 } from "@/bindings";
@@ -85,27 +84,6 @@ export function accountMutationErrorToI18n(err: AccountError): I18nMessage {
       return { key: "error.Unknown" };
   }
 }
-
-// i18n keys for UpdateFrequency display labels
-export const FREQUENCY_I18N_KEYS: Record<UpdateFrequency, string> = {
-  Automatic: "account.frequency_automatic",
-  ManualDay: "account.frequency_manual_day",
-  ManualWeek: "account.frequency_manual_week",
-  ManualMonth: "account.frequency_manual_month",
-  ManualYear: "account.frequency_manual_year",
-};
-
-// Ordered list of all frequencies — derived from FREQUENCY_I18N_KEYS to stay in sync with Specta bindings
-export const FREQUENCIES = Object.keys(FREQUENCY_I18N_KEYS) as UpdateFrequency[];
-
-// R9 — logical sort order for UpdateFrequency (not alphabetical)
-export const FREQUENCY_ORDER: Record<UpdateFrequency, number> = {
-  Automatic: 0,
-  ManualDay: 1,
-  ManualWeek: 2,
-  ManualMonth: 3,
-  ManualYear: 4,
-};
 
 /**
  * PMV-021/022/034/040 — a value in micros as a 2-decimal display string. The

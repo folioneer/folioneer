@@ -131,7 +131,6 @@ mod tests {
     use super::*;
     use crate::command_line::args::{parse, Invocation};
     use crate::command_line::output::{REFUSED, WRONG_USAGE};
-    use crate::context::account::UpdateFrequency;
     use crate::context::asset::{AssetClass, CreateAssetDTO};
     use crate::shared::infrastructure::window_lock::WindowLock;
     use crate::use_cases::account_creation::AccountCreationUseCase;
@@ -203,13 +202,7 @@ mod tests {
         let assets: Arc<dyn crate::context::asset::AssetServiceContract> =
             Arc::clone(&container.asset_service) as _;
         let account = AccountCreationUseCase::new(accounts, assets)
-            .create(
-                "PEA".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("PEA".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .expect("account");
         container
