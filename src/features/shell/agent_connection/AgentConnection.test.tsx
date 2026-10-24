@@ -19,6 +19,7 @@ import { ALLOW_AFTER_MS } from "./useActiveAfterAMoment";
 const answer = vi.fn();
 const answerRemoval = vi.fn();
 const answerChange = vi.fn();
+const answerReplacement = vi.fn();
 const disconnect = vi.fn();
 const removeRecordings = vi.fn();
 const state = (overrides = {}) => ({
@@ -26,10 +27,12 @@ const state = (overrides = {}) => ({
   sessions: [],
   removal: null,
   change: null,
+  replacement: null,
   user: "phil",
   answer,
   answerRemoval,
   answerChange,
+  answerReplacement,
   disconnect,
   removeRecordings,
   ...overrides,
@@ -68,6 +71,45 @@ const removal = (overrides = {}) => ({
     fees: 0,
     exchange_rate: 1_000_000,
     note: null,
+  },
+  ...overrides,
+});
+
+const shown = (kind: string, account: string, amount: number, asset: boolean) => ({
+  ...removal().transaction,
+  id: `tx-${kind}`,
+  date: "2026-10-21",
+  account,
+  kind,
+  asset_name: asset ? "Bitcoin" : null,
+  asset_reference: asset ? "BTC" : null,
+  quantity: asset ? 500_000 : amount,
+  amount,
+});
+const replacement = (overrides = {}) => ({
+  id: 13,
+  session: 1,
+  client: "Claude Code",
+  asked_at: "2026-10-24T09:00:00",
+  transactions: [
+    shown("Sell", "Exchange", 21_000_000_000, true),
+    shown("Withdrawal", "Exchange", 21_000_000_000, false),
+    shown("Deposit", "Hardware wallet", 21_000_000_000, false),
+    shown("Purchase", "Hardware wallet", 21_000_000_000, true),
+  ],
+  transfer: {
+    from_account: "Exchange",
+    to_account: "Hardware wallet",
+    date: "2026-10-21",
+    asset_name: "Bitcoin",
+    asset_reference: "BTC",
+    quantity_sent: 500_000,
+    quantity_received: 500_000,
+    cost: 21_000_000_000,
+    from_currency: "EUR",
+    exchange_rate: null,
+    converted_cost: null,
+    to_currency: "EUR",
   },
   ...overrides,
 });
@@ -331,6 +373,87 @@ describe("AgentConnectionMount", () => {
     expect(within(dialog).getByText(/^0[.,]00 EUR$/)).toBeInTheDocument();
   });
 
+  // AGT-092 — an agent asks to replace four transactions with a transfer: the four struck
+  // through, each with its signs and "Cash" on the cash, the transfer in the accent colour,
+  // what becomes of it; refusing is in focus, and replacing is inactive for a moment.
+  it("shows a replacement request, the four struck through above the transfer", () => {
+    hook.mockReturnValue(state({ replacement: replacement() }));
+    render(<AgentConnectionMount />);
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("id", "agent-replacement-dialog");
+    expect(dialog).toHaveTextContent("agent.replacement_title(Claude Code)");
+    expect(dialog).toHaveTextContent("agent.replacement_removed");
+    const sale = document.getElementById("agent-replacement-removed-sell") as HTMLElement;
+    expect(sale).toHaveClass("line-through");
+    expect(sale).toHaveTextContent("Exchange");
+    expect(sale).toHaveTextContent("21/10/2026");
+    expect(sale).toHaveTextContent("transaction.type_sell");
+    expect(sale).toHaveTextContent("Bitcoin");
+    expect(sale).toHaveTextContent(/\u22120[.,]5/);
+    expect(sale).toHaveTextContent(/\+21[\s\u202f,.]?000[.,]00 EUR/);
+    const withdrawal = document.getElementById("agent-replacement-removed-withdrawal");
+    expect(withdrawal).toHaveTextContent("agent.replacement_cash");
+    expect(withdrawal).toHaveTextContent(/\u221221[\s\u202f,.]?000[.,]00 EUR/);
+    expect(document.getElementById("agent-replacement-removed-deposit")).toHaveTextContent(
+      /\+21[\s\u202f,.]?000[.,]00 EUR/,
+    );
+    const purchase = document.getElementById("agent-replacement-removed-purchase");
+    expect(purchase).toHaveTextContent(/\+0[.,]5/);
+    expect(purchase).toHaveTextContent(/\u221221[\s\u202f,.]?000[.,]00 EUR/);
+
+    expect(dialog).toHaveTextContent("agent.replacement_recorded");
+    expect(document.getElementById("agent-replacement-transfer-from")).toHaveTextContent(
+      "Exchange",
+    );
+    expect(document.getElementById("agent-replacement-transfer-to")).toHaveTextContent(
+      "Hardware wallet",
+    );
+    expect(document.getElementById("agent-replacement-transfer-asset")).toHaveTextContent(
+      "Bitcoin (BTC)",
+    );
+    expect(document.getElementById("agent-replacement-transfer-quantity")).toHaveTextContent(
+      /agent\.replacement_quantity\(0[.,]5,0[.,]5\)/,
+    );
+    const cost = document.getElementById("agent-replacement-transfer-cost") as HTMLElement;
+    expect(cost).toHaveClass("text-m3-primary");
+    expect(cost).toHaveTextContent(/^21[\s\u202f,.]?000[.,]00 EUR$/);
+    expect(dialog).toHaveTextContent("agent.replacement_becomes(Bitcoin,Hardware wallet)");
+    expect(document.getElementById("agent-replacement-fee-in-kind")).toBeNull();
+    expect(dialog).toHaveTextContent("agent.replacement_covers");
+    expect(document.getElementById("modal-close-btn")).toBeNull();
+    expect(document.getElementById("agent-replacement-refuse")).toHaveFocus();
+    const replace = document.getElementById("agent-replacement-replace") as HTMLButtonElement;
+    expect(replace).toBeDisabled();
+
+    fireEvent.click(screen.getByText("agent.removal_refuse"));
+    expect(answerReplacement).toHaveBeenLastCalledWith(13, false);
+    act(() => vi.advanceTimersByTime(ALLOW_AFTER_MS));
+    fireEvent.click(replace);
+    expect(answerReplacement).toHaveBeenLastCalledWith(13, true);
+  });
+
+  // AGT-092 — between currencies the cost moved names the rate and the converted cost; less
+  // received than sent adds the fee in kind.
+  it("shows the rate between currencies and the fee in kind", () => {
+    const transfer = {
+      ...replacement().transfer,
+      quantity_received: 400_000,
+      exchange_rate: 1_080_000,
+      converted_cost: 22_680_000_000,
+      to_currency: "USD",
+    };
+    hook.mockReturnValue(state({ replacement: replacement({ transfer }) }));
+    render(<AgentConnectionMount />);
+
+    expect(document.getElementById("agent-replacement-transfer-cost")).toHaveTextContent(
+      /agent\.replacement_cost_converted\(21[\s\u202f,.]?000[.,]00 EUR,22[\s\u202f,.]?680[.,]00 USD,1[.,]08\)/,
+    );
+    expect(document.getElementById("agent-replacement-fee-in-kind")).toHaveTextContent(
+      /agent\.replacement_fee_in_kind\(0[.,]1,Exchange\)/,
+    );
+  });
+
   // AGT-083 — an agent asking to connect comes first; the removal waits its turn.
   it("shows a connection request before a removal request", () => {
     hook.mockReturnValue(state({ request, removal: null }));
@@ -537,6 +660,21 @@ describe("AgentIndicator", () => {
         change: { ...removal(), becomes: { ...asItIs, quantity: 1 }, moved: ["quantity"] },
       }),
     );
+    rerender(<AgentIndicator />);
+    expect(document.getElementById("agent-session-dialog")).toBeNull();
+
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    rerender(<AgentIndicator />);
+    expect(document.getElementById("agent-session-dialog")).not.toBeNull();
+  });
+
+  // AGT-092 — the session dialog gives way to a replacement request as to the others.
+  it("gives way to a replacement request and comes back once it is answered", () => {
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    const { rerender } = render(<AgentIndicator />);
+    fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
+
+    hook.mockReturnValue(state({ sessions: [session()], replacement: replacement() }));
     rerender(<AgentIndicator />);
     expect(document.getElementById("agent-session-dialog")).toBeNull();
 
