@@ -3,7 +3,7 @@ use super::domain::{
     FeeCatchUpPosition, FeeCatchUpRepository, FeeSchedule, FeeScheduleRepository, Holding,
     HoldingNote, HoldingNoteRepository, HoldingRepository, HoldingSnapshot, JournalFilter,
     ManagementFeeRemoval, SessionRecording, StockSplitPosition, ThresholdDirection, Transaction,
-    TransactionRepository, TransactionType, WriteOffReason,
+    TransactionRepository, TransactionType, TransferView, WriteOffReason,
 };
 use super::error::AccountError;
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
@@ -631,6 +631,30 @@ impl AccountService {
             .collect();
         for row in &mut journal.rows {
             row.recorded_by = marks.remove(&row.transaction.id);
+        }
+        // TRF-062 — a part of a transfer names the transfer's other account.
+        if journal
+            .rows
+            .iter()
+            .any(|row| row.transaction.transfer_id.is_some())
+        {
+            let others: std::collections::HashMap<String, String> = self
+                .transaction_repo
+                .transfer_other_accounts(account_id)
+                .await
+                .map_err(|e| {
+                    tracing::error!(target: BACKEND, account_id = %account_id, err = ?e, "get_account_journal: transfers' other accounts not read");
+                    AccountError::DatabaseError
+                })?
+                .into_iter()
+                .collect();
+            for row in &mut journal.rows {
+                row.transfer_account_id = row
+                    .transaction
+                    .transfer_id
+                    .as_ref()
+                    .and_then(|transfer_id| others.get(transfer_id).cloned());
+            }
         }
         Ok(journal)
     }
@@ -1295,6 +1319,13 @@ impl AccountService {
                 tracing::error!(target: BACKEND, transfer_id = %transfer_id, err = ?e, "transfer_accounts: repository failure");
                 AccountError::DatabaseError
             })
+    }
+
+    /// TRF-060 — the transfer `transfer_id` read as one from its parts; an unknown transfer,
+    /// or one that has lost a side, is `TransferNotFound`.
+    pub async fn transfer_view(&self, transfer_id: &str) -> Result<TransferView, AccountError> {
+        let parts = self.transfer_parts(transfer_id).await?;
+        TransferView::from_parts(transfer_id, &parts).ok_or(AccountError::TransferNotFound)
     }
 
     /// TRF-040 — removes every part of the transfer `transfer_id`, in every account holding
@@ -2700,6 +2731,8 @@ pub trait AccountServiceContract: Send + Sync {
         exchange_rate: i64,
         note: Option<String>,
     ) -> StdResult<TransferPreview, AccountError>;
+    /// A transfer read as one from its parts (TRF-060).
+    async fn transfer_view(&self, transfer_id: &str) -> StdResult<TransferView, AccountError>;
     /// The sending account, the receiving account and the asset of a transfer (TRF-030).
     async fn transfer_sides(
         &self,
@@ -3257,6 +3290,10 @@ impl AccountServiceContract for AccountService {
             note,
         )
         .await
+    }
+
+    async fn transfer_view(&self, transfer_id: &str) -> StdResult<TransferView, AccountError> {
+        AccountService::transfer_view(self, transfer_id).await
     }
 
     async fn transfer_sides(

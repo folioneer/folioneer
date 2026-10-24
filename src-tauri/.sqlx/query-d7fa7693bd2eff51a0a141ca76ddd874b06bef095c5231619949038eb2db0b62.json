@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT DISTINCT mine.transfer_id AS \"transfer_id!: String\",\n                      other.account_id AS \"account_id!: String\"\n               FROM transactions mine\n               JOIN transactions other\n                 ON other.transfer_id = mine.transfer_id AND other.account_id <> mine.account_id\n               WHERE mine.account_id = ? AND mine.transfer_id IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "transfer_id!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_id!: String",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "d7fa7693bd2eff51a0a141ca76ddd874b06bef095c5231619949038eb2db0b62"
+}

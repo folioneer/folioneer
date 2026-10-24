@@ -1015,3 +1015,135 @@ async fn trf_010_the_other_refusals() {
         TransferError::UseCase(TransferTask::ArchivedAsset)
     ));
 }
+
+// TRF-060 — a transfer read as one: its quantity sent counts the fee in kind, the rest is the
+// transfer in's; one left without a side, or unknown, is not found.
+#[tokio::test]
+async fn trf_060_a_transfer_is_read_as_one() {
+    let ctx = build_ctx().await;
+    let (from, to, asset) = seed(&ctx, "USD").await;
+    let parts = ctx
+        .transfer
+        .record_transfer(
+            &from,
+            &to,
+            asset.clone(),
+            figures(micro(4), 3_500_000, Some(1_100_000)),
+        )
+        .await
+        .unwrap();
+    let transfer_id = parts[0].transfer_id.clone().unwrap();
+
+    let view = ctx.transfer.get_transfer(&transfer_id).await.unwrap();
+    let out = part(&parts, TransactionType::TransferOut);
+    assert_eq!(
+        (
+            view.from_account_id.as_str(),
+            view.to_account_id.as_str(),
+            view.asset_id.as_str()
+        ),
+        (from.as_str(), to.as_str(), asset.as_str())
+    );
+    assert_eq!(
+        (
+            view.date.as_str(),
+            view.quantity_sent,
+            view.quantity_received
+        ),
+        ("2024-03-01", micro(4), 3_500_000)
+    );
+    assert_eq!(
+        (view.cost, view.exchange_rate, view.note.as_deref()),
+        (out.total_amount, 1_100_000, Some("to cold storage"))
+    );
+
+    assert!(matches!(
+        ctx.transfer.get_transfer("nope").await.unwrap_err(),
+        TransferError::Account(AccountError::TransferNotFound)
+    ));
+    ctx.account_service.delete(&to).await.unwrap();
+    assert!(matches!(
+        ctx.transfer.get_transfer(&transfer_id).await.unwrap_err(),
+        TransferError::Account(AccountError::TransferNotFound)
+    ));
+}
+
+// TRF-061 — the rate a transfer would take: one within a currency, the stored rate on or before
+// the date between two, none before any; an unknown account and a malformed date are refused.
+#[tokio::test]
+async fn trf_061_the_rate_a_transfer_would_take() {
+    let ctx = build_ctx().await;
+    let (from, to, _) = seed(&ctx, "USD").await;
+    let same = account(&ctx, "Broker", "EUR").await;
+    ctx.currency_service
+        .record_currency_rate(
+            "EUR".to_string(),
+            "USD".to_string(),
+            "2024-02-20".to_string(),
+            1_100_000,
+        )
+        .await
+        .unwrap();
+
+    let rate = |to: String, date: &'static str| {
+        let (transfer, from) = (&ctx.transfer, from.clone());
+        async move { transfer.transfer_rate(&from, &to, date).await }
+    };
+    assert_eq!(
+        rate(same.clone(), "2024-01-01").await.unwrap(),
+        Some(1_000_000)
+    );
+    assert_eq!(
+        rate(to.clone(), "2024-03-01").await.unwrap(),
+        Some(1_100_000)
+    );
+    assert_eq!(rate(to.clone(), "2024-02-19").await.unwrap(), None);
+    assert!(matches!(
+        rate("nope".to_string(), "2024-03-01").await.unwrap_err(),
+        TransferError::Account(AccountError::AccountNotFound { .. })
+    ));
+    assert!(matches!(
+        rate(to, "2024-13-01").await.unwrap_err(),
+        TransferError::Account(AccountError::InvalidDate)
+    ));
+}
+
+// TRF-062 — each journal row of a part of a transfer carries the other account; any other row,
+// and a part left alone, none.
+#[tokio::test]
+async fn trf_062_the_journal_names_the_other_account() {
+    use folioneer_lib::context::account::JournalFilter;
+
+    let ctx = build_ctx().await;
+    let (from, to, asset) = seed(&ctx, "EUR").await;
+    ctx.transfer
+        .record_transfer(&from, &to, asset, figures(micro(4), micro(3), None))
+        .await
+        .unwrap();
+    let others = |account_id: String| {
+        let accounts = &ctx.account_service;
+        async move {
+            accounts
+                .get_account_journal(&account_id, &JournalFilter::default())
+                .await
+                .unwrap()
+                .rows
+                .into_iter()
+                .map(|row| (row.transaction.transaction_type, row.transfer_account_id))
+                .collect::<Vec<_>>()
+        }
+    };
+
+    let sending = others(from.clone()).await;
+    assert!(sending.contains(&(TransactionType::TransferOut, Some(to.clone()))));
+    assert!(sending.contains(&(TransactionType::WriteOff, Some(to.clone()))));
+    assert!(sending.contains(&(TransactionType::Purchase, None)));
+    assert!(others(to.clone())
+        .await
+        .contains(&(TransactionType::TransferIn, Some(from.clone()))));
+
+    ctx.account_service.delete(&from).await.unwrap();
+    assert!(others(to)
+        .await
+        .contains(&(TransactionType::TransferIn, None)));
+}

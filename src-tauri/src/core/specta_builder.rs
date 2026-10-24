@@ -192,6 +192,8 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             transfer::record_transfer,
             transfer::correct_transfer,
             transfer::cancel_transfer,
+            transfer::get_transfer,
+            transfer::get_transfer_rate,
             holding_transaction::record_split,
             holding_transaction::record_management_fee,
             holding_transaction::preview_management_fee,
