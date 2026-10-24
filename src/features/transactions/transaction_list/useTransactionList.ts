@@ -27,6 +27,8 @@ export function useTransactionList() {
   const [assetListError, setAssetListError] = useState<I18nMessage | null>(null);
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  // TRF-062 — each part of a transfer's other account, by transaction id, from the journal.
+  const [transferAccounts, setTransferAccounts] = useState<Map<string, string>>(new Map());
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
   const [transactionError, setTransactionError] = useState<I18nMessage | null>(null);
 
@@ -80,6 +82,13 @@ export function useTransactionList() {
         if (request !== latestRequest.current) return found;
         if (res.status === "ok") {
           setTransactions(found);
+          setTransferAccounts(
+            new Map(
+              res.data.rows.flatMap((row) =>
+                row.transfer_account_id ? [[row.transaction.id, row.transfer_account_id]] : [],
+              ),
+            ),
+          );
           return found;
         }
         setTransactionError(accountMutationErrorToI18n(res.error));
@@ -185,9 +194,15 @@ export function useTransactionList() {
     return transactions.map((tx) => {
       const asset = assets.find((a) => a.id === tx.asset_id);
       const account = accounts.find((a) => a.id === tx.account_id);
-      return toTransactionRow(tx, asset?.name ?? tx.asset_id, account?.name ?? tx.account_id);
+      const other = accounts.find((a) => a.id === transferAccounts.get(tx.id));
+      return toTransactionRow(
+        tx,
+        asset?.name ?? tx.asset_id,
+        account?.name ?? tx.account_id,
+        other ? { id: other.id, name: other.name } : null,
+      );
     });
-  }, [transactions, assets, accounts]);
+  }, [transactions, transferAccounts, assets, accounts]);
 
   const sortedTransactions = rows;
 

@@ -15,6 +15,8 @@ export type ModalSearchParams = {
   editTxId?: string;
   editTxAccountId?: string;
   editTxAssetId?: string;
+  /** Transfer edit (TRF-057): the transfer corrected as one (`modal=edit-transfer`). */
+  editTransferId?: string;
   /** Record-FX-rate shortcut (FXR-012): the directed pair to pre-fill (`modal=record-fx-rate`). */
   fxFrom?: string;
   fxTo?: string;

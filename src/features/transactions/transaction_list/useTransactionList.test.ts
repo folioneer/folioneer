@@ -18,7 +18,7 @@ const mockSubscribeToEvents = vi.fn();
 
 // The core's account journal filtered to the asset (TXL-060), standing in for the backend:
 // `mockGetTransactions` holds the asset's transactions oldest first, and the journal
-// returns them in the order asked.
+// returns them in the order asked; a part of a transfer names "account-2" as its other one.
 const journalOf = async (
   accountId: string,
   filter: { asset_id: string; newest_first: boolean },
@@ -30,11 +30,12 @@ const journalOf = async (
   return {
     status: "ok",
     data: {
-      rows: ordered.map((transaction: unknown) => ({
+      rows: ordered.map((transaction: { transfer_id?: string }) => ({
         transaction,
         cash_out: null,
         cash_in: null,
         cash_balance: 0,
+        transfer_account_id: transaction.transfer_id ? "account-2" : null,
       })),
       asset_ids: [],
       transaction_types: [],
@@ -110,6 +111,22 @@ describe("useTransactionList", () => {
     expect(mockGetTransactions).toHaveBeenCalledWith("account-1", "asset-1");
     expect(result.current.assetOptions).toHaveLength(2);
     expect(result.current.transactions).toHaveLength(2);
+  });
+
+  // TRF-056 / TRF-062 — a part of a transfer carries its other account; other rows none
+  it("names the other account of a part of a transfer", async () => {
+    mockGetTransactions.mockResolvedValue({
+      status: "ok",
+      data: [
+        makeTx("tx-1", "2024-01-01"),
+        { ...makeTx("tx-2", "2024-03-01"), transaction_type: "TransferOut", transfer_id: "trf-1" },
+      ],
+    });
+    const { result } = renderHook(() => useTransactionList());
+    await act(async () => {});
+    const [out, purchase] = result.current.sortedTransactions;
+    expect(out?.transferAccount).toEqual({ id: "account-2", name: "Other Account" });
+    expect(purchase?.transferAccount).toBeNull();
   });
 
   // Default sort is descending — most recent first (TXL-024)

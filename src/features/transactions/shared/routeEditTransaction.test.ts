@@ -63,6 +63,19 @@ describe("routeEditTransaction", () => {
     );
   });
 
+  // TRF-057 — any part of a transfer, its fee in kind included, opens the whole transfer.
+  it("routes any part of a transfer to the transfer form (TRF-057)", () => {
+    const openGeneric = vi.fn();
+    for (const type of ["TransferOut", "TransferIn", "WriteOff"] as const) {
+      routeEditTransaction(navigate, { ...tx(type), transfer_id: "trf-1" }, openGeneric);
+      expect(patchModalSearch).toHaveBeenLastCalledWith(navigate, {
+        modal: "edit-transfer",
+        editTransferId: "trf-1",
+      });
+    }
+    expect(openGeneric).not.toHaveBeenCalled();
+  });
+
   it("routes ManagementFee to the management-fee edit modal (FEE-063)", () => {
     routeEditTransaction(navigate, tx("ManagementFee"), vi.fn());
     expect(patchModalSearch).toHaveBeenCalledWith(

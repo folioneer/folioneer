@@ -589,7 +589,9 @@
     "recorded_by_agent": "{{agent}} · session of {{when}}",
     "recorded_by_session": "session of {{when}}",
     "action_write_off": "Write off",
-    "action_transfer": "Transfer"
+    "action_transfer": "Transfer",
+    "type_transferout": "Transfer out",
+    "type_transferin": "Transfer in"
   },
   "account_details": {
     "title": "Account Details",
@@ -874,7 +876,11 @@
     "error_TransferNotFound": "This transfer no longer has both its sides: delete what is left of it.",
     "error_TransferRateMissing": "No {{from}} → {{to}} rate is stored for this date: type one.",
     "action_record": "Record the transfer",
-    "recorded": "Transfer recorded."
+    "recorded": "Transfer recorded.",
+    "to_account": "to {{account}} →",
+    "from_account": "← from {{account}}",
+    "part_of_transfer_to": "part of the transfer to {{account}}",
+    "delete_confirm_message": "This removes the whole transfer, from both accounts."
   },
   "interest": {
     "modal_title": "Record interest",

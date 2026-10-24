@@ -18,6 +18,7 @@ import type {
   Transaction,
   TransactionDraftError,
   TransferError,
+  TransferView,
   UnrecordedSplit,
   WriteOffError,
 } from "@/bindings";
@@ -771,6 +772,15 @@ export function transferErrorToI18n(
     default:
       return { message: { key: `error.${err.code}` }, onQuantity: false };
   }
+}
+
+/**
+ * TRF-057 — a transfer's average price as its edit form shows it: the transfer out's own,
+ * the cost it moved over the quantity it took, the quantity received.
+ */
+export function transferAveragePriceMicro(transfer: TransferView): number {
+  if (transfer.quantity_received <= 0) return 0;
+  return Number((BigInt(transfer.cost) * 1_000_000n) / BigInt(transfer.quantity_received));
 }
 
 /**

@@ -7,6 +7,8 @@ import { patchModalSearch } from "@/lib/modalSearch";
  * modals via the URL-driven modal mount (the generic modal is cash-excluded,
  * CSH-018 / FSD-040 / FEE-063 / SPL-030 / INT-040 / DIV-040 / WOF-058); everything else opens the generic
  * edit modal through `openGenericModal`.
+ * Any part of a transfer, its fee in kind included, opens the transfer form for the whole
+ * transfer (TRF-057).
  * Shared by the per-asset and account-wide journals so the branching lives in one place.
  */
 export function routeEditTransaction(
@@ -14,6 +16,10 @@ export function routeEditTransaction(
   raw: Transaction,
   openGenericModal: (transaction: Transaction) => void,
 ): void {
+  if (raw.transfer_id) {
+    patchModalSearch(navigate, { modal: "edit-transfer", editTransferId: raw.transfer_id });
+    return;
+  }
   switch (raw.transaction_type) {
     case "Deposit":
       patchModalSearch(navigate, {

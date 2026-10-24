@@ -589,7 +589,9 @@
     "recorded_by_agent": "{{agent}} · session du {{when}}",
     "recorded_by_session": "session du {{when}}",
     "action_write_off": "Sortie sans contrepartie",
-    "action_transfer": "Transférer"
+    "action_transfer": "Transférer",
+    "type_transferout": "Transfert sortant",
+    "type_transferin": "Transfert entrant"
   },
   "account_details": {
     "title": "Détails du compte",
@@ -874,7 +876,11 @@
     "error_TransferNotFound": "Ce transfert n'a plus ses deux côtés : supprimez ce qu'il en reste.",
     "error_TransferRateMissing": "Aucun taux {{from}} → {{to}} n'est enregistré pour cette date : saisissez-en un.",
     "action_record": "Enregistrer le transfert",
-    "recorded": "Transfert enregistré."
+    "recorded": "Transfert enregistré.",
+    "to_account": "vers {{account}} →",
+    "from_account": "← depuis {{account}}",
+    "part_of_transfer_to": "partie du transfert vers {{account}}",
+    "delete_confirm_message": "Ceci supprime tout le transfert, des deux comptes."
   },
   "interest": {
     "modal_title": "Enregistrer des intérêts",

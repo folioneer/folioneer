@@ -116,6 +116,11 @@ export interface TransactionRowViewModel {
   type: string;
   /** WOF-057 — a write-off's reason, read with its type; null or undefined for other types. */
   writeOffReason?: WriteOffReason | null;
+  /**
+   * TRF-056 — for a part of a transfer, the transfer's other account, read with the journal;
+   * null for any other row and for a part left alone (TRF-041).
+   */
+  transferAccount: { id: string; name: string } | null;
   date: string;
   /** Formatted quantity string (3 decimal places). */
   quantity: string;
@@ -163,6 +168,7 @@ export function toTransactionRow(
   tx: Transaction,
   assetName: string,
   accountName: string,
+  transferAccount: { id: string; name: string } | null = null,
 ): TransactionRowViewModel {
   return {
     id: tx.id,
@@ -172,6 +178,7 @@ export function toTransactionRow(
     accountName,
     type: tx.transaction_type,
     writeOffReason: tx.write_off_reason ?? null,
+    transferAccount: tx.transfer_id ? transferAccount : null,
     date: tx.date,
     quantity:
       tx.transaction_type === "Split"
@@ -232,4 +239,29 @@ export function takeOutRefusal(
     default:
       return null;
   }
+}
+
+/**
+ * TRF-056 — the line under a part of a transfer's type, naming the other account; null for a
+ * row that is no part of a transfer or a part left alone.
+ */
+export function transferLineKey(row: TransactionRowViewModel): string | null {
+  if (!row.transferAccount) return null;
+  switch (row.type) {
+    case "TransferOut":
+      return "transfer.to_account";
+    case "TransferIn":
+      return "transfer.from_account";
+    case "WriteOff":
+      return "transfer.part_of_transfer_to";
+    default:
+      return null;
+  }
+}
+
+/** TRF-057 / TXL-040 — the confirmation of a deletion: a part of a transfer removes it whole. */
+export function deleteConfirmKey(row: TransactionRowViewModel | undefined): string {
+  return row?.transferAccount
+    ? "transfer.delete_confirm_message"
+    : "transaction.delete_confirm_message";
 }

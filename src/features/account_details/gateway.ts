@@ -41,6 +41,7 @@ import type {
   TransactionPreview,
   TransferDTO,
   TransferError,
+  TransferView,
   UpdateFeeScheduleDTO,
   UpsertHoldingNoteDTO,
   WithdrawalDTO,
@@ -127,6 +128,10 @@ export const accountDetailsGateway = {
 
   async correctTransfer(dto: CorrectTransferDTO): Promise<Result<Transaction[], TransferError>> {
     return commands.correctTransfer(dto);
+  },
+
+  async getTransfer(transferId: string): Promise<Result<TransferView, TransferError>> {
+    return commands.getTransfer(transferId);
   },
 
   async getTransferRate(

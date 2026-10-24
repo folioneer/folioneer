@@ -11,6 +11,7 @@ import { InterestEditModalMount } from "@/features/shell/InterestEditModalMount"
 import { MainLayout } from "@/features/shell/MainLayout";
 import { ManagementFeeEditModalMount } from "@/features/shell/ManagementFeeEditModalMount";
 import { SplitEditModalMount } from "@/features/shell/SplitEditModalMount";
+import { TransferEditModalMount } from "@/features/shell/TransferEditModalMount";
 import { UnpricedPricesModalMount } from "@/features/shell/UnpricedPricesModalMount";
 import { WhatsNewDialogMount } from "@/features/shell/WhatsNewDialogMount";
 import { WriteOffEditModalMount } from "@/features/shell/WriteOffEditModalMount";
@@ -35,6 +36,7 @@ export function AppShell() {
       <ManagementFeeEditModalMount />
       <SplitEditModalMount />
       <WriteOffEditModalMount />
+      <TransferEditModalMount />
       <UnpricedPricesModalMount />
       <AddTransactionModalMount />
       <WhatsNewDialogMount />
