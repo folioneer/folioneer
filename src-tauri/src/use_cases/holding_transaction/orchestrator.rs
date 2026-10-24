@@ -873,7 +873,8 @@ impl HoldingTransactionUseCase {
         reason: WriteOffReason,
         note: Option<String>,
     ) -> Result<Transaction, WriteOffError> {
-        self.ensure_writable_off(account_id, &asset_id).await?;
+        self.ensure_writable_off(account_id, &asset_id, "record_write_off")
+            .await?;
         self.account_service
             .record_write_off(account_id, asset_id, date, quantity, reason, note)
             .await
@@ -909,7 +910,8 @@ impl HoldingTransactionUseCase {
         reason: WriteOffReason,
         note: Option<String>,
     ) -> Result<RecordingPreview, WriteOffError> {
-        self.ensure_writable_off(account_id, &asset_id).await?;
+        self.ensure_writable_off(account_id, &asset_id, "preview_write_off")
+            .await?;
         let op = RecordingOp::WriteOff {
             asset_id,
             date,
@@ -928,6 +930,7 @@ impl HoldingTransactionUseCase {
         &self,
         account_id: &str,
         asset_id: &str,
+        op: &str,
     ) -> Result<(), WriteOffError> {
         self.ensure_account(account_id).await?;
         let asset = self
@@ -935,7 +938,7 @@ impl HoldingTransactionUseCase {
             .get_asset_by_id(asset_id)
             .await
             .map_err(|e| {
-                tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "record_write_off: get_asset_by_id failed");
+                tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, op = %op, err = ?e, "ensure_writable_off: get_asset_by_id failed");
                 AccountError::DatabaseError
             })?;
         match asset {
