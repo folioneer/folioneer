@@ -31,8 +31,12 @@ use super::connections::{
 };
 use super::{definitions, wire};
 
+/// AGT-090 — the replacement of four transactions the owner typed with a transfer.
+mod replacement;
 /// AGT-065A — the transfer tool.
 mod transfer;
+
+pub(super) use transfer::refusal_from_transfer;
 
 /// Why a tool call is refused: a stable code and a reason for the agent to read.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -171,6 +175,9 @@ impl AgentTools {
             "cancel_recording" => self.cancel(granted, arguments).await,
             "request_removal" => self.request_removal(granted, arguments).await,
             "request_change" => self.request_change(granted, arguments).await,
+            "request_transfer_replacement" => {
+                self.request_transfer_replacement(granted, arguments).await
+            }
             "preview_recording" => self.preview(granted, arguments).await,
             "record_opening_balance"
             | "record_purchase"

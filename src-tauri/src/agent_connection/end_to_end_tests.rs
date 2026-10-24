@@ -698,6 +698,8 @@ struct Workbench {
     accounts: Arc<crate::context::account::AccountService>,
     assets: Arc<crate::context::asset::AssetService>,
     recorder: crate::use_cases::holding_transaction::HoldingTransactionUseCase,
+    /// The window's transfer, which the owner's answer to a replacement records through.
+    transfers: crate::use_cases::transfer::TransferUseCase,
     /// The portfolio's database, for a test that makes it unreadable.
     pool: sqlx::SqlitePool,
 }
@@ -724,6 +726,11 @@ async fn workbench(data_dir: &Path) -> Workbench {
         connections,
         accounts: container.account_service,
         assets: container.asset_service,
+        transfers: crate::use_cases::transfer::TransferUseCase::new(
+            Arc::clone(&accounts),
+            Arc::clone(&assets),
+            Arc::clone(&container.currency_service),
+        ),
         recorder: crate::use_cases::holding_transaction::HoldingTransactionUseCase::new(
             accounts, assets,
         ),
@@ -6124,4 +6131,468 @@ async fn agt_065a_a_transfer_that_cannot_be_marked_is_undone() {
             .await
             .expect("count");
     assert_eq!(parts, 0, "the transfer is undone whole");
+}
+
+/// The first replacement request waiting.
+async fn replacement_waiting(
+    connections: &AgentConnections,
+) -> super::connections::ReplacementRequest {
+    for _ in 0..400 {
+        if let Some(request) = connections.replacements().into_iter().next() {
+            return request;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    panic!("no replacement request arrived");
+}
+
+/// An account of `name` in euros, created as the window creates it.
+async fn euro_account(bench: &Workbench, name: &str) -> String {
+    let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&bench.accounts) as _;
+    let assets: Arc<dyn AssetServiceContract> = Arc::clone(&bench.assets) as _;
+    AccountCreationUseCase::new(accounts, assets)
+        .create(name.to_string(), String::new(), "EUR".to_string(), false)
+        .await
+        .expect("account")
+        .id
+}
+
+/// Records what the owner typed, through the window's recording: the transaction recorded.
+async fn typed(
+    bench: &Workbench,
+    recording: crate::use_cases::holding_transaction::Recording,
+) -> crate::context::account::Transaction {
+    *bench
+        .recorder
+        .record_named(recording, "2026-10-24")
+        .await
+        .expect("recorded")
+        .transaction
+}
+
+/// What the owner typed, by kind: a trade of CW8 at `price`, or cash of `amount`.
+mod owner {
+    use crate::use_cases::holding_transaction::{
+        CashAmount, Recording, Target, Trade, TradeAmount,
+    };
+
+    const M: i64 = 1_000_000;
+
+    fn trade(account: &str, date: &str, quantity: i64, price: i64) -> Trade {
+        Trade {
+            target: Target {
+                account: account.to_string(),
+                asset: "CW8".to_string(),
+                date: Some(date.to_string()),
+                quantity: quantity * M,
+            },
+            amount: TradeAmount::Price(price * M),
+            fees: 0,
+            rate: M,
+            note: None,
+        }
+    }
+
+    fn cash(account: &str, date: &str, amount: i64) -> CashAmount {
+        CashAmount {
+            account: account.to_string(),
+            date: Some(date.to_string()),
+            amount: amount * M,
+            note: None,
+        }
+    }
+
+    pub fn buy(account: &str, date: &str, quantity: i64, price: i64) -> Recording {
+        Recording::Buy(trade(account, date, quantity, price))
+    }
+
+    pub fn sell(account: &str, date: &str, quantity: i64, price: i64) -> Recording {
+        Recording::Sell(trade(account, date, quantity, price))
+    }
+
+    pub fn deposit(account: &str, date: &str, amount: i64) -> Recording {
+        Recording::Deposit(cash(account, date, amount))
+    }
+
+    pub fn withdraw(account: &str, date: &str, amount: i64) -> Recording {
+        Recording::Withdrawal(cash(account, date, amount))
+    }
+}
+
+/// An account's figures as the owner reads them, whatever ids its transactions carry: each
+/// transaction's kind, date and amounts, and each holding.
+async fn figures_of(bench: &Workbench, account_id: &str) -> (Vec<String>, Vec<String>) {
+    let journal = bench
+        .accounts
+        .get_account_journal(
+            account_id,
+            &crate::context::account::JournalFilter::default(),
+        )
+        .await
+        .expect("journal");
+    let mut transactions: Vec<String> = journal
+        .rows
+        .iter()
+        .map(|row| {
+            let t = &row.transaction;
+            format!(
+                "{} {:?} {} q{} u{} f{} r{} t{} pnl{:?} cash{}",
+                t.date,
+                t.transaction_type,
+                t.asset_id,
+                t.quantity,
+                t.unit_price,
+                t.fees,
+                t.exchange_rate,
+                t.total_amount,
+                t.realized_pnl,
+                row.cash_balance
+            )
+        })
+        .collect();
+    transactions.sort();
+    let mut holdings: Vec<String> = bench
+        .accounts
+        .get_holdings_for_account(account_id)
+        .await
+        .expect("holdings")
+        .iter()
+        .map(|h| {
+            format!(
+                "{} q{} avg{} pnl{} sold{:?}",
+                h.asset_id, h.quantity, h.average_price, h.total_realized_pnl, h.last_sold_date
+            )
+        })
+        .collect();
+    holdings.sort();
+    (transactions, holdings)
+}
+
+// AGT-090 / AGT-091 — a sale, a withdrawal, a deposit and a purchase forming a past transfer
+// are replaced by one transfer on the owner's yes, and both accounts then stand exactly as
+// if the transfer had been recorded from the start.
+#[tokio::test]
+async fn agt_091_four_transactions_replaced_stand_as_the_transfer_recorded_from_the_start() {
+    use super::gate::answer_replacement;
+    use crate::context::account::TransactionType;
+    use crate::use_cases::transfer::TransferFigures;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = Arc::new(workbench(data_dir.path()).await);
+    let granted = session(&bench.connections).await;
+    let (a1, a2) = (
+        euro_account(&bench, "A1").await,
+        euro_account(&bench, "A2").await,
+    );
+    let (b1, b2) = (
+        euro_account(&bench, "B1").await,
+        euro_account(&bench, "B2").await,
+    );
+    // The same history in both pairs: 10 CW8 bought at 100.
+    for account in ["A1", "B1"] {
+        typed(&bench, owner::deposit(account, "2019-01-15", 2000)).await;
+        typed(&bench, owner::buy(account, "2019-03-01", 10, 100)).await;
+    }
+    // A1 to A2 the four-step way, on four days, at 150.
+    let sale = typed(&bench, owner::sell("A1", "2019-06-01", 4, 150)).await;
+    let withdrawal = typed(&bench, owner::withdraw("A1", "2019-06-02", 600)).await;
+    let deposit = typed(&bench, owner::deposit("A2", "2019-06-03", 600)).await;
+    let purchase = typed(&bench, owner::buy("A2", "2019-06-04", 4, 150)).await;
+    // B1 to B2 as the transfer, from the start.
+    bench
+        .transfers
+        .record_transfer(
+            &b1,
+            &b2,
+            sale.asset_id.clone(),
+            TransferFigures {
+                date: "2019-06-01".to_string(),
+                quantity_sent: 4 * M,
+                quantity_received: 4 * M,
+                exchange_rate: None,
+                note: None,
+            },
+        )
+        .await
+        .expect("transferred");
+    // A later sale in both receiving accounts, whose result the replacement moves.
+    for account in ["A2", "B2"] {
+        typed(&bench, owner::sell(account, "2019-09-01", 1, 200)).await;
+    }
+
+    let asking = {
+        let (bench, granted) = (Arc::clone(&bench), granted.clone());
+        // Given in any order.
+        let ids = json!([purchase.id, sale.id, deposit.id, withdrawal.id]);
+        tokio::spawn(async move {
+            bench
+                .tools
+                .call(
+                    &granted,
+                    "request_transfer_replacement",
+                    &json!({ "transactions": ids }),
+                )
+                .await
+        })
+    };
+    let request = replacement_waiting(&bench.connections).await;
+    let kinds: Vec<_> = request.transactions.iter().map(|t| t.kind).collect();
+    assert_eq!(
+        kinds,
+        [
+            TransactionType::Sell,
+            TransactionType::Withdrawal,
+            TransactionType::Deposit,
+            TransactionType::Purchase
+        ],
+        "shown in the order of the steps"
+    );
+    assert_eq!(request.transfer.from_account, "A1");
+    assert_eq!(request.transfer.to_account, "A2");
+    assert_eq!(request.transfer.date, "2019-06-01", "the sale's date");
+    assert_eq!(request.transfer.quantity_sent, 4 * M);
+    assert_eq!(
+        request.transfer.cost,
+        400 * M,
+        "4 at the average price of 100"
+    );
+    assert_eq!(request.transfer.exchange_rate, None, "one currency");
+    let (before_a1, _) = figures_of(&bench, &a1).await;
+    assert!(
+        before_a1.iter().any(|t| t.contains("Sell")),
+        "nothing replaced before the owner's answer"
+    );
+
+    answer_replacement(&bench.connections, &bench.transfers, request.id, true)
+        .await
+        .expect("replaced");
+    let answered = asking.await.expect("asked").expect("replaced");
+    assert_eq!(answered["status"], "replaced");
+    assert_eq!(answered["transfer"]["quantity_sent"], 4 * M);
+    assert!(
+        bench.connections.replacements().is_empty(),
+        "the request is gone"
+    );
+
+    assert_eq!(figures_of(&bench, &a1).await, figures_of(&bench, &b1).await);
+    assert_eq!(figures_of(&bench, &a2).await, figures_of(&bench, &b2).await);
+    for id in [&sale.id, &withdrawal.id, &deposit.id, &purchase.id] {
+        assert!(
+            bench
+                .accounts
+                .get_transaction_by_id(id)
+                .await
+                .expect("read")
+                .is_none(),
+            "the four are removed"
+        );
+    }
+    // AGT-045 — the transfer is the owner's: no part carries an agent's mark.
+    let journal = bench
+        .accounts
+        .get_account_journal(&a2, &crate::context::account::JournalFilter::default())
+        .await
+        .expect("journal");
+    let parts: Vec<_> = journal.rows.iter().map(|row| &row.transaction).collect();
+    assert!(
+        parts.iter().any(|t| t.transfer_id.is_some()),
+        "the transfer is in A2"
+    );
+    for part in parts.iter().filter(|t| t.transfer_id.is_some()) {
+        assert!(
+            bench
+                .accounts
+                .agent_recording_of(&part.id)
+                .await
+                .expect("read")
+                .is_none(),
+            "unmarked"
+        );
+    }
+}
+
+// AGT-090 — what is not four transactions the owner typed forming a transfer, or what the
+// window's transfer would refuse on the accounts without them, is refused before asking.
+#[tokio::test]
+async fn agt_090_what_is_no_transfer_is_refused_before_asking() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    euro_account(&bench, "A1").await;
+    euro_account(&bench, "A2").await;
+    typed(&bench, owner::deposit("A1", "2019-01-15", 2000)).await;
+    typed(&bench, owner::buy("A1", "2019-03-01", 10, 100)).await;
+    let sale = typed(&bench, owner::sell("A1", "2019-06-01", 4, 150)).await;
+    let withdrawal = typed(&bench, owner::withdraw("A1", "2019-06-02", 600)).await;
+    // More is deposited than the purchase took, and spent later: without the deposit the
+    // cash of A2 cannot pay it.
+    let deposit = typed(&bench, owner::deposit("A2", "2019-06-03", 700)).await;
+    let purchase = typed(&bench, owner::buy("A2", "2019-06-04", 4, 150)).await;
+    let spent = typed(&bench, owner::withdraw("A2", "2019-07-01", 100)).await;
+    let other_sale = typed(&bench, owner::sell("A1", "2019-08-01", 1, 150)).await;
+    let marked = bench
+        .tools
+        .call(
+            &granted,
+            "record_deposit",
+            &json!({ "account": "A1", "amount": 5, "date": "2019-09-01" }),
+        )
+        .await
+        .expect("recorded");
+    let marked = recorded_id(&marked);
+
+    let four = |ids: [&String; 4]| json!({ "transactions": ids });
+    for (arguments, code) in [
+        (json!({}), "MissingArgument"),
+        (json!({ "transactions": [1, 2, 3, 4] }), "MissingArgument"),
+        (
+            json!({ "transactions": [sale.id, withdrawal.id, deposit.id] }),
+            "InvalidArguments",
+        ),
+        (
+            four([&sale.id, &sale.id, &deposit.id, &purchase.id]),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "transactions": [sale.id, withdrawal.id, deposit.id, "no-such-id"] }),
+            "TransactionNotFound",
+        ),
+        (
+            four([&sale.id, &marked, &deposit.id, &purchase.id]),
+            "NotTypedByOwner",
+        ),
+        (
+            four([&sale.id, &other_sale.id, &deposit.id, &purchase.id]),
+            "NotATransfer",
+        ),
+        // The withdrawal is not in the sale's account.
+        (
+            four([&sale.id, &spent.id, &deposit.id, &purchase.id]),
+            "NotATransfer",
+        ),
+        (
+            json!({ "transactions": [sale.id, withdrawal.id, deposit.id, purchase.id], "rate": 2 }),
+            "TransferRateNotOne",
+        ),
+        (
+            four([&sale.id, &withdrawal.id, &deposit.id, &purchase.id]),
+            "InsufficientCash",
+        ),
+    ] {
+        let refused = bench
+            .tools
+            .call(&granted, "request_transfer_replacement", &arguments)
+            .await
+            .expect_err("refused");
+        assert_eq!(refused.code, code, "{arguments}");
+    }
+    assert!(
+        bench.connections.replacements().is_empty(),
+        "nothing was asked"
+    );
+    assert!(
+        bench
+            .accounts
+            .get_transaction_by_id(&sale.id)
+            .await
+            .expect("read")
+            .is_some(),
+        "nothing was written"
+    );
+}
+
+// AGT-091 — a refusal replaces nothing; a yes on four that changed since the owner was shown
+// them replaces nothing and says so; an answer to a request no longer waiting is refused;
+// a session that ends withdraws its request.
+#[tokio::test]
+async fn agt_091_a_refusal_or_a_change_since_replaces_nothing() {
+    use super::gate::{answer_replacement, AnswerRefused};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = Arc::new(workbench(data_dir.path()).await);
+    let granted = session(&bench.connections).await;
+    let a2 = {
+        euro_account(&bench, "A1").await;
+        euro_account(&bench, "A2").await
+    };
+    typed(&bench, owner::deposit("A1", "2019-01-15", 2000)).await;
+    typed(&bench, owner::buy("A1", "2019-03-01", 10, 100)).await;
+    let sale = typed(&bench, owner::sell("A1", "2019-06-01", 4, 150)).await;
+    let withdrawal = typed(&bench, owner::withdraw("A1", "2019-06-02", 600)).await;
+    let deposit = typed(&bench, owner::deposit("A2", "2019-06-03", 600)).await;
+    let purchase = typed(&bench, owner::buy("A2", "2019-06-04", 4, 150)).await;
+    let ids = json!({ "transactions": [sale.id, withdrawal.id, deposit.id, purchase.id] });
+    let ask = || {
+        let (bench, granted, ids) = (Arc::clone(&bench), granted.clone(), ids.clone());
+        tokio::spawn(async move {
+            bench
+                .tools
+                .call(&granted, "request_transfer_replacement", &ids)
+                .await
+        })
+    };
+    let before = figures_of(&bench, &a2).await;
+
+    // Refused: nothing replaced, and the agent is told nothing else.
+    let asked = ask();
+    let request = replacement_waiting(&bench.connections).await;
+    answer_replacement(&bench.connections, &bench.transfers, request.id, false)
+        .await
+        .expect("answered");
+    let refused = asked.await.expect("asked").expect_err("refused");
+    assert_eq!(refused.code, "ReplacementRefused");
+    assert_eq!(figures_of(&bench, &a2).await, before);
+    assert_eq!(
+        answer_replacement(&bench.connections, &bench.transfers, request.id, true).await,
+        Err(AnswerRefused::Gone),
+        "a request no longer waiting"
+    );
+
+    // Changed since the owner was shown it: the yes replaces nothing.
+    let asked = ask();
+    let request = replacement_waiting(&bench.connections).await;
+    bench
+        .accounts
+        .correct_transaction(
+            &deposit.account_id,
+            &deposit.id,
+            deposit.date.clone(),
+            deposit.quantity,
+            deposit.unit_price,
+            deposit.exchange_rate,
+            deposit.fees,
+            Some(deposit.total_amount),
+            Some("typed again".to_string()),
+        )
+        .await
+        .expect("corrected");
+    assert_eq!(
+        answer_replacement(&bench.connections, &bench.transfers, request.id, true).await,
+        Err(AnswerRefused::NotDone {
+            reason: "TransactionChanged".to_string()
+        })
+    );
+    assert_eq!(
+        asked.await.expect("asked").expect_err("not replaced").code,
+        "TransactionChanged"
+    );
+    assert!(
+        bench
+            .accounts
+            .get_transaction_by_id(&sale.id)
+            .await
+            .expect("read")
+            .is_some(),
+        "nothing was written"
+    );
+
+    // AGT-082 — a session that ends withdraws its request: its call is refused.
+    let asked = ask();
+    replacement_waiting(&bench.connections).await;
+    assert!(bench.connections.end(granted.session_id));
+    assert_eq!(
+        asked.await.expect("asked").expect_err("refused").code,
+        "ReplacementRefused"
+    );
+    assert!(bench.connections.replacements().is_empty());
 }

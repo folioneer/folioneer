@@ -418,6 +418,21 @@ pub fn definitions() -> Vec<ToolDefinition> {
                 "additionalProperties": false
             }),
         },
+        ToolDefinition {
+            name: "request_transfer_replacement",
+            title: "Ask to replace four transactions you typed with a transfer",
+            only_reads: false,
+            description: "Ask the owner to replace four transactions the owner typed that record a transfer the four-step way — a sale and a withdrawal in one account, a deposit and a purchase in another, the sale and the purchase of one asset — with the one transfer they stand for: give their ids, as list_transactions gives them, and a rate between currencies if not the stored one. The transfer goes from the sale's account to the purchase's, on the sale's date, the sale's quantity sent and the purchase's received, at its cost. What the window's transfer would refuse on the accounts without the four is refused before asking. The owner is shown the four and the transfer, and answers them alone; the call waits for that answer. Answered replaced, with the transfer, or refused with ReplacementRefused, which gives nothing else. The transfer is the owner's: it is not marked as an agent's.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "transactions": { "type": "array", "items": { "type": "string" }, "description": "The ids of the four transactions, as list_transactions gives them." },
+                    "rate": { "type": ["string", "number"], "description": "Between accounts of different currencies, the rate from the sending account's currency to the receiving one's; the stored rate of the sale's date when not given." }
+                },
+                "required": ["transactions"],
+                "additionalProperties": false
+            }),
+        },
     ]
 }
 

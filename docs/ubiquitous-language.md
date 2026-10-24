@@ -560,6 +560,12 @@ An agent asking the owner, in the window, to remove one transaction the owner ty
 
 An agent asking the owner, in the window, to change one transaction the owner typed, of any kind: the transaction is shown as it is and as it would become, refusing is the default, and the answer covers that one change only. The agent calls `request_change`. In French: "Demande de modification" (owner, 2026-10-17).
 
+### Replacement request
+
+> Status: confirmed
+
+An agent asking the owner, in the window, to replace four transactions the owner typed — a sale, a withdrawal, a deposit and a purchase, a transfer recorded the four-step way — with one transfer: the four are shown struck through above the transfer recorded in their place, refusing is the default, and the answer covers those four only (AGT-090 to AGT-092). The agent calls `request_transfer_replacement`. In French: "Demande de remplacement" (owner, 2026-10-24).
+
 ### Agent session
 
 > Status: confirmed

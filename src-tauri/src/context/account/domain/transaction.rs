@@ -723,6 +723,31 @@ impl Transaction {
         ((total_amount as i128 * 1_000_000) / quantity as i128) as i64
     }
 
+    /// AGT-088 / AGT-091 — whether this transaction still stands in full as `shown` stood
+    /// when the owner was shown it: the same date, type, quantity, total, unit price, fees,
+    /// rate and note.
+    pub fn stands_as(&self, shown: &Transaction) -> bool {
+        (
+            &self.date,
+            self.transaction_type,
+            self.quantity,
+            self.total_amount,
+            self.unit_price,
+            self.fees,
+            self.exchange_rate,
+            &self.note,
+        ) == (
+            &shown.date,
+            shown.transaction_type,
+            shown.quantity,
+            shown.total_amount,
+            shown.unit_price,
+            shown.fees,
+            shown.exchange_rate,
+            &shown.note,
+        )
+    }
+
     /// Whether this transaction is a part of a transfer (TRF entity).
     pub fn is_transfer_part(&self) -> bool {
         self.transfer_id.is_some()

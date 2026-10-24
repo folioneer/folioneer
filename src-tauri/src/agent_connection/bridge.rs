@@ -343,6 +343,7 @@ mod tests {
                 "preview_recording",
                 "request_removal",
                 "request_change",
+                "request_transfer_replacement",
             ]
         );
         assert_eq!(

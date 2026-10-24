@@ -1086,6 +1086,29 @@ impl Account {
             .collect()
     }
 
+    /// AGT-091 — takes the transactions `ids` out of this account, for a transfer to be
+    /// placed in their stead: nothing is replayed here — the transfer's placement replays
+    /// its asset and `settle_cash` the cash — so no state between the two is checked.
+    pub fn take_out(&mut self, ids: &[String]) -> Result<()> {
+        for id in ids {
+            let position = self
+                .transactions
+                .iter()
+                .position(|t| &t.id == id)
+                .ok_or(AccountError::TransactionNotFound)?;
+            self.transactions.remove(position);
+            self.pending_changes
+                .push(AccountChange::TransactionDeleted(id.clone()));
+        }
+        Ok(())
+    }
+
+    /// AGT-091 — replays the cash once transactions were taken out and a transfer placed: a
+    /// later debit left short refuses it (CSH-080).
+    pub fn settle_cash(&mut self) -> Result<()> {
+        Ok(self.replay_cash_holding()?)
+    }
+
     /// TRF-020/021/030 — places the parts of a transfer this account holds: `parts` replace
     /// those `transfer_id` had here (none for a new transfer). A part whose id it had is
     /// updated, a new one inserted, one no longer among `parts` deleted. The holding is

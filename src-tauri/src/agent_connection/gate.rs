@@ -8,12 +8,17 @@ use tokio::task::JoinHandle;
 
 use crate::core::BACKEND;
 use crate::use_cases::holding_transaction::{AsShown, HoldingTransactionUseCase, Refusal};
+use crate::use_cases::transfer::TransferUseCase;
 
 use super::channel;
-use super::connections::{AgentConnections, ChangeAnswer, RemovalAnswer, TransactionShown};
+use super::connections::{
+    AgentConnections, ChangeAnswer, RemovalAnswer, ReplacementAnswer, TransactionShown,
+};
 use super::server::ToolRunner;
+use super::tools::refusal_from_transfer;
 
-/// Why the owner's answer to a removal or change request did nothing (AGT-081, AGT-088).
+/// Why the owner's answer to a removal, change or replacement request did nothing (AGT-081,
+/// AGT-088, AGT-091).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnswerRefused {
     /// The request was already answered, or its session ended.
@@ -108,6 +113,64 @@ pub async fn answer_change(
             Err(error)
         }
     }
+}
+
+/// AGT-091 — the owner's answer to a replacement request, over the connections and the
+/// transfer: removing the four transactions and recording the transfer in one write, or
+/// refusing. The agent that asked is told what became of it.
+pub async fn answer_replacement(
+    connections: &AgentConnections,
+    transfers: &TransferUseCase,
+    request_id: u32,
+    replace: bool,
+) -> Result<(), AnswerRefused> {
+    let answered = connections
+        .take_replacement(request_id)
+        .ok_or(AnswerRefused::Gone)?;
+    let session = answered.request.session;
+    if !replace {
+        tracing::info!(target: BACKEND, session, "the owner refused a replacement");
+        answered.tell(ReplacementAnswer::Refused);
+        return Ok(());
+    }
+    let refusal = match transfers.replace(&answered.held).await {
+        Ok(Some(parts)) => {
+            tracing::info!(target: BACKEND, session, "the owner replaced four transactions with a transfer");
+            let transfer_id = parts.first().and_then(|part| part.transfer_id.clone());
+            let view = match transfer_id {
+                Some(transfer_id) => transfers.get_transfer(&transfer_id).await.ok(),
+                None => None,
+            };
+            let Some(view) = view else {
+                tracing::error!(target: BACKEND, session, "answer_replacement_request: the transfer recorded could not be read");
+                answered.tell(ReplacementAnswer::NotReplaced {
+                    code: "DatabaseError".to_string(),
+                    message: "the transfer was recorded, but could not be read: list_transactions shows it".to_string(),
+                });
+                return Ok(());
+            };
+            answered.tell(ReplacementAnswer::Replaced(Box::new(view)));
+            return Ok(());
+        }
+        Ok(None) => Refusal {
+            code: "TransactionChanged".to_string(),
+            message: "the four transactions or the transfer changed since the owner was shown them: ask again".to_string(),
+        },
+        Err(error) => {
+            let refusal = refusal_from_transfer(&error);
+            Refusal {
+                code: refusal.code,
+                message: refusal.message,
+            }
+        }
+    };
+    tracing::warn!(target: BACKEND, session, code = %refusal.code, "answer_replacement_request: nothing replaced");
+    let error = not_done(&refusal);
+    answered.tell(ReplacementAnswer::NotReplaced {
+        code: refusal.code,
+        message: refusal.message,
+    });
+    Err(error)
 }
 
 /// What the owner was shown of `shown`, as an answer checks it still stands.

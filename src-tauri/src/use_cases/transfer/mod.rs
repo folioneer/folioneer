@@ -10,8 +10,12 @@ mod api;
 mod error;
 /// Cross-BC orchestrator.
 mod orchestrator;
+/// AGT-090 / AGT-091 — four transactions the owner typed replaced with the transfer they
+/// stand for.
+mod replacement;
 
 #[cfg(feature = "app")]
 pub use api::*;
 pub use error::{TransferError, TransferTask};
 pub use orchestrator::{AgentTransferError, TransferFigures, TransferUseCase};
+pub use replacement::{FourSteps, Replacement, ReplacementError};
