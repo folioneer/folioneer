@@ -13,6 +13,16 @@ interface ReplacementRequestDialogProps {
 
 const DIALOG_ID = "agent-replacement-dialog";
 
+/** The columns of a removed transaction's line, named for a screen reader. */
+const COLUMNS = [
+  "agent.transaction_account",
+  "agent.transaction_date",
+  "agent.transaction_kind",
+  "agent.transaction_asset",
+  "agent.transaction_quantity",
+  "agent.transaction_amount",
+] as const;
+
 /**
  * AGT-092 — an agent asks to replace four transactions the owner typed with one transfer.
  * The dialog shows the four struck through, the transfer recorded in their place in the
@@ -65,6 +75,15 @@ export function ReplacementRequestDialog({ request, onAnswer }: ReplacementReque
         <div className="rounded-2xl bg-m3-surface-variant/60 px-4 py-3">
           <p className="mb-2 text-m3-on-surface-variant">{t("agent.replacement_removed")}</p>
           <table className="w-full border-separate border-spacing-y-1 text-left">
+            <thead className="sr-only">
+              <tr>
+                {COLUMNS.map((column) => (
+                  <th key={column} scope="col">
+                    {t(column)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
             <tbody>
               {request.transactions.map((shown) => (
                 <tr

@@ -5,7 +5,7 @@ import { formatIsoDateNumeric } from "@/ui/format/date";
 import type { TransactionRow } from "./transactionRows";
 
 /** One cell of a replaced transaction's line: a stable key and its value. */
-export type ReplacedCell = [key: string, value: string];
+type ReplacedCell = [key: string, value: string];
 
 const MINUS = "−";
 

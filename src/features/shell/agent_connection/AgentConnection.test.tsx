@@ -385,6 +385,9 @@ describe("AgentConnectionMount", () => {
     expect(dialog).toHaveAttribute("id", "agent-replacement-dialog");
     expect(dialog).toHaveTextContent("agent.replacement_title(Claude Code)");
     expect(dialog).toHaveTextContent("agent.replacement_removed");
+    expect(
+      within(dialog).getByRole("columnheader", { name: "agent.transaction_amount" }),
+    ).toBeInTheDocument();
     const sale = document.getElementById("agent-replacement-removed-sell") as HTMLElement;
     expect(sale).toHaveClass("line-through");
     expect(sale).toHaveTextContent("Exchange");
