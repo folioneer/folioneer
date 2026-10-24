@@ -745,3 +745,28 @@ async fn trf_025_the_receiving_cost_follows_the_sending_cost() {
         "the transfer onward follows"
     );
 }
+
+// TRF-011 — between currencies with no rate given, a malformed date is named as such
+// before any rate is looked up.
+#[tokio::test]
+async fn trf_011_a_malformed_date_is_named_before_the_rate() {
+    let ctx = build_ctx().await;
+    let (from, to, asset) = seed(&ctx, "USD").await;
+    let refused = ctx
+        .transfer
+        .record_transfer(
+            &from,
+            &to,
+            asset,
+            TransferFigures {
+                date: "not-a-date".to_string(),
+                ..figures(micro(1), micro(1), None)
+            },
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        refused,
+        TransferError::Account(AccountError::InvalidDate)
+    ));
+}

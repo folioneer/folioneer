@@ -126,6 +126,8 @@ impl TransferUseCase {
     ) -> Result<i64, TransferError> {
         let from = self.currency_of(from_account_id).await?;
         let to = self.currency_of(to_account_id).await?;
+        // TRF-011 — a malformed or out-of-bounds date is named as such, not as a missing rate.
+        Transaction::validate_date(&figures.date)?;
         if let Some(rate) = figures.exchange_rate {
             return Ok(rate);
         }

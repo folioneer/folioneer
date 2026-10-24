@@ -459,7 +459,7 @@ enum WriteOffReason {
 }
 
 // Returned by buy_holding, sell_holding, correct_transaction, open_holding, record_deposit,
-// record_withdrawal, and get_transactions.
+// record_withdrawal, record_transfer, correct_transfer, and get_transactions.
 //
 // For Deposit/Withdrawal: asset_id is always the Cash Asset for account.currency;
 // quantity == total_amount; unit_price == 1_000_000 (cash is its own unit); exchange_rate ==
@@ -471,6 +471,9 @@ enum WriteOffReason {
 // For FreeShares (FSD-022): asset_id is the DISTRIBUTING asset; quantity is the distributed
 // shares; unit_price == 0, exchange_rate == 1_000_000, fees == 0, total_amount == 0 (no money
 // moved — FSD-023); realized_pnl is None.
+// For TransferOut / TransferIn (TRF-022): unit_price and total_amount are in the side's ACCOUNT
+// currency (the cost moved, rounded down); exchange_rate is 1_000_000 on the transfer out and the
+// sending → receiving account rate on the transfer in; fees == 0; realized_pnl is None.
 struct Transaction {
     id: String,
     account_id: String,

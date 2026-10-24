@@ -813,7 +813,7 @@ impl Transaction {
     }
 
     /// TRX-020 — date must be parseable, not in the future, not before 1900-01-01.
-    pub(super) fn validate_date(date: &str) -> StdResult<(), AccountError> {
+    pub fn validate_date(date: &str) -> StdResult<(), AccountError> {
         let parsed_date =
             NaiveDate::parse_from_str(date, "%Y-%m-%d").map_err(|_| AccountError::InvalidDate)?;
         let today = chrono::Local::now().date_naive();
