@@ -60,9 +60,7 @@ impl RateRefreshUseCase {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::account::{
-        Account, AccountError, Holding, MockAccountServiceContract, UpdateFrequency,
-    };
+    use crate::context::account::{Account, AccountError, Holding, MockAccountServiceContract};
     use crate::context::asset::{
         Asset, AssetCategory, AssetClass, MockAssetServiceContract, SYSTEM_CATEGORY_ID,
     };
@@ -95,7 +93,6 @@ mod tests {
                 "Portfolio".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )])
         });
@@ -209,7 +206,6 @@ mod tests {
                 "Brokerage".to_string(),
                 String::new(),
                 "USD".to_string(),
-                UpdateFrequency::Automatic,
                 false,
             )])
         });

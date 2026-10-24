@@ -48,7 +48,7 @@ mod tests {
     use super::*;
     use crate::context::account::{
         AccountService, SqliteAccountRepository, SqliteHoldingRepository,
-        SqliteTransactionRepository, UpdateFrequency,
+        SqliteTransactionRepository,
     };
     use crate::context::asset::{
         AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
@@ -110,7 +110,6 @@ mod tests {
                 "Empty Account".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -136,7 +135,6 @@ mod tests {
                 "Test Account".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -188,7 +186,6 @@ mod tests {
                 "Test Account".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await

@@ -2,7 +2,7 @@
 #![allow(clippy::unreachable)]
 
 use super::AccountCreationUseCase;
-use crate::context::account::{Account, AccountError, UpdateFrequency};
+use crate::context::account::{Account, AccountError};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;
@@ -16,8 +16,6 @@ pub struct CreateAccountDTO {
     pub bank_name: String,
     /// ISO 4217 currency code.
     pub currency: String,
-    /// Update frequency.
-    pub update_frequency: UpdateFrequency,
     /// Whether the % management-fee mechanism is enabled (FEE-075). New accounts
     /// default to false; the creation form can opt in.
     pub management_fees_enabled: bool,
@@ -40,7 +38,6 @@ pub async fn add_account(
         dto.name,
         dto.bank_name,
         dto.currency,
-        dto.update_frequency,
         dto.management_fees_enabled,
         dto.country,
         dto.wrapper,

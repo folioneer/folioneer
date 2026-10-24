@@ -71,8 +71,8 @@ export function GlobalPerformancePage() {
             </h2>
           </div>
 
-          {/* GPF-014 — view-mode toggle, present only when month view is available */}
-          {view.monthViewAvailable && !view.isLoading && !view.error && !view.isEmpty && (
+          {/* GPF-014 — view-mode toggle */}
+          {!view.isLoading && !view.error && !view.isEmpty && (
             <fieldset
               id="global-performance-view-toggle"
               data-testid="global-performance-view-toggle"

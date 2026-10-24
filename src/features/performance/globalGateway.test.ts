@@ -36,7 +36,6 @@ const makeResponse = (
 ): AccountPerformanceResponse => ({
   account_name: "",
   currency: "EUR",
-  month_view_available: true,
   lifetime_unavailable: null,
   yearly: [makeYearRow()],
   monthly: [],
@@ -119,9 +118,7 @@ describe("globalPerformanceGateway — getGlobalPerformance", () => {
 
   // GPF-015 — an empty portfolio is an ok result with empty arrays
   it("passes through ok result with empty yearly and monthly arrays (GPF-015)", async () => {
-    mockInvoke.mockResolvedValue(
-      makeResponse({ yearly: [], monthly: [], month_view_available: false }),
-    );
+    mockInvoke.mockResolvedValue(makeResponse({ yearly: [], monthly: [] }));
 
     const result = await globalPerformanceGateway.getGlobalPerformance(null, null);
 
@@ -129,7 +126,6 @@ describe("globalPerformanceGateway — getGlobalPerformance", () => {
     if (result.status === "ok") {
       expect(result.data.yearly).toHaveLength(0);
       expect(result.data.monthly).toHaveLength(0);
-      expect(result.data.month_view_available).toBe(false);
     }
   });
 });

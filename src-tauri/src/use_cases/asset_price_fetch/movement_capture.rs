@@ -239,7 +239,6 @@ mod tests {
                 "Alpha".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                crate::context::account::UpdateFrequency::ManualMonth,
                 false,
             )])
         });
@@ -353,7 +352,6 @@ mod tests {
                 "Alpha".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                crate::context::account::UpdateFrequency::ManualMonth,
                 false,
             )])
         });
@@ -397,7 +395,6 @@ mod tests {
                 "Alpha".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                crate::context::account::UpdateFrequency::ManualMonth,
                 false,
             )])
         });
@@ -431,7 +428,6 @@ mod tests {
                 "Alpha".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                crate::context::account::UpdateFrequency::ManualMonth,
                 false,
             )])
         });
@@ -479,7 +475,6 @@ mod tests {
                 "Alpha".to_string(),
                 String::new(),
                 "USD".to_string(),
-                crate::context::account::UpdateFrequency::ManualMonth,
                 false,
             )])
         });
@@ -523,7 +518,6 @@ mod tests {
                 "Alpha".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                crate::context::account::UpdateFrequency::ManualMonth,
                 false,
             )])
         });

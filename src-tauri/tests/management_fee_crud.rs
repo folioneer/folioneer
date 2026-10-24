@@ -8,7 +8,7 @@
 
 use folioneer_lib::context::account::{
     Account, AccountService, SqliteAccountRepository, SqliteHoldingRepository,
-    SqliteTransactionRepository, UpdateFrequency,
+    SqliteTransactionRepository,
 };
 use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
@@ -32,7 +32,6 @@ async fn enable_management_fees(svc: &AccountService, account: &Account) -> Acco
         account.name.clone(),
         String::new(),
         account.currency.clone(),
-        account.update_frequency,
         true,
     )
     .await
@@ -125,7 +124,6 @@ async fn record_management_fee_does_not_create_asset_price_row() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -214,7 +212,6 @@ async fn record_management_fee_performance_neutrality() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::Automatic,
             false,
         )
         .await
@@ -295,7 +292,6 @@ async fn account_holding(ctx: &Ctx, quantity: i64) -> (Account, String) {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -673,7 +669,6 @@ async fn fee_029_the_preview_refuses_what_the_recording_refuses() {
             account.name.clone(),
             String::new(),
             account.currency.clone(),
-            account.update_frequency,
             false,
         )
         .await
@@ -775,12 +770,10 @@ async fn fee_063_a_deduction_is_edited_and_deleted_through_the_replay() {
 async fn fee_075_an_account_from_before_the_parameter_keeps_its_fees() {
     let ctx = build_ctx().await;
     let pool = make_pool().await;
-    sqlx::query(
-        "INSERT INTO accounts (id, name, update_frequency, currency) VALUES ('old', 'Old', 'ManualMonth', 'EUR')",
-    )
-    .execute(&pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO accounts (id, name, currency) VALUES ('old', 'Old', 'EUR')")
+        .execute(&pool)
+        .await
+        .unwrap();
     let (enabled,): (bool,) =
         sqlx::query_as("SELECT management_fees_enabled FROM accounts WHERE id = 'old'")
             .fetch_one(&pool)
@@ -790,13 +783,7 @@ async fn fee_075_an_account_from_before_the_parameter_keeps_its_fees() {
 
     let created = ctx
         .account_service
-        .create(
-            "New".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("New".to_string(), String::new(), "EUR".to_string(), false)
         .await
         .unwrap();
     assert!(!created.management_fees_enabled);

@@ -80,7 +80,6 @@ const makeResponse = (
 ): AccountPerformanceResponse => ({
   account_name: "",
   currency: "EUR",
-  month_view_available: true,
   lifetime_unavailable: null,
   yearly: [makeYearRow()],
   monthly: [makeMonthRow(5), makeMonthRow(4), makeMonthRow(3)],
@@ -92,7 +91,6 @@ const makeAccount = (overrides: Partial<Account> = {}): Account => ({
   name: "Broker One",
   bank_name: "",
   currency: "EUR",
-  update_frequency: "ManualMonth",
   management_fees_enabled: false,
   ...overrides,
 });
@@ -213,7 +211,7 @@ describe("GlobalPerformancePage", () => {
   it("renders the empty state when the portfolio has no data (GPF-015)", async () => {
     vi.mocked(gateway.globalPerformanceGateway.getGlobalPerformance).mockResolvedValue({
       status: "ok",
-      data: makeResponse({ yearly: [], monthly: [], month_view_available: false }),
+      data: makeResponse({ yearly: [], monthly: [] }),
     });
 
     render(<GlobalPerformancePage />);

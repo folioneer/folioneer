@@ -1,5 +1,5 @@
 use crate::context::account::{
-    Account, AccountError, AccountServiceContract, Transaction, TransactionType, UpdateFrequency,
+    Account, AccountError, AccountServiceContract, Transaction, TransactionType,
 };
 use crate::context::asset::AssetServiceContract;
 use crate::context::currency::CurrencyService;
@@ -125,29 +125,15 @@ impl GlobalPerformanceUseCase {
             return Ok(empty_response(&reference));
         };
 
-        // GPF-014 — the monthly series exists only when EVERY included account
-        // is month-eligible (PRF-013).
-        let month_view_available = included.iter().all(|(account, _)| {
-            matches!(
-                account.update_frequency,
-                UpdateFrequency::Automatic
-                    | UpdateFrequency::ManualDay
-                    | UpdateFrequency::ManualWeek
-            )
-        });
-
-        // Every date the aggregation values: yearly period ends, plus — when the
-        // monthly series exists — monthly period ends and their prior-year-end
-        // YTD baselines (FXR-035/042 pre-resolution set).
+        // Every date the aggregation values: yearly and monthly period ends, and the
+        // monthly periods' prior-year-end YTD baselines (FXR-035/042 pre-resolution set).
         let mut valued_dates: BTreeSet<NaiveDate> = BTreeSet::new();
         for period in year_periods(earliest_date, today) {
             valued_dates.insert(period.period_end);
         }
-        if month_view_available {
-            for period in month_periods(earliest_date, today) {
-                valued_dates.insert(period.period_end);
-                valued_dates.insert(period.year_start_baseline);
-            }
+        for period in month_periods(earliest_date, today) {
+            valued_dates.insert(period.period_end);
+            valued_dates.insert(period.year_start_baseline);
         }
         let valued_dates: Vec<NaiveDate> = valued_dates.into_iter().collect();
 
@@ -185,18 +171,14 @@ impl GlobalPerformanceUseCase {
             earliest_date,
             today,
         );
-        let monthly = if month_view_available {
-            build_monthly_aggregated(
-                &converted_accounts,
-                &flows,
-                &scoped_transactions,
-                asset_scope,
-                earliest_date,
-                today,
-            )
-        } else {
-            Vec::new()
-        };
+        let monthly = build_monthly_aggregated(
+            &converted_accounts,
+            &flows,
+            &scoped_transactions,
+            asset_scope,
+            earliest_date,
+            today,
+        );
 
         // PRF-087 — the cause, across every included account's transactions in scope.
         let all_transactions: Vec<Transaction> = converted_accounts
@@ -208,7 +190,6 @@ impl GlobalPerformanceUseCase {
         Ok(AccountPerformanceResponse {
             account_name: String::new(),
             currency: reference,
-            month_view_available,
             yearly,
             monthly,
             lifetime_unavailable,
@@ -345,7 +326,6 @@ fn empty_response(reference: &str) -> AccountPerformanceResponse {
     AccountPerformanceResponse {
         account_name: String::new(),
         currency: reference.to_string(),
-        month_view_available: false,
         yearly: Vec::new(),
         monthly: Vec::new(),
         lifetime_unavailable: None,
@@ -944,16 +924,9 @@ mod tests {
         account_svc: &AccountService,
         name: &str,
         currency: &str,
-        update_frequency: UpdateFrequency,
     ) -> crate::context::account::Account {
         account_svc
-            .create(
-                name.to_string(),
-                String::new(),
-                currency.to_string(),
-                update_frequency,
-                false,
-            )
+            .create(name.to_string(), String::new(), currency.to_string(), false)
             .await
             .expect("account created")
     }
@@ -991,9 +964,8 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         asset_svc.seed_cash_asset("EUR").await.unwrap();
-        let first = create_account(&account_svc, "First", "EUR", UpdateFrequency::Automatic).await;
-        let second =
-            create_account(&account_svc, "Second", "EUR", UpdateFrequency::Automatic).await;
+        let first = create_account(&account_svc, "First", "EUR").await;
+        let second = create_account(&account_svc, "Second", "EUR").await;
         account_svc
             .record_deposit(&first.id, "2024-03-01".to_string(), 1_000_000_000, None)
             .await
@@ -1030,8 +1002,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         asset_svc.seed_cash_asset("USD").await.unwrap();
-        let account =
-            create_account(&account_svc, "Foreign", "USD", UpdateFrequency::Automatic).await;
+        let account = create_account(&account_svc, "Foreign", "USD").await;
         account_svc
             .record_deposit(&account.id, "2024-03-15".to_string(), 1_000_000_000, None)
             .await
@@ -1079,10 +1050,8 @@ mod tests {
         let (account_svc, asset_svc) = setup(&pool).await;
         asset_svc.seed_cash_asset("EUR").await.unwrap();
         asset_svc.seed_cash_asset("USD").await.unwrap();
-        let domestic =
-            create_account(&account_svc, "Domestic", "EUR", UpdateFrequency::Automatic).await;
-        let foreign =
-            create_account(&account_svc, "Foreign", "USD", UpdateFrequency::Automatic).await;
+        let domestic = create_account(&account_svc, "Domestic", "EUR").await;
+        let foreign = create_account(&account_svc, "Foreign", "USD").await;
         account_svc
             .record_deposit(&domestic.id, "2024-02-10".to_string(), 500_000_000, None)
             .await
@@ -1113,54 +1082,14 @@ mod tests {
         assert_eq!(since_inception.gain, 0);
     }
 
-    // GPF-014 — one month-ineligible included account disables the monthly series.
+    // GPF-014 — the monthly series exists for every aggregation (PRF-013).
     #[tokio::test]
-    async fn month_view_unavailable_when_any_included_account_is_month_ineligible() {
+    async fn the_monthly_series_spans_every_included_account() {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         asset_svc.seed_cash_asset("EUR").await.unwrap();
-        let eligible =
-            create_account(&account_svc, "Eligible", "EUR", UpdateFrequency::Automatic).await;
-        let ineligible = create_account(
-            &account_svc,
-            "Ineligible",
-            "EUR",
-            UpdateFrequency::ManualMonth,
-        )
-        .await;
-        account_svc
-            .record_deposit(&eligible.id, "2024-03-01".to_string(), 100_000_000, None)
-            .await
-            .unwrap();
-        account_svc
-            .record_deposit(&ineligible.id, "2024-04-01".to_string(), 100_000_000, None)
-            .await
-            .unwrap();
-
-        let uc = GlobalPerformanceUseCase::new(
-            account_svc,
-            asset_svc,
-            make_currency_service_with_no_rate(),
-        );
-        let response = uc.get_global_performance(None, None).await.unwrap();
-
-        assert!(
-            !response.month_view_available,
-            "AND over included accounts: ManualMonth disables the month view"
-        );
-        assert!(response.monthly.is_empty(), "no monthly series");
-        assert!(!response.yearly.is_empty(), "yearly series always present");
-    }
-
-    // GPF-014 — the monthly series exists when every included account is eligible.
-    #[tokio::test]
-    async fn month_view_available_when_all_included_accounts_are_month_eligible() {
-        let pool = make_pool().await;
-        let (account_svc, asset_svc) = setup(&pool).await;
-        asset_svc.seed_cash_asset("EUR").await.unwrap();
-        let first = create_account(&account_svc, "First", "EUR", UpdateFrequency::Automatic).await;
-        let second =
-            create_account(&account_svc, "Second", "EUR", UpdateFrequency::ManualWeek).await;
+        let first = create_account(&account_svc, "First", "EUR").await;
+        let second = create_account(&account_svc, "Second", "EUR").await;
         account_svc
             .record_deposit(&first.id, "2024-03-01".to_string(), 100_000_000, None)
             .await
@@ -1177,7 +1106,6 @@ mod tests {
         );
         let response = uc.get_global_performance(None, None).await.unwrap();
 
-        assert!(response.month_view_available);
         assert!(!response.monthly.is_empty());
 
         // PRF-042 — the first month has no month before it to compare with; every
@@ -1203,15 +1131,14 @@ mod tests {
     }
 
     // GPF-012 — an account with no in-scope transactions is excluded from the
-    // aggregation AND from the month-view eligibility.
+    // aggregation: the series start at the active account's first month.
     #[tokio::test]
     async fn accounts_without_in_scope_transactions_are_excluded() {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         asset_svc.seed_cash_asset("EUR").await.unwrap();
-        let active =
-            create_account(&account_svc, "Active", "EUR", UpdateFrequency::Automatic).await;
-        create_account(&account_svc, "Dormant", "EUR", UpdateFrequency::ManualMonth).await;
+        let active = create_account(&account_svc, "Active", "EUR").await;
+        create_account(&account_svc, "Dormant", "EUR").await;
         account_svc
             .record_deposit(&active.id, "2024-03-01".to_string(), 100_000_000, None)
             .await
@@ -1224,9 +1151,9 @@ mod tests {
         );
         let response = uc.get_global_performance(None, None).await.unwrap();
 
-        assert!(
-            response.month_view_available,
-            "the transaction-less ManualMonth account does not drag eligibility"
+        assert_eq!(
+            response.monthly.last().map(|row| (row.year, row.month)),
+            Some((2024, Some(3)))
         );
     }
 
@@ -1236,8 +1163,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         asset_svc.seed_cash_asset("EUR").await.unwrap();
-        let account =
-            create_account(&account_svc, "Delegated", "EUR", UpdateFrequency::Automatic).await;
+        let account = create_account(&account_svc, "Delegated", "EUR").await;
         account_svc
             .record_deposit(&account.id, "2024-03-01".to_string(), 12_500_000_000, None)
             .await
@@ -1305,8 +1231,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         asset_svc.seed_cash_asset("EUR").await.unwrap();
-        let account =
-            create_account(&account_svc, "Delegated", "EUR", UpdateFrequency::Automatic).await;
+        let account = create_account(&account_svc, "Delegated", "EUR").await;
         account_svc
             .record_deposit(&account.id, "2024-03-01".to_string(), 12_500_000_000, None)
             .await
@@ -1364,9 +1289,8 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         asset_svc.seed_cash_asset("EUR").await.unwrap();
-        let first = create_account(&account_svc, "First", "EUR", UpdateFrequency::Automatic).await;
-        let second =
-            create_account(&account_svc, "Second", "EUR", UpdateFrequency::Automatic).await;
+        let first = create_account(&account_svc, "First", "EUR").await;
+        let second = create_account(&account_svc, "Second", "EUR").await;
         let stock = create_stock(&asset_svc, "Shared Stock", "SHR").await;
         for account_id in [&first.id, &second.id] {
             account_svc
@@ -1434,7 +1358,6 @@ mod tests {
 
         assert_eq!(response.account_name, "");
         assert_eq!(response.currency, "EUR");
-        assert!(!response.month_view_available);
         assert!(response.yearly.is_empty());
         assert!(response.monthly.is_empty());
     }
@@ -1446,8 +1369,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         asset_svc.seed_cash_asset("CHF").await.unwrap();
-        let account =
-            create_account(&account_svc, "Swiss", "CHF", UpdateFrequency::Automatic).await;
+        let account = create_account(&account_svc, "Swiss", "CHF").await;
         account_svc
             .record_deposit(&account.id, "2024-03-01".to_string(), 100_000_000, None)
             .await
@@ -1485,8 +1407,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         asset_svc.seed_cash_asset("EUR").await.unwrap();
-        let account =
-            create_account(&account_svc, "Holder", "EUR", UpdateFrequency::Automatic).await;
+        let account = create_account(&account_svc, "Holder", "EUR").await;
         account_svc
             .record_deposit(&account.id, "2024-03-01".to_string(), 100_000_000, None)
             .await
@@ -1515,8 +1436,8 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         asset_svc.seed_cash_asset("EUR").await.unwrap();
-        let older = create_account(&account_svc, "Older", "EUR", UpdateFrequency::Automatic).await;
-        let newer = create_account(&account_svc, "Newer", "EUR", UpdateFrequency::Automatic).await;
+        let older = create_account(&account_svc, "Older", "EUR").await;
+        let newer = create_account(&account_svc, "Newer", "EUR").await;
         account_svc
             .record_deposit(&older.id, "2023-03-01".to_string(), 500_000_000, None)
             .await
@@ -1620,8 +1541,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         asset_svc.seed_cash_asset("USD").await.unwrap();
-        let account =
-            create_account(&account_svc, "Foreign", "USD", UpdateFrequency::Automatic).await;
+        let account = create_account(&account_svc, "Foreign", "USD").await;
         // A USD-currency stock inside the USD account: no asset→account
         // conversion, so the only FX leg is USD→EUR (GPF-020/030/040).
         let stock = asset_svc

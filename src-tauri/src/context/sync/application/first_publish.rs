@@ -344,7 +344,7 @@ mod tests {
     use super::*;
     use crate::context::account::{
         AccountService, SqliteAccountRepository, SqliteHoldingRepository,
-        SqliteTransactionRepository, UpdateFrequency,
+        SqliteTransactionRepository,
     };
     use crate::context::asset::{
         AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
@@ -440,13 +440,7 @@ mod tests {
             .unwrap();
         asset_service.seed_cash_asset("USD").await.unwrap();
         let account = account_service
-            .create(
-                "Portfolio".into(),
-                String::new(),
-                "USD".into(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Portfolio".into(), String::new(), "USD".into(), false)
             .await
             .unwrap();
         account_service

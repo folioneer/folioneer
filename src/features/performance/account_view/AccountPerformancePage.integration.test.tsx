@@ -80,7 +80,6 @@ const makeResponse = (
 ): AccountPerformanceResponse => ({
   account_name: "My Portfolio",
   currency: "EUR",
-  month_view_available: true,
   lifetime_unavailable: null,
   yearly: [makeYearRow()],
   monthly: [makeMonthRow(5), makeMonthRow(4), makeMonthRow(3), makeMonthRow(2), makeMonthRow(1)],
@@ -228,11 +227,11 @@ describe("AccountPerformancePage", () => {
     expect(await screen.findByTestId("account-performance-back")).toBeInTheDocument();
   });
 
-  // PRF-011 — view-mode toggle present when month_view_available is true
-  it("renders the month/year view-mode toggle when month view is available (PRF-011, PRF-013)", async () => {
+  // PRF-011 — the view-mode toggle is present for every account
+  it("renders the month/year view-mode toggle for every account (PRF-011, PRF-013)", async () => {
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
-      data: makeResponse({ month_view_available: true }),
+      data: makeResponse({}),
     });
 
     render(<AccountPerformancePage />);
@@ -240,31 +239,11 @@ describe("AccountPerformancePage", () => {
     expect(await screen.findByTestId("account-performance-view-toggle")).toBeInTheDocument();
   });
 
-  // PRF-013 — toggle hidden or disabled when month_view_available is false
-  it("hides or disables the view-mode toggle when month view is not available (PRF-013)", async () => {
+  // PRF-014 — the page opens in month view when nothing is remembered
+  it("opens in month view by default (PRF-014)", async () => {
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
-      data: makeResponse({ month_view_available: false, monthly: [] }),
-    });
-
-    render(<AccountPerformancePage />);
-
-    await screen.findByTestId("account-performance-table");
-
-    // Toggle must be absent from the DOM OR be disabled
-    const toggle = screen.queryByTestId("account-performance-view-toggle");
-    if (toggle) {
-      expect(toggle).toBeDisabled();
-    } else {
-      expect(toggle).toBeNull();
-    }
-  });
-
-  // PRF-014 — page opens in month view when month_view_available is true
-  it("opens in month view by default when month view is available (PRF-014)", async () => {
-    vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
-      status: "ok",
-      data: makeResponse({ month_view_available: true }),
+      data: makeResponse({}),
     });
 
     render(<AccountPerformancePage />);
@@ -275,27 +254,12 @@ describe("AccountPerformancePage", () => {
     expect(screen.getByTestId("account-performance-year-selector")).toBeInTheDocument();
   });
 
-  // PRF-014 — page opens in year view when month view is not available
-  it("opens in year view by default when month view is not available (PRF-014)", async () => {
-    vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
-      status: "ok",
-      data: makeResponse({ month_view_available: false, monthly: [] }),
-    });
-
-    render(<AccountPerformancePage />);
-
-    await screen.findByTestId("account-performance-table");
-
-    // Year selector must not be present in year view
-    expect(screen.queryByTestId("account-performance-year-selector")).not.toBeInTheDocument();
-  });
-
   // PRF-014 — a remembered "year" preference overrides the month-view default
   it("restores the remembered view mode over the default (PRF-014)", async () => {
     localStorage.setItem("perf_view_mode_account-1", "year");
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
-      data: makeResponse({ month_view_available: true }),
+      data: makeResponse({}),
     });
 
     render(<AccountPerformancePage />);
@@ -309,7 +273,7 @@ describe("AccountPerformancePage", () => {
   it("persists the view mode when the user toggles it (PRF-014)", async () => {
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
-      data: makeResponse({ month_view_available: true }),
+      data: makeResponse({}),
     });
 
     render(<AccountPerformancePage />);
@@ -320,25 +284,11 @@ describe("AccountPerformancePage", () => {
     expect(localStorage.getItem("perf_view_mode_account-1")).toBe("year");
   });
 
-  // PRF-014 — a remembered "month" is clamped to year view when month view is gone
-  it("falls back to year view when the remembered month view is unavailable (PRF-014)", async () => {
-    localStorage.setItem("perf_view_mode_account-1", "month");
-    vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
-      status: "ok",
-      data: makeResponse({ month_view_available: false, monthly: [] }),
-    });
-
-    render(<AccountPerformancePage />);
-    await screen.findByTestId("account-performance-table");
-
-    expect(screen.queryByTestId("account-performance-year-selector")).not.toBeInTheDocument();
-  });
-
   // PRF-015 — year selector is present in month view
   it("renders a year selector in month view (PRF-015)", async () => {
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
-      data: makeResponse({ month_view_available: true }),
+      data: makeResponse({}),
     });
 
     render(<AccountPerformancePage />);
@@ -348,9 +298,10 @@ describe("AccountPerformancePage", () => {
 
   // PRF-037 — YTD column absent in year view
   it("does not render the YTD column in year view (PRF-037)", async () => {
+    localStorage.setItem("perf_view_mode_account-1", "year");
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
-      data: makeResponse({ month_view_available: false, monthly: [] }),
+      data: makeResponse({ monthly: [] }),
     });
 
     render(<AccountPerformancePage />);
@@ -365,7 +316,7 @@ describe("AccountPerformancePage", () => {
   it("renders the YTD column in month view (PRF-037)", async () => {
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
-      data: makeResponse({ month_view_available: true }),
+      data: makeResponse({}),
     });
 
     render(<AccountPerformancePage />);
@@ -378,7 +329,7 @@ describe("AccountPerformancePage", () => {
   it("removes the YTD column when the user switches to year view (PRF-011, PRF-037)", async () => {
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
-      data: makeResponse({ month_view_available: true }),
+      data: makeResponse({}),
     });
 
     render(<AccountPerformancePage />);
@@ -396,7 +347,7 @@ describe("AccountPerformancePage", () => {
   it("renders the annualized-yield column only in year view (T3)", async () => {
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
-      data: makeResponse({ month_view_available: true }),
+      data: makeResponse({}),
     });
 
     render(<AccountPerformancePage />);
@@ -413,10 +364,10 @@ describe("AccountPerformancePage", () => {
 
   // PRF-041 — rows rendered as-is (most-recent first from backend)
   it("renders period rows in the order returned by the backend (PRF-041)", async () => {
+    localStorage.setItem("perf_view_mode_account-1", "year");
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
       data: makeResponse({
-        month_view_available: false,
         lifetime_unavailable: null,
         monthly: [],
         yearly: [makeYearRow({ year: 2025 }), makeYearRow({ year: 2024 })],
@@ -435,10 +386,10 @@ describe("AccountPerformancePage", () => {
 
   // Value and percentage render in dedicated columns (not combined in one cell).
   it("renders performance value and percentage in separate columns", async () => {
+    localStorage.setItem("perf_view_mode_account-1", "year");
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
       data: makeResponse({
-        month_view_available: false,
         lifetime_unavailable: null,
         monthly: [],
         yearly: [makeYearRow({ year: 2025 })],
@@ -533,7 +484,7 @@ describe("AccountPerformancePage", () => {
   it("keeps the view-mode toggle and year selector working in scoped mode (PRF-011, PRF-015)", async () => {
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
-      data: makeResponse({ month_view_available: true }),
+      data: makeResponse({}),
     });
 
     render(<AccountPerformancePage />);

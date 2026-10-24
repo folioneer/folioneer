@@ -7,7 +7,7 @@
 
 use folioneer_lib::context::account::{
     AccountError, AccountService, SqliteAccountRepository, SqliteHoldingRepository,
-    SqliteTransactionRepository, TransactionType, UpdateFrequency,
+    SqliteTransactionRepository, TransactionType,
 };
 use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
@@ -101,7 +101,6 @@ async fn seed_held_position(ctx: &Ctx) -> (String, String) {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await
@@ -261,7 +260,6 @@ async fn record_split_on_cash_line_rejected() {
             "Portfolio".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await

@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 
-use crate::context::account::{AccountServiceContract, UpdateFrequency};
+use crate::context::account::AccountServiceContract;
 use crate::context::asset::{AssetClass, AssetServiceContract, CreateAssetDTO};
 use crate::context::sync::SqliteChangeRecorder;
 use crate::core::event_bus::{Event, EventReceiver, SideEffectEventBus};
@@ -57,13 +57,7 @@ async fn application_with_accounts(
     let assets: Arc<dyn AssetServiceContract> = Arc::clone(&container.asset_service) as _;
     if accounts.get_all().await.expect("accounts").is_empty() {
         let account = AccountCreationUseCase::new(Arc::clone(&accounts), Arc::clone(&assets))
-            .create(
-                "PEA".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("PEA".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .expect("account");
         container
@@ -1848,7 +1842,6 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
             account.name.clone(),
             account.bank_name.clone(),
             account.currency.clone(),
-            account.update_frequency,
             true,
         )
         .await
@@ -5060,13 +5053,7 @@ async fn agt_072_the_cash_of_an_account_built_from_opening_balances_is_previewed
     let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&bench.accounts) as _;
     let assets: Arc<dyn AssetServiceContract> = Arc::clone(&bench.assets) as _;
     AccountCreationUseCase::new(accounts, assets)
-        .create(
-            "CTO".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("CTO".to_string(), String::new(), "EUR".to_string(), false)
         .await
         .expect("account");
     bench

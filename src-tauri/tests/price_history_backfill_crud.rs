@@ -9,7 +9,6 @@ use std::sync::{Arc, Mutex};
 use chrono::NaiveDate;
 use folioneer_lib::context::account::{
     AccountService, SqliteAccountRepository, SqliteHoldingRepository, SqliteTransactionRepository,
-    UpdateFrequency,
 };
 use folioneer_lib::context::asset::{
     AssetClass, AssetPriceSource, AssetService, CreateAssetDTO, DatedClose, PriceProvider, Quote,
@@ -142,7 +141,6 @@ async fn build_ctx(opened_on: &str, today: &str, provider: ScriptedProvider) -> 
             "Backfill".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .await

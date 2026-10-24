@@ -16,18 +16,16 @@ export async function seedCategory(label: string): Promise<string> {
 export async function seedAccount(
   name: string,
   currency = "EUR",
-  updateFrequency = "ManualMonth",
   managementFeesEnabled = false,
 ): Promise<string> {
   const acc = (await browser.executeAsync(
-    (n: string, c: string, freq: string, fees: boolean, done: (r: unknown) => void) => {
+    (n: string, c: string, fees: boolean, done: (r: unknown) => void) => {
       // @ts-expect-error __TAURI_INTERNALS__ injected by Tauri WebView
       window.__TAURI_INTERNALS__
         .invoke("add_account", {
           dto: {
             name: n,
             currency: c,
-            update_frequency: freq,
             management_fees_enabled: fees,
             bank_name: "",
           },
@@ -37,7 +35,6 @@ export async function seedAccount(
     },
     name,
     currency,
-    updateFrequency,
     managementFeesEnabled,
   )) as { id: string };
   assert.ok(!("__error" in acc), `seedAccount failed: ${JSON.stringify(acc)}`);

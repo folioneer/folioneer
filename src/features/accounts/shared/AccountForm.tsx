@@ -1,17 +1,16 @@
 import type { ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
-import type { UpdateFrequency, WrapperLists } from "@/bindings";
+import type { WrapperLists } from "@/bindings";
 import { ComboboxField } from "@/ui/components/field/ComboboxField";
 import { SelectField } from "@/ui/components/field/SelectField";
 import { TextField } from "@/ui/components/field/TextField";
-import { countryOptions, FREQUENCY_I18N_KEYS, wrapperOptions } from "./presenter";
+import { countryOptions, wrapperOptions } from "./presenter";
 
 export interface AccountFormData {
   name: string;
   /** ACC-026 — bank or broker brand name; empty string means unset. */
   bank_name: string;
   currency: string;
-  update_frequency: UpdateFrequency;
   /** FEE-075 — whether the % management-fee mechanism is enabled on the account. */
   management_fees_enabled: boolean;
   /** ACC-041 — the account's own country; "" takes the portfolio's. */
@@ -25,7 +24,6 @@ interface AccountFormProps {
   handleChange: (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   /** ACC-045 — the country chosen in the searchable list ("" for the portfolio's). */
   setCountry: (country: string) => void;
-  frequencies: UpdateFrequency[];
   /** ACC-045 — the wrapper lists; the two fields show once they are read. */
   wrapperLists: WrapperLists | null;
   idPrefix?: string;
@@ -35,16 +33,10 @@ export function AccountForm({
   formData,
   handleChange,
   setCountry,
-  frequencies,
   wrapperLists,
   idPrefix = "account",
 }: AccountFormProps) {
   const { t, i18n } = useTranslation();
-
-  const frequencyOptions = frequencies.map((freq) => ({
-    label: t(FREQUENCY_I18N_KEYS[freq]),
-    value: freq,
-  }));
 
   return (
     <div className="space-y-6">
@@ -114,15 +106,6 @@ export function AccountForm({
           </div>
         </>
       )}
-
-      <SelectField
-        label={t("account.form_frequency_label")}
-        id={`${idPrefix}-update-frequency`}
-        name="update_frequency"
-        value={formData.update_frequency}
-        onChange={handleChange}
-        options={frequencyOptions}
-      />
 
       {/* FEE-075 — opt-in gate for the % management-fee mechanism */}
       <label className="flex items-center gap-3 cursor-pointer group">

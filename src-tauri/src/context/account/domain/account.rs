@@ -16,34 +16,6 @@ use std::result::Result as StdResult;
 use std::str::FromStr;
 use uuid::Uuid;
 
-/// Defines how often an account's data should be updated.
-#[derive(
-    Debug,
-    Serialize,
-    Deserialize,
-    Clone,
-    Copy,
-    Type,
-    PartialEq,
-    Eq,
-    Default,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
-pub enum UpdateFrequency {
-    /// Automatic updates (e.g. via API)
-    Automatic,
-    /// Manual update daily
-    ManualDay,
-    /// Manual update weekly
-    ManualWeek,
-    /// Manual update monthly
-    #[default]
-    ManualMonth,
-    /// Manual update yearly
-    ManualYear,
-}
-
 /// What the user should know about an opening balance that can be recorded (TRX-066).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OpeningBalanceNotice {
@@ -116,8 +88,6 @@ pub struct Account {
     pub bank_name: String,
     /// ISO 4217 currency code for this account (TRX-021).
     pub currency: String,
-    /// How often this account is updated.
-    pub update_frequency: UpdateFrequency,
     /// Whether the % management-fee mechanism (one-off fees + schedules) is
     /// available on this account (FEE-075). New accounts start disabled.
     pub management_fees_enabled: bool,
@@ -151,7 +121,6 @@ impl Account {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
     ) -> StdResult<Self, AccountError> {
         let name = name.trim().to_string();
@@ -165,7 +134,6 @@ impl Account {
             name,
             bank_name,
             currency,
-            update_frequency,
             management_fees_enabled,
             country: None,
             wrapper: None,
@@ -181,7 +149,6 @@ impl Account {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
     ) -> StdResult<Self, AccountError> {
         let name = name.trim().to_string();
@@ -195,7 +162,6 @@ impl Account {
             name,
             bank_name,
             currency,
-            update_frequency,
             management_fees_enabled,
             country: None,
             wrapper: None,
@@ -211,7 +177,6 @@ impl Account {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
     ) -> Self {
         Self {
@@ -219,7 +184,6 @@ impl Account {
             name,
             bank_name,
             currency,
-            update_frequency,
             management_fees_enabled,
             country: None,
             wrapper: None,
@@ -237,7 +201,6 @@ impl Account {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
         holdings: Vec<Holding>,
         transactions: Vec<Transaction>,
@@ -247,7 +210,6 @@ impl Account {
             name,
             bank_name,
             currency,
-            update_frequency,
             management_fees_enabled,
             country: None,
             wrapper: None,
@@ -2324,6 +2286,23 @@ mod tests {
         assert_eq!((account.country, account.wrapper), (None, None));
     }
 
+    // SYN-038 / ACC-004 — an account change written before data format version 8 carries an
+    // update frequency: it is read, the frequency ignored.
+    #[test]
+    fn syn_038_an_account_written_before_version_8_reads_without_its_update_frequency() {
+        let account: Account = serde_json::from_str(
+            r#"{"id":"a1","name":"PEA","bank_name":"","currency":"EUR",
+                "update_frequency":"ManualYear","management_fees_enabled":true,
+                "country":"FR","wrapper":"PEA"}"#,
+        )
+        .expect("a version 7 account change");
+        assert_eq!(account.name, "PEA");
+        assert!(account.management_fees_enabled);
+        assert!(!serde_json::to_string(&account)
+            .expect("serialised")
+            .contains("update_frequency"));
+    }
+
     fn micro(v: i64) -> i64 {
         v * 1_000_000
     }
@@ -2334,7 +2313,6 @@ mod tests {
             "Test".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             true,
             Vec::new(),
             Vec::new(),
@@ -2359,7 +2337,6 @@ mod tests {
             "  My Account  ".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .unwrap();
@@ -2369,13 +2346,7 @@ mod tests {
     // R1, R2 — spaces-only name is invalid after trim
     #[test]
     fn new_rejects_whitespace_only_name() {
-        let result = Account::new(
-            "   ".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        );
+        let result = Account::new("   ".to_string(), String::new(), "EUR".to_string(), false);
         assert!(result.is_err());
     }
 
@@ -2386,7 +2357,6 @@ mod tests {
             "My Account".to_string(),
             String::new(),
             "INVALID".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         );
         assert!(result.is_err());
@@ -2400,7 +2370,6 @@ mod tests {
             "  Trimmed  ".to_string(),
             String::new(),
             "USD".to_string(),
-            UpdateFrequency::ManualDay,
             false,
         )
         .unwrap();
@@ -2414,7 +2383,6 @@ mod tests {
             "My Account".to_string(),
             "  Maple Bank  ".to_string(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .unwrap();
@@ -2425,7 +2393,6 @@ mod tests {
             "My Account".to_string(),
             "   ".to_string(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .unwrap();
@@ -2436,24 +2403,12 @@ mod tests {
     // disabled" rule is enforced by the creation DTO/form default upstream.
     #[test]
     fn new_account_carries_management_fees_flag() {
-        let disabled = Account::new(
-            "Fresh".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
-        .unwrap();
+        let disabled =
+            Account::new("Fresh".to_string(), String::new(), "EUR".to_string(), false).unwrap();
         assert!(!disabled.management_fees_enabled);
 
-        let enabled = Account::new(
-            "Funds".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            true,
-        )
-        .unwrap();
+        let enabled =
+            Account::new("Funds".to_string(), String::new(), "EUR".to_string(), true).unwrap();
         assert!(enabled.management_fees_enabled);
     }
 
@@ -2465,7 +2420,6 @@ mod tests {
             "Enabled".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             true,
         )
         .unwrap();
@@ -2476,7 +2430,6 @@ mod tests {
             "Disabled".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
         .unwrap();
@@ -2494,7 +2447,6 @@ mod tests {
             "  ".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         );
         assert!(result.is_err());
@@ -6380,7 +6332,6 @@ mod two_asset_and_synced_ledger_tests {
             "Test".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
             vec![],
             vec![],
@@ -7094,7 +7045,6 @@ mod write_off_tests {
             "Wallet".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
             vec![],
             vec![],

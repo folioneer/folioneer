@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, bank_name, currency, update_frequency, management_fees_enabled, country, wrapper FROM accounts",
+  "query": "SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper FROM accounts WHERE LOWER(name) = LOWER(?)",
   "describe": {
     "columns": [
       {
@@ -24,31 +24,25 @@
         "type_info": "Text"
       },
       {
-        "name": "update_frequency",
-        "ordinal": 4,
-        "type_info": "Text"
-      },
-      {
         "name": "management_fees_enabled",
-        "ordinal": 5,
+        "ordinal": 4,
         "type_info": "Integer"
       },
       {
         "name": "country",
-        "ordinal": 6,
+        "ordinal": 5,
         "type_info": "Text"
       },
       {
         "name": "wrapper",
-        "ordinal": 7,
+        "ordinal": 6,
         "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
-      false,
       false,
       false,
       false,
@@ -58,5 +52,5 @@
       true
     ]
   },
-  "hash": "661b3951b9899d9bc84d7f3a4132a4f73851af87d29b64e06a70ec256bce8dbe"
+  "hash": "2db9cbbefef1830e632db597172c152e120095a9b10eff108180effec91ec06f"
 }

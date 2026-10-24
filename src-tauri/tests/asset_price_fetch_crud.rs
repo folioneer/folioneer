@@ -180,7 +180,7 @@ async fn fetch_all_returns_fetch_already_running_while_guard_held() {
 async fn fetch_for_account_passes_exchange_qualified_symbol_to_provider() {
     use folioneer_lib::context::account::{
         AccountService, SqliteAccountRepository, SqliteHoldingRepository,
-        SqliteTransactionRepository, UpdateFrequency,
+        SqliteTransactionRepository,
     };
     use folioneer_lib::context::asset::{
         AssetPriceRepository, AssetService, CreateAssetDTO, PriceProvider,
@@ -241,13 +241,7 @@ async fn fetch_for_account_passes_exchange_qualified_symbol_to_provider() {
         .expect("seed asset with XPAR exchange");
 
     let account = account_service
-        .create(
-            "Test".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Test".to_string(), String::new(), "EUR".to_string(), false)
         .await
         .expect("seed account");
     account_service
@@ -312,7 +306,6 @@ async fn fetch_for_account_passes_exchange_qualified_symbol_to_provider() {
 /// (MKT-111), proving the asset was skipped before any provider call.
 #[tokio::test]
 async fn fetch_for_account_skips_locked_asset() {
-    use folioneer_lib::context::account::UpdateFrequency;
     use folioneer_lib::context::asset::{
         AssetClass, AssetPriceRepository, CreateAssetDTO, PriceProvider, SYSTEM_CATEGORY_ID,
     };
@@ -371,13 +364,7 @@ async fn fetch_for_account_skips_locked_asset() {
         .expect("lock asset");
 
     let account = account_service
-        .create(
-            "Test".to_string(),
-            String::new(),
-            "USD".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Test".to_string(), String::new(), "USD".to_string(), false)
         .await
         .expect("seed account");
     account_service
@@ -428,7 +415,6 @@ async fn fetch_for_account_skips_locked_asset() {
 /// successfully (scope is non-empty again), exercising the unblock repo path.
 #[tokio::test]
 async fn fetch_for_account_includes_unblocked_asset() {
-    use folioneer_lib::context::account::UpdateFrequency;
     use folioneer_lib::context::asset::{
         AssetClass, AssetPriceRepository, CreateAssetDTO, PriceProvider, SYSTEM_CATEGORY_ID,
     };
@@ -488,13 +474,7 @@ async fn fetch_for_account_includes_unblocked_asset() {
         .expect("unlock asset");
 
     let account = account_service
-        .create(
-            "Test".to_string(),
-            String::new(),
-            "USD".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Test".to_string(), String::new(), "USD".to_string(), false)
         .await
         .expect("seed account");
     account_service
@@ -540,7 +520,6 @@ async fn fetch_for_account_includes_unblocked_asset() {
 /// the terminal event reports `ok = 1, skipped = 0`.
 #[tokio::test]
 async fn fetch_publishes_completion_event_with_counts() {
-    use folioneer_lib::context::account::UpdateFrequency;
     use folioneer_lib::context::asset::{
         AssetClass, CreateAssetDTO, PriceProvider, SYSTEM_CATEGORY_ID,
     };
@@ -590,13 +569,7 @@ async fn fetch_publishes_completion_event_with_counts() {
         .await
         .expect("seed asset");
     let account = account_service
-        .create(
-            "Test".to_string(),
-            String::new(),
-            "USD".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Test".to_string(), String::new(), "USD".to_string(), false)
         .await
         .expect("seed account");
     account_service
@@ -674,7 +647,6 @@ async fn fetch_publishes_completion_event_with_counts() {
 /// Also verifies MKT-171: `unpriced.len() == skipped`.
 #[tokio::test]
 async fn fetch_completion_event_unpriced_list_contains_skipped_asset_with_last_price() {
-    use folioneer_lib::context::account::UpdateFrequency;
     use folioneer_lib::context::asset::{
         AssetClass, AssetService, CreateAssetDTO, PriceProvider, SqliteAssetCategoryRepository,
         SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
@@ -736,13 +708,7 @@ async fn fetch_completion_event_unpriced_list_contains_skipped_asset_with_last_p
         .expect("seed prior price");
 
     let account = account_service
-        .create(
-            "Test".to_string(),
-            String::new(),
-            "USD".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Test".to_string(), String::new(), "USD".to_string(), false)
         .await
         .expect("seed account");
     account_service
@@ -845,7 +811,6 @@ async fn fetch_completion_event_unpriced_list_contains_skipped_asset_with_last_p
 /// `last_price_date` in the `UnpricedAsset` entry are `None`.
 #[tokio::test]
 async fn fetch_completion_unpriced_entry_has_none_last_price_when_never_priced() {
-    use folioneer_lib::context::account::UpdateFrequency;
     use folioneer_lib::context::asset::{
         AssetClass, AssetService, CreateAssetDTO, PriceProvider, SqliteAssetCategoryRepository,
         SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
@@ -898,13 +863,7 @@ async fn fetch_completion_unpriced_entry_has_none_last_price_when_never_priced()
         .expect("seed asset");
 
     let account = account_service
-        .create(
-            "Test".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Test".to_string(), String::new(), "EUR".to_string(), false)
         .await
         .expect("seed account");
     account_service
@@ -973,7 +932,6 @@ async fn fetch_completion_unpriced_entry_has_none_last_price_when_never_priced()
 /// With one asset fetched ok (provider returns a quote), `unpriced` is empty.
 #[tokio::test]
 async fn fetch_completion_unpriced_list_excludes_successfully_fetched_asset() {
-    use folioneer_lib::context::account::UpdateFrequency;
     use folioneer_lib::context::asset::{
         AssetClass, AssetService, CreateAssetDTO, PriceProvider, SqliteAssetCategoryRepository,
         SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
@@ -1028,13 +986,7 @@ async fn fetch_completion_unpriced_list_excludes_successfully_fetched_asset() {
         .expect("seed asset");
 
     let account = account_service
-        .create(
-            "Test".to_string(),
-            String::new(),
-            "USD".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Test".to_string(), String::new(), "USD".to_string(), false)
         .await
         .expect("seed account");
     account_service
@@ -1099,7 +1051,6 @@ async fn fetch_completion_unpriced_list_excludes_successfully_fetched_asset() {
 /// the skipped one appears in `unpriced`, and `skipped == 1 == unpriced.len()`.
 #[tokio::test]
 async fn fetch_completion_unpriced_len_equals_skipped_count_in_mixed_outcome() {
-    use folioneer_lib::context::account::UpdateFrequency;
     use folioneer_lib::context::asset::{
         AssetClass, AssetService, CreateAssetDTO, PriceProvider, SqliteAssetCategoryRepository,
         SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
@@ -1178,13 +1129,7 @@ async fn fetch_completion_unpriced_len_equals_skipped_count_in_mixed_outcome() {
         .expect("seed asset err");
 
     let account = account_service
-        .create(
-            "Test".to_string(),
-            String::new(),
-            "USD".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Test".to_string(), String::new(), "USD".to_string(), false)
         .await
         .expect("seed account");
     // Open holdings for both assets so both enter fetch scope.
@@ -1271,7 +1216,6 @@ async fn fetch_completion_unpriced_len_equals_skipped_count_in_mixed_outcome() {
 /// is never reached.
 #[tokio::test]
 async fn fetch_completion_locked_asset_absent_from_unpriced_list() {
-    use folioneer_lib::context::account::UpdateFrequency;
     use folioneer_lib::context::asset::{
         AssetClass, AssetService, CreateAssetDTO, PriceProvider, SqliteAssetCategoryRepository,
         SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
@@ -1331,13 +1275,7 @@ async fn fetch_completion_locked_asset_absent_from_unpriced_list() {
         .expect("lock asset");
 
     let account = account_service
-        .create(
-            "Test".to_string(),
-            String::new(),
-            "USD".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Test".to_string(), String::new(), "USD".to_string(), false)
         .await
         .expect("seed account");
     account_service
@@ -1390,7 +1328,6 @@ async fn fetch_completion_locked_asset_absent_from_unpriced_list() {
 /// no rate recorded. Rates refresh through their own task.
 #[tokio::test]
 async fn a_price_fetch_leaves_exchange_rates_alone() {
-    use folioneer_lib::context::account::UpdateFrequency;
     use folioneer_lib::context::asset::{
         AssetClass, CreateAssetDTO, PriceProvider, SYSTEM_CATEGORY_ID,
     };
@@ -1439,13 +1376,7 @@ async fn a_price_fetch_leaves_exchange_rates_alone() {
         .await
         .expect("seed asset");
     let account = account_service
-        .create(
-            "Test".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Test".to_string(), String::new(), "EUR".to_string(), false)
         .await
         .expect("seed account");
     account_service

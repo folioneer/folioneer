@@ -1237,7 +1237,7 @@ mod tests {
     use crate::context::account::{
         AccountService, Holding, HoldingRepository, SqliteAccountRepository,
         SqliteFeeScheduleRepository, SqliteHoldingNoteRepository, SqliteHoldingRepository,
-        SqliteTransactionRepository, UpdateFrequency,
+        SqliteTransactionRepository,
     };
     use crate::context::asset::AssetService;
     use crate::context::asset::{
@@ -1272,7 +1272,6 @@ mod tests {
             account.name.clone(),
             String::new(),
             account.currency.clone(),
-            account.update_frequency,
             true,
         )
         .await
@@ -1323,13 +1322,7 @@ mod tests {
         let (account_svc, asset_svc) = setup(&pool).await;
 
         let account = account_svc
-            .create(
-                "Test".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Test".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -1381,7 +1374,6 @@ mod tests {
                 "Portfolio".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -1442,7 +1434,6 @@ mod tests {
                 "Archived Test".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -1508,7 +1499,6 @@ mod tests {
                 "My Account".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -1528,13 +1518,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "X".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("X".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -1580,13 +1564,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Acct".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acct".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -1637,13 +1615,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Acct".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acct".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -1693,13 +1665,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "P".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("P".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -1748,13 +1714,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "P".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("P".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -1832,13 +1792,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "D".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("D".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -1887,13 +1841,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "F".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("F".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -1933,13 +1881,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "H".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("H".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let holding_repo = SqliteHoldingRepository::new(pool.clone());
@@ -1995,13 +1937,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "I".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("I".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let holding_repo = SqliteHoldingRepository::new(pool.clone());
@@ -2083,13 +2019,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "J".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("J".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = AccountDetailsUseCase::new(
@@ -2107,13 +2037,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "K".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("K".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = AccountDetailsUseCase::new(
@@ -2131,13 +2055,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -2186,13 +2104,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -2247,13 +2159,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -2309,13 +2215,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -2651,13 +2551,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         held_asset(
@@ -2693,13 +2587,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         held_asset(
@@ -2751,13 +2639,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let unpriced = asset_svc
@@ -2830,13 +2712,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -2867,13 +2743,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let account = enable_management_fees(&account_svc, &account).await;
@@ -3183,13 +3053,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -3221,13 +3085,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = AccountDetailsUseCase::new(
@@ -3245,13 +3103,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -3282,13 +3134,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -3333,13 +3179,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -3393,13 +3233,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -3453,13 +3287,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = asset_svc
@@ -3514,13 +3342,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         // No holdings at all → None
@@ -3539,13 +3361,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
 
@@ -3636,13 +3452,7 @@ mod tests {
         let (account_svc, asset_svc) = setup(&pool).await;
 
         let account = account_svc
-            .create(
-                "Alpha".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Alpha".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
 
@@ -3704,7 +3514,6 @@ mod tests {
                 "Cash + Stocks".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -3800,7 +3609,6 @@ mod tests {
                 "Cash drained".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -3866,13 +3674,7 @@ mod tests {
         real_asset_svc: &Arc<AssetService>,
     ) -> (String, String) {
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = real_asset_svc
@@ -3913,13 +3715,7 @@ mod tests {
         real_asset_svc: &Arc<AssetService>,
     ) -> (String, String) {
         let account = account_svc
-            .create(
-                "A".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let asset = real_asset_svc
@@ -4129,7 +3925,6 @@ mod tests {
                 "FX Test".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -4241,7 +4036,6 @@ mod tests {
                 "No FX Rate".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -4332,7 +4126,6 @@ mod tests {
                 "Same CCY".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -4468,13 +4261,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -4569,13 +4356,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let account = enable_management_fees(&account_svc, &account).await;
@@ -4651,13 +4432,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -4725,13 +4500,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -4789,13 +4558,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -4864,13 +4627,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -4940,13 +4697,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -5067,13 +4818,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -5114,13 +4859,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -5153,13 +4892,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::Automatic,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();
@@ -5232,7 +4965,6 @@ mod tests {
                 "FEE Zero Acct".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5297,7 +5029,6 @@ mod tests {
                 "FEE Total Zero".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5329,7 +5060,6 @@ mod tests {
                 "FEE Aggregate".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5426,7 +5156,6 @@ mod tests {
                 "FEE FX Acct".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5519,7 +5248,6 @@ mod tests {
                 "FEE-054".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5612,7 +5340,6 @@ mod tests {
                 "FEE-072".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -5735,7 +5462,6 @@ mod tests {
                 "Windowed".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -6255,13 +5981,7 @@ mod tests {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
-            .create(
-                "Test".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Test".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         asset_svc.seed_cash_asset("EUR").await.unwrap();

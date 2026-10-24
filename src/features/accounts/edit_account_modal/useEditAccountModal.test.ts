@@ -10,7 +10,6 @@ const mockAccount: Account = {
   name: "Alpha",
   bank_name: "",
   currency: "EUR",
-  update_frequency: "ManualMonth",
   management_fees_enabled: false,
 };
 
@@ -84,7 +83,6 @@ describe("useEditAccountModal", () => {
       name: "Beta",
       bank_name: "",
       currency: "EUR",
-      update_frequency: "ManualDay",
       management_fees_enabled: false,
     };
     rerender({ account: otherAccount });

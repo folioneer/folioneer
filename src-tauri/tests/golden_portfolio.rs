@@ -24,7 +24,7 @@ use std::sync::Arc;
 use folioneer_lib::context::account::{
     AccountService, FeeFrequency, SqliteAccountRepository, SqliteFeeCatchUpRepository,
     SqliteFeeScheduleRepository, SqliteHoldingNoteRepository, SqliteHoldingRepository,
-    SqliteTransactionRepository, UpdateFrequency,
+    SqliteTransactionRepository,
 };
 use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, PriceProvider, Quote, SqliteAssetCategoryRepository,
@@ -213,13 +213,7 @@ async fn build_portfolio() -> Portfolio {
 
     // Main EUR: buys (one in USD), a dividend, free shares, a split, a partial sale, a one-off fee.
     let main_eur = account_service
-        .create(
-            "Main EUR".into(),
-            "Bank One".into(),
-            "EUR".into(),
-            UpdateFrequency::Automatic,
-            true,
-        )
+        .create("Main EUR".into(), "Bank One".into(), "EUR".into(), true)
         .await
         .expect("main account")
         .id;
@@ -328,13 +322,7 @@ async fn build_portfolio() -> Portfolio {
 
     // Growth USD: one holding, a recurring fee schedule that ends in the past, a sale.
     let growth_usd = account_service
-        .create(
-            "Growth USD".into(),
-            "Bank Two".into(),
-            "USD".into(),
-            UpdateFrequency::ManualMonth,
-            true,
-        )
+        .create("Growth USD".into(), "Bank Two".into(), "USD".into(), true)
         .await
         .expect("growth account")
         .id;

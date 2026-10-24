@@ -58,8 +58,8 @@ export function AccountPerformancePage() {
             </h2>
           </div>
 
-          {/* PRF-011 / PRF-013 — view-mode toggle, present only when month view is available */}
-          {view.monthViewAvailable && !view.isLoading && !view.error && !view.isEmpty && (
+          {/* PRF-011 / PRF-013 — view-mode toggle */}
+          {!view.isLoading && !view.error && !view.isEmpty && (
             <fieldset
               id="account-performance-view-toggle"
               data-testid="account-performance-view-toggle"

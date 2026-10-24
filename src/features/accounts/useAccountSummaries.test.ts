@@ -24,7 +24,6 @@ const makeSummary = (overrides: Partial<AccountSummary> = {}): AccountSummary =>
   id: "acc-1",
   name: "Main",
   currency: "EUR",
-  update_frequency: "ManualMonth",
   wrapper: null,
   total_global_value: 100_000_000,
   total_unrealized_pnl: null,

@@ -29,7 +29,6 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .typ::<asset::Exchange>()
         // ----- account BC -----
         .typ::<account::Account>()
-        .typ::<account::UpdateFrequency>()
         .typ::<account::Holding>()
         .typ::<account::HoldingSnapshot>()
         .typ::<account::AccountError>()

@@ -20,24 +20,25 @@ Read this when:
 
 ```rust
 #[derive(sqlx::FromRow)]
-struct AccountRow {
+struct AssetRow {
     id: String,
     name: String,
-    currency: String,
-    update_frequency: String,
+    asset_class: String,
+    kind: String,
 }
 
-impl From<AccountRow> for Account {
-    fn from(row: AccountRow) -> Self {
-        let update_frequency = UpdateFrequency::from_str(&row.update_frequency).unwrap_or_else(|_| {
+impl From<AssetRow> for Asset {
+    fn from(row: AssetRow) -> Self {
+        let asset_class = AssetClass::from_str(&row.asset_class).unwrap_or_default();
+        let kind = AssetKind::from_str(&row.kind).unwrap_or_else(|_| {
             tracing::warn!(
                 target: BACKEND,
-                value = %row.update_frequency,
-                "unknown update_frequency value, falling back to default"
+                value = %row.kind,
+                "unknown asset kind value, falling back to the kind its class makes it"
             );
-            UpdateFrequency::default()
+            AssetKind::of(&asset_class, None)
         });
-        Account::restore(row.id, row.name, row.currency, update_frequency)
+        Asset::restore(row.id, kind, row.name, asset_class)
     }
 }
 ```
@@ -46,15 +47,15 @@ Queries use `sqlx::query_as!(RowType, "SELECT ...")` and map via `.map(Domain::f
 
 ```rust
 let rows = sqlx::query_as!(
-    AccountRow,
-    r#"SELECT id, name, currency, update_frequency FROM accounts"#
+    AssetRow,
+    r#"SELECT id, name, asset_class, kind FROM assets"#
 ).fetch_all(&self.pool).await?;
-Ok(rows.into_iter().map(Account::from).collect())
+Ok(rows.into_iter().map(Asset::from).collect())
 ```
 
 **Rules**:
 
-- The `Row` struct is repository-private (`struct AccountRow`, not `pub`). Domain types know nothing about its existence.
+- The `Row` struct is repository-private (`struct AssetRow`, not `pub`). Domain types know nothing about its existence.
 - Domain enums persisted as `TEXT` columns derive `strum_macros::Display + strum_macros::EnumString` (see `AssetClass`, `AssetPriceSource`). Repo writes call `enum.to_string()`; repo reads call `Enum::from_str(&row.field)`.
 - Unknown-value fallback in `From<Row>` MUST log via `tracing::warn!(target: BACKEND, value = %..., "unknown ... value, falling back to default")` and pick a deterministic default. Never panic on storage drift — old rows from prior versions must keep loading.
 - The `From` impl goes inside the repository module (`context/{bc}/repository/{aggregate}.rs`), directly under the `Row` struct.
@@ -66,7 +67,7 @@ Ok(rows.into_iter().map(Account::from).collect())
 - ❌ Bare `sqlx::query!` returning anonymous row structs when the same shape is used in multiple methods. Use `query_as!(RowType, ...)`.
 - ❌ Panicking on unknown enum values (`.unwrap()`, `.expect()`, `unreachable!()`). Migrations may leave old rows; always degrade with a logged fallback.
 
-See: `src-tauri/src/context/account/repository/account.rs` (canonical), `src-tauri/src/context/asset/repository/asset_price.rs`.
+See: `src-tauri/src/context/asset/repository/asset.rs` (canonical), `src-tauri/src/context/asset/repository/asset_price.rs`.
 
 ---
 

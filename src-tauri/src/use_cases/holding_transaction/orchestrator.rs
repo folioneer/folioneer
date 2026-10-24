@@ -1362,7 +1362,7 @@ mod tests {
     use super::*;
     use crate::context::account::{
         AccountService, SqliteAccountRepository, SqliteHoldingRepository,
-        SqliteTransactionRepository, UpdateFrequency,
+        SqliteTransactionRepository,
     };
     use crate::context::asset::{
         AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
@@ -1429,13 +1429,7 @@ mod tests {
         let pool = setup_pool().await;
         let (account_svc, asset_svc) = make_services(&pool);
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
 
@@ -1468,13 +1462,7 @@ mod tests {
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         asset_svc.archive_asset(&asset.id).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
 
@@ -1507,13 +1495,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc.clone());
@@ -1585,13 +1567,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let cash_asset = asset_svc.seed_cash_asset("EUR").await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
 
@@ -1625,13 +1601,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
 
@@ -1676,13 +1646,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -1753,13 +1717,7 @@ mod tests {
         let pool = setup_pool().await;
         let (account_svc, asset_svc) = make_services(&pool);
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -1791,7 +1749,6 @@ mod tests {
                 "Acc".to_string(),
                 String::new(),
                 "USD".to_string(), // match asset currency so rate=1
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -1889,13 +1846,7 @@ mod tests {
         let pool = setup_pool().await;
         let (account_svc, asset_svc) = make_services(&pool);
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -1926,13 +1877,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -1963,13 +1908,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let cash_asset = asset_svc.seed_cash_asset("EUR").await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -2003,13 +1942,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -2057,13 +1990,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -2114,13 +2041,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc.clone());
@@ -2170,13 +2091,7 @@ mod tests {
         // Asset is USD, account is EUR → exchange_rate = 0.9 (EUR per USD)
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap(); // USD asset
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -2235,13 +2150,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc.clone());
@@ -2341,13 +2250,7 @@ mod tests {
         let pool = setup_pool().await;
         let (account_svc, asset_svc) = make_services(&pool);
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -2377,13 +2280,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -2444,13 +2341,7 @@ mod tests {
         let pool = setup_pool().await;
         let (account_svc, asset_svc) = make_services(&pool);
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -2480,13 +2371,7 @@ mod tests {
         let pool = setup_pool().await;
         let (account_svc, asset_svc) = make_services(&pool);
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -2518,13 +2403,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -2597,13 +2476,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -2634,13 +2507,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let cash_asset = asset_svc.seed_cash_asset("EUR").await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -2674,13 +2541,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -2731,13 +2592,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -2784,13 +2639,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let cash_asset = asset_svc.seed_cash_asset("EUR").await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -2823,13 +2672,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -2874,13 +2717,7 @@ mod tests {
             .await
             .unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -2967,13 +2804,7 @@ mod tests {
         let pool = setup_pool().await;
         let (account_svc, asset_svc) = make_services(&pool);
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -3008,13 +2839,7 @@ mod tests {
             .await
             .unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
@@ -3045,13 +2870,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -3105,13 +2924,7 @@ mod tests {
         let (account_svc, asset_svc) = make_services(&pool);
         let cash_asset = asset_svc.seed_cash_asset("EUR").await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -3158,13 +2971,7 @@ mod tests {
             .await
             .unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -3216,13 +3023,7 @@ mod tests {
             .await
             .unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -3311,13 +3112,7 @@ mod tests {
             .await
             .unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -3365,13 +3160,7 @@ mod tests {
         let cash_asset = asset_svc.seed_cash_asset("USD").await.unwrap();
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create(
-                "Acc".to_string(),
-                String::new(),
-                "USD".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -3453,7 +3242,6 @@ mod draft_tests {
             "Account".into(),
             String::new(),
             "EUR".into(),
-            crate::context::account::UpdateFrequency::ManualMonth,
             false,
         )
         .expect("account");
@@ -3541,7 +3329,6 @@ mod draft_tests {
                     "Account".into(),
                     String::new(),
                     "EUR".into(),
-                    crate::context::account::UpdateFrequency::ManualMonth,
                     false,
                 )
                 .expect("account");
@@ -4163,7 +3950,6 @@ mod draft_tests {
 #[cfg(test)]
 mod name_lookup_tests {
     use super::*;
-    use crate::context::account::UpdateFrequency;
 
     fn account(id: &str, name: &str) -> Account {
         Account::restore(
@@ -4171,7 +3957,6 @@ mod name_lookup_tests {
             name.to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
     }

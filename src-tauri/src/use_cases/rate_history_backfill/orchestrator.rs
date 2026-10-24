@@ -102,7 +102,6 @@ mod tests {
     use super::*;
     use crate::context::account::{
         Account, AccountError, MockAccountServiceContract, Transaction, TransactionType,
-        UpdateFrequency,
     };
     use crate::context::asset::{
         Asset, AssetCategory, AssetClass, MockAssetServiceContract, SYSTEM_CATEGORY_ID,
@@ -119,7 +118,6 @@ mod tests {
             "Portfolio".to_string(),
             String::new(),
             "EUR".to_string(),
-            UpdateFrequency::Automatic,
             false,
         )
     }

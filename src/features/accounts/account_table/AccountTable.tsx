@@ -1,4 +1,4 @@
-import { AlertTriangle, Calendar, ChevronRight, Edit2, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronRight, Edit2, Trash2, X } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
@@ -11,7 +11,6 @@ import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { SortIcon } from "@/ui/components/SortIcon";
 import { EditAccountModal } from "../edit_account_modal/EditAccountModal";
 import {
-  FREQUENCY_I18N_KEYS,
   formatAccountRowTotalUnrealizedPnl,
   formatAccountRowYtdPerformancePct,
   groupByWrapper,
@@ -57,7 +56,6 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
     handleSort,
     handleNameKeyDown,
     handleBankNameKeyDown,
-    handleFrequencyKeyDown,
     handleGlobalValueKeyDown,
     handleUnrealizedPnlKeyDown,
     handleYtdPctKeyDown,
@@ -138,14 +136,6 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
         ) : (
           <span className="text-m3-on-surface">{labelOf(account.wrapper)}</span>
         )}
-      </td>
-      <td className="m3-td">
-        <div className="flex items-center gap-2 text-m3-on-surface-variant">
-          <Calendar size={14} className="text-m3-primary" />
-          <span className="m3-chip-outline">
-            {t(FREQUENCY_I18N_KEYS[account.update_frequency])}
-          </span>
-        </div>
       </td>
       <td className="m3-td text-right tabular-nums">
         <span className="font-medium text-m3-on-surface">
@@ -286,28 +276,6 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
               {t("account.column_wrapper")}
             </th>
             <th
-              className="m3-th cursor-pointer"
-              tabIndex={0}
-              scope="col"
-              aria-sort={
-                sortConfig.key === "update_frequency"
-                  ? sortConfig.direction === "asc"
-                    ? "ascending"
-                    : "descending"
-                  : "none"
-              }
-              onClick={() => handleSort("update_frequency")}
-              onKeyDown={handleFrequencyKeyDown}
-            >
-              <div className="flex items-center">
-                {t("account.column_frequency")}
-                <SortIcon
-                  active={sortConfig.key === "update_frequency"}
-                  direction={sortConfig.key === "update_frequency" ? sortConfig.direction : null}
-                />
-              </div>
-            </th>
-            <th
               id="account-column-global-value"
               className="m3-th cursor-pointer text-right"
               tabIndex={0}
@@ -384,7 +352,7 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
         <tbody>
           {loading ? (
             <tr>
-              <td colSpan={8} className="m3-td text-center py-12">
+              <td colSpan={7} className="m3-td text-center py-12">
                 <span className="text-m3-on-surface-variant animate-pulse">
                   {t("account.loading")}
                 </span>
@@ -393,14 +361,14 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
           ) : isEmpty ? (
             // R11 — empty state distinct from no-search-results
             <tr>
-              <td colSpan={8} className="m3-td text-center py-12 text-m3-on-surface-variant italic">
+              <td colSpan={7} className="m3-td text-center py-12 text-m3-on-surface-variant italic">
                 {t("account.empty")}
               </td>
             </tr>
           ) : fetchError ? (
             // R12 — error state with retry (only shown when accounts exist but failed to reload)
             <tr>
-              <td colSpan={8} className="m3-td text-center py-12">
+              <td colSpan={7} className="m3-td text-center py-12">
                 <div className="flex flex-col items-center gap-3">
                   <span className="text-m3-error text-sm">{t("account.error_load")}</span>
                   <Button variant="outline" size="sm" onClick={refetch}>
@@ -412,7 +380,7 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
           ) : hasNoSearchResults ? (
             // R10 — no search results (filter active, no match)
             <tr>
-              <td colSpan={8} className="m3-td text-center py-12 text-m3-on-surface-variant italic">
+              <td colSpan={7} className="m3-td text-center py-12 text-m3-on-surface-variant italic">
                 {t("account.no_search_results")}
               </td>
             </tr>
@@ -423,7 +391,7 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
                   id={`account-wrapper-group-${group.wrapper ?? "none"}`}
                   className="bg-m3-surface-container-high"
                 >
-                  <td colSpan={8} className="m3-td">
+                  <td colSpan={7} className="m3-td">
                     <span className="text-xs font-semibold uppercase tracking-wide text-m3-on-surface-variant">
                       {group.label ?? t("account.group_no_wrapper")}
                     </span>
@@ -443,7 +411,7 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
               id="account-portfolio-total"
               className="border-t-2 border-m3-outline/20 bg-m3-surface-container"
             >
-              <td className="m3-td" colSpan={4}>
+              <td className="m3-td" colSpan={3}>
                 <span className="font-semibold text-m3-on-surface">{t("account.total")}</span>
                 {/* ACC-028 — an unconvertible account hides a figure from the total */}
                 {portfolioTotal.incomplete && (

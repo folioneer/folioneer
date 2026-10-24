@@ -3,10 +3,10 @@
  *
  * Contract: docs/contracts/account-contract.md
  * Spec rules covered:
- *   ACC-001 — create account → appears in account list
- *   ACC-002 — edit account name → list reflects update
- *   ACC-003 — delete account → removed from list
- *   ACC-004 — create duplicate name → inline error shown
+ *   ACC-016 — create account → appears in account list
+ *   ACC-017 — edit account name → list reflects update
+ *   ACC-005 — delete account → removed from list
+ *   ACC-003 — create duplicate name → inline error shown
  */
 
 import assert from "node:assert";
@@ -57,10 +57,10 @@ describe("accounts", () => {
   });
 
   // -------------------------------------------------------------------------
-  // ACC-001 — create account → appears in account list
+  // ACC-016 — create account → appears in account list
   // -------------------------------------------------------------------------
-  it("ACC-001: creating an account shows it in the account list", async () => {
-    const ACCOUNT_NAME = "E2E ACC-001 Account";
+  it("ACC-016: creating an account shows it in the account list", async () => {
+    const ACCOUNT_NAME = "E2E ACC-016 Account";
 
     const fab = await $("#fab-add-account");
     await fab.click();
@@ -91,11 +91,11 @@ describe("accounts", () => {
   });
 
   // -------------------------------------------------------------------------
-  // ACC-002 — edit account name → list reflects update
+  // ACC-017 — edit account name → list reflects update
   // -------------------------------------------------------------------------
-  it("ACC-002: editing an account name updates the list", async () => {
-    const ORIGINAL_NAME = "E2E ACC-002 Original";
-    const UPDATED_NAME = "E2E ACC-002 Updated";
+  it("ACC-017: editing an account name updates the list", async () => {
+    const ORIGINAL_NAME = "E2E ACC-017 Original";
+    const UPDATED_NAME = "E2E ACC-017 Updated";
 
     const editAccountId = await seedAccount(ORIGINAL_NAME);
 
@@ -127,10 +127,10 @@ describe("accounts", () => {
   });
 
   // -------------------------------------------------------------------------
-  // ACC-003 — delete account → removed from list
+  // ACC-005 — delete account → removed from list
   // -------------------------------------------------------------------------
-  it("ACC-003: deleting an account removes it from the list", async () => {
-    const ACCOUNT_NAME = "E2E ACC-003 Delete";
+  it("ACC-005: deleting an account removes it from the list", async () => {
+    const ACCOUNT_NAME = "E2E ACC-005 Delete";
 
     const deleteAccountId = await seedAccount(ACCOUNT_NAME);
 
@@ -158,10 +158,10 @@ describe("accounts", () => {
   });
 
   // -------------------------------------------------------------------------
-  // ACC-004 — duplicate name → inline error shown
+  // ACC-003 — duplicate name → inline error shown
   // -------------------------------------------------------------------------
-  it("ACC-004: creating an account with a duplicate name shows an inline error", async () => {
-    const DUPLICATE_NAME = "E2E ACC-004 Duplicate";
+  it("ACC-003: creating an account with a duplicate name shows an inline error", async () => {
+    const DUPLICATE_NAME = "E2E ACC-003 Duplicate";
 
     await seedAccount(DUPLICATE_NAME);
     await forceRefreshToAccounts();

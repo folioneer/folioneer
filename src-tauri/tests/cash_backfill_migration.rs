@@ -33,14 +33,18 @@ async fn backfill_preserves_existing_cash_and_seeds_missing() {
         .execute(&pool).await.unwrap();
 
     // Account A — legacy account that already has a cash holding with a non-zero balance.
-    sqlx::query("INSERT INTO accounts (id,name,update_frequency,currency) VALUES ('acct-a','A','ManualMonth','EUR')")
-        .execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO accounts (id,name,currency) VALUES ('acct-a','A','EUR')")
+        .execute(&pool)
+        .await
+        .unwrap();
     sqlx::query("INSERT INTO holdings (id,account_id,asset_id,quantity,average_price) VALUES ('legacy-cash','acct-a','system-cash-eur',777,1000000)")
         .execute(&pool).await.unwrap();
 
     // Account B — no cash holding yet.
-    sqlx::query("INSERT INTO accounts (id,name,update_frequency,currency) VALUES ('acct-b','B','ManualMonth','EUR')")
-        .execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO accounts (id,name,currency) VALUES ('acct-b','B','EUR')")
+        .execute(&pool)
+        .await
+        .unwrap();
 
     sqlx::query(BACKFILL_HOLDINGS).execute(&pool).await.unwrap();
 

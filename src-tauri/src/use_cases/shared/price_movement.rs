@@ -172,7 +172,6 @@ fn movement_amount(before: i64, after: i64) -> Option<i64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::account::UpdateFrequency;
     use crate::context::asset::{AssetClass, AssetPriceSource};
     use crate::use_cases::shared::global_value::AssetValuationFacts;
 
@@ -182,7 +181,6 @@ mod tests {
             name.to_string(),
             String::new(),
             currency.to_string(),
-            UpdateFrequency::ManualMonth,
             false,
         )
     }

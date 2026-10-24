@@ -24,8 +24,6 @@ interface UseAccountPerformanceResult {
   isLoading: boolean;
   error: I18nMessage | null;
   retry: () => void;
-  /** True only for Automatic/ManualDay/ManualWeek accounts (PRF-013). */
-  monthViewAvailable: boolean;
   isEmpty: boolean;
   viewMode: PerformanceViewMode;
   setViewMode: (mode: PerformanceViewMode) => void;
@@ -93,9 +91,9 @@ export function useAccountPerformance(accountId: string): UseAccountPerformanceR
       if (requestSeq !== requestSeqRef.current) return;
       if (result.status === "ok") {
         setData(result.data);
-        // PRF-014 — restore the account's remembered view mode (clamped to availability),
-        // falling back to the default when there is no stored preference.
-        setViewMode(resolveViewMode(getPerfViewMode(accountId), result.data.month_view_available));
+        // PRF-014 — restore the account's remembered view mode, falling back to the
+        // default when there is no stored preference.
+        setViewMode(resolveViewMode(getPerfViewMode(accountId)));
         // PRF-015 — the year selector starts on the most recent year of the monthly data,
         // and keeps the year the user chose when a later fetch for the same account still
         // carries it: a price update, a sync or another asset scope must not move the
@@ -191,8 +189,6 @@ export function useAccountPerformance(accountId: string): UseAccountPerformanceR
     [accountId],
   );
 
-  const monthViewAvailable = data?.month_view_available ?? false;
-
   const isEmpty = useMemo(
     () => data !== null && data.yearly.length === 0 && data.monthly.length === 0,
     [data],
@@ -258,7 +254,6 @@ export function useAccountPerformance(accountId: string): UseAccountPerformanceR
     isLoading,
     error,
     retry: retryPerformance,
-    monthViewAvailable,
     isEmpty,
     viewMode,
     setViewMode: selectViewMode,

@@ -168,7 +168,7 @@ The `Asset` entity (owned by the AST spec) gains one field for this feature.
 **MKT-032 — No-price diagnostic (frontend)**: When `current_price` is `None` for a holding, the "Current Price" column displays a typed diagnostic state derived from the holding's data, so the user can see _why_ a price is unavailable. Two states:
 
 - **"Missing ticker"** — when `asset_reference` is empty (no identifier the price-fetch path can query). Signals that adding a ticker is the action that would unlock price fetch.
-- **"No price available"** — when `asset_reference` is non-empty but `current_price` is `None`. The two upstream causes ("provider returned N/D" and "no fetch has run yet under a manual-update-frequency account") are intentionally merged into this single state in this phase; `update_frequency` is not consulted by the presenter. Disambiguation is deferred — see Open Questions.
+- **"No price available"** — when `asset_reference` is non-empty but `current_price` is `None`. The two upstream causes ("provider returned N/D" and "no fetch has run yet") are intentionally merged into this single state in this phase. Disambiguation is deferred — see Open Questions.
 
 **Cell composition.** The diagnostic string occupies the primary price slot. No secondary staleness label (MKT-140 is skipped — there is no `current_price_date` to label) and no source badge (MKT-142 is skipped — there is no `AssetPrice.source` to badge) are rendered alongside it; only the "Not updated: …" line of MKT-222 and the "Price typed by hand" line of MKT-158 may follow it. Both states render as subdued text.
 
@@ -974,7 +974,7 @@ A "Fill missing price history" icon button in the actions of each active, non-ca
 
 ## Open Questions / Deferred
 
-**Deferred on MKT-032 — disambiguating the "No price available" state.** The current rule merges two upstream causes (provider returned N/D vs no fetch has run yet under a manual-update-frequency account) into one diagnostic. Distinguishing them requires BE telemetry (per-asset last-fetch-attempt + outcome) not currently exposed on `HoldingDetail`. Defer until a real user-pain signal warrants the BE surface change. — Partly answered by MKT-220–222: the row now says why the last fetch on this device left the asset unpriced; "no fetch has run yet" still shows nothing.
+**Deferred on MKT-032 — disambiguating the "No price available" state.** The current rule merges two upstream causes (provider returned N/D vs no fetch has run yet) into one diagnostic. Distinguishing them requires BE telemetry (per-asset last-fetch-attempt + outcome) not currently exposed on `HoldingDetail`. Defer until a real user-pain signal warrants the BE surface change. — Partly answered by MKT-220–222: the row now says why the last fetch on this device left the asset unpriced; "no fetch has run yet" still shows nothing.
 
 **Deferred on MKT-153 — the toggle in the Asset management table.** This phase exposes the toggle only from the Account Details holding row, where the price discrepancy is observed. Surfacing the same toggle in the Asset management table (assets view) — so an asset's price can be typed by hand without holding it in an open account — is deferred until a need surfaces; the flag and commands (MKT-150, MKT-156) already support it.
 

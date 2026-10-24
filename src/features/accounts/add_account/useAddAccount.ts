@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useAppStore } from "@/lib/store";
 import type { I18nMessage } from "@/ui/format/i18n";
 import type { AccountFormData } from "../shared/AccountForm";
-import { FREQUENCIES } from "../shared/presenter";
 import { validateAccountCurrency, validateAccountName } from "../shared/validateAccount";
 import { useAccounts } from "../useAccounts";
 
@@ -19,7 +18,6 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
     name: "",
     bank_name: "",
     currency: referenceCurrency,
-    update_frequency: "ManualMonth",
     management_fees_enabled: false,
     country: "",
     wrapper: "",
@@ -56,7 +54,6 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
       name: formData.name,
       bank_name: formData.bank_name,
       currency: formData.currency,
-      update_frequency: formData.update_frequency,
       management_fees_enabled: formData.management_fees_enabled,
       country: formData.country || null,
       wrapper: formData.wrapper || null,
@@ -74,7 +71,6 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
       name: "",
       bank_name: "",
       currency: referenceCurrency,
-      update_frequency: "ManualMonth",
       management_fees_enabled: false,
       country: "",
       wrapper: "",
@@ -92,6 +88,5 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
     handleChange,
     setCountry,
     handleSubmit,
-    frequencies: FREQUENCIES,
   };
 }

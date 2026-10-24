@@ -14,12 +14,11 @@ This spec covers the CRUD lifecycle of accounts. The Account Details view (drill
 
 A financial account owned by the user.
 
-| Field              | Business meaning                                                                                                                         |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`             | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among all accounts (case-insensitive).                             |
-| `update_frequency` | Frequency at which the user plans to update the account's data. Informational only — no automation is triggered today.                   |
-| `country`          | The account's own country (two upper-case letters), when one is set; absent otherwise (ACC-041).                                         |
-| `wrapper`          | The identifier of the tax wrapper the account sits in, normally one of the lists of ACC-040; absent when none is set (ACC-043, ACC-044). |
+| Field     | Business meaning                                                                                                                         |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`    | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among all accounts (case-insensitive).                             |
+| `country` | The account's own country (two upper-case letters), when one is set; absent otherwise (ACC-041).                                         |
+| `wrapper` | The identifier of the tax wrapper the account sits in, normally one of the lists of ACC-040; absent when none is set (ACC-043, ACC-044). |
 
 ### PortfolioTotal
 
@@ -41,13 +40,11 @@ The total of every account, read together with the account summaries (ACC-027). 
 
 **ACC-001 — Name normalisation (backend)** _(formerly R1)_: The `name` is normalised on receipt before any validation or storage: leading and trailing whitespace is stripped.
 
-**ACC-002 — Account validation (backend)** _(formerly R2)_: An `Account` is valid if and only if its `name` (after ACC-001 normalisation) is non-empty, and its `update_frequency` is one of the five fixed values (`Automatic`, `ManualDay`, `ManualWeek`, `ManualMonth`, `ManualYear`). Any violation is rejected with an explicit error.
+**ACC-002 — Account validation (backend)** _(formerly R2)_: An `Account` is valid if and only if its `name` (after ACC-001 normalisation) is non-empty. Any violation is rejected with an explicit error.
 
 **ACC-003 — Name uniqueness (backend + frontend)** _(formerly R3)_: No two accounts may share the same name (comparison is performed on the normalised name per ACC-001, case-insensitive). Any create or edit operation resulting in a duplicate is rejected by the backend with an explicit error. ACC-001, ACC-002, and ACC-003 apply to both creation and modification.
 
-**ACC-004 — UpdateFrequency fixed list (backend + frontend)** _(formerly R4)_: The update frequency is a fixed list of five non-customisable values. It is purely informational: no automation is triggered in the current version.
-
-> Note: active scheduling behaviour is planned for a future release.
+**ACC-004 — No update frequency (backend + frontend)** _(formerly R4)_: An account carries no update frequency: nothing in the application depends on how often its figures are updated, so the account form asks for none and the account table shows none (ACC-008, ACC-016, ACC-017). An account change written before data format version 8 carries one, which is ignored (SYN-038).
 
 ### Deletion
 
@@ -63,16 +60,15 @@ The total of every account, read together with the account summaries (ACC-027). 
 
 **ACC-008 — Table columns (frontend)** _(formerly R8 — column definition)_: The account table exposes the following columns:
 
-| Column          | Content                                                                                                                 | Sortable                                                                                              |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Name            | `account.name`                                                                                                          | Yes                                                                                                   |
-| Bank            | Bank or broker name (ACC-026); "—" when unset                                                                           | Yes — unset sorts last in both directions                                                             |
-| Wrapper         | The account's wrapper (ACC-046); "—" without one                                                                        | No                                                                                                    |
-| Frequency       | Human-readable label for `update_frequency`                                                                             | Yes — sorted on the logical enum order: Automatic → ManualDay → ManualWeek → ManualMonth → ManualYear |
-| Global Value    | `total_global_value` formatted in the account's own currency (ACC-021); 0 shown for empty accounts                      | Yes                                                                                                   |
-| Unrealized P&L  | `total_unrealized_pnl` formatted in the account's own currency (ACC-023); "—" when no holding has a computable value    | Yes — null values sort last                                                                           |
-| YTD Performance | Year-to-date net-of-flows performance since Jan 1 as a percentage (ACC-024); "—" when the year-start baseline is absent | Yes — null values sort last                                                                           |
-| Actions         | Edit button + Delete button                                                                                             | No                                                                                                    |
+| Column          | Content                                                                                                                 | Sortable                                  |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Name            | `account.name`                                                                                                          | Yes                                       |
+| Bank            | Bank or broker name (ACC-026); "—" when unset                                                                           | Yes — unset sorts last in both directions |
+| Wrapper         | The account's wrapper (ACC-046); "—" without one                                                                        | No                                        |
+| Global Value    | `total_global_value` formatted in the account's own currency (ACC-021); 0 shown for empty accounts                      | Yes                                       |
+| Unrealized P&L  | `total_unrealized_pnl` formatted in the account's own currency (ACC-023); "—" when no holding has a computable value    | Yes — null values sort last               |
+| YTD Performance | Year-to-date net-of-flows performance since Jan 1 as a percentage (ACC-024); "—" when the year-start baseline is absent | Yes — null values sort last               |
+| Actions         | Edit button + Delete button                                                                                             | No                                        |
 
 The account section title is displayed in the application shell header, not in the page body. A real-time search field (partial match, case-insensitive) filters the table by name. The table closes with a portfolio total row (ACC-030 to ACC-032).
 
@@ -94,11 +90,9 @@ The account section title is displayed in the application shell header, not in t
 
 ### Mutations
 
-**ACC-015 — Default UpdateFrequency (frontend)** _(formerly R7)_: The create form pre-selects `ManualMonth` as the default frequency.
+**ACC-016 — Create via FAB (frontend)** _(formerly R14)_: A floating action button (bottom-right) opens a create modal with a Name field (required), and the account's Country and Wrapper (ACC-045, ACC-048). Submission is blocked if the name is empty or whitespace-only. After successful creation the modal closes and the table refreshes. On backend error, an inline error message is shown per ACC-014.
 
-**ACC-016 — Create via FAB (frontend)** _(formerly R14)_: A floating action button (bottom-right) opens a create modal with a Name field (required), an `UpdateFrequency` selector, and the account's Country and Wrapper (ACC-045, ACC-048). Submission is blocked if the name is empty or whitespace-only. After successful creation the modal closes and the table refreshes. On backend error, an inline error message is shown per ACC-014.
-
-**ACC-017 — Edit (frontend)** _(formerly R15)_: The Edit button opens a modal with the Name and `UpdateFrequency` fields pre-filled, and the account's Country and Wrapper as the account has them, a wrapper from another country's list or one this device does not know included (ACC-043, ACC-048). After saving, the modal closes and the table refreshes. On backend error, an inline error message is shown per ACC-014.
+**ACC-017 — Edit (frontend)** _(formerly R15)_: The Edit button opens a modal with the Name field pre-filled, and the account's Country and Wrapper as the account has them, a wrapper from another country's list or one this device does not know included (ACC-043, ACC-048). After saving, the modal closes and the table refreshes. On backend error, an inline error message is shown per ACC-014.
 
 **ACC-018 — Delete empty account (frontend)** _(formerly R16)_: If the `Account` has no `Holding`, the Delete button opens a standard confirmation dialog. Confirmation triggers deletion (ACC-005, ACC-006); after deletion the dialog closes and the table refreshes.
 
@@ -128,7 +122,7 @@ The account section title is displayed in the application shell header, not in t
 
 **ACC-029 — The portfolio Unrealized P&L can be absent (backend)**: The portfolio Unrealized P&L is absent when no account that can be converted carries an Unrealized P&L; the total is then incomplete when ACC-028's condition holds.
 
-**ACC-030 — What the total row shows (frontend)**: The account table closes with a total row. Its label, "Total", spans the name, bank, wrapper and frequency columns. It states the portfolio Global Value and the portfolio Unrealized P&L, both in the cross-account reference currency, which it names; the Unrealized P&L is presented as a gain when positive, a loss when negative, neither when zero, and "—" when absent (ACC-029). A "partial" marker follows the label when the total is incomplete (ACC-028). The year-to-date and actions cells stay blank.
+**ACC-030 — What the total row shows (frontend)**: The account table closes with a total row. Its label, "Total", spans the name, bank and wrapper columns. It states the portfolio Global Value and the portfolio Unrealized P&L, both in the cross-account reference currency, which it names; the Unrealized P&L is presented as a gain when positive, a loss when negative, neither when zero, and "—" when absent (ACC-029). A "partial" marker follows the label when the total is incomplete (ACC-028). The year-to-date and actions cells stay blank.
 
 **ACC-031 — Where the total row sits (frontend)**: The total row stays below every account whatever the sort column and direction (ACC-009). It is not an account row: it cannot be focused, clicked, or used to open Account Details (ACC-010).
 
@@ -179,11 +173,11 @@ The tax wrapper an account sits in — a PEA, an assurance vie, a Depot — is a
           │
           ├─ [Group by] → Nothing or Wrapper (ACC-047)
           │
-          ├─ [FAB] → Create modal (Name, Bank, Frequency default ManualMonth, Country, Wrapper)
+          ├─ [FAB] → Create modal (Name, Bank, Country, Wrapper)
           │            → Inline error if name empty or duplicate (ACC-014)
           │            → Account created → modal closed → table refreshed
           │
-          ├─ [Edit] → Edit modal (Name, Bank, Frequency, Country, Wrapper pre-filled)
+          ├─ [Edit] → Edit modal (Name, Bank, Country, Wrapper pre-filled)
           │            → Inline error if duplicate (ACC-014)
           │            → Saved → modal closed → table refreshed
           │
@@ -224,7 +218,7 @@ Full-width table, default sort by Name ascending. Floating action button (bottom
 
 1. User opens the Accounts page (section title shown in the shell header).
 2. User clicks a row → navigates to Account Details for the selected account (ACC-010).
-3. User clicks FAB → modal → enters name, bank, frequency, country and wrapper → submits → account created.
+3. User clicks FAB → modal → enters name, bank, country and wrapper → submits → account created.
 4. User clicks Edit → pre-filled modal → modifies → saves → modal closes.
 5. User clicks Delete (empty account) → standard dialog → confirms → account deleted.
 6. User clicks Delete (account with positions) → reinforced dialog → confirms → account + positions + transactions deleted.

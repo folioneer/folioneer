@@ -7,7 +7,6 @@ import { useAccountTable } from "./useAccountTable";
 function makeAccount(
   id: string,
   name: string,
-  freq: AccountSummary["update_frequency"],
   total_global_value = 0,
   total_unrealized_pnl: number | null = null,
   ytd_performance_pct: number | null = null,
@@ -16,7 +15,6 @@ function makeAccount(
     id,
     name,
     currency: "EUR",
-    update_frequency: freq,
     wrapper: null,
     total_global_value,
     total_unrealized_pnl,
@@ -27,10 +25,10 @@ function makeAccount(
 }
 
 const accounts: [AccountSummary, AccountSummary, AccountSummary, AccountSummary] = [
-  makeAccount("1", "Alpha", "ManualYear"),
-  makeAccount("2", "Beta", "Automatic"),
-  makeAccount("3", "Gamma", "ManualDay"),
-  makeAccount("4", "Delta", "ManualMonth"),
+  makeAccount("1", "Alpha"),
+  makeAccount("2", "Beta"),
+  makeAccount("3", "Gamma"),
+  makeAccount("4", "Delta"),
 ];
 
 const noopDelete = vi.fn().mockResolvedValue({ error: null });
@@ -55,33 +53,6 @@ function makeMouseEvent(): React.MouseEvent {
 }
 
 describe("useAccountTable", () => {
-  // R9 — frequency sorted by logical enum order, not alphabetical label
-  it("sorts update_frequency by logical enum order ascending", () => {
-    const { result } = renderHook(() =>
-      useAccountTable(accounts, "", noopDelete, noopSummary, noopAccountClick),
-    );
-
-    act(() => {
-      result.current.handleSort("update_frequency");
-    });
-
-    const freqs = result.current.sortedAndFilteredAccounts.map((a) => a.update_frequency);
-    expect(freqs).toEqual(["Automatic", "ManualDay", "ManualMonth", "ManualYear"]);
-  });
-
-  // R9 — descending reverses logical order
-  it("sorts update_frequency by logical enum order descending on second click", () => {
-    const { result } = renderHook(() =>
-      useAccountTable(accounts, "", noopDelete, noopSummary, noopAccountClick),
-    );
-
-    act(() => result.current.handleSort("update_frequency"));
-    act(() => result.current.handleSort("update_frequency"));
-
-    const freqs = result.current.sortedAndFilteredAccounts.map((a) => a.update_frequency);
-    expect(freqs).toEqual(["ManualYear", "ManualMonth", "ManualDay", "Automatic"]);
-  });
-
   // R10 — search active with no match → hasNoSearchResults true
   it("sets hasNoSearchResults when filter is active but no match", () => {
     const { result } = renderHook(() =>
@@ -112,9 +83,9 @@ describe("useAccountTable", () => {
   // ACC-008 / ACC-021 — sort by total_global_value ascending then descending (numeric, not string)
   it("sorts total_global_value numerically ascending then descending", () => {
     const valued: AccountSummary[] = [
-      makeAccount("a", "A", "ManualMonth", 500_000_000), // 500
-      makeAccount("b", "B", "ManualMonth", 100_000_000), // 100
-      makeAccount("c", "C", "ManualMonth", 9_000_000_000), // 9000 — would sort wrong as string
+      makeAccount("a", "A", 500_000_000), // 500
+      makeAccount("b", "B", 100_000_000), // 100
+      makeAccount("c", "C", 9_000_000_000), // 9000 — would sort wrong as string
     ];
     const { result } = renderHook(() =>
       useAccountTable(valued, "", noopDelete, noopSummary, noopAccountClick),
@@ -147,9 +118,9 @@ describe("useAccountTable", () => {
   // ACC-008 — ties broken by name asc to keep ordering stable
   it("breaks total_global_value ties by name ascending", () => {
     const tied: AccountSummary[] = [
-      makeAccount("1", "Beta", "ManualMonth", 100_000_000),
-      makeAccount("2", "Alpha", "ManualMonth", 100_000_000),
-      makeAccount("3", "Gamma", "ManualMonth", 100_000_000),
+      makeAccount("1", "Beta", 100_000_000),
+      makeAccount("2", "Alpha", 100_000_000),
+      makeAccount("3", "Gamma", 100_000_000),
     ];
     const { result } = renderHook(() =>
       useAccountTable(tied, "", noopDelete, noopSummary, noopAccountClick),
@@ -219,7 +190,6 @@ describe("useAccountTable", () => {
       name: account.name,
       bank_name: "",
       currency: account.currency,
-      update_frequency: account.update_frequency,
       management_fees_enabled: false,
       country: null,
       wrapper: null,
@@ -308,9 +278,9 @@ describe("useAccountTable", () => {
 describe("useAccountTable — sort by total_unrealized_pnl (ACC-023, ACC-008)", () => {
   // Accounts: one with a positive P&L, one negative, one null
   const pnlAccounts: AccountSummary[] = [
-    makeAccount("a", "Alpha", "ManualMonth", 0, 5_000_000, null), // pnl=5, ytd=null
-    makeAccount("b", "Beta", "ManualMonth", 0, -2_000_000, null), // pnl=-2, ytd=null
-    makeAccount("c", "Gamma", "ManualMonth", 0, null, null), // pnl=null → sorts last
+    makeAccount("a", "Alpha", 0, 5_000_000, null), // pnl=5, ytd=null
+    makeAccount("b", "Beta", 0, -2_000_000, null), // pnl=-2, ytd=null
+    makeAccount("c", "Gamma", 0, null, null), // pnl=null → sorts last
   ];
 
   it("sorts total_unrealized_pnl ascending, nulls last", () => {
@@ -349,9 +319,9 @@ describe("useAccountTable — sort by total_unrealized_pnl (ACC-023, ACC-008)", 
   // ACC-008 — when both compared values are null, they order among themselves by name.
   it("orders null total_unrealized_pnl rows among themselves by name", () => {
     const bothNull: AccountSummary[] = [
-      makeAccount("z", "Zeta", "ManualMonth", 0, null, null),
-      makeAccount("a", "Alpha", "ManualMonth", 0, null, null),
-      makeAccount("b", "Beta", "ManualMonth", 0, 5_000_000, null),
+      makeAccount("z", "Zeta", 0, null, null),
+      makeAccount("a", "Alpha", 0, null, null),
+      makeAccount("b", "Beta", 0, 5_000_000, null),
     ];
     const { result } = renderHook(() =>
       useAccountTable(bothNull, "", noopDelete, noopSummary, noopAccountClick),
@@ -364,8 +334,8 @@ describe("useAccountTable — sort by total_unrealized_pnl (ACC-023, ACC-008)", 
   // ACC-008 — equal non-null metrics break ties by name ascending.
   it("breaks equal total_unrealized_pnl ties by name ascending", () => {
     const tied: AccountSummary[] = [
-      makeAccount("z", "Zeta", "ManualMonth", 0, 5_000_000, null),
-      makeAccount("a", "Alpha", "ManualMonth", 0, 5_000_000, null),
+      makeAccount("z", "Zeta", 0, 5_000_000, null),
+      makeAccount("a", "Alpha", 0, 5_000_000, null),
     ];
     const { result } = renderHook(() =>
       useAccountTable(tied, "", noopDelete, noopSummary, noopAccountClick),
@@ -397,16 +367,15 @@ describe("useAccountTable — bank name column (ACC-026, ACC-008)", () => {
       name,
       bank_name,
       currency: "EUR",
-      update_frequency: "ManualMonth",
       wrapper: null,
       management_fees_enabled: false,
     };
   }
 
   const bankAccounts: [AccountSummary, AccountSummary, AccountSummary] = [
-    makeAccount("a", "Alpha", "ManualMonth"),
-    makeAccount("b", "Beta", "ManualMonth"),
-    makeAccount("c", "Gamma", "ManualMonth"),
+    makeAccount("a", "Alpha"),
+    makeAccount("b", "Beta"),
+    makeAccount("c", "Gamma"),
   ];
 
   beforeEach(() => {
@@ -528,9 +497,9 @@ describe("useAccountTable — bank name column (ACC-026, ACC-008)", () => {
 describe("useAccountTable — sort by ytd_performance_pct (ACC-024, ACC-008)", () => {
   // Accounts: one positive YTD, one negative YTD, one null
   const ytdAccounts: AccountSummary[] = [
-    makeAccount("a", "Alpha", "ManualMonth", 0, null, 8_000_000), // ytd=+8%, pnl=null
-    makeAccount("b", "Beta", "ManualMonth", 0, null, -3_700_000), // ytd=-3.7%, pnl=null
-    makeAccount("c", "Gamma", "ManualMonth", 0, null, null), // ytd=null → sorts last
+    makeAccount("a", "Alpha", 0, null, 8_000_000), // ytd=+8%, pnl=null
+    makeAccount("b", "Beta", 0, null, -3_700_000), // ytd=-3.7%, pnl=null
+    makeAccount("c", "Gamma", 0, null, null), // ytd=null → sorts last
   ];
 
   it("sorts ytd_performance_pct ascending, nulls last", () => {
@@ -584,8 +553,8 @@ describe("useAccountTable — sort by ytd_performance_pct (ACC-024, ACC-008)", (
 // AccountTable can render the account-level marker (#account-inconsistent-{id}).
 describe("useAccountTable — inconsistent holding marker (SYN-040)", () => {
   const inconsistentAccounts: AccountSummary[] = [
-    makeAccount("1", "Alpha", "ManualMonth"),
-    { ...makeAccount("2", "Beta", "ManualMonth"), has_inconsistent_holding: true },
+    makeAccount("1", "Alpha"),
+    { ...makeAccount("2", "Beta"), has_inconsistent_holding: true },
   ];
 
   it("carries has_inconsistent_holding through into the sorted/filtered rows", () => {

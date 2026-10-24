@@ -3,7 +3,7 @@
 
 use super::domain::{
     country_offers, generic_wrapper_ids, offered_countries, Account, FeeFrequency, FeeSchedule,
-    HoldingNote, ThresholdDirection, UpdateFrequency, Wrapper, PORTFOLIO_COUNTRY, WRAPPERS,
+    HoldingNote, ThresholdDirection, Wrapper, PORTFOLIO_COUNTRY, WRAPPERS,
 };
 use crate::context::account::{
     AccountError, AccountJournal, HoldingSnapshot, JournalFilter, Transaction,
@@ -26,8 +26,6 @@ pub struct UpdateAccountDTO {
     pub bank_name: String,
     /// ISO 4217 currency code.
     pub currency: String,
-    /// New update frequency.
-    pub update_frequency: UpdateFrequency,
     /// Whether the % management-fee mechanism is enabled (FEE-075).
     pub management_fees_enabled: bool,
     /// ACC-041 — the account's own country, when it differs from the portfolio's.
@@ -84,7 +82,6 @@ pub async fn update_account(
             dto.name,
             dto.bank_name,
             dto.currency,
-            dto.update_frequency,
             dto.management_fees_enabled,
             dto.country,
             dto.wrapper,

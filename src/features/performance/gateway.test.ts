@@ -67,7 +67,6 @@ const makeResponse = (
 ): AccountPerformanceResponse => ({
   account_name: "My Portfolio",
   currency: "EUR",
-  month_view_available: true,
   lifetime_unavailable: null,
   yearly: [makeYearRow()],
   monthly: [makeMonthRow()],
@@ -90,7 +89,6 @@ describe("accountPerformanceGateway — getAccountPerformance", () => {
     if (result.status === "ok") {
       expect(result.data.account_name).toBe("My Portfolio");
       expect(result.data.currency).toBe("EUR");
-      expect(result.data.month_view_available).toBe(true);
       expect(result.data.yearly).toHaveLength(1);
       expect(result.data.monthly).toHaveLength(1);
     }
@@ -144,20 +142,6 @@ describe("accountPerformanceGateway — getAccountPerformance", () => {
     expect(result.status).toBe("ok");
     if (result.status === "ok") {
       expect(result.data.yearly).toHaveLength(0);
-      expect(result.data.monthly).toHaveLength(0);
-    }
-  });
-
-  // PRF-013 — month_view_available=false passes through unchanged
-  it("passes through month_view_available=false for ManualMonth/ManualYear accounts (PRF-013)", async () => {
-    const response = makeResponse({ month_view_available: false, monthly: [] });
-    mockInvoke.mockResolvedValue(response);
-
-    const result = await accountPerformanceGateway.getAccountPerformance("account-1", null);
-
-    expect(result.status).toBe("ok");
-    if (result.status === "ok") {
-      expect(result.data.month_view_available).toBe(false);
       expect(result.data.monthly).toHaveLength(0);
     }
   });

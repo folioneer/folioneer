@@ -140,11 +140,10 @@ pub(crate) async fn load_rate_map(
     priced_assets: &HashMap<String, PricedAsset>,
     account_currency: &str,
     transactions: &[Transaction],
-    month_view_available: bool,
     earliest_date: NaiveDate,
     today: NaiveDate,
 ) -> StdResult<RateMap, AccountError> {
-    let mut dates = period_end_dates(month_view_available, earliest_date, today);
+    let mut dates = period_end_dates(earliest_date, today);
     // PRF-071/PRF-086 — zero-cost credits and opening balances are valued at
     // their own transaction date, so those dates need a pre-resolved rate too.
     dates.extend(market_valued_flow_dates(transactions));
@@ -374,22 +373,16 @@ pub(crate) fn month_periods(earliest_date: NaiveDate, today: NaiveDate) -> Vec<M
 /// same `year_periods` / `month_periods` the `build_*` methods iterate (including
 /// the prior-year-end YTD baseline) so FX rates can be pre-resolved for the
 /// synchronous valuation (FXR-035/042) without drifting from the series.
-fn period_end_dates(
-    month_view_available: bool,
-    earliest_date: NaiveDate,
-    today: NaiveDate,
-) -> BTreeSet<NaiveDate> {
+fn period_end_dates(earliest_date: NaiveDate, today: NaiveDate) -> BTreeSet<NaiveDate> {
     // A set deduplicates the prior-year-end baselines (one per month in a year)
     // and any overlap between the yearly and monthly series.
     let mut dates = BTreeSet::new();
     for period in year_periods(earliest_date, today) {
         dates.insert(period.period_end);
     }
-    if month_view_available {
-        for period in month_periods(earliest_date, today) {
-            dates.insert(period.period_end);
-            dates.insert(period.year_start_baseline);
-        }
+    for period in month_periods(earliest_date, today) {
+        dates.insert(period.period_end);
+        dates.insert(period.year_start_baseline);
     }
     dates
 }
@@ -1051,8 +1044,8 @@ mod tests {
         let earliest = NaiveDate::from_ymd_opt(2022, 3, 15).expect("valid date");
         let today = NaiveDate::from_ymd_opt(2024, 6, 10).expect("valid date");
 
-        // month_view_available = true: yearly ends + monthly ends + YTD baselines.
-        let dates = period_end_dates(true, earliest, today);
+        // Yearly ends, monthly ends and YTD baselines.
+        let dates = period_end_dates(earliest, today);
         for period in year_periods(earliest, today) {
             assert!(
                 dates.contains(&period.period_end),
@@ -1070,16 +1063,6 @@ mod tests {
                 dates.contains(&period.year_start_baseline),
                 "YTD baseline {} not pre-resolved",
                 period.year_start_baseline
-            );
-        }
-
-        // month_view_available = false: only the yearly ends are pre-resolved.
-        let yearly_only = period_end_dates(false, earliest, today);
-        for period in year_periods(earliest, today) {
-            assert!(
-                yearly_only.contains(&period.period_end),
-                "yearly-only period_end {} not pre-resolved",
-                period.period_end
             );
         }
     }

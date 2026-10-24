@@ -1,4 +1,4 @@
-use crate::context::account::{Account, AccountError, AccountServiceContract, UpdateFrequency};
+use crate::context::account::{Account, AccountError, AccountServiceContract};
 use crate::context::asset::AssetServiceContract;
 use crate::core::logger::BACKEND;
 use std::result::Result as StdResult;
@@ -37,14 +37,12 @@ impl AccountCreationUseCase {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
     ) -> StdResult<Account, AccountError> {
         self.create_classified(
             name,
             bank_name,
             currency,
-            update_frequency,
             management_fees_enabled,
             None,
             None,
@@ -61,7 +59,6 @@ impl AccountCreationUseCase {
         name: String,
         bank_name: String,
         currency: String,
-        update_frequency: UpdateFrequency,
         management_fees_enabled: bool,
         country: Option<String>,
         wrapper: Option<String>,
@@ -72,7 +69,6 @@ impl AccountCreationUseCase {
             name.clone(),
             bank_name.clone(),
             currency.clone(),
-            update_frequency,
             management_fees_enabled,
         )?
         .classified(country.clone(), wrapper.clone(), None)?;
@@ -92,7 +88,6 @@ impl AccountCreationUseCase {
                 name,
                 bank_name,
                 currency,
-                update_frequency,
                 management_fees_enabled,
                 country,
                 wrapper,
@@ -156,7 +151,6 @@ mod tests {
                 "Brokerage".to_string(),
                 String::new(),
                 "EURO".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -184,7 +178,6 @@ mod tests {
                 "Brokerage".to_string(),
                 String::new(),
                 "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
                 false,
             )
             .await
@@ -217,24 +210,12 @@ mod tests {
         let pool = setup_pool().await;
         let uc = make_uc(&pool);
         let disabled = uc
-            .create(
-                "Plain".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                false,
-            )
+            .create("Plain".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         assert!(!disabled.management_fees_enabled);
         let enabled = uc
-            .create(
-                "Funds".to_string(),
-                String::new(),
-                "EUR".to_string(),
-                UpdateFrequency::ManualMonth,
-                true,
-            )
+            .create("Funds".to_string(), String::new(), "EUR".to_string(), true)
             .await
             .unwrap();
         assert!(enabled.management_fees_enabled);
@@ -247,24 +228,12 @@ mod tests {
         let pool = setup_pool().await;
         let uc = make_uc(&pool);
 
-        uc.create(
-            "A".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
-        .await
-        .unwrap();
-        uc.create(
-            "B".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
-        .await
-        .unwrap();
+        uc.create("A".to_string(), String::new(), "EUR".to_string(), false)
+            .await
+            .unwrap();
+        uc.create("B".to_string(), String::new(), "EUR".to_string(), false)
+            .await
+            .unwrap();
 
         let asset_count: (i64,) =
             sqlx::query_as("SELECT COUNT(*) FROM assets WHERE id = 'system-cash-eur'")

@@ -5,7 +5,7 @@
 
 use folioneer_lib::context::account::{
     AccountError, AccountService, SqliteAccountRepository, SqliteHoldingRepository,
-    SqliteTransactionRepository, TransactionType, UpdateFrequency,
+    SqliteTransactionRepository, TransactionType,
 };
 use sqlx::sqlite::SqlitePoolOptions;
 
@@ -58,13 +58,7 @@ async fn setup_with_active_asset() -> (AccountService, sqlx::Pool<sqlx::Sqlite>,
 async fn open_holding_end_to_end_persists_correct_fields() {
     let (svc, _pool, asset_id) = setup_with_active_asset().await;
     let account = svc
-        .create(
-            "Acc".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
         .await
         .unwrap();
 

@@ -3,18 +3,11 @@ import { useCallback, useMemo, useState } from "react";
 import type { Account, AccountDeletionSummary, AccountSummary } from "@/bindings";
 import { useAppStore } from "@/lib/store";
 import type { I18nMessage } from "@/ui/format/i18n";
-import { FREQUENCY_ORDER } from "../shared/presenter";
 
 const UNKNOWN_ERROR: I18nMessage = { key: "error.Unknown" };
 
 export type SortConfig = {
-  key:
-    | "name"
-    | "bank_name"
-    | "update_frequency"
-    | "total_global_value"
-    | "total_unrealized_pnl"
-    | "ytd_performance_pct";
+  key: "name" | "bank_name" | "total_global_value" | "total_unrealized_pnl" | "ytd_performance_pct";
   direction: "asc" | "desc";
 };
 
@@ -62,16 +55,6 @@ export function useAccountTable(
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         handleSort("bank_name");
-      }
-    },
-    [handleSort],
-  );
-
-  const handleFrequencyKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        handleSort("update_frequency");
       }
     },
     [handleSort],
@@ -136,7 +119,7 @@ export function useAccountTable(
       // bank_name (ACC-026), management_fees_enabled (FEE-075) and the country
       // (ACC-041), so they are read from the loaded account catalog to prefill the
       // edit form — an edit must not clear what it did not show.
-      const { id, name, currency, update_frequency } = account;
+      const { id, name, currency } = account;
       const catalogAccount = storeAccounts.find((a) => a.id === id);
       const bank_name = catalogAccount?.bank_name ?? "";
       const management_fees_enabled = catalogAccount?.management_fees_enabled ?? false;
@@ -145,7 +128,6 @@ export function useAccountTable(
         name,
         bank_name,
         currency,
-        update_frequency,
         management_fees_enabled,
         country: catalogAccount?.country ?? null,
         wrapper: catalogAccount?.wrapper ?? null,
@@ -230,10 +212,7 @@ export function useAccountTable(
       }
 
       let cmp: number;
-      if (sortConfig.key === "update_frequency") {
-        // R9 — sort by logical enum order, not alphabetical label
-        cmp = FREQUENCY_ORDER[a.update_frequency] - FREQUENCY_ORDER[b.update_frequency];
-      } else if (sortConfig.key === "total_global_value") {
+      if (sortConfig.key === "total_global_value") {
         // ACC-008 — numeric compare on micros; ties broken by name asc for stability
         cmp = a.total_global_value - b.total_global_value;
         if (cmp === 0) cmp = byName(a, b);
@@ -256,7 +235,6 @@ export function useAccountTable(
     handleSort,
     handleNameKeyDown,
     handleBankNameKeyDown,
-    handleFrequencyKeyDown,
     handleGlobalValueKeyDown,
     handleUnrealizedPnlKeyDown,
     handleYtdPctKeyDown,

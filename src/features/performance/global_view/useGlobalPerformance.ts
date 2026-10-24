@@ -35,7 +35,6 @@ interface UseGlobalPerformanceResult {
   isLoading: boolean;
   error: I18nMessage | null;
   retry: () => void;
-  monthViewAvailable: boolean;
   isEmpty: boolean;
   viewMode: PerformanceViewMode;
   setViewMode: (mode: PerformanceViewMode) => void;
@@ -103,9 +102,9 @@ export function useGlobalPerformance(): UseGlobalPerformanceResult {
       if (requestSeq !== requestSeqRef.current) return;
       if (result.status === "ok") {
         setData(result.data);
-        // GPF-016 — restore the remembered view mode (clamped to availability),
-        // falling back to the default when there is no stored preference.
-        setViewMode(resolveViewMode(getGlobalPerfViewMode(), result.data.month_view_available));
+        // GPF-016 — restore the remembered view mode, falling back to the default when
+        // there is no stored preference.
+        setViewMode(resolveViewMode(getGlobalPerfViewMode()));
         const firstMonthlyYear = result.data.monthly[0]?.year ?? null;
         setSelectedYear(firstMonthlyYear);
       } else {
@@ -189,8 +188,6 @@ export function useGlobalPerformance(): UseGlobalPerformanceResult {
     setGlobalPerfViewMode(mode);
   }, []);
 
-  const monthViewAvailable = data?.month_view_available ?? false;
-
   const isEmpty = useMemo(
     () => data !== null && data.yearly.length === 0 && data.monthly.length === 0,
     [data],
@@ -269,7 +266,6 @@ export function useGlobalPerformance(): UseGlobalPerformanceResult {
     isLoading,
     error,
     retry: retryPerformance,
-    monthViewAvailable,
     isEmpty,
     viewMode,
     setViewMode: selectViewMode,

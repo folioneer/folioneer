@@ -57,7 +57,6 @@ const makeResponse = (
 ): AccountPerformanceResponse => ({
   account_name: "",
   currency: "EUR",
-  month_view_available: false,
   lifetime_unavailable: null,
   yearly: [makeYearRow()],
   monthly: [],
@@ -69,7 +68,6 @@ const makeAccount = (overrides: Partial<Account> = {}): Account => ({
   name: "Broker One",
   bank_name: "",
   currency: "EUR",
-  update_frequency: "ManualMonth",
   management_fees_enabled: false,
   ...overrides,
 });
@@ -351,6 +349,7 @@ describe("useGlobalPerformance", () => {
 
   // F27 — a gateway error surfaces as an i18n message with retry
   it("exposes the presented error and retries the fetch", async () => {
+    localStorage.setItem("global_perf_view_mode", "year");
     vi.mocked(gateway.globalPerformanceGateway.getGlobalPerformance).mockResolvedValue({
       status: "error",
       error: { code: "DatabaseError" },
@@ -374,12 +373,11 @@ describe("useGlobalPerformance", () => {
     expect(result.current.rows).toHaveLength(1);
   });
 
-  // GPF-016 — month view available opens in month view with the most recent year selected
-  it("opens in month view with the most recent year when month view is available (GPF-016)", async () => {
+  // GPF-016 — opens in month view with the most recent year selected
+  it("opens in month view with the most recent year by default (GPF-016)", async () => {
     vi.mocked(gateway.globalPerformanceGateway.getGlobalPerformance).mockResolvedValue({
       status: "ok",
       data: makeResponse({
-        month_view_available: true,
         lifetime_unavailable: null,
         monthly: [makeYearRow({ year: 2025, month: 5 }), makeYearRow({ year: 2024, month: 12 })],
       }),
@@ -398,7 +396,6 @@ describe("useGlobalPerformance", () => {
     vi.mocked(gateway.globalPerformanceGateway.getGlobalPerformance).mockResolvedValue({
       status: "ok",
       data: makeResponse({
-        month_view_available: true,
         lifetime_unavailable: null,
         monthly: [makeYearRow({ year: 2025, month: 5 })],
       }),
@@ -415,7 +412,6 @@ describe("useGlobalPerformance", () => {
     vi.mocked(gateway.globalPerformanceGateway.getGlobalPerformance).mockResolvedValue({
       status: "ok",
       data: makeResponse({
-        month_view_available: true,
         lifetime_unavailable: null,
         monthly: [makeYearRow({ year: 2025, month: 5 })],
       }),
@@ -428,18 +424,6 @@ describe("useGlobalPerformance", () => {
 
     expect(result.current.viewMode).toBe("year");
     expect(localStorage.getItem("global_perf_view_mode")).toBe("year");
-  });
-
-  // GPF-016 — a remembered "month" is clamped to year view when month view is gone
-  it("falls back to year view when the remembered month view is unavailable (GPF-016)", async () => {
-    localStorage.setItem("global_perf_view_mode", "month");
-
-    const { result } = renderHook(() => useGlobalPerformance());
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.viewMode).toBe("year");
-    // The stored preference is left intact for when month view returns.
-    expect(localStorage.getItem("global_perf_view_mode")).toBe("month");
   });
 
   // GPF-015 — the empty portfolio read is exposed as isEmpty
@@ -476,6 +460,7 @@ describe("useGlobalPerformance", () => {
 
   // Stale-response guard — racing the two selectors never lets an older read win
   it("ignores a stale response when the account and asset scopes race", async () => {
+    localStorage.setItem("global_perf_view_mode", "year");
     let resolveStale: (value: { status: "ok"; data: AccountPerformanceResponse }) => void =
       () => {};
     vi.mocked(gateway.globalPerformanceGateway.getGlobalPerformance)

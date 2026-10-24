@@ -19,10 +19,9 @@ export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
     logger.info("[AddAccountModal] mounted");
   }, []);
 
-  const { formData, error, isSubmitting, handleChange, setCountry, handleSubmit, frequencies } =
-    useAddAccount({
-      onSubmitSuccess: onClose,
-    });
+  const { formData, error, isSubmitting, handleChange, setCountry, handleSubmit } = useAddAccount({
+    onSubmitSuccess: onClose,
+  });
 
   const actions = (
     <>
@@ -54,7 +53,6 @@ export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
           formData={formData}
           handleChange={handleChange}
           setCountry={setCountry}
-          frequencies={frequencies}
           wrapperLists={wrapperLists}
           idPrefix="add-account"
         />

@@ -8,7 +8,6 @@
 
 use folioneer_lib::context::account::{
     AccountService, SqliteAccountRepository, SqliteHoldingRepository, SqliteTransactionRepository,
-    UpdateFrequency,
 };
 use folioneer_lib::context::asset::AssetPriceRepository;
 use folioneer_lib::context::asset::{
@@ -134,13 +133,7 @@ where
         .expect("seed baseline price");
 
     let account = account_service
-        .create(
-            "Test".to_string(),
-            String::new(),
-            "EUR".to_string(),
-            UpdateFrequency::ManualMonth,
-            false,
-        )
+        .create("Test".to_string(), String::new(), "EUR".to_string(), false)
         .await
         .expect("seed account");
     account_service
