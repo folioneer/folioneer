@@ -3,6 +3,7 @@ import type {
   AccountError,
   AssetError,
   AssetPrice,
+  CorrectTransferDTO,
   CorrectWriteOffDTO,
   CreateFeeScheduleDTO,
   DeleteHoldingNoteDTO,
@@ -38,6 +39,8 @@ import type {
   TransactionDraft,
   TransactionDraftError,
   TransactionPreview,
+  TransferDTO,
+  TransferError,
   UpdateFeeScheduleDTO,
   UpsertHoldingNoteDTO,
   WithdrawalDTO,
@@ -115,6 +118,23 @@ export const accountDetailsGateway = {
 
   async correctWriteOff(dto: CorrectWriteOffDTO): Promise<Result<Transaction, AccountError>> {
     return commands.correctWriteOff(dto);
+  },
+
+  // TRF-050–057 — the window's transfer: recorded, corrected, read as one, and its rate.
+  async recordTransfer(dto: TransferDTO): Promise<Result<Transaction[], TransferError>> {
+    return commands.recordTransfer(dto);
+  },
+
+  async correctTransfer(dto: CorrectTransferDTO): Promise<Result<Transaction[], TransferError>> {
+    return commands.correctTransfer(dto);
+  },
+
+  async getTransferRate(
+    fromAccountId: string,
+    toAccountId: string,
+    date: string,
+  ): Promise<Result<number | null, TransferError>> {
+    return commands.getTransferRate(fromAccountId, toAccountId, date);
   },
 
   // SPL-010/020 — record a stock split rescaling a held position at its date.

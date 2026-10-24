@@ -91,6 +91,10 @@ export const selectUnpricedModalOpen = (state: AppState): boolean =>
  */
 export const selectHasExternalProvider = (state: AppState): boolean => state.hasExternalProvider;
 
+/** TRF-050 / TRF-051 — the portfolio's accounts a holding of `accountId` can be transferred to. */
+export const otherAccounts = (accounts: Account[], accountId: string): Account[] =>
+  accounts.filter((a) => a.id !== accountId);
+
 export const useAppStore = create<AppState>((set, get) => {
   return {
     appName: "Folioneer",

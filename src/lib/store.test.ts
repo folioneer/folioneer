@@ -81,7 +81,7 @@ vi.mock("@tauri-apps/api/app", () => ({
   getVersion: vi.fn().mockResolvedValue("0.0.0"),
 }));
 
-const { useAppStore } = await import("./store");
+const { otherAccounts, useAppStore } = await import("./store");
 
 describe("store — locallyHandledEvents (FXR-037)", () => {
   beforeEach(() => {
@@ -502,5 +502,13 @@ describe("store — the build's capabilities (MKT-211)", () => {
 
     expect(useAppStore.getState().distributionChannel).toBe("private");
     cleanup();
+  });
+});
+
+describe("otherAccounts (TRF-050, TRF-051)", () => {
+  it("lists the portfolio's accounts but the one named", () => {
+    const accounts = [{ id: "a" }, { id: "b" }, { id: "c" }] as never;
+    expect(otherAccounts(accounts, "b").map((a) => a.id)).toEqual(["a", "c"]);
+    expect(otherAccounts([{ id: "a" }] as never, "a")).toEqual([]);
   });
 });

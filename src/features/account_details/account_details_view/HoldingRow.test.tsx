@@ -166,6 +166,50 @@ describe("HoldingRow — price cell (MKT-030, MKT-140, MKT-142)", () => {
     expect(archived.container.querySelector("#action-write-off-asset-1")).toBeNull();
   });
 
+  // TRF-050 — the transfer action opens the form with the holding and the sending account;
+  // with no other account, or for an archived asset, there is none.
+  it("offers the transfer action while another account exists", () => {
+    const onTransfer = vi.fn();
+    const row = () => (
+      <table>
+        <tbody>
+          <HoldingRow
+            row={baseRow}
+            accountId="account-1"
+            onBuy={vi.fn()}
+            onSell={vi.fn()}
+            onTransfer={onTransfer}
+            onPriceHistory={vi.fn()}
+          />
+        </tbody>
+      </table>
+    );
+    const accounts = [
+      { id: "account-1", name: "Broker", currency: "EUR" },
+      { id: "account-2", name: "Wallet", currency: "USD" },
+    ] as never;
+    useAppStore.setState({ assets: [], accounts });
+    const live = render(row());
+    fireEvent.click(live.container.querySelector("#action-transfer-asset-1") as Element);
+    expect(onTransfer).toHaveBeenCalledWith({
+      assetId: "asset-1",
+      assetName: "Apple Inc",
+      assetReference: "AAPL",
+      quantityMicro: 2_000_000,
+      averagePriceMicro: 100_000_000,
+      accountName: "Broker",
+      accountCurrency: "EUR",
+    });
+    live.unmount();
+    useAppStore.setState({ assets: [], accounts: [accounts[0]] as never });
+    const alone = render(row());
+    expect(alone.container.querySelector("#action-transfer-asset-1")).toBeNull();
+    alone.unmount();
+    useAppStore.setState({ assets: [{ id: "asset-1", is_archived: true } as Asset], accounts });
+    const archived = render(row());
+    expect(archived.container.querySelector("#action-transfer-asset-1")).toBeNull();
+  });
+
   // WOF-059 — the lost part of the realized P&L shows under it only when there is one.
   it("shows the lost amount under the realized P&L when there is one", () => {
     const none = renderInTable(baseRow);

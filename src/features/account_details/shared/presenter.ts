@@ -17,6 +17,7 @@ import type {
   SplitError,
   Transaction,
   TransactionDraftError,
+  TransferError,
   UnrecordedSplit,
   WriteOffError,
 } from "@/bindings";
@@ -717,6 +718,53 @@ export function writeOffErrorToI18n(
       return { message: { key: `error.${err.code}` }, onQuantity: true };
     case "ArchivedAsset":
       return { message: { key: "write_off.error_archived" }, onQuantity: false };
+    case "NegativeQuantity":
+    case "NegativeAveragePrice":
+      return { message: { key: "error.Unknown" }, onQuantity: false };
+    default:
+      return { message: { key: `error.${err.code}` }, onQuantity: false };
+  }
+}
+
+/** TRF-055 — a refusal of the transfer form, and whether it shows under the quantity sent. */
+export interface TransferRefusal {
+  message: I18nMessage;
+  onQuantity: boolean;
+}
+
+/**
+ * F27 / TRF-055 — maps a refused transfer, recorded or corrected, to its message. A refusal
+ * for lack of units shows under the quantity sent with the wording of SEL-046, naming what
+ * was held of `reference` on `isoDate`; the codes the form never meets fall back to the
+ * generic message for their code.
+ */
+export function transferErrorToI18n(
+  err: TransferError,
+  reference: string,
+  isoDate: string,
+  locale: string,
+): TransferRefusal {
+  const takenOut = takeOutRefusal(err, reference, isoDate, locale);
+  if (takenOut) return { message: takenOut, onQuantity: true };
+  switch (err.code) {
+    case "QuantityNotPositive":
+      return { message: { key: `error.${err.code}` }, onQuantity: true };
+    case "ArchivedAsset":
+      return { message: { key: "transfer.error_archived" }, onQuantity: false };
+    case "TransferToSameAccount":
+    case "TransferReceivedAboveSent":
+    case "TransferRateNotOne":
+    case "TransferOfCash":
+    case "TransferNotFound":
+      return { message: { key: `transfer.error_${err.code}` }, onQuantity: false };
+    case "TransferRateMissing":
+      return {
+        message: {
+          key: "transfer.error_TransferRateMissing",
+          vars: { from: err.from_currency, to: err.to_currency },
+        },
+        onQuantity: false,
+      };
     case "NegativeQuantity":
     case "NegativeAveragePrice":
       return { message: { key: "error.Unknown" }, onQuantity: false };

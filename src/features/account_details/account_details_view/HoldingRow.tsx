@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
   ArrowDownToLine,
+  ArrowRightLeft,
   ArrowUpFromLine,
   Bell,
   BellRing,
@@ -21,6 +22,7 @@ import { type KeyboardEvent, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { patchModalSearch } from "@/lib/modalSearch";
 import type { StoredPerfPeriod } from "@/lib/perfPeriodStorage";
+import { otherAccounts } from "@/lib/store";
 import { IconButton } from "@/ui/components/button/IconButton";
 import { formatIsoDateMedium } from "@/ui/format/date";
 import { useCachedAccounts, useCachedAssets } from "../gateway";
@@ -31,7 +33,13 @@ import {
   hasNoPeriodFigure,
   selectPerformanceCell,
 } from "../shared/presenter";
-import type { ModalTarget, SellTarget, SplitTarget, WriteOffTarget } from "../shared/types";
+import type {
+  ModalTarget,
+  SellTarget,
+  SplitTarget,
+  TransferTarget,
+  WriteOffTarget,
+} from "../shared/types";
 
 type HoldingRowProps = {
   row: HoldingRowViewModel;
@@ -40,6 +48,8 @@ type HoldingRowProps = {
   onSell: (target: SellTarget) => void;
   /** WOF-050 — open the write-off form for this holding. */
   onWriteOff?: (target: WriteOffTarget) => void;
+  /** TRF-050 — open the transfer form for this holding. */
+  onTransfer?: (target: TransferTarget) => void;
   onPriceHistory: (assetId: string) => void;
   /** Cash variant — open Deposit modal (CSH-091). */
   onDeposit?: () => void;
@@ -72,6 +82,7 @@ export function HoldingRow({
   onBuy,
   onSell,
   onWriteOff,
+  onTransfer,
   onPriceHistory,
   onDeposit,
   onWithdraw,
@@ -123,6 +134,21 @@ export function HoldingRow({
       averagePriceMicro: row.averagePriceMicro,
     });
   }, [onWriteOff, row]);
+
+  // TRF-050 — the transfer form needs the sending account's name and currency.
+  const sendingAccount = accounts.find((a) => a.id === accountId);
+  const hasOtherAccount = otherAccounts(accounts, accountId).length > 0;
+  const handleTransfer = useCallback(() => {
+    onTransfer?.({
+      assetId: row.assetId,
+      assetName: row.assetName,
+      assetReference: row.assetReference,
+      quantityMicro: row.quantityMicro,
+      averagePriceMicro: row.averagePriceMicro,
+      accountName: sendingAccount?.name ?? "",
+      accountCurrency: sendingAccount?.currency ?? "",
+    });
+  }, [onTransfer, row, sendingAccount]);
 
   const handleViewTransactions = useCallback(() => {
     navigate({
@@ -317,6 +343,16 @@ export function HoldingRow({
                   id={`action-write-off-${row.assetId}`}
                   aria-label={t("transaction.action_write_off")}
                   onClick={handleWriteOff}
+                />
+              )}
+              {/* TRF-050 — Transfer action, after Write off, while another account exists */}
+              {onTransfer && !isArchived && hasOtherAccount && (
+                <IconButton
+                  icon={<ArrowRightLeft size={16} />}
+                  size="sm"
+                  id={`action-transfer-${row.assetId}`}
+                  aria-label={t("transaction.action_transfer")}
+                  onClick={handleTransfer}
                 />
               )}
               {/* SPL-061 — Split action (non-cash active rows; hidden for archived assets) */}

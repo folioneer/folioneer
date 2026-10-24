@@ -56,3 +56,17 @@ export type WriteOffTarget = {
   /** Average price in account currency, micro-units — the form's estimate (WOF-052). */
   averagePriceMicro: number;
 };
+
+/** The holding a transfer moves out of its account (TRF-050/051). */
+export type TransferTarget = WriteOffTarget & {
+  /** The sending account's name and currency (TRF-051, TRF-052). */
+  accountName: string;
+  accountCurrency: string;
+};
+
+/** An account a transfer can reach: another account of the portfolio (TRF-051). */
+export interface TransferDestination {
+  id: string;
+  name: string;
+  currency: string;
+}
