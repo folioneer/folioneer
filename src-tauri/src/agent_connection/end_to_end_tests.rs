@@ -526,7 +526,7 @@ async fn agt_042_a_refusal_names_only_what_was_sent() {
                 "list_holdings",
                 json!({ "account": "PEA", "as_of": 20260105 }),
             ),
-            // AGT-090 — a date longer than any text an agent may send.
+            // AGT-048A — a date longer than any text an agent may send.
             call(
                 6,
                 "list_holdings",

@@ -1184,7 +1184,7 @@ fn trade(arguments: &Value) -> Result<Trade, Refusal> {
 /// The longest note an agent may attach to a recording, in characters.
 const NOTE_LENGTH: usize = 500;
 
-/// AGT-090 — the longest of any other text argument, in characters, so the core never
+/// AGT-048A — the longest of any other text argument, in characters, so the core never
 /// reads an unbounded one.
 const TEXT_LENGTH: usize = 200;
 
@@ -1211,7 +1211,7 @@ fn raw_text<'a>(arguments: &'a Value, name: &str) -> Result<Option<&'a str>, Ref
     }
 }
 
-/// AGT-090 — a text argument other than a note is at most `TEXT_LENGTH` characters.
+/// AGT-048A — a text argument other than a note is at most `TEXT_LENGTH` characters.
 fn bounded(name: &str, typed: &str) -> Result<(), Refusal> {
     if typed.chars().count() > TEXT_LENGTH {
         return Err(Refusal {
@@ -1418,9 +1418,9 @@ mod tests {
         assert!(trade(&with_note("first line\r\nsecond line")).is_ok());
     }
 
-    // AGT-090 — any other text argument is bounded before the core reads it.
+    // AGT-048A — any other text argument is bounded before the core reads it.
     #[test]
-    fn agt_090_a_text_argument_is_bounded() {
+    fn agt_048a_a_text_argument_is_bounded() {
         let at = |length: usize| json!({ "isin": "x".repeat(length) });
         assert_eq!(
             code(optional_text(&at(TEXT_LENGTH + 1), "isin")),
