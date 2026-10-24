@@ -175,13 +175,14 @@ describe("buy_sell", () => {
     );
     assert.ok(await form.isExisting(), "Sell form must remain open (TRX-030)");
 
-    // TRX-067 — the reason is on the field that was typed in, naming both quantities.
+    // TRX-067 / SEL-046 — the reason is on the field that was typed in, naming what was held
+    // of the asset on the sale's date.
     const quantityError = await $("#sell-trx-quantity-error");
     await quantityError.waitForExist({ timeout: 5000 });
     const message = await quantityError.getText();
     assert.ok(
-      message.includes("999") && /(^|\D)2[.,]0+(\D|$)/.test(message),
-      `The oversell message must name both quantities (TRX-067), got: "${message}"`,
+      /(^|\D)2([.,]0+)?\s/.test(message) && message.includes("E2E-ASSET-TRX030"),
+      `The oversell message must name the 2 held of the asset (SEL-046), got: "${message}"`,
     );
   });
 });

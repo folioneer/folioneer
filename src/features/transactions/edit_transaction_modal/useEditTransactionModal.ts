@@ -10,10 +10,9 @@ import {
 } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
-import { takeOutRefusal } from "@/ui/format/takeOutRefusal";
 import { useLatestCheck } from "@/ui/hooks/useLatestCheck";
 import { transactionGateway } from "../gateway";
-import { transactionDraftErrorToI18n } from "../shared/presenter";
+import { takeOutRefusal, transactionDraftErrorToI18n } from "../shared/presenter";
 import type { TransactionEntryMode, TransactionFormData } from "../shared/types";
 import { type DraftField, useDraftProblemDisplay } from "../shared/useDraftProblemDisplay";
 import { toTransactionDraft, useTransactionDraftCheck } from "../shared/useTransactionDraftCheck";

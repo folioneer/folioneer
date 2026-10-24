@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { microToFormattedQuantity } from "@/lib/microUnits";
-import { takeOutRefusal } from "./takeOutRefusal";
+import { takeOutRefusal } from "./presenter";
 
 // SEL-046 / WOF-055 — a refusal for lack of units names what was held of the asset on the
 // date; any other refusal is not one of them.
