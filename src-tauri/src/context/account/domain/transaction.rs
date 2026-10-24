@@ -909,6 +909,8 @@ pub struct SessionRecording {
     pub transaction_id: String,
     /// The account it belongs to.
     pub account_id: String,
+    /// Whether it is a part of a transfer, which goes with its other parts (TRF-040).
+    pub transfer_part: bool,
 }
 
 /// The mark of a transaction an agent recorded (AGT-045): which agent, in which session.

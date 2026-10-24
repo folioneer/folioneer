@@ -5767,3 +5767,182 @@ async fn agt_072_the_rest_gives_the_refusal_of_the_real_call() {
         assert_eq!(previewed.message, real.message, "{tool} {arguments}");
     }
 }
+
+// AGT-065A — a session records a transfer through the window's transfer (TRF): refused as
+// the window refuses it, previewed on both accounts, each part marked and counted, never
+// corrected part by part, cancelled whole, and removed with the session's recordings.
+#[tokio::test]
+async fn agt_065a_a_session_records_a_transfer() {
+    use crate::context::account::TransactionType;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+    let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&bench.accounts) as _;
+    let assets: Arc<dyn AssetServiceContract> = Arc::clone(&bench.assets) as _;
+    AccountCreationUseCase::new(accounts, assets)
+        .create(
+            "Wallet".to_string(),
+            String::new(),
+            "EUR".to_string(),
+            false,
+        )
+        .await
+        .expect("account");
+    call(
+        "record_deposit",
+        json!({ "account": "PEA", "amount": 2000, "date": "2019-01-15" }),
+    )
+    .await
+    .expect("deposited");
+    call(
+        "record_purchase",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 10, "price": 100, "date": "2019-03-01" }),
+    )
+    .await
+    .expect("bought");
+
+    let base = json!({ "from": "PEA", "to": "Wallet", "asset": "CW8", "quantity": 4, "date": "2019-06-01" });
+    let with = |extra: Value| {
+        let mut arguments = base.clone();
+        for (key, value) in extra.as_object().expect("an object") {
+            arguments[key] = value.clone();
+        }
+        arguments
+    };
+    for (arguments, code) in [
+        (
+            json!({ "to": "Wallet", "asset": "CW8", "quantity": 1 }),
+            "MissingArgument",
+        ),
+        (with(json!({ "to": "PEA" })), "TransferToSameAccount"),
+        (with(json!({ "to": "NOPE" })), "AccountNotFound"),
+        (with(json!({ "asset": "NOPE" })), "AssetNotFound"),
+        (with(json!({ "quantity": 0 })), "QuantityNotPositive"),
+        (with(json!({ "received": 5 })), "TransferReceivedAboveSent"),
+        (with(json!({ "rate": 2 })), "TransferRateNotOne"),
+        (with(json!({ "date": "2019-02-01" })), "ClosedPosition"),
+        (with(json!({ "quantity": 20 })), "Oversell"),
+    ] {
+        assert_eq!(
+            call("record_transfer", arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{arguments}"
+        );
+    }
+
+    // Previewed on both accounts, nothing written.
+    let previewed = call(
+        "preview_recording",
+        json!({ "tool": "record_transfer", "arguments": with(json!({ "received": "3.5" })) }),
+    )
+    .await
+    .expect("previewed");
+    assert_eq!(previewed["status"], "previewed");
+    let kinds: Vec<&str> = previewed["transactions"]
+        .as_array()
+        .expect("parts")
+        .iter()
+        .map(|part| {
+            assert!(part["id"].is_null());
+            part["transaction_type"].as_str().expect("a type")
+        })
+        .collect();
+    assert_eq!(kinds, ["WriteOff", "TransferOut", "TransferIn"]);
+    assert_eq!(previewed["from"]["account"], "PEA");
+    assert_eq!(previewed["from"]["after"]["holdings"][0]["quantity"], 6 * M);
+    assert_eq!(
+        previewed["from"]["after"]["cash"],
+        previewed["from"]["before"]["cash"]
+    );
+    assert_eq!(previewed["to"]["account"], "Wallet");
+    assert_eq!(previewed["to"]["before"]["holdings"], json!([]));
+    assert_eq!(
+        previewed["to"]["after"]["holdings"][0]["quantity"],
+        3_500_000_i64
+    );
+    assert_eq!(
+        previewed["to"]["after"]["holdings"][0]["average_price"],
+        100 * M
+    );
+    assert_eq!(
+        bench.connections.sessions()[0].recordings,
+        2,
+        "nothing written"
+    );
+
+    let recorded = call(
+        "record_transfer",
+        with(json!({ "received": "3.5", "note": "to cold storage" })),
+    )
+    .await
+    .expect("recorded");
+    assert_eq!(recorded["status"], "recorded");
+    assert_eq!(
+        (recorded["from"].clone(), recorded["to"].clone()),
+        (json!("PEA"), json!("Wallet"))
+    );
+    let parts = recorded["transactions"].as_array().expect("parts").clone();
+    assert_eq!(parts.len(), 3);
+    for part in &parts {
+        let mark = bench
+            .accounts
+            .agent_recording_of(part["id"].as_str().expect("an id"))
+            .await
+            .expect("read")
+            .expect("a mark");
+        assert_eq!(mark.session, granted.key);
+        assert_eq!(part["note"], "to cold storage");
+    }
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.recordings, 5, "each part is a transaction recorded");
+    assert_eq!(
+        told.last_recording.expect("a last recording").kind,
+        TransactionType::TransferIn
+    );
+
+    // A part is not corrected alone (TRF-031); cancelling any part cancels the transfer.
+    let part_id = |kind: &str| {
+        parts
+            .iter()
+            .find(|part| part["transaction_type"] == kind)
+            .and_then(|part| part["id"].as_str())
+            .expect("the part")
+            .to_string()
+    };
+    assert_eq!(
+        call(
+            "correct_recording",
+            json!({ "transaction": part_id("TransferIn"), "quantity": 1 }),
+        )
+        .await
+        .expect_err("refused")
+        .code,
+        "PartOfTransfer"
+    );
+    call(
+        "cancel_recording",
+        json!({ "transaction": part_id("TransferOut") }),
+    )
+    .await
+    .expect("cancelled");
+    assert_eq!(bench.connections.sessions()[0].recordings, 2);
+
+    // AGT-053 — removed with the session's recordings, each part counted.
+    call("record_transfer", base.clone())
+        .await
+        .expect("recorded");
+    let removal = bench
+        .recorder
+        .remove_recorded_in_session(&granted.key)
+        .await
+        .expect("removed");
+    assert_eq!((removal.removed, removal.kept), (4, 0));
+}

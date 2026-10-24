@@ -1,5 +1,5 @@
 use super::error::{TransferError, TransferTask};
-use crate::context::account::{AccountError, AccountServiceContract, Transaction};
+use crate::context::account::{AccountError, AccountServiceContract, Transaction, TransferPreview};
 use crate::context::asset::{AssetClass, AssetServiceContract};
 use crate::context::currency::CurrencyService;
 use crate::core::logger::BACKEND;
@@ -56,6 +56,32 @@ impl TransferUseCase {
         Ok(self
             .account_service
             .record_transfer(
+                from_account_id,
+                to_account_id,
+                asset_id,
+                figures.date,
+                figures.quantity_sent,
+                figures.quantity_received,
+                rate,
+                figures.note,
+            )
+            .await?)
+    }
+
+    /// AGT-065A — what `record_transfer` would make of the two accounts, with the same
+    /// checks and the same rate, nothing written.
+    pub async fn preview_transfer(
+        &self,
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        figures: TransferFigures,
+    ) -> Result<TransferPreview, TransferError> {
+        self.ensure_transferable(&asset_id).await?;
+        let rate = self.rate(from_account_id, to_account_id, &figures).await?;
+        Ok(self
+            .account_service
+            .preview_transfer(
                 from_account_id,
                 to_account_id,
                 asset_id,

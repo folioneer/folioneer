@@ -5,7 +5,7 @@
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName" }` object; a variant with fields carries them beside `code`, as `TransactionNotRemoved { reason }` does. The FE matches on `code`.
 >
-> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–063, AGT-070, AGT-071, AGT-080, AGT-087) and the tools of AGT-064 and AGT-068 are not Tauri commands — what the window shows of an added asset is `AgentSession.assets_added` and `last_asset` here, of a created account `accounts_added` and `last_account`; what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
+> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–063, AGT-065A, AGT-070, AGT-071, AGT-080, AGT-087) and the tools of AGT-064 and AGT-068 are not Tauri commands — what the window shows of an added asset is `AgentSession.assets_added` and `last_asset` here, of a created account `accounts_added` and `last_account`; what an agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
 
 ---
 
@@ -165,3 +165,4 @@ The mark of a transaction an agent recorded (AGT-045) reaches the window in the 
 - 2026-10-14 — TODO-079: `AgentSession` gains `transactions_recorded` (AGT-084). No command or error changes.
 - 2026-10-17 — TODO-080: `answer_change_request` (AGT-088); `AgentConnectionState` gains `changes`, with `ChangeRequest` and `ShownValue`; `AgentConnectionError` gains `ChangeRequestGone` and `TransactionNotChanged { reason }`; `TransactionShown` gains `unit_price`, `fees`, `exchange_rate` and `note`.
 - 2026-10-24 — #386: `AgentSession` gains `accounts_added` and `last_account` (AGT-068). No command or error changes.
+- 2026-10-24 — #512: the tool `record_transfer` (AGT-065A) is no Tauri command; its parts reach the window as `AgentSession.recordings` and `transactions_recorded` count them. No command, type or error changes.
