@@ -144,6 +144,36 @@ describe("useAccountJournal", () => {
     expect(purchase?.recordedBy).toBeNull();
   });
 
+  // TRF-056 / TRF-062 — a part of a transfer carries its other account, read with the journal
+  it("names the other account of a part of a transfer", async () => {
+    useAppStore.setState({
+      accounts: [
+        { id: "account-1", name: "My Account" },
+        { id: "account-2", name: "Wallet" },
+      ] as Account[],
+    });
+    mockGetJournal.mockResolvedValue({
+      status: "ok",
+      data: {
+        ...JOURNAL,
+        rows: [
+          {
+            ...JOURNAL.rows[1],
+            transaction: tx({ id: "out", transaction_type: "TransferOut", transfer_id: "trf-1" }),
+            transfer_account_id: "account-2",
+          },
+        ],
+      },
+    });
+    const { result } = renderHook(() => useAccountJournal());
+    await act(async () => {});
+
+    expect(result.current.filteredSortedRows[0]?.transferAccount).toEqual({
+      id: "account-2",
+      name: "Wallet",
+    });
+  });
+
   // TXL-061 — the filter choices are the assets and types the journal lists
   it("offers the assets and types the journal lists", async () => {
     const { result } = renderHook(() => useAccountJournal());

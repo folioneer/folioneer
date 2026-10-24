@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionRowViewModel } from "../shared/presenter";
@@ -15,6 +15,7 @@ const row = (over: Partial<TransactionRowViewModel> = {}): TransactionRowViewMod
   assetName: "Apple",
   accountName: "My Account",
   type: "Purchase",
+  transferAccount: null,
   date: "2024-06-14",
   quantity: "10.000",
   unitPrice: "100.000",
@@ -49,6 +50,38 @@ describe("TransactionTable", () => {
     expect(document.querySelector("#txl-unit-price-wof")?.textContent).toBe(
       "account_details.pnl_placeholder",
     );
+  });
+
+  // TRF-056 — each part of a transfer names the other account, which opens it; a part
+  // left alone names none.
+  it("names the other account under each part of a transfer", () => {
+    const onOpenAccount = vi.fn();
+    const other = { id: "acc-2", name: "Wallet" };
+    render(
+      <TransactionTable
+        rows={[
+          row({ id: "out", type: "TransferOut", transferAccount: other }),
+          row({ id: "in", type: "TransferIn", transferAccount: other }),
+          row({
+            id: "fee",
+            type: "WriteOff",
+            writeOffReason: "NetworkFee",
+            transferAccount: other,
+          }),
+          row({ id: "alone", type: "TransferOut", transferAccount: null }),
+        ]}
+        {...baseProps}
+        onOpenAccount={onOpenAccount}
+      />,
+    );
+    expect(document.querySelector("#txl-transfer-out")?.textContent).toBe("transfer.to_account");
+    expect(document.querySelector("#txl-transfer-in")?.textContent).toBe("transfer.from_account");
+    expect(document.querySelector("#txl-transfer-fee")?.textContent).toBe(
+      "transfer.part_of_transfer_to",
+    );
+    expect(document.querySelector("#txl-transfer-alone")).toBeNull();
+    fireEvent.click(document.querySelector("#txl-transfer-in") as Element);
+    expect(onOpenAccount).toHaveBeenCalledWith("acc-2");
   });
 
   it("hides the Asset column by default", () => {

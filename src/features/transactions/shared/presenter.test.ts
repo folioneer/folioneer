@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  deleteConfirmKey,
   toTransactionRow,
   transactionDraftErrorToI18n,
   transactionLoadErrorToI18n,
   transactionMutationErrorToI18n,
+  transferLineKey,
 } from "./presenter";
 
 const MICRO = 1_000_000;
@@ -341,5 +343,30 @@ describe("transactionLoadErrorToI18n", () => {
   it("unreachable code falls back to error.Unknown", () => {
     const err = { code: "NameEmpty" } as Parameters<typeof transactionLoadErrorToI18n>[0];
     expect(transactionLoadErrorToI18n(err)).toEqual({ key: "error.Unknown" });
+  });
+});
+
+describe("toTransactionRow — parts of a transfer (TRF-056, TRF-057)", () => {
+  const other = { id: "acc-2", name: "Wallet" };
+  const part = (type: "TransferOut" | "TransferIn" | "WriteOff", transferId: string | null) =>
+    toTransactionRow(
+      { ...openingBalanceTx, transaction_type: type, transfer_id: transferId } as never,
+      "Bitcoin",
+      "Exchange",
+      other,
+    );
+
+  it("names the other account on each part, and none on a row out of any transfer", () => {
+    expect(transferLineKey(part("TransferOut", "trf-1"))).toBe("transfer.to_account");
+    expect(transferLineKey(part("TransferIn", "trf-1"))).toBe("transfer.from_account");
+    expect(transferLineKey(part("WriteOff", "trf-1"))).toBe("transfer.part_of_transfer_to");
+    expect(part("WriteOff", null).transferAccount).toBeNull();
+    expect(transferLineKey(part("WriteOff", null))).toBeNull();
+  });
+
+  it("warns that deleting a part removes the whole transfer", () => {
+    expect(deleteConfirmKey(part("TransferIn", "trf-1"))).toBe("transfer.delete_confirm_message");
+    expect(deleteConfirmKey(part("WriteOff", null))).toBe("transaction.delete_confirm_message");
+    expect(deleteConfirmKey(undefined)).toBe("transaction.delete_confirm_message");
   });
 });

@@ -138,8 +138,14 @@ export function useAccountJournal() {
         const tx = row.transaction;
         const asset = assets.find((a) => a.id === tx.asset_id);
         const account = accounts.find((a) => a.id === tx.account_id);
+        const other = accounts.find((a) => a.id === row.transfer_account_id);
         return {
-          ...toTransactionRow(tx, asset?.name ?? tx.asset_id, account?.name ?? tx.account_id),
+          ...toTransactionRow(
+            tx,
+            asset?.name ?? tx.asset_id,
+            account?.name ?? tx.account_id,
+            other ? { id: other.id, name: other.name } : null,
+          ),
           ...toCashStatementCells({
             debitMicros: row.cash_out,
             creditMicros: row.cash_in,

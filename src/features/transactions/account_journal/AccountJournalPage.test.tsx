@@ -47,6 +47,7 @@ const rowVm = (over: Partial<TransactionRowViewModel> = {}): TransactionRowViewM
   assetName: "Apple",
   accountName: "Main",
   type: "Purchase",
+  transferAccount: null,
   date: "2024-06-14",
   quantity: "10.000",
   unitPrice: "100.000",

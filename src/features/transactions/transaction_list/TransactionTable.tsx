@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { IconButton } from "@/ui/components/button/IconButton";
 import { SortIcon } from "@/ui/components/SortIcon";
 import { formatIsoDateNumeric, formatIsoDateTime } from "@/ui/format/date";
-import type { TransactionRowViewModel } from "../shared/presenter";
+import { type TransactionRowViewModel, transferLineKey } from "../shared/presenter";
 
 interface TransactionTableProps {
   /** Already-sorted rows to render. */
@@ -19,6 +19,8 @@ interface TransactionTableProps {
   cashStatement?: boolean;
   onEditTransaction: (transactionId: string) => void;
   onDeleteTransaction: (transactionId: string) => void;
+  /** TRF-056 — open the other account of a part of a transfer. */
+  onOpenAccount?: (accountId: string) => void;
 }
 
 /**
@@ -34,6 +36,7 @@ export function TransactionTable({
   cashStatement = false,
   onEditTransaction,
   onDeleteTransaction,
+  onOpenAccount,
 }: TransactionTableProps) {
   const { t, i18n } = useTranslation();
 
@@ -97,6 +100,7 @@ export function TransactionTable({
                   {t(`transaction.type_${row.type.toLowerCase()}`)}
                   {/* WOF-057 — a write-off reads with its reason */}
                   {row.writeOffReason && ` · ${t(`write_off.short_reason_${row.writeOffReason}`)}`}
+                  <TransferLine row={row} onOpenAccount={onOpenAccount} />
                 </td>
                 {showAssetColumn && (
                   <td id={`txl-asset-${row.id}`} className="m3-td">
@@ -206,5 +210,32 @@ export function TransactionTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * TRF-056 — under a part of a transfer's type, the other account, drawn from the transfer and
+ * never stored as a note; its name opens that account.
+ */
+function TransferLine({
+  row,
+  onOpenAccount,
+}: {
+  row: TransactionRowViewModel;
+  onOpenAccount?: (accountId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const key = transferLineKey(row);
+  if (!key || !row.transferAccount) return null;
+  const { id, name } = row.transferAccount;
+  return (
+    <button
+      type="button"
+      id={`txl-transfer-${row.id}`}
+      onClick={() => onOpenAccount?.(id)}
+      className="block text-left text-xs text-m3-primary hover:underline cursor-pointer"
+    >
+      {t(key, { account: name })}
+    </button>
   );
 }

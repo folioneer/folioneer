@@ -10,6 +10,7 @@ import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import { AddTransactionModal } from "../add_transaction/AddTransactionModal";
 import { EditTransactionModal } from "../edit_transaction_modal/EditTransactionModal";
+import { deleteConfirmKey } from "../shared/presenter";
 import { routeEditTransaction } from "../shared/routeEditTransaction";
 import { useTransactions } from "../useTransactions";
 import { TransactionTable } from "./TransactionTable";
@@ -191,6 +192,9 @@ export function TransactionListPage() {
                 if (raw) routeEditTransaction(navigate, raw, setEditingTransaction);
               }}
               onDeleteTransaction={setDeletingTransactionId}
+              onOpenAccount={(otherId) =>
+                navigate({ to: "/accounts/$accountId", params: { accountId: otherId } })
+              }
             />
           )}
         </div>
@@ -216,7 +220,9 @@ export function TransactionListPage() {
         onCancel={() => setDeletingTransactionId(null)}
         onConfirm={handleConfirmDelete}
         title={t("transaction.delete_confirm_title")}
-        message={t("transaction.delete_confirm_message")}
+        message={t(
+          deleteConfirmKey(sortedTransactions.find((row) => row.id === deletingTransactionId)),
+        )}
         confirmLabel={t("action.confirm")}
         cancelLabel={t("action.cancel")}
         variant="danger"

@@ -10,6 +10,7 @@ import { SelectField } from "@/ui/components/field/SelectField";
 import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import { EditTransactionModal } from "../edit_transaction_modal/EditTransactionModal";
+import { deleteConfirmKey } from "../shared/presenter";
 import { routeEditTransaction } from "../shared/routeEditTransaction";
 import { TransactionTable } from "../transaction_list/TransactionTable";
 import { useTransactions } from "../useTransactions";
@@ -170,6 +171,9 @@ export function AccountJournalPage() {
                 if (raw) routeEditTransaction(navigate, raw, setEditingTransaction);
               }}
               onDeleteTransaction={setDeletingTransactionId}
+              onOpenAccount={(otherId) =>
+                navigate({ to: "/accounts/$accountId", params: { accountId: otherId } })
+              }
             />
           )}
         </div>
@@ -194,7 +198,9 @@ export function AccountJournalPage() {
         onCancel={() => setDeletingTransactionId(null)}
         onConfirm={handleConfirmDelete}
         title={t("transaction.delete_confirm_title")}
-        message={t("transaction.delete_confirm_message")}
+        message={t(
+          deleteConfirmKey(filteredSortedRows.find((row) => row.id === deletingTransactionId)),
+        )}
         confirmLabel={t("action.confirm")}
         cancelLabel={t("action.cancel")}
         variant="danger"
