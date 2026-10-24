@@ -57,6 +57,11 @@ impl TransferUseCase {
         }
     }
 
+    /// The account context the transfer is placed in.
+    pub(super) fn account_service(&self) -> &dyn AccountServiceContract {
+        &*self.account_service
+    }
+
     /// Records a transfer of `asset_id` from one account to another (TRF-010 to TRF-022):
     /// every part, the fee in kind first when there is one.
     pub async fn record_transfer(
@@ -201,7 +206,7 @@ impl TransferUseCase {
     }
 
     /// TRF-010 — the asset exists, is not archived and is not a Cash Asset.
-    async fn ensure_transferable(&self, asset_id: &str) -> Result<(), TransferError> {
+    pub(super) async fn ensure_transferable(&self, asset_id: &str) -> Result<(), TransferError> {
         let asset = self
             .asset_service
             .get_asset_by_id(asset_id)
@@ -222,7 +227,7 @@ impl TransferUseCase {
 
     /// TRF-022 — the rate given or, with none, the most recent stored rate on or before the
     /// date from the sending account's currency to the receiving one's.
-    async fn rate(
+    pub(super) async fn rate(
         &self,
         from_account_id: &str,
         to_account_id: &str,

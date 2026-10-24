@@ -12,10 +12,15 @@ use specta::Type;
 use tauri::State;
 
 use super::channel;
-use super::connections::{AgentConnectionRequest, AgentSession, ChangeRequest, RemovalRequest};
-use super::gate::{answer_change, answer_removal, AgentGate, AnswerRefused, GateError};
+use super::connections::{
+    AgentConnectionRequest, AgentSession, ChangeRequest, RemovalRequest, ReplacementRequest,
+};
+use super::gate::{
+    answer_change, answer_removal, answer_replacement, AgentGate, AnswerRefused, GateError,
+};
 use crate::core::BACKEND;
 use crate::use_cases::holding_transaction::{HoldingTransactionUseCase, SessionRemoval};
+use crate::use_cases::transfer::TransferUseCase;
 
 /// Failures of the agent connection commands.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Type)]
@@ -51,6 +56,15 @@ pub enum AgentConnectionError {
         /// The correction's code.
         reason: String,
     },
+    /// The replacement request was already answered, or its session ended (AGT-091).
+    #[error("No such replacement request")]
+    ReplacementRequestGone,
+    /// A yes replaced nothing (AGT-091): `reason` is the code the agent is given.
+    #[error("The transactions could not be replaced")]
+    TransactionsNotReplaced {
+        /// The code the agent is given.
+        reason: String,
+    },
     /// The portfolio could not be read or written; the cause is in the log.
     #[error("The portfolio could not be read or written")]
     DatabaseError,
@@ -62,6 +76,15 @@ impl AgentConnectionError {
         match refused {
             AnswerRefused::Gone => Self::RemovalRequestGone,
             AnswerRefused::NotDone { reason } => Self::TransactionNotRemoved { reason },
+            AnswerRefused::Unreadable => Self::DatabaseError,
+        }
+    }
+
+    /// The owner's answer to a replacement request that did nothing (AGT-091).
+    fn of_replacement(refused: AnswerRefused) -> Self {
+        match refused {
+            AnswerRefused::Gone => Self::ReplacementRequestGone,
+            AnswerRefused::NotDone { reason } => Self::TransactionsNotReplaced { reason },
             AnswerRefused::Unreadable => Self::DatabaseError,
         }
     }
@@ -104,6 +127,9 @@ pub struct AgentConnectionState {
     /// The change requests waiting for the owner's answer, oldest first (AGT-088); they
     /// share one order with the removal requests.
     pub changes: Vec<ChangeRequest>,
+    /// The replacement requests waiting for the owner's answer, oldest first (AGT-091); they
+    /// share one order with the removal and change requests.
+    pub replacements: Vec<ReplacementRequest>,
 }
 
 /// The state of `gate`, as the window reads it.
@@ -119,6 +145,7 @@ pub fn state_of(gate: &AgentGate) -> AgentConnectionState {
         sessions: gate.connections().sessions(),
         removals: gate.connections().removals(),
         changes: gate.connections().changes(),
+        replacements: gate.connections().replacements(),
     }
 }
 
@@ -184,6 +211,22 @@ pub async fn answer_change_request(
     answer_change(gate.connections(), &recorder, request_id, change)
         .await
         .map_err(AgentConnectionError::of_change)
+}
+
+/// AGT-091 — the owner's answer to a replacement request: removing the four transactions and
+/// recording the transfer in one write, or refusing. The agent that asked is told what
+/// became of it.
+#[tauri::command]
+#[specta::specta]
+pub async fn answer_replacement_request(
+    gate: State<'_, Arc<AgentGate>>,
+    transfers: State<'_, TransferUseCase>,
+    request_id: u32,
+    replace: bool,
+) -> Result<(), AgentConnectionError> {
+    answer_replacement(gate.connections(), &transfers, request_id, replace)
+        .await
+        .map_err(AgentConnectionError::of_replacement)
 }
 
 /// AGT-034 — the owner disconnects an agent client.

@@ -209,8 +209,8 @@ fn not_undone() -> Refusal {
     }
 }
 
-/// AGT-065A — the transfer's refusals keep their codes (CLI-021).
-fn refusal_from_transfer(error: &TransferError) -> Refusal {
+/// AGT-065A / AGT-090 — the transfer's refusals keep their codes (CLI-021).
+pub(in crate::agent_connection) fn refusal_from_transfer(error: &TransferError) -> Refusal {
     match error {
         TransferError::Account(error) => {
             let refusal = refusal_from_account(error);

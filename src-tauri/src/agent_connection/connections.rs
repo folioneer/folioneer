@@ -8,8 +8,9 @@ use serde::Serialize;
 use specta::Type;
 use tokio::sync::{oneshot, Notify};
 
-use crate::context::account::{Transaction, TransactionType};
+use crate::context::account::{Transaction, TransactionType, TransferView};
 use crate::use_cases::holding_transaction::CorrectionFields;
+use crate::use_cases::transfer::Replacement;
 
 /// An agent client waiting for the owner's answer (AGT-030).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
@@ -213,6 +214,72 @@ pub enum ChangeAnswer {
     },
 }
 
+/// An agent asking the owner to replace four transactions the owner typed with the transfer
+/// they stand for (AGT-090).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct ReplacementRequest {
+    /// Identifies the request in the owner's answer; removal, change and replacement
+    /// requests share one order (AGT-091).
+    pub id: u32,
+    /// The session that asks.
+    pub session: u32,
+    /// The name of the agent that asks.
+    pub client: String,
+    /// When it asked, as an RFC 3339 timestamp in this computer's time.
+    pub asked_at: String,
+    /// The four as they stood when the agent asked: the sale, the withdrawal, the deposit,
+    /// the purchase.
+    pub transactions: Vec<TransactionShown>,
+    /// The transfer recorded in their place.
+    pub transfer: TransferShown,
+}
+
+/// AGT-091 — the transfer a replacement records, as the owner is shown it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct TransferShown {
+    /// The sending account's name.
+    pub from_account: String,
+    /// The receiving account's name.
+    pub to_account: String,
+    /// Its date (YYYY-MM-DD): the sale's.
+    pub date: String,
+    /// The asset's name.
+    pub asset_name: String,
+    /// The asset's reference.
+    pub asset_reference: String,
+    /// The quantity sent, the sale's, in micro-units.
+    pub quantity_sent: i64,
+    /// The quantity received, the purchase's, in micro-units.
+    pub quantity_received: i64,
+    /// The cost it moves, in the sending account's currency, in micro-units.
+    pub cost: i64,
+    /// The sending account's currency.
+    pub from_currency: String,
+    /// Its rate, in micro-units; none between accounts of one currency.
+    pub exchange_rate: Option<i64>,
+    /// The cost in the receiving account's currency, in micro-units; none between accounts
+    /// of one currency.
+    pub converted_cost: Option<i64>,
+    /// The receiving account's currency; the sending one's within one currency.
+    pub to_currency: String,
+}
+
+/// What became of a replacement request, as the agent that asked is told (AGT-090).
+#[derive(Debug, Clone)]
+pub enum ReplacementAnswer {
+    /// The owner replaced the four: the transfer as it now stands (TRF-060).
+    Replaced(Box<TransferView>),
+    /// The owner refused, or the session ended before an answer.
+    Refused,
+    /// The owner said yes and nothing was replaced: the code and reason of why.
+    NotReplaced {
+        /// The code.
+        code: String,
+        /// The reason.
+        message: String,
+    },
+}
+
 /// A request waiting for the owner's answer, with what performing it needs and the call that
 /// waits on it: whoever takes it to perform the owner's answer tells the agent what became
 /// of it.
@@ -237,6 +304,10 @@ pub type WaitingRemoval = Waiting<RemovalRequest, RemovalAnswer>;
 /// A change request waiting for the owner's answer, with what its correction is given
 /// (AGT-087).
 pub type WaitingChange = Waiting<ChangeRequest, ChangeAnswer, CorrectionFields>;
+
+/// A replacement request waiting for the owner's answer, with the transfer it records
+/// (AGT-090).
+pub type WaitingReplacement = Waiting<ReplacementRequest, ReplacementAnswer, Replacement>;
 
 /// What a session did, shared by the connection that serves it and by what the window is
 /// told of it.
@@ -388,6 +459,7 @@ struct State {
     open: Vec<Open>,
     removals: Vec<WaitingRemoval>,
     changes: Vec<WaitingChange>,
+    replacements: Vec<WaitingReplacement>,
 }
 
 /// The requests waiting and the sessions open. `changed` is called after every change, so
@@ -419,7 +491,8 @@ impl Drop for Withdrawal<'_> {
     }
 }
 
-/// Withdraws a removal or change request whose call went away before the owner answered.
+/// Withdraws a removal, change or replacement request whose call went away before the owner
+/// answered.
 struct RequestWithdrawal<'a> {
     connections: &'a AgentConnections,
     request_id: u32,
@@ -449,6 +522,13 @@ impl State {
         self.changes
             .retain(|pending| pending.request.id != request_id);
         self.changes.len() != before
+    }
+
+    fn withdraw_replacement(&mut self, request_id: u32) -> bool {
+        let before = self.replacements.len();
+        self.replacements
+            .retain(|pending| pending.request.id != request_id);
+        self.replacements.len() != before
     }
 
     fn is_open(&self, session_id: u32) -> bool {
@@ -599,13 +679,17 @@ impl AgentConnections {
                 .iter()
                 .position(|open| open.session.id == session_id);
             let ended = position.map(|position| state.open.remove(position));
-            // AGT-082 — its removal and change requests are withdrawn: their calls are refused.
+            // AGT-082 — its removal, change and replacement requests are withdrawn: their
+            // calls are refused.
             if ended.is_some() {
                 state
                     .removals
                     .retain(|pending| pending.request.session != session_id);
                 state
                     .changes
+                    .retain(|pending| pending.request.session != session_id);
+                state
+                    .replacements
                     .retain(|pending| pending.request.session != session_id);
             }
             ended
@@ -622,7 +706,7 @@ impl AgentConnections {
 
     /// AGT-035 — stops admitting agents, refuses every request and ends every session.
     pub fn end_all(&self) {
-        let (pending, open, removals, changes) = {
+        let (pending, open, removals, changes, replacements) = {
             let mut state = self.state();
             state.admitting = false;
             (
@@ -630,9 +714,15 @@ impl AgentConnections {
                 std::mem::take(&mut state.open),
                 std::mem::take(&mut state.removals),
                 std::mem::take(&mut state.changes),
+                std::mem::take(&mut state.replacements),
             )
         };
-        if pending.is_empty() && open.is_empty() && removals.is_empty() && changes.is_empty() {
+        if pending.is_empty()
+            && open.is_empty()
+            && removals.is_empty()
+            && changes.is_empty()
+            && replacements.is_empty()
+        {
             return;
         }
         for pending in pending {
@@ -641,9 +731,11 @@ impl AgentConnections {
         for open in open {
             open.ended.notify_one();
         }
-        // AGT-082 — the removal and change requests' calls are refused as their answers drop.
+        // AGT-082 — the removal, change and replacement requests' calls are refused as their
+        // answers drop.
         drop(removals);
         drop(changes);
+        drop(replacements);
         (self.changed)();
     }
 
@@ -726,6 +818,72 @@ impl AgentConnections {
             withdraw: State::withdraw_change,
         };
         answered.await.unwrap_or(ChangeAnswer::Refused)
+    }
+
+    /// AGT-090 — the session `granted` asks the owner to replace the four transactions
+    /// `shown` with the transfer `transfer` shows, and waits for the answer: `Refused` when
+    /// the session is no longer open, or ends before an answer. `replacement` is what the
+    /// yes records. A caller that stops waiting withdraws its request.
+    pub async fn ask_replacement(
+        &self,
+        granted: &Granted,
+        shown: Vec<TransactionShown>,
+        transfer: TransferShown,
+        replacement: Replacement,
+    ) -> ReplacementAnswer {
+        let (answer, answered) = oneshot::channel();
+        let request_id = {
+            let mut state = self.state();
+            if !state.is_open(granted.session_id) {
+                return ReplacementAnswer::Refused;
+            }
+            state.last_id = state.last_id.wrapping_add(1);
+            let request = ReplacementRequest {
+                id: state.last_id,
+                session: granted.session_id,
+                client: granted.client.clone(),
+                asked_at: chrono::Local::now().to_rfc3339(),
+                transactions: shown,
+                transfer,
+            };
+            state.replacements.push(WaitingReplacement {
+                request,
+                held: replacement,
+                answer,
+            });
+            state.last_id
+        };
+        (self.changed)();
+        let _withdrawal = RequestWithdrawal {
+            connections: self,
+            request_id,
+            withdraw: State::withdraw_replacement,
+        };
+        answered.await.unwrap_or(ReplacementAnswer::Refused)
+    }
+
+    /// AGT-091 — takes the replacement request the owner answered from those waiting; `None`
+    /// when no such request waits. The window is told it is gone.
+    pub fn take_replacement(&self, request_id: u32) -> Option<WaitingReplacement> {
+        let taken = {
+            let mut state = self.state();
+            let position = state
+                .replacements
+                .iter()
+                .position(|pending| pending.request.id == request_id);
+            position.map(|position| state.replacements.remove(position))
+        }?;
+        (self.changed)();
+        Some(taken)
+    }
+
+    /// The replacement requests waiting, oldest first (AGT-091).
+    pub fn replacements(&self) -> Vec<ReplacementRequest> {
+        self.state()
+            .replacements
+            .iter()
+            .map(|pending| pending.request.clone())
+            .collect()
     }
 
     /// AGT-088 — takes the change request the owner answered from those waiting; `None`

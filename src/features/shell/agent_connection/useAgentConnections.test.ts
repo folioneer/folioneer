@@ -39,6 +39,7 @@ const state = (overrides = {}) => ({
   sessions: [],
   removals: [],
   changes: [],
+  replacements: [],
   ...overrides,
 });
 

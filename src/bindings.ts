@@ -1215,6 +1215,19 @@ async answerChangeRequest(requestId: number, change: boolean) : Promise<Result<n
 }
 },
 /**
+ * AGT-091 — the owner's answer to a replacement request: removing the four transactions and
+ * recording the transfer in one write, or refusing. The agent that asked is told what
+ * became of it.
+ */
+async answerReplacementRequest(requestId: number, replace: boolean) : Promise<Result<null, AgentConnectionError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("answer_replacement_request", { requestId, replace }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * AGT-034 — the owner disconnects an agent client.
  */
 async disconnectAgent(sessionId: number) : Promise<Result<null, AgentConnectionError>> {
@@ -1800,6 +1813,14 @@ export type AgentConnectionError =
  */
 { code: "TransactionNotChanged"; reason: string } | 
 /**
+ * The replacement request was already answered, or its session ended (AGT-091).
+ */
+{ code: "ReplacementRequestGone" } | 
+/**
+ * A yes replaced nothing (AGT-091): `reason` is the code the agent is given.
+ */
+{ code: "TransactionsNotReplaced"; reason: string } | 
+/**
  * The portfolio could not be read or written; the cause is in the log.
  */
 { code: "DatabaseError" }
@@ -1852,7 +1873,12 @@ removals: RemovalRequest[];
  * The change requests waiting for the owner's answer, oldest first (AGT-088); they
  * share one order with the removal requests.
  */
-changes: ChangeRequest[] }
+changes: ChangeRequest[]; 
+/**
+ * The replacement requests waiting for the owner's answer, oldest first (AGT-091); they
+ * share one order with the removal and change requests.
+ */
+replacements: ReplacementRequest[] }
 /**
  * The mark of a transaction an agent recorded (AGT-045): which agent, in which session.
  */
@@ -4605,6 +4631,37 @@ asked_at: string;
  */
 transaction: TransactionShown }
 /**
+ * An agent asking the owner to replace four transactions the owner typed with the transfer
+ * they stand for (AGT-090).
+ */
+export type ReplacementRequest = { 
+/**
+ * Identifies the request in the owner's answer; removal, change and replacement
+ * requests share one order (AGT-091).
+ */
+id: number; 
+/**
+ * The session that asks.
+ */
+session: number; 
+/**
+ * The name of the agent that asks.
+ */
+client: string; 
+/**
+ * When it asked, as an RFC 3339 timestamp in this computer's time.
+ */
+asked_at: string; 
+/**
+ * The four as they stood when the agent asked: the sale, the withdrawal, the deposit,
+ * the purchase.
+ */
+transactions: TransactionShown[]; 
+/**
+ * The transfer recorded in their place.
+ */
+transfer: TransferShown }
+/**
  * One other device known from the roster (the manifest set, SYN-037).
  */
 export type RosterEntry = { 
@@ -5608,6 +5665,59 @@ AccountError |
  * Use-case-layer rejection (cross-BC asset checks).
  */
 TransferTask
+/**
+ * AGT-091 — the transfer a replacement records, as the owner is shown it.
+ */
+export type TransferShown = { 
+/**
+ * The sending account's name.
+ */
+from_account: string; 
+/**
+ * The receiving account's name.
+ */
+to_account: string; 
+/**
+ * Its date (YYYY-MM-DD): the sale's.
+ */
+date: string; 
+/**
+ * The asset's name.
+ */
+asset_name: string; 
+/**
+ * The asset's reference.
+ */
+asset_reference: string; 
+/**
+ * The quantity sent, the sale's, in micro-units.
+ */
+quantity_sent: number; 
+/**
+ * The quantity received, the purchase's, in micro-units.
+ */
+quantity_received: number; 
+/**
+ * The cost it moves, in the sending account's currency, in micro-units.
+ */
+cost: number; 
+/**
+ * The sending account's currency.
+ */
+from_currency: string; 
+/**
+ * Its rate, in micro-units; none between accounts of one currency.
+ */
+exchange_rate: number | null; 
+/**
+ * The cost in the receiving account's currency, in micro-units; none between accounts
+ * of one currency.
+ */
+converted_cost: number | null; 
+/**
+ * The receiving account's currency; the sending one's within one currency.
+ */
+to_currency: string }
 /**
  * Application-layer rejections of a transfer — the cross-BC asset checks performed by the
  * orchestrator before delegating to the account context (TRF-010).

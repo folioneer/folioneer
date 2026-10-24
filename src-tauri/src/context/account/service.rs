@@ -1380,13 +1380,7 @@ impl AccountService {
                 },
             )
             .await?;
-        Ok(TransferPreview {
-            parts: staged.parts,
-            sending_before: staged.sending_before,
-            sending_after: staged.sending.transactions,
-            receiving_before: staged.receiving_before,
-            receiving_after: staged.receiving.transactions,
-        })
+        Ok(staged.into_preview())
     }
 
     /// Places the parts of `transfer_id` in both accounts from `figures` (TRF-020 to
@@ -1418,130 +1412,284 @@ impl AccountService {
         if from_account_id == to_account_id {
             return Err(AccountError::TransferToSameAccount);
         }
-        let mut sending = load_account(&*self.account_repo, from_account_id).await?;
-        let mut receiving = load_account(&*self.account_repo, to_account_id).await?;
-        let sending_before = sending.transactions.clone();
-        let receiving_before = receiving.transactions.clone();
-        let TransferFigures {
-            asset_id,
-            date,
-            quantity_sent,
-            quantity_received,
-            exchange_rate,
-            note,
-        } = figures;
-        if quantity_sent <= 0 || quantity_received <= 0 {
-            return Err(AccountError::QuantityNotPositive);
-        }
-        if quantity_received > quantity_sent {
-            return Err(AccountError::TransferReceivedAboveSent);
-        }
-        if sending.currency == receiving.currency && exchange_rate != 1_000_000 {
-            return Err(AccountError::TransferRateNotOne);
-        }
-        let previous: Vec<Transaction> = sending
-            .transfer_parts(transfer_id)
-            .into_iter()
-            .chain(receiving.transfer_parts(transfer_id))
-            .cloned()
-            .collect();
-        let kept = |kind: TransactionType| {
-            previous
-                .iter()
-                .find(|t| t.transaction_type == kind)
-                .map(|t| (t.id.clone(), t.created_at.clone()))
-        };
-        // A correction keeps each part's identity (TRF-030); a new transfer has none yet.
-        let side = |kind: TransactionType,
-                    account_id: &str,
-                    date: &str,
-                    total_amount: i64,
-                    exchange_rate: i64| match kept(kind) {
-            Some((id, created_at)) => Transaction::transfer_side_with_id(
-                id,
-                created_at,
-                account_id.to_string(),
-                asset_id.clone(),
-                kind,
-                date.to_string(),
-                quantity_received,
-                total_amount,
-                exchange_rate,
-                note.clone(),
-                transfer_id.to_string(),
-            ),
-            None => Transaction::new_transfer_side(
-                account_id.to_string(),
-                asset_id.clone(),
-                kind,
-                date.to_string(),
-                quantity_received,
-                total_amount,
-                exchange_rate,
-                note.clone(),
-                transfer_id.to_string(),
-            ),
-        };
-        let mut sent_parts = Vec::new();
-        if quantity_sent > quantity_received {
-            let quantity = quantity_sent - quantity_received;
-            let fee = match kept(TransactionType::WriteOff) {
-                Some((id, created_at)) => Transaction::write_off_with_id(
-                    id,
-                    from_account_id.to_string(),
-                    asset_id.clone(),
-                    date.clone(),
-                    quantity,
-                    WriteOffReason::NetworkFee,
-                    note.clone(),
-                    created_at,
-                ),
-                None => Transaction::write_off(
-                    from_account_id.to_string(),
-                    asset_id.clone(),
-                    date.clone(),
-                    quantity,
-                    WriteOffReason::NetworkFee,
-                    note.clone(),
-                ),
-            }?
-            .with_transfer_id(Some(transfer_id.to_string()));
-            sent_parts.push(fee);
-        }
-        sent_parts.push(side(
-            TransactionType::TransferOut,
-            from_account_id,
-            &date,
-            0,
-            1_000_000,
-        )?);
-        let placed_out = sending
-            .place_transfer_parts(transfer_id, &asset_id, sent_parts)
-            .map_err(to_holding_tx_error)?;
-        let cost = placed_out
-            .iter()
-            .find(|t| t.transaction_type == TransactionType::TransferOut)
-            .map(|t| t.total_amount)
-            .unwrap_or(0);
-        let incoming = side(
-            TransactionType::TransferIn,
-            to_account_id,
-            &date,
-            super::domain::converted_cost(cost, exchange_rate),
-            exchange_rate,
-        )?;
-        let placed_in = receiving
-            .place_transfer_parts(transfer_id, &asset_id, vec![incoming])
-            .map_err(to_holding_tx_error)?;
-        Ok(StagedTransfer {
-            parts: placed_out.into_iter().chain(placed_in).collect(),
-            sending,
-            receiving,
-            sending_before,
-            receiving_before,
-        })
+        let sending = load_account(&*self.account_repo, from_account_id).await?;
+        let receiving = load_account(&*self.account_repo, to_account_id).await?;
+        stage_on(transfer_id, sending, receiving, figures)
     }
 
+    /// AGT-091 — both accounts with the transactions `replaced` taken out and a new transfer
+    /// placed from `figures` in their stead, the cash replayed, checked as TRF-010 to TRF-022
+    /// and CSH-080 check them; nothing written. No state between the two is checked: the
+    /// accounts stand as if the transfer had been recorded instead from the start. Also
+    /// answers the four as they were stored, in the order of `replaced`.
+    async fn stage_replacement(
+        &self,
+        replaced: &[String],
+        from_account_id: &str,
+        to_account_id: &str,
+        figures: TransferFigures,
+    ) -> Result<(StagedTransfer, Vec<Transaction>), AccountError> {
+        if from_account_id == to_account_id {
+            return Err(AccountError::TransferToSameAccount);
+        }
+        let mut sending = load_account(&*self.account_repo, from_account_id).await?;
+        let mut receiving = load_account(&*self.account_repo, to_account_id).await?;
+        let stored = replaced
+            .iter()
+            .map(|id| {
+                sending
+                    .transactions
+                    .iter()
+                    .chain(&receiving.transactions)
+                    .find(|t| &t.id == id)
+                    .cloned()
+                    .ok_or(AccountError::TransactionNotFound)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let (sending_before, receiving_before) =
+            (sending.transactions.clone(), receiving.transactions.clone());
+        let ids_in = |account_id: &str| -> Vec<String> {
+            stored
+                .iter()
+                .filter(|t| t.account_id == account_id)
+                .map(|t| t.id.clone())
+                .collect()
+        };
+        sending
+            .take_out(&ids_in(from_account_id))
+            .map_err(to_holding_tx_error)?;
+        receiving
+            .take_out(&ids_in(to_account_id))
+            .map_err(to_holding_tx_error)?;
+        let transfer_id = Uuid::new_v4().to_string();
+        let mut staged = stage_on(&transfer_id, sending, receiving, figures)?;
+        staged.sending.settle_cash().map_err(to_holding_tx_error)?;
+        staged
+            .receiving
+            .settle_cash()
+            .map_err(to_holding_tx_error)?;
+        staged.sending_before = sending_before;
+        staged.receiving_before = receiving_before;
+        Ok((staged, stored))
+    }
+
+    /// AGT-090 — what replacing the transactions `replaced` with a transfer would make of its
+    /// two accounts: the checks of `replace_with_transfer`, nothing written.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn preview_replacement(
+        &self,
+        replaced: &[String],
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+    ) -> Result<TransferPreview, AccountError> {
+        let (staged, _) = self
+            .stage_replacement(
+                replaced,
+                from_account_id,
+                to_account_id,
+                TransferFigures {
+                    asset_id,
+                    date,
+                    quantity_sent,
+                    quantity_received,
+                    exchange_rate,
+                    note: None,
+                },
+            )
+            .await?;
+        Ok(staged.into_preview())
+    }
+
+    /// AGT-091 — replaces the transactions `shown` with a transfer in one write, as
+    /// `stage_replacement` stages it, only while each stands as it was shown and the
+    /// transfer moves `cost_shown`; `None` when not, nothing written.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn replace_with_transfer(
+        &self,
+        shown: &[Transaction],
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        cost_shown: i64,
+    ) -> Result<Option<Vec<Transaction>>, AccountError> {
+        info!(target: BACKEND, from = %from_account_id, to = %to_account_id, asset_id = %asset_id, "replace_with_transfer");
+        let replaced: Vec<String> = shown.iter().map(|t| t.id.clone()).collect();
+        let (mut staged, stored) = self
+            .stage_replacement(
+                &replaced,
+                from_account_id,
+                to_account_id,
+                TransferFigures {
+                    asset_id,
+                    date,
+                    quantity_sent,
+                    quantity_received,
+                    exchange_rate,
+                    note: None,
+                },
+            )
+            .await?;
+        let cost = staged
+            .parts
+            .iter()
+            .find(|t| t.transaction_type == TransactionType::TransferOut)
+            .map_or(0, |t| t.total_amount);
+        let stands = stored
+            .iter()
+            .zip(shown)
+            .all(|(stored, shown)| stored.stands_as(shown));
+        if !stands || cost != cost_shown {
+            return Ok(None);
+        }
+        let mut written = vec![&mut staged.sending, &mut staged.receiving];
+        save_accounts(&*self.account_repo, &mut written).await?;
+        self.emit_transaction_updated();
+        Ok(Some(staged.parts))
+    }
+}
+
+/// Both accounts, as loaded, with the parts of `transfer_id` placed from `figures`, checked
+/// and replayed (TRF-010 to TRF-022, TRF-030), nothing written.
+fn stage_on(
+    transfer_id: &str,
+    mut sending: Account,
+    mut receiving: Account,
+    figures: TransferFigures,
+) -> Result<StagedTransfer, AccountError> {
+    let (from_account_id, to_account_id) = (sending.id.clone(), receiving.id.clone());
+    let (from_account_id, to_account_id) = (from_account_id.as_str(), to_account_id.as_str());
+    let sending_before = sending.transactions.clone();
+    let receiving_before = receiving.transactions.clone();
+    let TransferFigures {
+        asset_id,
+        date,
+        quantity_sent,
+        quantity_received,
+        exchange_rate,
+        note,
+    } = figures;
+    if quantity_sent <= 0 || quantity_received <= 0 {
+        return Err(AccountError::QuantityNotPositive);
+    }
+    if quantity_received > quantity_sent {
+        return Err(AccountError::TransferReceivedAboveSent);
+    }
+    if sending.currency == receiving.currency && exchange_rate != 1_000_000 {
+        return Err(AccountError::TransferRateNotOne);
+    }
+    let previous: Vec<Transaction> = sending
+        .transfer_parts(transfer_id)
+        .into_iter()
+        .chain(receiving.transfer_parts(transfer_id))
+        .cloned()
+        .collect();
+    let kept = |kind: TransactionType| {
+        previous
+            .iter()
+            .find(|t| t.transaction_type == kind)
+            .map(|t| (t.id.clone(), t.created_at.clone()))
+    };
+    // A correction keeps each part's identity (TRF-030); a new transfer has none yet.
+    let side = |kind: TransactionType,
+                account_id: &str,
+                date: &str,
+                total_amount: i64,
+                exchange_rate: i64| match kept(kind) {
+        Some((id, created_at)) => Transaction::transfer_side_with_id(
+            id,
+            created_at,
+            account_id.to_string(),
+            asset_id.clone(),
+            kind,
+            date.to_string(),
+            quantity_received,
+            total_amount,
+            exchange_rate,
+            note.clone(),
+            transfer_id.to_string(),
+        ),
+        None => Transaction::new_transfer_side(
+            account_id.to_string(),
+            asset_id.clone(),
+            kind,
+            date.to_string(),
+            quantity_received,
+            total_amount,
+            exchange_rate,
+            note.clone(),
+            transfer_id.to_string(),
+        ),
+    };
+    let mut sent_parts = Vec::new();
+    if quantity_sent > quantity_received {
+        let quantity = quantity_sent - quantity_received;
+        let fee = match kept(TransactionType::WriteOff) {
+            Some((id, created_at)) => Transaction::write_off_with_id(
+                id,
+                from_account_id.to_string(),
+                asset_id.clone(),
+                date.clone(),
+                quantity,
+                WriteOffReason::NetworkFee,
+                note.clone(),
+                created_at,
+            ),
+            None => Transaction::write_off(
+                from_account_id.to_string(),
+                asset_id.clone(),
+                date.clone(),
+                quantity,
+                WriteOffReason::NetworkFee,
+                note.clone(),
+            ),
+        }?
+        .with_transfer_id(Some(transfer_id.to_string()));
+        sent_parts.push(fee);
+    }
+    sent_parts.push(side(
+        TransactionType::TransferOut,
+        from_account_id,
+        &date,
+        0,
+        1_000_000,
+    )?);
+    let placed_out = sending
+        .place_transfer_parts(transfer_id, &asset_id, sent_parts)
+        .map_err(to_holding_tx_error)?;
+    let cost = placed_out
+        .iter()
+        .find(|t| t.transaction_type == TransactionType::TransferOut)
+        .map(|t| t.total_amount)
+        .unwrap_or(0);
+    let incoming = side(
+        TransactionType::TransferIn,
+        to_account_id,
+        &date,
+        super::domain::converted_cost(cost, exchange_rate),
+        exchange_rate,
+    )?;
+    let placed_in = receiving
+        .place_transfer_parts(transfer_id, &asset_id, vec![incoming])
+        .map_err(to_holding_tx_error)?;
+    Ok(StagedTransfer {
+        parts: placed_out.into_iter().chain(placed_in).collect(),
+        sending,
+        receiving,
+        sending_before,
+        receiving_before,
+    })
+}
+
+impl AccountService {
     /// Records a stock split on a held asset (SPL-010/020).
     ///
     /// The micro-scaled factor rescales the position at the split date; the
@@ -2731,6 +2879,35 @@ pub trait AccountServiceContract: Send + Sync {
         exchange_rate: i64,
         note: Option<String>,
     ) -> StdResult<TransferPreview, AccountError>;
+    /// What replacing transactions with a transfer would make of its two accounts, nothing
+    /// written (AGT-090).
+    #[allow(clippy::too_many_arguments)]
+    async fn preview_replacement(
+        &self,
+        replaced: &[String],
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+    ) -> StdResult<TransferPreview, AccountError>;
+    /// Replaces transactions with a transfer in one write while each stands as shown and
+    /// the transfer moves the cost shown; `None` when not (AGT-091).
+    #[allow(clippy::too_many_arguments)]
+    async fn replace_with_transfer(
+        &self,
+        shown: &[Transaction],
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        cost_shown: i64,
+    ) -> StdResult<Option<Vec<Transaction>>, AccountError>;
     /// A transfer read as one from its parts (TRF-060).
     async fn transfer_view(&self, transfer_id: &str) -> StdResult<TransferView, AccountError>;
     /// The sending account, the receiving account and the asset of a transfer (TRF-030).
@@ -3292,6 +3469,58 @@ impl AccountServiceContract for AccountService {
         .await
     }
 
+    async fn preview_replacement(
+        &self,
+        replaced: &[String],
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+    ) -> StdResult<TransferPreview, AccountError> {
+        AccountService::preview_replacement(
+            self,
+            replaced,
+            from_account_id,
+            to_account_id,
+            asset_id,
+            date,
+            quantity_sent,
+            quantity_received,
+            exchange_rate,
+        )
+        .await
+    }
+
+    async fn replace_with_transfer(
+        &self,
+        shown: &[Transaction],
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        cost_shown: i64,
+    ) -> StdResult<Option<Vec<Transaction>>, AccountError> {
+        AccountService::replace_with_transfer(
+            self,
+            shown,
+            from_account_id,
+            to_account_id,
+            asset_id,
+            date,
+            quantity_sent,
+            quantity_received,
+            exchange_rate,
+            cost_shown,
+        )
+        .await
+    }
+
     async fn transfer_view(&self, transfer_id: &str) -> StdResult<TransferView, AccountError> {
         AccountService::transfer_view(self, transfer_id).await
     }
@@ -3511,6 +3740,19 @@ struct StagedTransfer {
     receiving: Account,
     sending_before: Vec<Transaction>,
     receiving_before: Vec<Transaction>,
+}
+
+impl StagedTransfer {
+    /// What the staged transfer makes of its two accounts (AGT-065A, AGT-090).
+    fn into_preview(self) -> TransferPreview {
+        TransferPreview {
+            parts: self.parts,
+            sending_before: self.sending_before,
+            sending_after: self.sending.transactions,
+            receiving_before: self.receiving_before,
+            receiving_after: self.receiving.transactions,
+        }
+    }
 }
 
 /// The figures a transfer is placed from (TRF entity).
