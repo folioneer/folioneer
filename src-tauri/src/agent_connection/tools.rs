@@ -752,7 +752,7 @@ fn figure(arguments: &Value, name: &str) -> Result<Option<i64>, Refusal> {
         code: "InvalidFigure".to_string(),
         message: format!(
             "{name} is not a decimal with a dot and at most six decimals: \"{}\"",
-            typed.escape_debug()
+            typed.chars().take(40).collect::<String>().escape_debug()
         ),
     })
 }
@@ -1430,6 +1430,10 @@ mod tests {
             optional_text(&at(TEXT_LENGTH), "isin"),
             Ok(Some("x".repeat(TEXT_LENGTH)))
         );
+        let refusal = figure(&json!({ "price": "9".repeat(500) }), "price").expect_err("refused");
+        assert!(refusal
+            .message
+            .ends_with(&format!("\"{}\"", "9".repeat(40))));
         let account = |length: usize| json!({ "account": "x".repeat(length) });
         assert_eq!(
             code(text(&account(TEXT_LENGTH + 1), "account")),

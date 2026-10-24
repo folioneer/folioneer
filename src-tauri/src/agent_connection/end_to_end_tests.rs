@@ -526,6 +526,12 @@ async fn agt_042_a_refusal_names_only_what_was_sent() {
                 "list_holdings",
                 json!({ "account": "PEA", "as_of": 20260105 }),
             ),
+            // AGT-090 — a date longer than any text an agent may send.
+            call(
+                6,
+                "list_holdings",
+                json!({ "account": "PEA", "as_of": "2".repeat(201) }),
+            ),
         ],
     )
     .await;
@@ -544,6 +550,10 @@ async fn agt_042_a_refusal_names_only_what_was_sent() {
     assert_eq!(answered[4]["result"]["isError"], true);
     assert_eq!(
         text(&answered[4]),
+        "as_of is not a past date written YYYY-MM-DD"
+    );
+    assert_eq!(
+        text(&answered[5]),
         "as_of is not a past date written YYYY-MM-DD"
     );
     // AGT-034 — the bridge left with its client: its session ends.
