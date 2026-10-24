@@ -541,8 +541,11 @@ impl Account {
             )?
         } else if tx_type == TransactionType::WriteOff {
             // WOF-030 — a write-off keeps its zero-proceeds packing and its reason; the
-            // reason itself is corrected by `correct_write_off`.
-            let reason = existing.write_off_reason.unwrap_or(WriteOffReason::Other);
+            // reason itself is corrected by `correct_write_off`. WOF-033 — a stored write-off
+            // without one is refused, never given a reason the user did not choose.
+            let reason = existing
+                .write_off_reason
+                .ok_or(AccountError::WriteOffWithoutReason)?;
             Transaction::write_off_with_id(
                 tx_id.to_string(),
                 self.id.clone(),
@@ -643,6 +646,15 @@ impl Account {
                 created_at,
             )?
         };
+
+        self.splice_correction(tx_id, updated_tx)
+    }
+
+    /// Puts a corrected transaction in the place of the one it corrects and replays what it
+    /// touches (TRX-031, SEL-032); on a refusal the history keeps the original.
+    fn splice_correction(&mut self, tx_id: &str, updated_tx: Transaction) -> Result<&Transaction> {
+        let tx_type = updated_tx.transaction_type;
+        let asset_id = updated_tx.asset_id.clone();
 
         // SEL-030 / WOF-030 — a sale or a write-off is refused as its recording is, against
         // what was held just before it in the replay order, itself left out.
@@ -1070,19 +1082,20 @@ impl Account {
     ) -> Result<Transaction> {
         let existing = self
             .transactions
-            .iter_mut()
+            .iter()
             .find(|t| t.id == tx_id && t.transaction_type == TransactionType::WriteOff)
             .ok_or(AccountError::TransactionNotFound)?;
-        let previous = existing.write_off_reason.replace(reason);
-        match self.correct_transaction(tx_id, date, quantity, 0, 1_000_000, 0, None, note) {
-            Ok(corrected) => Ok(corrected.clone()),
-            Err(error) => {
-                if let Some(existing) = self.transactions.iter_mut().find(|t| t.id == tx_id) {
-                    existing.write_off_reason = previous;
-                }
-                Err(error)
-            }
-        }
+        let corrected = Transaction::write_off_with_id(
+            tx_id.to_string(),
+            self.id.clone(),
+            existing.asset_id.clone(),
+            date,
+            quantity,
+            reason,
+            note,
+            existing.created_at.clone(),
+        )?;
+        self.splice_correction(tx_id, corrected).cloned()
     }
 
     /// Aggregate-root method: applies a pre-built Split transaction to this
@@ -7332,6 +7345,67 @@ mod write_off_tests {
             )
             .count();
         assert_eq!(recorded, 1, "the corrected write-off is recorded once");
+    }
+
+    // WOF-033 — a stored write-off without a reason is refused when corrected without one,
+    // never given one the user did not choose.
+    #[test]
+    fn wof_033_a_write_off_without_a_reason_is_never_given_one() {
+        let mut acc = funded();
+        buy(&mut acc, "2024-01-02", 10, 100);
+        let tx = write_off(&mut acc, "2024-03-01", micro(2), WriteOffReason::Lost).unwrap();
+        let stored = acc.transactions.iter_mut().find(|t| t.id == tx.id).unwrap();
+        stored.write_off_reason = None;
+        let refusal = acc
+            .correct_transaction(
+                &tx.id,
+                "2024-03-01".into(),
+                micro(3),
+                0,
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            refusal.downcast::<AccountError>(),
+            Ok(AccountError::WriteOffWithoutReason)
+        ));
+        let kept = acc.transactions.iter().find(|t| t.id == tx.id).unwrap();
+        assert_eq!(kept.write_off_reason, None);
+        assert_eq!(kept.quantity, micro(2));
+    }
+
+    // WOF-033 — a write-off without a reason takes the one its correction names, and can be
+    // deleted.
+    #[test]
+    fn wof_033_a_write_off_without_a_reason_takes_the_one_named_or_is_deleted() {
+        let mut acc = funded();
+        buy(&mut acc, "2024-01-02", 10, 100);
+        let unnamed = |acc: &mut Account| {
+            let tx = write_off(acc, "2024-03-01", micro(1), WriteOffReason::Lost).unwrap();
+            acc.transactions
+                .iter_mut()
+                .find(|t| t.id == tx.id)
+                .unwrap()
+                .write_off_reason = None;
+            tx.id
+        };
+        let named = unnamed(&mut acc);
+        let corrected = acc
+            .correct_write_off(
+                &named,
+                "2024-03-01".into(),
+                micro(1),
+                WriteOffReason::Dust,
+                None,
+            )
+            .unwrap();
+        assert_eq!(corrected.write_off_reason, Some(WriteOffReason::Dust));
+        let deleted = unnamed(&mut acc);
+        acc.cancel_transaction(&deleted).unwrap();
+        assert!(acc.transactions.iter().all(|t| t.id != deleted));
     }
 
     // WOF-030 / #607 — a write-off's correction is refused as its recording is: above what

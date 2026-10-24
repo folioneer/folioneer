@@ -71,6 +71,9 @@ pub enum AccountError {
     /// Correcting a transaction would leave a later sell with insufficient units.
     #[error("Editing this transaction would create a cascading oversell")]
     CascadingOversell,
+    /// A stored write-off has no reason, and its correction names none (WOF-033).
+    #[error("This write-off has no reason; correct it with one")]
+    WriteOffWithoutReason,
     /// No transaction with the given ID exists within this account.
     #[error("Transaction not found")]
     TransactionNotFound,

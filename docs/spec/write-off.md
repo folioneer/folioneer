@@ -57,11 +57,13 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 
 ### Correction (030–039)
 
-**WOF-030 — Corrected as a sale is (backend)**: A write-off's date, quantity, reason and note are corrected through the transactions' modification (TRX-031), checked again as WOF-010 to WOF-012 say, with their codes, on the corrected history replayed from the log (TRX-036), counting what was held just before the write-off, itself left out. The archived-asset check is not repeated, as for a sale.
+**WOF-030 — Corrected as a sale is (backend)**: A write-off's date, quantity, reason and note are corrected through the transactions' modification (TRX-031), checked again as WOF-010 to WOF-012 say, with the same errors, on the corrected history replayed from the log (TRX-036), counting what was held just before the write-off, itself left out. The archived-asset check is not repeated, as for a sale.
 
 **WOF-031 — Synced (backend)**: A write-off is a transaction like any other for sync (SYN-021); the write-off type and its reason are values of data format version 7 (SYN-038).
 
 **WOF-032 — An edit that oversells a later write-off (backend)**: The correction or deletion of another transaction of the asset in the account is refused when the replay would then leave a later write-off above what is held at its date, as one that leaves a later sale so is (SEL-032, FSD-041).
+
+**WOF-033 — A write-off's reason when corrected (backend)**: The store admits a write-off without a reason, though the core never records one. A correction that names no reason (TRX-031) is refused for such a write-off, and a reason is never chosen for it; a correction that names a reason (WOF-056) gives the write-off that reason. Deleting it (WOF-040) stays possible.
 
 ### Removal (040–049)
 

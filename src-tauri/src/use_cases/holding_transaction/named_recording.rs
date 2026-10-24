@@ -1993,6 +1993,9 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
         AccountError::CascadingOversell => {
             "this would leave a later transaction without enough units".to_string()
         }
+        AccountError::WriteOffWithoutReason => {
+            "this write-off has no reason: correct it with one".to_string()
+        }
         AccountError::OpeningBalanceOnCashAsset => {
             "an opening balance cannot be recorded on cash".to_string()
         }
@@ -2092,6 +2095,11 @@ mod tests {
                 AccountError::CascadingOversell,
                 "CascadingOversell",
                 "this would leave a later transaction without enough units",
+            ),
+            (
+                AccountError::WriteOffWithoutReason,
+                "WriteOffWithoutReason",
+                "this write-off has no reason: correct it with one",
             ),
             (
                 AccountError::DateInFuture,
