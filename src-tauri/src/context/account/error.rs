@@ -74,6 +74,31 @@ pub enum AccountError {
     /// A stored write-off has no reason, and its correction names none (WOF-033).
     #[error("This write-off has no reason; correct it with one")]
     WriteOffWithoutReason,
+    /// A transfer names one account as both its sending and receiving side (TRF-010).
+    #[error("A transfer moves a holding to another account")]
+    TransferToSameAccount,
+    /// A transfer receives more than it sends (TRF-011).
+    #[error("The quantity received cannot exceed the quantity sent")]
+    TransferReceivedAboveSent,
+    /// A transfer between two currencies has no rate given and none stored (TRF-022).
+    #[error(
+        "No exchange rate from {from_currency} to {to_currency} on or before the transfer's date"
+    )]
+    TransferRateMissing {
+        /// The sending account's currency.
+        from_currency: String,
+        /// The receiving account's currency.
+        to_currency: String,
+    },
+    /// A transfer between accounts of one currency names a rate other than one (TRF-022).
+    #[error("A transfer between accounts of one currency takes no exchange rate")]
+    TransferRateNotOne,
+    /// A part of a transfer is corrected alone (TRF-031).
+    #[error("This transaction is part of a transfer; correct the transfer")]
+    PartOfTransfer,
+    /// No transfer with the given id exists (TRF-030, TRF-040).
+    #[error("Transfer not found")]
+    TransferNotFound,
     /// No transaction with the given ID exists within this account.
     #[error("Transaction not found")]
     TransactionNotFound,
@@ -290,6 +315,18 @@ mod tests {
         assert_eq!(
             to_value(AccountError::CascadingOversell).unwrap(),
             json!({ "code": "CascadingOversell" })
+        );
+        assert_eq!(
+            to_value(AccountError::TransferRateMissing {
+                from_currency: "EUR".into(),
+                to_currency: "USD".into()
+            })
+            .unwrap(),
+            json!({ "code": "TransferRateMissing", "from_currency": "EUR", "to_currency": "USD" })
+        );
+        assert_eq!(
+            to_value(AccountError::PartOfTransfer).unwrap(),
+            json!({ "code": "PartOfTransfer" })
         );
         assert_eq!(
             to_value(AccountError::TransactionNotFound).unwrap(),

@@ -791,6 +791,39 @@ async correctWriteOff(dto: CorrectWriteOffDTO) : Promise<Result<Transaction, Acc
 }
 },
 /**
+ * Records a transfer between two accounts at its cost (TRF-020); returns its parts.
+ */
+async recordTransfer(dto: TransferDTO) : Promise<Result<Transaction[], TransferError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("record_transfer", { dto }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Corrects a transfer as one operation (TRF-030); returns its parts.
+ */
+async correctTransfer(dto: CorrectTransferDTO) : Promise<Result<Transaction[], TransferError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("correct_transfer", { dto }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Removes every part of a transfer together (TRF-040).
+ */
+async cancelTransfer(transferId: string) : Promise<Result<null, TransferError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cancel_transfer", { transferId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Records a stock split rescaling a held position at its date (SPL-010/020).
  */
 async recordSplit(dto: RecordSplitDTO) : Promise<Result<Transaction, SplitError>> {
@@ -1392,6 +1425,30 @@ export type AccountError =
  * A stored write-off has no reason, and its correction names none (WOF-033).
  */
 { code: "WriteOffWithoutReason" } | 
+/**
+ * A transfer names one account as both its sending and receiving side (TRF-010).
+ */
+{ code: "TransferToSameAccount" } | 
+/**
+ * A transfer receives more than it sends (TRF-011).
+ */
+{ code: "TransferReceivedAboveSent" } | 
+/**
+ * A transfer between two currencies has no rate given and none stored (TRF-022).
+ */
+{ code: "TransferRateMissing"; from_currency: string; to_currency: string } | 
+/**
+ * A transfer between accounts of one currency names a rate other than one (TRF-022).
+ */
+{ code: "TransferRateNotOne" } | 
+/**
+ * A part of a transfer is corrected alone (TRF-031).
+ */
+{ code: "PartOfTransfer" } | 
+/**
+ * No transfer with the given id exists (TRF-030, TRF-040).
+ */
+{ code: "TransferNotFound" } | 
 /**
  * No transaction with the given ID exists within this account.
  */
@@ -2487,6 +2544,34 @@ fees: number;
 total_amount: number | null; 
 /**
  * Optional user note.
+ */
+note: string | null }
+/**
+ * Parameters for correcting a transfer (TRF-030); its accounts and asset are fixed.
+ */
+export type CorrectTransferDTO = { 
+/**
+ * The transfer corrected.
+ */
+transfer_id: string; 
+/**
+ * Corrected business date (YYYY-MM-DD).
+ */
+date: string; 
+/**
+ * Corrected quantity sent (micro-units).
+ */
+quantity_sent: number; 
+/**
+ * Corrected quantity received (micro-units).
+ */
+quantity_received: number; 
+/**
+ * Corrected rate (micros); `null` takes the stored rate of the date again (TRF-030).
+ */
+exchange_rate: number | null; 
+/**
+ * Corrected note.
  */
 note: string | null }
 /**
@@ -5230,7 +5315,12 @@ created_at: string;
  * Why a write-off's quantity left (WOF entity); `None` on every other type. Absent
  * from a change written before data format 7, read as `None` (SYN-038).
  */
-write_off_reason?: WriteOffReason | null }
+write_off_reason?: WriteOffReason | null; 
+/**
+ * The transfer this transaction is a part of (TRF entity): its two sides and its fee in
+ * kind share it; `None` on every other transaction, and on a change written before it.
+ */
+transfer_id?: string | null }
 /**
  * A transaction draft: a purchase or sale as the user is still entering it (TRX-062).
  * Empty strings are fields not filled yet; amounts are in micros.
@@ -5425,7 +5515,88 @@ export type TransactionType =
  * A quantity leaving the holding without proceeds, at its weighted-average cost; no
  * cash moves, its realised result is the cost taken out, negated (WOF-020/021).
  */
-"WriteOff"
+"WriteOff" | 
+/**
+ * The sending side of a transfer: the quantity received leaves at its weighted-average
+ * cost, the cost it moves; no cash moves and nothing is realised (TRF-020, TRF-023).
+ */
+"TransferOut" | 
+/**
+ * The receiving side of a transfer: the quantity received enters at the cost the
+ * transfer out moved, converted at its recorded rate (TRF-020, TRF-022).
+ */
+"TransferIn"
+/**
+ * Parameters for recording a transfer (TRF-011).
+ */
+export type TransferDTO = { 
+/**
+ * The account the holding leaves.
+ */
+from_account_id: string; 
+/**
+ * The account the holding reaches — another one (TRF-010).
+ */
+to_account_id: string; 
+/**
+ * The asset moved — not a Cash Asset, not archived (TRF-010).
+ */
+asset_id: string; 
+/**
+ * Business date (YYYY-MM-DD, TRF-011).
+ */
+date: string; 
+/**
+ * Quantity leaving the sending account (micro-units, strictly positive).
+ */
+quantity_sent: number; 
+/**
+ * Quantity reaching the receiving account (micro-units, strictly positive, not above
+ * the quantity sent); the difference is the fee in kind (TRF-021).
+ */
+quantity_received: number; 
+/**
+ * Rate from the sending account's currency to the receiving one's (micros); `null`
+ * takes the stored rate of the date (TRF-022).
+ */
+exchange_rate: number | null; 
+/**
+ * Optional note, carried by every part.
+ */
+note: string | null }
+/**
+ * Use-case composite for the transfer failure surface.
+ * 
+ * - `AccountError` — every account-BC rejection (lookup, infrastructure, the figures
+ * TRF-011, the replay guards TRF-012/030/040, the rate TRF-022).
+ * - `TransferTask` — use-case-owned (this file), the cross-BC asset checks.
+ */
+export type TransferError = 
+/**
+ * Account-BC rejection.
+ */
+AccountError | 
+/**
+ * Use-case-layer rejection (cross-BC asset checks).
+ */
+TransferTask
+/**
+ * Application-layer rejections of a transfer — the cross-BC asset checks performed by the
+ * orchestrator before delegating to the account context (TRF-010).
+ */
+export type TransferTask = 
+/**
+ * No asset exists with the requested ID (TRF-010).
+ */
+{ code: "AssetNotFound" } | 
+/**
+ * The asset is archived — nothing of it is transferred (TRF-010, as SEL-037).
+ */
+{ code: "ArchivedAsset" } | 
+/**
+ * The asset is a Cash Asset — cash moves by a withdrawal and a deposit (TRF-010).
+ */
+{ code: "TransferOfCash" }
 /**
  * One asset a price-fetch task could not price (MKT-170/171), carried in the
  * `AssetPriceFetchCompleted` payload so the frontend can list it for manual entry.

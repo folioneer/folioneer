@@ -160,7 +160,10 @@ pub(crate) fn market_valued_flow_dates(transactions: &[Transaction]) -> BTreeSet
     transactions
         .iter()
         .filter(|t| match t.transaction_type {
-            TransactionType::FreeShares | TransactionType::OpeningBalance => true,
+            TransactionType::FreeShares
+            | TransactionType::OpeningBalance
+            | TransactionType::TransferIn
+            | TransactionType::TransferOut => true,
             TransactionType::Interest => !crate::core::cash::is_cash_asset(&t.asset_id),
             _ => false,
         })
@@ -455,11 +458,14 @@ pub(crate) fn end_value_as_of(
             }
             // FSD-022d / FEE-022d / SPL-010 — free-share, management-fee and
             // split events have no cash leg.
+            // TRF-020 — a transfer moves no cash.
             TransactionType::OpeningBalance
             | TransactionType::FreeShares
             | TransactionType::ManagementFee
             | TransactionType::Split
-            | TransactionType::WriteOff => {}
+            | TransactionType::WriteOff
+            | TransactionType::TransferIn
+            | TransactionType::TransferOut => {}
         }
         match transaction.transaction_type {
             // FSD-070 — free shares enter the as-of-date unit reconstruction like a
@@ -469,13 +475,17 @@ pub(crate) fn end_value_as_of(
             TransactionType::Purchase
             | TransactionType::OpeningBalance
             | TransactionType::FreeShares
-            | TransactionType::Interest => {
+            | TransactionType::Interest
+            | TransactionType::TransferIn => {
                 *quantity_by_asset
                     .entry(transaction.asset_id.as_str())
                     .or_insert(0) += transaction.quantity as i128;
             }
             // FEE-046/050 — a management fee reduces the position quantity like a sell.
-            TransactionType::Sell | TransactionType::ManagementFee | TransactionType::WriteOff => {
+            TransactionType::Sell
+            | TransactionType::ManagementFee
+            | TransactionType::WriteOff
+            | TransactionType::TransferOut => {
                 *quantity_by_asset
                     .entry(transaction.asset_id.as_str())
                     .or_insert(0) -= transaction.quantity as i128;
@@ -569,8 +579,11 @@ pub(crate) fn external_cash_flows(transactions: &[Transaction]) -> Vec<DatedFlow
             continue;
         };
         let amount = match transaction.transaction_type {
-            TransactionType::Deposit | TransactionType::OpeningBalance => transaction.total_amount,
-            TransactionType::Withdrawal => -transaction.total_amount,
+            // TRF-026 — a transfer enters and leaves at its cost moved in lifetime metrics.
+            TransactionType::Deposit
+            | TransactionType::OpeningBalance
+            | TransactionType::TransferIn => transaction.total_amount,
+            TransactionType::Withdrawal | TransactionType::TransferOut => -transaction.total_amount,
             // SPL-050 — a split is not a flow.
             TransactionType::Purchase
             | TransactionType::Sell
@@ -603,8 +616,12 @@ pub(crate) fn external_cash_flows_windowed(
         };
         let amount = match transaction.transaction_type {
             TransactionType::Deposit => transaction.total_amount,
-            TransactionType::OpeningBalance => {
+            // TRF-026 — a transfer is valued as an opening balance, in and out.
+            TransactionType::OpeningBalance | TransactionType::TransferIn => {
                 opening_balance_flow_value(transaction, priced_assets, rate_map, account_currency)
+            }
+            TransactionType::TransferOut => {
+                -opening_balance_flow_value(transaction, priced_assets, rate_map, account_currency)
             }
             TransactionType::Withdrawal => -transaction.total_amount,
             // SPL-050 — a split is not a flow.
@@ -755,11 +772,14 @@ pub(crate) fn position_flows(asset_transactions: &[&Transaction]) -> PositionFlo
             continue;
         };
         match transaction.transaction_type {
-            TransactionType::Purchase | TransactionType::OpeningBalance => trades.push(DatedFlow {
+            // TRF-027 — a transfer is an inflow or an outflow of the position at its cost.
+            TransactionType::Purchase
+            | TransactionType::OpeningBalance
+            | TransactionType::TransferIn => trades.push(DatedFlow {
                 date,
                 amount: transaction.total_amount,
             }),
-            TransactionType::Sell => trades.push(DatedFlow {
+            TransactionType::Sell | TransactionType::TransferOut => trades.push(DatedFlow {
                 date,
                 amount: -transaction.total_amount,
             }),
@@ -800,9 +820,21 @@ pub(crate) fn position_flows_windowed(
                 date,
                 amount: transaction.total_amount,
             }),
-            TransactionType::OpeningBalance => trades.push(DatedFlow {
+            // TRF-027 — a transfer is valued as an opening balance, in and out.
+            TransactionType::OpeningBalance | TransactionType::TransferIn => {
+                trades.push(DatedFlow {
+                    date,
+                    amount: opening_balance_flow_value(
+                        transaction,
+                        priced_assets,
+                        rate_map,
+                        account_currency,
+                    ),
+                })
+            }
+            TransactionType::TransferOut => trades.push(DatedFlow {
                 date,
-                amount: opening_balance_flow_value(
+                amount: -opening_balance_flow_value(
                     transaction,
                     priced_assets,
                     rate_map,
@@ -1008,11 +1040,13 @@ pub(crate) fn holding_close_date_as_of(
             | TransactionType::OpeningBalance
             | TransactionType::Deposit
             | TransactionType::FreeShares
-            | TransactionType::Interest => quantity += transaction.quantity as i128,
+            | TransactionType::Interest
+            | TransactionType::TransferIn => quantity += transaction.quantity as i128,
             TransactionType::Sell
             | TransactionType::Withdrawal
             | TransactionType::ManagementFee
-            | TransactionType::WriteOff => quantity -= transaction.quantity as i128,
+            | TransactionType::WriteOff
+            | TransactionType::TransferOut => quantity -= transaction.quantity as i128,
             // SPL-020 — a split rescales the running quantity (factor in `quantity`).
             TransactionType::Split => {
                 quantity = quantity * transaction.quantity as i128 / 1_000_000

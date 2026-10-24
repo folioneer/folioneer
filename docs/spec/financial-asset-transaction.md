@@ -56,9 +56,9 @@ Represents the current state of a position (asset held within an account). Compu
 
 ### Creation
 
-**TRX-020 — Field validation (backend)**: A transaction is valid if: `account_id` and `asset_id` exist, `date` is not in the future and not before `1900-01-01`, `quantity` is strictly positive, `unit_price` is positive or zero, `exchange_rate` is strictly positive, and the backend-computed `total_amount` is positive.
+**TRX-020 — Field validation (backend)**: A transaction is valid if: `account_id` and `asset_id` exist, `date` is not in the future and not before `1900-01-01`, `quantity` is strictly positive, `unit_price` is positive or zero, `exchange_rate` is strictly positive, and the backend-computed `total_amount` is positive. A transfer's figures are checked by TRF-011 instead.
 
-**TRX-021 — Multi-currency semantics (backend)**: The `unit_price` is stored in the asset's native currency. The `exchange_rate` is the conversion rate from the asset's currency to the account's currency, and is stored explicitly with the transaction.
+**TRX-021 — Multi-currency semantics (backend)**: The `unit_price` is stored in the asset's native currency. The `exchange_rate` is the conversion rate from the asset's currency to the account's currency, and is stored explicitly with the transaction. An opening balance (TRX-047) and a transfer's sides (TRF-022) are the exceptions: their unit price is in the account's currency, and a transfer in's rate converts the sending account's currency to its own.
 
 **TRX-022 — Holding quantity update (backend)**: Creating a purchase transaction increases the `Holding.quantity` for the specified asset and account.
 
@@ -80,13 +80,13 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-030 — VWAP Calculation (backend)**: Average purchase price for a `Holding` is calculated using the Volume Weighted Average Price (VWAP) method: `average_price = Sum(total_amount_i) / Total Quantity`, where `total_amount_i` is computed per TRX-026 (fees included). This ensures the displayed transaction cost and the cost basis use the same value. Only `Purchase` transactions are included. _(Extended by TRX-048 to include `OpeningBalance` transactions.)_ This rule applies on creation (TRX-025) and on recalculation triggered by modification or deletion.
 
-**TRX-031 — Transaction modification (backend)**: Modifying a transaction triggers a full recalculation of the `Holding` cost basis and quantity for the `(account_id, asset_id)` pair, processing all associated transactions in chronological order (TRX-036).
+**TRX-031 — Transaction modification (backend)**: Modifying a transaction triggers a full recalculation of the `Holding` cost basis and quantity for the `(account_id, asset_id)` pair, processing all associated transactions in chronological order (TRX-036). A part of a transfer is corrected as its transfer, never alone (TRF-030, TRF-031).
 
 **TRX-032 — Modifiable fields (backend)**: A correction changes a transaction's date, quantity, unit price, exchange rate, fees, total amount and note. It changes neither its type (SEL-035), nor its account, nor its asset: a transaction entered on the wrong asset or account is deleted (TRX-034) and entered again.
 
 **TRX-033 — Update field validation (backend)**: When modifying a transaction, the same field constraints as TRX-020 apply. When the `Sell` transaction type is active, editing a purchase transaction must also verify that no subsequent sell in the chronological sequence for the `(account_id, asset_id)` pair would become invalid (oversell) as a result — see SEL-032.
 
-**TRX-034 — Transaction deletion (backend)**: Deleting a transaction triggers a recalculation of the `Holding` for the `(account_id, asset_id)` pair. If no transactions remain for that asset in the account, the `Holding` record is removed.
+**TRX-034 — Transaction deletion (backend)**: Deleting a transaction triggers a recalculation of the `Holding` for the `(account_id, asset_id)` pair. If no transactions remain for that asset in the account, the `Holding` record is removed. Deleting a part of a transfer removes the whole transfer (TRF-040).
 
 **TRX-035 — Deletion confirmation (frontend)**: Deleting a transaction requires a user confirmation dialog to prevent accidental data loss.
 

@@ -431,6 +431,8 @@ fn changes_taken(kind: TransactionType) -> &'static [&'static str] {
         | TransactionType::ManagementFee
         | TransactionType::Interest
         | TransactionType::WriteOff => &["quantity"],
+        // TRF-031 — a part of a transfer is corrected as its transfer, never alone.
+        TransactionType::TransferOut | TransactionType::TransferIn => &[],
     }
 }
 
@@ -1996,6 +1998,25 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
         AccountError::WriteOffWithoutReason => {
             "this write-off has no reason: correct it with one".to_string()
         }
+        AccountError::TransferToSameAccount => {
+            "a transfer moves a holding to another account".to_string()
+        }
+        AccountError::TransferReceivedAboveSent => {
+            "the quantity received cannot exceed the quantity sent".to_string()
+        }
+        AccountError::TransferRateMissing {
+            from_currency,
+            to_currency,
+        } => format!(
+            "no {from_currency} to {to_currency} rate is stored on or before that date: give one"
+        ),
+        AccountError::TransferRateNotOne => {
+            "the two accounts share a currency: a transfer between them takes no rate".to_string()
+        }
+        AccountError::PartOfTransfer => {
+            "this is part of a transfer: correct the transfer".to_string()
+        }
+        AccountError::TransferNotFound => "the transfer no longer exists".to_string(),
         AccountError::OpeningBalanceOnCashAsset => {
             "an opening balance cannot be recorded on cash".to_string()
         }

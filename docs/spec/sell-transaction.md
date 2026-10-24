@@ -70,7 +70,7 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 
 **SEL-031 — Full recalculation on edit (backend)**: Modifying any field of a sell transaction triggers a full chronological recalculation of `Holding.quantity` and `realized_pnl` for all transactions (purchases and sells) in the `(account_id, asset_id)` pair, in the same manner as TRX-031 for purchases.
 
-**SEL-032 — Cascading oversell detection (backend)**: A recording or a correction — a back-dated sale, a purchase made smaller — that leaves a later sale, write-off or management fee in the chronological sequence above what is held at that point is rejected with a specific error.
+**SEL-032 — Cascading oversell detection (backend)**: A recording or a correction — a back-dated sale, a purchase made smaller — that leaves a later sale, write-off or management fee in the chronological sequence above what is held at that point is rejected with a specific error. A later transfer out counts as a sale does (TRF-012).
 
 **SEL-033 — Delete sell transaction (backend)**: Deleting a sell transaction triggers a full recalculation of the `Holding` and `realized_pnl` for the `(account_id, asset_id)` pair. If no transactions remain for that pair, the `Holding` record is removed (per TRX-034).
 

@@ -29,6 +29,7 @@ struct TransactionRow {
     realized_pnl: Option<i64>,
     created_at: String,
     write_off_reason: Option<String>,
+    transfer_id: Option<String>,
 }
 
 impl TryFrom<TransactionRow> for Transaction {
@@ -61,7 +62,8 @@ impl TryFrom<TransactionRow> for Transaction {
             row.realized_pnl,
             row.created_at,
         )
-        .with_write_off_reason(write_off_reason))
+        .with_write_off_reason(write_off_reason)
+        .with_transfer_id(row.transfer_id))
     }
 }
 
@@ -93,7 +95,7 @@ impl TransactionRepository for SqliteTransactionRepository {
     async fn get_by_id(&self, id: &str) -> Result<Option<Transaction>> {
         let row = sqlx::query_as!(
             TransactionRow,
-            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason FROM transactions WHERE id = ?"#,
+            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id FROM transactions WHERE id = ?"#,
             id
         )
         .fetch_optional(&self.pool)
@@ -110,7 +112,7 @@ impl TransactionRepository for SqliteTransactionRepository {
     ) -> Result<Vec<Transaction>> {
         let rows = sqlx::query_as!(
             TransactionRow,
-            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason
+            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id
                FROM transactions
                WHERE account_id = ? AND asset_id = ?
                ORDER BY date ASC, created_at ASC, id ASC"#,
@@ -134,7 +136,7 @@ impl TransactionRepository for SqliteTransactionRepository {
     async fn get_all_for_account(&self, account_id: &str) -> Result<Vec<Transaction>> {
         let rows = sqlx::query_as!(
             TransactionRow,
-            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason
+            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id
                FROM transactions
                WHERE account_id = ?
                ORDER BY date ASC, created_at ASC, id ASC"#,

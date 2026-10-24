@@ -43,7 +43,7 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 
 **WOF-011 — Its inputs (backend)**: The quantity must be strictly positive; the date a well-formed ISO date, neither in the future nor before the TRX lower bound (TRX-020); the reason one of the four of the entity. These replace TRX-020's figure checks for a write-off, which carries no proceeds (its total is 0). The note is free text, absent when empty. Each failure is refused with an error of its own.
 
-**WOF-012 — A backdated write-off (backend)**: A write-off dated before later transactions of the asset is refused when the replay would then leave a later sale, write-off or management fee above what is held at its own date, as an edit that does so is (SEL-032).
+**WOF-012 — A backdated write-off (backend)**: A write-off dated before later transactions of the asset is refused when the replay would then leave a later sale, write-off or management fee above what is held at its own date, as an edit that does so is (SEL-032). A later transfer out counts as a sale does (TRF-012).
 
 ### Effect (020–029)
 
@@ -57,17 +57,17 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 
 ### Correction (030–039)
 
-**WOF-030 — Corrected as a sale is (backend)**: A write-off's date, quantity, reason and note are corrected through the transactions' modification (TRX-031), checked again as WOF-010 to WOF-012 say, with the same errors, on the corrected history replayed from the log (TRX-036), counting what was held just before the write-off, itself left out. The archived-asset check is not repeated, as for a sale.
+**WOF-030 — Corrected as a sale is (backend)**: A write-off's date, quantity, reason and note are corrected through the transactions' modification (TRX-031), checked again as WOF-010 to WOF-012 say, with the same errors, on the corrected history replayed from the log (TRX-036), counting what was held just before the write-off, itself left out. The archived-asset check is not repeated, as for a sale. A fee in kind is corrected only with its transfer (TRF-031).
 
 **WOF-031 — Synced (backend)**: A write-off is a transaction like any other for sync (SYN-021); the write-off type and its reason are values of data format version 7 (SYN-038).
 
-**WOF-032 — An edit that oversells a later write-off (backend)**: The correction or deletion of another transaction of the asset in the account is refused when the replay would then leave a later write-off above what is held at its date, as one that leaves a later sale so is (SEL-032, FSD-041).
+**WOF-032 — An edit that oversells a later write-off (backend)**: The correction or deletion of another transaction of the asset in the account is refused when the replay would then leave a later write-off above what is held at its date, as one that leaves a later sale so is (SEL-032, FSD-041). A later transfer out counts as a sale does (TRF-012).
 
 **WOF-033 — A write-off's reason when corrected (backend)**: The store admits a write-off without a reason, though the core never records one. A correction that names no reason (TRX-031) is refused for such a write-off, and a reason is never chosen for it; a correction that names a reason (WOF-056) gives the write-off that reason. Deleting it (WOF-040) stays possible.
 
 ### Removal (040–049)
 
-**WOF-040 — Removed as a sale is (backend)**: A write-off is removed through the transactions' deletion (TRX-034); the holding is replayed from the log, so removing it restores the holding exactly.
+**WOF-040 — Removed as a sale is (backend)**: A write-off is removed through the transactions' deletion (TRX-034); the holding is replayed from the log, so removing it restores the holding exactly. A fee in kind is removed with its transfer (TRF-040).
 
 ### Window (050–059)
 
@@ -83,7 +83,7 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 
 **WOF-055 — Its refusals (frontend)**: A refusal for lack of units — a quantity above what was held on the chosen date, a date on which nothing was held, a later sale, write-off or management fee left short — shows under the quantity with the wording of SEL-046, for a recording and a correction alike. Any other refusal shows below the form as the message for that refusal. The record action stays inactive while the form shows a refusal, until the date, the quantity or the reason changes.
 
-**WOF-056 — What the window records (backend)**: The window records a write-off under WOF-010 to WOF-012 and WOF-020, with their refusals, as the agent connection does (AGT-065), and corrects one under WOF-030, taking its date, quantity, reason and note.
+**WOF-056 — What the window records (backend)**: The window records a write-off under WOF-010 to WOF-012 and WOF-020, with their refusals, as the agent connection does (AGT-065), and corrects one under WOF-030, taking its date, quantity, reason and note. A fee in kind is the transfer's, never the window's write-off (TRF-031).
 
 **WOF-057 — In the journals (frontend)**: A write-off's Type reads with its short reason — "Write-off · Network fee", "· Dust", "· Lost", "· Other" (FR « Sortie sans contrepartie · Frais de réseau », « · Reste », « · Perdu », « · Autre »). Its Quantity shows the quantity written off; Unit Price and Total Amount the neutral placeholder `—`; Exchange Rate and Fees their stored values, not a placeholder, as for free shares; Realized P&L its realized P&L (WOF-021), as for a sale (TXL-022).
 

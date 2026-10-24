@@ -50,7 +50,7 @@ The total of every account, read together with the account summaries (ACC-027). 
 
 **ACC-005 — Cascade delete holdings (backend)** _(formerly R5)_: Deleting an `Account` is permanent and irreversible. All associated `Holding` records are deleted in cascade. The `Asset` records themselves are not affected.
 
-**ACC-006 — Cascade delete transactions (backend)** _(formerly R6)_: Deleting an `Account` also deletes all transactions associated with that account. The `Asset` records referenced by those transactions are not affected.
+**ACC-006 — Cascade delete transactions (backend)** _(formerly R6)_: Deleting an `Account` also deletes all transactions associated with that account. The `Asset` records referenced by those transactions are not affected. The parts of a transfer held by the other account stay there (TRF-041).
 
 > ⚠️ **Dependency**: ACC-006 requires the Transaction feature to be available ([`docs/spec/financial-asset-transaction.md`](financial-asset-transaction.md)). Until that table exists in the database, only the cascade on `Holding` (ACC-005) is active.
 
