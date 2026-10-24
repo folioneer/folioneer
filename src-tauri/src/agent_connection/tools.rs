@@ -1184,12 +1184,26 @@ fn trade(arguments: &Value) -> Result<Trade, Refusal> {
 /// The longest note an agent may attach to a recording, in characters.
 const NOTE_LENGTH: usize = 500;
 
+/// AGT-090 — the longest of any other text argument, in characters, so the core never
+/// reads an unbounded one.
+const TEXT_LENGTH: usize = 200;
+
 /// An optional text argument: absent or null is none; anything but text is refused, never
 /// ignored — a date sent as a number must not become today.
 fn optional_text(arguments: &Value, name: &str) -> Result<Option<String>, Refusal> {
+    let typed = raw_text(arguments, name)?;
+    if let Some(typed) = typed {
+        bounded(name, typed)?;
+    }
+    Ok(typed.map(str::to_string))
+}
+
+/// AGT-048 — a text argument as sent, before any bound: absent or null is none; anything
+/// but text is refused.
+fn raw_text<'a>(arguments: &'a Value, name: &str) -> Result<Option<&'a str>, Refusal> {
     match arguments.get(name) {
         None | Some(Value::Null) => Ok(None),
-        Some(Value::String(text)) => Ok(Some(text.clone())),
+        Some(Value::String(text)) => Ok(Some(text)),
         Some(_) => Err(Refusal {
             code: "InvalidArguments".to_string(),
             message: format!("{name} is not text"),
@@ -1197,19 +1211,40 @@ fn optional_text(arguments: &Value, name: &str) -> Result<Option<String>, Refusa
     }
 }
 
-/// AGT-048 — the note of a recording, at most `NOTE_LENGTH` characters.
+/// AGT-090 — a text argument other than a note is at most `TEXT_LENGTH` characters.
+fn bounded(name: &str, typed: &str) -> Result<(), Refusal> {
+    if typed.chars().count() > TEXT_LENGTH {
+        return Err(Refusal {
+            code: "InvalidArguments".to_string(),
+            message: format!("{name} is longer than {TEXT_LENGTH} characters"),
+        });
+    }
+    Ok(())
+}
+
+/// AGT-048 — the note of a recording, at most `NOTE_LENGTH` characters, shown to the owner
+/// as the agent wrote it: line breaks, as the window's note has, and nothing hidden.
 fn note(arguments: &Value) -> Result<Option<String>, Refusal> {
-    let note = optional_text(arguments, "note")?;
-    if note
-        .as_ref()
-        .is_some_and(|note| note.chars().count() > NOTE_LENGTH)
-    {
+    let note = raw_text(arguments, "note")?;
+    if note.is_some_and(|note| note.chars().count() > NOTE_LENGTH) {
         return Err(Refusal {
             code: "InvalidArguments".to_string(),
             message: format!("note is longer than {NOTE_LENGTH} characters"),
         });
     }
-    Ok(note)
+    if note.is_some_and(|note| {
+        !note
+            .lines()
+            .all(|line| wire::shows_as_written(line, NOTE_LENGTH))
+    }) {
+        return Err(Refusal {
+            code: "InvalidArguments".to_string(),
+            message:
+                "note holds a control character other than a line break, or an invisible character"
+                    .to_string(),
+        });
+    }
+    Ok(note.map(str::to_string))
 }
 
 fn text<'a>(arguments: &'a Value, name: &str) -> Result<&'a str, Refusal> {
@@ -1221,6 +1256,7 @@ fn text<'a>(arguments: &'a Value, name: &str) -> Result<&'a str, Refusal> {
             code: "MissingArgument".to_string(),
             message: format!("{name} is missing"),
         })
+        .and_then(|typed| bounded(name, typed).map(|()| typed))
 }
 
 fn as_json<T: serde::Serialize>(value: &T) -> Result<Value, Refusal> {
@@ -1360,6 +1396,48 @@ mod tests {
                 &json!({ "account": " ", "asset": "CW8", "quantity": 1 })
             )),
             "MissingArgument"
+        );
+    }
+
+    // AGT-048 — a note is shown to the owner as the agent wrote it: one holding a control
+    // character, or one that hides or reorders text, is refused; a line break shows.
+    #[test]
+    fn agt_048_a_note_shows_as_written() {
+        let with_note = |note: &str| json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "price": 1, "note": note });
+        for hidden in [
+            "pay\u{202E}evil",
+            "a\u{200B}b",
+            "bell\u{7}",
+            "\u{FEFF}x",
+            "a\tb",
+        ] {
+            let refusal = trade(&with_note(hidden)).expect_err(hidden);
+            assert_eq!(refusal.code, "InvalidArguments", "{hidden:?}");
+        }
+        assert!(trade(&with_note("first line\nsecond line")).is_ok());
+        assert!(trade(&with_note("first line\r\nsecond line")).is_ok());
+    }
+
+    // AGT-090 — any other text argument is bounded before the core reads it.
+    #[test]
+    fn agt_090_a_text_argument_is_bounded() {
+        let at = |length: usize| json!({ "isin": "x".repeat(length) });
+        assert_eq!(
+            code(optional_text(&at(TEXT_LENGTH + 1), "isin")),
+            "InvalidArguments"
+        );
+        assert_eq!(
+            optional_text(&at(TEXT_LENGTH), "isin"),
+            Ok(Some("x".repeat(TEXT_LENGTH)))
+        );
+        let account = |length: usize| json!({ "account": "x".repeat(length) });
+        assert_eq!(
+            code(text(&account(TEXT_LENGTH + 1), "account")),
+            "InvalidArguments"
+        );
+        assert_eq!(
+            text(&account(TEXT_LENGTH), "account").map(str::len),
+            Ok(TEXT_LENGTH)
         );
     }
 }

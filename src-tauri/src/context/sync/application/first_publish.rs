@@ -210,7 +210,7 @@ impl FirstPublish {
         };
         let header = FolderHeader {
             derivation_parameters,
-            passphrase_check: make_check(&key),
+            passphrase_check: make_check(&key)?,
             data_format_version: DATA_FORMAT_VERSION,
             created_at: timestamp.as_str().to_string(),
             created_by_device_id: device.device_id.clone(),
