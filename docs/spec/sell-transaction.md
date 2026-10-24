@@ -66,7 +66,7 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 
 ### Update and Deletion (030–039)
 
-**SEL-030 — Edit sell validation (backend)**: When modifying a sell transaction, the same field constraints as SEL-020 apply. The closed-position and oversell guards (SEL-012, SEL-021) are re-evaluated against the holding quantity as it stands immediately before this sell in the full chronological recalculation sequence for the `(account_id, asset_id)` pair, the sell itself left out, with the same errors; a later transaction left short is refused as SEL-032 says.
+**SEL-030 — Edit sell validation (backend)**: When modifying a sell transaction, the same field constraints as SEL-020 apply. The guards on what was held (SEL-012, SEL-021) are re-evaluated against the holding quantity as it stands immediately before this sell in the full chronological recalculation sequence for the `(account_id, asset_id)` pair, the sell itself left out, with the same errors; a later transaction left short is refused as SEL-032 says.
 
 **SEL-031 — Full recalculation on edit (backend)**: Modifying any field of a sell transaction triggers a full chronological recalculation of `Holding.quantity` and `realized_pnl` for all transactions (purchases and sells) in the `(account_id, asset_id)` pair, in the same manner as TRX-031 for purchases.
 
