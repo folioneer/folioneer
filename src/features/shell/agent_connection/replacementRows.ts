@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { TransactionShown, TransferShown } from "@/bindings";
+import type { ReplacedShown, TransferShown } from "@/bindings";
 import { microToFormatted, microToFormattedQuantity } from "@/lib/microUnits";
 import { formatIsoDateNumeric } from "@/ui/format/date";
 import type { TransactionRow } from "./transactionRows";
@@ -9,10 +9,10 @@ type ReplacedCell = [key: string, value: string];
 
 const MINUS = "−";
 
-/** The kinds that bring money into the account's cash; the others take it out. */
-const INTO_CASH = new Set(["Sell", "Deposit"]);
-/** The kinds whose asset leaves the holding; a purchase enters it. */
-const OUT_OF_HOLDING = new Set(["Sell"]);
+/** A figure the core signed, shown with its sign: a plus in, a minus out. */
+function signed(moved: number, format: (magnitude: number) => string): string {
+  return `${moved < 0 ? MINUS : "+"}${format(Math.abs(moved))}`;
+}
 
 /**
  * AGT-092 — one of the four transactions a replacement removes, on one line: the account,
@@ -22,20 +22,23 @@ const OUT_OF_HOLDING = new Set(["Sell"]);
  * of it.
  */
 export function replacedRow(
-  shown: TransactionShown,
+  replaced: ReplacedShown,
   t: TFunction,
   language: string,
 ): ReplacedCell[] {
-  const onCash = shown.asset_name === null;
-  const quantitySign = OUT_OF_HOLDING.has(shown.kind) ? MINUS : "+";
-  const amountSign = INTO_CASH.has(shown.kind) ? "+" : MINUS;
+  const shown = replaced.transaction;
+  const quantity =
+    replaced.holding_moved === null ? "" : signed(replaced.holding_moved, microToFormattedQuantity);
   return [
     ["account", shown.account],
     ["date", formatIsoDateNumeric(shown.date, language)],
     ["kind", t(`transaction.type_${shown.kind.toLowerCase()}`)],
     ["asset", shown.asset_name ?? t("agent.replacement_cash")],
-    ["quantity", onCash ? "" : `${quantitySign}${microToFormattedQuantity(shown.quantity)}`],
-    ["amount", `${amountSign}${microToFormatted(Math.abs(shown.amount), 2)} ${shown.currency}`],
+    ["quantity", quantity],
+    [
+      "amount",
+      `${signed(replaced.cash_moved, (magnitude) => microToFormatted(magnitude, 2))} ${shown.currency}`,
+    ],
   ];
 }
 

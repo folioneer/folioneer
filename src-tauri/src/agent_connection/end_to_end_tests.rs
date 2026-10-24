@@ -6353,7 +6353,26 @@ async fn replaced_stands_as_recorded(received: i64) {
         })
     };
     let request = replacement_waiting(&bench.connections).await;
-    let kinds: Vec<_> = request.transactions.iter().map(|t| t.kind).collect();
+    let kinds: Vec<_> = request
+        .transactions
+        .iter()
+        .map(|t| t.transaction.kind)
+        .collect();
+    let moved: Vec<_> = request
+        .transactions
+        .iter()
+        .map(|t| (t.holding_moved, t.cash_moved))
+        .collect();
+    assert_eq!(
+        moved,
+        [
+            (Some(-4 * M), 600 * M),
+            (None, -600 * M),
+            (None, 600 * M),
+            (Some(received * M), -600 * M)
+        ],
+        "each step's quantity and cash, signed by the core"
+    );
     assert_eq!(
         kinds,
         [

@@ -4631,6 +4631,23 @@ asked_at: string;
  */
 transaction: TransactionShown }
 /**
+ * AGT-092 — one of the four a replacement removes, with what it moved, signed.
+ */
+export type ReplacedShown = { 
+/**
+ * The transaction as it stood when the agent asked.
+ */
+transaction: TransactionShown; 
+/**
+ * The quantity it moved into the holding, negative out of it, in micro-units; `None`
+ * for a transaction on the account's cash.
+ */
+holding_moved: number | null; 
+/**
+ * The cash it moved into the account, negative out of it, in micro-units.
+ */
+cash_moved: number }
+/**
  * An agent asking the owner to replace four transactions the owner typed with the transfer
  * they stand for (AGT-090).
  */
@@ -4656,7 +4673,7 @@ asked_at: string;
  * The four as they stood when the agent asked: the sale, the withdrawal, the deposit,
  * the purchase.
  */
-transactions: TransactionShown[]; 
+transactions: ReplacedShown[]; 
 /**
  * The transfer recorded in their place.
  */

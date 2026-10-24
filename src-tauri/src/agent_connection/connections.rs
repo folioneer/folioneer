@@ -229,9 +229,21 @@ pub struct ReplacementRequest {
     pub asked_at: String,
     /// The four as they stood when the agent asked: the sale, the withdrawal, the deposit,
     /// the purchase.
-    pub transactions: Vec<TransactionShown>,
+    pub transactions: Vec<ReplacedShown>,
     /// The transfer recorded in their place.
     pub transfer: TransferShown,
+}
+
+/// AGT-092 — one of the four a replacement removes, with what it moved, signed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct ReplacedShown {
+    /// The transaction as it stood when the agent asked.
+    pub transaction: TransactionShown,
+    /// The quantity it moved into the holding, negative out of it, in micro-units; `None`
+    /// for a transaction on the account's cash.
+    pub holding_moved: Option<i64>,
+    /// The cash it moved into the account, negative out of it, in micro-units.
+    pub cash_moved: i64,
 }
 
 /// AGT-091 — the transfer a replacement records, as the owner is shown it.
@@ -830,7 +842,7 @@ impl AgentConnections {
     pub async fn ask_replacement(
         &self,
         granted: &Granted,
-        shown: Vec<TransactionShown>,
+        shown: Vec<ReplacedShown>,
         transfer: TransferShown,
         replacement: Replacement,
     ) -> ReplacementAnswer {

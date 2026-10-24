@@ -75,16 +75,26 @@ const removal = (overrides = {}) => ({
   ...overrides,
 });
 
-const shown = (kind: string, account: string, amount: number, asset: boolean) => ({
-  ...removal().transaction,
-  id: `tx-${kind}`,
-  date: "2026-10-21",
-  account,
-  kind,
-  asset_name: asset ? "Bitcoin" : null,
-  asset_reference: asset ? "BTC" : null,
-  quantity: asset ? 500_000 : amount,
-  amount,
+const shown = (
+  kind: string,
+  account: string,
+  amount: number,
+  holding_moved: number | null,
+  cash_moved: number,
+) => ({
+  transaction: {
+    ...removal().transaction,
+    id: `tx-${kind}`,
+    date: "2026-10-21",
+    account,
+    kind,
+    asset_name: holding_moved === null ? null : "Bitcoin",
+    asset_reference: holding_moved === null ? null : "BTC",
+    quantity: holding_moved === null ? amount : 500_000,
+    amount,
+  },
+  holding_moved,
+  cash_moved,
 });
 const replacement = (overrides = {}) => ({
   id: 13,
@@ -92,10 +102,10 @@ const replacement = (overrides = {}) => ({
   client: "Claude Code",
   asked_at: "2026-10-24T09:00:00",
   transactions: [
-    shown("Sell", "Exchange", 21_000_000_000, true),
-    shown("Withdrawal", "Exchange", 21_000_000_000, false),
-    shown("Deposit", "Hardware wallet", 21_000_000_000, false),
-    shown("Purchase", "Hardware wallet", 21_000_000_000, true),
+    shown("Sell", "Exchange", 21_000_000_000, -500_000, 21_000_000_000),
+    shown("Withdrawal", "Exchange", 21_000_000_000, null, -21_000_000_000),
+    shown("Deposit", "Hardware wallet", 21_000_000_000, null, 21_000_000_000),
+    shown("Purchase", "Hardware wallet", 21_000_000_000, 500_000, -21_000_000_000),
   ],
   transfer: {
     from_account: "Exchange",

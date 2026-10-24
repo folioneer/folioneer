@@ -85,13 +85,13 @@ export function ReplacementRequestDialog({ request, onAnswer }: ReplacementReque
               </tr>
             </thead>
             <tbody>
-              {request.transactions.map((shown) => (
+              {request.transactions.map((replaced) => (
                 <tr
-                  key={shown.id}
-                  id={`agent-replacement-removed-${shown.kind.toLowerCase()}`}
+                  key={replaced.transaction.id}
+                  id={`agent-replacement-removed-${replaced.transaction.kind.toLowerCase()}`}
                   className="text-m3-on-surface-variant line-through"
                 >
-                  {replacedRow(shown, t, i18n.language).map(([key, value]) => (
+                  {replacedRow(replaced, t, i18n.language).map(([key, value]) => (
                     <td
                       key={key}
                       className={
