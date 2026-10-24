@@ -401,10 +401,10 @@ impl ScheduledFetchOrchestrator {
                     .fetch_daily_closes(symbol, &from, &to)
                     .await
                 {
-                    Ok(Some(closes)) if !closes.is_empty() => {
-                        // MKT-230 — the window's reported splits are read beside its closes;
-                        // a failed reading skips the asset as a failed close request does
-                        // (MKT-193B, SPF-041).
+                    Ok(Some(closes)) => {
+                        // MKT-230 — the window's reported splits are read beside its closes,
+                        // an empty answer included; a failed reading skips the asset as a
+                        // failed close request does (MKT-193B, SPF-041).
                         let splits = match self.price_provider.fetch_splits(symbol, &from).await {
                             Ok(splits) => splits,
                             Err(error) => {
@@ -417,11 +417,13 @@ impl ScheduledFetchOrchestrator {
                                 continue;
                             }
                         };
+                        let no_close = closes.is_empty();
                         let recorded = match self
                             .asset_service
                             .record_reported_splits(&asset.id, &from, &splits)
                             .await
                         {
+                            Ok(()) if no_close => Ok(0),
                             Ok(()) => {
                                 self.asset_service
                                     .record_daily_closes(&asset.id, closes)
@@ -430,6 +432,10 @@ impl ScheduledFetchOrchestrator {
                             Err(error) => Err(error),
                         };
                         match recorded {
+                            // SPF-032/033 — an empty answer is a window with no close to give
+                            // (no trading day, or a session not closed yet): MKT-220 keeps
+                            // what it had.
+                            Ok(_) if no_close => skipped_count += 1,
                             Ok(_) => {
                                 updated_count += 1;
                                 outcomes.push((asset.id.clone(), None));
@@ -450,9 +456,6 @@ impl ScheduledFetchOrchestrator {
                         skipped_count += 1;
                         outcomes.push((asset.id.clone(), Some(PriceFetchFailureReason::NoData)));
                     }
-                    // SPF-032/033 — an empty answer is a window with no close to give (no
-                    // trading day, or a session not closed yet): MKT-220 keeps what it had.
-                    Ok(Some(_)) => skipped_count += 1,
                     Err(error) => {
                         outcomes.push((
                             asset.id.clone(),
@@ -1424,6 +1427,10 @@ mod tests {
         assert_eq!(run.updated_count, 1);
     }
 
+    /// MKT-230 — how often the splits of the asset EMPTYSPLIT were kept.
+    static EMPTY_ANSWER_SPLITS_KEPT: std::sync::atomic::AtomicUsize =
+        std::sync::atomic::AtomicUsize::new(0);
+
     /// An orchestrator over one account holding 10 units of each of `references` — and
     /// nothing any more of a `CLOSED` asset — whose provider answers a symbol by `answer`
     /// and whose price writes fail for the asset `asset-writefail`.
@@ -1511,11 +1518,15 @@ mod tests {
                 "SPLITDOWN" => Err(anyhow::anyhow!("split request failed")),
                 _ => Ok(Vec::new()),
             });
-        // MKT-232 — keeping KEEPFAIL's splits fails.
+        // MKT-232 — keeping KEEPFAIL's splits fails. MKT-230 — EMPTYSPLIT's are counted.
         asset_service
             .expect_record_reported_splits()
             .returning(|asset_id, _, _| match asset_id {
                 "asset-keepfail" => Err(crate::context::asset::AssetError::DatabaseError),
+                "asset-emptysplit" => {
+                    EMPTY_ANSWER_SPLITS_KEPT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    Ok(())
+                }
                 _ => Ok(()),
             });
         ScheduledFetchOrchestrator::new(
@@ -1568,6 +1579,35 @@ mod tests {
         let orchestrator =
             sweeping_orchestrator(&["UPDATED", "SPLITDOWN"], |_| Ok(Some(one_close())));
         let run = orchestrator.run_scheduled_fetch().await.unwrap();
+        assert_eq!(run.updated_count, 1);
+        assert_eq!(run.skipped_count, 1);
+    }
+
+    // MKT-230 (#609) — an empty answer still reads and keeps the window's splits, and the
+    // asset is skipped as an empty answer is.
+    #[tokio::test]
+    async fn mkt_230_an_empty_answer_still_keeps_the_splits() {
+        let orchestrator = sweeping_orchestrator(&["EMPTYSPLIT"], |_| Ok(Some(vec![])));
+        let run = orchestrator.run_scheduled_fetch().await.unwrap();
+        assert_eq!(run.updated_count, 0);
+        assert_eq!(run.skipped_count, 1);
+        assert_eq!(
+            EMPTY_ANSWER_SPLITS_KEPT.load(std::sync::atomic::Ordering::SeqCst),
+            1
+        );
+    }
+
+    // MKT-230 (#609) — a failed split reading on an empty answer skips the asset as a failed
+    // close request does; the others are priced.
+    #[tokio::test]
+    async fn mkt_230_a_failed_split_reading_on_an_empty_answer_skips_the_asset() {
+        let orchestrator =
+            sweeping_orchestrator(&["UPDATED", "SPLITDOWN"], |symbol| match symbol {
+                "SPLITDOWN" => Ok(Some(vec![])),
+                _ => Ok(Some(one_close())),
+            });
+        let run = orchestrator.run_scheduled_fetch().await.unwrap();
+        assert_eq!(run.outcome, ScheduledFetchOutcome::Succeeded);
         assert_eq!(run.updated_count, 1);
         assert_eq!(run.skipped_count, 1);
     }
