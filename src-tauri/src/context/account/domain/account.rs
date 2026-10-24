@@ -2,7 +2,9 @@ use super::fee_schedule::{FeeCatchUpPosition, FeeSchedule};
 use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot, StockSplitPosition};
 use super::holding_note::HoldingNote;
 use super::journal::CashEffect;
-use super::transaction::{EnteredAmount, Transaction, TransactionType, WriteOffReason};
+use super::transaction::{
+    AgentRecording, EnteredAmount, Transaction, TransactionType, WriteOffReason,
+};
 use super::wrapper::{country_well_formed, wrapper_known, PORTFOLIO_COUNTRY};
 use crate::context::account::error::AccountError;
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
@@ -2115,6 +2117,10 @@ pub trait AccountRepository: Send + Sync {
     async fn find_by_name(&self, name: &str) -> Result<Option<Account>>;
     /// Persists a new account.
     async fn create(&self, account: Account) -> Result<Account>;
+    /// AGT-068 — persists a new account an agent created, with its mark, in one write.
+    async fn create_by_agent(&self, account: Account, mark: AgentRecording) -> Result<Account>;
+    /// AGT-068 — the mark of every account an agent created on this computer, by account id.
+    async fn agent_creations(&self) -> Result<Vec<(String, AgentRecording)>>;
     /// Updates an existing account.
     async fn update(&self, account: Account) -> Result<Account>;
     /// Permanently deletes an account and cascades to its holdings (R5).

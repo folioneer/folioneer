@@ -264,16 +264,57 @@ impl AccountService {
         self.create_account(account).await
     }
 
+    /// AGT-068 / AGT-069 — creates a new account an agent asked for, with its mark, as the
+    /// window creates one: management fees off (FEE-075), the country and wrapper optional.
+    pub async fn create_by_agent(
+        &self,
+        name: String,
+        bank_name: String,
+        currency: String,
+        country: Option<String>,
+        wrapper: Option<String>,
+        mark: AgentRecording,
+    ) -> Result<Account, AccountError> {
+        let account =
+            Account::new(name, bank_name, currency, false)?.classified(country, wrapper, None)?;
+        self.store_new_account(account, Some(mark)).await
+    }
+
+    /// AGT-069 — the mark of every account an agent created on this computer, by account id.
+    pub async fn agent_creations(
+        &self,
+    ) -> Result<std::collections::HashMap<String, AgentRecording>, AccountError> {
+        let marks = self.account_repo.agent_creations().await.map_err(|e| {
+            tracing::error!(target: BACKEND, err = ?e, "agent_creations: repository failure");
+            AccountError::DatabaseError
+        })?;
+        Ok(marks.into_iter().collect())
+    }
+
     /// ACC-003 — stores a valid new account whose name no other account has.
     async fn create_account(&self, account: Account) -> Result<Account, AccountError> {
+        self.store_new_account(account, None).await
+    }
+
+    /// ACC-003 — stores a valid new account whose name no other account has, with the mark
+    /// of the agent that created it, if one did (AGT-069).
+    async fn store_new_account(
+        &self,
+        account: Account,
+        mark: Option<AgentRecording>,
+    ) -> Result<Account, AccountError> {
         if find_account_by_name(&*self.account_repo, &account.name)
             .await?
             .is_some()
         {
             return Err(AccountError::NameAlreadyExists);
         }
-        info!(target: BACKEND, account_id = %account.id, name = %account.name, "creating account");
-        let created = self.account_repo.create(account).await.map_err(|e| {
+        info!(target: BACKEND, account_id = %account.id, name = %account.name, by_agent = mark.is_some(), "creating account");
+        let written = match mark {
+            Some(mark) => self.account_repo.create_by_agent(account, mark).await,
+            None => self.account_repo.create(account).await,
+        };
+        let created = written.map_err(|e| {
             tracing::error!(target: BACKEND, err = ?e, "create: repository failure");
             AccountError::DatabaseError
         })?;
@@ -2073,6 +2114,20 @@ pub trait AccountServiceContract: Send + Sync {
         country: Option<String>,
         wrapper: Option<String>,
     ) -> StdResult<Account, AccountError>;
+    /// AGT-068 / AGT-069 — creates a new account an agent asked for, with its mark.
+    async fn create_by_agent(
+        &self,
+        name: String,
+        bank_name: String,
+        currency: String,
+        country: Option<String>,
+        wrapper: Option<String>,
+        mark: AgentRecording,
+    ) -> StdResult<Account, AccountError>;
+    /// AGT-069 — the mark of every account an agent created on this computer, by account id.
+    async fn agent_creations(
+        &self,
+    ) -> StdResult<std::collections::HashMap<String, AgentRecording>, AccountError>;
     /// Seeds the account's 0-balance Cash Holding (CSH-012).
     async fn seed_cash_holding(&self, account_id: &str) -> StdResult<(), AccountError>;
     /// Retrieves all holdings for a given account (ACD-022, B24).
@@ -2415,6 +2470,25 @@ impl AccountServiceContract for AccountService {
         management_fees_enabled: bool,
     ) -> StdResult<Account, AccountError> {
         AccountService::create(self, name, bank_name, currency, management_fees_enabled).await
+    }
+
+    async fn create_by_agent(
+        &self,
+        name: String,
+        bank_name: String,
+        currency: String,
+        country: Option<String>,
+        wrapper: Option<String>,
+        mark: AgentRecording,
+    ) -> StdResult<Account, AccountError> {
+        AccountService::create_by_agent(self, name, bank_name, currency, country, wrapper, mark)
+            .await
+    }
+
+    async fn agent_creations(
+        &self,
+    ) -> StdResult<std::collections::HashMap<String, AgentRecording>, AccountError> {
+        AccountService::agent_creations(self).await
     }
 
     async fn create_classified(

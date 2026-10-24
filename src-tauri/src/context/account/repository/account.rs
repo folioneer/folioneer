@@ -4,8 +4,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::context::account::domain::{
-    Account, AccountChange, AccountRepository, FeeCatchUpPosition, FeeFrequency, FeeSchedule,
-    Holding, HoldingNote, ThresholdDirection, Transaction, TransactionType, WriteOffReason,
+    Account, AccountChange, AccountRepository, AgentRecording, FeeCatchUpPosition, FeeFrequency,
+    FeeSchedule, Holding, HoldingNote, ThresholdDirection, Transaction, TransactionType,
+    WriteOffReason,
 };
 use crate::context::account::repository::fee_schedule::schedule_content;
 use crate::shared::domain::{
@@ -158,6 +159,61 @@ impl SqliteAccountRepository {
             pool,
             change_recorder: Arc::new(NoopChangeRecorder),
         }
+    }
+
+    /// Inserts a new account and records its creation for sync (CFR-014); with a mark,
+    /// an agent created it (AGT-068).
+    async fn insert(&self, account: Account, mark: Option<AgentRecording>) -> Result<Account> {
+        let management_fees_enabled = account.management_fees_enabled as i64;
+        let mut db_tx = self
+            .pool
+            .begin()
+            .await
+            .context("Failed to begin DB transaction for account create")?;
+        sqlx::query!(
+            r#"INSERT INTO accounts (id, name, bank_name, currency, management_fees_enabled,
+                                     country, wrapper)
+               VALUES (?, ?, ?, ?, ?, ?, ?)"#,
+            account.id,
+            account.name,
+            account.bank_name,
+            account.currency,
+            management_fees_enabled,
+            account.country,
+            account.wrapper
+        )
+        .execute(&mut *db_tx)
+        .await
+        .with_context(|| format!("Failed to create account {}", account.name))?;
+        let draft = ChangeDraft::new(
+            RecordKind::Account,
+            account_identity(&account.id),
+            Operation::Created,
+            Origin::User,
+            None,
+            Some(serde_json::to_string(&account)?),
+        );
+        self.record_account(&mut db_tx, &account.id, draft).await?;
+        // AGT-068 — the mark is written with the account: neither exists without the other.
+        if let Some(mark) = mark {
+            sqlx::query!(
+                r#"INSERT INTO agent_account_creations (account_id, agent, session, session_started_at)
+                   VALUES (?, ?, ?, ?)"#,
+                account.id,
+                mark.agent,
+                mark.session,
+                mark.session_started_at
+            )
+            .execute(&mut *db_tx)
+            .await
+            .with_context(|| format!("Failed to mark account {} as an agent's", account.id))?;
+        }
+        db_tx
+            .commit()
+            .await
+            .context("Failed to commit account create")?;
+
+        Ok(account)
     }
 
     /// Attaches the change recorder every write appends through (SYN-020).
@@ -637,42 +693,36 @@ impl AccountRepository for SqliteAccountRepository {
     }
 
     async fn create(&self, account: Account) -> Result<Account> {
-        let management_fees_enabled = account.management_fees_enabled as i64;
-        let mut db_tx = self
-            .pool
-            .begin()
-            .await
-            .context("Failed to begin DB transaction for account create")?;
-        sqlx::query!(
-            r#"INSERT INTO accounts (id, name, bank_name, currency, management_fees_enabled,
-                                     country, wrapper)
-               VALUES (?, ?, ?, ?, ?, ?, ?)"#,
-            account.id,
-            account.name,
-            account.bank_name,
-            account.currency,
-            management_fees_enabled,
-            account.country,
-            account.wrapper
-        )
-        .execute(&mut *db_tx)
-        .await
-        .with_context(|| format!("Failed to create account {}", account.name))?;
-        let draft = ChangeDraft::new(
-            RecordKind::Account,
-            account_identity(&account.id),
-            Operation::Created,
-            Origin::User,
-            None,
-            Some(serde_json::to_string(&account)?),
-        );
-        self.record_account(&mut db_tx, &account.id, draft).await?;
-        db_tx
-            .commit()
-            .await
-            .context("Failed to commit account create")?;
+        self.insert(account, None).await
+    }
 
-        Ok(account)
+    async fn create_by_agent(&self, account: Account, mark: AgentRecording) -> Result<Account> {
+        self.insert(account, Some(mark)).await
+    }
+
+    async fn agent_creations(&self) -> Result<Vec<(String, AgentRecording)>> {
+        let rows = sqlx::query!(
+            r#"SELECT account_id AS "account_id!: String", agent AS "agent!: String",
+                      session AS "session!: String",
+                      session_started_at AS "session_started_at!: String"
+               FROM agent_account_creations"#
+        )
+        .fetch_all(&self.pool)
+        .await
+        .context("Failed to fetch the marks of accounts agents created")?;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                (
+                    row.account_id,
+                    AgentRecording {
+                        agent: row.agent,
+                        session: row.session,
+                        session_started_at: row.session_started_at,
+                    },
+                )
+            })
+            .collect())
     }
 
     async fn update(&self, account: Account) -> Result<Account> {

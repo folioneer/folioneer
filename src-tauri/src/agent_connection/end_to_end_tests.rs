@@ -2470,6 +2470,304 @@ async fn agt_064_a_session_adds_an_asset_of_each_kind() {
     assert_eq!(past_the_limit.code, "SessionLimitReached");
 }
 
+// AGT-068 — a session creates the account a statement names, through the rules of the
+// window: usable at once by its name, with its cash line; the same name is refused twice,
+// each created account takes a place of the session's limit, and the window is told how
+// many and the last.
+#[tokio::test]
+async fn agt_068_a_session_creates_an_account() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+
+    let created = call(
+        "add_account",
+        json!({ "name": "  Hardware wallet ", "currency": "EUR", "bank": "Ledger", "country": "DE", "wrapper": "brokerage" }),
+    )
+    .await
+    .expect("an account");
+    assert_eq!(created["status"], "created");
+    assert_eq!(
+        created["account"],
+        json!({ "name": "Hardware wallet", "currency": "EUR", "country": "DE", "wrapper": "brokerage" })
+    );
+    let plain = call(
+        "add_account",
+        json!({ "name": "Livret", "currency": "USD" }),
+    )
+    .await
+    .expect("an account with only a name and a currency");
+    assert_eq!(plain["account"]["wrapper"], Value::Null);
+
+    // Usable at once by its name, with its cash line, its fees off and its bank kept.
+    let holdings = call("list_holdings", json!({ "account": "hardware WALLET" }))
+        .await
+        .expect("its holdings");
+    assert_eq!(holdings["account_name"], "Hardware wallet");
+    let account = bench
+        .accounts
+        .get_all()
+        .await
+        .expect("accounts")
+        .into_iter()
+        .find(|account| account.name == "Hardware wallet")
+        .expect("created");
+    assert_eq!(account.bank_name, "Ledger");
+    assert!(!account.management_fees_enabled);
+    assert!(bench
+        .accounts
+        .get_holdings_for_account(&account.id)
+        .await
+        .expect("holdings")
+        .iter()
+        .any(|holding| holding.asset_id.starts_with("system-cash")));
+
+    // The window's refusals, with their codes; what is missing or misread as for any tool.
+    for (arguments, code) in [
+        (
+            json!({ "name": "pea", "currency": "EUR" }),
+            "NameAlreadyExists",
+        ),
+        (
+            json!({ "name": "Other", "currency": "EURO" }),
+            "InvalidCurrency",
+        ),
+        (
+            json!({ "name": "Other", "currency": "EUR", "country": "fr" }),
+            "InvalidCountry",
+        ),
+        (
+            json!({ "name": "Other", "currency": "EUR", "wrapper": "fr_nowhere" }),
+            "WrapperNotAvailable",
+        ),
+        (json!({ "currency": "EUR" }), "MissingArgument"),
+        (
+            json!({ "name": "   ", "currency": "EUR" }),
+            "MissingArgument",
+        ),
+        (json!({ "name": "Other" }), "MissingArgument"),
+        (
+            json!({ "name": "Other", "currency": "EUR", "bank": 12 }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "name": "Other", "currency": "EUR", "wrapper": true }),
+            "InvalidArguments",
+        ),
+        // Text the portfolio keeps and the window shows: bounded, and nothing in it that
+        // hides or reorders what is read.
+        (
+            json!({ "name": "O".repeat(101), "currency": "EUR" }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "name": "Other", "currency": "EUR", "bank": "B".repeat(101) }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "name": "PEA\u{202E}AEP", "currency": "EUR" }),
+            "InvalidArguments",
+        ),
+        (
+            json!({ "name": "Other", "currency": "EUR", "bank": "Bank\nlast: X" }),
+            "InvalidArguments",
+        ),
+    ] {
+        assert_eq!(
+            call("add_account", arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{arguments}"
+        );
+    }
+    let duplicate = call("add_account", json!({ "name": "PEA", "currency": "EUR" }))
+        .await
+        .expect_err("refused");
+    assert!(
+        !duplicate.message.contains("PEA"),
+        "AGT-042: the reason names only what was sent: {}",
+        duplicate.message
+    );
+
+    // The window is told how many and the last; an account is no transaction.
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.accounts_added, 2);
+    assert_eq!(told.last_account.as_deref(), Some("Livret"));
+    assert_eq!(told.recordings, 0);
+    assert_eq!(told.transactions_recorded, 0);
+
+    // A blank bank is none, as in the window's form.
+    call(
+        "add_account",
+        json!({ "name": "Savings", "currency": "EUR", "bank": "  " }),
+    )
+    .await
+    .expect("a blank bank is none");
+
+    // Its three accounts took three places of the session's limit and the refusals none:
+    // the last place left is still free.
+    for _ in 3..super::connections::MAX_RECORDINGS - 1 {
+        granted.count_recording();
+    }
+    call(
+        "add_account",
+        json!({ "name": "Last place", "currency": "EUR" }),
+    )
+    .await
+    .expect("the last place");
+    let past_the_limit = call("add_account", json!({ "name": "Gold", "currency": "EUR" }))
+        .await
+        .expect_err("refused");
+    assert_eq!(past_the_limit.code, "SessionLimitReached");
+}
+
+// AGT-069 — an account an agent created carries the agent and its session in the account
+// summaries; the owner's carries none, and deleting the account takes its mark with it.
+#[tokio::test]
+async fn agt_069_an_account_an_agent_created_is_marked() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    bench
+        .tools
+        .call(
+            &granted,
+            "add_account",
+            &json!({ "name": "Hardware wallet", "currency": "EUR" }),
+        )
+        .await
+        .expect("an account");
+
+    let container = AppContainer::for_headless_writes(bench.pool.clone());
+    let rows = crate::use_cases::account_summary::AccountSummaryUseCase::new(
+        Arc::clone(&container.account_service) as _,
+        Arc::clone(&container.asset_service) as _,
+        Arc::clone(&container.currency_service),
+    )
+    .get_account_summaries()
+    .await
+    .expect("the summaries")
+    .summaries;
+    let created_by = |name: &str| {
+        rows.iter()
+            .find(|row| row.name == name)
+            .map(|row| row.created_by.clone())
+            .expect("a row")
+    };
+    let mark = created_by("Hardware wallet").expect("marked");
+    assert_eq!(
+        (
+            mark.agent.as_str(),
+            mark.session.as_str(),
+            mark.session_started_at.as_str()
+        ),
+        (
+            granted.client.as_str(),
+            granted.key.as_str(),
+            granted.started_at.as_str()
+        )
+    );
+    assert_eq!(created_by("PEA"), None);
+
+    // AGT-040 — an agent reads the summaries without the marks: they name session keys.
+    let read = bench
+        .tools
+        .call(&granted, "portfolio_summary", &json!({}))
+        .await
+        .expect("the summaries");
+    assert!(read["summaries"]
+        .as_array()
+        .expect("rows")
+        .iter()
+        .all(|row| row.get("created_by").is_none()));
+
+    let account = bench
+        .accounts
+        .get_all()
+        .await
+        .expect("accounts")
+        .into_iter()
+        .find(|account| account.name == "Hardware wallet")
+        .expect("created");
+    bench.accounts.delete(&account.id).await.expect("deleted");
+    let marks: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agent_account_creations")
+        .fetch_one(&bench.pool)
+        .await
+        .expect("counted");
+    assert_eq!(marks, 0, "the mark goes with its account");
+
+    // SYN-023 — an account another computer deleted takes its mark with it too.
+    bench
+        .tools
+        .call(
+            &granted,
+            "add_account",
+            &json!({ "name": "Livret", "currency": "EUR" }),
+        )
+        .await
+        .expect("an account");
+    let livret = bench
+        .accounts
+        .get_all()
+        .await
+        .expect("accounts")
+        .into_iter()
+        .find(|account| account.name == "Livret")
+        .expect("created");
+    let mut conn = bench.pool.acquire().await.expect("a connection");
+    use crate::context::account::AccountRepository;
+    crate::context::account::SqliteAccountRepository::new(bench.pool.clone())
+        .remove_account(&mut conn, &livret.id)
+        .await
+        .expect("removed");
+    let marks: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agent_account_creations")
+        .fetch_one(&bench.pool)
+        .await
+        .expect("counted");
+    assert_eq!(
+        marks, 0,
+        "the mark goes with its account, deleted from elsewhere"
+    );
+}
+
+// AGT-069 — the account and its mark are written together: a mark that cannot be written
+// creates nothing, and the creation is refused and takes no place of the limit.
+#[tokio::test]
+async fn agt_069_an_account_whose_mark_cannot_be_written_is_not_created() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    sqlx::query("DROP TABLE agent_account_creations")
+        .execute(&bench.pool)
+        .await
+        .expect("dropped");
+
+    let refused = bench
+        .tools
+        .call(
+            &granted,
+            "add_account",
+            &json!({ "name": "Hardware wallet", "currency": "EUR" }),
+        )
+        .await
+        .expect_err("refused");
+    assert_eq!(refused.code, "DatabaseError");
+    assert!(bench
+        .accounts
+        .get_all()
+        .await
+        .expect("accounts")
+        .iter()
+        .all(|account| account.name != "Hardware wallet"));
+    assert_eq!(bench.connections.sessions().remove(0).accounts_added, 0);
+}
+
 // AGT-070 — a session lists an account's transactions, oldest first and in pages, with the
 // id of each and who recorded it: the owner, an agent, or this session. It is a read.
 #[tokio::test]
@@ -2884,7 +3182,7 @@ async fn agt_071_a_session_reads_the_price_of_an_asset_at_a_date() {
 }
 
 // AGT-036 / B45 / TODO-083 — every write an agent makes reaches the window with the session's
-// change after it: an added asset, a transaction on it, a price, then many recordings sent
+// change after it: an added asset, a transaction on it, a price, an account, then many recordings sent
 // at once, none of them lost to the one after.
 #[tokio::test]
 async fn agt_036_every_write_of_an_agent_reaches_the_window() {
@@ -2914,10 +3212,15 @@ async fn agt_036_every_write_of_an_agent_reaches_the_window() {
             "record_price",
             json!({ "asset": "AI", "price": "2", "date": "2026-02-01" }),
         ),
+        call(
+            4,
+            "add_account",
+            json!({ "name": "Hardware wallet", "currency": "EUR" }),
+        ),
     ];
     lines.extend((0..MANY).map(|n| {
         call(
-            4 + n,
+            5 + n,
             "record_purchase",
             json!({ "account": "PEA", "asset": "CW8",
             "quantity": "1", "price": "1", "date": "2026-02-02" }),
@@ -2941,6 +3244,7 @@ async fn agt_036_every_write_of_an_agent_reaches_the_window() {
         Event::AssetUpdated,
         Event::TransactionUpdated,
         Event::AssetPriceUpdated,
+        Event::AccountUpdated,
     ];
     writes.extend((0..MANY).map(|_| Event::TransactionUpdated));
     let mut told_writes = calls.iter().filter(|call| !call.is_empty());

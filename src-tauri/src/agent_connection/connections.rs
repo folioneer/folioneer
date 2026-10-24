@@ -42,6 +42,10 @@ pub struct AgentSession {
     pub transactions_recorded: u32,
     /// The one it recorded last among them.
     pub last_recording: Option<LastRecording>,
+    /// How many accounts it created (AGT-068).
+    pub accounts_added: u32,
+    /// The name of the one it created last.
+    pub last_account: Option<String>,
     /// How many assets it added (AGT-064).
     pub assets_added: u32,
     /// The one it added last.
@@ -247,9 +251,16 @@ struct Facts {
     /// How many assets it added, and the last of them (AGT-064): counted as they are
     /// added, and kept until the session ends.
     assets: Mutex<(u32, Option<LastAsset>)>,
+    /// How many accounts it created, and the name of the last of them (AGT-068): counted as
+    /// they are created, and kept until the session ends.
+    accounts: Mutex<(u32, Option<String>)>,
 }
 
 impl Facts {
+    fn accounts(&self) -> MutexGuard<'_, (u32, Option<String>)> {
+        self.accounts.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
     fn assets(&self) -> MutexGuard<'_, (u32, Option<LastAsset>)> {
         self.assets.lock().unwrap_or_else(PoisonError::into_inner)
     }
@@ -307,6 +318,12 @@ impl Granted {
         self.facts.reads.fetch_add(1, Ordering::SeqCst);
     }
 
+    /// AGT-068 — the session created an account: one more, and the last of them.
+    pub fn count_account(&self, name: String) {
+        let mut accounts = self.facts.accounts();
+        *accounts = (accounts.0 + 1, Some(name));
+    }
+
     /// AGT-064 — the session added an asset: one more, and the last of them.
     pub fn count_asset(&self, name: String, reference: String) {
         let mut assets = self.facts.assets();
@@ -338,7 +355,10 @@ impl Open {
     fn told(&self) -> AgentSession {
         let (recordings, last_recording) = self.facts.recordings().clone();
         let (assets_added, last_asset) = self.facts.assets().clone();
+        let (accounts_added, last_account) = self.facts.accounts().clone();
         AgentSession {
+            accounts_added,
+            last_account,
             reads: self.facts.reads.load(Ordering::SeqCst),
             transactions_recorded: self.facts.recorded.load(Ordering::SeqCst),
             recordings,
@@ -505,6 +525,8 @@ impl AgentConnections {
                     recordings: 0,
                     transactions_recorded: 0,
                     last_recording: None,
+                    accounts_added: 0,
+                    last_account: None,
                     assets_added: 0,
                     last_asset: None,
                 },
@@ -841,6 +863,8 @@ mod tests {
                 recordings: 0,
                 transactions_recorded: 0,
                 last_recording: None,
+                accounts_added: 0,
+                last_account: None,
                 assets_added: 0,
                 last_asset: None,
             }]

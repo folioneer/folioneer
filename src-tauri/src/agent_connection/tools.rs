@@ -15,6 +15,7 @@ use crate::context::asset::{
 };
 use crate::context::currency::CurrencyService;
 use crate::core::BACKEND;
+use crate::use_cases::account_creation::AccountCreationUseCase;
 use crate::use_cases::account_details::AccountDetailsUseCase;
 use crate::use_cases::account_summary::AccountSummaryUseCase;
 use crate::use_cases::holding_transaction::{
@@ -91,6 +92,7 @@ pub fn last_recording(
 /// Runs the tools in the running application, through the queries the window uses.
 pub struct AgentTools {
     recorder: Arc<HoldingTransactionUseCase>,
+    creation: Arc<AccountCreationUseCase>,
     account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,
     summaries: AccountSummaryUseCase,
@@ -108,6 +110,10 @@ impl AgentTools {
         connections: Arc<AgentConnections>,
     ) -> Self {
         Self {
+            creation: Arc::new(AccountCreationUseCase::new(
+                Arc::clone(&account_service),
+                Arc::clone(&asset_service),
+            )),
             recorder: Arc::new(HoldingTransactionUseCase::new(
                 Arc::clone(&account_service),
                 Arc::clone(&asset_service),
@@ -175,12 +181,14 @@ impl AgentTools {
             }
             "record_price" => self.record_price(granted, arguments).await,
             "add_asset" => self.add_asset(granted, arguments).await,
+            "add_account" => self.add_account(granted, arguments).await,
             "portfolio_summary" => self
                 .summaries
                 .get_account_summaries()
                 .await
                 .map_err(|error| unreadable("portfolio_summary", &error))
-                .and_then(|summaries| as_json(&summaries)),
+                .and_then(|summaries| as_json(&summaries))
+                .map(without_creators),
             "list_accounts" => {
                 let accounts = self
                     .account_service
@@ -489,6 +497,74 @@ impl AgentTools {
             "status": "added",
             "asset": AssetRow::from(added.asset),
             "reference_shared": added.reference_shared,
+        }))
+    }
+
+    /// AGT-068 / AGT-069 — creates an account through the rules of the window, marked with
+    /// the agent and its session. It takes a place of the session's limit (AGT-047) and the
+    /// window is told.
+    async fn add_account(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
+        let name = kept_text(arguments, "name", ACCOUNT_TEXT_LENGTH)?;
+        let currency = text(arguments, "currency")?.to_string();
+        let bank_name = optional_kept_text(arguments, "bank", ACCOUNT_TEXT_LENGTH)?;
+        let country = optional_text(arguments, "country")?;
+        let wrapper = optional_text(arguments, "wrapper")?;
+        if !granted.may_record_one_more() {
+            return Err(session_limit_reached());
+        }
+        let mark = AgentRecording {
+            agent: granted.client.clone(),
+            session: granted.key.clone(),
+            session_started_at: granted.started_at.clone(),
+        };
+        // As a recording (AGT-049, AGT-086): once started, the creation runs to its end.
+        let creation = Arc::clone(&self.creation);
+        let created = tokio::spawn(async move {
+            creation
+                .create_by_agent(
+                    name,
+                    bank_name.unwrap_or_default(),
+                    currency,
+                    country,
+                    wrapper,
+                    mark,
+                )
+                .await
+        })
+        .await
+        .map_err(|error| {
+            tracing::error!(target: BACKEND, err = ?error, "agent creating an account: the task ended early");
+            portfolio_unreadable()
+        })?
+        .map_err(|error| {
+            let code = code_of(&error);
+            if matches!(error, AccountError::DatabaseError) {
+                tracing::error!(target: BACKEND, session = granted.session_id, "agent creating an account: the portfolio could not be read or written");
+            }
+            Refusal {
+                message: match error {
+                    AccountError::NameAlreadyExists => {
+                        "the portfolio already has an account of this name".to_string()
+                    }
+                    AccountError::DatabaseError => {
+                        "the portfolio could not be read or written".to_string()
+                    }
+                    _ => format!("refused by the rules ({code})"),
+                },
+                code,
+            }
+        })?;
+        granted.count_recording();
+        granted.count_account(created.name.clone());
+        tracing::info!(target: BACKEND, session = granted.session_id, account = %created.id, "agent created an account");
+        as_json(&serde_json::json!({
+            "status": "created",
+            "account": AccountRow {
+                country: created.effective_country().to_string(),
+                name: created.name,
+                currency: created.currency,
+                wrapper: created.wrapper,
+            },
         }))
     }
 
@@ -1081,6 +1157,8 @@ fn page(arguments: &Value) -> Result<usize, Refusal> {
 /// AGT-064 — the longest name and reference an agent gives an asset, in characters.
 const ASSET_NAME_LENGTH: usize = 100;
 const ASSET_REFERENCE_LENGTH: usize = 30;
+/// AGT-068 — the longest name or bank of an account an agent creates, in characters.
+const ACCOUNT_TEXT_LENGTH: usize = 100;
 
 /// AGT-064 — text an agent wrote that the portfolio keeps and the window shows: it is
 /// refused when it is too long or holds a character that shows nothing or reorders text.
@@ -1095,6 +1173,31 @@ fn kept_text(arguments: &Value, name: &str, longest: usize) -> Result<String, Re
         });
     }
     Ok(typed.to_string())
+}
+
+/// AGT-040 — the account summaries as an agent reads them: the mark of an account an agent
+/// created (AGT-069) is the window's, and names a session's key no agent is given.
+fn without_creators(mut summaries: Value) -> Value {
+    if let Some(rows) = summaries.get_mut("summaries").and_then(Value::as_array_mut) {
+        for row in rows.iter_mut().filter_map(Value::as_object_mut) {
+            row.remove("created_by");
+        }
+    }
+    summaries
+}
+
+/// AGT-068 — an optional text an agent wrote that the portfolio keeps and the window shows,
+/// bounded as `kept_text` bounds a required one; blank, it is none.
+fn optional_kept_text(
+    arguments: &Value,
+    name: &str,
+    longest: usize,
+) -> Result<Option<String>, Refusal> {
+    match raw_text(arguments, name)? {
+        // As the window's form: a blank optional text is none.
+        Some(typed) if !typed.trim().is_empty() => kept_text(arguments, name, longest).map(Some),
+        _ => Ok(None),
+    }
 }
 
 /// AGT-064 — `kind` as one of the kinds the core lets a user add an asset of, case ignored;

@@ -537,6 +537,7 @@ struct AccountSummary {
     ytd_performance_pct: Option<i64>,          // micro-percent: year-to-date net-of-flows performance since Jan 1, reusing PRF-034 (ACC-024); first-year accounts use an inception baseline (present, not None); None only when the Simple-Dietz denominator is 0 (PRF-032)
     has_inconsistent_holding: bool,            // derived on read; true when any holding of the account carries an inconsistency (SYN-040, CFR-042)
     outdated_price_count: i64,                 // the account's active holdings whose price is outdated (MKT-205, MKT-206)
+    created_by: Option<AgentRecording>,        // the agent session that created the account on this computer; None for the owner's own, or one created on another computer (AGT-069)
 }
 
 // Response of get_account_summaries (ACC-021, ACC-027)
@@ -792,6 +793,7 @@ struct AccountJournal {
 ## Changelog
 
 - 2026-10-24 — #405 (ACC-004, PRF-013, GPF-014): `Account`, `CreateAccountDTO`, `UpdateAccountDTO` and `AccountSummary` lose `update_frequency`, and the `UpdateFrequency` type goes; `AccountPerformanceResponse` loses `month_view_available`, its `monthly` series always filled.
+- 2026-10-24 — #386: `AccountSummary` gains `created_by: Option<AgentRecording>`, the agent session that created the account (AGT-069). No command or error changes.
 - 2026-10-24 — #599 (WOF-033): `correct_transaction` gains `WriteOffWithoutReason` — a stored write-off without a reason is refused, never given `Other`.
 - 2026-10-24 — #607 (SEL-012, SEL-021, SEL-030, SEL-032, TRX-062, WOF-030): a sale or a write-off is refused against what was held on its date — for a correction, what was held just before it, itself left out — with `ClosedPosition` or `Oversell { available, requested }`, `available` the quantity held then; `CascadingOversell` only for a later transaction left short. `sell_holding` reads the sale's date instead of today's holding; `validate_transaction_draft` records a new sale in memory, so it returns what `sell_holding` would. No type changed.
 - 2026-10-19 — #551 (WOF-056): `record_write_off` (`WriteOffDTO`, `WriteOffError`) and `correct_write_off` (`CorrectWriteOffDTO`), over the agent connection's use case.

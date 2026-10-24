@@ -30,6 +30,7 @@ const makeSummary = (overrides: Partial<AccountSummary> = {}): AccountSummary =>
   ytd_performance_pct: null,
   has_inconsistent_holding: false,
   outdated_price_count: 0,
+  created_by: null,
   ...overrides,
 });
 

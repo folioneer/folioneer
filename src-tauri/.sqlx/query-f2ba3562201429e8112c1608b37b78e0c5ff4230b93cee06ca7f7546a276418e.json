@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO agent_account_creations (account_id, agent, session, session_started_at)\n                   VALUES (?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "f2ba3562201429e8112c1608b37b78e0c5ff4230b93cee06ca7f7546a276418e"
+}

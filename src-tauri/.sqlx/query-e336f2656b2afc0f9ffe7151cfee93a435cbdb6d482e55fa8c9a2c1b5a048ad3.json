@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT account_id AS \"account_id!: String\", agent AS \"agent!: String\",\n                      session AS \"session!: String\",\n                      session_started_at AS \"session_started_at!: String\"\n               FROM agent_account_creations",
+  "describe": {
+    "columns": [
+      {
+        "name": "account_id!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "agent!: String",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "session!: String",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "session_started_at!: String",
+        "ordinal": 3,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e336f2656b2afc0f9ffe7151cfee93a435cbdb6d482e55fa8c9a2c1b5a048ad3"
+}

@@ -42,6 +42,8 @@ const session = (overrides = {}) => ({
   reads: 27,
   recordings: 12,
   last_recording: { kind: "Purchase", asset: "CW8", date: "2019-12-31" },
+  accounts_added: 0,
+  last_account: null,
   assets_added: 0,
   last_asset: null,
   ...overrides,
@@ -414,17 +416,43 @@ describe("AgentIndicator", () => {
         row.nextElementSibling?.textContent,
       ]);
     expect(rows()[1]).toEqual(["agent.session_read", "agent.session_read_count(27)"]);
-    expect(rows()[2]).toEqual([
+    expect(rows()[3]).toEqual([
       "agent.session_assets",
       "agent.session_assets_count(2,Air Liquide,AI)",
     ]);
-    expect(rows()[3]).toEqual(["agent.session_recorded", "agent.session_recorded_count(12)"]);
+    expect(rows()[4]).toEqual(["agent.session_recorded", "agent.session_recorded_count(12)"]);
     unmount();
 
     hook.mockReturnValue(state({ sessions: [session()] }));
     render(<AgentIndicator />);
     fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
-    expect(rows()[2]).toEqual(["agent.session_assets", "agent.session_none"]);
+    expect(rows()[3]).toEqual(["agent.session_assets", "agent.session_none"]);
+  });
+
+  // AGT-054 / AGT-068 — the session dialog says how many accounts the session created and
+  // names the last one, above the assets it added; none is said as such.
+  it("says the accounts the session created, or that it created none", () => {
+    hook.mockReturnValue(
+      state({ sessions: [session({ accounts_added: 1, last_account: "Hardware wallet" })] }),
+    );
+    const { unmount } = render(<AgentIndicator />);
+    fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
+    const rows = () =>
+      Array.from(screen.getByRole("dialog").querySelectorAll("dt")).map((row) => [
+        row.textContent,
+        row.nextElementSibling?.textContent,
+      ]);
+    expect(rows()[2]).toEqual([
+      "agent.session_accounts",
+      "agent.session_accounts_count(1,Hardware wallet)",
+    ]);
+    expect(rows()[3]?.[0]).toBe("agent.session_assets");
+    unmount();
+
+    hook.mockReturnValue(state({ sessions: [session()] }));
+    render(<AgentIndicator />);
+    fireEvent.click(document.getElementById("agent-connected-1") as HTMLElement);
+    expect(rows()[2]).toEqual(["agent.session_accounts", "agent.session_none"]);
   });
 
   // AGT-053 — removing everything asks to confirm, keeping is the action in focus, and

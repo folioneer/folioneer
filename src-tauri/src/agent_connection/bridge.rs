@@ -336,6 +336,7 @@ mod tests {
                 "record_management_fee",
                 "record_price",
                 "add_asset",
+                "add_account",
                 "correct_recording",
                 "cancel_recording",
                 "preview_recording",

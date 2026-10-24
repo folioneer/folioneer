@@ -21,6 +21,7 @@ function makeAccount(
     ytd_performance_pct,
     has_inconsistent_holding: false,
     outdated_price_count: 0,
+    created_by: null,
   };
 }
 

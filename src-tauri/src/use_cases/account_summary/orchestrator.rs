@@ -1,4 +1,4 @@
-use crate::context::account::{Account, AccountError, AccountServiceContract};
+use crate::context::account::{Account, AccountError, AccountServiceContract, AgentRecording};
 use crate::context::asset::{is_price_outdated, AssetClass, AssetServiceContract};
 use crate::context::currency::CurrencyService;
 use crate::core::logger::BACKEND;
@@ -51,6 +51,9 @@ pub struct AccountSummary {
     pub has_inconsistent_holding: bool,
     /// MKT-206 — how many of the account's active holdings have an outdated price (MKT-205).
     pub outdated_price_count: i64,
+    /// AGT-069 — the agent and the session that created the account on this computer; none
+    /// for an account the owner created, or one created on another computer.
+    pub created_by: Option<AgentRecording>,
 }
 
 /// ACC-027/028 — the portfolio total over every account, in the reference currency.
@@ -108,6 +111,7 @@ impl AccountSummaryUseCase {
     /// Builds a summary row for every non-deleted account.
     pub async fn get_account_summaries(&self) -> StdResult<AccountSummaries, AccountError> {
         let accounts = self.account_service.get_all().await?;
+        let mut creators = self.account_service.agent_creations().await?;
         let mut summaries = Vec::with_capacity(accounts.len());
         let today = chrono::Local::now().date_naive();
         for account in accounts {
@@ -139,6 +143,7 @@ impl AccountSummaryUseCase {
                 .iter()
                 .any(|holding| holding_inconsistency(holding).is_some());
             let outdated_price_count = self.count_outdated_prices(&account, today).await?;
+            let created_by = creators.remove(&account.id);
             summaries.push(AccountSummary {
                 id: account.id,
                 name: account.name,
@@ -149,6 +154,7 @@ impl AccountSummaryUseCase {
                 ytd_performance_pct,
                 has_inconsistent_holding,
                 outdated_price_count,
+                created_by,
             });
         }
         // ACC-027/028 — the portfolio total in the reference currency, each account
@@ -1564,6 +1570,7 @@ mod tests {
             ytd_performance_pct: None,
             has_inconsistent_holding: false,
             outdated_price_count: 0,
+            created_by: None,
         }
     }
 
