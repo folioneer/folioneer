@@ -7374,6 +7374,37 @@ mod write_off_tests {
         assert_eq!(kept.quantity, micro(2));
     }
 
+    // WOF-033 — a write-off without a reason takes the one its correction names, and can be
+    // deleted.
+    #[test]
+    fn wof_033_a_write_off_without_a_reason_takes_the_one_named_or_is_deleted() {
+        let mut acc = funded();
+        buy(&mut acc, "2024-01-02", 10, 100);
+        let unnamed = |acc: &mut Account| {
+            let tx = write_off(acc, "2024-03-01", micro(1), WriteOffReason::Lost).unwrap();
+            acc.transactions
+                .iter_mut()
+                .find(|t| t.id == tx.id)
+                .unwrap()
+                .write_off_reason = None;
+            tx.id
+        };
+        let named = unnamed(&mut acc);
+        let corrected = acc
+            .correct_write_off(
+                &named,
+                "2024-03-01".into(),
+                micro(1),
+                WriteOffReason::Dust,
+                None,
+            )
+            .unwrap();
+        assert_eq!(corrected.write_off_reason, Some(WriteOffReason::Dust));
+        let deleted = unnamed(&mut acc);
+        acc.cancel_transaction(&deleted).unwrap();
+        assert!(acc.transactions.iter().all(|t| t.id != deleted));
+    }
+
     // WOF-030 / #607 — a write-off's correction is refused as its recording is: above what
     // was held on the corrected date, itself left out, with that figure; on a date with
     // nothing held; and leaving a later sale short. A refusal keeps the reason.
