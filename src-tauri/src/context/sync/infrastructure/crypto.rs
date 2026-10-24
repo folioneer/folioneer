@@ -158,20 +158,20 @@ pub async fn derive_key_blocking(
 /// plaintext produce different ciphertext (XChaCha20-Poly1305's 192-bit nonce makes a random
 /// per-message nonce safe without a cross-device counter, D7). The nonce is prefixed to the
 /// ciphertext.
-pub fn seal(key: &Key, plaintext: &[u8]) -> Vec<u8> {
+pub fn seal(key: &Key, plaintext: &[u8]) -> Result<Vec<u8>, SyncError> {
     let nonce = XNonce::generate();
-    let Ok(cipher) = XChaCha20Poly1305::new_from_slice(key.as_bytes()) else {
+    let cipher = XChaCha20Poly1305::new_from_slice(key.as_bytes()).map_err(|_| {
         tracing::error!(target: BACKEND, "seal: key has an invalid length");
-        return Vec::new();
-    };
-    let Ok(ciphertext) = cipher.encrypt(&nonce, plaintext) else {
+        SyncError::DatabaseError
+    })?;
+    let ciphertext = cipher.encrypt(&nonce, plaintext).map_err(|_| {
         tracing::error!(target: BACKEND, "seal: encryption failed");
-        return Vec::new();
-    };
+        SyncError::DatabaseError
+    })?;
     let mut sealed = Vec::with_capacity(NONCE_LENGTH + ciphertext.len());
     sealed.extend_from_slice(&nonce);
     sealed.extend_from_slice(&ciphertext);
-    sealed
+    Ok(sealed)
 }
 
 /// Opens ciphertext produced by `seal`. Fails on a wrong key or tampered ciphertext.
@@ -189,7 +189,7 @@ pub fn open(key: &Key, ciphertext: &[u8]) -> Result<Vec<u8>, SyncError> {
 
 /// Builds the folder header's `passphrase_check` marker (SYN-055): an encrypted value that
 /// decrypts correctly only with the right key.
-pub fn make_check(key: &Key) -> Vec<u8> {
+pub fn make_check(key: &Key) -> Result<Vec<u8>, SyncError> {
     seal(key, PASSPHRASE_CHECK_MARKER)
 }
 
@@ -373,7 +373,7 @@ mod tests {
     fn seal_then_open_round_trips_the_plaintext() {
         let key = key_for("correct horse battery staple", &params());
         let plaintext = b"segment payload".to_vec();
-        let ciphertext = seal(&key, &plaintext);
+        let ciphertext = seal(&key, &plaintext).expect("seals");
         let opened = open(&key, &ciphertext).expect("seal/open round trip must succeed");
         assert_eq!(opened, plaintext);
     }
@@ -384,8 +384,8 @@ mod tests {
     fn seal_produces_different_ciphertext_for_the_same_plaintext_twice() {
         let key = key_for("correct horse battery staple", &params());
         let plaintext = b"segment payload".to_vec();
-        let first = seal(&key, &plaintext);
-        let second = seal(&key, &plaintext);
+        let first = seal(&key, &plaintext).expect("seals");
+        let second = seal(&key, &plaintext).expect("seals");
         assert_ne!(first, second);
     }
 
@@ -394,7 +394,7 @@ mod tests {
     fn open_with_wrong_key_fails() {
         let key = key_for("correct horse battery staple", &params());
         let wrong_key = key_for("a different passphrase entirely", &params());
-        let ciphertext = seal(&key, b"segment payload");
+        let ciphertext = seal(&key, b"segment payload").expect("seals");
         let result = open(&wrong_key, &ciphertext);
         assert!(result.is_err());
     }
@@ -403,7 +403,7 @@ mod tests {
     #[test]
     fn make_check_verifies_true_with_the_same_key() {
         let key = key_for("correct horse battery staple", &params());
-        let marker = make_check(&key);
+        let marker = make_check(&key).expect("seals");
         assert!(verify_check(&key, &marker));
     }
 
@@ -412,7 +412,7 @@ mod tests {
     fn verify_check_fails_with_a_different_key() {
         let key = key_for("correct horse battery staple", &params());
         let wrong_key = key_for("a different passphrase entirely", &params());
-        let marker = make_check(&key);
+        let marker = make_check(&key).expect("seals");
         assert!(!verify_check(&wrong_key, &marker));
     }
 

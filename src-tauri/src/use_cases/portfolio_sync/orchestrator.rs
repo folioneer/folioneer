@@ -955,7 +955,7 @@ mod tests {
         let key = derive_key(PASSPHRASE, &derivation_parameters).expect("key derives");
         let header = encode_header(&FolderHeader {
             derivation_parameters,
-            passphrase_check: make_check(&key),
+            passphrase_check: make_check(&key).expect("seals"),
             data_format_version: DATA_FORMAT_VERSION,
             created_at: format!("{:020}", 1),
             created_by_device_id: "desktop-device".into(),

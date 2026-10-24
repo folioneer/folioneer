@@ -100,7 +100,7 @@ fn encode_sealed<T: serde::Serialize>(
     let plaintext = serde_json::to_vec(value)
         .map_err(|error| encode_failed("encode_sealed: serialization failed", error))?;
     let mut bytes = data_format_version.to_be_bytes().to_vec();
-    bytes.extend(seal(key, &plaintext));
+    bytes.extend(seal(key, &plaintext)?);
     Ok(bytes)
 }
 
