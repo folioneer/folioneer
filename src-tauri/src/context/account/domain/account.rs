@@ -545,7 +545,7 @@ impl Account {
             // without one is refused, never given a reason the user did not choose.
             let reason = existing
                 .write_off_reason
-                .ok_or_else(|| anyhow!("write-off {tx_id} has no reason in account {}", self.id))?;
+                .ok_or(AccountError::WriteOffWithoutReason)?;
             Transaction::write_off_with_id(
                 tx_id.to_string(),
                 self.id.clone(),
@@ -7368,7 +7368,10 @@ mod write_off_tests {
                 None,
             )
             .unwrap_err();
-        assert!(refusal.to_string().contains("has no reason"), "{refusal}");
+        assert!(matches!(
+            refusal.downcast::<AccountError>(),
+            Ok(AccountError::WriteOffWithoutReason)
+        ));
         let kept = acc.transactions.iter().find(|t| t.id == tx.id).unwrap();
         assert_eq!(kept.write_off_reason, None);
         assert_eq!(kept.quantity, micro(2));
