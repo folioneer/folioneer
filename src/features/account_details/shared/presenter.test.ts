@@ -28,6 +28,7 @@ import {
   toHoldingRow,
   toPriceableAssets,
   transactionDraftErrorToI18n,
+  transferAveragePriceMicro,
   writeOffAveragePriceMicro,
   writeOffErrorToI18n,
 } from "./presenter";
@@ -1291,6 +1292,29 @@ describe("writeOffErrorToI18n", () => {
 });
 
 // WOF-058 — the edit form shows the write-off's own average price.
+describe("transferAveragePriceMicro (TRF-057)", () => {
+  const transfer = {
+    transfer_id: "trf-1",
+    from_account_id: "acc-a",
+    to_account_id: "acc-b",
+    asset_id: "asset-btc",
+    date: "2024-06-15",
+    quantity_sent: 200_000,
+    quantity_received: 190_000,
+    cost: 3_800_000_000,
+    exchange_rate: 1_000_000,
+    note: null,
+  };
+
+  it("is the transfer out's own: its cost over the quantity received, the fee in kind apart", () => {
+    expect(transferAveragePriceMicro(transfer)).toBe(20_000_000_000);
+  });
+
+  it("is zero for a transfer that received nothing", () => {
+    expect(transferAveragePriceMicro({ ...transfer, quantity_received: 0 })).toBe(0);
+  });
+});
+
 describe("writeOffAveragePriceMicro", () => {
   it("is the cost taken out over the quantity", () => {
     const tx = { quantity: 100_000, realized_pnl: -2_000_000_000 } as never;
