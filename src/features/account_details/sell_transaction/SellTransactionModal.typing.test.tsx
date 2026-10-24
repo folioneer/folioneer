@@ -64,6 +64,7 @@ describe("SellTransactionModal — typing while the draft check answers (L-019)"
           assetId="ast"
           assetName="Asset"
           assetCurrency="EUR"
+          assetReference="AAPL"
           holdingQuantityMicro={10_000_000}
           onSubmitSuccess={() => {}}
         />,

@@ -250,7 +250,7 @@ mod tests {
         assert_eq!(oversold.exit_code, REFUSED);
         assert_eq!(
             oversold.stderr.as_deref(),
-            Some("Refused: only 12 held, not 20")
+            Some("Refused: only 12 held on that date, not 20")
         );
 
         let sold = run_line(&dir, "holding sell --account PEA --asset CW8 --quantity 2 --total 990 --date 2026-04-01 --json").await;

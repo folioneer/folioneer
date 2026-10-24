@@ -20,6 +20,8 @@ interface SellTransactionModalProps {
   accountName: string;
   assetId: string;
   assetName: string;
+  /** The asset's reference, named by a refusal for lack of units (SEL-021). */
+  assetReference: string;
   assetCurrency: string;
   /** Holding quantity in micro-units — used for max hint and oversell guard (SEL-022). */
   holdingQuantityMicro: number;
@@ -36,6 +38,7 @@ export function SellTransactionModal({
   accountName,
   assetId,
   assetName,
+  assetReference,
   assetCurrency,
   holdingQuantityMicro,
   showExchangeRate = false,
@@ -70,6 +73,7 @@ export function SellTransactionModal({
   } = useSellTransaction({
     accountId,
     assetId,
+    assetReference,
     holdingQuantityMicro,
     onSubmitSuccess,
   });

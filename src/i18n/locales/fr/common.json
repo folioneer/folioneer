@@ -491,6 +491,9 @@
     "migration_in_progress": "Initialisation en cours…"
   },
   "transaction": {
+    "error_over_held_on": "Plus que les {{held}} {{reference}} détenus le {{date}}.",
+    "error_none_held_on": "Aucun {{reference}} détenu le {{date}}.",
+    "error_later_left_short": "Retirer ces unités à cette date laisserait une transaction ultérieure sans unités suffisantes.",
     "add_modal_title": "Ajouter une transaction",
     "edit_modal_title": "Modifier la transaction",
     "delete_confirm_title": "Supprimer la transaction",
@@ -576,7 +579,6 @@
     "form_max_quantity_hint": "Max : {{max}}",
     "form_avg_cost_hint": "Coût moyen à ce jour : {{value}}",
     "form_potential_pnl_hint": "P&L potentiel : {{value}}",
-    "error_closed_position": "Aucune unité disponible à la vente.",
     "error_archived_asset_sell": "Impossible de vendre un actif archivé.",
     "column_realized_pnl": "P&L réalisé",
     "success_sell_created": "Transaction de vente enregistrée.",
@@ -845,9 +847,7 @@
     "form_quantity_label": "Quantité sortie",
     "estimate": "Sort {{quantity}} {{reference}} à son coût, {{cost}}. Aucun mouvement d'espèces ; le résultat réalisé est −{{cost}}.",
     "estimate_lost": "Sort {{quantity}} {{reference}} à son coût, {{cost}}. Aucun mouvement d'espèces ; le résultat réalisé est −{{cost}}, montré à part comme perdu.",
-    "error_over_held": "Plus que les {{held}} {{reference}} détenus à cette date.",
     "error_over_holding": "Plus que les {{held}} {{reference}} détenus.",
-    "error_closed_position": "Rien de cet actif n'est détenu à cette date.",
     "error_archived": "L'actif est archivé : désarchivez-le pour enregistrer la sortie.",
     "action_record": "Enregistrer la sortie",
     "recorded": "Sortie enregistrée."

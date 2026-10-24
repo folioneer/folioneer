@@ -107,8 +107,12 @@ export function HoldingRow({
   }, [onBuy, buildTarget]);
 
   const handleSell = useCallback(() => {
-    onSell({ ...buildTarget(), holdingQuantityMicro: row.quantityMicro });
-  }, [onSell, buildTarget, row.quantityMicro]);
+    onSell({
+      ...buildTarget(),
+      assetReference: row.assetReference,
+      holdingQuantityMicro: row.quantityMicro,
+    });
+  }, [onSell, buildTarget, row.assetReference, row.quantityMicro]);
 
   const handleWriteOff = useCallback(() => {
     onWriteOff?.({

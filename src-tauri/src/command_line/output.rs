@@ -377,7 +377,7 @@ mod tests {
 
         let refusal = Refusal {
             code: "Oversell".to_string(),
-            message: "only 1 held, not 2".to_string(),
+            message: "only 1 held on that date, not 2".to_string(),
         };
         let printed = render(&Outcome::Refused(refusal), true);
         assert_eq!(printed.exit_code, REFUSED);
@@ -386,7 +386,7 @@ mod tests {
             serde_json::from_str(&printed.stdout.expect("json")).expect("valid json");
         assert_eq!(
             value,
-            json!({"status":"refused","code":"Oversell","message":"only 1 held, not 2"})
+            json!({"status":"refused","code":"Oversell","message":"only 1 held on that date, not 2"})
         );
     }
 

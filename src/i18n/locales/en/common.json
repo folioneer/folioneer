@@ -491,6 +491,9 @@
     "migration_in_progress": "Initializing…"
   },
   "transaction": {
+    "error_over_held_on": "More than the {{held}} {{reference}} held on {{date}}.",
+    "error_none_held_on": "No {{reference}} held on {{date}}.",
+    "error_later_left_short": "Taking these units out on this date would leave a later transaction without enough units.",
     "add_modal_title": "Add transaction",
     "edit_modal_title": "Edit transaction",
     "delete_confirm_title": "Delete transaction",
@@ -576,7 +579,6 @@
     "form_max_quantity_hint": "Max: {{max}}",
     "form_avg_cost_hint": "Average cost to date: {{value}}",
     "form_potential_pnl_hint": "Potential P&L: {{value}}",
-    "error_closed_position": "No units available to sell.",
     "error_archived_asset_sell": "Cannot sell an archived asset.",
     "column_realized_pnl": "Realized P&L",
     "success_sell_created": "Sell transaction recorded.",
@@ -845,9 +847,7 @@
     "form_quantity_label": "Quantity written off",
     "estimate": "Takes {{quantity}} {{reference}} out at its cost, {{cost}}. No cash moves; the realized result is −{{cost}}.",
     "estimate_lost": "Takes {{quantity}} {{reference}} out at its cost, {{cost}}. No cash moves; the realized result is −{{cost}}, shown apart as lost.",
-    "error_over_held": "More than the {{held}} {{reference}} held on that date.",
     "error_over_holding": "More than the {{held}} {{reference}} held.",
-    "error_closed_position": "Nothing of this asset is held on that date.",
     "error_archived": "The asset is archived: unarchive it to write it off.",
     "action_record": "Record the write-off",
     "recorded": "Write-off recorded."

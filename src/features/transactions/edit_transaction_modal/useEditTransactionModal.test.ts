@@ -56,6 +56,9 @@ const answersByMode =
   };
 
 // 2 units @ 50.0 each, rate=1.0, fees=0 → total=100_000_000
+/** The reference the form names in a refusal for lack of units (SEL-046). */
+const referenceOf = () => "AAPL";
+
 const baseTransaction: Transaction = {
   id: "tx-existing",
   account_id: "account-1",
@@ -104,7 +107,9 @@ describe("useEditTransactionModal", () => {
   // Pre-fill: micro-unit values are converted to decimal strings; the total comes from the check
   it("pre-fills formData from transaction (micro → decimal)", async () => {
     mockValidateDraft.mockImplementation(answersByMode([50 * MICRO, 100 * MICRO], [0, 0]));
-    const { result } = renderHook(() => useEditTransactionModal({ transaction: baseTransaction }));
+    const { result } = renderHook(() =>
+      useEditTransactionModal({ referenceOf, transaction: baseTransaction }),
+    );
     expect(result.current.formData.quantity).toBe("2.000");
     expect(result.current.formData.unitPrice).toBe("50.000");
     expect(result.current.formData.exchangeRate).toBe("1.000");
@@ -125,6 +130,7 @@ describe("useEditTransactionModal", () => {
     const onSubmitSuccess = vi.fn();
     const { result } = renderHook(() =>
       useEditTransactionModal({
+        referenceOf,
         transaction: baseTransaction,
         onSubmitSuccess,
       }),
@@ -160,6 +166,7 @@ describe("useEditTransactionModal", () => {
     const onSubmitSuccess = vi.fn();
     const { result } = renderHook(() =>
       useEditTransactionModal({
+        referenceOf,
         transaction: baseTransaction,
         onSubmitSuccess,
       }),
@@ -177,10 +184,54 @@ describe("useEditTransactionModal", () => {
     expect(onSubmitSuccess).not.toHaveBeenCalled();
   });
 
+  // SEL-046 — a sale's correction refused for lack of units shows under the
+  // quantity, naming what was held then, until the quantity changes; a purchase's
+  // refusal stays below the form.
+  it.each([
+    [
+      "Sell",
+      { code: "Oversell", available: MICRO, requested: 2 * MICRO },
+      {
+        key: "transaction.error_over_held_on",
+        vars: { held: "1", reference: "AAPL", date: "10/01/2024" },
+      },
+    ],
+    [
+      "Sell",
+      { code: "ClosedPosition" },
+      { key: "transaction.error_none_held_on", vars: { reference: "AAPL", date: "10/01/2024" } },
+    ],
+    ["Sell", { code: "CascadingOversell" }, { key: "transaction.error_later_left_short" }],
+    ["Purchase", { code: "CascadingOversell" }, undefined],
+  ] as const)("a %s correction refused with %o", async (type, refusal, onQuantity) => {
+    mockCorrectTransaction.mockResolvedValue({
+      data: null,
+      error: { key: `error.${refusal.code}` },
+      refusal,
+    });
+    const transaction = { ...baseTransaction, transaction_type: type } as Transaction;
+    const { result } = renderHook(() => useEditTransactionModal({ referenceOf, transaction }));
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
+    await act(async () => {
+      await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+    });
+    expect(result.current.fieldErrors.quantity).toEqual(onQuantity);
+    if (onQuantity) {
+      expect(result.current.error).toBeNull();
+      expect(result.current.isFormValid).toBe(false);
+      await act(async () => result.current.handleChange("quantity", "1"));
+      expect(result.current.fieldErrors.quantity).toBeUndefined();
+    } else {
+      expect(result.current.error).toEqual({ key: "error.CascadingOversell" });
+    }
+  });
+
   // MKT-052 — recordPrice is always false on edit regardless of localStorage
   it("recordPrice is false on edit mount even when localStorage auto_record_price is true", () => {
     localStorage.setItem("auto_record_price", "true");
-    const { result } = renderHook(() => useEditTransactionModal({ transaction: baseTransaction }));
+    const { result } = renderHook(() =>
+      useEditTransactionModal({ referenceOf, transaction: baseTransaction }),
+    );
     expect(result.current.recordPrice).toBe(false);
   });
 
@@ -192,7 +243,9 @@ describe("useEditTransactionModal", () => {
     });
     mockRecordAssetPrice.mockResolvedValue({ status: "ok", data: null });
 
-    const { result } = renderHook(() => useEditTransactionModal({ transaction: baseTransaction }));
+    const { result } = renderHook(() =>
+      useEditTransactionModal({ referenceOf, transaction: baseTransaction }),
+    );
 
     await act(async () => {
       result.current.setRecordPrice(true);
@@ -216,7 +269,7 @@ describe("useEditTransactionModal", () => {
     });
 
     const { result } = renderHook(() =>
-      useEditTransactionModal({ transaction: zeroUnitPriceTransaction }),
+      useEditTransactionModal({ referenceOf, transaction: zeroUnitPriceTransaction }),
     );
 
     await act(async () => {
@@ -252,7 +305,9 @@ describe("useEditTransactionModal", () => {
     mockValidateDraft.mockImplementation(fakeDraftCheck);
     mockCorrectTransaction.mockResolvedValue({ data: { id: "tx-precise" }, error: null });
     mockRecordAssetPrice.mockResolvedValue({ status: "ok", data: null });
-    const { result } = renderHook(() => useEditTransactionModal({ transaction: precise }));
+    const { result } = renderHook(() =>
+      useEditTransactionModal({ referenceOf, transaction: precise }),
+    );
     expect(result.current.formData).toMatchObject({
       quantity: "0.123456",
       unitPrice: "12.345678",
@@ -283,7 +338,7 @@ describe("useEditTransactionModal", () => {
   // TRX-051: OpeningBalance pre-fill uses total_amount (not unit_price) as the "Total Cost" field
   it("TRX-051: pre-fills unitPrice from total_amount for OpeningBalance", () => {
     const { result } = renderHook(() =>
-      useEditTransactionModal({ transaction: openingBalanceTransaction }),
+      useEditTransactionModal({ referenceOf, transaction: openingBalanceTransaction }),
     );
     expect(result.current.formData.unitPrice).toBe("100.000");
   });
@@ -295,7 +350,7 @@ describe("useEditTransactionModal", () => {
       error: null,
     });
     const { result } = renderHook(() =>
-      useEditTransactionModal({ transaction: openingBalanceTransaction }),
+      useEditTransactionModal({ referenceOf, transaction: openingBalanceTransaction }),
     );
 
     const fakeSubmit = {
@@ -330,6 +385,7 @@ describe("useEditTransactionModal", () => {
     const onSubmitSuccess = vi.fn();
     const { result } = renderHook(() =>
       useEditTransactionModal({
+        referenceOf,
         transaction: baseTransaction,
         onSubmitSuccess,
       }),
@@ -363,16 +419,20 @@ describe("useEditTransactionModal", () => {
     // TRX-051 — an opening balance's total is its typed total cost, not quantity × cost
     it("shows an opening balance's total cost as typed", () => {
       const { result } = renderHook(() =>
-        useEditTransactionModal({ transaction: openingBalanceTransaction }),
+        useEditTransactionModal({ referenceOf, transaction: openingBalanceTransaction }),
       );
       expect(result.current.totalAmountDisplay).toBe("100,000");
     });
 
     it("offers total-entry for Purchase and Sell but not OpeningBalance", async () => {
-      const purchase = renderHook(() => useEditTransactionModal({ transaction: baseTransaction }));
-      const sell = renderHook(() => useEditTransactionModal({ transaction: sellTransaction }));
+      const purchase = renderHook(() =>
+        useEditTransactionModal({ referenceOf, transaction: baseTransaction }),
+      );
+      const sell = renderHook(() =>
+        useEditTransactionModal({ referenceOf, transaction: sellTransaction }),
+      );
       const ob = renderHook(() =>
-        useEditTransactionModal({ transaction: openingBalanceTransaction }),
+        useEditTransactionModal({ referenceOf, transaction: openingBalanceTransaction }),
       );
       expect(purchase.result.current.isTotalEntryEligible).toBe(true);
       expect(sell.result.current.isTotalEntryEligible).toBe(true);
@@ -392,7 +452,7 @@ describe("useEditTransactionModal", () => {
     // amount field as its total cost, and none while that field is empty.
     it("TRX-066: a corrected opening balance follows its draft check", async () => {
       const { result } = renderHook(() =>
-        useEditTransactionModal({ transaction: openingBalanceTransaction }),
+        useEditTransactionModal({ referenceOf, transaction: openingBalanceTransaction }),
       );
       await waitFor(() => expect(result.current.isFormValid).toBe(true));
       expect(mockValidateOpening).toHaveBeenLastCalledWith({
@@ -431,7 +491,7 @@ describe("useEditTransactionModal", () => {
         error: { code: "QuantityNotPositive" },
       });
       const refused = renderHook(() =>
-        useEditTransactionModal({ transaction: openingBalanceTransaction }),
+        useEditTransactionModal({ referenceOf, transaction: openingBalanceTransaction }),
       );
       await waitFor(() =>
         expect(refused.result.current.problemHint).toEqual({
@@ -446,7 +506,7 @@ describe("useEditTransactionModal", () => {
       // corrected: the correction is valid and says nothing.
       mockValidateOpening.mockResolvedValue({ status: "ok", data: { zero_cost: true } });
       const free = renderHook(() =>
-        useEditTransactionModal({ transaction: openingBalanceTransaction }),
+        useEditTransactionModal({ referenceOf, transaction: openingBalanceTransaction }),
       );
       await waitFor(() => expect(free.result.current.isFormValid).toBe(true));
       expect(free.result.current.error).toBeNull();
@@ -454,7 +514,7 @@ describe("useEditTransactionModal", () => {
 
       mockValidateOpening.mockRejectedValue(new Error("ipc down"));
       const failed = renderHook(() =>
-        useEditTransactionModal({ transaction: openingBalanceTransaction }),
+        useEditTransactionModal({ referenceOf, transaction: openingBalanceTransaction }),
       );
       await waitFor(() => expect(failed.result.current.error).toEqual({ key: "error.Unknown" }));
       expect(failed.result.current.isFormValid).toBe(false);
@@ -463,7 +523,7 @@ describe("useEditTransactionModal", () => {
     it("price mode (default) submits total_amount: null", async () => {
       mockCorrectTransaction.mockResolvedValue({ data: { id: "tx-existing" }, error: null });
       const { result } = renderHook(() =>
-        useEditTransactionModal({ transaction: baseTransaction }),
+        useEditTransactionModal({ referenceOf, transaction: baseTransaction }),
       );
       await waitFor(() => expect(result.current.isFormValid).toBe(true));
       await act(async () => {
@@ -483,7 +543,7 @@ describe("useEditTransactionModal", () => {
       );
       mockCorrectTransaction.mockResolvedValue({ data: { id: "tx-existing" }, error: null });
       const { result } = renderHook(() =>
-        useEditTransactionModal({ transaction: baseTransaction }),
+        useEditTransactionModal({ referenceOf, transaction: baseTransaction }),
       );
       // Switch to total mode (seeds from computed 100), then type an all-in 110.
       await act(async () => {
@@ -509,7 +569,7 @@ describe("useEditTransactionModal", () => {
       );
       mockCorrectTransaction.mockResolvedValue({ data: { id: "tx-sell" }, error: null });
       const { result } = renderHook(() =>
-        useEditTransactionModal({ transaction: sellTransaction }),
+        useEditTransactionModal({ referenceOf, transaction: sellTransaction }),
       );
       await act(async () => {
         result.current.handleChange("fees", "10");
@@ -536,7 +596,7 @@ describe("useEditTransactionModal", () => {
         answersByMode([50 * MICRO, 100 * MICRO], [55 * MICRO, 110 * MICRO]),
       );
       const { result } = renderHook(() =>
-        useEditTransactionModal({ transaction: baseTransaction }),
+        useEditTransactionModal({ referenceOf, transaction: baseTransaction }),
       );
       await act(async () => {
         result.current.handleEntryModeChange("total");
@@ -558,7 +618,7 @@ describe("useEditTransactionModal", () => {
         error: { code: "QuantityNotPositive" },
       });
       const { result } = renderHook(() =>
-        useEditTransactionModal({ transaction: baseTransaction }),
+        useEditTransactionModal({ referenceOf, transaction: baseTransaction }),
       );
       await waitFor(() => expect(mockValidateDraft).toHaveBeenCalled());
       await act(async () => {}); // the check's answer lands
@@ -577,7 +637,7 @@ describe("useEditTransactionModal", () => {
           : fakeDraftCheck(draft),
       );
       const { result } = renderHook(() =>
-        useEditTransactionModal({ transaction: baseTransaction }),
+        useEditTransactionModal({ referenceOf, transaction: baseTransaction }),
       );
       await act(async () => {
         result.current.handleChange("fees", "20");

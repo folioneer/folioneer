@@ -606,6 +606,7 @@ describe("useAccountDetailsView — as-of read-only mode", () => {
         assetName: "A1",
         assetCurrency: "EUR",
         showExchangeRate: false,
+        assetReference: "A1",
         holdingQuantityMicro: 1_000_000,
       }),
     );

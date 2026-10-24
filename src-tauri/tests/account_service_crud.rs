@@ -607,8 +607,8 @@ async fn seed_cash_holding_errors_when_account_missing() {
     );
 }
 
-// SEL-024 / SEL-030 — full-stack guard: correcting a sell to a date before its buy is
-// rejected with CascadingOversell. Transactions hydrate from SQLite ordered by date
+// SEL-012 / SEL-030 — full-stack guard: correcting a sell to a date before its buy is
+// rejected with ClosedPosition, nothing being held then. Transactions hydrate from SQLite ordered by date
 // (ORDER BY date ASC, created_at ASC), the exact reload condition under which the
 // chronological replay must run — independent of the in-session append order.
 #[tokio::test]
@@ -672,8 +672,8 @@ async fn correct_transaction_rejects_moving_sell_before_buy_end_to_end() {
         .await
         .expect_err("moving a sell before its buy must be rejected");
     assert!(
-        matches!(err, AccountError::CascadingOversell),
-        "expected CascadingOversell, got: {err:?}"
+        matches!(err, AccountError::ClosedPosition),
+        "expected ClosedPosition, got: {err:?}"
     );
 
     // The rejected correction must not have mutated the persisted sell.

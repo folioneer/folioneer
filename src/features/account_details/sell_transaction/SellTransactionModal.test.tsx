@@ -56,6 +56,7 @@ const BASE_PROPS = {
   assetId: "asset-1",
   assetName: "Apple",
   assetCurrency: "USD",
+  assetReference: "AAPL",
   holdingQuantityMicro: 3_000_000,
   onSubmitSuccess: vi.fn(),
 };

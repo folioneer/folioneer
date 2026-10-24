@@ -30,12 +30,13 @@ export function useTransactions() {
     try {
       const res = await transactionGateway.sellHolding(dto);
       if (res.status === "ok") {
-        return { data: res.data, error: null };
+        return { data: res.data, error: null, refusal: null };
       }
-      return { data: null, error: transactionMutationErrorToI18n(res.error) };
+      // The refusal itself, for a form that places it with what it alone knows (SEL-021).
+      return { data: null, error: transactionMutationErrorToI18n(res.error), refusal: res.error };
     } catch (e) {
       logger.error("Failed to sell holding", { error: e });
-      return { data: null, error: UNKNOWN_ERROR };
+      return { data: null, error: UNKNOWN_ERROR, refusal: null };
     }
   }, []);
 
@@ -44,12 +45,12 @@ export function useTransactions() {
       try {
         const res = await transactionGateway.correctTransaction(id, accountId, dto);
         if (res.status === "ok") {
-          return { data: res.data, error: null };
+          return { data: res.data, error: null, refusal: null };
         }
-        return { data: null, error: transactionMutationErrorToI18n(res.error) };
+        return { data: null, error: transactionMutationErrorToI18n(res.error), refusal: res.error };
       } catch (e) {
         logger.error("Failed to correct transaction", { error: e });
-        return { data: null, error: UNKNOWN_ERROR };
+        return { data: null, error: UNKNOWN_ERROR, refusal: null };
       }
     },
     [],

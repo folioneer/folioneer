@@ -1587,6 +1587,60 @@ async fn agt_065_a_session_records_a_write_off() {
             .expect_err("refused");
         assert_eq!(refused.code, code);
     }
+    // #607 — refused as its recording is (WOF-010, WOF-012), naming what was held then.
+    for (arguments, code, message) in [
+        (
+            json!({ "quantity": 11 }),
+            "Oversell",
+            "only 10 held on that date, not 11",
+        ),
+        (
+            json!({ "date": "2019-02-01" }),
+            "ClosedPosition",
+            "nothing of this asset is held on that date",
+        ),
+    ] {
+        let mut arguments = arguments;
+        arguments["transaction"] = json!(recorded_id(&written_off));
+        let refused = call("correct_recording", arguments)
+            .await
+            .expect_err("refused");
+        assert_eq!(
+            (refused.code.as_str(), refused.message.as_str()),
+            (code, message)
+        );
+    }
+    let sold = call(
+        "record_sale",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": 9, "price": 110, "date": "2019-08-01" }),
+    )
+    .await
+    .expect("sold");
+    // A sale's correction too (SEL-030): nine held before it once the write-off is out.
+    for (arguments, code) in [
+        (json!({ "quantity": 10 }), "Oversell"),
+        (json!({ "date": "2019-02-01" }), "ClosedPosition"),
+    ] {
+        let mut arguments = arguments;
+        arguments["transaction"] = json!(recorded_id(&sold));
+        assert_eq!(
+            call("correct_recording", arguments)
+                .await
+                .expect_err("refused")
+                .code,
+            code
+        );
+    }
+    assert_eq!(
+        call(
+            "correct_recording",
+            json!({ "transaction": recorded_id(&written_off), "quantity": 2 }),
+        )
+        .await
+        .expect_err("refused")
+        .code,
+        "CascadingOversell"
+    );
     // A reason is a write-off's only.
     let other = bench
         .accounts
@@ -1613,7 +1667,7 @@ async fn agt_065_a_session_records_a_write_off() {
     .await
     .expect("cancelled");
     assert_eq!(cancelled["status"], "cancelled");
-    assert_eq!(bench.connections.sessions().remove(0).recordings, 2);
+    assert_eq!(bench.connections.sessions().remove(0).recordings, 3);
 
     // An archived asset is not written off.
     let asset = bench

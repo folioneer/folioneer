@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { microToFormattedQuantity } from "@/lib/microUnits";
-import { todayIso } from "@/ui/format/date";
+import { formatIsoDateNumeric, todayIso } from "@/ui/format/date";
 import type { WriteOffTarget } from "../shared/types";
 import { useWriteOff } from "./useWriteOff";
 
@@ -124,19 +124,25 @@ describe("useWriteOff (WOF-051 to WOF-058)", () => {
     expect(onSubmitSuccess).toHaveBeenCalledOnce();
   });
 
-  // WOF-055 — Oversell shows under the quantity and holds until the quantity changes.
+  // WOF-055 — Oversell shows under the quantity, naming the date, and holds until the
+  // quantity changes.
   it("shows an oversell under the quantity until the quantity changes", async () => {
     mockRecordWriteOff.mockResolvedValue({
       status: "error",
       error: { code: "Oversell", available: 200_000, requested: 300_000 },
     });
     const { result } = setup();
+    act(() => result.current.handleChange("date", "2024-06-15"));
     act(() => result.current.handleChange("quantity", "0.3"));
     await act(async () => result.current.handleSubmit(fakeSubmit));
     expect(result.current.refusal).toEqual({
       message: {
-        key: "write_off.error_over_held",
-        vars: { held: microToFormattedQuantity(200_000), reference: "BTC" },
+        key: "transaction.error_over_held_on",
+        vars: {
+          held: microToFormattedQuantity(200_000),
+          reference: "BTC",
+          date: formatIsoDateNumeric("2024-06-15", "en"),
+        },
       },
       onQuantity: true,
     });

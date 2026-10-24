@@ -71,9 +71,10 @@ computes none.
 
 **TDI-031 — Shown only when computable (backend + frontend)**: the draft check returns a
 potential P&L only for a new sale whose position, as of the sell date, holds at least the
-quantity sold. It returns none — and the check stands — when nothing is held at that
-date, when less is held than is sold, or when that position cannot be read; and none for
-a purchase, a sale being corrected, or a draft that has a problem. The dialog shows the
+quantity sold. Nothing held at that date and less held than is sold are the draft's
+problem (SEL-012, SEL-021), and a position that cannot be read makes the check fail
+(TRX-067), with no P&L; it returns none for a purchase, a sale being
+corrected, or any draft that has a problem. The dialog shows the
 line when a figure is returned and hides it otherwise.
 
 **TDI-032 — Sign-coloured**: a gain renders in the success colour, a loss in the
