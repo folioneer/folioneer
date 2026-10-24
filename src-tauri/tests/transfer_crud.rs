@@ -770,3 +770,248 @@ async fn trf_011_a_malformed_date_is_named_before_the_rate() {
         TransferError::Account(AccountError::InvalidDate)
     ));
 }
+
+// TRF-012 — a backdated transfer that would leave a later sale above what is held is
+// refused, and a sale backdated before a transfer out is refused likewise.
+#[tokio::test]
+async fn trf_012_a_backdated_transfer_keeps_later_sales_covered() {
+    let ctx = build_ctx().await;
+    let (from, to, asset) = seed(&ctx, "EUR").await;
+    ctx.recording
+        .sell_holding(
+            &from,
+            asset.clone(),
+            "2024-04-01".to_string(),
+            micro(8),
+            micro(60),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    let refused = ctx
+        .transfer
+        .record_transfer(&from, &to, asset.clone(), figures(micro(4), micro(4), None))
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        refused,
+        TransferError::Account(AccountError::CascadingOversell)
+    ));
+    assert!(
+        holding(&ctx, &to, &asset).await.is_none(),
+        "nothing persists"
+    );
+
+    ctx.transfer
+        .record_transfer(&from, &to, asset.clone(), figures(micro(2), micro(2), None))
+        .await
+        .unwrap();
+    let backdated = ctx
+        .recording
+        .sell_holding(
+            &from,
+            asset.clone(),
+            "2024-02-01".to_string(),
+            micro(1),
+            micro(60),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(backdated, AccountError::CascadingOversell));
+}
+
+// TRF-025 — a backdated opening balance in the sending account re-costs the transfer.
+#[tokio::test]
+async fn trf_025_a_backdated_opening_balance_recosts_the_transfer() {
+    let ctx = build_ctx().await;
+    let (from, to, asset) = seed(&ctx, "EUR").await;
+    ctx.transfer
+        .record_transfer(&from, &to, asset.clone(), figures(micro(4), micro(4), None))
+        .await
+        .unwrap();
+    ctx.recording
+        .open_holding(
+            &from,
+            asset.clone(),
+            "2024-01-05".to_string(),
+            micro(10),
+            micro(1_500),
+        )
+        .await
+        .unwrap();
+    let receiving = holding(&ctx, &to, &asset).await.unwrap();
+    assert_eq!(
+        receiving.average_price,
+        micro(100),
+        "(500 + 1500) / 20 units"
+    );
+}
+
+// TRF-030 — a correction naming no rate takes the stored rate of its new date.
+#[tokio::test]
+async fn trf_030_a_correction_without_a_rate_reads_the_rate_of_its_date() {
+    let ctx = build_ctx().await;
+    let (from, to, asset) = seed(&ctx, "USD").await;
+    for (date, rate) in [("2024-02-20", 1_100_000), ("2024-03-05", 1_200_000)] {
+        ctx.currency_service
+            .record_currency_rate("EUR".to_string(), "USD".to_string(), date.to_string(), rate)
+            .await
+            .unwrap();
+    }
+    let parts = ctx
+        .transfer
+        .record_transfer(&from, &to, asset.clone(), figures(micro(4), micro(4), None))
+        .await
+        .unwrap();
+    let transfer_id = parts[0].transfer_id.clone().unwrap();
+    let corrected = ctx
+        .transfer
+        .correct_transfer(
+            &transfer_id,
+            TransferFigures {
+                date: "2024-03-10".to_string(),
+                ..figures(micro(4), micro(4), None)
+            },
+        )
+        .await
+        .unwrap();
+    let inn = part(&corrected, TransactionType::TransferIn);
+    assert_eq!(inn.exchange_rate, 1_200_000);
+    assert_eq!(inn.total_amount, micro(240));
+}
+
+// TRF-041, ACC-006 — deleting the sending account leaves the transfer in at its cost; it is
+// no longer corrected, and removing it removes what is left of the transfer.
+#[tokio::test]
+async fn trf_041_a_removed_account_leaves_the_other_side() {
+    let ctx = build_ctx().await;
+    let (from, to, asset) = seed(&ctx, "EUR").await;
+    let parts = ctx
+        .transfer
+        .record_transfer(&from, &to, asset.clone(), figures(micro(4), micro(4), None))
+        .await
+        .unwrap();
+    let transfer_id = parts[0].transfer_id.clone().unwrap();
+    ctx.account_service.delete(&from).await.unwrap();
+
+    let receiving = holding(&ctx, &to, &asset).await.unwrap();
+    assert_eq!(
+        (receiving.quantity, receiving.average_price),
+        (micro(4), micro(50))
+    );
+    let refused = ctx
+        .transfer
+        .correct_transfer(&transfer_id, figures(micro(1), micro(1), None))
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        refused,
+        TransferError::Account(AccountError::TransferNotFound)
+    ));
+    let inn = part(&parts, TransactionType::TransferIn).id.clone();
+    ctx.account_service
+        .cancel_transaction(&to, &inn)
+        .await
+        .unwrap();
+    assert!(ctx
+        .account_service
+        .get_transactions(&to, &asset)
+        .await
+        .unwrap()
+        .is_empty());
+}
+
+// TRF-010, TRF-011 — the other refusals: an unknown account, an archived asset, nothing held
+// on the date, a quantity not positive, a rate not positive.
+#[tokio::test]
+async fn trf_010_the_other_refusals() {
+    let ctx = build_ctx().await;
+    let (from, to, asset) = seed(&ctx, "USD").await;
+
+    let unknown = ctx
+        .transfer
+        .record_transfer(
+            &from,
+            "nope",
+            asset.clone(),
+            figures(micro(1), micro(1), Some(micro(1))),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        unknown,
+        TransferError::Account(AccountError::AccountNotFound { .. })
+    ));
+    let before = ctx
+        .transfer
+        .record_transfer(
+            &from,
+            &to,
+            asset.clone(),
+            TransferFigures {
+                date: "2024-01-10".to_string(),
+                ..figures(micro(1), micro(1), Some(micro(1)))
+            },
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        before,
+        TransferError::Account(AccountError::ClosedPosition)
+    ));
+    let zero = ctx
+        .transfer
+        .record_transfer(&from, &to, asset.clone(), figures(0, 0, Some(micro(1))))
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        zero,
+        TransferError::Account(AccountError::QuantityNotPositive)
+    ));
+    let no_rate = ctx
+        .transfer
+        .record_transfer(
+            &from,
+            &to,
+            asset.clone(),
+            figures(micro(1), micro(1), Some(0)),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        no_rate,
+        TransferError::Account(AccountError::ExchangeRateNotPositive)
+    ));
+
+    let other = ctx
+        .asset_service
+        .create_asset(CreateAssetDTO {
+            reference: "ETH".to_string(),
+            name: "Ether".to_string(),
+            ..asset_dto(AssetClass::DigitalAsset)
+        })
+        .await
+        .unwrap();
+    ctx.asset_service.archive_asset(&other.id).await.unwrap();
+    let archived = ctx
+        .transfer
+        .record_transfer(
+            &from,
+            &to,
+            other.id,
+            figures(micro(1), micro(1), Some(micro(1))),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        archived,
+        TransferError::UseCase(TransferTask::ArchivedAsset)
+    ));
+}

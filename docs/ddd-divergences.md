@@ -226,6 +226,18 @@ Read this when:
 
 ---
 
+## 19. One repository write of several accounts
+
+**Pattern**: An aggregate is the unit of consistency, and a write across aggregates goes through the unit of work (ADR-006, B10/B26).
+
+**Practice**: `AccountRepository::save_all` persists the pending changes of several `Account` aggregates in one SQLite transaction that the repository opens itself, as `save` does for one. The account service calls it for a transfer (TRF-020, TRF-030, TRF-040) and for the transfers in a re-costed transfer out reaches (TRF-025). No use case touches a connection, and no other bounded context takes part.
+
+**Trade**: A transfer's two sides must commit together or not at all, and they live in two accounts. Without ADR-006's unit of work (#412), the repository that owns the `Account` tables is the only place that can make that write atomic without handing a connection to the service.
+
+**When to revisit**: When ADR-006's unit of work lands, `save_all` becomes a run of `save` inside it.
+
+---
+
 ## What we follow strictly (not divergences)
 
 For reference, the patterns this codebase enforces tightly:

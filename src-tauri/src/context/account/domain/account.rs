@@ -1131,7 +1131,7 @@ impl Account {
         }
         self.transactions
             .retain(|t| t.transfer_id.as_deref() != Some(transfer_id));
-        self.transactions.extend(parts.iter().cloned());
+        self.transactions.extend(parts);
         let pair_txs: Vec<&Transaction> = self
             .transactions
             .iter()
@@ -1318,16 +1318,16 @@ impl Account {
         }
         tx.total_amount = cost;
         tx.unit_price = Transaction::unit_cost(cost, tx.quantity);
-        let updated = tx.clone();
+        let asset_id = tx.asset_id.clone();
         self.pending_changes
-            .push(AccountChange::TransactionUpdated(updated.clone()));
+            .push(AccountChange::TransactionUpdated(tx.clone()));
         let pair_txs: Vec<&Transaction> = self
             .transactions
             .iter()
-            .filter(|t| t.asset_id == updated.asset_id)
+            .filter(|t| t.asset_id == asset_id)
             .collect();
-        let (holding, pnl_map) = self.recalculate_holding(&updated.asset_id, &pair_txs)?;
-        self.refresh_leaving(&updated.asset_id, &pnl_map, transfer_id);
+        let (holding, pnl_map) = self.recalculate_holding(&asset_id, &pair_txs)?;
+        self.refresh_leaving(&asset_id, &pnl_map, transfer_id);
         self.pending_changes
             .push(AccountChange::HoldingUpserted(holding.clone()));
         self.upsert_holding_in_memory(holding);
@@ -2446,6 +2446,8 @@ pub trait AccountRepository: Send + Sync {
     async fn save(&self, account: &mut Account) -> Result<()>;
     /// Persists the pending changes of every account in `accounts` in one database
     /// transaction: all of them or none (TRF-020, TRF-025, TRF-040).
+    /// One repository writing several aggregates of its own, not a use case opening a
+    /// transaction across contexts (`docs/ddd-divergences.md` § 19, until ADR-006 lands).
     async fn save_all<'a>(&self, accounts: &mut [&'a mut Account]) -> Result<()>;
     /// The accounts holding a part of the transfer `transfer_id`, sending side first.
     async fn transfer_accounts(&self, transfer_id: &str) -> Result<Vec<String>>;

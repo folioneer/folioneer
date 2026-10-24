@@ -3401,10 +3401,9 @@ async fn save_accounts(
         .map(|account| &mut **account)
         .chain(followers.iter_mut())
         .collect();
-    repo.save_all(&mut written).await.map_err(|e| {
-        tracing::error!(target: BACKEND, err = ?e, "save_accounts: repository failure");
-        AccountError::DatabaseError
-    })
+    repo.save_all(&mut written)
+        .await
+        .map_err(|e| save_error("save_accounts", e))
 }
 
 /// Persists an Account aggregate's pending changes for the holding-transaction
@@ -3420,21 +3419,26 @@ async fn save_account(
         let mut written: Vec<&mut Account> = std::iter::once(&mut *account)
             .chain(followers.iter_mut())
             .collect();
-        return repo.save_all(&mut written).await.map_err(|e| {
-            tracing::error!(target: BACKEND, account_id = %account.id, err = ?e, "save_account: repository failure");
-            AccountError::DatabaseError
-        });
+        return repo
+            .save_all(&mut written)
+            .await
+            .map_err(|e| save_error("save_account", e));
     }
-    repo.save(account).await.map_err(|e| {
-        // CFR-016 — the change recorder refused the application's own write: the
-        // repository's transaction rolled back with it, nothing to report as a failure.
-        if let Some(refused) = e.downcast_ref::<LocalWriteOutranked>() {
-            tracing::info!(target: BACKEND, account_id = %account.id, record_identity = %refused.record_identity, "save_account: application write outranked by the user's state");
-            return AccountError::ApplicationWriteOutranked;
-        }
-        tracing::error!(target: BACKEND, account_id = %account.id, err = ?e, "save_account: repository failure");
-        AccountError::DatabaseError
-    })
+    repo.save(account)
+        .await
+        .map_err(|e| save_error("save_account", e))
+}
+
+/// A failed save, translated: the change recorder refusing the application's own write is
+/// `ApplicationWriteOutranked` (CFR-016) — the repository's transaction rolled back with it,
+/// nothing to report as a failure; anything else is logged and is `DatabaseError`.
+fn save_error(op: &'static str, e: anyhow::Error) -> AccountError {
+    if let Some(refused) = e.downcast_ref::<LocalWriteOutranked>() {
+        tracing::info!(target: BACKEND, op = %op, record_identity = %refused.record_identity, "application write outranked by the user's state");
+        return AccountError::ApplicationWriteOutranked;
+    }
+    tracing::error!(target: BACKEND, op = %op, err = ?e, "repository failure");
+    AccountError::DatabaseError
 }
 
 /// CRUD-family parallel to the load/save helpers above. Wraps the
@@ -3477,10 +3481,8 @@ async fn save_account_for_open_holding(
     repo: &dyn AccountRepository,
     account: &mut Account,
 ) -> Result<(), OpenHoldingError> {
-    repo.save(account).await.map_err(|e| {
-        tracing::error!(target: BACKEND, account_id = %account.id, err = ?e, "save_account_for_open_holding: repository failure");
-        AccountError::DatabaseError.into()
-    })
+    // TRF-025 — a backdated opening balance re-costs the transfers out it precedes.
+    save_account(repo, account).await.map_err(Into::into)
 }
 
 /// A recording applied to `account` in memory — what recording saves and

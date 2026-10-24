@@ -260,11 +260,24 @@ impl GlobalPerformanceUseCase {
         // a flow with no usable rate contributes 0 (dropped). The lifetime set
         // keeps opening balances at typed cost (PRF-035); the windowed set
         // values them at their entry-date market price (PRF-086).
+        // TRF-028 — what a transfer takes out of one account reaches another: no flow of the
+        // portfolio, so neither side enters its flows, whatever the two currencies.
+        let portfolio_transactions: Vec<Transaction> = converted_account
+            .transactions
+            .iter()
+            .filter(|t| {
+                !matches!(
+                    t.transaction_type,
+                    TransactionType::TransferIn | TransactionType::TransferOut
+                )
+            })
+            .cloned()
+            .collect();
         let (raw_trades, raw_windowed_trades, raw_dividends) = match asset_scope {
             None => (
-                external_cash_flows(&converted_account.transactions),
+                external_cash_flows(&portfolio_transactions),
                 external_cash_flows_windowed(
-                    &converted_account.transactions,
+                    &portfolio_transactions,
                     &converted_account.priced_assets,
                     &converted_account.rate_map,
                     &converted_account.currency,
@@ -272,8 +285,7 @@ impl GlobalPerformanceUseCase {
                 Vec::new(),
             ),
             Some(_) => {
-                let asset_transactions: Vec<&Transaction> =
-                    converted_account.transactions.iter().collect();
+                let asset_transactions: Vec<&Transaction> = portfolio_transactions.iter().collect();
                 let flows = position_flows(&asset_transactions);
                 let windowed = position_flows_windowed(
                     &asset_transactions,
@@ -965,6 +977,67 @@ mod tests {
             .iter()
             .find(|row| row.year == year)
             .expect("year row present")
+    }
+
+    // TRF-028, GPF-030 — a transfer between accounts of two currencies is no flow of the
+    // portfolio: the since-inception gain is the end value less the deposit alone, though
+    // the receiving side's date has no reference rate read for it.
+    #[tokio::test]
+    async fn trf_028_a_transfer_between_currencies_is_no_portfolio_flow() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        asset_svc.seed_cash_asset("EUR").await.unwrap();
+        let stock = create_stock(&asset_svc, "Stock", "STK").await;
+        let sending = create_account(&account_svc, "Sending", "EUR").await;
+        let receiving = create_account(&account_svc, "Receiving", "USD").await;
+        account_svc
+            .record_deposit(&sending.id, "2024-02-01".to_string(), 1_000_000_000, None)
+            .await
+            .unwrap();
+        account_svc
+            .buy_holding(
+                &sending.id,
+                stock.clone(),
+                "2024-02-10".to_string(),
+                10_000_000,
+                50_000_000,
+                1_000_000,
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        account_svc
+            .record_transfer(
+                &sending.id,
+                &receiving.id,
+                stock.clone(),
+                "2024-07-01".to_string(),
+                4_000_000,
+                4_000_000,
+                1_250_000,
+                None,
+            )
+            .await
+            .unwrap();
+
+        let uc = GlobalPerformanceUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_usd_rate_by_date(),
+        );
+        let response = uc.get_global_performance(None, None).await.unwrap();
+
+        let row = year_row(&response, 2024);
+        assert_eq!(row.cash_flow, 1_000_000_000, "only the deposit");
+        assert_eq!(row.asset_flow, 0, "GPF-040: the transfer is no asset flow");
+        let since_inception = row.since_inception.as_ref().expect("since_inception");
+        assert_eq!(
+            since_inception.gain,
+            row.end_value - 1_000_000_000,
+            "net invested is the deposit alone"
+        );
     }
 
     // GPF-020 — two reference-currency accounts sum exactly, with no conversion.

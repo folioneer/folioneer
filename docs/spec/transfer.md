@@ -126,4 +126,4 @@ record (sending, receiving, asset, date, sent, received, rate?)
 
 ## Open Questions
 
-None — the owner's answers on #393 (2026-10-17) and #510 (2026-10-23) settle the cost, the rate, the fee in kind, realized gains and cash. The vocabulary — transfer, transfer in, transfer out, fee in kind — and its French awaits the owner's validation with the window's form (#511).
+- The vocabulary — transfer, transfer in, transfer out, fee in kind — and its French await the owner's validation before the window's form (#639, #511). The owner's answers on #393 (2026-10-17) and #510 (2026-10-23) settle the cost, the rate, the fee in kind, realized gains and cash.

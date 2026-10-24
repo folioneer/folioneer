@@ -18,19 +18,19 @@ The `Holding` entity represents the current state of a financial position: an as
 
 Represents a single purchase (or sale) event for an asset in an account.
 
-| Field              | Business meaning                                                                              |
-| ------------------ | --------------------------------------------------------------------------------------------- |
-| `id`               | Unique identifier of the transaction.                                                         |
-| `account_id`       | The account where the transaction occurred.                                                   |
-| `asset_id`         | The financial asset involved in the transaction.                                              |
-| `transaction_type` | Type of transaction: `Purchase`, `Sell`, or `OpeningBalance`. Immutable once saved (SEL-035). |
-| `date`             | Date when the transaction was executed.                                                       |
-| `quantity`         | Number of units acquired (positive, stored in micros: value \* 10^6).                         |
-| `unit_price`       | Price per unit in asset's currency (stored in micros: value \* 10^6).                         |
-| `exchange_rate`    | Exchange rate between asset currency and account currency (micros).                           |
-| `fees`             | Transaction fees in the account's currency (stored in micros).                                |
-| `total_amount`     | Total cost in account's currency (incl. fees, stored in micros).                              |
-| `note`             | Optional user comment.                                                                        |
+| Field              | Business meaning                                                                                                                                                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`               | Unique identifier of the transaction.                                                                                                                                                                                                                        |
+| `account_id`       | The account where the transaction occurred.                                                                                                                                                                                                                  |
+| `asset_id`         | The financial asset involved in the transaction.                                                                                                                                                                                                             |
+| `transaction_type` | Type of transaction: `Purchase`, `Sell`, `OpeningBalance`, and the kinds other specs add (`Deposit`, `Withdrawal`, `Dividend`, `FreeShares`, `ManagementFee`, `Split`, `Interest`, `WriteOff`, `TransferOut`, `TransferIn`). Immutable once saved (SEL-035). |
+| `date`             | Date when the transaction was executed.                                                                                                                                                                                                                      |
+| `quantity`         | Number of units acquired (positive, stored in micros: value \* 10^6).                                                                                                                                                                                        |
+| `unit_price`       | Price per unit in asset's currency (stored in micros: value \* 10^6).                                                                                                                                                                                        |
+| `exchange_rate`    | Exchange rate between asset currency and account currency (micros).                                                                                                                                                                                          |
+| `fees`             | Transaction fees in the account's currency (stored in micros).                                                                                                                                                                                               |
+| `total_amount`     | Total cost in account's currency (incl. fees, stored in micros).                                                                                                                                                                                             |
+| `note`             | Optional user comment.                                                                                                                                                                                                                                       |
 
 ### Holding
 
