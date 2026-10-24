@@ -1337,7 +1337,7 @@ fn raw_text<'a>(arguments: &'a Value, name: &str) -> Result<Option<&'a str>, Ref
 }
 
 /// AGT-048A — a text argument other than a note is at most `TEXT_LENGTH` characters.
-fn bounded(name: &str, typed: &str) -> Result<(), Refusal> {
+pub(super) fn bounded(name: &str, typed: &str) -> Result<(), Refusal> {
     if typed.chars().count() > TEXT_LENGTH {
         return Err(Refusal {
             code: "InvalidArguments".to_string(),

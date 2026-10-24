@@ -92,6 +92,9 @@ fn ids_of(arguments: &Value) -> Result<Vec<String>, Refusal> {
         .map(|id| id.as_str().map(str::to_string))
         .collect::<Option<Vec<_>>>()
         .ok_or_else(missing)?;
+    for id in &ids {
+        super::bounded("transactions", id)?;
+    }
     let distinct = ids.iter().collect::<std::collections::HashSet<_>>().len() == ids.len();
     if ids.len() != FOUR || !distinct {
         return Err(Refusal {

@@ -6273,6 +6273,19 @@ async fn figures_of(bench: &Workbench, account_id: &str) -> (Vec<String>, Vec<St
 // if the transfer had been recorded from the start.
 #[tokio::test]
 async fn agt_091_four_transactions_replaced_stand_as_the_transfer_recorded_from_the_start() {
+    replaced_stands_as_recorded(4).await;
+}
+
+// AGT-091 / TRF-021 — a purchase of less than was sold is a transfer with a fee in kind: the
+// replacement records it as the transfer recorded so from the start does.
+#[tokio::test]
+async fn agt_091_less_received_than_sent_is_replaced_with_its_fee_in_kind() {
+    replaced_stands_as_recorded(3).await;
+}
+
+/// The four-step way of 4 CW8 from A1 to A2, `received` of them bought again for the 600
+/// withdrawn, replaced on the owner's yes, beside B1 to B2 recorded as the transfer.
+async fn replaced_stands_as_recorded(received: i64) {
     use super::gate::answer_replacement;
     use crate::context::account::TransactionType;
     use crate::use_cases::transfer::TransferFigures;
@@ -6297,7 +6310,11 @@ async fn agt_091_four_transactions_replaced_stand_as_the_transfer_recorded_from_
     let sale = typed(&bench, owner::sell("A1", "2019-06-01", 4, 150)).await;
     let withdrawal = typed(&bench, owner::withdraw("A1", "2019-06-02", 600)).await;
     let deposit = typed(&bench, owner::deposit("A2", "2019-06-03", 600)).await;
-    let purchase = typed(&bench, owner::buy("A2", "2019-06-04", 4, 150)).await;
+    let purchase = typed(
+        &bench,
+        owner::buy("A2", "2019-06-04", received, 600 / received),
+    )
+    .await;
     // B1 to B2 as the transfer, from the start.
     bench
         .transfers
@@ -6308,7 +6325,7 @@ async fn agt_091_four_transactions_replaced_stand_as_the_transfer_recorded_from_
             TransferFigures {
                 date: "2019-06-01".to_string(),
                 quantity_sent: 4 * M,
-                quantity_received: 4 * M,
+                quantity_received: received * M,
                 exchange_rate: None,
                 note: None,
             },
@@ -6351,10 +6368,11 @@ async fn agt_091_four_transactions_replaced_stand_as_the_transfer_recorded_from_
     assert_eq!(request.transfer.to_account, "A2");
     assert_eq!(request.transfer.date, "2019-06-01", "the sale's date");
     assert_eq!(request.transfer.quantity_sent, 4 * M);
+    assert_eq!(request.transfer.quantity_received, received * M);
     assert_eq!(
         request.transfer.cost,
-        400 * M,
-        "4 at the average price of 100"
+        received * 100 * M,
+        "what is received, at the average price of 100 (TRF-057)"
     );
     assert_eq!(request.transfer.exchange_rate, None, "one currency");
     let (before_a1, _) = figures_of(&bench, &a1).await;
@@ -6451,6 +6469,11 @@ async fn agt_090_what_is_no_transfer_is_refused_before_asking() {
         ),
         (
             four([&sale.id, &sale.id, &deposit.id, &purchase.id]),
+            "InvalidArguments",
+        ),
+        // AGT-048A — an id is bounded as any text an agent sends.
+        (
+            json!({ "transactions": [sale.id, withdrawal.id, deposit.id, "x".repeat(201)] }),
             "InvalidArguments",
         ),
         (
@@ -6595,4 +6618,41 @@ async fn agt_091_a_refusal_or_a_change_since_replaces_nothing() {
         "ReplacementRefused"
     );
     assert!(bench.connections.replacements().is_empty());
+
+    // Deleted since the owner was shown it: the yes replaces nothing.
+    let granted = session(&bench.connections).await;
+    let asked = {
+        let (bench, ids) = (Arc::clone(&bench), ids.clone());
+        tokio::spawn(async move {
+            bench
+                .tools
+                .call(&granted, "request_transfer_replacement", &ids)
+                .await
+        })
+    };
+    let request = replacement_waiting(&bench.connections).await;
+    bench
+        .accounts
+        .cancel_transaction(&withdrawal.account_id, &withdrawal.id)
+        .await
+        .expect("deleted");
+    assert_eq!(
+        answer_replacement(&bench.connections, &bench.transfers, request.id, true).await,
+        Err(AnswerRefused::NotDone {
+            reason: "TransactionNotFound".to_string()
+        })
+    );
+    assert_eq!(
+        asked.await.expect("asked").expect_err("not replaced").code,
+        "TransactionNotFound"
+    );
+    assert!(
+        bench
+            .accounts
+            .get_transaction_by_id(&sale.id)
+            .await
+            .expect("read")
+            .is_some(),
+        "nothing was written"
+    );
 }
