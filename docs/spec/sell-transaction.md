@@ -34,15 +34,15 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 
 **SEL-011 — Contextual pre-filling (frontend)**: When initiated from a holding row, both the account and the asset are pre-filled in the sell form and cannot be changed by the user.
 
-**SEL-012 — Closed position guard (backend)**: The backend rejects a sell if the current `Holding.quantity` is zero for the `(account_id, asset_id)` pair at the time of submission, returning a specific error.
+**SEL-012 — Nothing held on the sale's date (backend)**: The backend rejects a sell when nothing of the asset is held on the sale's date — the pair's transactions dated on or before that day replayed in order (TRX-036) — with a specific error.
 
 ### Creation (020–029)
 
 **SEL-020 — Sell field validation (backend)**: A sell transaction is valid if: `account_id` and `asset_id` exist; `date` satisfies the same bounds as TRX-020 (not in the future, not before `1900-01-01`); `quantity` is strictly positive; `unit_price` is positive or zero; `exchange_rate` is strictly positive; `fees` is zero or positive; and backend-computed `total_amount` is positive.
 
-**SEL-021 — Oversell guard (backend)**: The backend rejects the sell if the submitted `quantity` exceeds the current `Holding.quantity` for the `(account_id, asset_id)` pair at the moment of processing, returning a specific error message.
+**SEL-021 — Oversell guard (backend)**: The backend rejects the sell if the submitted `quantity` exceeds what is held of the asset on the sale's date, counted as SEL-012 counts it, with a specific error that carries that quantity. A back-dated sale within what was held then that leaves a later transaction short is refused as SEL-032 says.
 
-**SEL-022 — Maximum quantity hint (frontend)**: The sell form displays the current `Holding.quantity` as the maximum sellable quantity. While the draft check (TRX-062) reports the entered quantity above the holding — for a new sale, not a correction — the Save button stays disabled (TRX-063).
+**SEL-022 — Maximum quantity hint (frontend)**: The sell form displays today's `Holding.quantity` as the maximum sellable quantity; for a back-dated sale the limit is what was held on its date (SEL-021). While the draft check (TRX-062) of a new sale — not a correction — reports a refusal of SEL-012, SEL-021 or SEL-032, the Save button stays disabled (TRX-063).
 
 **SEL-023 — Sell total amount formula (backend)**: `total_amount` for a sell is computed by the backend as `floor(floor(quantity × unit_price / MICRO) × exchange_rate / MICRO) − fees`. Fees reduce the net proceeds. All values are `i64` micro-units (TRX-024); arithmetic uses `i128` intermediates to prevent overflow. `total_amount` is never received from the frontend. In total-entry mode the user-typed total is stored instead and this formula does not apply — see SEL-050.
 
@@ -66,11 +66,11 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 
 ### Update and Deletion (030–039)
 
-**SEL-030 — Edit sell validation (backend)**: When modifying a sell transaction, the same field constraints as SEL-020 apply. The oversell guard (SEL-021) is re-evaluated against the holding quantity as it stands immediately before this sell in the full chronological recalculation sequence for the `(account_id, asset_id)` pair.
+**SEL-030 — Edit sell validation (backend)**: When modifying a sell transaction, the same field constraints as SEL-020 apply. The guards on what was held (SEL-012, SEL-021) are re-evaluated against the holding quantity as it stands immediately before this sell in the full chronological recalculation sequence for the `(account_id, asset_id)` pair, the sell itself left out, with the same errors; a later transaction left short is refused as SEL-032 says.
 
 **SEL-031 — Full recalculation on edit (backend)**: Modifying any field of a sell transaction triggers a full chronological recalculation of `Holding.quantity` and `realized_pnl` for all transactions (purchases and sells) in the `(account_id, asset_id)` pair, in the same manner as TRX-031 for purchases.
 
-**SEL-032 — Cascading oversell detection on purchase edit (backend)**: If editing a purchase transaction reduces the quantity available at a later sell in the chronological sequence such that the sell would now exceed the holding at that point, the edit is rejected. The error message identifies the sell transaction that would become invalid.
+**SEL-032 — Cascading oversell detection (backend)**: A recording or a correction — a back-dated sale, a purchase made smaller — that leaves a later sale, write-off or management fee in the chronological sequence above what is held at that point is rejected with a specific error.
 
 **SEL-033 — Delete sell transaction (backend)**: Deleting a sell transaction triggers a full recalculation of the `Holding` and `realized_pnl` for the `(account_id, asset_id)` pair. If no transactions remain for that pair, the `Holding` record is removed (per TRX-034).
 
@@ -92,6 +92,8 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 
 **SEL-045 — Success feedback (frontend)**: On successful sell creation, edit, or deletion, the form modal closes and a success snackbar is displayed. The Account Details holdings table (including the Realized P&L column) refreshes to reflect the updated state via the `TransactionUpdated` event (TRX-037, TRX-038).
 
+**SEL-046 — Refused for lack of units (frontend)**: In the sell form and in a sale's correction, a refusal of SEL-012, SEL-021 or SEL-032 — by the draft check or on saving — shows under the quantity, the date in the user's format (owner, 2026-10-24). More than was held (SEL-021): "More than the {held} {reference} held on {date}." (FR « Plus que les {held} {reference} détenus le {date}. »). Nothing held (SEL-012): "No {reference} held on {date}." (FR « Aucun {reference} détenu le {date}. »). A later transaction left short (SEL-032): "Taking these units out on this date would leave a later transaction without enough units." (FR « Retirer ces unités à cette date laisserait une transaction ultérieure sans unités suffisantes. »). One shown on saving holds, with Save inactive, until the date or the quantity changes.
+
 ### Total-Entry Mode (050–059)
 
 **SEL-050 — Total-entry sell (backend)**: `sell_holding` accepts an optional user-entered `total_amount` — the all-in net proceeds credited by the broker, in account-currency micro-units, after fees. When provided, the typed total is ground truth: it is stored verbatim as `total_amount` (the SEL-023 formula does not apply) and the unit price is derived as `unit_price = round(((total_amount + fees) × MICRO × MICRO) / (quantity × exchange_rate))`, rounding half away from zero, with `i128` intermediates. Validation: `total_amount` must be strictly positive (`TotalAmountNotPositive`). When absent, SEL-023 applies unchanged. Realized P&L (SEL-024) consumes the stored `total_amount` unchanged. The entry mode is not persisted: a correction (TRX-031, SEL-030) operates on the stored decomposition (`quantity`, `unit_price`, `exchange_rate`, `fees`) and recomputes `total_amount` per SEL-023, unless the correction itself supplies a typed total (SEL-051). For purchases, see TRX-060.
@@ -107,7 +109,7 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
   → Form opens with Account + Asset pre-filled (SEL-011)
   → Max quantity shown as hint (SEL-022)
   │
-  ├─ [Enter Quantity] (≤ current holding, SEL-022)
+  ├─ [Enter Quantity] (≤ what was held on the sale's date, SEL-021)
   ├─ [Enter Unit Price]
   ├─ [Enter Exchange Rate] (default: 1.0)
   ├─ [Enter Fees] (default: 0)
@@ -141,7 +143,7 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 - Account (pre-filled, read-only)
 - Asset (pre-filled, read-only)
 - Date (date picker, default: today)
-- Quantity (number field, upper bound = current holding quantity shown as hint)
+- Quantity (number field, today's holding shown as hint, SEL-022)
 - Unit Price (amount field with asset currency suffix)
 - Exchange Rate (visible only if asset currency ≠ account currency, default: 1.0)
 - Fees (amount field with account currency suffix, default: 0)
@@ -153,7 +155,7 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 - **Empty**: Fields at defaults; account and asset pre-filled.
 - **Checking**: The draft check (TRX-062) is running; Save is disabled.
 - **Loading**: Form submission in progress (spinner, fields disabled).
-- **Error**: A rejection on save (archived asset, SEL-037); while the draft check reports a problem — a closed position included, reported as an oversell — Save stays disabled.
+- **Error**: A rejection on save (archived asset, SEL-037); while the draft check reports a problem Save stays disabled; one for lack of units shows under the quantity (SEL-046).
 - **Success**: Modal closes; success snackbar; Account Details holdings refreshed.
 
 ### User Flow

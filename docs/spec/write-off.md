@@ -43,7 +43,7 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 
 **WOF-011 — Its inputs (backend)**: The quantity must be strictly positive; the date a well-formed ISO date, neither in the future nor before the TRX lower bound (TRX-020); the reason one of the four of the entity. These replace TRX-020's figure checks for a write-off, which carries no proceeds (its total is 0). The note is free text, absent when empty. Each failure is refused with an error of its own.
 
-**WOF-012 — A backdated write-off (backend)**: A write-off dated before later transactions of the asset is refused when the replay would then leave a later sale or write-off above what is held at its own date, as an edit that does so is (SEL-032).
+**WOF-012 — A backdated write-off (backend)**: A write-off dated before later transactions of the asset is refused when the replay would then leave a later sale, write-off or management fee above what is held at its own date, as an edit that does so is (SEL-032).
 
 ### Effect (020–029)
 
@@ -57,7 +57,7 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 
 ### Correction (030–039)
 
-**WOF-030 — Corrected as a sale is (backend)**: A write-off's date, quantity, reason and note are corrected through the transactions' modification (TRX-031), checked again as WOF-010 to WOF-012 say on the corrected history — except that the asset is archived, which a sale's correction does not check either — the holding replayed from the log (TRX-036).
+**WOF-030 — Corrected as a sale is (backend)**: A write-off's date, quantity, reason and note are corrected through the transactions' modification (TRX-031), checked again as WOF-010 to WOF-012 say, with their codes, on the corrected history replayed from the log (TRX-036), counting what was held just before the write-off, itself left out. The archived-asset check is not repeated, as for a sale.
 
 **WOF-031 — Synced (backend)**: A write-off is a transaction like any other for sync (SYN-021); the write-off type and its reason are values of data format version 7 (SYN-038).
 
@@ -75,11 +75,11 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 
 **WOF-052 — Its estimate (frontend)**: While the quantity is a positive figure within what is held, a line gives what it takes out at the average price shown and says that no cash moves and, for `Lost`, that the result is shown apart as lost. It is the form's estimate; the core takes the cost at the date (WOF-021).
 
-**WOF-053 — Its quantity (frontend)**: While the quantity is empty, zero, below one micro-unit or not a positive figure, the record action is inactive. As it is typed, a quantity above the quantity held shown in the form is refused under the field, naming what is held, and the record action stays inactive; what was held on the chosen date is the core's check (WOF-055).
+**WOF-053 — Its quantity (frontend)**: While the quantity is empty, zero, below one micro-unit or not a positive figure, the record action is inactive. As it is typed, a quantity above the quantity held shown in the form is refused under the field, naming what is held, and the record action stays inactive; what was held on the chosen date is the core's check, its refusal worded as WOF-055 says.
 
 **WOF-054 — Saving (frontend)**: While it saves, the record action is inactive; on success the form closes, a confirmation shows and the holding row shows the new figures.
 
-**WOF-055 — Its refusals (frontend)**: A quantity above what was held on the chosen date is refused under the quantity, naming what was held then; a write-off that would leave a later sale or write-off above what is held is refused under the quantity too, saying so. Any other refusal shows below the form as the message for that refusal. The record action stays inactive while the form shows a refusal, until the date, the quantity or the reason changes.
+**WOF-055 — Its refusals (frontend)**: A refusal for lack of units — a quantity above what was held on the chosen date, a date on which nothing was held, a later sale, write-off or management fee left short — shows under the quantity with the wording of SEL-046, for a recording and a correction alike. Any other refusal shows below the form as the message for that refusal. The record action stays inactive while the form shows a refusal, until the date, the quantity or the reason changes.
 
 **WOF-056 — What the window records (backend)**: The window records a write-off under WOF-010 to WOF-012 and WOF-020, with their refusals, as the agent connection does (AGT-065), and corrects one under WOF-030, taking its date, quantity, reason and note.
 

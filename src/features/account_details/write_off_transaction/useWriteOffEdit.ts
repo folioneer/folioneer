@@ -17,7 +17,7 @@ export function useWriteOffEdit(
   assetReference: string,
   onClose: () => void,
 ): number | null {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const showSnackbar = useSnackbar();
   const [heldMicro, setHeldMicro] = useState<number | null>(null);
 
@@ -28,7 +28,12 @@ export function useWriteOffEdit(
       if (cancelled) return;
       if (result.status === "error") {
         logger.error("[useWriteOffEdit] failed to load the holding", { error: result.error });
-        const { message } = writeOffErrorToI18n(result.error, assetReference);
+        const { message } = writeOffErrorToI18n(
+          result.error,
+          assetReference,
+          transaction.date,
+          i18n.language,
+        );
         showSnackbar(t(message.key, message.vars), "error");
         onClose();
         return;
@@ -39,7 +44,16 @@ export function useWriteOffEdit(
     return () => {
       cancelled = true;
     };
-  }, [accountId, transaction.asset_id, assetReference, onClose, showSnackbar, t]);
+  }, [
+    accountId,
+    transaction.asset_id,
+    transaction.date,
+    assetReference,
+    onClose,
+    showSnackbar,
+    t,
+    i18n.language,
+  ]);
 
   return heldMicro;
 }

@@ -53,7 +53,7 @@ function costOf(quantityMicro: number, averagePriceMicro: number): number {
 }
 
 export function useWriteOff({ accountId, target, onSubmitSuccess, editMode }: UseWriteOffProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const showSnackbar = useSnackbar();
 
   const [formData, setFormData] = useState<WriteOffFormData>(() => ({
@@ -125,7 +125,9 @@ export function useWriteOff({ accountId, target, onSubmitSuccess, editMode }: Us
 
         if (result.status === "error") {
           logger.error("[useWriteOff] write-off refused", { error: result.error });
-          setRefusal(writeOffErrorToI18n(result.error, target.assetReference));
+          setRefusal(
+            writeOffErrorToI18n(result.error, target.assetReference, formData.date, i18n.language),
+          );
           return;
         }
         if (!editMode) setLastOperationDate(accountId, formData.date);
@@ -143,6 +145,7 @@ export function useWriteOff({ accountId, target, onSubmitSuccess, editMode }: Us
       overHolding,
       editMode,
       t,
+      i18n.language,
       showSnackbar,
       onSubmitSuccess,
     ],

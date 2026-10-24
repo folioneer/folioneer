@@ -566,6 +566,7 @@ export function AccountDetailsView() {
           accountName={view.sellTarget.accountName}
           assetId={view.sellTarget.assetId}
           assetName={view.sellTarget.assetName}
+          assetReference={view.sellTarget.assetReference}
           assetCurrency={view.sellTarget.assetCurrency}
           holdingQuantityMicro={view.sellTarget.holdingQuantityMicro}
           showExchangeRate={view.sellTarget.showExchangeRate}

@@ -9,6 +9,8 @@ export type ModalTarget = {
 };
 
 export type SellTarget = ModalTarget & {
+  /** The asset's reference, named by a refusal for lack of units (SEL-021). */
+  assetReference: string;
   holdingQuantityMicro: number;
 };
 

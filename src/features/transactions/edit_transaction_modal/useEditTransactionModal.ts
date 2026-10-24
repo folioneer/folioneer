@@ -12,7 +12,7 @@ import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { useLatestCheck } from "@/ui/hooks/useLatestCheck";
 import { transactionGateway } from "../gateway";
-import { transactionDraftErrorToI18n } from "../shared/presenter";
+import { takeOutRefusal, transactionDraftErrorToI18n } from "../shared/presenter";
 import type { TransactionEntryMode, TransactionFormData } from "../shared/types";
 import { type DraftField, useDraftProblemDisplay } from "../shared/useDraftProblemDisplay";
 import { toTransactionDraft, useTransactionDraftCheck } from "../shared/useTransactionDraftCheck";
@@ -20,6 +20,8 @@ import { useTransactions } from "../useTransactions";
 
 interface UseEditTransactionModalProps {
   transaction: Transaction;
+  /** An asset's reference, named by a sale's refusal for lack of units (SEL-046). */
+  referenceOf: (assetId: string) => string;
   onSubmitSuccess?: () => void;
 }
 
@@ -29,9 +31,10 @@ interface UseEditTransactionModalProps {
  */
 export function useEditTransactionModal({
   transaction,
+  referenceOf,
   onSubmitSuccess,
 }: UseEditTransactionModalProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const showSnackbar = useSnackbar();
   const { correctTransaction } = useTransactions();
 
@@ -56,6 +59,9 @@ export function useEditTransactionModal({
   }));
 
   const [error, setError] = useState<I18nMessage | null>(null);
+  // SEL-046 — a sale's correction refused for lack of units, under the quantity until the
+  // date, the quantity or the asset changes.
+  const [quantityRefusal, setQuantityRefusal] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // MKT-052 — edit mode always starts OFF, regardless of the global toggle.
   // The user can manually opt in per-edit; the prior price record is independent (MKT-059).
@@ -142,7 +148,8 @@ export function useEditTransactionModal({
     [formData, isOpeningBalance],
   );
   // TRX-063/066 — saving follows the check of the latest draft.
-  const isFormValid = isOpeningBalance ? openingCheck.data !== null : check.isClean;
+  const isFormValid =
+    (isOpeningBalance ? openingCheck.data !== null : check.isClean) && quantityRefusal === null;
   // TRX-051 — an opening balance's amount field holds its total cost, shown as typed; every
   // other total is the core's.
   const totalMicro = isTotalEntryEligible ? (preview?.total_amount ?? 0) : entered.priceMicro;
@@ -150,6 +157,9 @@ export function useEditTransactionModal({
   const handleChange = useCallback(
     (field: keyof TransactionFormData, value: string) => {
       setFormData((prev) => ({ ...prev, [field]: value }));
+      if (field === "date" || field === "quantity" || field === "assetId") {
+        setQuantityRefusal(null);
+      }
       const typed: Partial<Record<keyof TransactionFormData, DraftField>> = {
         date: "date",
         quantity: "quantity",
@@ -216,7 +226,17 @@ export function useEditTransactionModal({
       });
 
       if (result.error) {
-        setError(result.error);
+        const takenOut =
+          isSell && result.refusal
+            ? takeOutRefusal(
+                result.refusal,
+                referenceOf(formData.assetId),
+                formData.date,
+                i18n.language,
+              )
+            : null;
+        if (takenOut) setQuantityRefusal(takenOut);
+        else setError(result.error);
         return;
       }
 
@@ -254,6 +274,9 @@ export function useEditTransactionModal({
     transaction.id,
     transaction.account_id,
     transaction.asset_id,
+    isSell,
+    referenceOf,
+    i18n.language,
     t,
     onSubmitSuccess,
     showSnackbar,
@@ -284,7 +307,7 @@ export function useEditTransactionModal({
     totalAmountInput,
     handleTotalAmountChange,
     /** TRX-067 — the first problem as an error on the field it concerns, once typed in. */
-    fieldErrors,
+    fieldErrors: quantityRefusal ? { ...fieldErrors, quantity: quantityRefusal } : fieldErrors,
     /** TRX-067 — what to enter, for a field not typed in yet. */
     problemHint: problemDisplay.hint,
     /** Derived unit price shown read-only while in total-entry mode. */

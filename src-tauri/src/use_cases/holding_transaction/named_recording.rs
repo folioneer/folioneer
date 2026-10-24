@@ -1984,14 +1984,14 @@ fn refusal_from_account(error: &AccountError) -> Refusal {
             available,
             requested,
         } => format!(
-            "only {} held, not {}",
+            "only {} held on that date, not {}",
             decimal(*available),
             decimal(*requested)
         ),
         AccountError::InsufficientCash { .. } => "not enough cash in the account".to_string(),
-        AccountError::ClosedPosition => "nothing of this asset is held in the account".to_string(),
+        AccountError::ClosedPosition => "nothing of this asset is held on that date".to_string(),
         AccountError::CascadingOversell => {
-            "this would leave a later sale above the quantity held".to_string()
+            "this would leave a later transaction without enough units".to_string()
         }
         AccountError::OpeningBalanceOnCashAsset => {
             "an opening balance cannot be recorded on cash".to_string()
@@ -2081,17 +2081,17 @@ mod tests {
                     requested: 2_500_000,
                 },
                 "Oversell",
-                "only 1 held, not 2.5",
+                "only 1 held on that date, not 2.5",
             ),
             (
                 AccountError::ClosedPosition,
                 "ClosedPosition",
-                "nothing of this asset is held in the account",
+                "nothing of this asset is held on that date",
             ),
             (
                 AccountError::CascadingOversell,
                 "CascadingOversell",
-                "this would leave a later sale above the quantity held",
+                "this would leave a later transaction without enough units",
             ),
             (
                 AccountError::DateInFuture,

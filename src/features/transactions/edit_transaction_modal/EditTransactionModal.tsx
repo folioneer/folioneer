@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import type { Transaction } from "@/bindings";
 import { logger } from "@/lib/logger";
@@ -43,6 +43,11 @@ export function EditTransactionModal({
 
   // CSH-018 — Cash Assets cannot be the target of a manual edit (Deposit/Withdrawal flow only).
   const assets = useNonCashAssets();
+  // SEL-046 — the reference a sale's refusal for lack of units names.
+  const referenceOf = useCallback(
+    (assetId: string) => assets.find((a) => a.id === assetId)?.reference ?? "",
+    [assets],
+  );
   const accounts = useAppStore((state) => state.accounts);
 
   const {
@@ -66,6 +71,7 @@ export function EditTransactionModal({
     handleSubmit,
   } = useEditTransactionModal({
     transaction,
+    referenceOf,
     onSubmitSuccess: onSuccess ?? onClose,
   });
 

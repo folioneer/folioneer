@@ -63,6 +63,7 @@ const fakeSubmit = { preventDefault: vi.fn() } as unknown as React.FormEvent;
 const BASE_PROPS = {
   accountId: "account-1",
   assetId: "asset-1",
+  assetReference: "AAPL",
   holdingQuantityMicro: 3_000_000, // 3 units
 };
 
@@ -230,12 +231,51 @@ describe("useSellTransaction", () => {
       await result.current.handleSubmit(fakeSubmit);
     });
 
+    // SEL-046 — the oversell names what was held of the asset on the sale's date.
     expect(result.current.error).toEqual({
-      key: "error.Oversell",
-      vars: expect.objectContaining({ available: expect.any(String) }),
+      key: "transaction.error_over_held_on",
+      vars: { held: "1", reference: "AAPL", date: "6/1/2024" },
     });
+    expect(result.current.fieldErrors.quantity).toEqual(result.current.error);
     expect(mockSellHolding).not.toHaveBeenCalled();
     expect(onSubmitSuccess).not.toHaveBeenCalled();
+  });
+
+  // SEL-046 — a sale refused at saving for lack of units shows under the quantity,
+  // naming the date, and holds until the quantity or the date changes.
+  it("shows a closed position refused at saving under the quantity", async () => {
+    mockValidateDraft.mockImplementation(fakeDraftCheck);
+    mockSellHolding.mockResolvedValue({
+      data: null,
+      error: { key: "error.ClosedPosition" },
+      refusal: { code: "ClosedPosition" },
+    });
+    const { result } = renderHook(() => useSellTransaction(BASE_PROPS));
+    await act(async () => {
+      result.current.handleChange("date", "2024-06-01");
+      result.current.handleChange("quantity", "1");
+      result.current.handleChange("unitPrice", "50");
+    });
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(result.current.fieldErrors.quantity).toEqual({
+      key: "transaction.error_none_held_on",
+      vars: { reference: "AAPL", date: "6/1/2024" },
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.isFormValid).toBe(false);
+    await act(async () => result.current.handleChange("quantity", "0.5"));
+    expect(result.current.fieldErrors.quantity).toBeUndefined();
+
+    // A date change clears it too.
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(result.current.fieldErrors.quantity).toBeDefined();
+    await act(async () => result.current.handleChange("date", "2024-06-02"));
+    expect(result.current.fieldErrors.quantity).toBeUndefined();
   });
 
   // Submit calls sellHolding (not addTransaction with transaction_type)

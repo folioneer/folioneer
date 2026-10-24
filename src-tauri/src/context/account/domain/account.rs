@@ -417,19 +417,10 @@ impl Account {
         note: Option<String>,
     ) -> Result<&Transaction> {
         Self::ensure_tradable(&asset_id)?;
-        // SEL-012 — closed position guard
-        let current_qty = self.holding_quantity(&asset_id);
-        if current_qty == 0 {
-            return Err(AccountError::ClosedPosition.into());
-        }
-        // SEL-021 — oversell guard
-        if quantity > current_qty {
-            return Err(AccountError::Oversell {
-                available: current_qty,
-                requested: quantity,
-            }
-            .into());
-        }
+        // SEL-012 / SEL-021 — what was held on the sale's date; the replay below refuses a
+        // backdated sale that leaves a later one short (SEL-032).
+        let held = Self::reconstruct_holding_as_of(&self.transactions, &asset_id, &date).quantity;
+        Self::ensure_held(held, quantity)?;
 
         let (unit_price, total_amount) = match total_amount {
             // SEL-050 — the typed net proceeds are ground truth; the unit price is derived.
@@ -652,6 +643,25 @@ impl Account {
                 created_at,
             )?
         };
+
+        // SEL-030 / WOF-030 — a sale or a write-off is refused as its recording is, against
+        // what was held just before it in the replay order, itself left out.
+        if matches!(tx_type, TransactionType::Sell | TransactionType::WriteOff) {
+            let before: Vec<Transaction> = self
+                .transactions
+                .iter()
+                .filter(|t| {
+                    t.id != tx_id
+                        && t.asset_id == asset_id
+                        && (t.date < updated_tx.date
+                            || (t.date == updated_tx.date && t.created_at < updated_tx.created_at))
+                })
+                .cloned()
+                .collect();
+            let held =
+                Self::reconstruct_holding_as_of(&before, &asset_id, &updated_tx.date).quantity;
+            Self::ensure_held(held, updated_tx.quantity)?;
+        }
 
         // Replace the transaction in-memory, keeping the original so a failed
         // recalculation restores the history instead of leaving the splice behind
@@ -993,6 +1003,22 @@ impl Account {
         Ok(tx)
     }
 
+    /// SEL-012 / SEL-021 / WOF-010 — what takes units out needs a position held then, and
+    /// no more than it.
+    fn ensure_held(held: i64, quantity: i64) -> Result<()> {
+        if held <= 0 {
+            return Err(AccountError::ClosedPosition.into());
+        }
+        if quantity > held {
+            return Err(AccountError::Oversell {
+                available: held,
+                requested: quantity,
+            }
+            .into());
+        }
+        Ok(())
+    }
+
     /// Aggregate-root method: applies a pre-built write-off (WOF-010/012/020/021), built
     /// via `Transaction::write_off`. Refused on the cash line, on a position not held on
     /// the write-off's date, and above what is held then; the replay refuses a backdated
@@ -1002,16 +1028,7 @@ impl Account {
         Self::ensure_tradable(&tx.asset_id)?;
         let held =
             Self::reconstruct_holding_as_of(&self.transactions, &tx.asset_id, &tx.date).quantity;
-        if held <= 0 {
-            return Err(AccountError::ClosedPosition.into());
-        }
-        if tx.quantity > held {
-            return Err(AccountError::Oversell {
-                available: held,
-                requested: tx.quantity,
-            }
-            .into());
-        }
+        Self::ensure_held(held, tx.quantity)?;
         self.transactions.push(tx.clone());
         let pair_txs: Vec<&Transaction> = self
             .transactions
@@ -3594,9 +3611,10 @@ mod tests {
         let op_err = err
             .downcast_ref::<AccountError>()
             .unwrap_or_else(|| panic!("expected AccountError, got: {err}"));
+        // SEL-030 — nothing held before the buy: refused as its recording would be.
         assert!(
-            matches!(op_err, AccountError::CascadingOversell),
-            "expected CascadingOversell when moving a sell before its buy, got: {op_err}"
+            matches!(op_err, AccountError::ClosedPosition),
+            "expected ClosedPosition when moving a sell before its buy, got: {op_err}"
         );
     }
 
@@ -5606,7 +5624,7 @@ mod tests {
     // SPL-022 — moving a sell before the split re-validates against the
     // pre-split quantity and cascades an oversell.
     #[test]
-    fn spl_022_moving_sell_before_split_cascades_oversell() {
+    fn spl_022_moving_sell_before_split_is_above_what_was_held() {
         let mut acc = cash_seeded_account();
         acc.buy_holding(
             "asset-xyz".to_string(),
@@ -5642,7 +5660,7 @@ mod tests {
             )
             .unwrap()
             .clone();
-        // …but moving that sell before the split (only 10 held) must cascade.
+        // …but moving that sell before the split (only 10 held) is above what was held then.
         let err = acc
             .correct_transaction(
                 &sell.id,
@@ -5657,9 +5675,15 @@ mod tests {
             .unwrap_err();
         assert!(
             err.downcast_ref::<AccountError>()
-                .map(|e| matches!(e, AccountError::CascadingOversell))
+                .map(|e| matches!(
+                    e,
+                    AccountError::Oversell {
+                        available: 10_000_000,
+                        requested: 15_000_000
+                    }
+                ))
                 .unwrap_or(false),
-            "expected CascadingOversell, got: {err}"
+            "expected Oversell of the 10 held, got: {err}"
         );
     }
 
@@ -7308,5 +7332,111 @@ mod write_off_tests {
             )
             .count();
         assert_eq!(recorded, 1, "the corrected write-off is recorded once");
+    }
+
+    // WOF-030 / #607 — a write-off's correction is refused as its recording is: above what
+    // was held on the corrected date, itself left out, with that figure; on a date with
+    // nothing held; and leaving a later sale short. A refusal keeps the reason.
+    #[test]
+    fn wof_030_a_correction_is_refused_as_the_recording_is() {
+        let mut acc = funded();
+        buy(&mut acc, "2024-01-02", 10, 100);
+        let tx = write_off(&mut acc, "2024-03-01", micro(2), WriteOffReason::Lost).unwrap();
+        let correct = |acc: &mut Account, date: &str, quantity: i64| {
+            error_of(acc.correct_write_off(
+                &tx.id,
+                date.into(),
+                quantity,
+                WriteOffReason::Dust,
+                None,
+            ))
+        };
+        assert!(matches!(
+            correct(&mut acc, "2024-03-01", micro(11)),
+            AccountError::Oversell {
+                available: 10_000_000,
+                requested: 11_000_000
+            }
+        ));
+        assert!(matches!(
+            correct(&mut acc, "2023-12-31", micro(1)),
+            AccountError::ClosedPosition
+        ));
+        acc.sell_holding(
+            COIN.into(),
+            "2024-06-01".into(),
+            micro(7),
+            micro(120),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(matches!(
+            correct(&mut acc, "2024-03-01", micro(4)),
+            AccountError::CascadingOversell
+        ));
+        let kept = acc.transactions.iter().find(|t| t.id == tx.id).unwrap();
+        assert_eq!(kept.write_off_reason, Some(WriteOffReason::Lost));
+        assert_eq!(kept.quantity, micro(2));
+    }
+
+    // SEL-030 / #607 — a sale's correction is refused against what was held just before it,
+    // itself left out, with that figure; a sale's recording against what was held on its
+    // date (SEL-021), a backdated one leaving a later sale short as a cascade (SEL-032).
+    #[test]
+    fn sel_030_a_sale_is_refused_against_what_was_held_then() {
+        let mut acc = funded();
+        buy(&mut acc, "2024-01-02", 10, 100);
+        buy(&mut acc, "2024-05-02", 10, 100);
+        let sale = acc
+            .sell_holding(
+                COIN.into(),
+                "2024-03-01".into(),
+                micro(4),
+                micro(120),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .unwrap()
+            .clone();
+        let corrected = acc.correct_transaction(
+            &sale.id,
+            "2024-03-01".into(),
+            micro(12),
+            micro(120),
+            micro(1),
+            0,
+            None,
+            None,
+        );
+        assert!(matches!(
+            error_of(corrected.cloned()),
+            AccountError::Oversell {
+                available: 10_000_000,
+                requested: 12_000_000
+            }
+        ));
+        // Sixteen held today, six on 2024-04-01: a backdated sale names the six.
+        let backdated = acc.sell_holding(
+            COIN.into(),
+            "2024-04-01".into(),
+            micro(11),
+            micro(120),
+            micro(1),
+            0,
+            None,
+            None,
+        );
+        assert!(matches!(
+            error_of(backdated.cloned()),
+            AccountError::Oversell {
+                available: 6_000_000,
+                requested: 11_000_000
+            }
+        ));
     }
 }

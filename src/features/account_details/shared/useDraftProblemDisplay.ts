@@ -28,6 +28,8 @@ const FIELD_OF: Partial<Record<TransactionDraftError["code"], DraftField>> = {
   DateTooOld: "date",
   QuantityNotPositive: "quantity",
   Oversell: "quantity",
+  ClosedPosition: "quantity",
+  CascadingOversell: "quantity",
   UnitPriceNegative: "unitPrice",
   ExchangeRateNotPositive: "exchangeRate",
   FeesNegative: "fees",

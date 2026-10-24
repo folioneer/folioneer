@@ -1248,39 +1248,45 @@ describe("hasNoPeriodFigure (ACD-057)", () => {
   });
 });
 
-// WOF-055 — Oversell and CascadingOversell under the quantity; the rest below the form.
+// WOF-055 / #607 — a refusal for lack of units under the quantity, naming what was held on
+// the date; the rest below the form.
 describe("writeOffErrorToI18n", () => {
-  it("names what was held on that date for an oversell", () => {
-    const refusal = writeOffErrorToI18n(
-      { code: "Oversell", available: 200_000, requested: 300_000 },
-      "BTC",
-    );
-    expect(refusal.onQuantity).toBe(true);
-    expect(refusal.message.key).toBe("write_off.error_over_held");
-    expect(refusal.message.vars).toEqual({ held: "0,2", reference: "BTC" });
+  const refuse = (err: unknown) => writeOffErrorToI18n(err as never, "BTC", "2026-10-21", "fr");
+
+  it("names what was held on the date for an oversell", () => {
+    expect(refuse({ code: "Oversell", available: 200_000, requested: 300_000 })).toEqual({
+      message: {
+        key: "transaction.error_over_held_on",
+        vars: { held: "0,2", reference: "BTC", date: "21/10/2026" },
+      },
+      onQuantity: true,
+    });
   });
 
-  it.each([
-    "CascadingOversell",
-    "QuantityNotPositive",
-  ] as const)("%s shows under the quantity", (code) => {
-    expect(writeOffErrorToI18n({ code } as never, "BTC")).toEqual({
-      message: { key: `error.${code}` },
+  it("names the date for a position not held then", () => {
+    expect(refuse({ code: "ClosedPosition" })).toEqual({
+      message: {
+        key: "transaction.error_none_held_on",
+        vars: { reference: "BTC", date: "21/10/2026" },
+      },
       onQuantity: true,
     });
   });
 
   it.each([
-    ["ClosedPosition", "write_off.error_closed_position"],
+    ["CascadingOversell", "transaction.error_later_left_short"],
+    ["QuantityNotPositive", "error.QuantityNotPositive"],
+  ] as const)("%s shows under the quantity", (code, key) => {
+    expect(refuse({ code })).toEqual({ message: { key }, onQuantity: true });
+  });
+
+  it.each([
     ["ArchivedAsset", "write_off.error_archived"],
     ["NegativeQuantity", "error.Unknown"],
     ["DateInFuture", "error.DateInFuture"],
     ["AssetNotFound", "error.AssetNotFound"],
   ] as const)("%s shows below the form", (code, key) => {
-    expect(writeOffErrorToI18n({ code } as never, "BTC")).toEqual({
-      message: { key },
-      onQuantity: false,
-    });
+    expect(refuse({ code })).toEqual({ message: { key }, onQuantity: false });
   });
 });
 

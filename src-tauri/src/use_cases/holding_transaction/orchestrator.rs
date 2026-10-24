@@ -155,8 +155,7 @@ pub struct TransactionPreview {
     pub total_amount: i64,
     /// The gain a new sale would realize (TDI-030), in account currency: its proceeds minus
     /// the average cost, as of its date, of the quantity sold. `None` for anything but a
-    /// new sale, and when it cannot be computed — the position at that date does not
-    /// hold what is sold, or cannot be read (TDI-031).
+    /// new sale (TDI-031); a sale that cannot be recorded is the draft's refusal instead.
     pub realized_pnl: Option<i64>,
 }
 
@@ -322,31 +321,37 @@ impl HoldingTransactionUseCase {
             Account::preview_trade(transaction_type, &draft.date, draft.quantity, draft.entered)?;
         let mut realized_pnl = None;
         if draft.kind == DraftKind::Sell && draft.correcting.is_none() {
-            let available = self
+            // SEL-012 / SEL-021 / SEL-032 — the account's own recording, in memory: refused
+            // as recording refuses, and the gain it would realize (TDI-030).
+            let (exchange_rate, fees, typed_total) = match draft.entered {
+                EnteredAmount::UnitPrice {
+                    exchange_rate,
+                    fees,
+                    ..
+                } => (exchange_rate, fees, None),
+                EnteredAmount::Total {
+                    total,
+                    exchange_rate,
+                    fees,
+                } => (exchange_rate, fees, Some(total)),
+            };
+            let recorded = self
                 .account_service
-                .get_holding_by_account_asset(&draft.account_id, &draft.asset_id)
-                .await?
-                .map(|holding| holding.quantity)
-                .unwrap_or(0);
-            if draft.quantity > available {
-                return Err(AccountError::Oversell {
-                    available,
-                    requested: draft.quantity,
-                }
-                .into());
-            }
-            // TDI-030/031 — the gain against the position as it stood on the sale's date.
-            // It informs and blocks nothing: when that position cannot be read, or does
-            // not hold what is sold, the check stands and returns no gain.
-            realized_pnl = self
-                .account_service
-                .holding_snapshot_as_of(&draft.account_id, &draft.asset_id, &draft.date)
-                .await
-                .ok()
-                .filter(|held| held.quantity > 0 && draft.quantity <= held.quantity)
-                .map(|held| {
-                    Account::preview_realized_pnl(total_amount, held.average_price, draft.quantity)
-                });
+                .preview_recording(
+                    &draft.account_id,
+                    RecordingOp::Sell(TradeOp {
+                        asset_id: draft.asset_id.clone(),
+                        date: draft.date.clone(),
+                        quantity: draft.quantity,
+                        unit_price,
+                        exchange_rate,
+                        fees,
+                        total_amount: typed_total,
+                        note: None,
+                    }),
+                )
+                .await?;
+            realized_pnl = recorded.transaction.realized_pnl;
         }
         Ok(TransactionPreview {
             unit_price,
@@ -2568,9 +2573,16 @@ mod tests {
             )
             .await
             .unwrap_err();
+        // WOF-030 — refused as recording refuses, naming what was held then (#607).
         assert!(
-            matches!(refused, AccountError::CascadingOversell),
-            "expected CascadingOversell, got: {refused:?}"
+            matches!(
+                refused,
+                AccountError::Oversell {
+                    available: 10_000_000,
+                    requested: 11_000_000
+                }
+            ),
+            "expected Oversell of the 10 held, got: {refused:?}"
         );
     }
 
@@ -3410,7 +3422,7 @@ mod tests {
 #[cfg(test)]
 mod draft_tests {
     use super::*;
-    use crate::context::account::{Holding, HoldingSnapshot, MockAccountServiceContract};
+    use crate::context::account::{Holding, MockAccountServiceContract, RecordingPreview};
     use crate::context::asset::MockAssetServiceContract;
 
     const M: i64 = 1_000_000;
@@ -3431,55 +3443,85 @@ mod draft_tests {
         }
     }
 
-    fn use_case(held: Option<i64>) -> HoldingTransactionUseCase {
+    /// An account whose asset-1 ledger is `entries` — (date, units, unit price): an opening
+    /// balance for units above zero, a sale for units below.
+    fn ledger(entries: &[(&str, i64, i64)]) -> crate::context::account::Account {
+        let mut account = crate::context::account::Account::new(
+            "Account".into(),
+            String::new(),
+            "EUR".into(),
+            crate::context::account::UpdateFrequency::ManualMonth,
+            false,
+        )
+        .expect("account");
+        for &(date, units, price) in entries {
+            if units > 0 {
+                account
+                    .open_holding("asset-1".into(), date.into(), units, units / M * price)
+                    .expect("opening");
+            } else {
+                account
+                    .sell_holding(
+                        "asset-1".into(),
+                        date.into(),
+                        -units,
+                        price,
+                        M,
+                        0,
+                        None,
+                        None,
+                    )
+                    .expect("sale");
+            }
+        }
+        account
+    }
+
+    /// A use case whose recording runs on `ledger` in memory, as the service's does — or
+    /// fails to read it — called `reads` times when given.
+    fn ledger_use_case(
+        entries: Result<Vec<(&'static str, i64, i64)>, AccountError>,
+        reads: Option<usize>,
+    ) -> HoldingTransactionUseCase {
         let mut account = MockAccountServiceContract::new();
-        account
-            .expect_get_holding_by_account_asset()
-            .returning(move |account_id, asset_id| {
-                Ok(held.map(|quantity| {
-                    Holding::new(account_id.into(), asset_id.into(), quantity, M, 0, None)
-                        .expect("holding")
-                }))
-            });
-        // As of any date the position is what is held now, bought at 40 a unit.
-        account
-            .expect_holding_snapshot_as_of()
-            .returning(move |_, _, _| {
-                Ok(HoldingSnapshot {
-                    quantity: held.unwrap_or(0),
-                    average_price: 40 * M,
-                })
-            });
+        let previews = account.expect_preview_recording();
+        if let Some(reads) = reads {
+            previews.times(reads);
+        }
+        previews.returning(move |_, op| {
+            let mut account = ledger(&entries.clone()?);
+            let RecordingOp::Sell(t) = op else {
+                panic!("only a sale is previewed here")
+            };
+            let transaction = account
+                .sell_holding(
+                    t.asset_id,
+                    t.date,
+                    t.quantity,
+                    t.unit_price,
+                    t.exchange_rate,
+                    t.fees,
+                    t.total_amount,
+                    t.note,
+                )
+                .map_err(|e| e.downcast::<AccountError>().expect("an account refusal"))?
+                .clone();
+            Ok(RecordingPreview {
+                transaction,
+                before: vec![],
+                after: vec![],
+            })
+        });
         HoldingTransactionUseCase::new(Arc::new(account), Arc::new(MockAssetServiceContract::new()))
     }
 
-    /// A use case holding 5 units today, whose position as of the draft's date is `as_of`
-    /// (or cannot be read), and which reads that position `reads` times.
-    fn use_case_as_of(
-        as_of: Result<(i64, i64), AccountError>,
-        reads: usize,
-    ) -> HoldingTransactionUseCase {
-        let mut account = MockAccountServiceContract::new();
-        account
-            .expect_get_holding_by_account_asset()
-            .returning(|account_id, asset_id| {
-                Ok(Some(
-                    Holding::new(account_id.into(), asset_id.into(), 5 * M, M, 0, None)
-                        .expect("holding"),
-                ))
-            });
-        account
-            .expect_holding_snapshot_as_of()
-            .times(reads)
-            .returning(move |_, _, _| {
-                as_of
-                    .clone()
-                    .map(|(quantity, average_price)| HoldingSnapshot {
-                        quantity,
-                        average_price,
-                    })
-            });
-        HoldingTransactionUseCase::new(Arc::new(account), Arc::new(MockAssetServiceContract::new()))
+    /// A use case holding `held` units bought at 40 before any draft's date.
+    fn use_case(held: Option<i64>) -> HoldingTransactionUseCase {
+        let entries = held
+            .filter(|&quantity| quantity > 0)
+            .map(|quantity| vec![("2025-01-01", quantity, 40 * M)])
+            .unwrap_or_default();
+        ledger_use_case(Ok(entries), None)
     }
 
     /// A use case whose account holds the asset today and previews a split as `position`
@@ -3756,25 +3798,50 @@ mod draft_tests {
         assert_eq!(preview.realized_pnl, Some(-20 * M));
     }
 
-    // TDI-031 — no gain is previewed where none can be computed, and the check stands:
-    // nothing held at the sale's date, less held then than is sold, a position that
-    // cannot be read. A purchase and a sale being corrected do not read the position.
+    // SEL-032 — a backdated sale within what was held then that leaves a later sale short
+    // is refused as recording refuses it; one that leaves the later sale enough passes.
+    #[tokio::test]
+    async fn sel_032_a_backdated_draft_sale_leaving_a_later_one_short_is_refused() {
+        let held = |later_sale: i64| {
+            ledger_use_case(
+                Ok(vec![
+                    ("2025-12-01", 10 * M, 40 * M),
+                    ("2026-03-01", -later_sale, 60 * M),
+                ]),
+                Some(1),
+            )
+        };
+        let checked = held(9 * M).validate_draft(draft(DraftKind::Sell)).await;
+        assert_eq!(code(checked), "CascadingOversell");
+        let checked = held(8 * M).validate_draft(draft(DraftKind::Sell)).await;
+        assert_eq!(code(checked), "ok");
+    }
+
+    // TDI-031 / SEL-021 — a new sale is checked against the position of its date: nothing
+    // held then, less held then than is sold and a position that cannot be read are the
+    // draft's problem, and no gain is previewed. A purchase and a sale being corrected do
+    // not read the position.
     #[tokio::test]
     async fn tdi_031_no_gain_is_previewed_where_none_can_be_computed() {
-        for as_of in [
-            Ok((0, 0)),
-            Ok((M, 40 * M)),
-            Err(AccountError::DatabaseError),
+        // Bought after the sale's date; 1 held then, 4 more after; unreadable.
+        for (entries, refusal) in [
+            (Ok(vec![("2026-02-01", 5 * M, 40 * M)]), "ClosedPosition"),
+            (
+                Ok(vec![
+                    ("2025-12-01", M, 40 * M),
+                    ("2026-02-01", 4 * M, 40 * M),
+                ]),
+                "Oversell",
+            ),
+            (Err(AccountError::DatabaseError), "DatabaseError"),
         ] {
-            let preview = use_case_as_of(as_of, 1)
+            let checked = ledger_use_case(entries, Some(1))
                 .validate_draft(draft(DraftKind::Sell))
-                .await
-                .expect("the check stands");
-            assert_eq!(preview.total_amount, 100 * M);
-            assert_eq!(preview.realized_pnl, None);
+                .await;
+            assert_eq!(code(checked), refusal);
         }
 
-        let purchase = use_case_as_of(Ok((5 * M, 40 * M)), 0)
+        let purchase = ledger_use_case(Ok(vec![("2025-12-01", 5 * M, 40 * M)]), Some(0))
             .validate_draft(draft(DraftKind::Purchase))
             .await
             .expect("valid");
@@ -3782,7 +3849,7 @@ mod draft_tests {
 
         let mut corrected = draft(DraftKind::Sell);
         corrected.correcting = Some("tx-1".into());
-        let preview = use_case_as_of(Ok((5 * M, 40 * M)), 0)
+        let preview = ledger_use_case(Ok(vec![("2025-12-01", 5 * M, 40 * M)]), Some(0))
             .validate_draft(corrected)
             .await
             .expect("valid");
@@ -3794,10 +3861,16 @@ mod draft_tests {
     #[tokio::test]
     async fn tdi_030_a_back_dated_sale_uses_the_position_of_its_date() {
         // Held 3 units at 25 on that day (5 today): 2 sold at 50 → 100 − 50 = 50.
-        let preview = use_case_as_of(Ok((3 * M, 25 * M)), 1)
-            .validate_draft(draft(DraftKind::Sell))
-            .await
-            .expect("valid");
+        let preview = ledger_use_case(
+            Ok(vec![
+                ("2025-12-01", 3 * M, 25 * M),
+                ("2026-02-01", 2 * M, 100 * M),
+            ]),
+            Some(1),
+        )
+        .validate_draft(draft(DraftKind::Sell))
+        .await
+        .expect("valid");
         assert_eq!(preview.realized_pnl, Some(50 * M));
     }
 
@@ -4052,7 +4125,7 @@ mod draft_tests {
         }
         assert_eq!(
             code(use_case(None).validate_draft(draft(DraftKind::Sell)).await),
-            "Oversell"
+            "ClosedPosition"
         );
         assert_eq!(
             code(

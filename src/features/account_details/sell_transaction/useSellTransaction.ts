@@ -12,6 +12,7 @@ import { microToExactDecimal, microToFieldDecimal, microToFormatted } from "@/li
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
+import { takeOutRefusal } from "../shared/presenter";
 import { type DraftField, useDraftProblemDisplay } from "../shared/useDraftProblemDisplay";
 import { useHoldingSnapshotAsOf } from "../shared/useHoldingSnapshotAsOf";
 import { toTransactionDraft, useTransactionDraftCheck } from "../shared/useTransactionDraftCheck";
@@ -19,6 +20,8 @@ import { toTransactionDraft, useTransactionDraftCheck } from "../shared/useTrans
 interface UseSellTransactionProps {
   accountId: string;
   assetId: string;
+  /** The asset's reference, named by a refusal for lack of units (SEL-021). */
+  assetReference: string;
   /** Holding quantity in micro-units — shown as the maximum sellable quantity (SEL-022). */
   holdingQuantityMicro: number;
   onSubmitSuccess?: () => void;
@@ -27,10 +30,11 @@ interface UseSellTransactionProps {
 export function useSellTransaction({
   accountId,
   assetId,
+  assetReference,
   holdingQuantityMicro,
   onSubmitSuccess,
 }: UseSellTransactionProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const showSnackbar = useSnackbar();
   const { sellHolding } = useTransactions();
 
@@ -45,6 +49,8 @@ export function useSellTransaction({
     note: "",
   }));
   const [error, setError] = useState<I18nMessage | null>(null);
+  // SEL-046 — a save refused for lack of units, shown under the quantity until it changes.
+  const [quantityRefusal, setQuantityRefusal] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // MKT-052/053 — snapshot of the global auto-record toggle at hook mount
   const [recordPrice, setRecordPrice] = useState<boolean>(() => getAutoRecordPrice());
@@ -61,8 +67,16 @@ export function useSellTransaction({
   const check = useTransactionDraftCheck(draft);
   const preview = check.preview;
 
-  // TRX-067 — the first problem is shown on its field once typed in, as a hint before.
-  const problemDisplay = useDraftProblemDisplay(check.problem, check.problemMessage, entryMode);
+  // TRX-067 — the first problem is shown on its field once typed in, as a hint before; one
+  // for lack of units names what was held on the sale's date (SEL-046).
+  const problemMessage = useMemo(
+    () =>
+      (check.problem &&
+        takeOutRefusal(check.problem, assetReference, formData.date, i18n.language)) ??
+      check.problemMessage,
+    [check.problem, check.problemMessage, assetReference, formData.date, i18n.language],
+  );
+  const problemDisplay = useDraftProblemDisplay(check.problem, problemMessage, entryMode);
   const touch = problemDisplay.touch;
 
   // TDI-020 — average cost as of the entered sell date (or today). Hidden when
@@ -83,6 +97,7 @@ export function useSellTransaction({
   const handleChange = useCallback(
     (field: keyof TransactionFormData, value: string) => {
       setFormData((prev) => ({ ...prev, [field]: value }));
+      if (field === "date" || field === "quantity") setQuantityRefusal(null);
       const typed: Partial<Record<keyof TransactionFormData, DraftField>> = {
         date: "date",
         quantity: "quantity",
@@ -128,7 +143,7 @@ export function useSellTransaction({
       e.preventDefault();
 
       if (!preview) {
-        setError(check.problemMessage);
+        setError(problemMessage);
         return;
       }
 
@@ -150,7 +165,11 @@ export function useSellTransaction({
         });
 
         if (result.error) {
-          setError(result.error);
+          const takenOut =
+            result.refusal &&
+            takeOutRefusal(result.refusal, assetReference, formData.date, i18n.language);
+          if (takenOut) setQuantityRefusal(takenOut);
+          else setError(result.error);
           return;
         }
 
@@ -180,9 +199,11 @@ export function useSellTransaction({
       formData,
       draft,
       preview,
-      check.problemMessage,
+      problemMessage,
       recordPrice,
       sellHolding,
+      assetReference,
+      i18n.language,
       t,
       showSnackbar,
       onSubmitSuccess,
@@ -202,7 +223,9 @@ export function useSellTransaction({
     totalAmountInput,
     handleTotalAmountChange,
     /** TRX-067 — the first problem as an error on the field it concerns, once typed in. */
-    fieldErrors: problemDisplay.fieldErrors,
+    fieldErrors: quantityRefusal
+      ? { ...problemDisplay.fieldErrors, quantity: quantityRefusal }
+      : problemDisplay.fieldErrors,
     /** TRX-067 — what to enter, for a field not typed in yet. */
     problemHint: problemDisplay.hint,
     /** SEL-050 — formatted derived unit price shown in total mode; "—" until the draft checks clean. */
@@ -213,7 +236,7 @@ export function useSellTransaction({
     potentialPnl,
     error: error ?? problemDisplay.alert,
     isSubmitting,
-    isFormValid: check.isClean,
+    isFormValid: check.isClean && quantityRefusal === null,
     recordPrice,
     setRecordPrice,
     handleChange,
