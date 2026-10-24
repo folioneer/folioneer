@@ -895,6 +895,9 @@ pub trait TransactionRepository: Send + Sync {
         &self,
         account_id: &str,
     ) -> Result<Vec<(String, AgentRecording)>>;
+    /// TRF-062 — for each transfer a part of which the account holds, the transfer's other
+    /// account, by transfer id; a part left alone (TRF-041) has none.
+    async fn transfer_other_accounts(&self, account_id: &str) -> Result<Vec<(String, String)>>;
     /// AGT-050 — the mark of one transaction, when an agent recorded it.
     async fn agent_recording_of(&self, transaction_id: &str) -> Result<Option<AgentRecording>>;
     /// AGT-053 — the transactions a session recorded and that still exist, the last recorded first:

@@ -210,6 +210,27 @@ impl TransactionRepository for SqliteTransactionRepository {
         Ok(())
     }
 
+    async fn transfer_other_accounts(&self, account_id: &str) -> Result<Vec<(String, String)>> {
+        let rows = sqlx::query!(
+            r#"SELECT DISTINCT mine.transfer_id AS "transfer_id!: String",
+                      other.account_id AS "account_id!: String"
+               FROM transactions mine
+               JOIN transactions other
+                 ON other.transfer_id = mine.transfer_id AND other.account_id <> mine.account_id
+               WHERE mine.account_id = ? AND mine.transfer_id IS NOT NULL"#,
+            account_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .with_context(|| {
+            format!("Failed to read the transfers' other accounts for account {account_id}")
+        })?;
+        Ok(rows
+            .into_iter()
+            .map(|row| (row.transfer_id, row.account_id))
+            .collect())
+    }
+
     async fn agent_recordings_for_account(
         &self,
         account_id: &str,

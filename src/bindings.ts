@@ -824,6 +824,29 @@ async cancelTransfer(transferId: string) : Promise<Result<null, TransferError>> 
 }
 },
 /**
+ * A transfer read as one from its parts (TRF-060).
+ */
+async getTransfer(transferId: string) : Promise<Result<TransferView, TransferError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_transfer", { transferId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The rate a transfer between two accounts on a date takes when none is given (TRF-061);
+ * `null` when none is stored.
+ */
+async getTransferRate(fromAccountId: string, toAccountId: string, date: string) : Promise<Result<number | null, TransferError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_transfer_rate", { fromAccountId, toAccountId, date }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Records a stock split rescaling a held position at its date (SPL-010/020).
  */
 async recordSplit(dto: RecordSplitDTO) : Promise<Result<Transaction, SplitError>> {
@@ -3753,7 +3776,12 @@ cash_balance: number;
 /**
  * The agent session that recorded it; none for a transaction the owner typed (AGT-045).
  */
-recorded_by: AgentRecording | null }
+recorded_by: AgentRecording | null; 
+/**
+ * TRF-062 — for a part of a transfer, the transfer's other account; none otherwise,
+ * and none for a part left alone (TRF-041).
+ */
+transfer_account_id: string | null }
 /**
  * The rule an asset to settle breaks (AST-035): one of what its kind forbids (AST-031), or
  * being the same as another asset (AST-032).
@@ -5597,6 +5625,51 @@ export type TransferTask =
  * The asset is a Cash Asset — cash moves by a withdrawal and a deposit (TRF-010).
  */
 { code: "TransferOfCash" }
+/**
+ * A transfer read as one from its parts (TRF-060): it is not stored on its own.
+ */
+export type TransferView = { 
+/**
+ * Identifies the operation.
+ */
+transfer_id: string; 
+/**
+ * The sending account: the transfer out's.
+ */
+from_account_id: string; 
+/**
+ * The receiving account: the transfer in's.
+ */
+to_account_id: string; 
+/**
+ * The asset moved.
+ */
+asset_id: string; 
+/**
+ * The day of the transfer: the transfer in's (TRF-032).
+ */
+date: string; 
+/**
+ * What left the sending account: the transfer out's quantity plus its fee in kind's
+ * (micro-units).
+ */
+quantity_sent: number; 
+/**
+ * What reached the receiving account: the transfer in's quantity (micro-units).
+ */
+quantity_received: number; 
+/**
+ * The cost the transfer out moved, in the sending account's currency (micro-units).
+ */
+cost: number; 
+/**
+ * The rate used between the two accounts' currencies: the transfer in's (micros).
+ */
+exchange_rate: number; 
+/**
+ * The transfer in's note.
+ */
+note: string | null }
 /**
  * One asset a price-fetch task could not price (MKT-170/171), carried in the
  * `AssetPriceFetchCompleted` payload so the frontend can list it for manual entry.

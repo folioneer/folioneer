@@ -3,7 +3,7 @@
 
 use super::error::TransferError;
 use super::orchestrator::{TransferFigures, TransferUseCase};
-use crate::context::account::Transaction;
+use crate::context::account::{Transaction, TransferView};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;
@@ -98,4 +98,28 @@ pub async fn cancel_transfer(
     transfer_id: String,
 ) -> Result<(), TransferError> {
     uc.cancel_transfer(&transfer_id).await
+}
+
+/// A transfer read as one from its parts (TRF-060).
+#[tauri::command]
+#[specta::specta]
+pub async fn get_transfer(
+    uc: State<'_, TransferUseCase>,
+    transfer_id: String,
+) -> Result<TransferView, TransferError> {
+    uc.get_transfer(&transfer_id).await
+}
+
+/// The rate a transfer between two accounts on a date takes when none is given (TRF-061);
+/// `null` when none is stored.
+#[tauri::command]
+#[specta::specta]
+pub async fn get_transfer_rate(
+    uc: State<'_, TransferUseCase>,
+    from_account_id: String,
+    to_account_id: String,
+    date: String,
+) -> Result<Option<i64>, TransferError> {
+    uc.transfer_rate(&from_account_id, &to_account_id, &date)
+        .await
 }

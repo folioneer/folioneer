@@ -1,6 +1,7 @@
 use super::error::{TransferError, TransferTask};
 use crate::context::account::{
     AccountError, AccountServiceContract, AgentRecording, Transaction, TransferPreview,
+    TransferView,
 };
 use crate::context::asset::{AssetClass, AssetServiceContract};
 use crate::context::currency::CurrencyService;
@@ -171,6 +172,32 @@ impl TransferUseCase {
     /// Removes every part of the transfer `transfer_id` together (TRF-040).
     pub async fn cancel_transfer(&self, transfer_id: &str) -> Result<(), TransferError> {
         Ok(self.account_service.cancel_transfer(transfer_id).await?)
+    }
+
+    /// TRF-060 — a transfer read as one from its parts.
+    pub async fn get_transfer(&self, transfer_id: &str) -> Result<TransferView, TransferError> {
+        Ok(self.account_service.transfer_view(transfer_id).await?)
+    }
+
+    /// TRF-061 — the rate a transfer between the two accounts on `date` takes when none is
+    /// given: one within a currency, else the stored rate on or before the date, or none.
+    pub async fn transfer_rate(
+        &self,
+        from_account_id: &str,
+        to_account_id: &str,
+        date: &str,
+    ) -> Result<Option<i64>, TransferError> {
+        let from = self.currency_of(from_account_id).await?;
+        let to = self.currency_of(to_account_id).await?;
+        Transaction::validate_date(date)?;
+        Ok(self
+            .currency_service
+            .resolve_rate_micros(&from, &to, date)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, from = %from, to = %to, err = ?e, "transfer_rate: resolve_rate failed");
+                AccountError::DatabaseError
+            })?)
     }
 
     /// TRF-010 — the asset exists, is not archived and is not a Cash Asset.

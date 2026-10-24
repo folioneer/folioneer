@@ -60,6 +60,9 @@ pub struct JournalRow {
     pub cash_balance: i64,
     /// The agent session that recorded it; none for a transaction the owner typed (AGT-045).
     pub recorded_by: Option<AgentRecording>,
+    /// TRF-062 — for a part of a transfer, the transfer's other account; none otherwise,
+    /// and none for a part left alone (TRF-041).
+    pub transfer_account_id: Option<String>,
 }
 
 /// The account journal of one account, filtered (TXL-060).
@@ -118,6 +121,7 @@ impl AccountJournal {
                     i64::MAX
                 }),
                 recorded_by: None,
+                transfer_account_id: None,
             });
         }
         if filter.newest_first {

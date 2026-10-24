@@ -43,6 +43,7 @@ The transfer is not stored on its own: it is read from its parts, which carry it
 | `date`              | The day of the transfer.                                                            |
 | `quantity_sent`     | What left the sending account: the transfer out's quantity plus its fee in kind's.  |
 | `quantity_received` | What reached the receiving account: the transfer in's quantity.                     |
+| `cost`              | The cost the transfer out moved, in the sending account's currency.                 |
 | `exchange_rate`     | The rate used between the two accounts' currencies; one when they share a currency. |
 | `note`              | Optional free text.                                                                 |
 
@@ -94,6 +95,32 @@ The transfer is not stored on its own: it is read from its parts, which carry it
 
 **TRF-041 — An account removed (backend)**: Deleting an account removes the parts of a transfer it holds, as all its transactions (ACC-005, ACC-006). The parts left in the other account stay, with their figures: a transfer in left alone is an entry at its cost, a transfer out an exit at its cost, a fee in kind a write-off. A part left alone is no longer corrected (TRF-031 still holds); its removal removes what is left of its transfer.
 
+### Window (050–059)
+
+**TRF-050 — The row's action (frontend)**: While the portfolio has another account, each active, non-cash holding row of an asset that is not archived carries a "Transfer" action (FR « Transférer »), after Write off; the Cash Holding row and the as-of view (read-only) have none. It opens the transfer form for that asset.
+
+**TRF-051 — The form (frontend)**: The form, titled "Transfer to another account" (FR « Transfert vers un autre compte »), holds a line naming the asset, the quantity held, its average price and the sending account; the date, the account's last operation date by default, as the other forms; the receiving account, "To account" (FR « Vers le compte »), chosen among the portfolio's other accounts, each shown with its currency, none chosen by default; the quantity sent and the quantity received (FR « Quantité envoyée », « Quantité reçue »), the quantity received following the quantity sent until it is typed; the note; and the action "Record the transfer" (FR « Enregistrer le transfert »).
+
+**TRF-052 — Between currencies (frontend)**: When the receiving account's currency is not the sending one's, the form holds the rate, "Exchange rate {from} → {to}" (FR « Taux de change {from} → {to} »), filled with the rate the core would take for the date (TRF-061) and filled again when the date or the receiving account changes, until the owner types one; under it, "The stored rate on {date} or before; type another to use it instead." (FR « Le taux enregistré au {date} ou avant ; saisissez-en un autre pour l'utiliser. »), the date being the transfer's, or, with none stored, "No rate stored on or before {date}: type one." (FR « Aucun taux enregistré au {date} ou avant : saisissez-en un. »). The transfer is recorded at the rate the field holds. Between accounts of one currency there is no rate field.
+
+**TRF-053 — Its summary (frontend)**: While the quantities are positive figures, the quantity received not above the quantity sent and the quantity sent within what is held, a line says what moves: "Moves {received} {reference} and their cost, {cost} {currency}, to {account}. No cash moves; no realized result." (FR « Transfère {received} {reference} et leur coût, {cost} {currency}, vers {account}. Aucun mouvement d'espèces ; aucun résultat réalisé. »), between currencies the cost converted at the rate after it, "{cost} {from} = {converted} {to} at {rate}" (FR « {cost} {from} = {converted} {to} au taux de {rate} »); and while the quantity received is below the quantity sent, a second line: "The {fee} {reference} not received are written off as a network fee, at their cost, {fee_cost} {currency}." (FR « Les {fee} {reference} non reçus sortent comme frais de réseau, à leur coût, {fee_cost} {currency}. »). The figures are the form's estimate at the average price shown, rounded down as TRF-020 and TRF-022 round; the core takes the cost at the date.
+
+**TRF-054 — Its figures (frontend)**: While no receiving account is chosen, while a quantity is empty, zero, below one micro-unit or not a positive figure, or, between currencies, while the rate is empty or not a positive figure, the record action is inactive. As it is typed, a quantity sent above the quantity held shown in the form is refused under its field, naming what is held, as a write-off's (WOF-053), and a quantity received above the quantity sent under its own, "Above the quantity sent" (FR « Supérieure à la quantité envoyée »); the record action stays inactive.
+
+**TRF-055 — Saving and its refusals (frontend)**: While it saves, the record action is inactive; on success the form closes, "Transfer recorded" (FR « Transfert enregistré ») shows and the holding row shows the new figures. A refusal for lack of units — in the sending account (TRF-010, TRF-012) or, for a correction, in the receiving one (TRF-030), whose cause can be the quantity received: the core names no field — shows under the quantity sent with the wording of SEL-046, for a recording and a correction alike; any other refusal shows below the form as the message for that refusal. The record action stays inactive while the form shows a refusal, until the date, the receiving account, a quantity or the rate changes.
+
+**TRF-056 — In the journals (frontend)**: A transfer out reads "Transfer out" (FR « Transfert sortant »), a transfer in "Transfer in" (FR « Transfert entrant »). Under its type, a line names the transfer's other account (TRF-062) — "to {account} →", "← from {account}" (FR « vers {account} → », « ← depuis {account} ») —, and under a fee in kind's type (WOF-057), "part of the transfer to {account}" (FR « partie du transfert vers {account} »); the account's name opens that account. A part left alone (TRF-041) has no line. These lines are drawn by the journal from the transfer, never stored as a note. A side's Quantity, Unit Price, Exchange Rate, Fees and Total Amount show their stored values, its Realized P&L the neutral placeholder `—` (TRF-023); a fee in kind's columns are a write-off's (WOF-057).
+
+**TRF-057 — Corrected and deleted from the journals (frontend)**: The edit of any part of a transfer, in either journal, opens the transfer form for the whole transfer, with the same title and action, the asset and the receiving account fixed and the fields filled from the transfer read as one (TRF-060), once the sending account's holdings are read; if a read fails, the message for its refusal shows and no form opens, as for the other correction forms (DIV-042) — so for a part left alone. There the quantity held counts the quantity sent back in; the average price shown is the transfer out's own, its cost over its quantity sent (TRF-060); the filled figures count as typed — the quantity received no longer follows the quantity sent, the rate stays the transfer's when the date changes and its line under it (TRF-052) is not shown. Deleting any part removes the whole transfer (TRF-040); the confirmation of a part with its other account says so: "This removes the whole transfer, from both accounts." (FR « Ceci supprime tout le transfert, des deux comptes. »); a part left alone has the journals' own confirmation (TXL-040). A deletion refused (TRF-040) shows its message as any refused deletion does in the journals, and nothing is removed.
+
+### Reads (060–069)
+
+**TRF-060 — Read as one (backend)**: A transfer is read as one from its identity, as its view says: its two accounts, its asset, its quantity sent — the transfer out's quantity plus its fee in kind's —, the cost its transfer out moved, and its date, quantity received, rate and note — the transfer in's (TRF-032). An unknown transfer, or one that has lost a side (TRF-041), is rejected with the error of TRF-030.
+
+**TRF-061 — The rate it would take (backend)**: For two accounts and a date, the core gives the rate a transfer between them on that date takes when none is given (TRF-022): one between accounts of one currency; otherwise the stored rate from the sending account's currency to the receiving one's, the most recent on or before the date, or none. An unknown account, and a date TRF-011 refuses, are rejected with their errors (TRF-010, TRF-011).
+
+**TRF-062 — The other account in the journal (backend)**: Each row of an account journal (TXL-060) that is a part of a transfer carries the transfer's other account: the receiving one for a transfer out and a fee in kind, the sending one for a transfer in. A part left alone (TRF-041) carries none, as does every row that is not a part of a transfer.
+
 ---
 
 ## Workflow
@@ -104,7 +131,22 @@ record (sending, receiving, asset, date, sent, received, rate?)
   ├─ sending account:   [write-off NetworkFee (sent − received)] + transfer out (received)
   └─ receiving account: transfer in (received, cost × rate)
            one write; one TransactionUpdated
+
+window: holding row "Transfer" → form (rate read, TRF-061) → record → journals
+        journal row edit → read as one (TRF-060) → form → correct
+        journal row delete → confirmation → cancel the whole transfer
 ```
+
+## UX Draft
+
+The validated mock is on #511 (folioneer/folioneer-design, `511/`). Where it differs from WOF-057 — a fee in kind's Total Amount — the rule holds.
+
+1. On an active holding row, "Transfer" (after Write off), shown while another account exists, opens the form for that asset (TRF-050, TRF-051).
+2. The owner picks the date and the receiving account and types the quantity sent, and the quantity received when it differs; between currencies the rate is filled and can be typed over; the summary follows (TRF-052 to TRF-054).
+3. "Record the transfer": the form closes and the row shows the new quantity; or a refusal shows and the action waits for a change (TRF-055).
+4. In both journals the sides read with their other account; the edit of any part reopens the form for the whole transfer, the deletion of any part removes it (TRF-056, TRF-057).
+
+States: no other account — no action; the form while the rate is read; a refusal (TRF-055); saved (TRF-055).
 
 ---
 
@@ -116,6 +158,12 @@ record (sending, receiving, asset, date, sent, received, rate?)
 - **ACC-006** — a transfer's parts in another account stay (TRF-041).
 - **FEE-027, FEE-047** — a later transfer out counts as a sale does (TRF-012).
 - **WOF-030, WOF-040, WOF-056** — a fee in kind is corrected and removed with its transfer (TRF-031, TRF-040).
+- **WOF-050, WOF-057, WOF-058** — the Transfer action follows Write off; a fee in kind reads with its transfer and is edited as the transfer (TRF-050, TRF-056, TRF-057).
+- **TXL-060** — a journal row of a part of a transfer carries its other account (TRF-062).
+- **TXL-022** — a transfer side's Type and columns (TRF-056).
+- **TXL-030** — the edit of a part of a transfer opens the transfer form (TRF-057).
+- **TXL-040, TRX-035** — the confirmation of deleting a part of a transfer (TRF-057).
+- **ACD UX Draft** — an active position's actions gain Transfer after Write off (TRF-050).
 - **PRF-084, GPF-040** — the bridges' asset in/out (TRF-026 to TRF-028).
 - **ACD-043, ACD-048** — a transfer out closes a position as a sale does (TRF-024).
 - **PRF-030, PRF-071, PRF-083, ACD-056, GPF-030** — the transfer's flows (TRF-026 to TRF-028).

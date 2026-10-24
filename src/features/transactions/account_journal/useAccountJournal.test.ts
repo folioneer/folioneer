@@ -59,6 +59,7 @@ const JOURNAL: AccountJournal = {
         session: "session-1",
         session_started_at: "2026-10-09T14:32:00+02:00",
       },
+      transfer_account_id: null,
     },
     {
       transaction: tx({ id: "a", asset_id: "asset-1", date: "2024-01-01" }),
@@ -66,6 +67,7 @@ const JOURNAL: AccountJournal = {
       cash_in: null,
       cash_balance: 400 * MICRO,
       recorded_by: null,
+      transfer_account_id: null,
     },
   ],
   asset_ids: ["asset-1", "asset-2"],

@@ -158,13 +158,17 @@
 > returns every part: the fee in kind when there is one, the transfer out, the transfer in. Its
 > error `TransferError` is `AccountError` plus the use case's `AssetNotFound`, `ArchivedAsset`
 > and `TransferOfCash`. `correct_transfer` and `cancel_transfer` act on all the parts at once
-> (TRF-030, TRF-040).
+> (TRF-030, TRF-040). `get_transfer` reads a transfer as one from its parts (TRF-060);
+> `get_transfer_rate` gives the rate a transfer takes when none is given: one within a
+> currency, else the stored rate on or before the date, `None` when none is stored (TRF-061).
 
-| Command            | Args                  | Return             | Errors                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ------------------ | --------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `record_transfer`  | `TransferDTO`         | `Vec<Transaction>` | `AccountNotFound { account_id }`, `TransferToSameAccount`, `AssetNotFound`, `TransferOfCash`, `ArchivedAsset`, `ClosedPosition` (nothing held on the date, or before a later split), `Oversell { available, requested }` (TRF-010), `QuantityNotPositive`, `TransferReceivedAboveSent`, `ExchangeRateNotPositive`, `InvalidDate`, `DateInFuture`, `DateTooOld` (TRF-011), `CascadingOversell` (TRF-012), `SplitCollapsesPosition` (SPL-021 — before a later reverse split), `TransferRateMissing { from_currency, to_currency }`, `TransferRateNotOne` (TRF-022), `DatabaseError` |
-| `correct_transfer` | `CorrectTransferDTO`  | `Vec<Transaction>` | `TransferNotFound` (TRF-030 — unknown, or left without a side), `AccountNotFound { account_id }`, `AssetNotFound`, `TransferOfCash`, `ArchivedAsset`, `ClosedPosition`, `Oversell { available, requested }`, `QuantityNotPositive`, `TransferReceivedAboveSent`, `ExchangeRateNotPositive`, `InvalidDate`, `DateInFuture`, `DateTooOld`, `CascadingOversell` (TRF-030 — either account left short), `SplitCollapsesPosition`, `TransferRateMissing { from_currency, to_currency }`, `TransferRateNotOne`, `DatabaseError`                                                         |
-| `cancel_transfer`  | `transfer_id: String` | `()`               | `TransferNotFound` (TRF-040), `ClosedPosition`, `SplitCollapsesPosition` (SPL-012 / SPL-021 — the receiving account replayed across a later split), `CascadingOversell` (TRF-040 — the receiving account left short), `DatabaseError`                                                                                                                                                                                                                                                                                                                                             |
+| Command             | Args                                                           | Return             | Errors                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------- | -------------------------------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `record_transfer`   | `TransferDTO`                                                  | `Vec<Transaction>` | `AccountNotFound { account_id }`, `TransferToSameAccount`, `AssetNotFound`, `TransferOfCash`, `ArchivedAsset`, `ClosedPosition` (nothing held on the date, or before a later split), `Oversell { available, requested }` (TRF-010), `QuantityNotPositive`, `TransferReceivedAboveSent`, `ExchangeRateNotPositive`, `InvalidDate`, `DateInFuture`, `DateTooOld` (TRF-011), `CascadingOversell` (TRF-012), `SplitCollapsesPosition` (SPL-021 — before a later reverse split), `TransferRateMissing { from_currency, to_currency }`, `TransferRateNotOne` (TRF-022), `DatabaseError` |
+| `correct_transfer`  | `CorrectTransferDTO`                                           | `Vec<Transaction>` | `TransferNotFound` (TRF-030 — unknown, or left without a side), `AccountNotFound { account_id }`, `AssetNotFound`, `TransferOfCash`, `ArchivedAsset`, `ClosedPosition`, `Oversell { available, requested }`, `QuantityNotPositive`, `TransferReceivedAboveSent`, `ExchangeRateNotPositive`, `InvalidDate`, `DateInFuture`, `DateTooOld`, `CascadingOversell` (TRF-030 — either account left short), `SplitCollapsesPosition`, `TransferRateMissing { from_currency, to_currency }`, `TransferRateNotOne`, `DatabaseError`                                                         |
+| `cancel_transfer`   | `transfer_id: String`                                          | `()`               | `TransferNotFound` (TRF-040), `ClosedPosition`, `SplitCollapsesPosition` (SPL-012 / SPL-021 — the receiving account replayed across a later split), `CascadingOversell` (TRF-040 — the receiving account left short), `DatabaseError`                                                                                                                                                                                                                                                                                                                                             |
+| `get_transfer`      | `transfer_id: String`                                          | `TransferView`     | `TransferNotFound` (TRF-060 — unknown, or left without a side), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `get_transfer_rate` | `from_account_id: String, to_account_id: String, date: String` | `Option<i64>`      | `AccountNotFound { account_id }` (TRF-061), `InvalidDate`, `DateInFuture`, `DateTooOld` (TRF-011), `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ### Interest Credit
 
@@ -410,6 +414,20 @@ struct TransferDTO {
     quantity_received: i64,      // micro-units; strictly positive, not above quantity_sent
     exchange_rate: Option<i64>,  // micros, sending → receiving account currency; None = the stored rate of the date (TRF-022)
     note: Option<String>,
+}
+
+// A transfer read as one from its parts (TRF-060).
+struct TransferView {
+    transfer_id: String,
+    from_account_id: String,     // the transfer out's account
+    to_account_id: String,       // the transfer in's account
+    asset_id: String,
+    date: String,                // the transfer in's
+    quantity_sent: i64,          // micro-units: the transfer out's quantity plus its fee in kind's
+    quantity_received: i64,      // micro-units: the transfer in's
+    cost: i64,                   // micro-units, sending account's currency: the transfer out's total amount
+    exchange_rate: i64,          // micros: the transfer in's
+    note: Option<String>,        // the transfer in's
 }
 
 // The corrected fields of a transfer (TRF-030); its accounts and asset are fixed.
@@ -793,6 +811,7 @@ struct JournalRow {
     cash_in: Option<i64>,
     cash_balance: i64,
     recorded_by: Option<AgentRecording>,    // None when this computer holds no mark: the owner's own, or one an agent recorded on another computer (AGT-045)
+    transfer_account_id: Option<String>,    // a part of a transfer: the transfer's other account; None otherwise, and for a part left alone (TRF-062)
 }
 struct AgentRecording {
     agent: String,              // the agent's name, cleaned (AGT-037)
@@ -882,3 +901,4 @@ struct AccountJournal {
 - 2026-09-28 — TXL-060: `get_account_journal(account_id, JournalFilter) -> AccountJournal` — the account's transactions oldest first with `cash_out` / `cash_in` / `cash_balance` from the cash balance rules (interest on the cash line included, INT-023); the filter picks rows (and `newest_first` their order), the balance runs over all.
 - 2026-09-28 — PRF-087: `AccountPerformanceResponse` (returned by `get_account_performance` and `get_global_performance`) gains `lifetime_unavailable: Option<LifetimeUnavailable>` — the earliest zero-cost opening balance in scope, or no invested capital.
 - 2026-10-09 — AGT-045: `JournalRow` gains `recorded_by: Option<AgentRecording>`, the agent session that recorded the transaction.
+- 2026-10-24 — #511 (TRF-060 to TRF-062): `get_transfer -> TransferView` and `get_transfer_rate -> Option<i64>`, both `TransferError`; `JournalRow` gains `transfer_account_id: Option<String>`.
