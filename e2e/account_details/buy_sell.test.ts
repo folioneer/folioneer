@@ -6,7 +6,8 @@
  *   TRX-010 — buy holding → holding appears in account details
  *   TRX-020 — sell holding → quantity decremented in holding row
  *   TRX-030 — sell more than held → the draft check keeps submit disabled
- *   TRX-067 — the form says why: the oversell on the quantity field, with both quantities
+ *   TRX-067 / SEL-046 — the form says why: the oversell on the quantity field, naming what
+ *     was held of the asset on the sale's date
  *
  * Seed strategy:
  *   - TRX-010: account + asset seeded via IPC; buy exercised through the UI.

@@ -5315,8 +5315,7 @@ total_amount: number;
 /**
  * The gain a new sale would realize (TDI-030), in account currency: its proceeds minus
  * the average cost, as of its date, of the quantity sold. `None` for anything but a
- * new sale, and when it cannot be computed — the position at that date does not
- * hold what is sold, or cannot be read (TDI-031).
+ * new sale (TDI-031); a sale that cannot be recorded is the draft's refusal instead.
  */
 realized_pnl: number | null }
 /**

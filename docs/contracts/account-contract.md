@@ -731,7 +731,7 @@ enum EnteredAmount {              // serde tag "mode"
     Total { total: i64, exchange_rate: i64, fees: i64 },           // unit price derived (TRX-060 / SEL-050)
 }
 
-struct TransactionPreview { unit_price: i64, total_amount: i64, realized_pnl: Option<i64> }  // what recording would store; realized_pnl: the gain a new sale would realize (TDI-030), None otherwise, or when the position at the sale's date does not hold what is sold or cannot be read (TDI-031)
+struct TransactionPreview { unit_price: i64, total_amount: i64, realized_pnl: Option<i64> }  // what recording would store; realized_pnl: the gain a new sale would realize (TDI-030), None for a purchase or a sale being corrected (TDI-031)
 struct OpeningBalanceDraft { account_id: String, asset_id: String, date: String, quantity: i64, total_cost: Option<i64> }  // empty strings and None: not filled yet (TRX-066)
 struct OpeningBalancePreview { zero_cost: bool }  // TRX-065: warn, never block
 struct RecordSplitDTO { account_id: String, asset_id: String, date: String, factor: i64, note: Option<String> }  // factor: micros (2 for 1 → 2_000_000), strictly positive and ≠ 1_000_000 (SPL-011)

@@ -652,6 +652,7 @@ impl Account {
                 .iter()
                 .filter(|t| {
                     t.id != tx_id
+                        && t.asset_id == asset_id
                         && (t.date < updated_tx.date
                             || (t.date == updated_tx.date && t.created_at < updated_tx.created_at))
                 })

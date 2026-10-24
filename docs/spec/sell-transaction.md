@@ -34,7 +34,7 @@ All other fields (`id`, `account_id`, `asset_id`, `transaction_type`, `date`, `q
 
 **SEL-011 — Contextual pre-filling (frontend)**: When initiated from a holding row, both the account and the asset are pre-filled in the sell form and cannot be changed by the user.
 
-**SEL-012 — Closed position guard (backend)**: The backend rejects a sell when nothing of the asset is held on the sale's date — the pair's transactions dated on or before that day replayed in order (TRX-036) — with a specific error.
+**SEL-012 — Nothing held on the sale's date (backend)**: The backend rejects a sell when nothing of the asset is held on the sale's date — the pair's transactions dated on or before that day replayed in order (TRX-036) — with a specific error.
 
 ### Creation (020–029)
 
