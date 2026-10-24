@@ -588,7 +588,8 @@
     "column_recorded_by": "Recorded by",
     "recorded_by_agent": "{{agent}} · session of {{when}}",
     "recorded_by_session": "session of {{when}}",
-    "action_write_off": "Write off"
+    "action_write_off": "Write off",
+    "action_transfer": "Transfer"
   },
   "account_details": {
     "title": "Account Details",
@@ -848,6 +849,32 @@
     "error_archived": "The asset is archived: unarchive it to write it off.",
     "action_record": "Record the write-off",
     "recorded": "Write-off recorded."
+  },
+  "transfer": {
+    "modal_title": "Transfer to another account",
+    "holding_line": "held {{quantity}} {{reference}} at an average price of {{price}} · in {{account}}",
+    "form_to_label": "To account",
+    "account_option": "{{name}} ({{currency}})",
+    "form_sent_label": "Quantity sent",
+    "form_received_label": "Quantity received",
+    "form_rate_label": "Exchange rate {{from}} → {{to}}",
+    "rate_stored": "The stored rate on {{date}} or before; type another to use it instead.",
+    "rate_none": "No rate stored on or before {{date}}: type one.",
+    "summary": "Moves {{received}} {{reference}} and their cost, {{cost}}, to {{account}}. No cash moves; no realized result.",
+    "summary_cost": "{{cost}} {{currency}}",
+    "summary_cost_converted": "{{cost}} {{from}} = {{converted}} {{to}} at {{rate}}",
+    "summary_fee": "The {{fee}} {{reference}} not received are written off as a network fee, at their cost, {{cost}} {{currency}}.",
+    "error_over_holding": "More than the {{held}} {{reference}} held.",
+    "error_received_above_sent": "Above the quantity sent",
+    "error_archived": "The asset is archived: unarchive it to transfer it.",
+    "error_TransferToSameAccount": "Choose another account to transfer to.",
+    "error_TransferReceivedAboveSent": "The quantity received is above the quantity sent.",
+    "error_TransferRateNotOne": "Both accounts share a currency: the rate is one.",
+    "error_TransferOfCash": "Cash is not transferred: record a withdrawal and a deposit.",
+    "error_TransferNotFound": "This transfer no longer has both its sides: delete what is left of it.",
+    "error_TransferRateMissing": "No {{from}} → {{to}} rate is stored for this date: type one.",
+    "action_record": "Record the transfer",
+    "recorded": "Transfer recorded."
   },
   "interest": {
     "modal_title": "Record interest",

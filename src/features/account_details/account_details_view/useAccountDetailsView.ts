@@ -10,7 +10,7 @@ import {
   setPerfPeriod as persistPerfPeriod,
   type StoredPerfPeriod,
 } from "@/lib/perfPeriodStorage";
-import { useAppStore } from "@/lib/store";
+import { otherAccounts, useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import { formatIsoDateNumeric, todayIso } from "@/ui/format/date";
 import { accountDetailsGateway, useCachedAssets } from "../gateway";
@@ -25,6 +25,7 @@ import type {
   ModalTarget,
   SellTarget,
   SplitTarget,
+  TransferTarget,
   WriteOffTarget,
 } from "../shared/types";
 import { useAccountDetails } from "./useAccountDetails";
@@ -97,6 +98,7 @@ export function useAccountDetailsView(accountId: string) {
   } | null>(null);
   const [splitTarget, setSplitTarget] = useState<SplitTarget | null>(null);
   const [writeOffTarget, setWriteOffTarget] = useState<WriteOffTarget | null>(null);
+  const [transferTarget, setTransferTarget] = useState<TransferTarget | null>(null);
   const [holdingNoteTarget, setHoldingNoteTarget] = useState<HoldingNoteTarget | null>(null);
 
   // ---------------------------------------------------------------------------
@@ -271,6 +273,25 @@ export function useAccountDetailsView(accountId: string) {
   const handleWriteOffClose = useCallback(() => setWriteOffTarget(null), []);
   const handleWriteOffSuccess = useCallback(() => {
     setWriteOffTarget(null);
+    data.retry();
+  }, [data]);
+
+  // TRF-050 — transfer form, opened per holding from its row action, to the portfolio's
+  // other accounts (TRF-051).
+  const transferDestinations = useMemo(
+    () => otherAccounts(accounts, accountId),
+    [accounts, accountId],
+  );
+  const handleTransferOpen = useCallback(
+    (target: TransferTarget) => {
+      if (isAsOf) return;
+      setTransferTarget(target);
+    },
+    [isAsOf],
+  );
+  const handleTransferClose = useCallback(() => setTransferTarget(null), []);
+  const handleTransferSuccess = useCallback(() => {
+    setTransferTarget(null);
     data.retry();
   }, [data]);
 
@@ -455,6 +476,8 @@ export function useAccountDetailsView(accountId: string) {
     feeScheduleTarget,
     splitTarget,
     writeOffTarget,
+    transferTarget,
+    transferDestinations,
     holdingNoteTarget,
     // Handlers
     handleAddTransaction,
@@ -497,6 +520,9 @@ export function useAccountDetailsView(accountId: string) {
     handleWriteOffOpen,
     handleWriteOffClose,
     handleWriteOffSuccess,
+    handleTransferOpen,
+    handleTransferClose,
+    handleTransferSuccess,
     handleHoldingNoteOpen,
     handleHoldingNoteClose,
     handleHoldingNoteSuccess,

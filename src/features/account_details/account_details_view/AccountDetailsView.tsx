@@ -40,6 +40,7 @@ import { SellTransactionModal } from "../sell_transaction/SellTransactionModal";
 import { PINNED_ACTIONS_HEADER, PINNED_ASSET_HEADER } from "../shared/pinnedColumns";
 import { performanceColumnKey } from "../shared/presenter";
 import { SplitModal } from "../split_transaction/SplitModal";
+import { TransferModal } from "../transfer_transaction/TransferModal";
 import { WithdrawalTransactionModal } from "../withdrawal_transaction/WithdrawalTransactionModal";
 import { WriteOffModal } from "../write_off_transaction/WriteOffModal";
 import { ClosedHoldingRow } from "./ClosedHoldingRow";
@@ -405,6 +406,7 @@ export function AccountDetailsView() {
                         onBuy={view.handleBuyOpen}
                         onSell={view.handleSellOpen}
                         onWriteOff={view.handleWriteOffOpen}
+                        onTransfer={view.handleTransferOpen}
                         onPriceHistory={view.handlePriceHistory}
                         onDeposit={view.handleDepositOpen}
                         onWithdraw={view.handleWithdrawalOpen}
@@ -687,6 +689,18 @@ export function AccountDetailsView() {
           accountId={accountId}
           target={view.writeOffTarget}
           onSubmitSuccess={view.handleWriteOffSuccess}
+        />
+      )}
+
+      {/* TRF-050 — transfer form for a specific holding (opened from its row action) */}
+      {view.transferTarget && (
+        <TransferModal
+          isOpen
+          onClose={view.handleTransferClose}
+          accountId={accountId}
+          target={view.transferTarget}
+          destinations={view.transferDestinations}
+          onSubmitSuccess={view.handleTransferSuccess}
         />
       )}
 

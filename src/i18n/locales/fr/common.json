@@ -588,7 +588,8 @@
     "column_recorded_by": "Enregistré par",
     "recorded_by_agent": "{{agent}} · session du {{when}}",
     "recorded_by_session": "session du {{when}}",
-    "action_write_off": "Sortie sans contrepartie"
+    "action_write_off": "Sortie sans contrepartie",
+    "action_transfer": "Transférer"
   },
   "account_details": {
     "title": "Détails du compte",
@@ -848,6 +849,32 @@
     "error_archived": "L'actif est archivé : désarchivez-le pour enregistrer la sortie.",
     "action_record": "Enregistrer la sortie",
     "recorded": "Sortie enregistrée."
+  },
+  "transfer": {
+    "modal_title": "Transfert vers un autre compte",
+    "holding_line": "détenu {{quantity}} {{reference}} à un prix moyen de {{price}} · dans {{account}}",
+    "form_to_label": "Vers le compte",
+    "account_option": "{{name}} ({{currency}})",
+    "form_sent_label": "Quantité envoyée",
+    "form_received_label": "Quantité reçue",
+    "form_rate_label": "Taux de change {{from}} → {{to}}",
+    "rate_stored": "Le taux enregistré au {{date}} ou avant ; saisissez-en un autre pour l'utiliser.",
+    "rate_none": "Aucun taux enregistré au {{date}} ou avant : saisissez-en un.",
+    "summary": "Transfère {{received}} {{reference}} et leur coût, {{cost}}, vers {{account}}. Aucun mouvement d'espèces ; aucun résultat réalisé.",
+    "summary_cost": "{{cost}} {{currency}}",
+    "summary_cost_converted": "{{cost}} {{from}} = {{converted}} {{to}} au taux de {{rate}}",
+    "summary_fee": "Les {{fee}} {{reference}} non reçus sortent comme frais de réseau, à leur coût, {{cost}} {{currency}}.",
+    "error_over_holding": "Plus que les {{held}} {{reference}} détenus.",
+    "error_received_above_sent": "Supérieure à la quantité envoyée",
+    "error_archived": "L'actif est archivé : désarchivez-le pour le transférer.",
+    "error_TransferToSameAccount": "Choisissez un autre compte vers lequel transférer.",
+    "error_TransferReceivedAboveSent": "La quantité reçue dépasse la quantité envoyée.",
+    "error_TransferRateNotOne": "Les deux comptes partagent une devise : le taux est un.",
+    "error_TransferOfCash": "Les espèces ne se transfèrent pas : enregistrez un retrait et un dépôt.",
+    "error_TransferNotFound": "Ce transfert n'a plus ses deux côtés : supprimez ce qu'il en reste.",
+    "error_TransferRateMissing": "Aucun taux {{from}} → {{to}} n'est enregistré pour cette date : saisissez-en un.",
+    "action_record": "Enregistrer le transfert",
+    "recorded": "Transfert enregistré."
   },
   "interest": {
     "modal_title": "Enregistrer des intérêts",
