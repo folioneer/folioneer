@@ -684,6 +684,37 @@ impl Transaction {
         })
     }
 
+    /// Rebuilds a side of a transfer with its identity kept (TRF-030 correction).
+    #[allow(clippy::too_many_arguments)]
+    pub fn transfer_side_with_id(
+        id: String,
+        created_at: String,
+        account_id: String,
+        asset_id: String,
+        transaction_type: TransactionType,
+        date: String,
+        quantity: i64,
+        total_amount: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+        transfer_id: String,
+    ) -> StdResult<Self, AccountError> {
+        let mut tx = Self::new_transfer_side(
+            account_id,
+            asset_id,
+            transaction_type,
+            date,
+            quantity,
+            total_amount,
+            exchange_rate,
+            note,
+            transfer_id,
+        )?;
+        tx.id = id;
+        tx.created_at = created_at;
+        Ok(tx)
+    }
+
     /// TRF-022 — a cost per unit: the cost over the quantity, rounded down (as TRX-047).
     pub fn unit_cost(total_amount: i64, quantity: i64) -> i64 {
         if quantity <= 0 {

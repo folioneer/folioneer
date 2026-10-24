@@ -1290,7 +1290,7 @@ impl AccountService {
         if account_ids.is_empty() {
             return Err(AccountError::TransferNotFound);
         }
-        let mut accounts = Vec::new();
+        let mut accounts = Vec::with_capacity(account_ids.len());
         for account_id in &account_ids {
             let mut account = load_account(&*self.account_repo, account_id).await?;
             account
@@ -1347,38 +1347,70 @@ impl AccountService {
                 .find(|t| t.transaction_type == kind)
                 .map(|t| (t.id.clone(), t.created_at.clone()))
         };
-        let reuse = |mut tx: Transaction, kind: TransactionType| {
-            if let Some((id, created_at)) = kept(kind) {
-                tx.id = id;
-                tx.created_at = created_at;
-            }
-            tx
+        // A correction keeps each part's identity (TRF-030); a new transfer has none yet.
+        let side = |kind: TransactionType,
+                    account_id: &str,
+                    date: &str,
+                    total_amount: i64,
+                    exchange_rate: i64| match kept(kind) {
+            Some((id, created_at)) => Transaction::transfer_side_with_id(
+                id,
+                created_at,
+                account_id.to_string(),
+                asset_id.clone(),
+                kind,
+                date.to_string(),
+                quantity_received,
+                total_amount,
+                exchange_rate,
+                note.clone(),
+                transfer_id.to_string(),
+            ),
+            None => Transaction::new_transfer_side(
+                account_id.to_string(),
+                asset_id.clone(),
+                kind,
+                date.to_string(),
+                quantity_received,
+                total_amount,
+                exchange_rate,
+                note.clone(),
+                transfer_id.to_string(),
+            ),
         };
         let mut sent_parts = Vec::new();
         if quantity_sent > quantity_received {
-            let fee = Transaction::write_off(
-                from_account_id.to_string(),
-                asset_id.clone(),
-                date.clone(),
-                quantity_sent - quantity_received,
-                WriteOffReason::NetworkFee,
-                note.clone(),
-            )?
+            let quantity = quantity_sent - quantity_received;
+            let fee = match kept(TransactionType::WriteOff) {
+                Some((id, created_at)) => Transaction::write_off_with_id(
+                    id,
+                    from_account_id.to_string(),
+                    asset_id.clone(),
+                    date.clone(),
+                    quantity,
+                    WriteOffReason::NetworkFee,
+                    note.clone(),
+                    created_at,
+                ),
+                None => Transaction::write_off(
+                    from_account_id.to_string(),
+                    asset_id.clone(),
+                    date.clone(),
+                    quantity,
+                    WriteOffReason::NetworkFee,
+                    note.clone(),
+                ),
+            }?
             .with_transfer_id(Some(transfer_id.to_string()));
-            sent_parts.push(reuse(fee, TransactionType::WriteOff));
+            sent_parts.push(fee);
         }
-        let out = Transaction::new_transfer_side(
-            from_account_id.to_string(),
-            asset_id.clone(),
+        sent_parts.push(side(
             TransactionType::TransferOut,
-            date.clone(),
-            quantity_received,
+            from_account_id,
+            &date,
             0,
             1_000_000,
-            note.clone(),
-            transfer_id.to_string(),
-        )?;
-        sent_parts.push(reuse(out, TransactionType::TransferOut));
+        )?);
         let placed_out = sending
             .place_transfer_parts(transfer_id, &asset_id, sent_parts)
             .map_err(to_holding_tx_error)?;
@@ -1387,23 +1419,15 @@ impl AccountService {
             .find(|t| t.transaction_type == TransactionType::TransferOut)
             .map(|t| t.total_amount)
             .unwrap_or(0);
-        let incoming = Transaction::new_transfer_side(
-            to_account_id.to_string(),
-            asset_id.clone(),
+        let incoming = side(
             TransactionType::TransferIn,
-            date,
-            quantity_received,
+            to_account_id,
+            &date,
             super::domain::converted_cost(cost, exchange_rate),
             exchange_rate,
-            note,
-            transfer_id.to_string(),
         )?;
         let placed_in = receiving
-            .place_transfer_parts(
-                transfer_id,
-                &asset_id,
-                vec![reuse(incoming, TransactionType::TransferIn)],
-            )
+            .place_transfer_parts(transfer_id, &asset_id, vec![incoming])
             .map_err(to_holding_tx_error)?;
         let mut written = vec![&mut sending, &mut receiving];
         save_accounts(&*self.account_repo, &mut written).await?;

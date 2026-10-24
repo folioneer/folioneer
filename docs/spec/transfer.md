@@ -82,7 +82,7 @@ The transfer is not stored on its own: it is read from its parts, which carry it
 
 ### Correction (030–039)
 
-**TRF-030 — Corrected together (backend)**: A transfer's date, quantities, rate and note are corrected as one operation, checked again as TRF-010 to TRF-012 and TRF-022 say on the history without it, with the same errors; and refused when the receiving account's replay would then leave a later sale, write-off, management fee or transfer out above what is held at its own date (WOF-032). A correction that names no rate takes the stored rate of its date again (TRF-022). A correction that leaves the quantity received equal to the quantity sent removes the fee in kind, and one that brings it below adds it. Its accounts and its asset are not corrected: a transfer between other accounts, or of another asset, is a new one. A transfer that is unknown, or that has lost a side (TRF-041), is rejected with a specific error. A refusal leaves the transfer as it was.
+**TRF-030 — Corrected together (backend)**: A transfer's date, quantities, rate and note are corrected as one operation, checked again as TRF-010 to TRF-012 and TRF-022 say on the history without it, with the same errors; and refused when the receiving account's replay would then leave a later sale, write-off, management fee or transfer out above what is held at its own date (SEL-032). A correction that names no rate takes the stored rate of its date again (TRF-022). A correction that leaves the quantity received equal to the quantity sent removes the fee in kind, and one that brings it below adds it. Its accounts and its asset are not corrected: a transfer between other accounts, or of another asset, is a new one. A transfer that is unknown, or that has lost a side (TRF-041), is rejected with a specific error. A refusal leaves the transfer as it was.
 
 **TRF-031 — Not corrected by its parts (backend)**: A part of a transfer is not corrected through the transactions' modification (TRX-031): it is rejected with a specific error naming the transfer as what to correct.
 
@@ -90,7 +90,7 @@ The transfer is not stored on its own: it is read from its parts, which carry it
 
 ### Removal (040–049)
 
-**TRF-040 — Cancelled together (backend)**: Removing any part of a transfer — through the transactions' deletion (TRX-034) or the transfer's cancellation — removes its two sides and its fee in kind together, atomically — an unknown transfer is rejected with a specific error; both holdings are replayed from their logs, so removing it restores both exactly. Without the transfer the sending account only holds more; the removal is refused when the receiving account's replay would then leave a later sale, write-off, management fee or transfer out above what is held at its own date (WOF-032), with the same error.
+**TRF-040 — Cancelled together (backend)**: Removing any part of a transfer — through the transactions' deletion (TRX-034) or the transfer's cancellation — removes its two sides and its fee in kind together, atomically — an unknown transfer is rejected with a specific error; both holdings are replayed from their logs, so removing it restores both exactly. Without the transfer the sending account only holds more; the removal is refused when the receiving account's replay would then leave a later sale, write-off, management fee or transfer out above what is held at its own date (SEL-032), with the same error.
 
 **TRF-041 — An account removed (backend)**: Deleting an account removes the parts of a transfer it holds, as all its transactions (ACC-005, ACC-006). The parts left in the other account stay, with their figures: a transfer in left alone is an entry at its cost, a transfer out an exit at its cost, a fee in kind a write-off. A part left alone is no longer corrected (TRF-031 still holds); its removal removes what is left of its transfer.
 
@@ -118,7 +118,7 @@ record (sending, receiving, asset, date, sent, received, rate?)
 - **WOF-030, WOF-040, WOF-056** — a fee in kind is corrected and removed with its transfer (TRF-031, TRF-040).
 - **PRF-084, GPF-040** — the bridges' asset in/out (TRF-026 to TRF-028).
 - **ACD-043, ACD-048** — a transfer out closes a position as a sale does (TRF-024).
-- **PRF-030, PRF-071, PRF-083, PRF-086, ACD-056, GPF-030** — the transfer's flows (TRF-026 to TRF-028).
+- **PRF-030, PRF-071, PRF-083, ACD-056, GPF-030** — the transfer's flows (TRF-026 to TRF-028).
 - **CFR-012** — the parts of a transfer corrected on two computers (TRF-032).
 - **SYN-038** — version 9 carries the transfer kinds and a transaction's transfer (TRF-032).
 
