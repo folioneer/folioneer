@@ -775,10 +775,6 @@ export function transferErrorToI18n(
 }
 
 /**
- * WOF-058 — the average price a recorded write-off left at: the cost it took out over its
- * quantity, micro-units, rounded down; 0 for no quantity.
- */
-/**
  * TRF-057 — a transfer's average price as its edit form shows it: the transfer out's own,
  * the cost it moved over the quantity it took, the quantity received.
  */
@@ -787,6 +783,10 @@ export function transferAveragePriceMicro(transfer: TransferView): number {
   return Number((BigInt(transfer.cost) * 1_000_000n) / BigInt(transfer.quantity_received));
 }
 
+/**
+ * WOF-058 — the average price a recorded write-off left at: the cost it took out over its
+ * quantity, micro-units, rounded down; 0 for no quantity.
+ */
 export function writeOffAveragePriceMicro(tx: Transaction): number {
   if (tx.quantity <= 0) return 0;
   const costMicro = -(tx.realized_pnl ?? 0);
