@@ -187,7 +187,8 @@ impl AgentTools {
                 .get_account_summaries()
                 .await
                 .map_err(|error| unreadable("portfolio_summary", &error))
-                .and_then(|summaries| as_json(&summaries)),
+                .and_then(|summaries| as_json(&summaries))
+                .map(without_creators),
             "list_accounts" => {
                 let accounts = self
                     .account_service
@@ -1174,16 +1175,28 @@ fn kept_text(arguments: &Value, name: &str, longest: usize) -> Result<String, Re
     Ok(typed.to_string())
 }
 
+/// AGT-040 — the account summaries as an agent reads them: the mark of an account an agent
+/// created (AGT-069) is the window's, and names a session's key no agent is given.
+fn without_creators(mut summaries: Value) -> Value {
+    if let Some(rows) = summaries.get_mut("summaries").and_then(Value::as_array_mut) {
+        for row in rows.iter_mut().filter_map(Value::as_object_mut) {
+            row.remove("created_by");
+        }
+    }
+    summaries
+}
+
 /// AGT-068 — an optional text an agent wrote that the portfolio keeps and the window shows,
-/// bounded as `kept_text` bounds a required one.
+/// bounded as `kept_text` bounds a required one; blank, it is none.
 fn optional_kept_text(
     arguments: &Value,
     name: &str,
     longest: usize,
 ) -> Result<Option<String>, Refusal> {
     match raw_text(arguments, name)? {
-        None => Ok(None),
-        Some(_) => kept_text(arguments, name, longest).map(Some),
+        // As the window's form: a blank optional text is none.
+        Some(typed) if !typed.trim().is_empty() => kept_text(arguments, name, longest).map(Some),
+        _ => Ok(None),
     }
 }
 
