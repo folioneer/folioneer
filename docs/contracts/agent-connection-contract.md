@@ -108,8 +108,15 @@ struct ReplacementRequest {
     session: u32,                        // the `AgentSession.id` that asks
     client: String,                      // the agent's name, cleaned (AGT-037)
     asked_at: String,                    // RFC 3339, this computer's time
-    transactions: Vec<TransactionShown>, // the four as they stood when the agent asked: the sale, the withdrawal, the deposit, the purchase
-    transfer: TransferShown,             // the transfer recorded in their place
+    transactions: Vec<ReplacedShown>, // the four as they stood when the agent asked: the sale, the withdrawal, the deposit, the purchase
+    transfer: TransferShown,          // the transfer recorded in their place
+}
+
+// AGT-092 — one of the four a replacement removes, with what it moved, signed.
+struct ReplacedShown {
+    transaction: TransactionShown, // the transaction as it stood when the agent asked
+    holding_moved: Option<i64>,    // micro-units: into the holding, negative out of it; None on the account's cash
+    cash_moved: i64,               // micro-units: into the account's cash, negative out of it
 }
 
 // AGT-091 — the transfer a replacement records, as the owner is shown it.
@@ -120,7 +127,8 @@ struct TransferShown {
     asset_name: String,
     asset_reference: String,
     quantity_sent: i64,           // micro-units: the sale's quantity
-    quantity_received: i64,       // micro-units: the purchase's quantity; less than quantity_sent, the difference is the quantity not received, the fee in kind (TRF-021) the dialog names by its quantity alone (AGT-092)
+    quantity_received: i64,       // micro-units: the purchase's quantity
+    quantity_not_received: Option<i64>, // micro-units: quantity_sent − quantity_received, the fee in kind (TRF-021) the dialog names by its quantity alone (AGT-092); None when all is received
     cost: i64,                    // micro-units, in `from_currency`: the cost the transfer moves
     from_currency: String,        // the sending account's currency
     exchange_rate: Option<i64>,   // micro-units; None between accounts of one currency
@@ -198,3 +206,4 @@ The mark of a transaction an agent recorded (AGT-045) reaches the window in the 
 - 2026-10-24 — #386: `AgentSession` gains `accounts_added` and `last_account` (AGT-068). No command or error changes.
 - 2026-10-24 — #512: the tool `record_transfer` (AGT-065A) is no Tauri command; its parts reach the window as `AgentSession.recordings` and `transactions_recorded` count them. No command, type or error changes.
 - 2026-10-24 — #513: `answer_replacement_request` (AGT-091); `AgentConnectionState` gains `replacements`, with `ReplacementRequest` and `TransferShown`; `AgentConnectionError` gains `ReplacementRequestGone` and `TransactionsNotReplaced { reason }`. The tool `request_transfer_replacement` (AGT-090) is no Tauri command.
+- 2026-10-24 — #513: `TransferShown` gains `quantity_not_received`, and `ReplacementRequest.transactions` are `ReplacedShown`, each with what it moved, signed (AGT-091, AGT-092). No command or error changes.

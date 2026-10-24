@@ -8,6 +8,7 @@ vi.mock("../gateway", () => ({
   answerAgentConnection: vi.fn(),
   answerRemovalRequest: vi.fn(),
   answerChangeRequest: vi.fn(),
+  answerReplacementRequest: vi.fn(),
   disconnectAgent: vi.fn(),
   removeAgentRecordings: vi.fn(),
   onAgentConnectionChanged: vi.fn((callback: () => void) => {
@@ -220,6 +221,65 @@ describe("useAgentConnections", () => {
     act(() => changed?.());
     await waitFor(() => expect(result.current.request).toEqual(request(1)));
     expect(result.current.change).toBeNull();
+  });
+
+  // AGT-091 — replacement requests join the one order: the oldest of the three kinds is
+  // offered, the others wait their turn.
+  it("offers the oldest of the removal, change and replacement requests", async () => {
+    const asked = (id: number) => ({ id, session: 1, client: "agent-1" });
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(
+      state({ removals: [asked(8)], changes: [asked(6)], replacements: [asked(4)] }) as never,
+    );
+    const { result } = renderHook(() => useAgentConnections());
+    await waitFor(() => expect(result.current.replacement).toEqual(asked(4)));
+    expect(result.current.removal).toBeNull();
+    expect(result.current.change).toBeNull();
+
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(
+      state({ removals: [asked(8)], replacements: [asked(9)] }) as never,
+    );
+    act(() => changed?.());
+    await waitFor(() => expect(result.current.removal).toEqual(asked(8)));
+    expect(result.current.replacement).toBeNull();
+
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(
+      state({ requests: [request(1)], replacements: [asked(9)] }) as never,
+    );
+    act(() => changed?.());
+    await waitFor(() => expect(result.current.request).toEqual(request(1)));
+    expect(result.current.replacement).toBeNull();
+  });
+
+  // AGT-092 — the owner's answer to a replacement is sent; one that did not happen says why.
+  it("sends the owner's answer and says why a replacement did not happen", async () => {
+    vi.mocked(gateway.getAgentConnectionState).mockResolvedValue(state());
+    const { result } = renderHook(() => useAgentConnections());
+    await waitFor(() => expect(gateway.getAgentConnectionState).toHaveBeenCalled());
+
+    for (const [error, sentence] of [
+      [
+        { code: "TransactionsNotReplaced", reason: "TransactionChanged" },
+        "agent.replacement_changed",
+      ],
+      [
+        { code: "TransactionsNotReplaced", reason: "TransactionNotFound" },
+        "agent.replacement_gone",
+      ],
+      [
+        { code: "TransactionsNotReplaced", reason: "InsufficientCash" },
+        "error.TransactionsNotReplaced",
+      ],
+      [{ code: "ReplacementRequestGone" }, "error.ReplacementRequestGone"],
+      [{ code: "DatabaseError" }, "error.DatabaseError"],
+    ] as const) {
+      vi.mocked(gateway.answerReplacementRequest).mockResolvedValue({
+        status: "error",
+        error,
+      } as never);
+      act(() => result.current.answerReplacement(3, true));
+      await waitFor(() => expect(showSnackbar).toHaveBeenLastCalledWith(sentence, "error"));
+    }
+    expect(gateway.answerReplacementRequest).toHaveBeenLastCalledWith(3, true);
   });
 
   // AGT-088 — the owner's answer to a change is sent; a change that did not happen says why.

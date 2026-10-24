@@ -10,7 +10,7 @@ use crate::use_cases::transfer::{Replacement, ReplacementError};
 
 use super::transfer::refusal_from_transfer;
 use super::{as_json, figure, shown, AgentTools, Granted, Refusal};
-use crate::agent_connection::connections::{ReplacementAnswer, TransactionShown, TransferShown};
+use crate::agent_connection::connections::{ReplacedShown, ReplacementAnswer, TransferShown};
 
 /// AGT-090 — how many transactions a replacement takes.
 const FOUR: usize = 4;
@@ -110,19 +110,31 @@ fn ids_of(arguments: &Value) -> Result<Vec<String>, Refusal> {
 fn shown_of(
     typed: &[TypedTransaction],
     asked: &Replacement,
-) -> Option<(Vec<TransactionShown>, TransferShown)> {
+) -> Option<(Vec<ReplacedShown>, TransferShown)> {
     let steps = &asked.steps;
     let typed_of = |id: &str| typed.iter().find(|t| t.transaction.id == id);
     let sale = typed_of(&steps.sale.id)?;
     let purchase = typed_of(&steps.purchase.id)?;
+    // AGT-092 — what each step moved: the sale takes its quantity out and brings its cash
+    // in, the withdrawal takes cash out, the deposit brings it in, the purchase brings its
+    // quantity in and takes its cash out.
     let transactions = [
-        &steps.sale,
-        &steps.withdrawal,
-        &steps.deposit,
-        &steps.purchase,
+        (&steps.sale, Some(-1), 1),
+        (&steps.withdrawal, None, -1),
+        (&steps.deposit, None, 1),
+        (&steps.purchase, Some(1), -1),
     ]
     .into_iter()
-    .map(|step| typed_of(&step.id).map(|t| shown(t, &t.transaction)))
+    .map(|(step, holding, cash)| {
+        typed_of(&step.id).map(|t| {
+            let transaction = shown(t, &t.transaction);
+            ReplacedShown {
+                holding_moved: holding.map(|sign| sign * transaction.quantity),
+                cash_moved: cash * transaction.amount,
+                transaction,
+            }
+        })
+    })
     .collect::<Option<Vec<_>>>()?;
     let between_currencies = sale.currency != purchase.currency;
     let converted = asked
@@ -140,6 +152,8 @@ fn shown_of(
         asset_reference: asset.reference.clone(),
         quantity_sent: steps.sale.quantity,
         quantity_received: steps.purchase.quantity,
+        quantity_not_received: Some(steps.sale.quantity - steps.purchase.quantity)
+            .filter(|not_received| *not_received > 0),
         cost: asked.cost(),
         from_currency: sale.currency.clone(),
         exchange_rate: between_currencies.then_some(asked.exchange_rate),

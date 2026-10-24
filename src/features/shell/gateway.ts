@@ -64,6 +64,14 @@ export function answerChangeRequest(
   return commands.answerChangeRequest(requestId, change);
 }
 
+// AGT-091 — the owner's answer to an agent's replacement request.
+export function answerReplacementRequest(
+  requestId: number,
+  replace: boolean,
+): Promise<Result<null, AgentConnectionError>> {
+  return commands.answerReplacementRequest(requestId, replace);
+}
+
 // AGT-034 — the owner disconnects an agent.
 export function disconnectAgent(sessionId: number): Promise<Result<null, AgentConnectionError>> {
   return commands.disconnectAgent(sessionId);
