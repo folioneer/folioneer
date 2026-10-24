@@ -23,6 +23,7 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 | `quantity`         | The quantity written off: strictly positive, micro-units (TRX-024).                                                                       |
 | `write_off_reason` | Why it left: `NetworkFee` (a fee paid in the asset), `Dust` (a remainder too small to use), `Lost` (sent away or lost for good), `Other`. |
 | `note`             | Optional free text.                                                                                                                       |
+| `transfer_id`      | Set only on a fee in kind: the transfer it belongs to (TRF-021). Empty on every other write-off.                                          |
 | `realized_pnl`     | The realized result: the cost taken out, negated (WOF-021).                                                                               |
 
 > A write-off carries **no proceeds, no unit price, no exchange rate and no fees**: the contract gives the stored convention. Every other transaction type carries no `write_off_reason`.
