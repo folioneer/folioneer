@@ -5425,6 +5425,14 @@ async fn agt_072_a_preview_gives_the_refusal_of_the_real_call() {
             "record_purchase",
             json!({ "account": "PEA", "asset": "CW8", "quantity": 1, "price": 1, "date": "2099-01-01" }),
         ),
+        (
+            "record_transfer",
+            json!({ "from": "PEA", "to": "PEA", "asset": "CW8", "quantity": 1, "date": "2026-03-01" }),
+        ),
+        (
+            "record_transfer",
+            json!({ "from": "PEA", "to": "NOPE", "asset": "CW8", "quantity": 1, "date": "2026-03-01" }),
+        ),
     ] {
         let previewed = bench
             .tools
@@ -5886,8 +5894,20 @@ async fn agt_065a_a_session_records_a_transfer() {
     .expect("recorded");
     assert_eq!(recorded["status"], "recorded");
     assert_eq!(
-        (recorded["from"].clone(), recorded["to"].clone()),
-        (json!("PEA"), json!("Wallet"))
+        [
+            &recorded["from"],
+            &recorded["from_currency"],
+            &recorded["to"],
+            &recorded["to_currency"],
+            &recorded["asset"]
+        ],
+        [
+            &json!("PEA"),
+            &json!("EUR"),
+            &json!("Wallet"),
+            &json!("EUR"),
+            &json!("CW8")
+        ]
     );
     let parts = recorded["transactions"].as_array().expect("parts").clone();
     assert_eq!(parts.len(), 3);
@@ -5903,6 +5923,7 @@ async fn agt_065a_a_session_records_a_transfer() {
     }
     let told = bench.connections.sessions().remove(0);
     assert_eq!(told.recordings, 5, "each part is a transaction recorded");
+    assert_eq!(told.transactions_recorded, 5);
     assert_eq!(
         told.last_recording.expect("a last recording").kind,
         TransactionType::TransferIn
@@ -5945,4 +5966,162 @@ async fn agt_065a_a_session_records_a_transfer() {
         .await
         .expect("removed");
     assert_eq!((removal.removed, removal.kept), (4, 0));
+
+    // TRF-022 — between currencies a rate is needed: none stored refuses the transfer.
+    let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&bench.accounts) as _;
+    let assets: Arc<dyn AssetServiceContract> = Arc::clone(&bench.assets) as _;
+    AccountCreationUseCase::new(accounts, assets)
+        .create(
+            "US Broker".to_string(),
+            String::new(),
+            "USD".to_string(),
+            false,
+        )
+        .await
+        .expect("account");
+    // The removal took the session's deposit and purchase with it.
+    call(
+        "record_deposit",
+        json!({ "account": "PEA", "amount": 2000, "date": "2019-01-15" }),
+    )
+    .await
+    .expect("deposited");
+    call("record_purchase", json!({ "account": "PEA", "asset": "CW8", "quantity": 10, "price": 100, "date": "2019-03-01" }))
+        .await
+        .expect("bought");
+    assert_eq!(
+        call("record_transfer", with(json!({ "to": "US Broker" })))
+            .await
+            .expect_err("refused")
+            .code,
+        "TransferRateMissing"
+    );
+    assert_eq!(
+        call(
+            "record_transfer",
+            with(json!({ "to": "US Broker", "rate": 0 }))
+        )
+        .await
+        .expect_err("refused")
+        .code,
+        "ExchangeRateNotPositive"
+    );
+    let converted = call(
+        "record_transfer",
+        with(json!({ "to": "US Broker", "rate": "1.1" })),
+    )
+    .await
+    .expect("recorded");
+    assert_eq!(converted["to_currency"], "USD");
+    assert_eq!(converted["transactions"][1]["exchange_rate"], 1_100_000);
+}
+
+// AGT-047 / AGT-065A — every part of a transfer takes a place of the session's limit, checked
+// before the transfer: one that would pass it is refused whole.
+#[tokio::test]
+async fn agt_065a_a_transfer_fits_within_the_limit() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&bench.accounts) as _;
+    let assets: Arc<dyn AssetServiceContract> = Arc::clone(&bench.assets) as _;
+    AccountCreationUseCase::new(accounts, assets)
+        .create(
+            "Wallet".to_string(),
+            String::new(),
+            "EUR".to_string(),
+            false,
+        )
+        .await
+        .expect("account");
+    bench
+        .tools
+        .call(
+            &granted,
+            "record_deposit",
+            &json!({ "account": "PEA", "amount": 2000, "date": "2019-01-15" }),
+        )
+        .await
+        .expect("deposited");
+    bench
+        .tools
+        .call(&granted, "record_purchase", &json!({ "account": "PEA", "asset": "CW8", "quantity": 10, "price": 100, "date": "2019-03-01" }))
+        .await
+        .expect("bought");
+    for _ in 2..super::connections::MAX_RECORDINGS - 2 {
+        granted.count_recording();
+    }
+    let transfer = |received: i64| json!({ "from": "PEA", "to": "Wallet", "asset": "CW8", "quantity": 4, "received": received, "date": "2019-06-01" });
+    assert_eq!(
+        bench
+            .tools
+            .call(&granted, "record_transfer", &transfer(3))
+            .await
+            .expect_err("three parts do not fit in two places")
+            .code,
+        "SessionLimitReached"
+    );
+    let recorded = bench
+        .tools
+        .call(&granted, "record_transfer", &transfer(4))
+        .await
+        .expect("two parts fit");
+    assert_eq!(recorded["transactions"].as_array().map(Vec::len), Some(2));
+    assert!(!granted.may_record_one_more());
+}
+
+// AGT-049 / AGT-065A — a transfer whose parts cannot be marked is undone whole.
+#[tokio::test]
+async fn agt_065a_a_transfer_that_cannot_be_marked_is_undone() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&bench.accounts) as _;
+    let assets: Arc<dyn AssetServiceContract> = Arc::clone(&bench.assets) as _;
+    AccountCreationUseCase::new(accounts, assets)
+        .create(
+            "Wallet".to_string(),
+            String::new(),
+            "EUR".to_string(),
+            false,
+        )
+        .await
+        .expect("account");
+    for (tool, arguments) in [
+        (
+            "record_deposit",
+            json!({ "account": "PEA", "amount": 2000, "date": "2019-01-15" }),
+        ),
+        (
+            "record_purchase",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 10, "price": 100, "date": "2019-03-01" }),
+        ),
+    ] {
+        bench
+            .tools
+            .call(&granted, tool, &arguments)
+            .await
+            .expect("recorded");
+    }
+    sqlx::query("DROP TABLE agent_recordings")
+        .execute(&bench.pool)
+        .await
+        .expect("the marks cannot be written");
+
+    let refused = bench
+        .tools
+        .call(
+            &granted,
+            "record_transfer",
+            &json!({ "from": "PEA", "to": "Wallet", "asset": "CW8", "quantity": 4, "received": 3, "date": "2019-06-01" }),
+        )
+        .await
+        .expect_err("not marked");
+    assert_eq!(refused.code, "NotRecorded");
+    let parts: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM transactions WHERE transfer_id IS NOT NULL")
+            .fetch_one(&bench.pool)
+            .await
+            .expect("count");
+    assert_eq!(parts, 0, "the transfer is undone whole");
 }

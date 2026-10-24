@@ -5,10 +5,12 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::context::account::{AccountServiceContract, AgentRecording, Transaction};
+use crate::context::account::AgentRecording;
 use crate::core::BACKEND;
 use crate::use_cases::holding_transaction::{code_of, refusal_from_account, NamedTarget};
-use crate::use_cases::transfer::{TransferError, TransferFigures, TransferTask};
+use crate::use_cases::transfer::{
+    AgentTransferError, TransferError, TransferFigures, TransferTask,
+};
 
 use super::{
     amount, as_json, figure, note, optional_text, portfolio_unreadable, session_limit_reached,
@@ -39,6 +41,18 @@ impl AgentTools {
             return Err(session_limit_reached());
         }
         let typed = transfer_of(arguments)?;
+        // AGT-065A — each part takes a place of the limit: the two sides and a fee in kind.
+        let part_count = if typed
+            .received
+            .is_some_and(|received| received < typed.quantity)
+        {
+            3
+        } else {
+            2
+        };
+        if !granted.may_record(part_count) {
+            return Err(session_limit_reached());
+        }
         let (sending, receiving, figures) = self.named(typed).await?;
         let mark = AgentRecording {
             agent: granted.client.clone(),
@@ -46,7 +60,6 @@ impl AgentTools {
             session_started_at: granted.started_at.clone(),
         };
         let transfer = Arc::clone(&self.transfer);
-        let account_service = Arc::clone(&self.account_service);
         let (from_id, to_id, asset_id) = (
             sending.account_id.clone(),
             receiving.account_id.clone(),
@@ -56,10 +69,9 @@ impl AgentTools {
         // becomes of the connection that asked.
         let outcome = tokio::spawn(async move {
             let parts = transfer
-                .record_transfer(&from_id, &to_id, asset_id, figures)
+                .record_transfer_by_agent(&from_id, &to_id, asset_id, figures, &mark)
                 .await
-                .map_err(|error| refusal_from_transfer(&error))?;
-            marked(&*account_service, &parts, &mark).await?;
+                .map_err(|error| refusal_from_agent_transfer(&error))?;
             Ok::<_, Refusal>(parts)
         })
         .await
@@ -70,7 +82,9 @@ impl AgentTools {
         let parts = outcome.inspect_err(|refusal| {
             // Parts that stayed without their mark were recorded all the same (AGT-047).
             if refusal.code == "RecordedNotMarked" {
-                granted.count_recording();
+                for _ in 0..part_count {
+                    granted.count_recording();
+                }
             }
         })?;
         for _ in &parts {
@@ -174,32 +188,18 @@ fn transfer_of(arguments: &Value) -> Result<TypedTransfer, Refusal> {
     })
 }
 
-/// AGT-045 / AGT-049 — marks every part; when one cannot be, the transfer is undone.
-async fn marked(
-    account_service: &dyn AccountServiceContract,
-    parts: &[Transaction],
-    mark: &AgentRecording,
-) -> Result<(), Refusal> {
-    for part in parts {
-        let Err(error) = account_service.mark_agent_recording(&part.id, mark).await else {
-            continue;
-        };
-        tracing::error!(target: BACKEND, transaction = %part.id, err = ?error, "agent transfer: a part not marked, undoing the transfer");
-        let Some(transfer_id) = part.transfer_id.as_deref() else {
-            return Err(not_undone());
-        };
-        return match account_service.cancel_transfer(transfer_id).await {
-            Ok(()) => Err(Refusal {
-                code: "NotRecorded".to_string(),
-                message: "the transfer could not be marked as an agent's, so nothing was recorded: try again".to_string(),
-            }),
-            Err(error) => {
-                tracing::error!(target: BACKEND, transfer = %transfer_id, err = ?error, "agent transfer: not marked and not undone");
-                Err(not_undone())
-            }
-        };
+/// AGT-049 — a transfer refused, or not marked and undone or not.
+fn refusal_from_agent_transfer(error: &AgentTransferError) -> Refusal {
+    match error {
+        AgentTransferError::Refused(error) => refusal_from_transfer(error),
+        AgentTransferError::NotMarked { undone: true } => Refusal {
+            code: "NotRecorded".to_string(),
+            message:
+                "the transfer could not be marked as an agent's, so nothing was recorded: try again"
+                    .to_string(),
+        },
+        AgentTransferError::NotMarked { undone: false } => not_undone(),
     }
-    Ok(())
 }
 
 fn not_undone() -> Refusal {
