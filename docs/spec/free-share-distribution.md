@@ -63,7 +63,7 @@ A quantity-only corporate event: shares of a held asset received for free, recor
 
 **FSD-040 — Edit (frontend + backend)**: A recorded distribution can be edited through the existing transaction-correction flow (TXL). Editing re-applies the chronological replay for the `(account, asset)` pair (TRX-031/036). Editable fields: `date`, `quantity`, and `note`. The distributing asset (`asset_id`) is **immutable** on edit — changing it requires deleting and re-recording. The FSD-011 eligibility guards are re-evaluated on edit. A successful edit publishes `TransactionUpdated` (FSD-026).
 
-**FSD-041 — Delete (frontend + backend)**: A recorded distribution can be deleted through the existing cancel flow. Deletion triggers a chronological replay with the free shares removed. If removing them would drive the running holding quantity below what any later Sell consumes (i.e. a later sell would oversell), the deletion is rejected with a specific error — the same replay integrity guard that protects sells today. A successful delete publishes `TransactionUpdated` (FSD-026).
+**FSD-041 — Delete (frontend + backend)**: A recorded distribution can be deleted through the existing cancel flow. Deletion triggers a chronological replay with the free shares removed. If removing them would drive the running holding quantity below what any later Sell consumes (i.e. a later sell would oversell), the deletion is rejected with a specific error — the same replay integrity guard that protects sells today. A successful delete publishes `TransactionUpdated` (FSD-026). A later transfer out counts as a sale does (TRF-012).
 
 ### Display (050–059)
 

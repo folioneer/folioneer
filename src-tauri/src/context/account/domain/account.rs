@@ -49,6 +49,12 @@ pub enum AccountChange {
     },
 }
 
+/// TRF-022 — a cost in the sending account's currency, converted at `exchange_rate`
+/// (micro-units) into the receiving account's, rounded down.
+pub fn converted_cost(cost: i64, exchange_rate: i64) -> i64 {
+    (cost as i128 * exchange_rate as i128 / 1_000_000) as i64
+}
+
 /// Whether a holding replay enforces the ledger invariants (oversell, insufficient cash,
 /// split guards) as every local write does, or tolerates them as a merged ledger must
 /// (CFR-042): an inconsistent holding is kept, with its negative figures, for the user to
@@ -473,6 +479,10 @@ impl Account {
             .iter()
             .find(|t| t.id == tx_id)
             .ok_or(AccountError::TransactionNotFound)?;
+        // TRF-031 — a part of a transfer is corrected as its transfer.
+        if existing.is_transfer_part() {
+            return Err(AccountError::PartOfTransfer.into());
+        }
 
         let tx_type = existing.transaction_type;
         let asset_id = existing.asset_id.clone();
@@ -589,7 +599,9 @@ impl Account {
                     | TransactionType::ManagementFee
                     | TransactionType::Interest
                     | TransactionType::Split
-                    | TransactionType::WriteOff,
+                    | TransactionType::WriteOff
+                    | TransactionType::TransferOut
+                    | TransactionType::TransferIn,
                     _,
                 ) => (unit_price, 0),
             };
@@ -1049,6 +1061,10 @@ impl Account {
             .iter()
             .find(|t| t.id == tx_id && t.transaction_type == TransactionType::WriteOff)
             .ok_or(AccountError::TransactionNotFound)?;
+        // TRF-031 — a fee in kind is corrected as its transfer.
+        if existing.is_transfer_part() {
+            return Err(AccountError::PartOfTransfer.into());
+        }
         let corrected = Transaction::write_off_with_id(
             tx_id.to_string(),
             self.id.clone(),
@@ -1060,6 +1076,262 @@ impl Account {
             existing.created_at.clone(),
         )?;
         self.splice_correction(tx_id, corrected).cloned()
+    }
+
+    /// The parts of the transfer `transfer_id` this account holds, in replay order.
+    pub fn transfer_parts(&self, transfer_id: &str) -> Vec<&Transaction> {
+        self.transactions
+            .iter()
+            .filter(|t| t.transfer_id.as_deref() == Some(transfer_id))
+            .collect()
+    }
+
+    /// TRF-020/021/030 — places the parts of a transfer this account holds: `parts` replace
+    /// those `transfer_id` had here (none for a new transfer). A part whose id it had is
+    /// updated, a new one inserted, one no longer among `parts` deleted. The holding is
+    /// replayed with the invariants enforced — what is held at each later date stays held
+    /// (TRF-010, TRF-012, TRF-030) — and each transfer out takes the cost it moves; a
+    /// refusal leaves the account as it was. Returns the parts as placed.
+    pub fn place_transfer_parts(
+        &mut self,
+        transfer_id: &str,
+        asset_id: &str,
+        parts: Vec<Transaction>,
+    ) -> Result<Vec<Transaction>> {
+        Self::ensure_tradable(asset_id)?;
+        let before = self.transactions.clone();
+        let previous: Vec<String> = self
+            .transfer_parts(transfer_id)
+            .iter()
+            .map(|t| t.id.clone())
+            .collect();
+        // TRF-010 / TRF-012 — what a transfer out and its fee take is held just before
+        // them, the transfer itself left out.
+        let taken: i64 = parts
+            .iter()
+            .filter(|t| {
+                matches!(
+                    t.transaction_type,
+                    TransactionType::TransferOut | TransactionType::WriteOff
+                )
+            })
+            .map(|t| t.quantity)
+            .sum();
+        if let Some(date) = parts.first().map(|t| t.date.clone()) {
+            if taken > 0 {
+                let others: Vec<Transaction> = self
+                    .transactions
+                    .iter()
+                    .filter(|t| t.transfer_id.as_deref() != Some(transfer_id))
+                    .cloned()
+                    .collect();
+                let held = Self::reconstruct_holding_as_of(&others, asset_id, &date).quantity;
+                Self::ensure_held(held, taken)?;
+            }
+        }
+        self.transactions
+            .retain(|t| t.transfer_id.as_deref() != Some(transfer_id));
+        self.transactions.extend(parts);
+        let pair_txs: Vec<&Transaction> = self
+            .transactions
+            .iter()
+            .filter(|t| t.asset_id == asset_id)
+            .collect();
+        let (holding, pnl_map) = match self.recalculate_holding(asset_id, &pair_txs) {
+            Ok(result) => result,
+            Err(e) => {
+                self.transactions = before;
+                return Err(e);
+            }
+        };
+        let mut placed = Vec::new();
+        for tx in self
+            .transactions
+            .iter_mut()
+            .filter(|t| t.transfer_id.as_deref() == Some(transfer_id))
+        {
+            match tx.transaction_type {
+                TransactionType::TransferOut => {
+                    let cost = pnl_map.get(&tx.id).copied().unwrap_or(0);
+                    tx.total_amount = cost;
+                    tx.unit_price = Transaction::unit_cost(cost, tx.quantity);
+                }
+                TransactionType::WriteOff => tx.realized_pnl = pnl_map.get(&tx.id).copied(),
+                _ => {}
+            }
+            placed.push(tx.clone());
+        }
+        for id in &previous {
+            if !placed.iter().any(|t| &t.id == id) {
+                self.pending_changes
+                    .push(AccountChange::TransactionDeleted(id.clone()));
+            }
+        }
+        for tx in &placed {
+            self.pending_changes.push(if previous.contains(&tx.id) {
+                AccountChange::TransactionUpdated(tx.clone())
+            } else {
+                AccountChange::TransactionInserted(tx.clone())
+            });
+        }
+        self.refresh_leaving(asset_id, &pnl_map, transfer_id);
+        self.pending_changes
+            .push(AccountChange::HoldingUpserted(holding.clone()));
+        self.upsert_holding_in_memory(holding);
+        Ok(placed)
+    }
+
+    /// TRF-040 — removes the parts of the transfer `transfer_id` this account holds and
+    /// replays the holding with the invariants enforced: a later sale, write-off, management
+    /// fee or transfer out left short refuses it, the account left as it was.
+    pub fn remove_transfer_parts(&mut self, transfer_id: &str) -> Result<()> {
+        let Some(asset_id) = self
+            .transfer_parts(transfer_id)
+            .first()
+            .map(|t| t.asset_id.clone())
+        else {
+            return Ok(());
+        };
+        let before = self.transactions.clone();
+        let removed: Vec<String> = self
+            .transfer_parts(transfer_id)
+            .iter()
+            .map(|t| t.id.clone())
+            .collect();
+        self.transactions
+            .retain(|t| t.transfer_id.as_deref() != Some(transfer_id));
+        let pair_txs: Vec<&Transaction> = self
+            .transactions
+            .iter()
+            .filter(|t| t.asset_id == asset_id)
+            .collect();
+        if pair_txs.is_empty() {
+            self.holdings
+                .retain(|h| !(h.account_id == self.id && h.asset_id == asset_id));
+            self.pending_changes.push(AccountChange::HoldingDeleted {
+                account_id: self.id.clone(),
+                asset_id: asset_id.clone(),
+            });
+        } else {
+            let (holding, pnl_map) = match self.recalculate_holding(&asset_id, &pair_txs) {
+                Ok(result) => result,
+                Err(e) => {
+                    self.transactions = before;
+                    return Err(e);
+                }
+            };
+            self.refresh_leaving(&asset_id, &pnl_map, transfer_id);
+            self.pending_changes
+                .push(AccountChange::HoldingUpserted(holding.clone()));
+            self.upsert_holding_in_memory(holding);
+        }
+        for id in removed {
+            self.pending_changes
+                .push(AccountChange::TransactionDeleted(id));
+        }
+        Ok(())
+    }
+
+    /// The realized P&L of the asset's sales and write-offs, as the replay `pnl_map` gives
+    /// them, for every one outside `transfer_id` whose figure moved (SEL-033).
+    fn refresh_leaving(
+        &mut self,
+        asset_id: &str,
+        pnl_map: &std::collections::HashMap<String, i64>,
+        transfer_id: &str,
+    ) {
+        for tx in self
+            .transactions
+            .iter_mut()
+            .filter(|t| t.asset_id == asset_id && t.transfer_id.as_deref() != Some(transfer_id))
+        {
+            let changed = match tx.transaction_type {
+                TransactionType::Sell | TransactionType::WriteOff => {
+                    let pnl = pnl_map.get(&tx.id).copied();
+                    let changed = tx.realized_pnl != pnl;
+                    tx.realized_pnl = pnl;
+                    changed
+                }
+                // TRF-025 — a transfer out is re-costed by `restate_transfers_out`, which
+                // tells its transfer in to follow.
+                _ => false,
+            };
+            if changed {
+                self.pending_changes
+                    .push(AccountChange::TransactionUpdated(tx.clone()));
+            }
+        }
+    }
+
+    /// TRF-025 — gives every transfer out of this account the cost the replay now moves:
+    /// a write that changed the average price before one re-costs it. Returns the
+    /// transfers whose cost moved, with that cost, for their transfers in to follow.
+    pub fn restate_transfers_out(&mut self) -> Vec<(String, i64)> {
+        let assets: std::collections::BTreeSet<String> = self
+            .transactions
+            .iter()
+            .filter(|t| t.transaction_type == TransactionType::TransferOut)
+            .map(|t| t.asset_id.clone())
+            .collect();
+        let mut moved = Vec::new();
+        for asset_id in assets {
+            let pair_txs: Vec<&Transaction> = self
+                .transactions
+                .iter()
+                .filter(|t| t.asset_id == asset_id)
+                .collect();
+            let Ok((_, pnl_map)) = self.replay_holding(&asset_id, &pair_txs, Invariants::Tolerated)
+            else {
+                continue;
+            };
+            for tx in self.transactions.iter_mut().filter(|t| {
+                t.asset_id == asset_id && t.transaction_type == TransactionType::TransferOut
+            }) {
+                let cost = pnl_map.get(&tx.id).copied().unwrap_or(0);
+                if tx.total_amount != cost {
+                    tx.total_amount = cost;
+                    tx.unit_price = Transaction::unit_cost(cost, tx.quantity);
+                    self.pending_changes
+                        .push(AccountChange::TransactionUpdated(tx.clone()));
+                    if let Some(transfer_id) = &tx.transfer_id {
+                        moved.push((transfer_id.clone(), cost));
+                    }
+                }
+            }
+        }
+        moved
+    }
+
+    /// TRF-025 — gives the transfer in of `transfer_id` the cost its transfer out now moves,
+    /// converted at its recorded rate (TRF-022), and replays the receiving holding. A cost
+    /// that does not move it leaves the account as it was; `false` when it has none here.
+    pub fn recost_transfer_in(&mut self, transfer_id: &str, sending_cost: i64) -> Result<bool> {
+        let Some(tx) = self.transactions.iter_mut().find(|t| {
+            t.transfer_id.as_deref() == Some(transfer_id)
+                && t.transaction_type == TransactionType::TransferIn
+        }) else {
+            return Ok(false);
+        };
+        let cost = converted_cost(sending_cost, tx.exchange_rate);
+        if tx.total_amount == cost {
+            return Ok(true);
+        }
+        tx.total_amount = cost;
+        tx.unit_price = Transaction::unit_cost(cost, tx.quantity);
+        let asset_id = tx.asset_id.clone();
+        self.pending_changes
+            .push(AccountChange::TransactionUpdated(tx.clone()));
+        let pair_txs: Vec<&Transaction> = self
+            .transactions
+            .iter()
+            .filter(|t| t.asset_id == asset_id)
+            .collect();
+        let (holding, pnl_map) = self.recalculate_holding(&asset_id, &pair_txs)?;
+        self.refresh_leaving(&asset_id, &pnl_map, transfer_id);
+        self.pending_changes
+            .push(AccountChange::HoldingUpserted(holding.clone()));
+        self.upsert_holding_in_memory(holding);
+        Ok(true)
     }
 
     /// Aggregate-root method: applies a pre-built Split transaction to this
@@ -1467,10 +1739,35 @@ impl Account {
 
         for t in &txs_by_date {
             match t.transaction_type {
-                TransactionType::Purchase | TransactionType::OpeningBalance => {
+                // TRF-020 — a transfer in enters at the cost it moved, as an opening balance.
+                TransactionType::Purchase
+                | TransactionType::OpeningBalance
+                | TransactionType::TransferIn => {
                     let qty = t.quantity as i128;
                     total_quantity += qty;
                     vwap_numerator += t.total_amount as i128 * MICRO;
+                }
+                // TRF-020/023/024 — a transfer out leaves at the average price at its place,
+                // the cost it moves, kept in the map under its id; it realizes nothing and,
+                // leaving nothing held, closes the position as a sale does.
+                TransactionType::TransferOut => {
+                    if enforced && t.quantity as i128 > total_quantity {
+                        return Err(AccountError::CascadingOversell.into());
+                    }
+                    let vwap_before: i64 = if total_quantity > 0 {
+                        (vwap_numerator / total_quantity) as i64
+                    } else {
+                        0
+                    };
+                    last_vwap = vwap_before;
+                    pnl_map.insert(
+                        t.id.clone(),
+                        -Self::compute_realized_pnl(0, vwap_before, t.quantity),
+                    );
+                    last_sold_date = Some(t.date.clone());
+                    let qty = t.quantity as i128;
+                    vwap_numerator -= vwap_before as i128 * qty;
+                    total_quantity -= qty;
                 }
                 // WOF-020/021 — a write-off leaves as a sale does, with no proceeds.
                 TransactionType::Sell | TransactionType::WriteOff => {
@@ -1692,9 +1989,24 @@ impl Account {
         let mut last_sold_date: Option<String> = None;
         for t in &txs {
             match t.transaction_type {
-                TransactionType::Purchase | TransactionType::OpeningBalance => {
+                TransactionType::Purchase
+                | TransactionType::OpeningBalance
+                | TransactionType::TransferIn => {
                     total_quantity += t.quantity as i128;
                     vwap_numerator += t.total_amount as i128 * MICRO;
+                }
+                // TRF-020/023 — a transfer out leaves at its average cost, realizing nothing.
+                TransactionType::TransferOut => {
+                    let vwap_before: i64 = if total_quantity > 0 {
+                        (vwap_numerator / total_quantity) as i64
+                    } else {
+                        0
+                    };
+                    last_vwap = vwap_before;
+                    last_sold_date = Some(t.date.clone());
+                    let qty = t.quantity as i128;
+                    vwap_numerator -= vwap_before as i128 * qty;
+                    total_quantity -= qty;
                 }
                 // WOF-020/021 — a write-off leaves as a sale does, with no proceeds.
                 TransactionType::Sell | TransactionType::WriteOff => {
@@ -1779,7 +2091,9 @@ impl Account {
             | TransactionType::FreeShares
             | TransactionType::ManagementFee
             | TransactionType::Split
-            | TransactionType::WriteOff => CashEffect::None,
+            | TransactionType::WriteOff
+            | TransactionType::TransferOut
+            | TransactionType::TransferIn => CashEffect::None,
         }
     }
 
@@ -2130,6 +2444,13 @@ pub trait AccountRepository: Send + Sync {
     /// Atomically applies all pending changes accumulated by aggregate operations.
     /// Clears `pending_changes` on the aggregate after a successful commit.
     async fn save(&self, account: &mut Account) -> Result<()>;
+    /// Persists the pending changes of every account in `accounts` in one database
+    /// transaction: all of them or none (TRF-020, TRF-025, TRF-040).
+    /// One repository writing several aggregates of its own, not a use case opening a
+    /// transaction across contexts (`docs/ddd-divergences.md` § 19, until ADR-006 lands).
+    async fn save_all<'a>(&self, accounts: &mut [&'a mut Account]) -> Result<()>;
+    /// The accounts holding a part of the transfer `transfer_id`, sending side first.
+    async fn transfer_accounts(&self, transfer_id: &str) -> Result<Vec<String>>;
     /// Stamps `rank` on every account, transaction, fee schedule, fee catch-up position, and
     /// holding note whose rank columns are still NULL (CFR-014, D6), on `conn` — the first
     /// publish's enrolment transaction (SYN-013). Returns how many rows were stamped.

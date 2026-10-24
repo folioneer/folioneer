@@ -77,6 +77,30 @@ also counted apart (WOF). Its reason is one of `NetworkFee`, `Dust`, `Lost`, `Ot
 
 > Status: confirmed
 
+### Transfer
+
+A holding's quantity moved from one account to another of the same portfolio, at its cost: no cash moves and no result is realized; between currencies the cost is converted at the transfer's rate (TRF-020, TRF-022). It is stored as its parts — a transfer out, a transfer in and, when less arrives than left, a fee in kind — sharing one `transfer_id`, and is recorded, corrected and cancelled as one (TRF). In French: « Transfert » (owner, 2026-10-24).
+
+> Status: confirmed
+
+### Transfer out
+
+The part of a transfer in the sending account: the quantity received leaving the sending holding at its cost (TRF-020). Code: `TransferOut`. In French: « Transfert sortant » (owner, 2026-10-24).
+
+> Status: confirmed
+
+### Transfer in
+
+The part of a transfer in the receiving account: the quantity received entering at the cost the transfer out took, converted at the rate (TRF-020, TRF-022). Code: `TransferIn`. In French: « Transfert entrant » (owner, 2026-10-24).
+
+> Status: confirmed
+
+### Fee in kind
+
+The difference between the quantity sent and the quantity received by a transfer: a write-off of reason `NetworkFee` in the sending account, part of the transfer (TRF-021). In French: « Frais en nature » (owner, 2026-10-24).
+
+> Status: confirmed
+
 ### Reported split
 
 A split the price provider reports for an asset, with its date and its split factor (new :
@@ -196,13 +220,18 @@ An asset that breaks a rule of its kind, or is the same as another, because it e
 
 ## Aggregate Root Methods (Account)
 
-| Name                  | Intent                                                                                                  | Status    |
-| --------------------- | ------------------------------------------------------------------------------------------------------- | --------- |
-| `buy_holding`         | Record a purchase of an asset into the account                                                          | confirmed |
-| `sell_holding`        | Record a sale of an asset from the account                                                              | confirmed |
-| `correct_transaction` | Correct the fields of an existing transaction (cascades VWAP/P&L recalculation on the affected holding) | confirmed |
-| `cancel_transaction`  | Delete an existing transaction (cascades VWAP/P&L recalculation or holding removal)                     | confirmed |
-| `open_holding`        | Seed an existing position with a quantity and total cost at a given date, without full purchase history | confirmed |
+| Name                    | Intent                                                                                                  | Status    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- | --------- |
+| `buy_holding`           | Record a purchase of an asset into the account                                                          | confirmed |
+| `sell_holding`          | Record a sale of an asset from the account                                                              | confirmed |
+| `correct_transaction`   | Correct the fields of an existing transaction (cascades VWAP/P&L recalculation on the affected holding) | confirmed |
+| `cancel_transaction`    | Delete an existing transaction (cascades VWAP/P&L recalculation or holding removal)                     | confirmed |
+| `open_holding`          | Seed an existing position with a quantity and total cost at a given date, without full purchase history | confirmed |
+| `place_transfer_parts`  | Put a transfer's parts in this account, replayed and checked (TRF-020, TRF-030)                         | confirmed |
+| `remove_transfer_parts` | Take a transfer's parts out of this account (TRF-040)                                                   | confirmed |
+| `restate_transfers_out` | Re-read the cost of this account's transfers out after an earlier change (TRF-025)                      | confirmed |
+| `recost_transfer_in`    | Set a transfer in to the cost its transfer out now takes (TRF-025)                                      | confirmed |
+| `transfer_parts`        | The parts of a transfer this account holds (TRF entity)                                                 | confirmed |
 
 ## Transaction Types
 
@@ -218,6 +247,8 @@ An asset that breaks a rule of its kind, or is the same as another, because it e
 | `ManagementFee`  | A fee paid by removing shares of a held asset; quantity falls, cost basis unchanged, no cash (FEE-022)                   | confirmed |
 | `Interest`       | Capitalized interest credited at no cost to a fund line or the cash line; quantity rises, cost basis unchanged (INT-024) | confirmed |
 | `WriteOff`       | A quantity of a held asset leaving without proceeds; quantity and cost basis fall at cost, no cash (WOF-020)             | confirmed |
+| `TransferOut`    | The sending part of a transfer; quantity and cost basis fall at cost, no cash (TRF-020)                                  | confirmed |
+| `TransferIn`     | The receiving part of a transfer; quantity enters at the cost moved, converted at the rate, no cash (TRF-020, TRF-022)   | confirmed |
 
 ### Total-Entry Mode
 

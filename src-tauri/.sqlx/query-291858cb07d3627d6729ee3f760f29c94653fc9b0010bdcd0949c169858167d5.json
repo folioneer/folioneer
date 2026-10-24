@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT account_id AS \"account_id!\" FROM transactions\n               WHERE transfer_id = ?\n               GROUP BY account_id\n               ORDER BY MAX(CASE transaction_type WHEN 'TransferIn' THEN 1 ELSE 0 END)",
+  "describe": {
+    "columns": [
+      {
+        "name": "account_id!",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "291858cb07d3627d6729ee3f760f29c94653fc9b0010bdcd0949c169858167d5"
+}

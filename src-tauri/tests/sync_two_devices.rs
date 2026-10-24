@@ -1848,7 +1848,8 @@ fn written_values_of_every_synced_enum() -> serde_json::Value {
             TransactionType::Purchase, TransactionType::Sell, TransactionType::OpeningBalance,
             TransactionType::Deposit, TransactionType::Withdrawal, TransactionType::Dividend,
             TransactionType::FreeShares, TransactionType::ManagementFee, TransactionType::Split,
-            TransactionType::Interest, TransactionType::WriteOff,
+            TransactionType::Interest, TransactionType::WriteOff, TransactionType::TransferOut,
+            TransactionType::TransferIn,
         ]),
         "WriteOffReason": written_values!(folioneer_lib::context::account::WriteOffReason, [
             folioneer_lib::context::account::WriteOffReason::NetworkFee,

@@ -7,7 +7,7 @@ use crate::{
         archive_asset, asset_price_fetch, asset_web_lookup, capabilities, delete_asset,
         fee_generation, global_performance, holding_transaction, portfolio_sync,
         price_fetch_failures, price_freshness, price_history_backfill, rate_history_backfill,
-        rate_refresh, scheduled_fetch, update_checker,
+        rate_refresh, scheduled_fetch, transfer, update_checker,
     },
 };
 
@@ -189,6 +189,9 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             holding_transaction::record_free_shares,
             holding_transaction::record_write_off,
             holding_transaction::correct_write_off,
+            transfer::record_transfer,
+            transfer::correct_transfer,
+            transfer::cancel_transfer,
             holding_transaction::record_split,
             holding_transaction::record_management_fee,
             holding_transaction::preview_management_fee,

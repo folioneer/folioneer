@@ -201,6 +201,7 @@ Record identity per kind follows CFR-012: accounts, categories, assets, transact
 
 ## Changelog
 
+- 2026-10-24 — #510 (SYN-038, TRF-032): `Transaction` gains `transfer_id` and `TransactionType` the values `TransferOut` and `TransferIn`; data format version 9. No command changed.
 - 2026-10-19 — #529 (SYN-021, SYN-038, MKT-230): `RecordKind` gains `ReportedSplit`; data format version 6. No command changed.
 - 2026-10-18 — TODO-032 (SYN-021, SYN-038): `RecordKind` gains `PortfolioSetting`; data format version 5. No command changed.
 - 2026-10-17 — DEBT-131 (SYN-074): the `HeaderRejected` note of `change_sync_folder` says it reads the folder it leaves only for a device that keeps no derivation parameters. No command or type changes.

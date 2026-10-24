@@ -49,6 +49,12 @@ pub enum TransactionType {
     /// A quantity leaving the holding without proceeds, at its weighted-average cost; no
     /// cash moves, its realised result is the cost taken out, negated (WOF-020/021).
     WriteOff,
+    /// The sending side of a transfer: the quantity received leaves at its weighted-average
+    /// cost, the cost it moves; no cash moves and nothing is realised (TRF-020, TRF-023).
+    TransferOut,
+    /// The receiving side of a transfer: the quantity received enters at the cost the
+    /// transfer out moved, converted at its recorded rate (TRF-020, TRF-022).
+    TransferIn,
 }
 
 /// Why a write-off's quantity left the holding (WOF entity).
@@ -124,6 +130,10 @@ pub struct Transaction {
     /// from a change written before data format 7, read as `None` (SYN-038).
     #[serde(default)]
     pub write_off_reason: Option<WriteOffReason>,
+    /// The transfer this transaction is a part of (TRF entity): its two sides and its fee in
+    /// kind share it; `None` on every other transaction, and on a change written before it.
+    #[serde(default)]
+    pub transfer_id: Option<String>,
 }
 
 impl Transaction {
@@ -174,6 +184,7 @@ impl Transaction {
                 .format("%Y-%m-%dT%H:%M:%S%.6fZ")
                 .to_string(),
             write_off_reason: None,
+            transfer_id: None,
         })
     }
 
@@ -219,6 +230,7 @@ impl Transaction {
             realized_pnl,
             created_at,
             write_off_reason: None,
+            transfer_id: None,
         })
     }
 
@@ -366,6 +378,7 @@ impl Transaction {
                 .format("%Y-%m-%dT%H:%M:%S%.6fZ")
                 .to_string(),
             write_off_reason: None,
+            transfer_id: None,
         })
     }
 
@@ -430,6 +443,7 @@ impl Transaction {
                 .format("%Y-%m-%dT%H:%M:%S%.6fZ")
                 .to_string(),
             write_off_reason: None,
+            transfer_id: None,
         })
     }
 
@@ -488,6 +502,7 @@ impl Transaction {
                 .format("%Y-%m-%dT%H:%M:%S%.6fZ")
                 .to_string(),
             write_off_reason: None,
+            transfer_id: None,
         })
     }
 
@@ -565,6 +580,7 @@ impl Transaction {
                 .format("%Y-%m-%dT%H:%M:%S%.6fZ")
                 .to_string(),
             write_off_reason: None,
+            transfer_id: None,
         })
     }
 
@@ -619,7 +635,97 @@ impl Transaction {
                 .format("%Y-%m-%dT%H:%M:%S%.6fZ")
                 .to_string(),
             write_off_reason: Some(reason),
+            transfer_id: None,
         })
+    }
+
+    /// Factory: one side of the transfer `transfer_id` (TRF entity), the quantity received
+    /// on its date. Its cost is the replay's (TRF-020): nothing on the transfer out until the
+    /// sending holding is replayed, and on the transfer in the `total_amount` converted at
+    /// `exchange_rate` (TRF-022), its unit price the cost over the quantity, rounded down.
+    /// TRF-011 replaces TRX-020's figure checks: a cost of zero is a holding at zero cost.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_transfer_side(
+        account_id: String,
+        asset_id: String,
+        transaction_type: TransactionType,
+        date: String,
+        quantity: i64,
+        total_amount: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+        transfer_id: String,
+    ) -> StdResult<Self, AccountError> {
+        Self::validate_date(&date)?;
+        if quantity <= 0 {
+            return Err(AccountError::QuantityNotPositive);
+        }
+        if exchange_rate <= 0 {
+            return Err(AccountError::ExchangeRateNotPositive);
+        }
+        Ok(Self {
+            id: Uuid::new_v4().to_string(),
+            account_id,
+            asset_id,
+            transaction_type,
+            date,
+            quantity,
+            unit_price: Self::unit_cost(total_amount, quantity),
+            exchange_rate,
+            fees: 0,
+            total_amount,
+            note,
+            realized_pnl: None,
+            created_at: chrono::Utc::now()
+                .format("%Y-%m-%dT%H:%M:%S%.6fZ")
+                .to_string(),
+            write_off_reason: None,
+            transfer_id: Some(transfer_id),
+        })
+    }
+
+    /// Rebuilds a side of a transfer with its identity kept (TRF-030 correction).
+    #[allow(clippy::too_many_arguments)]
+    pub fn transfer_side_with_id(
+        id: String,
+        created_at: String,
+        account_id: String,
+        asset_id: String,
+        transaction_type: TransactionType,
+        date: String,
+        quantity: i64,
+        total_amount: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+        transfer_id: String,
+    ) -> StdResult<Self, AccountError> {
+        let mut tx = Self::new_transfer_side(
+            account_id,
+            asset_id,
+            transaction_type,
+            date,
+            quantity,
+            total_amount,
+            exchange_rate,
+            note,
+            transfer_id,
+        )?;
+        tx.id = id;
+        tx.created_at = created_at;
+        Ok(tx)
+    }
+
+    /// TRF-022 — a cost per unit: the cost over the quantity, rounded down (as TRX-047).
+    pub fn unit_cost(total_amount: i64, quantity: i64) -> i64 {
+        if quantity <= 0 {
+            return 0;
+        }
+        ((total_amount as i128 * 1_000_000) / quantity as i128) as i64
+    }
+
+    /// Whether this transaction is a part of a transfer (TRF entity).
+    pub fn is_transfer_part(&self) -> bool {
+        self.transfer_id.is_some()
     }
 
     /// Rebuilds a write-off with its identity kept (WOF-030 correction).
@@ -644,6 +750,12 @@ impl Transaction {
     /// leaves it `None`, the repository sets it from its column.
     pub fn with_write_off_reason(mut self, reason: Option<WriteOffReason>) -> Self {
         self.write_off_reason = reason;
+        self
+    }
+
+    /// The same transaction as a part of the transfer `transfer_id` (TRF entity).
+    pub fn with_transfer_id(mut self, transfer_id: Option<String>) -> Self {
+        self.transfer_id = transfer_id;
         self
     }
 
@@ -679,6 +791,7 @@ impl Transaction {
             realized_pnl,
             created_at,
             write_off_reason: None,
+            transfer_id: None,
         }
     }
 
@@ -731,7 +844,7 @@ impl Transaction {
     }
 
     /// TRX-020 — date must be parseable, not in the future, not before 1900-01-01.
-    pub(super) fn validate_date(date: &str) -> StdResult<(), AccountError> {
+    pub fn validate_date(date: &str) -> StdResult<(), AccountError> {
         let parsed_date =
             NaiveDate::parse_from_str(date, "%Y-%m-%d").map_err(|_| AccountError::InvalidDate)?;
         let today = chrono::Local::now().date_naive();

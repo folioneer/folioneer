@@ -488,6 +488,23 @@ fn period_bridge(
                     account_currency,
                 ) as i128;
             }
+            // TRF-026/027 — a transfer enters or leaves in kind, valued as an opening balance.
+            TransactionType::TransferIn => {
+                asset_flow += opening_balance_flow_value(
+                    transaction,
+                    priced_assets,
+                    rate_map,
+                    account_currency,
+                ) as i128;
+            }
+            TransactionType::TransferOut => {
+                asset_flow -= opening_balance_flow_value(
+                    transaction,
+                    priced_assets,
+                    rate_map,
+                    account_currency,
+                ) as i128;
+            }
             // FSD-070/PRF-071 — free shares carry no cost, so their grant-date
             // market value is the in-kind contribution (valued like `end_value_as_of`).
             TransactionType::FreeShares => {
@@ -750,6 +767,23 @@ fn holding_period_bridge(
             // contribution at its entry-date market value (fallback typed cost).
             TransactionType::OpeningBalance => {
                 asset_flow += opening_balance_flow_value(
+                    transaction,
+                    priced_assets,
+                    rate_map,
+                    account_currency,
+                ) as i128;
+            }
+            // TRF-026/027 — a transfer enters or leaves in kind, valued as an opening balance.
+            TransactionType::TransferIn => {
+                asset_flow += opening_balance_flow_value(
+                    transaction,
+                    priced_assets,
+                    rate_map,
+                    account_currency,
+                ) as i128;
+            }
+            TransactionType::TransferOut => {
+                asset_flow -= opening_balance_flow_value(
                     transaction,
                     priced_assets,
                     rate_map,

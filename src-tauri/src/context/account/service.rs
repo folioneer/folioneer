@@ -3,7 +3,7 @@ use super::domain::{
     FeeCatchUpPosition, FeeCatchUpRepository, FeeSchedule, FeeScheduleRepository, Holding,
     HoldingNote, HoldingNoteRepository, HoldingRepository, HoldingSnapshot, JournalFilter,
     ManagementFeeRemoval, SessionRecording, StockSplitPosition, ThresholdDirection, Transaction,
-    TransactionRepository, WriteOffReason,
+    TransactionRepository, TransactionType, WriteOffReason,
 };
 use super::error::AccountError;
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
@@ -16,6 +16,7 @@ use sqlx::SqliteConnection;
 use std::result::Result as StdResult;
 use std::sync::Arc;
 use tracing::info;
+use uuid::Uuid;
 
 /// Orchestrates business logic for the Account bounded context.
 pub struct AccountService {
@@ -931,6 +932,15 @@ impl AccountService {
     ) -> Result<(), AccountError> {
         info!(target: BACKEND, account_id = %account_id, tx_id = %tx_id, "cancel_transaction");
         let mut account = load_account(&*self.account_repo, account_id).await?;
+        // TRF-040 — a part of a transfer is removed with the whole transfer.
+        if let Some(transfer_id) = account
+            .transactions
+            .iter()
+            .find(|t| t.id == tx_id)
+            .and_then(|t| t.transfer_id.clone())
+        {
+            return self.cancel_transfer(&transfer_id).await;
+        }
         account
             .cancel_transaction(tx_id)
             .map_err(to_holding_tx_error)?;
@@ -1150,6 +1160,278 @@ impl AccountService {
         save_account(&*self.account_repo, &mut account).await?;
         self.emit_transaction_updated();
         Ok(tx)
+    }
+
+    /// TRF-020/021/022 — records a transfer of `asset_id` from one account to another, its
+    /// fee in kind included when less is received than sent, at the rate the caller
+    /// resolved (micro-units; one between accounts of one currency). Both accounts are
+    /// written together; asset existence and archiving are the caller's (TRF-010).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn record_transfer(
+        &self,
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+    ) -> Result<Vec<Transaction>, AccountError> {
+        info!(target: BACKEND, from = %from_account_id, to = %to_account_id, asset_id = %asset_id, "record_transfer");
+        let transfer_id = Uuid::new_v4().to_string();
+        let parts = self
+            .place_transfer(
+                &transfer_id,
+                from_account_id,
+                to_account_id,
+                TransferFigures {
+                    asset_id,
+                    date,
+                    quantity_sent,
+                    quantity_received,
+                    exchange_rate,
+                    note,
+                },
+            )
+            .await?;
+        self.emit_transaction_updated();
+        Ok(parts)
+    }
+
+    /// TRF-030 — corrects the transfer `transfer_id` as one operation: its date, quantities,
+    /// rate and note; its accounts and asset stay. Checked again on the history without it.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn correct_transfer(
+        &self,
+        transfer_id: &str,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+    ) -> Result<Vec<Transaction>, AccountError> {
+        info!(target: BACKEND, transfer_id = %transfer_id, "correct_transfer");
+        let (from, to, asset_id) = self.transfer_sides(transfer_id).await?;
+        let parts = self
+            .place_transfer(
+                transfer_id,
+                &from,
+                &to,
+                TransferFigures {
+                    asset_id,
+                    date,
+                    quantity_sent,
+                    quantity_received,
+                    exchange_rate,
+                    note,
+                },
+            )
+            .await?;
+        self.emit_transaction_updated();
+        Ok(parts)
+    }
+
+    /// The sending account, the receiving account and the asset of the transfer
+    /// `transfer_id`; a transfer unknown or left without a side is not found (TRF-030).
+    pub async fn transfer_sides(
+        &self,
+        transfer_id: &str,
+    ) -> Result<(String, String, String), AccountError> {
+        let accounts = self
+            .account_repo
+            .transfer_accounts(transfer_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, transfer_id = %transfer_id, err = ?e, "transfer_sides: repository failure");
+                AccountError::DatabaseError
+            })?;
+        let [from, to] = accounts.as_slice() else {
+            return Err(AccountError::TransferNotFound);
+        };
+        let sending = load_account(&*self.account_repo, from).await?;
+        let asset_id = sending
+            .transfer_parts(transfer_id)
+            .iter()
+            .find(|t| t.transaction_type == TransactionType::TransferOut)
+            .map(|t| t.asset_id.clone())
+            .ok_or(AccountError::TransferNotFound)?;
+        Ok((from.clone(), to.clone(), asset_id))
+    }
+
+    /// The parts of the transfer `transfer_id` as they stand, in every account holding one.
+    pub async fn transfer_parts(
+        &self,
+        transfer_id: &str,
+    ) -> Result<Vec<Transaction>, AccountError> {
+        let mut parts = Vec::new();
+        for account_id in self.transfer_account_ids(transfer_id).await? {
+            let account = load_account(&*self.account_repo, &account_id).await?;
+            parts.extend(account.transfer_parts(transfer_id).into_iter().cloned());
+        }
+        Ok(parts)
+    }
+
+    async fn transfer_account_ids(&self, transfer_id: &str) -> Result<Vec<String>, AccountError> {
+        self.account_repo
+            .transfer_accounts(transfer_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, transfer_id = %transfer_id, err = ?e, "transfer_accounts: repository failure");
+                AccountError::DatabaseError
+            })
+    }
+
+    /// TRF-040 — removes every part of the transfer `transfer_id`, in every account holding
+    /// one, together; a later transaction left short in the receiving account refuses it.
+    pub async fn cancel_transfer(&self, transfer_id: &str) -> Result<(), AccountError> {
+        info!(target: BACKEND, transfer_id = %transfer_id, "cancel_transfer");
+        let account_ids = self.transfer_account_ids(transfer_id).await?;
+        if account_ids.is_empty() {
+            return Err(AccountError::TransferNotFound);
+        }
+        let mut accounts = Vec::with_capacity(account_ids.len());
+        for account_id in &account_ids {
+            let mut account = load_account(&*self.account_repo, account_id).await?;
+            account
+                .remove_transfer_parts(transfer_id)
+                .map_err(to_holding_tx_error)?;
+            accounts.push(account);
+        }
+        let mut written: Vec<&mut Account> = accounts.iter_mut().collect();
+        save_accounts(&*self.account_repo, &mut written).await?;
+        self.emit_transaction_updated();
+        Ok(())
+    }
+
+    /// Places the parts of `transfer_id` in both accounts from `figures` (TRF-020 to
+    /// TRF-022, TRF-030) and writes both, with what re-costing follows (TRF-025).
+    async fn place_transfer(
+        &self,
+        transfer_id: &str,
+        from_account_id: &str,
+        to_account_id: &str,
+        figures: TransferFigures,
+    ) -> Result<Vec<Transaction>, AccountError> {
+        if from_account_id == to_account_id {
+            return Err(AccountError::TransferToSameAccount);
+        }
+        let mut sending = load_account(&*self.account_repo, from_account_id).await?;
+        let mut receiving = load_account(&*self.account_repo, to_account_id).await?;
+        let TransferFigures {
+            asset_id,
+            date,
+            quantity_sent,
+            quantity_received,
+            exchange_rate,
+            note,
+        } = figures;
+        if quantity_sent <= 0 || quantity_received <= 0 {
+            return Err(AccountError::QuantityNotPositive);
+        }
+        if quantity_received > quantity_sent {
+            return Err(AccountError::TransferReceivedAboveSent);
+        }
+        if sending.currency == receiving.currency && exchange_rate != 1_000_000 {
+            return Err(AccountError::TransferRateNotOne);
+        }
+        let previous: Vec<Transaction> = sending
+            .transfer_parts(transfer_id)
+            .into_iter()
+            .chain(receiving.transfer_parts(transfer_id))
+            .cloned()
+            .collect();
+        let kept = |kind: TransactionType| {
+            previous
+                .iter()
+                .find(|t| t.transaction_type == kind)
+                .map(|t| (t.id.clone(), t.created_at.clone()))
+        };
+        // A correction keeps each part's identity (TRF-030); a new transfer has none yet.
+        let side = |kind: TransactionType,
+                    account_id: &str,
+                    date: &str,
+                    total_amount: i64,
+                    exchange_rate: i64| match kept(kind) {
+            Some((id, created_at)) => Transaction::transfer_side_with_id(
+                id,
+                created_at,
+                account_id.to_string(),
+                asset_id.clone(),
+                kind,
+                date.to_string(),
+                quantity_received,
+                total_amount,
+                exchange_rate,
+                note.clone(),
+                transfer_id.to_string(),
+            ),
+            None => Transaction::new_transfer_side(
+                account_id.to_string(),
+                asset_id.clone(),
+                kind,
+                date.to_string(),
+                quantity_received,
+                total_amount,
+                exchange_rate,
+                note.clone(),
+                transfer_id.to_string(),
+            ),
+        };
+        let mut sent_parts = Vec::new();
+        if quantity_sent > quantity_received {
+            let quantity = quantity_sent - quantity_received;
+            let fee = match kept(TransactionType::WriteOff) {
+                Some((id, created_at)) => Transaction::write_off_with_id(
+                    id,
+                    from_account_id.to_string(),
+                    asset_id.clone(),
+                    date.clone(),
+                    quantity,
+                    WriteOffReason::NetworkFee,
+                    note.clone(),
+                    created_at,
+                ),
+                None => Transaction::write_off(
+                    from_account_id.to_string(),
+                    asset_id.clone(),
+                    date.clone(),
+                    quantity,
+                    WriteOffReason::NetworkFee,
+                    note.clone(),
+                ),
+            }?
+            .with_transfer_id(Some(transfer_id.to_string()));
+            sent_parts.push(fee);
+        }
+        sent_parts.push(side(
+            TransactionType::TransferOut,
+            from_account_id,
+            &date,
+            0,
+            1_000_000,
+        )?);
+        let placed_out = sending
+            .place_transfer_parts(transfer_id, &asset_id, sent_parts)
+            .map_err(to_holding_tx_error)?;
+        let cost = placed_out
+            .iter()
+            .find(|t| t.transaction_type == TransactionType::TransferOut)
+            .map(|t| t.total_amount)
+            .unwrap_or(0);
+        let incoming = side(
+            TransactionType::TransferIn,
+            to_account_id,
+            &date,
+            super::domain::converted_cost(cost, exchange_rate),
+            exchange_rate,
+        )?;
+        let placed_in = receiving
+            .place_transfer_parts(transfer_id, &asset_id, vec![incoming])
+            .map_err(to_holding_tx_error)?;
+        let mut written = vec![&mut sending, &mut receiving];
+        save_accounts(&*self.account_repo, &mut written).await?;
+        Ok(placed_out.into_iter().chain(placed_in).collect())
     }
 
     /// Records a stock split on a held asset (SPL-010/020).
@@ -2303,6 +2585,36 @@ pub trait AccountServiceContract: Send + Sync {
         reason: WriteOffReason,
         note: Option<String>,
     ) -> StdResult<Transaction, AccountError>;
+    /// Records a transfer between two accounts, at its cost and without cash (TRF-020).
+    #[allow(clippy::too_many_arguments)]
+    async fn record_transfer(
+        &self,
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+    ) -> StdResult<Vec<Transaction>, AccountError>;
+    /// Corrects a transfer's date, quantities, rate and note as one operation (TRF-030).
+    async fn correct_transfer(
+        &self,
+        transfer_id: &str,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+    ) -> StdResult<Vec<Transaction>, AccountError>;
+    /// Removes every part of a transfer together (TRF-040).
+    async fn cancel_transfer(&self, transfer_id: &str) -> StdResult<(), AccountError>;
+    /// The sending account, the receiving account and the asset of a transfer (TRF-030).
+    async fn transfer_sides(
+        &self,
+        transfer_id: &str,
+    ) -> StdResult<(String, String, String), AccountError>;
     /// Records a stock split rescaling a held position (SPL-010/020).
     async fn record_split(
         &self,
@@ -2782,6 +3094,63 @@ impl AccountServiceContract for AccountService {
             .await
     }
 
+    async fn record_transfer(
+        &self,
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+    ) -> StdResult<Vec<Transaction>, AccountError> {
+        AccountService::record_transfer(
+            self,
+            from_account_id,
+            to_account_id,
+            asset_id,
+            date,
+            quantity_sent,
+            quantity_received,
+            exchange_rate,
+            note,
+        )
+        .await
+    }
+
+    async fn correct_transfer(
+        &self,
+        transfer_id: &str,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+    ) -> StdResult<Vec<Transaction>, AccountError> {
+        AccountService::correct_transfer(
+            self,
+            transfer_id,
+            date,
+            quantity_sent,
+            quantity_received,
+            exchange_rate,
+            note,
+        )
+        .await
+    }
+
+    async fn cancel_transfer(&self, transfer_id: &str) -> StdResult<(), AccountError> {
+        AccountService::cancel_transfer(self, transfer_id).await
+    }
+
+    async fn transfer_sides(
+        &self,
+        transfer_id: &str,
+    ) -> StdResult<(String, String, String), AccountError> {
+        AccountService::transfer_sides(self, transfer_id).await
+    }
+
     async fn record_split(
         &self,
         account_id: &str,
@@ -2983,23 +3352,117 @@ async fn load_account(
     }
 }
 
+/// The figures a transfer is placed from (TRF entity).
+struct TransferFigures {
+    asset_id: String,
+    date: String,
+    quantity_sent: i64,
+    quantity_received: i64,
+    exchange_rate: i64,
+    note: Option<String>,
+}
+
+/// TRF-025 — the accounts whose transfers in follow the transfers out `accounts` re-costed,
+/// each re-costed in turn until no cost moves; the accounts already in `accounts` are
+/// re-costed in place. A chain of transfers is followed to its end, at most once per
+/// account and transfer.
+async fn follow_transfers(
+    repo: &dyn AccountRepository,
+    accounts: &mut [&mut Account],
+) -> Result<Vec<Account>, AccountError> {
+    let mut followers: Vec<Account> = Vec::new();
+    // Each pass re-costs what the last one moved; a cost moves at most once per transfer
+    // and pass, so the passes end — bounded all the same against a corrupt ledger.
+    for _ in 0..64 {
+        let mut moved = Vec::new();
+        for account in accounts.iter_mut() {
+            moved.extend(account.restate_transfers_out());
+        }
+        for account in followers.iter_mut() {
+            moved.extend(account.restate_transfers_out());
+        }
+        if moved.is_empty() {
+            break;
+        }
+        for (transfer_id, cost) in moved {
+            let holders = repo.transfer_accounts(&transfer_id).await.map_err(|e| {
+                tracing::error!(target: BACKEND, transfer_id = %transfer_id, err = ?e, "follow_transfers: repository failure");
+                AccountError::DatabaseError
+            })?;
+            for holder in holders {
+                if let Some(account) = accounts.iter_mut().find(|a| a.id == holder) {
+                    account
+                        .recost_transfer_in(&transfer_id, cost)
+                        .map_err(to_holding_tx_error)?;
+                } else if let Some(account) = followers.iter_mut().find(|a| a.id == holder) {
+                    account
+                        .recost_transfer_in(&transfer_id, cost)
+                        .map_err(to_holding_tx_error)?;
+                } else {
+                    let mut account = load_account(repo, &holder).await?;
+                    if account
+                        .recost_transfer_in(&transfer_id, cost)
+                        .map_err(to_holding_tx_error)?
+                    {
+                        followers.push(account);
+                    }
+                }
+            }
+        }
+    }
+    Ok(followers)
+}
+
+/// Persists the pending changes of `accounts` and of the accounts their re-costed
+/// transfers reach (TRF-025), in one database transaction.
+async fn save_accounts(
+    repo: &dyn AccountRepository,
+    accounts: &mut [&mut Account],
+) -> Result<(), AccountError> {
+    let mut followers = follow_transfers(repo, accounts).await?;
+    let mut written: Vec<&mut Account> = accounts
+        .iter_mut()
+        .map(|account| &mut **account)
+        .chain(followers.iter_mut())
+        .collect();
+    repo.save_all(&mut written)
+        .await
+        .map_err(|e| save_error("save_accounts", e))
+}
+
 /// Persists an Account aggregate's pending changes for the holding-transaction
-/// family. Translates repository failures into `AccountError::DatabaseError`
-/// after logging the underlying error.
+/// family, with the transfers in its re-costed transfers out reach (TRF-025).
+/// Translates repository failures into `AccountError::DatabaseError` after
+/// logging the underlying error.
 async fn save_account(
     repo: &dyn AccountRepository,
     account: &mut Account,
 ) -> Result<(), AccountError> {
-    repo.save(account).await.map_err(|e| {
-        // CFR-016 — the change recorder refused the application's own write: the
-        // repository's transaction rolled back with it, nothing to report as a failure.
-        if let Some(refused) = e.downcast_ref::<LocalWriteOutranked>() {
-            tracing::info!(target: BACKEND, account_id = %account.id, record_identity = %refused.record_identity, "save_account: application write outranked by the user's state");
-            return AccountError::ApplicationWriteOutranked;
-        }
-        tracing::error!(target: BACKEND, account_id = %account.id, err = ?e, "save_account: repository failure");
-        AccountError::DatabaseError
-    })
+    let mut followers = follow_transfers(repo, std::slice::from_mut(&mut &mut *account)).await?;
+    if !followers.is_empty() {
+        let mut written: Vec<&mut Account> = std::iter::once(&mut *account)
+            .chain(followers.iter_mut())
+            .collect();
+        return repo
+            .save_all(&mut written)
+            .await
+            .map_err(|e| save_error("save_account", e));
+    }
+    repo.save(account)
+        .await
+        .map_err(|e| save_error("save_account", e))
+}
+
+/// A failed save, translated: the change recorder refusing the application's own write is
+/// `ApplicationWriteOutranked` (CFR-016) — the repository's transaction rolled back with it,
+/// nothing to report as a failure; anything else is logged and is `DatabaseError`.
+fn save_error(op: &'static str, e: anyhow::Error) -> AccountError {
+    if let Some(refused) = e.downcast_ref::<LocalWriteOutranked>() {
+        tracing::info!(target: BACKEND, op = %op, record_identity = %refused.record_identity, "application write outranked by the user's state");
+        return AccountError::ApplicationWriteOutranked;
+    }
+    tracing::error!(target: BACKEND, op = %op, err = ?e, "repository failure");
+    AccountError::DatabaseError
 }
 
 /// CRUD-family parallel to the load/save helpers above. Wraps the
@@ -3042,10 +3505,8 @@ async fn save_account_for_open_holding(
     repo: &dyn AccountRepository,
     account: &mut Account,
 ) -> Result<(), OpenHoldingError> {
-    repo.save(account).await.map_err(|e| {
-        tracing::error!(target: BACKEND, account_id = %account.id, err = ?e, "save_account_for_open_holding: repository failure");
-        AccountError::DatabaseError.into()
-    })
+    // TRF-025 — a backdated opening balance re-costs the transfers out it precedes.
+    save_account(repo, account).await.map_err(Into::into)
 }
 
 /// A recording applied to `account` in memory — what recording saves and

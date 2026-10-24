@@ -53,6 +53,7 @@ use crate::use_cases::shared::price_fetch_failures::{
 use crate::use_cases::shared::price_fetch_log::{
     PriceFetchLogRepository, SqlitePriceFetchLogRepository,
 };
+use crate::use_cases::transfer::TransferUseCase;
 use crate::use_cases::update_checker::UpdateState;
 use crate::{extensions, shared, AppState};
 use anyhow::Context;
@@ -247,6 +248,12 @@ pub fn run() {
                     asset_service.clone(),
                 );
 
+                let transfer_uc = TransferUseCase::new(
+                    account_service.clone(),
+                    asset_service.clone(),
+                    Arc::clone(&currency_service),
+                );
+
                 // The first-device publish reads and ranks the whole portfolio through the
                 // owning contexts' services (B24); a join and a run write through them.
                 let first_publish = Arc::new(FirstPublish::new(
@@ -299,6 +306,7 @@ pub fn run() {
                 app_handle.manage(account_deletion_uc);
                 app_handle.manage(account_creation_uc);
                 app_handle.manage(holding_transaction_uc);
+                app_handle.manage(transfer_uc);
                 app_handle.manage(fee_generation_uc);
 
                 app_handle.manage(AssetWebLookupUseCase::new(providers.asset_lookup));

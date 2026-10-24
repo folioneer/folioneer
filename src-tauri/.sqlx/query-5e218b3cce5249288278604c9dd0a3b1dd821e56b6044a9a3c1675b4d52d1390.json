@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason FROM transactions WHERE id = ?",
+  "query": "SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price,\n                  exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id\n           FROM transactions WHERE account_id = ?\n           ORDER BY date ASC, created_at ASC, id ASC",
   "describe": {
     "columns": [
       {
@@ -72,6 +72,11 @@
         "name": "write_off_reason",
         "ordinal": 13,
         "type_info": "Text"
+      },
+      {
+        "name": "transfer_id",
+        "ordinal": 14,
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -91,8 +96,9 @@
       true,
       true,
       false,
+      true,
       true
     ]
   },
-  "hash": "975546040009589c3b0fb7389497e52c302d320f885feb1ab42cd91c9cb6ab8a"
+  "hash": "5e218b3cce5249288278604c9dd0a3b1dd821e56b6044a9a3c1675b4d52d1390"
 }

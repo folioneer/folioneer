@@ -46,6 +46,8 @@ pub mod rate_refresh;
 pub mod scheduled_fetch;
 /// Shared stateless valuation helpers reused across performance/summary use cases — owned by neither.
 pub mod shared;
+/// Transfer: a holding moved from one account to another at its cost (TRF spec).
+pub mod transfer;
 /// Application auto-update: detection, download, and installation (R1–R27).
 #[cfg(feature = "app")]
 pub mod update_checker;
