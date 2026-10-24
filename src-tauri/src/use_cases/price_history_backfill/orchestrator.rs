@@ -87,22 +87,16 @@ impl PriceHistoryBackfillUseCase {
         let symbol = derive_yahoo_symbol_with_exchange(&asset.reference, asset.exchange.as_ref())
             .ok_or(PriceHistoryBackfillTask::TickerNotResolved)?;
         let closes = self.fetch_closes(&symbol, from, to).await?;
-        if closes.is_empty() {
-            // MKT-196 — a period of a week or more always holds a trading day, so a
-            // known symbol without any close there has no history with the provider.
-            const TRADING_WEEK_DAYS: i64 = 7;
-            if (to - from).num_days() + 1 >= TRADING_WEEK_DAYS {
-                return Err(PriceHistoryBackfillTask::TickerNotResolved.into());
-            }
-            return Ok(PriceHistoryBackfillOutcome {
-                written: 0,
-                already_priced: 0,
-            });
+        // MKT-196 — a period of a week or more always holds a trading day, so a known
+        // symbol without any close there has no history with the provider.
+        const TRADING_WEEK_DAYS: i64 = 7;
+        if closes.is_empty() && (to - from).num_days() + 1 >= TRADING_WEEK_DAYS {
+            return Err(PriceHistoryBackfillTask::TickerNotResolved.into());
         }
 
         // MKT-230 — the splits the provider reports from the held period's start, read
-        // before anything is kept: a failed reading rejects the backfill as a failed
-        // close request does (MKT-193B, MKT-195).
+        // before anything is kept, a period with no close included: a failed reading
+        // rejects the backfill as a failed close request does (MKT-193B, MKT-195).
         let from = from.to_string();
         let splits = self
             .price_provider
@@ -115,6 +109,12 @@ impl PriceHistoryBackfillUseCase {
         self.asset_service
             .record_reported_splits(asset_id, &from, &splits)
             .await?;
+        if closes.is_empty() {
+            return Ok(PriceHistoryBackfillOutcome {
+                written: 0,
+                already_priced: 0,
+            });
+        }
         Ok(self
             .asset_service
             .record_missing_daily_closes(asset_id, closes)
@@ -437,6 +437,8 @@ mod tests {
     async fn backfill_rejects_an_archived_asset_without_a_request() {
         let mut price_provider = MockPriceProvider::new();
         price_provider.expect_fetch_daily_closes().times(0);
+        // MKT-230 — a backfill rejected as an unresolvable ticker reads no splits.
+        price_provider.expect_fetch_splits().times(0);
 
         let error = make_use_case(
             account_holding(vec![make_transaction(ASSET, "2024-01-10")], 1_000_000),
@@ -539,6 +541,7 @@ mod tests {
             .expect_fetch_daily_closes()
             .times(1)
             .returning(|_, _, _| Ok(None));
+        price_provider.expect_fetch_splits().times(0);
         let mut asset_service = asset_service_serving(make_asset("AI", false, false));
         asset_service.expect_record_missing_daily_closes().times(0);
 
@@ -569,6 +572,7 @@ mod tests {
             .expect_fetch_daily_closes()
             .times(1)
             .returning(|_, _, _| Ok(Some(vec![])));
+        price_provider.expect_fetch_splits().times(0);
         let mut asset_service = asset_service_serving(make_asset("AI", false, false));
         asset_service.expect_record_missing_daily_closes().times(0);
 
@@ -591,8 +595,8 @@ mod tests {
     }
 
     // MKT-196 — a known symbol served no close over a held period shorter than a
-    // week (a weekend) is not a rejection: nothing is recorded and both counts are
-    // zero.
+    // week (a weekend) is not a rejection: no close is recorded and both counts are
+    // zero. MKT-230 (#609) — its reported splits are still read and kept.
     #[tokio::test]
     async fn backfill_of_a_period_without_a_close_succeeds_with_nothing_to_fill() {
         let mut price_provider = MockPriceProvider::new();
@@ -600,7 +604,22 @@ mod tests {
             .expect_fetch_daily_closes()
             .times(1)
             .returning(|_, _, _| Ok(Some(vec![])));
+        price_provider
+            .expect_fetch_splits()
+            .times(1)
+            .returning(|_, _| {
+                Ok(vec![crate::context::asset::DatedSplitFactor {
+                    date: "2024-06-29".into(),
+                    new: 2,
+                    old: 1,
+                }])
+            });
         let mut asset_service = asset_service_serving(make_asset("AI", false, false));
+        asset_service
+            .expect_record_reported_splits()
+            .withf(|asset_id, _, splits| asset_id == ASSET && splits.len() == 1)
+            .times(1)
+            .returning(|_, _, _| Ok(()));
         asset_service.expect_record_missing_daily_closes().times(0);
 
         let outcome = make_use_case(
@@ -945,6 +964,39 @@ mod tests {
         .backfill(ACCOUNT, ASSET)
         .await
         .unwrap();
+    }
+
+    // MKT-230 (#609) — a failed split reading over a period with no close rejects the
+    // backfill as the provider being unreachable.
+    #[tokio::test]
+    async fn mkt_230_a_failed_split_reading_without_a_close_rejects_the_backfill() {
+        let mut price_provider = MockPriceProvider::new();
+        price_provider
+            .expect_fetch_daily_closes()
+            .returning(|_, _, _| Ok(Some(vec![])));
+        price_provider
+            .expect_fetch_splits()
+            .times(1)
+            .returning(|_, _| Err(anyhow::anyhow!("split request failed")));
+        let mut asset_service = asset_service_serving(make_asset("AI", false, false));
+        asset_service.expect_record_reported_splits().times(0);
+
+        let error = make_use_case(
+            account_holding(vec![make_transaction(ASSET, "2024-06-29")], 1_000_000),
+            asset_service,
+            price_provider,
+        )
+        .backfill(ACCOUNT, ASSET)
+        .await
+        .unwrap_err();
+
+        assert!(
+            matches!(
+                error,
+                PriceHistoryBackfillError::Task(PriceHistoryBackfillTask::ProviderUnreachable)
+            ),
+            "got: {error:?}"
+        );
     }
 
     // MKT-230 / MKT-193B (#529) — a failed split reading rejects the backfill as a failed
