@@ -140,6 +140,8 @@ fn shown_of(
         asset_reference: asset.reference.clone(),
         quantity_sent: steps.sale.quantity,
         quantity_received: steps.purchase.quantity,
+        quantity_not_received: Some(steps.sale.quantity - steps.purchase.quantity)
+            .filter(|not_received| *not_received > 0),
         cost: asked.cost(),
         from_currency: sale.currency.clone(),
         exchange_rate: between_currencies.then_some(asked.exchange_rate),

@@ -42,8 +42,7 @@ export function replacedRow(
 /**
  * AGT-092 — the transfer recorded in the four's place: from, to, date, asset, the quantity
  * sent and received, and the cost moved — between currencies, at its rate into the receiving
- * account's. `feeInKind` is the quantity not received, formatted, when less is received than
- * sent; null otherwise.
+ * account's. `feeInKind` is the quantity not received, formatted, when the core gives one.
  */
 export function transferRows(
   transfer: TransferShown,
@@ -62,7 +61,6 @@ export function transferRows(
   const asset = transfer.asset_reference
     ? `${transfer.asset_name} (${transfer.asset_reference})`
     : transfer.asset_name;
-  const notReceived = transfer.quantity_sent - transfer.quantity_received;
   return {
     rows: [
       ["from", t("agent.replacement_from"), transfer.from_account],
@@ -79,6 +77,9 @@ export function transferRows(
       ],
       ["cost", t("agent.replacement_cost"), costMoved],
     ],
-    feeInKind: notReceived > 0 ? microToFormattedQuantity(notReceived) : null,
+    feeInKind:
+      transfer.quantity_not_received === null
+        ? null
+        : microToFormattedQuantity(transfer.quantity_not_received),
   };
 }

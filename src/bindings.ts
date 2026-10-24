@@ -5698,6 +5698,11 @@ quantity_sent: number;
  */
 quantity_received: number; 
 /**
+ * The quantity not received, the fee in kind (TRF-021), in micro-units; `None` when all
+ * that is sent is received.
+ */
+quantity_not_received: number | null; 
+/**
  * The cost it moves, in the sending account's currency, in micro-units.
  */
 cost: number; 

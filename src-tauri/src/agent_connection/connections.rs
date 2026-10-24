@@ -251,6 +251,9 @@ pub struct TransferShown {
     pub quantity_sent: i64,
     /// The quantity received, the purchase's, in micro-units.
     pub quantity_received: i64,
+    /// The quantity not received, the fee in kind (TRF-021), in micro-units; `None` when all
+    /// that is sent is received.
+    pub quantity_not_received: Option<i64>,
     /// The cost it moves, in the sending account's currency, in micro-units.
     pub cost: i64,
     /// The sending account's currency.

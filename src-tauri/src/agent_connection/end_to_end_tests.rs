@@ -6370,6 +6370,11 @@ async fn replaced_stands_as_recorded(received: i64) {
     assert_eq!(request.transfer.quantity_sent, 4 * M);
     assert_eq!(request.transfer.quantity_received, received * M);
     assert_eq!(
+        request.transfer.quantity_not_received,
+        (received < 4).then_some((4 - received) * M),
+        "the fee in kind, when less is received"
+    );
+    assert_eq!(
         request.transfer.cost,
         received * 100 * M,
         "what is received, at the average price of 100 (TRF-057)"

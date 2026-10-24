@@ -105,6 +105,7 @@ const replacement = (overrides = {}) => ({
     asset_reference: "BTC",
     quantity_sent: 500_000,
     quantity_received: 500_000,
+    quantity_not_received: null,
     cost: 21_000_000_000,
     from_currency: "EUR",
     exchange_rate: null,
@@ -439,6 +440,7 @@ describe("AgentConnectionMount", () => {
     const transfer = {
       ...replacement().transfer,
       quantity_received: 400_000,
+      quantity_not_received: 100_000,
       exchange_rate: 1_080_000,
       converted_cost: 22_680_000_000,
       to_currency: "USD",

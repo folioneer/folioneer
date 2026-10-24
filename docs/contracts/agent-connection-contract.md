@@ -120,7 +120,8 @@ struct TransferShown {
     asset_name: String,
     asset_reference: String,
     quantity_sent: i64,           // micro-units: the sale's quantity
-    quantity_received: i64,       // micro-units: the purchase's quantity; less than quantity_sent, the difference is the quantity not received, the fee in kind (TRF-021) the dialog names by its quantity alone (AGT-092)
+    quantity_received: i64,       // micro-units: the purchase's quantity
+    quantity_not_received: Option<i64>, // micro-units: quantity_sent − quantity_received, the fee in kind (TRF-021) the dialog names by its quantity alone (AGT-092); None when all is received
     cost: i64,                    // micro-units, in `from_currency`: the cost the transfer moves
     from_currency: String,        // the sending account's currency
     exchange_rate: Option<i64>,   // micro-units; None between accounts of one currency
@@ -198,3 +199,4 @@ The mark of a transaction an agent recorded (AGT-045) reaches the window in the 
 - 2026-10-24 — #386: `AgentSession` gains `accounts_added` and `last_account` (AGT-068). No command or error changes.
 - 2026-10-24 — #512: the tool `record_transfer` (AGT-065A) is no Tauri command; its parts reach the window as `AgentSession.recordings` and `transactions_recorded` count them. No command, type or error changes.
 - 2026-10-24 — #513: `answer_replacement_request` (AGT-091); `AgentConnectionState` gains `replacements`, with `ReplacementRequest` and `TransferShown`; `AgentConnectionError` gains `ReplacementRequestGone` and `TransactionsNotReplaced { reason }`. The tool `request_transfer_replacement` (AGT-090) is no Tauri command.
+- 2026-10-24 — #513: `TransferShown` gains `quantity_not_received` (AGT-091, AGT-092). No command or error changes.
