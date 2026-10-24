@@ -103,4 +103,18 @@ describe("AccountForm — country and wrapper (ACC-045, ACC-048)", () => {
     expect(document.getElementById("account-country")).toBeNull();
     expect(document.getElementById("account-wrapper")).toBeNull();
   });
+
+  // ACC-004 — an account carries no update frequency: the form asks for none
+  it("asks for no update frequency", () => {
+    render(
+      <AccountForm
+        formData={formData()}
+        handleChange={vi.fn()}
+        setCountry={vi.fn()}
+        wrapperLists={null}
+      />,
+    );
+    expect(document.getElementById("account-update-frequency")).toBeNull();
+    expect(screen.queryByText("account.form_frequency_label")).toBeNull();
+  });
 });

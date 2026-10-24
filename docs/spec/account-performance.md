@@ -114,7 +114,7 @@ Money entering or leaving the account from outside the tracked world: a `Deposit
 
 ### Reactivity (060–069)
 
-**PRF-060 — Reactivity to data changes (frontend)**: The page re-fetches its data when it receives a `TransactionUpdated`, `AssetPriceUpdated`, or `AccountUpdated` event, since all three can change reconstructed period values (transactions change holdings and flows, prices change valuations, account changes affect currency/frequency). This mirrors the Account Details subscription set (ACD-039, ACD-040, MKT-036).
+**PRF-060 — Reactivity to data changes (frontend)**: The page re-fetches its data when it receives a `TransactionUpdated`, `AssetPriceUpdated`, or `AccountUpdated` event, since all three can change reconstructed period values (transactions change holdings and flows, prices change valuations, account changes affect its currency). This mirrors the Account Details subscription set (ACD-039, ACD-040, MKT-036).
 
 ### Global Value Bridge (070–079)
 
@@ -208,7 +208,7 @@ A full-page table at `/accounts/:id/performance`.
 ### User Flow
 
 1. User opens an account and clicks "Performance" in the header.
-2. The page opens in the default view (PRF-014): month view of the current year for sub-monthly accounts, else year view.
+2. The page opens in the default view (PRF-014): the month view of the current year, unless the year view was last chosen for this account.
 3. User reads the end value and the period-over-period / YTD / since-inception figures per row.
 4. In month view, the user changes the year via the selector (PRF-015) or switches to year view (PRF-011).
 5. Recording a transaction or price elsewhere refreshes the page automatically (PRF-060).

@@ -4,7 +4,7 @@
  * Contract: docs/contracts/account-contract.md § "Account Performance"
  * Spec rules covered:
  *   PRF-010 — entry point: "Performance" button in AccountDetailsView header navigates to the page
- *   PRF-013 — month view available for sub-weekly update frequencies (Automatic/ManualDay/ManualWeek)
+ *   PRF-013 — the month view is offered for every account
  *   PRF-015 — selecting a past year lists that year's twelve months (the capture is taken there)
  *   PRF-037 — YTD column present in month view, absent in year view
  *   PRF-043 — no transactions → empty state rendered (account-performance-empty)
@@ -107,7 +107,7 @@ describe("account_performance", () => {
     await viewToggle.waitForExist({ timeout: 8000 });
     assert.ok(
       await viewToggle.isExisting(),
-      "View-mode toggle must be present for Automatic account (PRF-013)",
+      "View-mode toggle must be present for every account (PRF-013)",
     );
 
     // PRF-037: in month view the YTD column header must be visible.

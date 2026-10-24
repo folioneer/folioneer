@@ -373,8 +373,8 @@ describe("useGlobalPerformance", () => {
     expect(result.current.rows).toHaveLength(1);
   });
 
-  // GPF-016 — month view available opens in month view with the most recent year selected
-  it("opens in month view with the most recent year when month view is available (GPF-016)", async () => {
+  // GPF-016 — opens in month view with the most recent year selected
+  it("opens in month view with the most recent year by default (GPF-016)", async () => {
     vi.mocked(gateway.globalPerformanceGateway.getGlobalPerformance).mockResolvedValue({
       status: "ok",
       data: makeResponse({

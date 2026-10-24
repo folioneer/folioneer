@@ -227,8 +227,8 @@ describe("AccountPerformancePage", () => {
     expect(await screen.findByTestId("account-performance-back")).toBeInTheDocument();
   });
 
-  // PRF-011 — view-mode toggle present when month_view_available is true
-  it("renders the month/year view-mode toggle when month view is available (PRF-011, PRF-013)", async () => {
+  // PRF-011 — the view-mode toggle is present for every account
+  it("renders the month/year view-mode toggle for every account (PRF-011, PRF-013)", async () => {
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
       data: makeResponse({}),
@@ -239,8 +239,8 @@ describe("AccountPerformancePage", () => {
     expect(await screen.findByTestId("account-performance-view-toggle")).toBeInTheDocument();
   });
 
-  // PRF-014 — page opens in month view when month_view_available is true
-  it("opens in month view by default when month view is available (PRF-014)", async () => {
+  // PRF-014 — the page opens in month view when nothing is remembered
+  it("opens in month view by default (PRF-014)", async () => {
     vi.mocked(gateway.accountPerformanceGateway.getAccountPerformance).mockResolvedValue({
       status: "ok",
       data: makeResponse({}),

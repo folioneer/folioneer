@@ -104,6 +104,15 @@ describe("AccountTable — Global Value column (ACC-021)", () => {
     expect(screen.getByText("account.column_global_value")).toBeInTheDocument();
   });
 
+  // ACC-004 / ACC-008 — the table has no Frequency column
+  it("shows no Frequency column", () => {
+    mockSummaries.mockReturnValue([makeSummary()]);
+    render(<AccountTable searchTerm="" onAccountClick={vi.fn()} />);
+    const headers = screen.getAllByRole("columnheader").map((header) => header.textContent ?? "");
+    expect(headers).toHaveLength(7);
+    expect(headers.some((header) => /frequency/i.test(header))).toBe(false);
+  });
+
   it("formats each row's value with currency suffix", () => {
     mockSummaries.mockReturnValue([
       makeSummary({

@@ -40,7 +40,7 @@ The total of every account, read together with the account summaries (ACC-027). 
 
 **ACC-001 — Name normalisation (backend)** _(formerly R1)_: The `name` is normalised on receipt before any validation or storage: leading and trailing whitespace is stripped.
 
-**ACC-002 — Account validation (backend)** _(formerly R2)_: An `Account` is valid if and only if its `name` (after ACC-001 normalisation) is non-empty Any violation is rejected with an explicit error.
+**ACC-002 — Account validation (backend)** _(formerly R2)_: An `Account` is valid if and only if its `name` (after ACC-001 normalisation) is non-empty. Any violation is rejected with an explicit error.
 
 **ACC-003 — Name uniqueness (backend + frontend)** _(formerly R3)_: No two accounts may share the same name (comparison is performed on the normalised name per ACC-001, case-insensitive). Any create or edit operation resulting in a duplicate is rejected by the backend with an explicit error. ACC-001, ACC-002, and ACC-003 apply to both creation and modification.
 
@@ -122,7 +122,7 @@ The account section title is displayed in the application shell header, not in t
 
 **ACC-029 — The portfolio Unrealized P&L can be absent (backend)**: The portfolio Unrealized P&L is absent when no account that can be converted carries an Unrealized P&L; the total is then incomplete when ACC-028's condition holds.
 
-**ACC-030 — What the total row shows (frontend)**: The account table closes with a total row. Its label, "Total", spans the name, bank, wrapper and frequency columns. It states the portfolio Global Value and the portfolio Unrealized P&L, both in the cross-account reference currency, which it names; the Unrealized P&L is presented as a gain when positive, a loss when negative, neither when zero, and "—" when absent (ACC-029). A "partial" marker follows the label when the total is incomplete (ACC-028). The year-to-date and actions cells stay blank.
+**ACC-030 — What the total row shows (frontend)**: The account table closes with a total row. Its label, "Total", spans the name, bank and wrapper columns. It states the portfolio Global Value and the portfolio Unrealized P&L, both in the cross-account reference currency, which it names; the Unrealized P&L is presented as a gain when positive, a loss when negative, neither when zero, and "—" when absent (ACC-029). A "partial" marker follows the label when the total is incomplete (ACC-028). The year-to-date and actions cells stay blank.
 
 **ACC-031 — Where the total row sits (frontend)**: The total row stays below every account whatever the sort column and direction (ACC-009). It is not an account row: it cannot be focused, clicked, or used to open Account Details (ACC-010).
 
@@ -177,7 +177,7 @@ The tax wrapper an account sits in — a PEA, an assurance vie, a Depot — is a
           │            → Inline error if name empty or duplicate (ACC-014)
           │            → Account created → modal closed → table refreshed
           │
-          ├─ [Edit] → Edit modal (Name, Bank, Frequency, Country, Wrapper pre-filled)
+          ├─ [Edit] → Edit modal (Name, Bank, Country, Wrapper pre-filled)
           │            → Inline error if duplicate (ACC-014)
           │            → Saved → modal closed → table refreshed
           │
@@ -218,7 +218,7 @@ Full-width table, default sort by Name ascending. Floating action button (bottom
 
 1. User opens the Accounts page (section title shown in the shell header).
 2. User clicks a row → navigates to Account Details for the selected account (ACC-010).
-3. User clicks FAB → modal → enters name, bank, frequency, country and wrapper → submits → account created.
+3. User clicks FAB → modal → enters name, bank, country and wrapper → submits → account created.
 4. User clicks Edit → pre-filled modal → modifies → saves → modal closes.
 5. User clicks Delete (empty account) → standard dialog → confirms → account deleted.
 6. User clicks Delete (account with positions) → reinforced dialog → confirms → account + positions + transactions deleted.
