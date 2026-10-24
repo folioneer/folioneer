@@ -717,8 +717,22 @@ impl HoldingTransactionUseCase {
         })
     }
 
+    /// AGT-080 — the transaction the owner typed that an agent may ask to remove: refused as
+    /// `typed_by_owner` refuses, and with `PartOfTransfer` for a part of a transfer, whose
+    /// deletion would remove the whole transfer, more than the owner is shown (TRF-040).
+    pub async fn removable_by_owner(
+        &self,
+        transaction_id: &str,
+    ) -> Result<TypedTransaction, Refusal> {
+        let typed = self.typed_by_owner(transaction_id).await?;
+        if typed.transaction.is_transfer_part() {
+            return Err(refusal_from_account(&AccountError::PartOfTransfer));
+        }
+        Ok(typed)
+    }
+
     /// AGT-080 — removes a transaction the owner typed, on the owner's answer, through the
-    /// deletion of the window (TRX-034): refused as `typed_by_owner` refuses, with
+    /// deletion of the window (TRX-034): refused as `removable_by_owner` refuses, with
     /// `TransactionChanged` when it no longer stands as the owner was shown it, or as the
     /// deletion refuses.
     pub async fn remove_typed_by_owner(
@@ -726,7 +740,7 @@ impl HoldingTransactionUseCase {
         transaction_id: &str,
         shown: &AsShown,
     ) -> Result<Transaction, Refusal> {
-        let typed = self.typed_by_owner(transaction_id).await?;
+        let typed = self.removable_by_owner(transaction_id).await?;
         if !shown.stands(&typed.transaction) {
             return Err(transaction_changed());
         }

@@ -6680,3 +6680,59 @@ async fn agt_091_a_refusal_or_a_change_since_replaces_nothing() {
         "nothing was written"
     );
 }
+
+// AGT-080 — a part of a transfer the owner typed is refused before anything is asked: the
+// window's deletion would remove the whole transfer, more than the dialog shows (TRF-040).
+#[tokio::test]
+async fn agt_080_a_part_of_a_transfer_is_refused_before_asking() {
+    use crate::use_cases::transfer::TransferFigures;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = Arc::new(workbench(data_dir.path()).await);
+    let granted = session(&bench.connections).await;
+    let (from, to) = (
+        euro_account(&bench, "A1").await,
+        euro_account(&bench, "A2").await,
+    );
+    typed(&bench, owner::deposit("A1", "2019-01-15", 2000)).await;
+    let bought = typed(&bench, owner::buy("A1", "2019-03-01", 10, 100)).await;
+    // 4 sent, 3 received: a transfer out, a transfer in and a fee in kind.
+    let parts = bench
+        .transfers
+        .record_transfer(
+            &from,
+            &to,
+            bought.asset_id.clone(),
+            TransferFigures {
+                date: "2019-06-01".to_string(),
+                quantity_sent: 4 * M,
+                quantity_received: 3 * M,
+                exchange_rate: None,
+                note: None,
+            },
+        )
+        .await
+        .expect("transferred");
+    assert_eq!(parts.len(), 3, "the transfer's three parts");
+
+    for part in &parts {
+        // Refused at once: a call that waits for the owner has asked.
+        let refused = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            bench.tools.call(
+                &granted,
+                "request_removal",
+                &json!({ "transaction": part.id }),
+            ),
+        )
+        .await
+        .expect("refused before asking, not waiting for the owner")
+        .expect_err("refused");
+        assert_eq!(
+            refused.code, "PartOfTransfer",
+            "{:?}",
+            part.transaction_type
+        );
+    }
+    assert!(bench.connections.removals().is_empty(), "nothing was asked");
+}

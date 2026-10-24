@@ -634,7 +634,7 @@ impl AgentTools {
         let transaction_id = text(arguments, "transaction")?;
         let typed = self
             .recorder
-            .typed_by_owner(transaction_id)
+            .removable_by_owner(transaction_id)
             .await
             .map_err(|refusal| Refusal {
                 code: refusal.code,
