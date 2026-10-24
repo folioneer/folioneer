@@ -1,5 +1,7 @@
 use super::error::{TransferError, TransferTask};
-use crate::context::account::{AccountError, AccountServiceContract, Transaction};
+use crate::context::account::{
+    AccountError, AccountServiceContract, AgentRecording, Transaction, TransferPreview,
+};
 use crate::context::asset::{AssetClass, AssetServiceContract};
 use crate::context::currency::CurrencyService;
 use crate::core::logger::BACKEND;
@@ -19,6 +21,18 @@ pub struct TransferFigures {
     pub exchange_rate: Option<i64>,
     /// Note carried by every part.
     pub note: Option<String>,
+}
+
+/// Why an agent's transfer was not recorded and marked (AGT-049).
+#[derive(Debug)]
+pub enum AgentTransferError {
+    /// The transfer was refused as the window's is.
+    Refused(TransferError),
+    /// A part could not be marked.
+    NotMarked {
+        /// The transfer was removed again.
+        undone: bool,
+    },
 }
 
 /// Cross-BC orchestrator of the transfer (TRF).
@@ -56,6 +70,69 @@ impl TransferUseCase {
         Ok(self
             .account_service
             .record_transfer(
+                from_account_id,
+                to_account_id,
+                asset_id,
+                figures.date,
+                figures.quantity_sent,
+                figures.quantity_received,
+                rate,
+                figures.note,
+            )
+            .await?)
+    }
+
+    /// AGT-045 / AGT-049 — records a transfer as `record_transfer` does and marks every part
+    /// with the agent's session; when a part cannot be marked, the transfer is undone.
+    pub async fn record_transfer_by_agent(
+        &self,
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        figures: TransferFigures,
+        mark: &AgentRecording,
+    ) -> Result<Vec<Transaction>, AgentTransferError> {
+        let parts = self
+            .record_transfer(from_account_id, to_account_id, asset_id, figures)
+            .await
+            .map_err(AgentTransferError::Refused)?;
+        for part in &parts {
+            let Err(error) = self
+                .account_service
+                .mark_agent_recording(&part.id, mark)
+                .await
+            else {
+                continue;
+            };
+            tracing::error!(target: BACKEND, transaction = %part.id, err = ?error, "agent transfer: a part not marked, undoing the transfer");
+            let Some(transfer_id) = part.transfer_id.as_deref() else {
+                return Err(AgentTransferError::NotMarked { undone: false });
+            };
+            let undone = self.account_service.cancel_transfer(transfer_id).await;
+            if let Err(error) = &undone {
+                tracing::error!(target: BACKEND, transfer = %transfer_id, err = ?error, "agent transfer: not marked and not undone");
+            }
+            return Err(AgentTransferError::NotMarked {
+                undone: undone.is_ok(),
+            });
+        }
+        Ok(parts)
+    }
+
+    /// AGT-065A — what `record_transfer` would make of the two accounts, with the same
+    /// checks and the same rate, nothing written.
+    pub async fn preview_transfer(
+        &self,
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        figures: TransferFigures,
+    ) -> Result<TransferPreview, TransferError> {
+        self.ensure_transferable(&asset_id).await?;
+        let rate = self.rate(from_account_id, to_account_id, &figures).await?;
+        Ok(self
+            .account_service
+            .preview_transfer(
                 from_account_id,
                 to_account_id,
                 asset_id,

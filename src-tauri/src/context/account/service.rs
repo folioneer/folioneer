@@ -125,6 +125,21 @@ pub enum RecordingOp {
     },
 }
 
+/// What a transfer would make of its two accounts, nothing written (AGT-065A, AGT-072).
+#[derive(Debug, Clone)]
+pub struct TransferPreview {
+    /// The parts as they would be recorded, the fee in kind first when there is one.
+    pub parts: Vec<Transaction>,
+    /// The sending account's transactions without the transfer.
+    pub sending_before: Vec<Transaction>,
+    /// The sending account's transactions with it.
+    pub sending_after: Vec<Transaction>,
+    /// The receiving account's transactions without the transfer.
+    pub receiving_before: Vec<Transaction>,
+    /// The receiving account's transactions with it.
+    pub receiving_after: Vec<Transaction>,
+}
+
 /// What a recording would make of the account, nothing written (AGT-072).
 #[derive(Debug, Clone)]
 pub struct RecordingPreview {
@@ -1304,6 +1319,45 @@ impl AccountService {
         Ok(())
     }
 
+    /// AGT-065A — what recording a transfer would make of its two accounts: the checks of
+    /// `record_transfer`, nothing written.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn preview_transfer(
+        &self,
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+    ) -> Result<TransferPreview, AccountError> {
+        let transfer_id = Uuid::new_v4().to_string();
+        let staged = self
+            .stage_transfer(
+                &transfer_id,
+                from_account_id,
+                to_account_id,
+                TransferFigures {
+                    asset_id,
+                    date,
+                    quantity_sent,
+                    quantity_received,
+                    exchange_rate,
+                    note,
+                },
+            )
+            .await?;
+        Ok(TransferPreview {
+            parts: staged.parts,
+            sending_before: staged.sending_before,
+            sending_after: staged.sending.transactions,
+            receiving_before: staged.receiving_before,
+            receiving_after: staged.receiving.transactions,
+        })
+    }
+
     /// Places the parts of `transfer_id` in both accounts from `figures` (TRF-020 to
     /// TRF-022, TRF-030) and writes both, with what re-costing follows (TRF-025).
     async fn place_transfer(
@@ -1313,11 +1367,30 @@ impl AccountService {
         to_account_id: &str,
         figures: TransferFigures,
     ) -> Result<Vec<Transaction>, AccountError> {
+        let mut staged = self
+            .stage_transfer(transfer_id, from_account_id, to_account_id, figures)
+            .await?;
+        let mut written = vec![&mut staged.sending, &mut staged.receiving];
+        save_accounts(&*self.account_repo, &mut written).await?;
+        Ok(staged.parts)
+    }
+
+    /// Both accounts with the parts of `transfer_id` placed from `figures`, checked and
+    /// replayed (TRF-010 to TRF-022, TRF-030), nothing written.
+    async fn stage_transfer(
+        &self,
+        transfer_id: &str,
+        from_account_id: &str,
+        to_account_id: &str,
+        figures: TransferFigures,
+    ) -> Result<StagedTransfer, AccountError> {
         if from_account_id == to_account_id {
             return Err(AccountError::TransferToSameAccount);
         }
         let mut sending = load_account(&*self.account_repo, from_account_id).await?;
         let mut receiving = load_account(&*self.account_repo, to_account_id).await?;
+        let sending_before = sending.transactions.clone();
+        let receiving_before = receiving.transactions.clone();
         let TransferFigures {
             asset_id,
             date,
@@ -1429,9 +1502,13 @@ impl AccountService {
         let placed_in = receiving
             .place_transfer_parts(transfer_id, &asset_id, vec![incoming])
             .map_err(to_holding_tx_error)?;
-        let mut written = vec![&mut sending, &mut receiving];
-        save_accounts(&*self.account_repo, &mut written).await?;
-        Ok(placed_out.into_iter().chain(placed_in).collect())
+        Ok(StagedTransfer {
+            parts: placed_out.into_iter().chain(placed_in).collect(),
+            sending,
+            receiving,
+            sending_before,
+            receiving_before,
+        })
     }
 
     /// Records a stock split on a held asset (SPL-010/020).
@@ -2610,6 +2687,19 @@ pub trait AccountServiceContract: Send + Sync {
     ) -> StdResult<Vec<Transaction>, AccountError>;
     /// Removes every part of a transfer together (TRF-040).
     async fn cancel_transfer(&self, transfer_id: &str) -> StdResult<(), AccountError>;
+    /// What recording a transfer would make of its two accounts, nothing written (AGT-065A).
+    #[allow(clippy::too_many_arguments)]
+    async fn preview_transfer(
+        &self,
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+    ) -> StdResult<TransferPreview, AccountError>;
     /// The sending account, the receiving account and the asset of a transfer (TRF-030).
     async fn transfer_sides(
         &self,
@@ -3144,6 +3234,31 @@ impl AccountServiceContract for AccountService {
         AccountService::cancel_transfer(self, transfer_id).await
     }
 
+    async fn preview_transfer(
+        &self,
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+    ) -> StdResult<TransferPreview, AccountError> {
+        AccountService::preview_transfer(
+            self,
+            from_account_id,
+            to_account_id,
+            asset_id,
+            date,
+            quantity_sent,
+            quantity_received,
+            exchange_rate,
+            note,
+        )
+        .await
+    }
+
     async fn transfer_sides(
         &self,
         transfer_id: &str,
@@ -3350,6 +3465,15 @@ async fn load_account(
             Err(AccountError::DatabaseError)
         }
     }
+}
+
+/// A transfer placed in both accounts, not written yet.
+struct StagedTransfer {
+    parts: Vec<Transaction>,
+    sending: Account,
+    receiving: Account,
+    sending_before: Vec<Transaction>,
+    receiving_before: Vec<Transaction>,
 }
 
 /// The figures a transfer is placed from (TRF entity).

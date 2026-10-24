@@ -823,6 +823,10 @@ impl HoldingTransactionUseCase {
         reason: Option<WriteOffReason>,
     ) -> Result<Transaction, Refusal> {
         let recorded = self.recorded_by(transaction_id, session).await?;
+        // AGT-065A — a part of a transfer is corrected with its transfer, never alone (TRF-031).
+        if recorded.is_transfer_part() {
+            return Err(refusal_from_account(&AccountError::PartOfTransfer));
+        }
         let fields = change_fields(&recorded, &change, reason, true)?;
         let corrected = if recorded.transaction_type == TransactionType::WriteOff {
             // A stored write-off always carries its reason (WOF entity): one without is a
@@ -868,6 +872,10 @@ impl HoldingTransactionUseCase {
         reason: Option<WriteOffReason>,
     ) -> Result<Previewed, Refusal> {
         let recorded = self.recorded_by(transaction_id, session).await?;
+        // AGT-065A — a part of a transfer is corrected with its transfer, never alone (TRF-031).
+        if recorded.is_transfer_part() {
+            return Err(refusal_from_account(&AccountError::PartOfTransfer));
+        }
         let fields = change_fields(&recorded, &change, reason, true)?;
         // Read for its name and currency only: the preview loads the account again, and its
         // own load decides what the correction makes of it.
@@ -976,8 +984,13 @@ impl HoldingTransactionUseCase {
                     .await
                 {
                     Ok(()) => removed += 1,
-                    // Removed meanwhile, by the agent or by the owner: it is gone already.
-                    Err(AccountError::TransactionNotFound) => {}
+                    // Gone already: removed with the transfer it was a part of (TRF-040),
+                    // or meanwhile, by the agent or by the owner.
+                    Err(AccountError::TransactionNotFound | AccountError::TransferNotFound) => {
+                        if recording.transfer_part {
+                            removed += 1;
+                        }
+                    }
                     Err(AccountError::DatabaseError) => return Err(AccountError::DatabaseError),
                     Err(refusal) => {
                         tracing::info!(target: BACKEND, transaction = %recording.transaction_id, err = ?refusal, "agent recordings: one kept for now");
@@ -1268,9 +1281,35 @@ impl HoldingTransactionUseCase {
         }
     }
 
+    /// AGT-065A — the sending account, the receiving account and the asset a transfer names,
+    /// each found as a recording finds its own (CLI-011), refused as it is.
+    pub async fn find_transfer_by_name(
+        &self,
+        from: &str,
+        to: &str,
+        asset: &str,
+    ) -> Result<(NamedTarget, NamedTarget), Refusal> {
+        let sending = self
+            .find_by_name(from, asset)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let receiving = self
+            .find_account_by_name(to)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let receiving = NamedTarget {
+            account_id: receiving.id,
+            account_name: receiving.name,
+            currency: receiving.currency,
+            asset_id: sending.asset_id.clone(),
+            asset_reference: sending.asset_reference.clone(),
+        };
+        Ok((sending, receiving))
+    }
+
     /// AGT-072 — the account `transactions` make on the evening of `date`: each asset held,
     /// by reference, and the cash.
-    async fn account_as_of(&self, transactions: &[Transaction], date: &str) -> AccountAsOf {
+    pub async fn account_as_of(&self, transactions: &[Transaction], date: &str) -> AccountAsOf {
         let mut assets: Vec<&str> = transactions.iter().map(|tx| tx.asset_id.as_str()).collect();
         assets.sort_unstable();
         assets.dedup();
@@ -1977,7 +2016,7 @@ fn refusal_from_dividend(error: &DividendError) -> Refusal {
 
 /// CLI-021 — a recording rejection keeps its code; the sentence is the command line's. Every
 /// variant is named, so a new one fails to compile until it has a sentence.
-fn refusal_from_account(error: &AccountError) -> Refusal {
+pub fn refusal_from_account(error: &AccountError) -> Refusal {
     let message = match error {
         AccountError::ArchivedAssetSell => {
             "the asset is archived: unarchive it to sell".to_string()

@@ -298,7 +298,12 @@ pub const MAX_RECORDINGS: u32 = 500;
 impl Granted {
     /// AGT-047 — whether the session is still under its limit of recordings.
     pub fn may_record_one_more(&self) -> bool {
-        self.recorded.load(Ordering::SeqCst) < MAX_RECORDINGS
+        self.may_record(1)
+    }
+
+    /// AGT-047 / AGT-065A — `count` more transactions fit within the session's limit.
+    pub fn may_record(&self, count: u32) -> bool {
+        self.recorded.load(Ordering::SeqCst) + count <= MAX_RECORDINGS
     }
 
     /// Counts one transaction the session recorded.

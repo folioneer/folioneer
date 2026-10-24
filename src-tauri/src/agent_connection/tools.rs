@@ -23,12 +23,16 @@ use crate::use_cases::holding_transaction::{
     HoldingTransactionUseCase, InterestCredit, ManagementFee, PriceAt, RecordedBy, Recording,
     StockSplit, Target, Trade, TradeAmount, TransactionsAsked, TypedTransaction, WriteOff,
 };
+use crate::use_cases::transfer::TransferUseCase;
 
 use super::connections::{
     AgentConnections, ChangeAnswer, Granted, LastRecording, RemovalAnswer, TransactionShown,
     MAX_RECORDINGS,
 };
 use super::{definitions, wire};
+
+/// AGT-065A — the transfer tool.
+mod transfer;
 
 /// Why a tool call is refused: a stable code and a reason for the agent to read.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,6 +96,7 @@ pub fn last_recording(
 /// Runs the tools in the running application, through the queries the window uses.
 pub struct AgentTools {
     recorder: Arc<HoldingTransactionUseCase>,
+    transfer: Arc<TransferUseCase>,
     creation: Arc<AccountCreationUseCase>,
     account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,
@@ -117,6 +122,11 @@ impl AgentTools {
             recorder: Arc::new(HoldingTransactionUseCase::new(
                 Arc::clone(&account_service),
                 Arc::clone(&asset_service),
+            )),
+            transfer: Arc::new(TransferUseCase::new(
+                Arc::clone(&account_service),
+                Arc::clone(&asset_service),
+                Arc::clone(&currency_service),
             )),
             summaries: AccountSummaryUseCase::new(
                 Arc::clone(&account_service),
@@ -179,6 +189,7 @@ impl AgentTools {
                 let recording = interest_or_fee(tool, arguments)?;
                 self.record(granted, recording).await
             }
+            "record_transfer" => self.record_transfer(granted, arguments).await,
             "record_price" => self.record_price(granted, arguments).await,
             "add_asset" => self.add_asset(granted, arguments).await,
             "add_account" => self.add_account(granted, arguments).await,
@@ -692,6 +703,9 @@ impl AgentTools {
             code: refusal.code,
             message: refusal.message,
         };
+        if tool == "record_transfer" {
+            return self.preview_transfer(inner).await;
+        }
         if tool == "record_price" {
             let previewed = self
                 .recorder
@@ -921,7 +935,7 @@ fn price_of(arguments: &Value) -> Result<PriceAt, Refusal> {
 }
 
 /// AGT-072 — the calls `preview_recording` previews.
-const PREVIEWED: [&str; 11] = [
+const PREVIEWED: [&str; 12] = [
     "record_purchase",
     "record_sale",
     "record_opening_balance",
@@ -931,6 +945,7 @@ const PREVIEWED: [&str; 11] = [
     "record_dividend",
     "record_free_shares",
     "record_write_off",
+    "record_transfer",
     "record_price",
     "correct_recording",
 ];

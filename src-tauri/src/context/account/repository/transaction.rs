@@ -263,7 +263,8 @@ impl TransactionRepository for SqliteTransactionRepository {
     async fn recorded_in_session(&self, session: &str) -> Result<Vec<SessionRecording>> {
         use sqlx::Row;
         let rows = sqlx::query(
-            "SELECT t.id AS transaction_id, t.account_id AS account_id
+            "SELECT t.id AS transaction_id, t.account_id AS account_id,
+                    t.transfer_id IS NOT NULL AS transfer_part
              FROM agent_recordings r
              JOIN transactions t ON t.id = r.transaction_id
              WHERE r.session = ?
@@ -278,6 +279,7 @@ impl TransactionRepository for SqliteTransactionRepository {
                 Ok(SessionRecording {
                     transaction_id: row.try_get("transaction_id")?,
                     account_id: row.try_get("account_id")?,
+                    transfer_part: row.try_get("transfer_part")?,
                 })
             })
             .collect()

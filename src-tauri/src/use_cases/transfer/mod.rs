@@ -14,4 +14,4 @@ mod orchestrator;
 #[cfg(feature = "app")]
 pub use api::*;
 pub use error::{TransferError, TransferTask};
-pub use orchestrator::{TransferFigures, TransferUseCase};
+pub use orchestrator::{AgentTransferError, TransferFigures, TransferUseCase};

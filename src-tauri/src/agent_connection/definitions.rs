@@ -214,6 +214,27 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "record_transfer",
+            title: "Record a transfer",
+            only_reads: false,
+            description: "Record an asset moved from one account of the portfolio to another — shares moved between brokers, coins sent from an exchange to a wallet: the quantity leaves the sending account at its average cost and enters the receiving one at that cost, converted at the rate between the two accounts' currencies; no cash moves and no gain is realized. When less arrives than was sent, the difference is a fee in kind, written off in the sending account. The transfer's parts follow the application's rules and are marked as recorded by this agent; cancel_recording on any of them removes the whole transfer, and a part is not corrected: cancel it and record the transfer again. Figures are decimals with a dot (12.5), not millionths.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "from": { "type": "string", "description": "The sending account's name, as list_accounts gives it." },
+                    "to": { "type": "string", "description": "The receiving account's name, as list_accounts gives it." },
+                    "asset": { "type": "string", "description": "The asset's name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
+                    "quantity": { "type": ["string", "number"], "description": "How much of the asset left the sending account." },
+                    "received": { "type": ["string", "number"], "description": "How much reached the receiving account, not above quantity. Default: quantity." },
+                    "rate": { "type": ["string", "number"], "description": "Units of the receiving account's currency for one unit of the sending account's. Default: the rate stored for that date; give none between accounts of one currency." },
+                    "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." },
+                    "note": { "type": "string", "description": "A note kept with each part of the transfer." }
+                },
+                "required": ["from", "to", "asset", "quantity"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
             name: "record_interest",
             title: "Record interest",
             only_reads: false,
@@ -348,7 +369,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "preview_recording",
             title: "Preview a recording",
             only_reads: true,
-            description: "Preview what a recording, a correction or a price would do, writing nothing: give tool, one of record_purchase, record_sale, record_opening_balance, record_split, record_deposit, record_withdrawal, record_dividend, record_free_shares, record_write_off, record_price, correct_recording, and arguments, the object that tool takes. Answered with the refusal the real call would give, or with the transaction as it would be recorded and the account on the evening of its date without it (before) and with it (after): each asset held, by reference and name, with its quantity and average price, and the cash. A price is answered with the price it would replace at that date, or null. Read the account today with list_holdings once it is recorded.",
+            description: "Preview what a recording, a correction or a price would do, writing nothing: give tool, one of record_purchase, record_sale, record_opening_balance, record_split, record_deposit, record_withdrawal, record_dividend, record_free_shares, record_write_off, record_transfer, record_price, correct_recording, and arguments, the object that tool takes. Answered with the refusal the real call would give, or with the transaction as it would be recorded and the account on the evening of its date without it (before) and with it (after): each asset held, by reference and name, with its quantity and average price, and the cash. A transfer is answered with its parts and both accounts, from and to, each before and after. A price is answered with the price it would replace at that date, or null. Read the account today with list_holdings once it is recorded.",
             input_schema: json!({
                 "type": "object",
                 "properties": {

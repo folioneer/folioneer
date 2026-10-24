@@ -332,6 +332,7 @@ mod tests {
                 "record_split",
                 "record_free_shares",
                 "record_write_off",
+                "record_transfer",
                 "record_interest",
                 "record_management_fee",
                 "record_price",
