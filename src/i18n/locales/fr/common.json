@@ -569,8 +569,6 @@
     "type_split": "Division",
     "type_interest": "Intérêts",
     "type_writeoff": "Sortie sans contrepartie",
-    "type_transferout": "Transfert sortant",
-    "type_transferin": "Transfert entrant",
     "action_sell": "Vendre",
     "action_split": "Division d'actions",
     "buy_modal_title": "Acheter la position",
@@ -876,11 +874,7 @@
     "error_TransferNotFound": "Ce transfert n'a plus ses deux côtés : supprimez ce qu'il en reste.",
     "error_TransferRateMissing": "Aucun taux {{from}} → {{to}} n'est enregistré pour cette date : saisissez-en un.",
     "action_record": "Enregistrer le transfert",
-    "recorded": "Transfert enregistré.",
-    "to_account": "vers {{account}} →",
-    "from_account": "← depuis {{account}}",
-    "part_of_transfer_to": "partie du transfert vers {{account}}",
-    "delete_confirm_message": "Ceci supprime tout le transfert, des deux comptes."
+    "recorded": "Transfert enregistré."
   },
   "interest": {
     "modal_title": "Enregistrer des intérêts",

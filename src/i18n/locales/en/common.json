@@ -569,8 +569,6 @@
     "type_split": "Split",
     "type_interest": "Interest",
     "type_writeoff": "Write-off",
-    "type_transferout": "Transfer out",
-    "type_transferin": "Transfer in",
     "action_sell": "Sell",
     "action_split": "Split",
     "buy_modal_title": "Buy position",
@@ -876,11 +874,7 @@
     "error_TransferNotFound": "This transfer no longer has both its sides: delete what is left of it.",
     "error_TransferRateMissing": "No {{from}} → {{to}} rate is stored for this date: type one.",
     "action_record": "Record the transfer",
-    "recorded": "Transfer recorded.",
-    "to_account": "to {{account}} →",
-    "from_account": "← from {{account}}",
-    "part_of_transfer_to": "part of the transfer to {{account}}",
-    "delete_confirm_message": "This removes the whole transfer, from both accounts."
+    "recorded": "Transfer recorded."
   },
   "interest": {
     "modal_title": "Record interest",
