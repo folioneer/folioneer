@@ -90,7 +90,7 @@ describe("TransferEditModal (TRF-057)", () => {
     await waitFor(() => expect(screen.getByTestId("transfer-form")).toBeInTheDocument());
     expect(mockGetAccountDetails).toHaveBeenCalledWith("acc-exchange");
     expect(screen.getByTestId("transfer-form").textContent).toBe(
-      "acc-exchange:300000:20000000000:EUR:acc-usd:acc-usd:1.080:200000",
+      "acc-exchange:300000:21052631578:EUR:acc-usd:acc-usd:1.080:200000",
     );
   });
 

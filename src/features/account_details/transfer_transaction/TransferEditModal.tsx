@@ -82,7 +82,7 @@ export function TransferEditModal({
     assetReference: asset?.reference ?? "",
     quantityMicro: heldMicro,
     averagePriceMicro: Number(
-      (BigInt(transfer.cost) * 1_000_000n) / BigInt(transfer.quantity_sent),
+      (BigInt(transfer.cost) * 1_000_000n) / BigInt(transfer.quantity_received),
     ),
     accountName: from?.name ?? "",
     accountCurrency: from?.currency ?? "",
