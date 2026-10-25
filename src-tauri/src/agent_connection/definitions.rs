@@ -101,6 +101,23 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "list_prices",
+            title: "List an asset's prices over a period",
+            only_reads: true,
+            description: "The prices the application holds for one asset, oldest first, 100 to a page, between two dates, both included, or over its whole history: each with its date, the price of one unit in the asset's currency, and its source: Manual (typed by the owner), Agent (recorded by an agent), or the name of the provider it was fetched from. total says how many prices the dates keep. Use it to check a price history against a statement or a known event, such as a split, and to say which dates are wrong. The price is a whole number of millionths: 1500000 is 1.5.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "asset": { "type": "string", "description": "The asset's name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
+                    "from": { "type": "string", "description": "Only from this date on, YYYY-MM-DD." },
+                    "to": { "type": "string", "description": "Only up to this date, YYYY-MM-DD." },
+                    "page": { "type": "integer", "description": "The page, from 1. Default: 1." }
+                },
+                "required": ["asset"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
             name: "record_opening_balance",
             title: "Record an opening balance",
             only_reads: false,

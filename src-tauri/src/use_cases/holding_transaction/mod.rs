@@ -28,8 +28,8 @@ pub use error::{
     WriteOffTask,
 };
 pub use named_listing::{
-    ListedTransaction, ListedTransactions, PriceRead, RecordedBy, TransactionsAsked,
-    TRANSACTIONS_PER_PAGE,
+    ListedPrices, ListedTransaction, ListedTransactions, PriceRead, RecordedBy, TransactionsAsked,
+    PRICES_PER_PAGE, TRANSACTIONS_PER_PAGE,
 };
 pub use named_recording::{
     code_of, decimal, decimal_to_micro, refusal_from_account, AccountAsOf, AsShown, CashAmount,

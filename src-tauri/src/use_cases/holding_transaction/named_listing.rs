@@ -2,7 +2,7 @@
 //! named (AGT-070): the rows a filter keeps of the account journal the window reads
 //! (TXL-060), oldest first and one page at a time, each with the reference of its asset and
 //! the mark of the agent session that recorded it. The price of the asset named at a date
-//! (AGT-071).
+//! (AGT-071), and its prices over a period, one page at a time (AGT-075).
 
 use std::collections::HashMap;
 
@@ -17,6 +17,9 @@ use super::orchestrator::HoldingTransactionUseCase;
 
 /// AGT-070 — how many transactions one page of a listing holds.
 pub const TRANSACTIONS_PER_PAGE: usize = 100;
+
+/// AGT-075 — how many prices one page of a price history holds.
+pub const PRICES_PER_PAGE: usize = 100;
 
 /// Who recorded the transactions a listing keeps.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -86,6 +89,21 @@ pub struct PriceRead {
     /// The price on that date or the closest earlier one; `None` when the asset has no
     /// price up to that date.
     pub price: Option<AssetPrice>,
+}
+
+/// One page of an asset's prices over a period (AGT-075).
+#[derive(Debug, Clone)]
+pub struct ListedPrices {
+    /// The asset named.
+    pub asset: Asset,
+    /// How many prices the dates keep, over every page.
+    pub total: usize,
+    /// The page given, from 1.
+    pub page: usize,
+    /// How many pages the kept prices make.
+    pub pages: usize,
+    /// The prices of the page, oldest first.
+    pub prices: Vec<AssetPrice>,
 }
 
 impl HoldingTransactionUseCase {
@@ -204,6 +222,51 @@ impl HoldingTransactionUseCase {
                 unreadable()
             })?;
         Ok(PriceRead { asset, date, price })
+    }
+
+    /// AGT-075 — the prices of the asset named whose dates `from` and `to` keep, both
+    /// included, oldest first: the page asked for, with how many there are in all.
+    pub async fn prices_listed(
+        &self,
+        asset: &str,
+        from: Option<&str>,
+        to: Option<&str>,
+        page: usize,
+    ) -> Result<ListedPrices, Refusal> {
+        let from = bound(from, "from")?;
+        let to = bound(to, "to")?;
+        let asset = self
+            .find_asset_by_name(asset)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let mut kept: Vec<AssetPrice> = self
+            .asset_service
+            .get_asset_prices(&asset.id)
+            .await
+            .map_err(|error| {
+                tracing::error!(target: BACKEND, err = ?error, "prices_listed: the prices could not be read");
+                unreadable()
+            })?
+            .into_iter()
+            .filter(|price| {
+                from.as_deref().is_none_or(|from| price.date.as_str() >= from)
+                    && to.as_deref().is_none_or(|to| price.date.as_str() <= to)
+            })
+            .collect();
+        kept.sort_by(|a, b| a.date.cmp(&b.date));
+        let total = kept.len();
+        let page = page.max(1);
+        Ok(ListedPrices {
+            asset,
+            total,
+            page,
+            pages: total.div_ceil(PRICES_PER_PAGE),
+            prices: kept
+                .into_iter()
+                .skip((page - 1).saturating_mul(PRICES_PER_PAGE))
+                .take(PRICES_PER_PAGE)
+                .collect(),
+        })
     }
 }
 

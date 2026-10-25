@@ -3198,6 +3198,161 @@ async fn agt_071_a_session_reads_the_price_of_an_asset_at_a_date() {
     assert!(!granted.may_record_one_more());
 }
 
+// AGT-075 (#339) — list_prices answers an asset's prices oldest first, 100 to a page, each
+// with its date, price and source, within dates both included; an asset with none in them
+// is an empty page, an unknown one is refused, and each answer is a read.
+#[tokio::test]
+async fn agt_075_an_agent_lists_an_assets_prices_over_a_period() {
+    use crate::use_cases::holding_transaction::PRICES_PER_PAGE;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+    let asset = bench
+        .assets
+        .get_non_cash_assets()
+        .await
+        .expect("assets")
+        .remove(0);
+
+    let none = call("list_prices", json!({ "asset": "cw8" }))
+        .await
+        .expect("answered");
+    assert_eq!(
+        (
+            none["total"].clone(),
+            none["pages"].clone(),
+            none["prices"].clone()
+        ),
+        (json!(0), json!(0), json!([]))
+    );
+
+    // One more price than a page holds, the newest typed first so the order is the read's.
+    let first_day = chrono::NaiveDate::from_ymd_opt(2020, 1, 1).expect("a day");
+    let days: Vec<String> = (0..=PRICES_PER_PAGE as u64)
+        .map(|offset| {
+            (first_day + chrono::Days::new(offset))
+                .format("%Y-%m-%d")
+                .to_string()
+        })
+        .collect();
+    for (index, day) in days.iter().enumerate().rev() {
+        bench
+            .assets
+            .record_asset_price_in_micros(&asset.id, day, (index as i64 + 1) * M)
+            .await
+            .expect("typed by the owner");
+    }
+    let last_day = days.last().expect("a last day").clone();
+    call(
+        "record_price",
+        json!({ "asset": "CW8", "price": 900, "date": last_day }),
+    )
+    .await
+    .expect("recorded by the agent");
+
+    let first = call("list_prices", json!({ "asset": "CW8" }))
+        .await
+        .expect("answered");
+    assert_eq!(first["status"], "listed");
+    assert_eq!(first["asset"], "CW8");
+    assert_eq!(first["currency"], "EUR");
+    assert_eq!(
+        (
+            first["total"].clone(),
+            first["page"].clone(),
+            first["pages"].clone()
+        ),
+        (json!(PRICES_PER_PAGE + 1), json!(1), json!(2))
+    );
+    let page = first["prices"].as_array().expect("prices");
+    assert_eq!(page.len(), PRICES_PER_PAGE);
+    assert_eq!(
+        page[0],
+        json!({ "date": "2020-01-01", "price": M, "source": "Manual" })
+    );
+    assert!(page
+        .windows(2)
+        .all(|pair| pair[0]["date"].as_str() < pair[1]["date"].as_str()));
+    let second = call("list_prices", json!({ "asset": "CW8", "page": 2 }))
+        .await
+        .expect("answered");
+    assert_eq!(
+        second["prices"],
+        json!([{ "date": last_day, "price": 900 * M, "source": "Agent" }])
+    );
+    let past = call("list_prices", json!({ "asset": "CW8", "page": 3 }))
+        .await
+        .expect("answered");
+    assert_eq!(past["prices"], json!([]));
+
+    // Both bounds included; reversed or future bounds keep none and are not refused.
+    let ranged = call(
+        "list_prices",
+        json!({ "asset": "CW8", "from": "2020-01-02", "to": "2020-01-04" }),
+    )
+    .await
+    .expect("answered");
+    let dates: Vec<&str> = ranged["prices"]
+        .as_array()
+        .expect("prices")
+        .iter()
+        .map(|price| price["date"].as_str().expect("a date"))
+        .collect();
+    assert_eq!(dates, ["2020-01-02", "2020-01-03", "2020-01-04"]);
+    assert_eq!(ranged["total"], 3);
+    for arguments in [
+        json!({ "asset": "CW8", "from": "2020-02-01", "to": "2020-01-01" }),
+        json!({ "asset": "CW8", "from": "2999-01-01" }),
+    ] {
+        let empty = call("list_prices", arguments.clone())
+            .await
+            .expect("answered");
+        assert_eq!(empty["total"], 0, "{arguments}");
+    }
+
+    // An archived asset keeps its prices, and they are listed like any other.
+    bench
+        .assets
+        .archive_asset(&asset.id)
+        .await
+        .expect("archived");
+    let archived = call("list_prices", json!({ "asset": "CW8", "to": "2020-01-01" }))
+        .await
+        .expect("answered");
+    assert_eq!(archived["total"], 1);
+
+    for (arguments, code) in [
+        (json!({}), "MissingArgument"),
+        (json!({ "asset": "NOPE" }), "AssetNotFound"),
+        (json!({ "asset": "CW8", "from": "january" }), "InvalidDate"),
+        (json!({ "asset": "CW8", "to": 20200101 }), "InvalidDate"),
+        (json!({ "asset": "CW8", "page": 0 }), "InvalidArguments"),
+        (json!({ "asset": "CW8", "page": "2" }), "InvalidArguments"),
+    ] {
+        assert_eq!(
+            call("list_prices", arguments.clone())
+                .await
+                .expect_err("refused")
+                .code,
+            code,
+            "{arguments}"
+        );
+    }
+
+    // Eight answers, eight reads; the one recorded price is the only place taken.
+    let told = bench.connections.sessions().remove(0);
+    assert_eq!(told.reads, 8);
+    for _ in 1..super::connections::MAX_RECORDINGS {
+        granted.count_recording();
+    }
+    assert!(!granted.may_record_one_more());
+}
+
 // AGT-036 / B45 / TODO-083 — every write an agent makes reaches the window with the session's
 // change after it: an added asset, a transaction on it, a price, an account, then many recordings sent
 // at once, none of them lost to the one after.
@@ -4838,6 +4993,7 @@ async fn agt_080_a_portfolio_that_cannot_be_read_is_a_database_error() {
     for (tool, arguments) in [
         ("list_transactions", json!({ "account": "PEA" })),
         ("get_price", json!({ "asset": "CW8", "date": "2026-01-02" })),
+        ("list_prices", json!({ "asset": "CW8" })),
         ("request_removal", json!({ "transaction": deposit.id })),
     ] {
         let refused = bench
