@@ -2484,6 +2484,12 @@ pub trait AccountRepository: Send + Sync {
     /// One repository writing several aggregates of its own, not a use case opening a
     /// transaction across contexts (`docs/ddd-divergences.md` § 19, until ADR-006 lands).
     async fn save_all<'a>(&self, accounts: &mut [&'a mut Account]) -> Result<()>;
+    /// `save_all` inside `unit`, committed with it (ADR-006).
+    async fn save_all_in<'a>(
+        &self,
+        unit: &mut UnitOfWork,
+        accounts: &mut [&'a mut Account],
+    ) -> Result<()>;
     /// `save_all`, every transaction of `marked` marked with `mark` in the same write
     /// (AGT-045, AGT-049): the transactions and their marks exist together or not at all.
     async fn save_all_marked<'a>(

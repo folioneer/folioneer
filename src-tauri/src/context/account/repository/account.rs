@@ -894,6 +894,18 @@ impl AccountRepository for SqliteAccountRepository {
         self.write_all(accounts, None).await
     }
 
+    async fn save_all_in<'a>(
+        &self,
+        unit: &mut UnitOfWork,
+        accounts: &mut [&'a mut Account],
+    ) -> Result<()> {
+        let conn = unit.connection();
+        for account in accounts.iter_mut() {
+            self.persist_pending(conn, account, Capture::Record).await?;
+        }
+        Ok(())
+    }
+
     async fn save_all_marked<'a>(
         &self,
         accounts: &mut [&'a mut Account],

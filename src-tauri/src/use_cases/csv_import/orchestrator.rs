@@ -9,6 +9,7 @@ use crate::context::import::{
     LARGEST_FILE,
 };
 use crate::core::logger::BACKEND;
+use crate::shared::infrastructure::uow::TransactionManager;
 use serde::Serialize;
 use specta::Type;
 use std::collections::HashSet;
@@ -123,6 +124,7 @@ pub struct CsvImportUseCase {
     import_service: Arc<ImportService>,
     account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,
+    transactions: Arc<dyn TransactionManager>,
     /// IMP-010 — the files the user picked in the system dialog, the only ones read.
     picked: Mutex<HashSet<PathBuf>>,
 }
@@ -143,11 +145,13 @@ impl CsvImportUseCase {
         import_service: Arc<ImportService>,
         account_service: Arc<dyn AccountServiceContract>,
         asset_service: Arc<dyn AssetServiceContract>,
+        transactions: Arc<dyn TransactionManager>,
     ) -> Self {
         Self {
             import_service,
             account_service,
             asset_service,
+            transactions,
             picked: Mutex::new(HashSet::new()),
         }
     }
@@ -271,17 +275,7 @@ impl CsvImportUseCase {
                 (row.line, pending)
             })
             .collect();
-        if record.is_some() {
-            // CSH-010 — a deposit, an added one included, needs the account's Cash Asset.
-            self.asset_service
-                .seed_cash_asset(&currency)
-                .await
-                .map_err(|e| {
-                    tracing::error!(target: BACKEND, err = ?e, "confirm_import: cash asset");
-                    ImportError::DatabaseError
-                })?;
-        }
-        let rows = self.judge(account_id, pending, record).await?;
+        let rows = self.judge(account_id, &currency, pending, record).await?;
         Ok(ImportPreview {
             counts: count(&rows),
             file: read,
@@ -300,11 +294,59 @@ impl CsvImportUseCase {
             })
     }
 
+    /// IMP-050 — the Cash Asset of the account's currency (CSH-010), which a deposit needs,
+    /// and the rows recorded, in one unit of work (ADR-006): all of them or none.
+    async fn record(
+        &self,
+        account_id: &str,
+        currency: &str,
+        steps: Vec<RecordingStep>,
+        add_deposits: bool,
+    ) -> Result<Vec<RecordingJudgment>, CsvImportError> {
+        let unit_failed = |step: &'static str| {
+            move |e: anyhow::Error| {
+                tracing::error!(target: BACKEND, step = %step, err = ?e, "confirm_import: unit of work");
+                ImportError::DatabaseError
+            }
+        };
+        let mut prepared = self
+            .account_service
+            .prepare_recordings(account_id, steps, add_deposits)
+            .await?;
+        let recorded = prepared
+            .judgments
+            .iter()
+            .any(|judgment| matches!(judgment, RecordingJudgment::Ready { .. }));
+        if !recorded {
+            return Ok(prepared.judgments);
+        }
+        let mut unit = self
+            .transactions
+            .begin()
+            .await
+            .map_err(unit_failed("begin"))?;
+        let cash_asset_created = self
+            .asset_service
+            .seed_cash_asset_in(&mut unit, currency)
+            .await
+            .map_err(unit_failed("cash asset"))?;
+        self.account_service
+            .record_recordings_in(&mut unit, &mut prepared)
+            .await?;
+        unit.commit().await.map_err(unit_failed("commit"))?;
+        if cash_asset_created {
+            self.asset_service.notify_asset_updated();
+        }
+        self.account_service.notify_transaction_updated();
+        Ok(prepared.judgments)
+    }
+
     /// IMP-035 — the steps judged in date order, the file's order within one day, then each
     /// row's status in the file's order.
     async fn judge(
         &self,
         account_id: &str,
+        currency: &str,
         pending: Vec<(u32, Pending)>,
         record: Option<bool>,
     ) -> Result<Vec<PreviewRow>, CsvImportError> {
@@ -333,8 +375,7 @@ impl CsvImportUseCase {
                     .await?
             }
             Some(add_deposits) => {
-                self.account_service
-                    .record_recordings(account_id, steps, add_deposits)
+                self.record(account_id, currency, steps, add_deposits)
                     .await?
             }
         };

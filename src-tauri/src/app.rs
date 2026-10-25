@@ -256,6 +256,7 @@ pub fn run() {
                     Arc::clone(&import_service),
                     account_service.clone(),
                     asset_service.clone(),
+                    Arc::clone(&transactions),
                 );
 
                 let transfer_uc = TransferUseCase::new(

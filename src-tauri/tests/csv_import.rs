@@ -22,6 +22,7 @@ use folioneer_lib::context::import::{
 };
 use folioneer_lib::core::event_bus::Event;
 use folioneer_lib::core::SideEffectEventBus;
+use folioneer_lib::shared::infrastructure::uow::SqliteTransactionManager;
 use folioneer_lib::use_cases::csv_import::{
     CsvImportError, CsvImportTask, CsvImportUseCase, ImportPreview, PreviewCounts, RowReason,
     RowStatus,
@@ -76,6 +77,7 @@ async fn build_ctx() -> Ctx {
             Arc::clone(&mappings),
             account_service.clone(),
             asset_service.clone(),
+            Arc::new(SqliteTransactionManager::new(pool.clone())),
         ),
         mappings,
         recording: HoldingTransactionUseCase::new(account_service.clone(), asset_service.clone()),

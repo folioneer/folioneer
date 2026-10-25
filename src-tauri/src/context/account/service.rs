@@ -179,6 +179,14 @@ pub enum RecordingJudgment {
     NotHeld,
 }
 
+/// IMP-050 — the accounts a confirmed import changes, judged and not written yet: the
+/// account recorded on and the accounts of the transfers it re-costs (TRF-025).
+pub struct PreparedRecordings {
+    /// Each step's judgment, in the order given.
+    pub judgments: Vec<RecordingJudgment>,
+    accounts: Vec<Account>,
+}
+
 impl AccountService {
     /// Creates a new AccountService.
     pub fn new(
@@ -990,27 +998,43 @@ impl AccountService {
         Ok(judge_all(&mut account, steps, true))
     }
 
-    /// IMP-050 — recording steps judged as `judge_recordings` judges them, then every one
-    /// taken recorded in one write, raising one `TransactionUpdated`. With `add_deposits`, a
-    /// purchase the cash cannot fund is recorded after the deposit it needs, marked as added
-    /// (IMP-051); without, it is refused as manual entry refuses it (CSH-041).
-    pub async fn record_recordings(
+    /// IMP-050 — recording steps judged as `judge_recordings` judges them, every one taken
+    /// applied to the account, nothing written: `record_recordings_in` writes them. With
+    /// `add_deposits`, a purchase the cash cannot fund is taken after the deposit it needs,
+    /// marked as added (IMP-051); without, it is refused as manual entry refuses it (CSH-041).
+    pub async fn prepare_recordings(
         &self,
         account_id: &str,
         steps: Vec<RecordingStep>,
         add_deposits: bool,
-    ) -> Result<Vec<RecordingJudgment>, AccountError> {
-        info!(target: BACKEND, account_id = %account_id, steps = steps.len(), "record_recordings");
+    ) -> Result<PreparedRecordings, AccountError> {
+        info!(target: BACKEND, account_id = %account_id, steps = steps.len(), "prepare_recordings");
         let mut account = load_account(&*self.account_repo, account_id).await?;
         let judgments = judge_all(&mut account, steps, add_deposits);
-        if judgments
-            .iter()
-            .any(|judgment| matches!(judgment, RecordingJudgment::Ready { .. }))
-        {
-            save_account(&*self.account_repo, &mut account).await?;
-            self.emit_transaction_updated();
-        }
-        Ok(judgments)
+        let followers = follow_transfers(&*self.account_repo, &mut [&mut account]).await?;
+        Ok(PreparedRecordings {
+            judgments,
+            accounts: std::iter::once(account).chain(followers).collect(),
+        })
+    }
+
+    /// IMP-050 — writes `prepared` inside `unit`, committed with it (ADR-006). Nothing is
+    /// published — the caller commits, then calls `notify_transaction_updated`.
+    pub async fn record_recordings_in(
+        &self,
+        unit: &mut UnitOfWork,
+        prepared: &mut PreparedRecordings,
+    ) -> Result<(), AccountError> {
+        let mut written: Vec<&mut Account> = prepared.accounts.iter_mut().collect();
+        self.account_repo
+            .save_all_in(unit, &mut written)
+            .await
+            .map_err(|e| save_error("record_recordings_in", e))
+    }
+
+    /// Publishes `TransactionUpdated` for writes a unit of work committed (ADR-006).
+    pub fn notify_transaction_updated(&self) {
+        self.emit_transaction_updated();
     }
 
     /// AGT-072 — what recording an opening balance would make of the account, nothing
@@ -2887,13 +2911,21 @@ pub trait AccountServiceContract: Send + Sync {
         account_id: &str,
         steps: Vec<RecordingStep>,
     ) -> StdResult<Vec<RecordingJudgment>, AccountError>;
-    /// IMP-050 — recording steps judged in order, the ones taken recorded in one write.
-    async fn record_recordings(
+    /// IMP-050 — recording steps judged in order, the accounts they change not written yet.
+    async fn prepare_recordings(
         &self,
         account_id: &str,
         steps: Vec<RecordingStep>,
         add_deposits: bool,
-    ) -> StdResult<Vec<RecordingJudgment>, AccountError>;
+    ) -> StdResult<PreparedRecordings, AccountError>;
+    /// IMP-050 — writes prepared recordings inside `unit` (ADR-006); nothing published.
+    async fn record_recordings_in(
+        &self,
+        unit: &mut UnitOfWork,
+        prepared: &mut PreparedRecordings,
+    ) -> StdResult<(), AccountError>;
+    /// Publishes `TransactionUpdated` for writes a unit of work committed (ADR-006).
+    fn notify_transaction_updated(&self);
     /// AGT-072 — what recording an opening balance would make of the account, nothing written.
     async fn preview_opening(
         &self,
@@ -3439,13 +3471,25 @@ impl AccountServiceContract for AccountService {
         AccountService::judge_recordings(self, account_id, steps).await
     }
 
-    async fn record_recordings(
+    async fn prepare_recordings(
         &self,
         account_id: &str,
         steps: Vec<RecordingStep>,
         add_deposits: bool,
-    ) -> StdResult<Vec<RecordingJudgment>, AccountError> {
-        AccountService::record_recordings(self, account_id, steps, add_deposits).await
+    ) -> StdResult<PreparedRecordings, AccountError> {
+        AccountService::prepare_recordings(self, account_id, steps, add_deposits).await
+    }
+
+    async fn record_recordings_in(
+        &self,
+        unit: &mut UnitOfWork,
+        prepared: &mut PreparedRecordings,
+    ) -> StdResult<(), AccountError> {
+        AccountService::record_recordings_in(self, unit, prepared).await
+    }
+
+    fn notify_transaction_updated(&self) {
+        AccountService::notify_transaction_updated(self)
     }
 
     async fn preview_opening(
