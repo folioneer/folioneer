@@ -3983,6 +3983,18 @@ export type ManagementFeeTask =
  */
 { code: "ManagementFeeOnCashAsset" }
 /**
+ * UPD-018 / UPD-035 — what the window is told when the portfolio could not be opened.
+ */
+export type MigrationFailure = { 
+/**
+ * The error, as the log has it.
+ */
+detail: string; 
+/**
+ * The folder that holds the copies, when the portfolio was put back; null otherwise.
+ */
+backups_dir: string | null }
+/**
  * Parameters for recording an opening balance for an asset in an account (TRX-042).
  */
 export type OpenHoldingDTO = { 

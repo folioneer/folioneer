@@ -500,6 +500,8 @@
   },
   "app": {
     "migration_error": "Une erreur est survenue lors de la mise à jour de la base de données. Veuillez contacter le support.",
+    "migration_restored": "Cette version n'a pas pu mettre à jour votre portefeuille. Rien n'est perdu : il est revenu tel qu'il était avant la mise à jour. Réinstallez la version précédente et signalez le problème.",
+    "migration_backups": "Les copies faites avant chaque mise à jour sont dans ce dossier :",
     "migration_in_progress": "Initialisation en cours…"
   },
   "transaction": {

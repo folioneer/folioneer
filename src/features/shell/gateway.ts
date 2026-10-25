@@ -6,6 +6,7 @@ import type {
   CurrencyError,
   Event,
   FeeGenerationError,
+  MigrationFailure,
   PortfolioSyncError,
   PriceFreshness,
   PriceFreshnessError,
@@ -104,8 +105,9 @@ export function subscribeToEvents(callback: (type: Event["type"]) => void): Prom
 }
 
 export const shellGateway = {
-  onMigrationError(cb: (message: string) => void): Promise<UnlistenFn> {
-    return listen<string>("db:migration_error", (event) => cb(event.payload));
+  // UPD-018 / UPD-035 — the startup failure, with the copies' folder when the portfolio was put back.
+  onMigrationError(cb: (failure: MigrationFailure) => void): Promise<UnlistenFn> {
+    return listen<MigrationFailure>("db:migration_error", (event) => cb(event.payload));
   },
 
   // FEE-040 — apply every due recurring fee deduction (lazy catch-up on app start).
