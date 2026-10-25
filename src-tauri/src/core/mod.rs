@@ -6,7 +6,7 @@ pub use event_bus::{Event, SideEffectEventBus};
 
 /// SQLite database connection and migrations.
 mod db;
-pub use db::Database;
+pub use db::{Database, MigrationFailure};
 
 /// Cross-context cash constants (CSH-014, CSH-017).
 pub mod cash;

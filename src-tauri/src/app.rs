@@ -15,7 +15,7 @@ use crate::context::sync::{
     SyncService, SyncStateRepository,
 };
 use crate::core::event_bus::Event;
-use crate::core::{create_specta_builder, Database, SideEffectEventBus, BACKEND};
+use crate::core::{create_specta_builder, Database, MigrationFailure, SideEffectEventBus, BACKEND};
 use crate::shared::infrastructure::change_recorder::ChangeRecorder;
 use crate::shared::infrastructure::container::AppContainer;
 use crate::shared::infrastructure::scheduler::platform_scheduler;
@@ -146,13 +146,13 @@ pub fn run() {
             let providers = extensions::providers()?;
 
             tauri::async_runtime::block_on(async move {
-                // R18 — emit migration error and keep app running so frontend can show error screen
+                // UPD-018 / UPD-035 — tell the window, which stays open to show the error screen
                 let agent_data_dir = dirs.local_data_dir.clone();
                 let db = match Database::new(dirs.local_data_dir).await {
                     Ok(db) => Arc::new(db),
                     Err(e) => {
-                        tracing::error!(target: BACKEND, error = %e, "Database initialization failed (R18)");
-                        let _ = app_handle.emit("db:migration_error", e.to_string());
+                        tracing::error!(target: BACKEND, error = %e, "Database initialization failed (UPD-018)");
+                        let _ = app_handle.emit("db:migration_error", MigrationFailure::from_error(&e));
                         return;
                     }
                 };

@@ -113,6 +113,8 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .typ::<price_freshness::PriceFreshnessError>()
         .typ::<price_history_backfill::PriceHistoryBackfillError>()
         .typ::<price_history_backfill::PriceHistoryBackfillTask>()
+        // ----- startup -----
+        .typ::<crate::core::MigrationFailure>()
         .commands(tauri_specta::collect_commands![
             // ----- asset BC -----
             asset::get_assets,

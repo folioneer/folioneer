@@ -500,6 +500,8 @@
   },
   "app": {
     "migration_error": "A database migration error occurred. Please contact support.",
+    "migration_restored": "This version could not update your portfolio. Nothing was lost: it is back as it was before the update. Reinstall the previous version and report the problem.",
+    "migration_backups": "The copies made before each update are in this folder:",
     "migration_in_progress": "Initializing…"
   },
   "transaction": {

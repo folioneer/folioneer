@@ -2,9 +2,11 @@ import { RouterProvider } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { MigrationFailure } from "@/bindings";
 import { accountGateway } from "@/features/accounts/gateway";
 import { refreshCurrencyRates } from "@/features/currency/gateway";
 import { shellGateway } from "@/features/shell/gateway";
+import { MigrationErrorScreen } from "@/features/shell/MigrationErrorScreen";
 import { getAutoFetch } from "@/lib/autoFetchStorage";
 import { logger } from "@/lib/logger";
 import { useAppStore } from "@/lib/store";
@@ -50,16 +52,16 @@ export async function launchRateRefresh(): Promise<void> {
 }
 
 function App() {
-  const [dbError, setDbError] = useState<string | null>(null);
+  const [dbError, setDbError] = useState<MigrationFailure | null>(null);
   const init = useAppStore((state) => state.init);
   const isInitialized = useAppStore((state) => state.isInitialized);
   const { t } = useTranslation();
 
   useEffect(() => {
     logger.info("[App] mounted");
-    // R18 — listen for critical migration failure from backend
-    const unlistenPromise = shellGateway.onMigrationError((message) => {
-      setDbError(message);
+    // UPD-018 — listen for the critical startup failure from the backend
+    const unlistenPromise = shellGateway.onMigrationError((failure) => {
+      setDbError(failure);
     });
     return () => {
       unlistenPromise.then((fn) => fn()).catch(() => {});
@@ -81,16 +83,9 @@ function App() {
     void launchRateRefresh();
   }, [isInitialized]);
 
-  // R18 — critical migration error: app blocked with error message
+  // UPD-018 — critical startup failure: app blocked with the error screen (UPD-035)
   if (dbError) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-m3-surface p-8">
-        <div className="max-w-md text-center flex flex-col gap-4">
-          <p className="text-m3-error font-medium text-lg">{t("app.migration_error")}</p>
-          <p className="text-m3-on-surface-variant text-sm font-mono">{dbError}</p>
-        </div>
-      </div>
-    );
+    return <MigrationErrorScreen failure={dbError} />;
   }
 
   // R17 — loading screen while migrations/init are running

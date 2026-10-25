@@ -52,7 +52,15 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-017 (was R17) — Loading screen during migrations (frontend)**: During the UPD-016 migration phase, a loading screen is displayed with a message indicating that the database update is in progress.
 
-**UPD-018 (was R18) — Migration failure (backend)**: If a migration fails at startup, the application displays a critical error message and refuses to start in order to protect data integrity. The user is invited to contact support.
+**UPD-018 (was R18) — Migration failure (backend)**: If a migration fails at startup, the application refuses to start in order to protect data integrity; the error screen says so (UPD-035).
+
+**UPD-032 — A copy before migrating (backend)**: Before a launch applies its first migration to an existing portfolio's database, the database is copied, once for the whole launch, into a `backups` folder beside it — on this computer, never in the sync folder — under a name that carries the time of the copy. A new portfolio, or a launch with no migration to apply, copies nothing. When the copy cannot be made, no migration runs and UPD-018 applies. A later launch of a version whose migration failed copies again: each attempt has its own copy.
+
+**UPD-033 — Five copies kept (backend)**: After a copy (UPD-032), only the 5 most recent copies in the `backups` folder are kept; older ones are deleted. The copy just made is never deleted; an older copy that cannot be deleted is left, and the launch goes on.
+
+**UPD-034 — A failed migration puts the copy back (backend)**: When a migration fails, the launch's copy (UPD-032) is put back in place of the portfolio's database, which is then as it was before the update — whatever migrations of that launch had already succeeded. The failure says that the copy was put back and names the `backups` folder. When the copy cannot be put back, the copy stays in the `backups` folder and the failure names it.
+
+**UPD-035 — The migration error screen (frontend)**: After a failed migration whose copy was put back (UPD-034), the error screen says: "This version could not update your portfolio. Nothing was lost: it is back as it was before the update. Reinstall the previous version and report the problem.", names the folder that holds the copies, and shows the error. In any other migration failure — no copy made, a new portfolio, or the copy not put back — it says: "A database migration error occurred. Please contact support." and shows the error.
 
 ### Postponement
 
@@ -125,8 +133,10 @@ The application is distributed as a desktop executable. When a new version is pu
                                                 │
                                                 └─ [Restart now] (UPD-013)
                                                       → Data preserved (UPD-014)
-                                                      → DB migration if needed (UPD-016, UPD-017)
-                                                           ├─ Failure → critical error, app blocked (UPD-018)
+                                                      → DB migration if needed (UPD-016, UPD-017), a copy first (UPD-032, UPD-033)
+                                                           ├─ Copy failed → no migration, critical error, app blocked (UPD-018, UPD-035)
+                                                           ├─ Failure → copy put back, critical error, app blocked (UPD-018, UPD-034, UPD-035)
+                                                           ├─ Put-back failed → critical error naming the copy, app blocked (UPD-018, UPD-034, UPD-035)
                                                            └─ Success → installation + restart (UPD-013)
 ```
 
@@ -156,7 +166,7 @@ Fixed banner integrated into the application shell (header or footer), visible a
 - **Download error**: error message + "Retry" button (UPD-023)
 - **Access refused**: message naming the refusal + "Dismiss" button, no "Retry" (UPD-029)
 - **Migration in progress**: loading screen outside the banner ("Updating database…") (UPD-017)
-- **Migration error**: critical error message, application blocked at startup, outside the banner (UPD-018)
+- **Migration error**: critical error message, application blocked at startup, outside the banner; after the copy was put back, it says nothing was lost and names the copies' folder (UPD-018, UPD-035)
 - **Up to date** / **Check failed**: contextual message on the "About" page, outside the banner (UPD-027)
 
 ### User flow
