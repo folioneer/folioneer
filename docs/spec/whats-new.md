@@ -43,7 +43,7 @@ After the in-app updater (see [update.md](update.md)) installs a new version, th
 | `cash`         | Cash          | Liquidités               |
 | `fee`          | Fees          | Frais                    |
 | `price`        | Price         | Prix                     |
-| `rate`         | Exchange rate | Taux de change           |
+| `rate`         | Currency rate | Taux de change           |
 | `agent`        | AI agent      | Agent IA                 |
 | `sync`         | Sync          | Synchronisation          |
 | `performance`  | Performance   | Performance              |
