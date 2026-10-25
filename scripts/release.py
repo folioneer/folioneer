@@ -127,6 +127,12 @@ def runs_in_the_way(runs: list[dict]) -> list[str]:
     return obstacles
 
 
+def changelog_line(commit: dict) -> str:
+    """A commit's changelog line: its scope, when it has one, before its title (#672)."""
+    scope = (commit["scope"] or "").strip("()")
+    return f"[{scope}] {commit['description']}" if scope else commit["description"]
+
+
 class ReleaseManager:
     def __init__(
         self,
@@ -386,13 +392,13 @@ class ReleaseManager:
             entry += "\n### Added\n"
             for commit in self.commits:
                 if commit["type"] == "feat":
-                    entry += f"- {commit['description']}\n"
+                    entry += f"- {changelog_line(commit)}\n"
 
         if self.fixes > 0:
             entry += "\n### Fixed\n"
             for commit in self.commits:
                 if commit["type"] == "fix":
-                    entry += f"- {commit['description']}\n"
+                    entry += f"- {changelog_line(commit)}\n"
 
         return entry + "\n"
 

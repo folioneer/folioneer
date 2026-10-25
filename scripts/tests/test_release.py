@@ -146,6 +146,27 @@ class Validation(unittest.TestCase):
         self.assertTrue(checker.strict_mode)
 
 
+class ChangelogEntry(unittest.TestCase):
+    # #672 — the changelog writes a title's scope before its line, so a reader sees where a change is.
+    def test_a_scope_is_written_before_the_line(self):
+        manager = release.ReleaseManager.__new__(release.ReleaseManager)
+        manager.new_version = "1.2.0"
+        manager.breaking_changes = 0
+        commits = [
+            "feat(transfer): move a holding to another account, keeping its cost",
+            "feat: every account has the monthly view",
+            "fix(agent): removing one line of a transfer no longer deletes the whole transfer",
+        ]
+        manager.commits = [manager.parse_commit_message(message) for message in commits]
+        manager.features, manager.fixes = 2, 1
+
+        entry = manager._build_changelog_entry()
+
+        self.assertIn("- [transfer] move a holding to another account, keeping its cost\n", entry)
+        self.assertIn("- every account has the monthly view\n", entry)
+        self.assertIn("- [agent] removing one line of a transfer no longer deletes the whole transfer\n", entry)
+
+
 class ThroughAPullRequest(unittest.TestCase):
     """The release commit reaches main through a pull request, and the tag goes on what landed."""
 

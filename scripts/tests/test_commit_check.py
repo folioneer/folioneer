@@ -102,6 +102,28 @@ class CommitCheck(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("accepted as it is", result.stdout)
 
+    # #672 — the description after `: ` holds 100 characters; the type and the scope are not counted.
+    def test_the_description_holds_100_characters_whatever_the_scope(self):
+        self.commit("feat(command-line): " + "a" * 100)
+        self.assertEqual(self.check(f"{self.base}..HEAD").returncode, 0)
+
+        last = self.git("rev-parse", "HEAD")
+        self.commit("feat: " + "a" * 101)
+        result = self.check(f"{last}..HEAD")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("description > 100 chars (101)", result.stdout)
+
+    # #672 — a scope is a word of the list in docs/commit-rules.md.
+    def test_a_scope_off_the_list_fails(self):
+        self.commit("feat(transfer): move a holding to another account, keeping its cost")
+        self.assertEqual(self.check(f"{self.base}..HEAD").returncode, 0)
+
+        last = self.git("rev-parse", "HEAD")
+        self.commit("feat(backend): move a holding to another account")
+        result = self.check(f"{last}..HEAD")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("scope 'backend' is not in docs/commit-rules.md", result.stdout)
+
     def test_the_address_github_writes_with_the_account_id_is_the_owner(self):
         self.commit("docs: record", author=("phileggel", "1234+phileggel@users.noreply.github.com"))
         self.assertEqual(self.check(f"{self.base}..HEAD").returncode, 0)

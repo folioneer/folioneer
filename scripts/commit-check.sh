@@ -10,6 +10,13 @@ set -uo pipefail
 # writes the same address with the account's id in front (`<id>+phileggel@…`).
 OWNER_EMAIL="phileggel@users.noreply.github.com"
 REGEX='^(feat|fix|docs|test|chore|refactor|ci)(\([^)]+\))?!?: .+'
+# The scopes a person may write: the list of docs/commit-rules.md § Scope.
+SCOPES=$(sed -n '/<!-- scopes:start -->/,/<!-- scopes:end -->/p' \
+  "$(dirname "${BASH_SOURCE[0]}")/../docs/commit-rules.md" | grep -oE '^\| *`[a-z-]+`' | tr -d '|` ')
+if [ -z "$SCOPES" ]; then
+  echo "::error::no scope list found in docs/commit-rules.md § Scope"
+  exit 1
+fi
 
 RANGE="${1:?usage: commit-check.sh <base>..<head>}"
 # --no-merges skips the synthetic merge commit GitHub creates at HEAD for
@@ -43,8 +50,8 @@ for sha in $SHAS; do
     FAIL=1
   fi
 
-  # The remaining checks (author, title length, trailing period, body
-  # length, no Co-Authored-By) are human-writing-hygiene rules.
+  # The remaining checks (author, description length, scope, trailing
+  # period, body length, no Co-Authored-By) are human-writing-hygiene rules.
   # Bot commits (Dependabot, Renovate) carry auto-generated
   # titles/bodies that legitimately bypass them — e.g. "across
   # N directories with M updates" titles and multi-page release
@@ -54,8 +61,14 @@ for sha in $SHAS; do
       echo "::error::$sha — authored by $AUTHOR, not the owner ($OWNER_EMAIL): $TITLE"
       FAIL=1
     fi
-    if [ ${#TITLE} -gt 72 ]; then
-      echo "::error::$sha — title > 72 chars (${#TITLE}): $TITLE"
+    DESCRIPTION=${TITLE#*: }
+    if [ ${#DESCRIPTION} -gt 100 ]; then
+      echo "::error::$sha — description > 100 chars (${#DESCRIPTION}): $TITLE"
+      FAIL=1
+    fi
+    SCOPE=$(echo "$TITLE" | sed -nE 's/^[a-z]+\(([^)]+)\)!?: .*/\1/p')
+    if [ -n "$SCOPE" ] && ! grep -qx "$SCOPE" <<<"$SCOPES"; then
+      echo "::error::$sha — scope '$SCOPE' is not in docs/commit-rules.md § Scope: $TITLE"
       FAIL=1
     fi
     TRIMMED=$(echo "$TITLE" | sed 's/[[:space:]]*$//')

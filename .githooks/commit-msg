@@ -35,10 +35,26 @@ if ! echo "$TITLE" | grep -E "^(feat|fix|docs|test|chore|refactor|ci)(\([^)]+\))
     ERRORS=$((ERRORS + 1))
 fi
 
-# RULE 3: Title length
-if [ ${#TITLE} -gt 72 ]; then
-    echo -e "${RED}❌ Title longer than 72 characters (${#TITLE})${NC}"
+# RULE 3: Description length — what follows `: `; the type and the scope are not counted
+DESCRIPTION=${TITLE#*: }
+if [ ${#DESCRIPTION} -gt 100 ]; then
+    echo -e "${RED}❌ Description longer than 100 characters (${#DESCRIPTION})${NC}"
     ERRORS=$((ERRORS + 1))
+fi
+
+# RULE 3b: A scope is a word of the list in docs/commit-rules.md
+RULES="$(dirname "$0")/../docs/commit-rules.md"
+SCOPE=$(echo "$TITLE" | sed -nE 's/^[a-z]+\(([^)]+)\)!?: .*/\1/p')
+if [ -n "$SCOPE" ]; then
+    SCOPES=$( { sed -n '/<!-- scopes:start -->/,/<!-- scopes:end -->/p' "$RULES" 2>/dev/null || true; } \
+        | { grep -oE '^\| *`[a-z-]+`' || true; } | tr -d '|` ')
+    if [ -z "$SCOPES" ]; then
+        echo -e "${RED}❌ No scope list found in docs/commit-rules.md § Scope${NC}"
+        ERRORS=$((ERRORS + 1))
+    elif ! grep -qx "$SCOPE" <<<"$SCOPES"; then
+        echo -e "${RED}❌ Scope '$SCOPE' is not in docs/commit-rules.md § Scope${NC}"
+        ERRORS=$((ERRORS + 1))
+    fi
 fi
 
 # RULE 4: No trailing period

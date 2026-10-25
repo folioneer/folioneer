@@ -12,7 +12,10 @@ All commits must follow this format:
 
 ```
 type: description
+type(scope): description
 ```
+
+The description — what follows `: ` — is at most 100 characters; the type and the scope are not counted (hook-enforced). It is a ceiling, not a target.
 
 ### Type
 
@@ -27,9 +30,39 @@ Must be one of the following:
 | `chore`    | Build, dependencies, or tooling         | `chore: upgrade React to 18.3`                |
 | `refactor` | Code restructuring (no behavior change) | `refactor: extract validation logic`          |
 
+### Scope
+
+A scope is optional. When given, it names the part of Folioneer the change is about, in one word from the list below, each a term of [`ubiquitous-language.md`](ubiquitous-language.md); the hooks refuse any other (a bot's own scope, such as Dependabot's `deps`, is let through). `CHANGELOG.md` writes it before the line: `feat(transfer): …` becomes `- [transfer] …`. A scope missing from the list is added here, with its vocabulary entry, in the pull request that first needs it.
+
+<!-- scopes:start -->
+
+| Scope          | Vocabulary term    |
+| -------------- | ------------------ |
+| `account`      | Account            |
+| `holding`      | Holding            |
+| `asset`        | Asset              |
+| `transaction`  | Transaction        |
+| `transfer`     | Transfer           |
+| `write-off`    | Write-off          |
+| `split`        | Stock Split        |
+| `dividend`     | Dividends Received |
+| `cash`         | Cash Asset         |
+| `fee`          | Management Fees    |
+| `price`        | AssetPrice         |
+| `rate`         | CurrencyRate       |
+| `agent`        | Agent              |
+| `sync`         | Sync               |
+| `performance`  | Performance        |
+| `import`       | Import             |
+| `command-line` | Command line       |
+| `settings`     | Settings           |
+| `update`       | Update             |
+
+<!-- scopes:end -->
+
 ### Titles and the changelog
 
-- **A title is the user-visible outcome in plain words.** `feat` / `fix` titles are copied into `CHANGELOG.md` (titles only; bodies stay in git history) and shown by the What's-new dialog: no layer tags (`(FE)`, "backend"), no rule IDs or trigrams, no code identifiers, no abbreviations. The technical why stays in the body, two lines at most. At most 72 characters (hook-enforced).
+- **A title is the user-visible outcome in plain words, for a reader who knows neither the code nor Folioneer's vocabulary.** `feat` / `fix` titles are copied into `CHANGELOG.md` (titles only; bodies stay in git history) and shown by the What's-new dialog: what the reader can now do or what changed for them, without shorthand from the work ("replace four with a transfer" says nothing to that reader; "an AI agent can offer to merge the four entries of a past move into one transfer" does); no layer tags (`(FE)`, "backend"), no rule IDs or trigrams, no code identifiers, no abbreviations. The scope says where; the sentence need not repeat it. The technical why stays in the body, two lines at most.
 - **One changelog line per user-visible change.** A `feat` / `fix` commit adds user-visible value of its own. A commit that does not (a review fix of an unreleased feature, the second layer of a feature another commit announced) is folded into its feature commit or typed `refactor` / `chore` / `test` / `docs`. Two near-identical `feat` / `fix` titles in one release are the tell.
 - **One entry, one commit.** An entry — or a run of record and documentation updates that follow one another — lands on `main` as one commit: review fixes, coverage fix-ups and closure edits belong inside it. Before the first push run what CI will judge (`just harness --coverage`) and fold locally with `git commit --amend`; after a push, a fix is a `git commit --fixup <sha>` that `just merge` folds. Never force-push to squash.
 
@@ -47,11 +80,10 @@ A change that touches production code is never `chore`, however invisible it is 
 ### Description
 
 - Use **imperative mood** ("add" not "added" or "adds")
-- Keep it **concise** (under 72 characters recommended for title)
+- Keep it **concise**: one plain sentence, within the ceiling of § Commit Format
 - Use **lowercase**
 - Do **not** end with a period
 - Be **specific** about what changed and why, not how
-- **Title**: Max 72 characters
 - **Optional body**: Max 5 lines for context (rationale, what changed, breaking changes)
   - Do NOT include test results (those go in PR descriptions only)
 - **No co-authoring footers** (never include `Co-Authored-By:` lines)
@@ -342,10 +374,10 @@ See [Testing Strategy](test-rules.md) for debugging help.
 
 ### "Commit message too long"
 
-The recommended limit is 72 characters. Try to be more concise:
+The description after `: ` is over the ceiling of § Commit Format. Keep one sentence and move the detail to the body:
 
-- ❌ `feat: add ability for users to search and filter assets by various criteria including name date and status`
-- ✅ `feat: add asset search and filtering`
+- ❌ `feat(asset): add ability for users to search and filter assets by various criteria including name, date, status and category`
+- ✅ `feat(asset): search and filter the assets by name, date or status`
 
 ### "Can't remember commit types"
 
