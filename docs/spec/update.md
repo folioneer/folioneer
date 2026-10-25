@@ -52,7 +52,7 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-017 (was R17) — Loading screen during migrations (frontend)**: During the UPD-016 migration phase, a loading screen is displayed with a message indicating that the database update is in progress.
 
-**UPD-018 (was R18) — Migration failure (backend)**: If a migration fails at startup, the application refuses to start in order to protect data integrity; the error screen says so (UPD-035).
+**UPD-018 (was R18) — Migration failure (backend)**: If a migration fails at startup, or the copy before it cannot be made (UPD-032), the application refuses to start in order to protect data integrity; the error screen says so (UPD-035).
 
 **UPD-032 — A copy before migrating (backend)**: Before a launch applies its first migration to an existing portfolio's database, the database is copied, once for the whole launch, into a `backups` folder beside it — on this computer, never in the shared folder — under a name that carries the time of the copy. A new portfolio, or a launch with no migration to apply, copies nothing. When the copy cannot be made, no migration runs and UPD-018 applies. A later launch of a version whose migration failed copies again: each attempt has its own copy.
 
@@ -60,7 +60,7 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-034 — A failed migration puts the copy back (backend)**: When a migration fails, the launch's copy (UPD-032) is put back in place of the portfolio's database, which is then as it was before the update — whatever migrations of that launch had already succeeded. The failure says that the copy was put back and names the `backups` folder. When the copy cannot be put back, it stays in the `backups` folder, and the error the screen shows names it (UPD-035).
 
-**UPD-035 — The migration error screen (frontend)**: After a failed migration whose copy was put back (UPD-034), the error screen says: "This version could not update your portfolio. Nothing was lost: it is back as it was before the update. Reinstall the previous version and report the problem.", names the folder that holds the copies, and shows the error. In any other migration failure — no copy made, a new portfolio, or the copy not put back — it says: "A database migration error occurred. Please contact support." and shows the error.
+**UPD-035 — The migration error screen (frontend)**: After a failed migration whose copy was put back (UPD-034), the error screen says: "This version could not update your portfolio. Nothing was lost: it is back as it was before the update. Reinstall the previous version and report the problem.", names the `backups` folder, and shows the error. In any other migration failure — no copy made, a new portfolio, or the copy not put back — it says: "A database migration error occurred. Please contact support." and shows the error.
 
 ### Postponement
 
