@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id\n               FROM transactions\n               WHERE account_id = ?\n               ORDER BY date ASC, created_at ASC, id ASC",
+  "query": "SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id, added_deposit AS \"added_deposit: bool\"\n               FROM transactions\n               WHERE account_id = ?\n               ORDER BY date ASC, created_at ASC, id ASC",
   "describe": {
     "columns": [
       {
@@ -77,6 +77,11 @@
         "name": "transfer_id",
         "ordinal": 14,
         "type_info": "Text"
+      },
+      {
+        "name": "added_deposit: bool",
+        "ordinal": 15,
+        "type_info": "Integer"
       }
     ],
     "parameters": {
@@ -97,8 +102,9 @@
       true,
       false,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "057360784ac6c7293205dfa3a036c6ef6e0077ed790e1e6a02c0c22b2929bee3"
+  "hash": "68a87a3f286ecbad721b7f691cc1ab9cd39faa75c2e7dcfec8b1746a0156495c"
 }

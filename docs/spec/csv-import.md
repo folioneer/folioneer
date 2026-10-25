@@ -2,9 +2,9 @@
 
 ## Context
 
-Every transaction is typed by hand today, which stops anyone with years of history from starting (#369). Brokers export CSV files, and none agree on columns, separators, number and date formats or encoding. An **Import** brings a file's rows into one account in two steps: the file is read through a **Column mapping** and previewed row by row, nothing written; then the user confirms, and the rows are recorded at once (#502).
+Every transaction is typed by hand today, which stops anyone with years of history from starting (#369). Brokers export CSV files, and none agree on columns, separators, number and date formats or encoding. An **Import** brings a file's rows into one account in two steps: the file is read through a **Column mapping** and previewed row by row, nothing written; then the user confirms, and the rows are recorded at once (IMP-050).
 
-This spec holds the reading, the column mapping and the preview (#501); the confirmation and the **Added deposit** come with #502, the screens with #503 and #504. The import is a surface beside the window, the command line and the AI agent connection: any of them may start it, and its rows are judged and recorded through the same recorder as theirs, by the same rules — every transaction follows them, whatever records it (owner, 2026-10-25): the purchase (TRX), the sale (SEL), the dividend (DIV), the deposit and the withdrawal (CSH). This version starts it from the window (#503). Figures follow TRX-024. No mapping ships with the application: the user saves the first. The reading rules were checked against a French broker's securities export: one file, ISO-8859-1 (read as Windows-1252, IMP-011), `;` with a trailing `;`, a decimal dot, no ISIN column, the trade tax on its own row (owner, 2026-10-25).
+This spec holds the reading, the column mapping and the preview (#501), the confirmation and the **Added deposit** (#502); the screens come with #503 and #504. The import is a surface beside the window, the command line and the AI agent connection: any of them may start it, and its rows are judged and recorded through the same recorder as theirs, by the same rules — every transaction follows them, whatever records it (owner, 2026-10-25): the purchase (TRX), the sale (SEL), the dividend (DIV), the deposit and the withdrawal (CSH). This version starts it from the window (#503). Figures follow TRX-024. No mapping ships with the application: the user saves the first. The reading rules were checked against a French broker's securities export: one file, ISO-8859-1 (read as Windows-1252, IMP-011), `;` with a trailing `;`, a decimal dot, no ISIN column, the trade tax on its own row (owner, 2026-10-25).
 
 ---
 
@@ -72,7 +72,7 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 **IMP-016 — Blank and short lines (backend)**: A line whose fields are all empty once trimmed — a line of separators only among them — is blank and skipped. A line with fewer fields than the header is rejected in the preview, its reason naming the line; a line's fields beyond the header's are ignored.
 
-**IMP-017 — Reading and previewing write nothing (backend)**: Reading a file and previewing it write nothing: no transaction, asset, holding or mapping. The portfolio is unchanged until the user confirms (#502); a mapping is written only when saved (IMP-020).
+**IMP-017 — Reading and previewing write nothing (backend)**: Reading a file and previewing it write nothing: no transaction, asset, holding or mapping. The portfolio is unchanged until the user confirms (IMP-050); a mapping is written only when saved (IMP-020).
 
 **IMP-018 — The user's choice replaces the detected one (backend)**: An encoding, separator, decimal mark or date format the user picks replaces the detected one, or the saved mapping's, and the file is read again with it; the choice is part of the mapping in use, kept when it is saved.
 
@@ -104,7 +104,7 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 **IMP-032 — Each row is matched to an asset (backend)**: A row of a purchase, a sale, a dividend or a trade tax is matched to an asset of the portfolio, archived ones included: first by the mapping's asset matches (IMP-033), then by its own ISIN and then its reference, each trimmed and case ignored, then its exact name, case and accents ignored: each that the row holds is tried in that order, and the first matching exactly one asset gives it. A row that none matches to exactly one asset is an **unknown asset**. A deposit and a withdrawal are the account's cash and take no asset.
 
-**IMP-033 — An unknown asset is matched once (backend)**: The user matches an unknown asset's name, ISIN or reference to an asset of the portfolio; the match is part of the mapping in use, kept when it is saved, so the next file of that broker matches it. A match is compared as the field it was read from is (IMP-032). Every row of that name, ISIN or reference then takes that asset, and the preview judges them again. A match to an asset unknown to the portfolio is rejected with a specific error when it is made. Saving a mapping keeps its matches as they are. A mapping refers to no other record, so a synced one is applied at once (SYN-041 does not hold it back): a match whose asset this device has not received yet leaves its rows unknown until the asset arrives. Creating the asset from the row instead comes with the confirmation (#502).
+**IMP-033 — An unknown asset is matched once (backend)**: The user matches an unknown asset's name, ISIN or reference to an asset of the portfolio; the match is part of the mapping in use, kept when it is saved, so the next file of that broker matches it. A match is compared as the field it was read from is (IMP-032). Every row of that name, ISIN or reference then takes that asset, and the preview judges them again. A match to an asset unknown to the portfolio is rejected with a specific error when it is made. Saving a mapping keeps its matches as they are. A mapping refers to no other record, so a synced one is applied at once (SYN-041 does not hold it back): a match whose asset this device has not received yet leaves its rows unknown until the asset arrives. The user may create the asset from the row instead (IMP-052).
 
 **IMP-034 — A trade tax joins its purchase (backend)**: A trade-tax row is added to the fees of the purchase in the file with the same asset — the same ISIN, reference and name as read —, on the same date, of the same quantity when the tax row has one; its amount is its net amount, or its gross amount. The tax row keeps its own line in the preview, its status naming the purchase's line, and is counted and recorded with that purchase. When several purchases fit, the first in the file's order not yet holding one takes it: a purchase takes one trade tax at most, and a second tax row of the same asset, date and quantity takes the next such purchase. A trade-tax row with no such purchase is rejected — "no purchase of this asset, date and quantity in the file".
 
@@ -114,11 +114,21 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 **IMP-037 — One currency in this version (backend)**: A row whose asset's currency, or whose own currency when the file has one, is not the account's is rejected — "another currency: record it by hand". The exchange rate is therefore always 1.
 
-**IMP-038 — A purchase the cash cannot fund (backend)**: A ready purchase the account's cash cannot fund, as CSH-041 judges it after the rows before it, is not rejected: it stays ready, the preview showing the smallest deposit on its date that funds it, and the confirmation adds the deposit it needs or leaves it out, by the user's choice (#502). The rows after it are judged as if that deposit were added.
+**IMP-038 — A purchase the cash cannot fund (backend)**: A ready purchase the account's cash cannot fund, as CSH-041 judges it after the rows before it, is not rejected: it stays ready, the preview showing the smallest deposit on its date that funds it, and the confirmation adds the deposit it needs or leaves it out, by the user's choice (IMP-051). The rows after it are judged as if that deposit were added.
 
 ### Deletion (040–049)
 
 **IMP-040 — A mapping is deleted (backend)**: The user deletes a saved mapping; nothing already recorded changes. Deleting a mapping that is no longer held is rejected with a specific error.
+
+### Confirmation (050–059)
+
+**IMP-050 — The confirmed import records every ready row at once (backend)**: On confirmation the file is read and its rows judged again, as the preview judges them (IMP-030 to IMP-038), against the account as it is then. Every ready row is recorded, in the order IMP-035 judges them, in one write: all of them or, when the write fails, none. The import raises one `TransactionUpdated`, none when nothing is recorded. The rows rejected, of an unknown asset, already recorded or not imported are left out. The confirmation returns the rows as judged then; the ready ones are those recorded.
+
+**IMP-051 — An added deposit funds a purchase (backend)**: By default, each ready purchase the cash cannot fund (IMP-038) is recorded after a deposit of the amount the preview shows, on the purchase's date: an **Added deposit**, marked as added. The mark is part of the deposit: it is kept when the deposit is corrected and synced with it, so every device shows which deposits an import added. The user may leave the added deposits out for this import: such a purchase is then judged without one and rejected as manual entry rejects it (CSH-041).
+
+**IMP-052 — An unknown asset is settled before confirming (backend)**: The user creates the asset of an unknown-asset row from what the row read — its name, ISIN and reference, in the account's currency (IMP-037) — or matches it to an asset of the portfolio (IMP-033); the preview then judges its rows again (IMP-032). A row still of an unknown asset at the confirmation is left out (IMP-050).
+
+**IMP-053 — The same file imported twice records nothing new (backend)**: Importing a file again shows already recorded every row the first import recorded (IMP-036), so nothing new is recorded and nothing is announced. An added deposit is no row of the file: its purchase being already recorded, none is added again.
 
 ---
 
@@ -137,7 +147,7 @@ map the columns, the operation labels (IMP-021, IMP-022); the date format follow
 preview: each row ready / rejected / unknown asset / already recorded / not imported (IMP-030)
         │  match an unknown asset (IMP-033) → judged again
         ▼
-confirm (#502)
+confirm: the ready rows recorded at once (IMP-050), the added deposits by default (IMP-051)
 ```
 
 ---
@@ -151,6 +161,8 @@ The screens are #503 (picking the file, mapping the columns) and #504 (the previ
 ## Cross-amendments
 
 - SYN-021 lists column mappings among the synced records; CFR-012 gives their identity; SYN-038 adds version 10.
+- SYN-038 adds version 11: a transaction carries the added-deposit mark (IMP-051).
+- CSH: a deposit may be an added deposit, marked as such (IMP-051).
 - SYN-014 counts a saved column mapping as user data: the user made it, and a rebuild would not replace it.
 - SYN-064 lists `ColumnMappingUpdated` among the events raised by this device's own writes (IMP-026).
 - CFR-060 does not report two column mappings left with the same name (IMP-027).

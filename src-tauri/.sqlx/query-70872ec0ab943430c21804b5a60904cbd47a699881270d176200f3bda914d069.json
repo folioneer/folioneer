@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price,\n                              exchange_rate, fees, total_amount, note, realized_pnl, created_at,\n                              write_off_reason, transfer_id, sync_logical_timestamp, sync_origin, sync_device_id\n                       FROM transactions WHERE id = ?",
+  "query": "SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id, added_deposit AS \"added_deposit: bool\" FROM transactions WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -79,19 +79,9 @@
         "type_info": "Text"
       },
       {
-        "name": "sync_logical_timestamp",
+        "name": "added_deposit: bool",
         "ordinal": 15,
-        "type_info": "Text"
-      },
-      {
-        "name": "sync_origin",
-        "ordinal": 16,
-        "type_info": "Text"
-      },
-      {
-        "name": "sync_device_id",
-        "ordinal": 17,
-        "type_info": "Text"
+        "type_info": "Integer"
       }
     ],
     "parameters": {
@@ -113,10 +103,8 @@
       false,
       true,
       true,
-      true,
-      true,
-      true
+      false
     ]
   },
-  "hash": "7a12ba779908a8e3d2d56beb9b08cdd6a35a51a8a1fb80fc014c4343dc05dd19"
+  "hash": "70872ec0ab943430c21804b5a60904cbd47a699881270d176200f3bda914d069"
 }

@@ -195,6 +195,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             csv_import::pick_import_file,
             csv_import::read_import_file,
             csv_import::preview_import,
+            csv_import::confirm_import,
             // ----- sync BC (SYN/CFR) -----
             sync::pause_sync,
             sync::leave_sync,

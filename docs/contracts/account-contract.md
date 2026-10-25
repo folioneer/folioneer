@@ -508,6 +508,7 @@ struct Transaction {
     created_at: String,             // ISO 8601 timestamp; chronological tie-breaking (TRX-036, SEL-024)
     write_off_reason: Option<WriteOffReason>, // WOF entity — Some on a WriteOff only; a WriteOff stores unit_price 0, exchange_rate 1_000_000, fees 0, total_amount 0
     transfer_id: Option<String>,    // TRF entity — Some on the parts of a transfer only: its two sides and its fee in kind
+    added_deposit: bool,            // IMP-051 — true on a deposit an import added before a purchase; kept by a correction
 }
 ```
 
@@ -832,12 +833,12 @@ struct AccountJournal {
 
 ### Published
 
-| Event                | Payload | Rule                                                          |
-| -------------------- | ------- | ------------------------------------------------------------- |
-| `AccountUpdated`     | —       | ACC-022                                                       |
-| `TransactionUpdated` | —       | TRX-037, DIV-026, FSD-026, FEE-026, AGT-044, AGT-045, TRF-029 |
-| `FeeScheduleUpdated` | —       | FEE-064                                                       |
-| `HoldingNoteUpdated` | —       | HNO-020, HNO-021                                              |
+| Event                | Payload | Rule                                                                   |
+| -------------------- | ------- | ---------------------------------------------------------------------- |
+| `AccountUpdated`     | —       | ACC-022                                                                |
+| `TransactionUpdated` | —       | TRX-037, DIV-026, FSD-026, FEE-026, AGT-044, AGT-045, TRF-029, IMP-050 |
+| `FeeScheduleUpdated` | —       | FEE-064                                                                |
+| `HoldingNoteUpdated` | —       | HNO-020, HNO-021                                                       |
 
 ### Subscribed (frontend re-fetch triggers)
 
@@ -857,6 +858,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-10-25 — #502 (IMP-051): `Transaction` gains `added_deposit`, absent from a change written before data format 11 and then `false`. No command changed.
 - 2026-10-24 — #510 (TRF): `record_transfer` (`TransferDTO`, `TransferError`), `correct_transfer` (`CorrectTransferDTO`) and `cancel_transfer`; `TransactionType` gains `TransferOut` and `TransferIn`, `Transaction` gains `transfer_id`; `AccountError` gains `TransferToSameAccount`, `TransferReceivedAboveSent`, `TransferRateMissing { from_currency, to_currency }`, `TransferRateNotOne`, `PartOfTransfer` and `TransferNotFound`. `correct_transaction` and `correct_write_off` refuse a part of a transfer; `cancel_transaction` removes the whole transfer. Data format version 9 (SYN-038).
 
 - 2026-10-24 — #405 (ACC-004, PRF-013, GPF-014): `Account`, `CreateAccountDTO`, `UpdateAccountDTO` and `AccountSummary` lose `update_frequency`, and the `UpdateFrequency` type goes; `AccountPerformanceResponse` loses `month_view_available`, its `monthly` series always filled.

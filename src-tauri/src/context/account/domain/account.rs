@@ -488,6 +488,8 @@ impl Account {
         let tx_type = existing.transaction_type;
         let asset_id = existing.asset_id.clone();
         let created_at = existing.created_at.clone();
+        // IMP-051 — a corrected deposit stays an added deposit.
+        let added_deposit = existing.added_deposit;
 
         let updated_tx = if tx_type == TransactionType::FreeShares {
             // FSD-040 — the zero-cost convention carries total_amount = 0, which the
@@ -622,6 +624,7 @@ impl Account {
                 None, // realized_pnl recomputed below
                 created_at,
             )?
+            .with_added_deposit(added_deposit)
         };
 
         self.splice_correction(tx_id, updated_tx)
@@ -2481,6 +2484,12 @@ pub trait AccountRepository: Send + Sync {
     /// One repository writing several aggregates of its own, not a use case opening a
     /// transaction across contexts (`docs/ddd-divergences.md` § 19, until ADR-006 lands).
     async fn save_all<'a>(&self, accounts: &mut [&'a mut Account]) -> Result<()>;
+    /// `save_all` inside `unit`, committed with it (ADR-006).
+    async fn save_all_in<'a>(
+        &self,
+        unit: &mut UnitOfWork,
+        accounts: &mut [&'a mut Account],
+    ) -> Result<()>;
     /// `save_all`, every transaction of `marked` marked with `mark` in the same write
     /// (AGT-045, AGT-049): the transactions and their marks exist together or not at all.
     async fn save_all_marked<'a>(

@@ -61,3 +61,27 @@ pub async fn preview_import(
         .preview_import(&account_id, &path, mapping_id.as_deref(), &mapping)
         .await
 }
+
+/// The file at `path` read and judged again for `account_id`, then every ready row recorded
+/// at once (IMP-050): the rows as judged then. `add_deposits`: the deposits the purchases
+/// need are added, marked as added (IMP-051).
+#[tauri::command]
+#[specta::specta]
+pub async fn confirm_import(
+    use_case: State<'_, CsvImportUseCase>,
+    account_id: String,
+    path: String,
+    mapping_id: Option<String>,
+    mapping: ColumnMappingDraft,
+    add_deposits: bool,
+) -> Result<ImportPreview, CsvImportError> {
+    use_case
+        .confirm_import(
+            &account_id,
+            &path,
+            mapping_id.as_deref(),
+            &mapping,
+            add_deposits,
+        )
+        .await
+}

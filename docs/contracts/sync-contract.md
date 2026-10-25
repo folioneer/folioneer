@@ -202,6 +202,7 @@ Record identity per kind follows CFR-012: accounts, categories, assets, transact
 
 ## Changelog
 
+- 2026-10-25 — #502 (SYN-038, IMP-051): a transaction carries `added_deposit`; data format version 11. No command changed.
 - 2026-10-25 — #501 (SYN-014, SYN-021, SYN-038, IMP-023): `RecordKind` gains `ColumnMapping`; a saved mapping is user data for `inspect_sync_folder`; data format version 10. No command changed.
 - 2026-10-24 — #510 (SYN-038, TRF-032): `Transaction` gains `transfer_id` and `TransactionType` the values `TransferOut` and `TransferIn`; data format version 9. No command changed.
 - 2026-10-19 — #529 (SYN-021, SYN-038, MKT-230): `RecordKind` gains `ReportedSplit`; data format version 6. No command changed.

@@ -134,6 +134,10 @@ pub struct Transaction {
     /// kind share it; `None` on every other transaction, and on a change written before it.
     #[serde(default)]
     pub transfer_id: Option<String>,
+    /// IMP-051 — a deposit the import added before a purchase the file left unfunded;
+    /// `false` on every other transaction, and on a change written before data format 11.
+    #[serde(default)]
+    pub added_deposit: bool,
 }
 
 impl Transaction {
@@ -185,6 +189,7 @@ impl Transaction {
                 .to_string(),
             write_off_reason: None,
             transfer_id: None,
+            added_deposit: false,
         })
     }
 
@@ -231,6 +236,7 @@ impl Transaction {
             created_at,
             write_off_reason: None,
             transfer_id: None,
+            added_deposit: false,
         })
     }
 
@@ -379,6 +385,7 @@ impl Transaction {
                 .to_string(),
             write_off_reason: None,
             transfer_id: None,
+            added_deposit: false,
         })
     }
 
@@ -444,6 +451,7 @@ impl Transaction {
                 .to_string(),
             write_off_reason: None,
             transfer_id: None,
+            added_deposit: false,
         })
     }
 
@@ -503,6 +511,7 @@ impl Transaction {
                 .to_string(),
             write_off_reason: None,
             transfer_id: None,
+            added_deposit: false,
         })
     }
 
@@ -581,6 +590,7 @@ impl Transaction {
                 .to_string(),
             write_off_reason: None,
             transfer_id: None,
+            added_deposit: false,
         })
     }
 
@@ -636,6 +646,7 @@ impl Transaction {
                 .to_string(),
             write_off_reason: Some(reason),
             transfer_id: None,
+            added_deposit: false,
         })
     }
 
@@ -681,6 +692,7 @@ impl Transaction {
                 .to_string(),
             write_off_reason: None,
             transfer_id: Some(transfer_id),
+            added_deposit: false,
         })
     }
 
@@ -784,6 +796,12 @@ impl Transaction {
         self
     }
 
+    /// IMP-051 — this deposit marked as added by an import, or not.
+    pub fn with_added_deposit(mut self, added_deposit: bool) -> Self {
+        self.added_deposit = added_deposit;
+        self
+    }
+
     /// Reconstructs a Transaction from storage without validation.
     #[allow(clippy::too_many_arguments)]
     pub fn restore(
@@ -817,6 +835,7 @@ impl Transaction {
             created_at,
             write_off_reason: None,
             transfer_id: None,
+            added_deposit: false,
         }
     }
 
