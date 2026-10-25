@@ -1,6 +1,6 @@
 use super::error::{CsvImportError, CsvImportTask};
 use crate::context::account::{
-    AccountError, AccountServiceContract, ImportJudgment, ImportStep, RecordingOp, TradeOp,
+    AccountError, AccountServiceContract, RecordingJudgment, RecordingOp, RecordingStep, TradeOp,
 };
 use crate::context::asset::{Asset, AssetServiceContract};
 use crate::context::import::{
@@ -133,7 +133,7 @@ enum Pending {
     Judged {
         operation: OperationRead,
         asset_id: Option<String>,
-        step: ImportStep,
+        step: RecordingStep,
     },
 }
 
@@ -278,15 +278,18 @@ impl CsvImportUseCase {
             _ => String::new(),
         };
         order.sort_by_key(date);
-        let steps: Vec<ImportStep> = order
+        let steps: Vec<RecordingStep> = order
             .iter()
             .filter_map(|index| match pending.get(*index) {
                 Some((_, Pending::Judged { step, .. })) => Some(step.clone()),
                 _ => None,
             })
             .collect();
-        let judgments = self.account_service.judge_import(account_id, steps).await?;
-        let mut judged: Vec<Option<ImportJudgment>> = vec![None; pending.len()];
+        let judgments = self
+            .account_service
+            .judge_recordings(account_id, steps)
+            .await?;
+        let mut judged: Vec<Option<RecordingJudgment>> = vec![None; pending.len()];
         for (index, judgment) in order.into_iter().zip(judgments) {
             if let Some(slot) = judged.get_mut(index) {
                 *slot = Some(judgment);
@@ -454,7 +457,7 @@ fn pend(read: RowRead, matches: &[AssetMatch], assets: &[Asset], currency: &str)
     Pending::Judged {
         operation,
         asset_id,
-        step: ImportStep { op, needs_held },
+        step: RecordingStep { op, needs_held },
     }
 }
 
@@ -508,22 +511,22 @@ fn matched<'a>(read: &AssetRead, matches: &[AssetMatch], assets: &'a [Asset]) ->
 fn status_of(
     operation: OperationRead,
     asset_id: Option<String>,
-    judgment: ImportJudgment,
+    judgment: RecordingJudgment,
 ) -> RowStatus {
     match judgment {
-        ImportJudgment::Ready { funding } => RowStatus::Ready {
+        RecordingJudgment::Ready { funding } => RowStatus::Ready {
             operation,
             asset_id,
             funding,
         },
-        ImportJudgment::AlreadyRecorded => RowStatus::AlreadyRecorded {
+        RecordingJudgment::AlreadyRecorded => RowStatus::AlreadyRecorded {
             operation,
             asset_id,
         },
-        ImportJudgment::NotHeld => RowStatus::Rejected {
+        RecordingJudgment::NotHeld => RowStatus::Rejected {
             reason: RowReason::AssetNotHeld,
         },
-        ImportJudgment::Refused(refusal) => RowStatus::Rejected {
+        RecordingJudgment::Refused(refusal) => RowStatus::Rejected {
             reason: RowReason::ManualEntry { refusal },
         },
     }

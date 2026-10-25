@@ -153,18 +153,18 @@ pub struct RecordingPreview {
     pub after: Vec<Transaction>,
 }
 
-/// One row of an import, as the account judges it (IMP-035).
+/// One recording to judge in turn, nothing written (IMP-035).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ImportStep {
-    /// The recording the row stands for.
+pub struct RecordingStep {
+    /// The recording to judge.
     pub op: RecordingOp,
     /// DIV-011 — a dividend's asset must be held, the rows before it included.
     pub needs_held: bool,
 }
 
-/// What the account makes of one import step (IMP-035, IMP-036, IMP-038).
+/// What the account makes of one recording step (IMP-035, IMP-036, IMP-038).
 #[derive(Debug, Clone)]
-pub enum ImportJudgment {
+pub enum RecordingJudgment {
     /// Manual entry takes it; `funding` is the deposit a purchase the cash cannot fund
     /// needs (IMP-038).
     Ready {
@@ -977,15 +977,15 @@ impl AccountService {
         })
     }
 
-    /// IMP-035 — the steps of an import judged in order, as manual entry would judge each
+    /// IMP-035 — recording steps judged in order, as manual entry would judge each
     /// typed after the ones accepted before it, nothing written: one matching a transaction
     /// the account holds is already recorded (IMP-036), a purchase the cash cannot fund is
     /// ready with the deposit it needs (IMP-038).
-    pub async fn judge_import(
+    pub async fn judge_recordings(
         &self,
         account_id: &str,
-        steps: Vec<ImportStep>,
-    ) -> Result<Vec<ImportJudgment>, AccountError> {
+        steps: Vec<RecordingStep>,
+    ) -> Result<Vec<RecordingJudgment>, AccountError> {
         let mut account = load_account(&*self.account_repo, account_id).await?;
         let mut recorded: Vec<Option<Transaction>> =
             account.transactions.iter().cloned().map(Some).collect();
@@ -1000,11 +1000,11 @@ impl AccountService {
             });
             if let Some(same) = same {
                 *same = None;
-                judgments.push(ImportJudgment::AlreadyRecorded);
+                judgments.push(RecordingJudgment::AlreadyRecorded);
                 continue;
             }
             if step.needs_held && !holds(&account, &step.op) {
-                judgments.push(ImportJudgment::NotHeld);
+                judgments.push(RecordingJudgment::NotHeld);
                 continue;
             }
             let (judgment, judged) = judge_step(&account, step.op);
@@ -2885,11 +2885,11 @@ pub trait AccountServiceContract: Send + Sync {
         op: RecordingOp,
     ) -> StdResult<RecordingPreview, AccountError>;
     /// IMP-035 — the steps of an import judged in order, nothing written.
-    async fn judge_import(
+    async fn judge_recordings(
         &self,
         account_id: &str,
-        steps: Vec<ImportStep>,
-    ) -> StdResult<Vec<ImportJudgment>, AccountError>;
+        steps: Vec<RecordingStep>,
+    ) -> StdResult<Vec<RecordingJudgment>, AccountError>;
     /// AGT-072 — what recording an opening balance would make of the account, nothing written.
     async fn preview_opening(
         &self,
@@ -3427,12 +3427,12 @@ impl AccountServiceContract for AccountService {
         AccountService::preview_recording(self, account_id, op).await
     }
 
-    async fn judge_import(
+    async fn judge_recordings(
         &self,
         account_id: &str,
-        steps: Vec<ImportStep>,
-    ) -> StdResult<Vec<ImportJudgment>, AccountError> {
-        AccountService::judge_import(self, account_id, steps).await
+        steps: Vec<RecordingStep>,
+    ) -> StdResult<Vec<RecordingJudgment>, AccountError> {
+        AccountService::judge_recordings(self, account_id, steps).await
     }
 
     async fn preview_opening(
@@ -4191,14 +4191,14 @@ fn holds(account: &Account, op: &RecordingOp) -> bool {
 /// manual entry takes it. A purchase the cash cannot fund takes, on its date, the smallest
 /// deposit that funds it (IMP-038): a deposit of its own total always does, the account
 /// having been funded without it.
-fn judge_step(account: &Account, op: RecordingOp) -> (ImportJudgment, Option<Account>) {
+fn judge_step(account: &Account, op: RecordingOp) -> (RecordingJudgment, Option<Account>) {
     let mut judged = account.clone();
     let refusal = match apply(&mut judged, op.clone()) {
-        Ok(_) => return (ImportJudgment::Ready { funding: None }, Some(judged)),
+        Ok(_) => return (RecordingJudgment::Ready { funding: None }, Some(judged)),
         Err(refusal) => refusal,
     };
     let (RecordingOp::Buy(trade), AccountError::InsufficientCash { .. }) = (&op, &refusal) else {
-        return (ImportJudgment::Refused(refusal), None);
+        return (RecordingJudgment::Refused(refusal), None);
     };
     let funded = |funding: i64| {
         let mut funded = account.clone();
@@ -4216,7 +4216,7 @@ fn judge_step(account: &Account, op: RecordingOp) -> (ImportJudgment, Option<Acc
         .or_else(|| recorded_key(&op, "").map(|key| key.total_amount))
         .unwrap_or(0);
     let Ok(mut best) = funded(total) else {
-        return (ImportJudgment::Refused(refusal), None);
+        return (RecordingJudgment::Refused(refusal), None);
     };
     let (mut low, mut high) = (0, total);
     while high - low > 1 {
@@ -4230,7 +4230,7 @@ fn judge_step(account: &Account, op: RecordingOp) -> (ImportJudgment, Option<Acc
         }
     }
     (
-        ImportJudgment::Ready {
+        RecordingJudgment::Ready {
             funding: Some(high),
         },
         Some(best),

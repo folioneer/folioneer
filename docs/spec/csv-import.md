@@ -54,7 +54,7 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 ### Reading the file (010–019)
 
-**IMP-010 — A file is read for one account (backend)**: An import reads one file for one account the user picks; the file is one the user picked in the system dialog, and no other is read. It is rejected with a specific error when the account is unknown, and when the file cannot be read, is empty, holds a header and no row — blank lines (IMP-016) are no row —, or is larger than 10 MB.
+**IMP-010 — A file is read for one account (backend)**: An import reads one file for one account the user picks; only the file the user picked is read. It is rejected with a specific error when the account is unknown, and when the file cannot be read, is empty, holds a header and no row — blank lines (IMP-016) are no row —, or is larger than 10 MB.
 
 **IMP-011 — The encoding is detected (backend)**: A file whose bytes read as UTF-8 is read as UTF-8, its byte order mark dropped; any other file is read as Windows-1252, which reads every byte and reads an ISO-8859-1 file as written. A file read as UTF-8 by the user's choice or a saved mapping's (IMP-018, IMP-020) whose bytes are not UTF-8 is rejected with a specific error.
 
@@ -98,7 +98,7 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 ### Rows and the preview (030–039)
 
-**IMP-030 — The preview judges every row (backend)**: The preview reads every row of the file through the mapping in use, in the file's order, and gives each its status: **ready**; **rejected**, with its reason; **unknown asset**, with the name, ISIN or reference read (IMP-032); **already recorded** (IMP-036); or **not imported**, with its reason (IMP-022). It also counts the rows of each status. A date or a figure that does not read is a rejection naming its column.
+**IMP-030 — The preview judges every row (backend)**: The preview reads every row of the file through the mapping in use, in the file's order, and gives each its status: **ready**; **rejected**, with its reason; **unknown asset**, with the name, ISIN or reference read (IMP-032); **already recorded** (IMP-036); **not imported**, with its label (IMP-022); or, for a trade tax joined to its purchase, that purchase's line (IMP-034). It also counts the rows of each status. A date or a figure that does not read is a rejection naming its column.
 
 **IMP-031 — The figures of each type (backend)**: Signs are ignored: the type gives the direction. A **purchase** and a **sale** read the quantity, the unit price — or, when the row has no unit price, the gross amount divided by the quantity, rounded down to the micro-unit, a quantity of zero being rejected first (TRX-020) — and the fees, zero when the column is absent or empty; the file's net amount is not checked. A **dividend**, a **deposit** and a **withdrawal** read the net amount when the mapping names its column and the row's field is not empty, and the gross amount otherwise. A figure the type needs and the row lacks is a rejection naming it.
 
