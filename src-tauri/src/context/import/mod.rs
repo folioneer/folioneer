@@ -16,6 +16,10 @@ pub mod infrastructure;
 pub use api::*;
 pub use application::ImportService;
 pub use domain::{
+    read_file, read_rows, AssetRead, DateReading, FileRead, OperationRead, ReadingChoices,
+    RowFigures, RowFormat, RowRead, RowRejection,
+};
+pub use domain::{
     AssetMatch, ColumnMapping, ColumnMappingDraft, ColumnMappingRepository, DateFormat,
     DecimalMark, Encoding, MappedColumns, OperationLabel, OperationType, Separator,
 };

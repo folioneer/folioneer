@@ -295,8 +295,14 @@ fn written_with_a_comma(field: &str) -> bool {
 }
 
 /// IMP-014 — the first of day/month/year, year-month-day and month/day/year that reads every
-/// date; day/month/year, not detected, when none does.
+/// date; day/month/year, not detected, when none does or the column holds no date.
 fn detect_date_format<'a>(dates: impl Iterator<Item = &'a String> + Clone) -> DateReading {
+    if dates.clone().next().is_none() {
+        return DateReading {
+            format: DateFormat::DayMonthYear,
+            detected: false,
+        };
+    }
     [
         DateFormat::DayMonthYear,
         DateFormat::YearMonthDay,
@@ -471,6 +477,14 @@ mod tests {
         assert_eq!(
             read("Date;X\n13/02/2024;a\n").expect("read").1.date_reading,
             None
+        );
+        assert_eq!(
+            detect("Date;X\n;a\n;b\n"),
+            Some(DateReading {
+                format: DateFormat::DayMonthYear,
+                detected: false
+            }),
+            "a column with no date is not detected"
         );
         assert_eq!(read_date("13/02/24", DateFormat::DayMonthYear), None);
         assert_eq!(read_date("31/02/2024", DateFormat::DayMonthYear), None);

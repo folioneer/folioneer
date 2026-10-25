@@ -4,7 +4,7 @@ use crate::{
     core::{logger, Event},
     use_cases::{
         account_creation, account_deletion, account_details, account_performance, account_summary,
-        archive_asset, asset_price_fetch, asset_web_lookup, capabilities, delete_asset,
+        archive_asset, asset_price_fetch, asset_web_lookup, capabilities, csv_import, delete_asset,
         fee_generation, global_performance, holding_transaction, portfolio_sync,
         price_fetch_failures, price_freshness, price_history_backfill, rate_history_backfill,
         rate_refresh, scheduled_fetch, transfer, update_checker,
@@ -65,6 +65,18 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .typ::<import::Encoding>()
         .typ::<import::OperationType>()
         .typ::<import::ImportError>()
+        .typ::<import::ReadingChoices>()
+        .typ::<import::FileRead>()
+        .typ::<import::DateReading>()
+        .typ::<import::OperationRead>()
+        .typ::<import::AssetRead>()
+        .typ::<import::RowFigures>()
+        .typ::<import::RowRejection>()
+        .typ::<csv_import::ImportPreview>()
+        .typ::<csv_import::PreviewRow>()
+        .typ::<csv_import::RowStatus>()
+        .typ::<csv_import::RowReason>()
+        .typ::<csv_import::PreviewCounts>()
         // ----- sync BC (SYN/CFR) -----
         .typ::<sync::SyncFolderState>()
         .typ::<sync::FolderProblem>()
@@ -178,6 +190,8 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             import::list_column_mappings,
             import::save_column_mapping,
             import::delete_column_mapping,
+            csv_import::read_import_file,
+            csv_import::preview_import,
             // ----- sync BC (SYN/CFR) -----
             sync::pause_sync,
             sync::leave_sync,

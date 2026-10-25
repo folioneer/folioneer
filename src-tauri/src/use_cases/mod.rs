@@ -22,6 +22,8 @@ pub mod asset_price_fetch;
 pub mod asset_web_lookup;
 /// What this build can do, read by the interface (MKT-211).
 pub mod capabilities;
+/// CSV import: a broker's export read through a column mapping and previewed (IMP).
+pub mod csv_import;
 /// Delete asset: guards hard-deletion against existing transactions.
 pub mod delete_asset;
 /// Fee generation: lazy catch-up management fee deduction across all active schedules (FEE-040+).

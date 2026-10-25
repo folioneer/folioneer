@@ -28,11 +28,25 @@ How one broker's export is read, saved under a name and reused for every file of
 
 ### Preview (computed, never stored)
 
-What reading a file through a mapping shows: the encoding, separator, decimal mark and date format it was read with, detected or chosen (IMP-011 to IMP-014, IMP-018); the file's columns, named by its header; its operation labels, each with the operation type the mapping gives it or none (IMP-022); every import row; and the count of rows of each status (IMP-030).
+What reading a file through a mapping shows, nothing written (IMP-017).
+
+| Field    | Business meaning                                                                                                                                                                                                  |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `file`   | How the file was read: its encoding, separator, decimal mark and date format, detected or chosen (IMP-011 to IMP-014, IMP-018) — the date format said not detected when none reads every date —, and its columns. |
+| `rows`   | Every import row, in the file's order; a label the mapping gives no type shows on its rows, rejected with it (IMP-022).                                                                                           |
+| `counts` | How many rows hold each status; a trade tax joined to its purchase counts with it (IMP-030, IMP-034).                                                                                                             |
 
 ### Import row (computed, never stored)
 
-One line of the file once read through a mapping: its line number, its operation type, its date, its asset, its figures — the quantity, the unit price and the fees (the trade tax joined, IMP-034) of a purchase or a sale, the amount of a dividend, a deposit or a withdrawal, each that read — and its **status** — ready, rejected with its reason, unknown asset, already recorded, or not imported with its reason (IMP-030).
+One line of the file that is not blank, once read through a mapping and judged.
+
+| Field       | Business meaning                                                                                                                                                                                                       |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `line`      | Its line number in the file, the header being line 1.                                                                                                                                                                  |
+| `operation` | Its operation type, date, asset as read and figures — the quantity, unit price and fees (a joined trade tax included, IMP-034) of a purchase or a sale, the amount of a dividend, a deposit or a withdrawal (IMP-031). |
+| `asset`     | The asset of the portfolio it was matched to, none for a deposit and a withdrawal (IMP-032).                                                                                                                           |
+| `status`    | **Ready**, **rejected** with its reason, **unknown asset**, **already recorded** or **not imported** with its label (IMP-030); a joined trade tax names its purchase's line instead.                                   |
+| `funding`   | For a ready purchase the cash cannot fund, the deposit it needs (IMP-038).                                                                                                                                             |
 
 ---
 
@@ -52,7 +66,7 @@ One line of the file once read through a mapping: its line number, its operation
 
 **IMP-013A — How a figure is read (backend)**: A figure is read with its sign, which is then ignored (IMP-031), its decimals after the decimal mark, spaces between its thousands — a space, a no-break space or a narrow no-break space — and, with the decimal comma, dots between its thousands; any other character, a comma under the decimal dot among them ("1,234.56"), makes it a figure that does not read; it is held in micro-units, a seventh decimal rounded down (TRX-024). An empty field is no figure.
 
-**IMP-014 — The date format is detected once the date column is known (backend)**: The date format is the first of day/month/year, year-month-day and month/day/year under which every field of the date column (IMP-021) that is not empty, on the lines that are not blank, reads as a real day; the parts of a date are separated by `/`, `-` or `.`, the year has four digits, and a time after the date is ignored. When none reads all of them, it is day/month/year, said to be not detected, and the preview rejects each row whose date does not read (IMP-030).
+**IMP-014 — The date format is detected once the date column is known (backend)**: The date format is the first of day/month/year, year-month-day and month/day/year under which every field of the date column (IMP-021) that is not empty, on the lines that are not blank, reads as a real day; the parts of a date are separated by `/`, `-` or `.`, the year has four digits, and a time after the date is ignored. When none reads all of them, or the column holds no date, it is day/month/year, said to be not detected, and the preview rejects each row whose date does not read (IMP-030).
 
 **IMP-015 — The header names the columns (backend)**: The first line of the file is its header; each column is named by its header field, trimmed. A file whose header holds a name twice, compared trimmed and case ignored (IMP-021), is rejected with a specific error; an empty header field names no column and is never a name held twice.
 

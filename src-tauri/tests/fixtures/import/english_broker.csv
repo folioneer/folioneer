@@ -1,0 +1,8 @@
+Date,Type,ISIN,Ticker,Name,Quantity,Price,Amount,Commission,Currency
+2024-02-01,Deposit,,,,,,500.00,,EUR
+2024-02-02,Buy,FR0000000010,ACM,Acme World,2,100.00,200.00,1.00,EUR
+2024-02-03,Sell,FR0000000010,ACM,Acme World,5,110.00,550.00,1.00,EUR
+2024-02-04,Withdrawal,,,,,,5000.00,,EUR
+2024-02-05,Buy,,USX,US Thing,1,10,10,0,USD
+2024-02-06,Dividend,FR0000000002,,,,,3.00,,EUR
+2024-02-07,Buy,FR0000000010,ACM,Acme World,10,100,1000,0,EUR
