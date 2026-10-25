@@ -1,5 +1,5 @@
-//! `ServiceRankStamper` — the `RankStamper` port over the account, asset, and currency
-//! services (B24): each bounded context stamps its own tables with the first segment's
+//! `ServiceRankStamper` — the `RankStamper` port over the account, asset, currency and
+//! import services (B24): each bounded context stamps its own tables with the first segment's
 //! rank (CFR-014, D6) on the enrolment transaction's connection (SYN-013), the way
 //! `ServicePortfolioSnapshot` reads them.
 
@@ -10,6 +10,7 @@ use sqlx::SqliteConnection;
 use crate::context::account::AccountService;
 use crate::context::asset::AssetService;
 use crate::context::currency::CurrencyService;
+use crate::context::import::ImportService;
 use crate::context::sync::{RankStamper, SyncError};
 use crate::shared::domain::Rank;
 
@@ -18,19 +19,22 @@ pub struct ServiceRankStamper {
     account_service: Arc<AccountService>,
     asset_service: Arc<AssetService>,
     currency_service: Arc<CurrencyService>,
+    import_service: Arc<ImportService>,
 }
 
 impl ServiceRankStamper {
-    /// Creates the stamper over the three services that own synced records.
+    /// Creates the stamper over the four services that own synced records.
     pub fn new(
         account_service: Arc<AccountService>,
         asset_service: Arc<AssetService>,
         currency_service: Arc<CurrencyService>,
+        import_service: Arc<ImportService>,
     ) -> Self {
         Self {
             account_service,
             asset_service,
             currency_service,
+            import_service,
         }
     }
 }
@@ -57,7 +61,12 @@ impl RankStamper for ServiceRankStamper {
             .stamp_sync_rank(conn, rank)
             .await
             .map_err(|error| SyncError::database("rank stamper: currency rows", error))?;
-        Ok(account_rows + asset_rows + currency_rows)
+        let mapping_rows = self
+            .import_service
+            .stamp_sync_rank(conn, rank)
+            .await
+            .map_err(|error| SyncError::database("rank stamper: column mappings", error))?;
+        Ok(account_rows + asset_rows + currency_rows + mapping_rows)
     }
 }
 
@@ -72,6 +81,7 @@ mod tests {
         SqliteAssetRepository, SYSTEM_CATEGORY_ID,
     };
     use crate::context::currency::{SqliteCurrencyPairRepository, SqliteCurrencyRateRepository};
+    use crate::context::import::SqliteColumnMappingRepository;
     use crate::shared::domain::{LogicalTimestamp, Origin};
     use sqlx::sqlite::SqlitePoolOptions;
 
@@ -103,7 +113,15 @@ mod tests {
             Box::new(SqliteCurrencyPairRepository::new(pool.clone())),
             Box::new(SqliteCurrencyRateRepository::new(pool.clone())),
         ));
-        ServiceRankStamper::new(account_service, asset_service, currency_service)
+        let import_service = Arc::new(ImportService::new(Box::new(
+            SqliteColumnMappingRepository::new(pool.clone()),
+        )));
+        ServiceRankStamper::new(
+            account_service,
+            asset_service,
+            currency_service,
+            import_service,
+        )
     }
 
     fn rank() -> Rank {

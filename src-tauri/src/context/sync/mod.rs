@@ -34,7 +34,7 @@ pub use domain::{
     Manifest, NoticeDraft, Outcome, PortfolioRecord, PortfolioSnapshot, RankStamper, RecordState,
     RosterEntry, Segment, SegmentChange, StoredDevice, SyncCursor, SyncDevice, SyncFailure,
     SyncFolderState, SyncHealth, SyncReport, SyncReportView, SyncStateRepository, SyncStatus,
-    SyncStatusView, Tombstone, WaitingFor, WriteHeaderOutcome, APP_VERSION,
+    SyncStatusView, Tombstone, WaitingFor, WriteHeaderOutcome, APP_VERSION, TEXT_BOUND,
 };
 pub use error::SyncError;
 pub use infrastructure::codec::{header_data_format_version, DATA_FORMAT_VERSION};

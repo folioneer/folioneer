@@ -2600,7 +2600,8 @@ impl AccountService {
             | RecordKind::ReportedSplit
             | RecordKind::CurrencyPair
             | RecordKind::CurrencyRate
-            | RecordKind::PortfolioSetting => {}
+            | RecordKind::PortfolioSetting
+            | RecordKind::ColumnMapping => {}
         }
         Ok(())
     }

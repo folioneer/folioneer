@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, name, separator, decimal_mark, date_format, encoding, columns,\n                      operation_types, asset_matches,\n                      sync_logical_timestamp, sync_origin, sync_device_id\n               FROM column_mappings WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "separator",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "decimal_mark",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "date_format",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "encoding",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "columns",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "operation_types",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "asset_matches",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 11,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "89c611973d45860f0152ea06f440e51f6d4981873474659aaeedab5071e52da3"
+}

@@ -194,6 +194,7 @@ pub fn run() {
                     asset_service,
                     currency_service,
                     transactions,
+                    import_service,
                 } = AppContainer::build(
                     db.pool.clone(),
                     Some(providers.rate),
@@ -266,11 +267,13 @@ pub fn run() {
                         account_service.clone(),
                         asset_service.clone(),
                         Arc::clone(&currency_service),
+                        Arc::clone(&import_service),
                     )),
                     Arc::new(ServicePortfolioSnapshot::new(
                         account_service.clone(),
                         asset_service.clone(),
                         Arc::clone(&currency_service),
+                        Arc::clone(&import_service),
                     )),
                 ));
                 let portfolio_sync_uc =
@@ -278,6 +281,7 @@ pub fn run() {
                         account_service: account_service.clone(),
                         asset_service: asset_service.clone(),
                         currency_service: Arc::clone(&currency_service),
+                        import_service: Arc::clone(&import_service),
                         sync_service: Arc::clone(&sync_service),
                         first_publish,
                         sync_run,
@@ -391,6 +395,7 @@ pub fn run() {
                 app_handle.manage(agent_gate);
 
                 app_handle.manage(Arc::clone(&currency_service));
+                app_handle.manage(import_service);
 
                 app_handle.manage(AppState {
                     db,

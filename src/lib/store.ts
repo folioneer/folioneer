@@ -237,6 +237,8 @@ export const useAppStore = create<AppState>((set, get) => {
         "CurrencyPairUpdated",
         "HoldingNoteUpdated",
         "AgentConnectionChanged",
+        // IMP-026 — no slice caches the mappings; whoever lists them reads them again.
+        "ColumnMappingUpdated",
       ]);
 
       // Setup event listeners

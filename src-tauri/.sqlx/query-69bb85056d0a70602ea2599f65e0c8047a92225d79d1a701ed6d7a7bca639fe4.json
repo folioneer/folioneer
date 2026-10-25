@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, name, separator, decimal_mark, date_format, encoding, columns,\n                      operation_types, asset_matches\n               FROM column_mappings ORDER BY name COLLATE NOCASE, id",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "separator",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "decimal_mark",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "date_format",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "encoding",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "columns",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "operation_types",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "asset_matches",
+        "ordinal": 8,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "69bb85056d0a70602ea2599f65e0c8047a92225d79d1a701ed6d7a7bca639fe4"
+}

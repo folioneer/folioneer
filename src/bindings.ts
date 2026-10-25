@@ -489,6 +489,40 @@ async getCurrencyRates(fromCurrency: string, toCurrency: string) : Promise<Resul
 }
 },
 /**
+ * Every saved column mapping, by name (IMP-020).
+ */
+async listColumnMappings() : Promise<Result<ColumnMapping[], ImportError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_column_mappings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Saves a column mapping: a new one without `mapping_id`, else the one it names, under
+ * its id (IMP-020, IMP-024, IMP-025).
+ */
+async saveColumnMapping(mappingId: string | null, draft: ColumnMappingDraft) : Promise<Result<ColumnMapping, ImportError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("save_column_mapping", { mappingId, draft }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Deletes a saved column mapping (IMP-040).
+ */
+async deleteColumnMapping(mappingId: string) : Promise<Result<null, ImportError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_column_mapping", { mappingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Pauses sync on this device (SYN-070).
  */
 async pauseSync() : Promise<Result<SyncStatusView, SyncError>> {
@@ -1270,8 +1304,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
+export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 
 /** user-defined types **/
 
@@ -2311,6 +2345,18 @@ asset_class: AssetClass | null;
  */
 exchange: Exchange | null }
 /**
+ * A name, ISIN or reference of the file the user matched to an asset (IMP-033).
+ */
+export type AssetMatch = { 
+/**
+ * The name, ISIN or reference as the file writes it.
+ */
+read: string; 
+/**
+ * The asset it stands for.
+ */
+asset_id: string }
+/**
  * A recorded market price for a financial asset on a specific date.
  * Owned by the `asset` bounded context (MKT spec).
  */
@@ -2491,6 +2537,83 @@ dividends_received: number;
  * ISO date of the most recent sell for this position ("YYYY-MM-DD", ACD-043).
  */
 last_sold_date: string }
+/**
+ * IMP-020 — how one broker's export is read, saved under a name and reused.
+ */
+export type ColumnMapping = { 
+/**
+ * Its own identity: a rename keeps it (IMP-025).
+ */
+id: string; 
+/**
+ * What the user calls it, trimmed (IMP-024).
+ */
+name: string; 
+/**
+ * The character between two fields.
+ */
+separator: Separator; 
+/**
+ * The mark before a figure's decimals.
+ */
+decimal_mark: DecimalMark; 
+/**
+ * The order a date is written in.
+ */
+date_format: DateFormat; 
+/**
+ * How the file's text is written.
+ */
+encoding: Encoding; 
+/**
+ * Which column holds each field of a row.
+ */
+columns: MappedColumns; 
+/**
+ * Each operation label and its operation type.
+ */
+operation_types: OperationLabel[]; 
+/**
+ * Each name, ISIN or reference matched to an asset.
+ */
+asset_matches: AssetMatch[] }
+/**
+ * What a mapping holds besides its identity: what the user saves (IMP-020). A field the
+ * window does not send is refused, never ignored.
+ */
+export type ColumnMappingDraft = { 
+/**
+ * What the user calls it.
+ */
+name: string; 
+/**
+ * The character between two fields.
+ */
+separator: Separator; 
+/**
+ * The mark before a figure's decimals.
+ */
+decimal_mark: DecimalMark; 
+/**
+ * The order a date is written in.
+ */
+date_format: DateFormat; 
+/**
+ * How the file's text is written.
+ */
+encoding: Encoding; 
+/**
+ * Which column holds each field of a row.
+ */
+columns: MappedColumns; 
+/**
+ * Each operation label and its operation type.
+ */
+operation_types: OperationLabel[]; 
+/**
+ * Each name, ISIN or reference matched to an asset.
+ */
+asset_matches: AssetMatch[] }
 /**
  * One persisted, dismissible notice (SYN-066, CFR-060).
  */
@@ -2899,6 +3022,34 @@ export type CurrencyRateSource =
  */
 "Ecb"
 /**
+ * The order a date is written in (IMP-014).
+ */
+export type DateFormat = 
+/**
+ * Day, month, year.
+ */
+"DayMonthYear" | 
+/**
+ * Month, day, year.
+ */
+"MonthDayYear" | 
+/**
+ * Year, month, day.
+ */
+"YearMonthDay"
+/**
+ * The mark before a figure's decimals (IMP-013).
+ */
+export type DecimalMark = 
+/**
+ * `.`
+ */
+"Dot" | 
+/**
+ * `,`
+ */
+"Comma"
+/**
  * Use-case composite for the **delete asset** failure surface — the single
  * command `delete_asset` and its full chain of rejections.
  * 
@@ -3066,6 +3217,18 @@ export type DraftKind =
  */
 "Dividend"
 /**
+ * How a file's text is written (IMP-011).
+ */
+export type Encoding = 
+/**
+ * UTF-8.
+ */
+"Utf8" | 
+/**
+ * Windows-1252, which reads an ISO-8859-1 file too.
+ */
+"Windows1252"
+/**
  * What the user entered for a purchase or sale (TRX-062): a unit price, or a typed
  * total (TRX-060 / SEL-050), each with its exchange rate and fees, in micros.
  */
@@ -3138,6 +3301,10 @@ export type Event =
  * another one (SYN-064).
  */
 { type: "HoldingNoteUpdated" } | 
+/**
+ * A column mapping was saved, renamed, or deleted on this device (IMP-026).
+ */
+{ type: "ColumnMappingUpdated" } | 
 /**
  * A fee schedule was created, updated, paused, reactivated, or deleted (FEE-064).
  */
@@ -3690,6 +3857,37 @@ quantity: number;
  */
 average_price: number }
 /**
+ * Single flat error enum for the `import` bounded context (gold error model).
+ * 
+ * `#[serde(tag = "code")]` makes each variant serialize as `{ "code": "VariantName", ... }`
+ * on the wire.
+ */
+export type ImportError = 
+/**
+ * The mapping's name is empty once trimmed (IMP-024).
+ */
+{ code: "MappingNameEmpty" } | 
+/**
+ * Another mapping holds the name, case and accents ignored (IMP-024).
+ */
+{ code: "MappingNameTaken"; name: string } | 
+/**
+ * The mapping names no date column, no operation column, or no asset column (IMP-021).
+ */
+{ code: "MappingColumnMissing" } | 
+/**
+ * A text of the mapping is longer than `MAPPING_TEXT_LENGTH` characters (IMP-024A).
+ */
+{ code: "MappingTextTooLong" } | 
+/**
+ * The mapping is no longer held (IMP-025, IMP-040).
+ */
+{ code: "MappingNotFound"; mapping_id: string } | 
+/**
+ * An infrastructure failure; the diagnostic is logged server-side, never sent.
+ */
+{ code: "DatabaseError" }
+/**
  * One inconsistent holding surfaced in sync status (SYN-040).
  */
 export type InconsistentHolding = { 
@@ -3983,6 +4181,55 @@ export type ManagementFeeTask =
  */
 { code: "ManagementFeeOnCashAsset" }
 /**
+ * Which column of the file holds each field of a row, by its header (IMP-021). An absent
+ * optional column is one the file does not have.
+ */
+export type MappedColumns = { 
+/**
+ * The date's column.
+ */
+date: string; 
+/**
+ * The operation label's column.
+ */
+operation: string; 
+/**
+ * The asset's ISIN column, when the file has one.
+ */
+isin: string | null; 
+/**
+ * The asset's reference column, when the file has one.
+ */
+reference: string | null; 
+/**
+ * The asset's name column, when the file has one.
+ */
+name: string | null; 
+/**
+ * The quantity's column, when the file has one.
+ */
+quantity: string | null; 
+/**
+ * The unit price's column, when the file has one.
+ */
+unit_price: string | null; 
+/**
+ * The gross amount's column, when the file has one.
+ */
+gross_amount: string | null; 
+/**
+ * The fees' column, when the file has one.
+ */
+fees: string | null; 
+/**
+ * The net amount's column, when the file has one.
+ */
+net_amount: string | null; 
+/**
+ * The currency's column, when the file has one.
+ */
+currency: string | null }
+/**
  * UPD-018 / UPD-035 — what the window is told when the portfolio could not be opened.
  */
 export type MigrationFailure = { 
@@ -4095,6 +4342,50 @@ export type OpeningBalancePreview = {
  * TRX-065 — the total cost is 0: the form and the command line warn, never block.
  */
 zero_cost: boolean }
+/**
+ * One operation label of the file and the operation type it stands for (IMP-022).
+ */
+export type OperationLabel = { 
+/**
+ * The label as the file writes it.
+ */
+label: string; 
+/**
+ * The operation type it stands for.
+ */
+transaction_type: OperationType }
+/**
+ * The operation type an operation label stands for (IMP-022).
+ */
+export type OperationType = 
+/**
+ * A purchase.
+ */
+"Purchase" | 
+/**
+ * A sale.
+ */
+"Sale" | 
+/**
+ * A dividend.
+ */
+"Dividend" | 
+/**
+ * A deposit.
+ */
+"Deposit" | 
+/**
+ * A withdrawal.
+ */
+"Withdrawal" | 
+/**
+ * A trade tax, added to its purchase's fees (IMP-034).
+ */
+"TradeTax" | 
+/**
+ * A corporate action this version leaves to record by hand.
+ */
+"NotImported"
 /**
  * Another asset that is a listing of the same instrument (AST-039).
  */
@@ -4581,7 +4872,11 @@ export type RecordKind =
 /**
  * A split a price provider reports for an asset, identified by (asset_id, date) (MKT-230).
  */
-"ReportedSplit"
+"ReportedSplit" | 
+/**
+ * A column mapping, identified by its own id (IMP-023).
+ */
+"ColumnMapping"
 /**
  * Parameters for recording a stock split on a held asset (SPL-010).
  */
@@ -4855,6 +5150,22 @@ total_amount: number | null;
  * Optional user note.
  */
 note: string | null }
+/**
+ * The character between two fields of a file (IMP-012).
+ */
+export type Separator = 
+/**
+ * `;`
+ */
+"Semicolon" | 
+/**
+ * `,`
+ */
+"Comma" | 
+/**
+ * A tab.
+ */
+"Tab"
 /**
  * What removing everything a session recorded did (AGT-053).
  */

@@ -19,6 +19,7 @@ use crate::context::currency::{
     CurrencyService, RateHistoryProvider, RateProvider, SqliteCurrencyPairRepository,
     SqliteCurrencyRateRepository, SqlitePortfolioSettingRepository,
 };
+use crate::context::import::{ImportService, SqliteColumnMappingRepository};
 use crate::context::sync::SqliteChangeRecorder;
 use crate::core::SideEffectEventBus;
 use crate::shared::infrastructure::change_recorder::{ChangeRecorder, NoopChangeRecorder};
@@ -41,12 +42,14 @@ pub struct AppContainer {
     pub currency_service: Arc<CurrencyService>,
     /// Opens the units of work of cross-context writes (ADR-006).
     pub transactions: Arc<dyn TransactionManager>,
+    /// Saved column mapping service (IMP).
+    pub import_service: Arc<ImportService>,
 }
 
 impl AppContainer {
     /// Boxes the SQLite repositories into their application services.
     ///
-    /// `event_bus` is attached to all three services when present; headless
+    /// `event_bus` is attached to every service when present; headless
     /// entry points pass `None` so no side-effect events are ever published.
     /// `rate_provider` and `rate_history_provider` are attached when present —
     /// the caller decides which external currency tiers its flow needs.
@@ -111,13 +114,19 @@ impl AppContainer {
             ),
         )
         .with_setting_repo(Box::new(
-            SqlitePortfolioSettingRepository::new(pool).with_change_recorder(change_recorder),
+            SqlitePortfolioSettingRepository::new(pool.clone())
+                .with_change_recorder(Arc::clone(&change_recorder)),
+        ));
+
+        let mut import_service = ImportService::new(Box::new(
+            SqliteColumnMappingRepository::new(pool).with_change_recorder(change_recorder),
         ));
 
         if let Some(event_bus) = &event_bus {
             asset_service = asset_service.with_event_bus(Arc::clone(event_bus));
             account_service = account_service.with_event_bus(Arc::clone(event_bus));
             currency_service = currency_service.with_event_bus(Arc::clone(event_bus));
+            import_service = import_service.with_event_bus(Arc::clone(event_bus));
         }
         if let Some(rate_provider) = rate_provider {
             currency_service = currency_service.with_rate_provider(rate_provider);
@@ -131,6 +140,7 @@ impl AppContainer {
             asset_service: Arc::new(asset_service),
             currency_service: Arc::new(currency_service),
             transactions,
+            import_service: Arc::new(import_service),
         }
     }
 
@@ -185,9 +195,9 @@ mod tests {
         assert!(accounts.is_empty());
     }
 
-    // App shape: the event bus must be cloned into each of the three services.
+    // App shape: the event bus must be cloned into each of the four services.
     #[tokio::test]
-    async fn build_attaches_event_bus_to_all_three_services() {
+    async fn build_attaches_event_bus_to_every_service() {
         let pool = make_pool().await;
         let event_bus = Arc::new(SideEffectEventBus::new());
 
@@ -199,8 +209,8 @@ mod tests {
             Arc::new(NoopChangeRecorder),
         );
 
-        // One clone per service (asset, account, currency) plus this handle.
-        assert_eq!(Arc::strong_count(&event_bus), 4);
+        // One clone per service (asset, account, currency, import) plus this handle.
+        assert_eq!(Arc::strong_count(&event_bus), 5);
     }
 
     // D1 — `AppContainer::build` must accept a `ChangeRecorder` and wire it into every

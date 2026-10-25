@@ -56,6 +56,8 @@ pub enum Event {
     /// A holding note was written or deleted — by this device (HNO-020/021) or applied from
     /// another one (SYN-064).
     HoldingNoteUpdated,
+    /// A column mapping was saved, renamed, or deleted on this device (IMP-026).
+    ColumnMappingUpdated,
     /// A fee schedule was created, updated, paused, reactivated, or deleted (FEE-064).
     FeeScheduleUpdated,
     /// A sync run completed — automatic, launch, `sync_now`, or `resume_sync` — that applied

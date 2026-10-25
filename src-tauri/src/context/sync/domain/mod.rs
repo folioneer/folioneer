@@ -42,7 +42,7 @@ pub use folder::{
 };
 pub use held_back::HeldBackChange;
 pub use rank_stamper::RankStamper;
-pub use received_change::{check_received_change, MalformedChange};
+pub use received_change::{check_received_change, MalformedChange, TEXT_BOUND};
 pub use resolution::{
     account_parent, cascade_child_tombstones, collision_notice, decide, display_name,
     duplicate_name_notice, local_write_allowed, notice_for, parent_references, reference_outcome,

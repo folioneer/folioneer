@@ -9,6 +9,7 @@ use std::sync::Arc;
 use crate::context::account::AccountService;
 use crate::context::asset::{AssetService, SYSTEM_CATEGORY_IDS};
 use crate::context::currency::{CurrencyRateSource, CurrencyService};
+use crate::context::import::ImportService;
 use crate::context::sync::{
     ensure_device_name, ensure_passphrase_length, header_data_format_version, FirstPublish,
     FolderChange, FolderStore, InconsistentHolding, JoinError, SyncError, SyncFailure,
@@ -42,6 +43,8 @@ pub struct PortfolioSyncDependencies {
     pub asset_service: Arc<AssetService>,
     /// Owner of currency pairs and rates.
     pub currency_service: Arc<CurrencyService>,
+    /// Owner of the saved column mappings.
+    pub import_service: Arc<ImportService>,
     /// This device's sync lifecycle and status (pause, resume, rename, leave).
     pub sync_service: Arc<SyncService>,
     /// Enabling as the first device (SYN-013).
@@ -59,6 +62,7 @@ pub struct PortfolioSyncOrchestrator {
     account_service: Arc<AccountService>,
     asset_service: Arc<AssetService>,
     currency_service: Arc<CurrencyService>,
+    import_service: Arc<ImportService>,
     sync_service: Arc<SyncService>,
     first_publish: Arc<FirstPublish>,
     sync_run: Arc<SyncRun>,
@@ -74,6 +78,7 @@ impl PortfolioSyncOrchestrator {
             account_service,
             asset_service,
             currency_service,
+            import_service,
             sync_service,
             first_publish,
             sync_run,
@@ -84,11 +89,13 @@ impl PortfolioSyncOrchestrator {
             Arc::clone(&account_service),
             Arc::clone(&asset_service),
             Arc::clone(&currency_service),
+            Arc::clone(&import_service),
         );
         Self {
             account_service,
             asset_service,
             currency_service,
+            import_service,
             sync_service,
             first_publish,
             sync_run,
@@ -129,9 +136,9 @@ impl PortfolioSyncOrchestrator {
     }
 
     /// Whether this installation holds user-entered records (SYN-014): any account, any
-    /// user-created asset or category, any currency rate the user typed. System-seeded
-    /// records (SYN-027), declared currency pairs and fetched rates (SYN-083)
-    /// do not count.
+    /// user-created asset or category, any currency rate the user typed, any saved column
+    /// mapping (IMP-020). System-seeded records (SYN-027), declared currency pairs and
+    /// fetched rates (SYN-083) do not count.
     async fn installation_holds_user_data(&self) -> Result<bool, PortfolioSyncError> {
         if !self.account_service.get_all().await?.is_empty() {
             return Ok(true);
@@ -161,7 +168,12 @@ impl PortfolioSyncOrchestrator {
                 return Ok(true);
             }
         }
-        Ok(false)
+        let mappings = self
+            .import_service
+            .list_column_mappings()
+            .await
+            .map_err(|error| SyncError::database("inspect: column mappings not read", error))?;
+        Ok(!mappings.is_empty())
     }
 
     /// Enables sync (SYN-011). The first-device branch (no header yet) delegates to
@@ -359,6 +371,7 @@ mod tests {
         SqliteAssetCategoryRepository, SqliteAssetPriceRepository, SqliteAssetRepository,
     };
     use crate::context::currency::{SqliteCurrencyPairRepository, SqliteCurrencyRateRepository};
+    use crate::context::import::SqliteColumnMappingRepository;
     use crate::context::sync::infrastructure::codec::{
         encode_header, encode_manifest, encode_segment,
     };
@@ -390,6 +403,7 @@ mod tests {
         orchestrator: PortfolioSyncOrchestrator,
         account_service: Arc<AccountService>,
         asset_service: Arc<AssetService>,
+        import_service: Arc<ImportService>,
     }
 
     fn build_ctx_with_state_repo(
@@ -411,6 +425,9 @@ mod tests {
             Box::new(SqliteCurrencyPairRepository::new(pool.clone())),
             Box::new(SqliteCurrencyRateRepository::new(pool.clone())),
         ));
+        let import_service = Arc::new(ImportService::new(Box::new(
+            SqliteColumnMappingRepository::new(pool.clone()),
+        )));
         let change_log = Arc::new(SqliteChangeLogRepository::new(pool.clone()));
         let sync_run = Arc::new(SyncRun::new(
             change_log.clone(),
@@ -426,11 +443,13 @@ mod tests {
             Arc::clone(&account_service),
             Arc::clone(&asset_service),
             Arc::clone(&currency_service),
+            Arc::clone(&import_service),
         ));
         let rank_stamper = Arc::new(ServiceRankStamper::new(
             Arc::clone(&account_service),
             Arc::clone(&asset_service),
             Arc::clone(&currency_service),
+            Arc::clone(&import_service),
         ));
         let first_publish = Arc::new(FirstPublish::new(
             change_log,
@@ -443,6 +462,7 @@ mod tests {
             account_service: Arc::clone(&account_service),
             asset_service: Arc::clone(&asset_service),
             currency_service,
+            import_service: Arc::clone(&import_service),
             sync_service,
             first_publish,
             sync_run,
@@ -453,6 +473,7 @@ mod tests {
             orchestrator,
             account_service,
             asset_service,
+            import_service,
         }
     }
 
@@ -627,6 +648,57 @@ mod tests {
             holds_user_data().await,
             "a rate the user typed is user data"
         );
+    }
+
+    // SYN-014 / IMP-020 — a saved column mapping is user data: the installation may not join.
+    #[tokio::test]
+    async fn syn_014_a_saved_column_mapping_is_user_data() {
+        use crate::context::import::{
+            ColumnMappingDraft, DateFormat, DecimalMark, Encoding, MappedColumns, Separator,
+        };
+        let pool = make_pool().await;
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = build_ctx_with_state_repo(
+            &pool,
+            Arc::new(SqliteSyncStateRepository::new(pool.clone())),
+            Arc::new(crate::context::sync::FsFolderStore::new(dir.path())),
+        );
+        ctx.import_service
+            .save_column_mapping(
+                None,
+                ColumnMappingDraft {
+                    name: "Broker".into(),
+                    separator: Separator::Comma,
+                    decimal_mark: DecimalMark::Dot,
+                    date_format: DateFormat::YearMonthDay,
+                    encoding: Encoding::Utf8,
+                    columns: MappedColumns {
+                        date: "Date".into(),
+                        operation: "Type".into(),
+                        isin: None,
+                        reference: Some("Ticker".into()),
+                        name: None,
+                        quantity: None,
+                        unit_price: None,
+                        gross_amount: None,
+                        fees: None,
+                        net_amount: None,
+                        currency: None,
+                    },
+                    operation_types: Vec::new(),
+                    asset_matches: Vec::new(),
+                },
+            )
+            .await
+            .unwrap();
+
+        let state = ctx
+            .orchestrator
+            .inspect_sync_folder(dir.path().to_string_lossy().to_string())
+            .await
+            .expect("inspect_sync_folder never rejects");
+
+        assert!(state.installation_holds_user_data);
     }
 
     // SYN-019 — a fresh installation and a missing folder: the problem is reported, never

@@ -1,5 +1,5 @@
-//! `ServicePortfolioSnapshot` — the `PortfolioSnapshot` port over the account, asset, and
-//! currency services (B24): every synced record this installation holds (SYN-013/021),
+//! `ServicePortfolioSnapshot` — the `PortfolioSnapshot` port over the account, asset,
+//! currency and import services (B24): every synced record this installation holds (SYN-013/021),
 //! system-seeded records excluded (SYN-027), serialized exactly as the repositories' change
 //! capture serializes them.
 
@@ -8,6 +8,7 @@ use std::sync::Arc;
 use crate::context::account::{AccountService, FeeSchedule};
 use crate::context::asset::{AssetService, SYSTEM_CATEGORY_IDS};
 use crate::context::currency::{CurrencyPair, CurrencyService};
+use crate::context::import::ImportService;
 use crate::context::sync::{PortfolioRecord, PortfolioSnapshot, SyncError};
 use crate::core::cash::is_cash_asset;
 use crate::shared::domain::{RecordIdentity, RecordKind};
@@ -17,6 +18,7 @@ pub struct ServicePortfolioSnapshot {
     account_service: Arc<AccountService>,
     asset_service: Arc<AssetService>,
     currency_service: Arc<CurrencyService>,
+    import_service: Arc<ImportService>,
 }
 
 fn record<T: serde::Serialize>(
@@ -48,16 +50,18 @@ fn fee_schedule_record(schedule: &FeeSchedule) -> Result<PortfolioRecord, SyncEr
 }
 
 impl ServicePortfolioSnapshot {
-    /// Creates the snapshot over the three services that own synced records.
+    /// Creates the snapshot over the four services that own synced records.
     pub fn new(
         account_service: Arc<AccountService>,
         asset_service: Arc<AssetService>,
         currency_service: Arc<CurrencyService>,
+        import_service: Arc<ImportService>,
     ) -> Self {
         Self {
             account_service,
             asset_service,
             currency_service,
+            import_service,
         }
     }
 }
@@ -215,6 +219,15 @@ impl PortfolioSnapshot for ServicePortfolioSnapshot {
             )?);
         }
 
+        let mappings = self
+            .import_service
+            .list_column_mappings()
+            .await
+            .map_err(|error| SyncError::database("snapshot: column mappings", error))?;
+        for mapping in &mappings {
+            records.push(record(RecordKind::ColumnMapping, &[&mapping.id], mapping)?);
+        }
+
         Ok(records)
     }
 }
@@ -232,6 +245,7 @@ mod tests {
         SqliteAssetRepository,
     };
     use crate::context::currency::{SqliteCurrencyPairRepository, SqliteCurrencyRateRepository};
+    use crate::context::import::SqliteColumnMappingRepository;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn make_pool() -> sqlx::Pool<sqlx::Sqlite> {
@@ -273,10 +287,14 @@ mod tests {
             Box::new(SqliteCurrencyPairRepository::new(pool.clone())),
             Box::new(SqliteCurrencyRateRepository::new(pool.clone())),
         ));
+        let import_service = Arc::new(ImportService::new(Box::new(
+            SqliteColumnMappingRepository::new(pool.clone()),
+        )));
         let snapshot = ServicePortfolioSnapshot::new(
             Arc::clone(&account_service),
             Arc::clone(&asset_service),
             currency_service,
+            import_service,
         );
         (account_service, asset_service, snapshot)
     }
