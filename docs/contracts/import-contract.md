@@ -12,7 +12,10 @@
 ### Column mappings
 
 > A column mapping says how one broker's export is read (IMP-020): saved under a name, reused for
-> the next file, synced (IMP-023). Reading and previewing a file come with the next amendment.
+> the next file, synced (IMP-023). Reading and previewing a file come with the next amendment;
+> `ImportError` already carries the reading errors that command returns: `FileTooLarge`, `FileEmpty`,
+> `FileHasNoRow` (IMP-010), `FileNotUtf8` (IMP-011), `SeparatorNotFound` (IMP-012),
+> `HeaderNameRepeated { name }` (IMP-015), `MappedColumnNotInFile { column }` (IMP-021).
 
 | Command                 | Args                                                    | Return               | Errors                                                                                                                                                                                              |
 | ----------------------- | ------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -103,3 +106,4 @@ enum OperationType { Purchase, Sale, Dividend, Deposit, Withdrawal, TradeTax, No
 ## Changelog
 
 - 2026-10-25 — Added by `csv-import` (#501): `list_column_mappings`, `save_column_mapping`, `delete_column_mapping`, the mapping types, event `ColumnMappingUpdated`.
+- 2026-10-25 — Amended by `csv-import` (#501): the reading errors of `ImportError` (IMP-010 to IMP-021), ahead of the preview command.

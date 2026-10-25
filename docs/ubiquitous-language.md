@@ -394,6 +394,7 @@ The `…Updated` events are raised by changes made on this device. Changes appli
 | `CurrencyPairUpdated`      | Currency BC            | A currency pair was declared on this device                                                                                                                  | confirmed |
 | `FeeScheduleUpdated`       | Account BC             | A fee schedule was created, changed, paused, resumed or deleted                                                                                              | confirmed |
 | `HoldingNoteUpdated`       | Account BC             | A holding note was written or deleted on this device                                                                                                         | confirmed |
+| `ColumnMappingUpdated`     | Import BC              | A column mapping was saved, changed, renamed or deleted (IMP-026)                                                                                            | proposed  |
 | `SyncCompleted`            | Sync BC                | A sync applied changes from the user's other devices, or changed this device's sync failures or paused state; carries nothing                                | confirmed |
 | `AgentConnectionChanged`   | AI agent connection    | An AI agent asked to connect, was answered, connected, called a tool or left, or the owner switched the setting; carries nothing                             | confirmed |
 
