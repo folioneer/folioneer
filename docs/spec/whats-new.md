@@ -2,7 +2,7 @@
 
 ## Context
 
-After the in-app updater (see [update.md](update.md)) installs a new version, the user has no visibility into what changed. This feature shows a one-time dialog on the first launch after a version upgrade, listing the CHANGELOG sections released between the last version the user acknowledged and the currently running version. The dialog content comes verbatim from the repo `CHANGELOG.md` (Keep a Changelog format) bundled into the frontend at build time.
+After the in-app updater (see [update.md](update.md)) installs a new version, the user has no visibility into what changed. This feature shows a one-time dialog on the first launch after a version upgrade, listing the CHANGELOG sections released between the last version the user acknowledged and the currently running version. The dialog content comes from the repo `CHANGELOG.md` (Keep a Changelog format), bundled into the frontend at build time, verbatim apart from each line's application area tag (WNW-090).
 
 ---
 
@@ -22,7 +22,35 @@ After the in-app updater (see [update.md](update.md)) installs a new version, th
 
 **WNW-040 — Version stacking (frontend)**: The dialog lists every changelog section strictly newer than the stored version and up to the current version (inclusive), newest first — skipped versions stack in one dialog. Each section shows its version, release date, subsection headings (Added/Fixed/Changed as written in the changelog), and bullet lines.
 
-**WNW-060 — English-only content (frontend)**: The changelog content is displayed as written — English-only by design. Only the dialog chrome (title, dismiss action) is translated.
+**WNW-060 — English-only content (frontend)**: The changelog content is displayed as written, its application area tags aside (WNW-090) — English-only by design. Only the dialog chrome (title, dismiss action) and the application area tags (WNW-090) are translated.
+
+**WNW-090 — Application area tag (frontend)**: A bullet line that opens with the tag of an application area — its lowercase key in square brackets, then one or more spaces and the sentence, as in `[transfer] Move a holding…` — shows that application area's name (WNW-092) as a tag before the sentence, and the sentence without the tag or those spaces. The match is exact and case-sensitive: `[Transfer]`, or a tag not followed by a space, is no tag. Only the opening tag is read; a second one stays in the sentence.
+
+**WNW-091 — A line without an application area (frontend)**: A bullet with no tag, with a tag of a key that is not an application area (a retired one included), or with a tag and no sentence is shown as written, with no tag.
+
+**WNW-092 — Application area names (frontend)**: Each application area is shown under the name the interface gives it, in the interface's language:
+
+| Key            | English       | French                   |
+| -------------- | ------------- | ------------------------ |
+| `account`      | Account       | Compte                   |
+| `holding`      | Holding       | Position                 |
+| `asset`        | Asset         | Actif                    |
+| `transaction`  | Transaction   | Transaction              |
+| `transfer`     | Transfer      | Transfert                |
+| `write-off`    | Write-off     | Sortie sans contrepartie |
+| `split`        | Split         | Division                 |
+| `dividend`     | Dividend      | Dividende                |
+| `cash`         | Cash          | Liquidités               |
+| `fee`          | Fees          | Frais                    |
+| `price`        | Price         | Prix                     |
+| `rate`         | Currency rate | Taux de change           |
+| `agent`        | AI agent      | Agent IA                 |
+| `sync`         | Sync          | Synchronisation          |
+| `performance`  | Performance   | Performance              |
+| `import`       | Import        | Import                   |
+| `command-line` | Command line  | Ligne de commande        |
+| `settings`     | Settings      | Paramètres               |
+| `update`       | Update        | Mise à jour              |
 
 ### On-demand re-read
 

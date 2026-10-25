@@ -797,7 +797,28 @@
   },
   "whats_new": {
     "title": "What's new ({{version}})",
-    "dismiss": "Got it"
+    "dismiss": "Got it",
+    "application_areas": {
+      "account": "Account",
+      "holding": "Holding",
+      "asset": "Asset",
+      "transaction": "Transaction",
+      "transfer": "Transfer",
+      "write_off": "Write-off",
+      "split": "Split",
+      "dividend": "Dividend",
+      "cash": "Cash",
+      "fee": "Fees",
+      "price": "Price",
+      "rate": "Currency rate",
+      "agent": "AI agent",
+      "sync": "Sync",
+      "performance": "Performance",
+      "import": "Import",
+      "command_line": "Command line",
+      "settings": "Settings",
+      "update": "Update"
+    }
   },
   "unpriced_prices": {
     "title": "Prices that couldn't be updated",

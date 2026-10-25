@@ -797,7 +797,28 @@
   },
   "whats_new": {
     "title": "Nouveautés ({{version}})",
-    "dismiss": "Compris"
+    "dismiss": "Compris",
+    "application_areas": {
+      "account": "Compte",
+      "holding": "Position",
+      "asset": "Actif",
+      "transaction": "Transaction",
+      "transfer": "Transfert",
+      "write_off": "Sortie sans contrepartie",
+      "split": "Division",
+      "dividend": "Dividende",
+      "cash": "Liquidités",
+      "fee": "Frais",
+      "price": "Prix",
+      "rate": "Taux de change",
+      "agent": "Agent IA",
+      "sync": "Synchronisation",
+      "performance": "Performance",
+      "import": "Import",
+      "command_line": "Ligne de commande",
+      "settings": "Paramètres",
+      "update": "Mise à jour"
+    }
   },
   "unpriced_prices": {
     "title": "Prix non mis à jour",
