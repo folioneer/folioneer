@@ -804,7 +804,7 @@
       "asset": "Actif",
       "transaction": "Transaction",
       "transfer": "Transfert",
-      "write-off": "Sortie sans contrepartie",
+      "write_off": "Sortie sans contrepartie",
       "split": "Division",
       "dividend": "Dividende",
       "cash": "Liquidités",
@@ -815,7 +815,7 @@
       "sync": "Synchronisation",
       "performance": "Performance",
       "import": "Import",
-      "command-line": "Ligne de commande",
+      "command_line": "Ligne de commande",
       "settings": "Paramètres",
       "update": "Mise à jour"
     }

@@ -39,10 +39,13 @@ function isArea(word: string): word is Area {
 
 /** A bullet's area tag and its sentence; a line with no tag, or one outside the list, as written (WNW-090). */
 export function splitAreaTag(item: string): { area: Area | null; text: string } {
-  const match = AREA_TAG_PATTERN.exec(item);
-  const word = match?.[1];
-  if (match === null || word === undefined || !isArea(word)) return { area: null, text: item };
-  return { area: word, text: match[2] ?? "" };
+  const [, word = "", text = ""] = AREA_TAG_PATTERN.exec(item) ?? [];
+  return isArea(word) ? { area: word, text } : { area: null, text: item };
+}
+
+/** The translation key of an area's name (WNW-092): i18n keys are snake_case. */
+export function areaLabelKey(area: Area): string {
+  return `whats_new.areas.${area.replaceAll("-", "_")}`;
 }
 
 type ParsedVersion = [number, number, number];

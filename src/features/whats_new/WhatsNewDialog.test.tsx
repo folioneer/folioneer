@@ -58,12 +58,20 @@ describe("WhatsNewDialog", () => {
       {
         version: "0.16.0",
         date: "2026-10-26",
-        body: ["### Added", "- [transfer] Move a holding to another account", "- an untagged line"],
+        body: [
+          "### Added",
+          "- [transfer] Move a holding to another account",
+          "- [transfer] Edit a transfer as one line",
+          "- an untagged line",
+        ],
       },
     ];
     render(<WhatsNewDialog version="0.16.0" sections={tagged} onDismiss={vi.fn()} />);
 
-    expect(screen.getByTestId("whats-new-area-0.16.0-transfer").textContent).toBe(
+    expect(screen.getByTestId("whats-new-area-0.16.0-1-0").textContent).toBe(
+      "whats_new.areas.transfer",
+    );
+    expect(screen.getByTestId("whats-new-area-0.16.0-1-1").textContent).toBe(
       "whats_new.areas.transfer",
     );
     expect(screen.getByText("Move a holding to another account")).toBeTruthy();

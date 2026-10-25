@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import commitRules from "../../../docs/commit-rules.md?raw";
 import en from "../../i18n/locales/en/common.json";
 import fr from "../../i18n/locales/fr/common.json";
-import { AREAS, extractSectionFor, extractSectionsBetween, splitAreaTag } from "./parseChangelog";
+import {
+  AREAS,
+  areaLabelKey,
+  extractSectionFor,
+  extractSectionsBetween,
+  splitAreaTag,
+} from "./parseChangelog";
 
 const CHANGELOG_FIXTURE = `# Changelog
 
@@ -161,8 +167,9 @@ describe("splitAreaTag (WNW-090)", () => {
 
   it("names every area in English and French (WNW-092)", () => {
     for (const area of AREAS) {
-      expect(en.whats_new.areas[area], `en ${area}`).toBeTruthy();
-      expect(fr.whats_new.areas[area], `fr ${area}`).toBeTruthy();
+      const key = areaLabelKey(area).replace("whats_new.areas.", "");
+      expect((en.whats_new.areas as Record<string, string>)[key], `en ${area}`).toBeTruthy();
+      expect((fr.whats_new.areas as Record<string, string>)[key], `fr ${area}`).toBeTruthy();
     }
   });
 });

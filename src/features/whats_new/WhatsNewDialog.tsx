@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Button } from "@/ui/components/button/Button";
 import { Dialog } from "@/ui/components/modal/Dialog";
-import { type ChangelogSection, splitAreaTag } from "./parseChangelog";
+import { areaLabelKey, type ChangelogSection, splitAreaTag } from "./parseChangelog";
 
 interface WhatsNewDialogProps {
   version: string;
@@ -81,16 +81,16 @@ export function WhatsNewDialog({ version, sections, onDismiss }: WhatsNewDialogP
               if (block.kind === "bullets") {
                 return (
                   <ul key={key} className="mt-1 list-disc pl-5 text-sm leading-relaxed">
-                    {block.items.map((item) => {
+                    {block.items.map((item, itemIndex) => {
                       const { area, text } = splitAreaTag(item);
                       return (
                         <li key={item}>
                           {area && (
                             <span
-                              id={`whats-new-area-${section.version}-${area}`}
+                              id={`whats-new-area-${section.version}-${blockIndex}-${itemIndex}`}
                               className="mr-2 inline-block rounded-md bg-m3-secondary-container px-2 py-0.5 text-xs text-m3-on-secondary-container"
                             >
-                              {t(`whats_new.areas.${area}`)}
+                              {t(areaLabelKey(area))}
                             </span>
                           )}
                           {text}

@@ -804,7 +804,7 @@
       "asset": "Asset",
       "transaction": "Transaction",
       "transfer": "Transfer",
-      "write-off": "Write-off",
+      "write_off": "Write-off",
       "split": "Split",
       "dividend": "Dividend",
       "cash": "Cash",
@@ -815,7 +815,7 @@
       "sync": "Sync",
       "performance": "Performance",
       "import": "Import",
-      "command-line": "Command line",
+      "command_line": "Command line",
       "settings": "Settings",
       "update": "Update"
     }
