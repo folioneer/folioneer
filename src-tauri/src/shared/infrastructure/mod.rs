@@ -13,5 +13,7 @@ pub mod e2e_run;
 pub mod http;
 /// Daily fetch scheduler abstraction + platform adapters (SPF-012, SPF-017).
 pub mod scheduler;
+/// Unit of work — one transaction across bounded contexts (ADR-006, B26).
+pub mod uow;
 /// The lock the application window holds on its data folder while it runs (CLI-030).
 pub mod window_lock;

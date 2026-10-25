@@ -3,6 +3,7 @@ use sqlx::{Pool, Sqlite, SqliteConnection};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use super::transaction::insert_agent_recording;
 use crate::context::account::domain::{
     Account, AccountChange, AccountRepository, AgentRecording, FeeCatchUpPosition, FeeFrequency,
     FeeSchedule, Holding, HoldingNote, ThresholdDirection, Transaction, TransactionType,
@@ -16,6 +17,7 @@ use crate::shared::domain::{
 use crate::shared::infrastructure::change_recorder::{
     rank_from_columns, ChangeRecorder, NoopChangeRecorder, RankColumns,
 };
+use crate::shared::infrastructure::uow::UnitOfWork;
 
 #[derive(sqlx::FromRow)]
 struct AccountRow {
@@ -165,13 +167,13 @@ impl SqliteAccountRepository {
 
     /// Inserts a new account and records its creation for sync (CFR-014); with a mark,
     /// an agent created it (AGT-068).
-    async fn insert(&self, account: Account, mark: Option<AgentRecording>) -> Result<Account> {
+    async fn insert_on(
+        &self,
+        db_tx: &mut SqliteConnection,
+        account: &Account,
+        mark: Option<AgentRecording>,
+    ) -> Result<()> {
         let management_fees_enabled = account.management_fees_enabled as i64;
-        let mut db_tx = self
-            .pool
-            .begin()
-            .await
-            .context("Failed to begin DB transaction for account create")?;
         sqlx::query!(
             r#"INSERT INTO accounts (id, name, bank_name, currency, management_fees_enabled,
                                      country, wrapper)
@@ -193,9 +195,9 @@ impl SqliteAccountRepository {
             Operation::Created,
             Origin::User,
             None,
-            Some(serde_json::to_string(&account)?),
+            Some(serde_json::to_string(account)?),
         );
-        self.record_account(&mut db_tx, &account.id, draft).await?;
+        self.record_account(db_tx, &account.id, draft).await?;
         // AGT-068 — the mark is written with the account: neither exists without the other.
         if let Some(mark) = mark {
             sqlx::query!(
@@ -210,11 +212,21 @@ impl SqliteAccountRepository {
             .await
             .with_context(|| format!("Failed to mark account {} as an agent's", account.id))?;
         }
+        Ok(())
+    }
+
+    /// Inserts a new account in a transaction of its own (`insert_on`).
+    async fn insert(&self, account: Account) -> Result<Account> {
+        let mut db_tx = self
+            .pool
+            .begin()
+            .await
+            .context("Failed to begin DB transaction for account create")?;
+        self.insert_on(&mut db_tx, &account, None).await?;
         db_tx
             .commit()
             .await
             .context("Failed to commit account create")?;
-
         Ok(account)
     }
 
@@ -252,6 +264,34 @@ impl SqliteAccountRepository {
 
     /// Writes the aggregate's pending changes on `conn`, recording or stamping per
     /// `capture`, and clears them afterward.
+    /// Writes several accounts, and the marks of the transactions `marks` names, in one
+    /// transaction.
+    async fn write_all(
+        &self,
+        accounts: &mut [&mut Account],
+        marks: Option<(&[String], &AgentRecording)>,
+    ) -> Result<()> {
+        let mut db_tx = self
+            .pool
+            .begin()
+            .await
+            .context("Failed to begin DB transaction for a write of several accounts")?;
+        for account in accounts.iter_mut() {
+            self.persist_pending(&mut db_tx, account, Capture::Record)
+                .await?;
+        }
+        if let Some((marked, mark)) = marks {
+            for transaction_id in marked {
+                insert_agent_recording(&mut *db_tx, transaction_id, mark).await?;
+            }
+        }
+        db_tx
+            .commit()
+            .await
+            .context("Failed to commit a write of several accounts")?;
+        Ok(())
+    }
+
     async fn persist_pending(
         &self,
         conn: &mut SqliteConnection,
@@ -590,6 +630,23 @@ async fn load_aggregate_on(conn: &mut SqliteConnection, id: &str) -> Result<Opti
     ))
 }
 
+/// `AccountRepository::find_by_name` on `executor` — the pool, or a unit of work's connection.
+async fn account_by_name<'e>(
+    executor: impl sqlx::Executor<'e, Database = Sqlite>,
+    name: &str,
+) -> Result<Option<Account>> {
+    let row = sqlx::query_as!(
+        AccountRow,
+        r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper FROM accounts WHERE LOWER(name) = LOWER(?)"#,
+        name
+    )
+    .fetch_optional(executor)
+    .await
+    .with_context(|| format!("Failed to find account by name {}", name))?;
+
+    Ok(row.map(Account::from))
+}
+
 #[async_trait::async_trait]
 impl AccountRepository for SqliteAccountRepository {
     async fn stamp_sync_rank(&self, conn: &mut SqliteConnection, rank: &Rank) -> Result<u64> {
@@ -684,24 +741,26 @@ impl AccountRepository for SqliteAccountRepository {
     }
 
     async fn find_by_name(&self, name: &str) -> Result<Option<Account>> {
-        let row = sqlx::query_as!(
-            AccountRow,
-            r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper FROM accounts WHERE LOWER(name) = LOWER(?)"#,
-            name
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .with_context(|| format!("Failed to find account by name {}", name))?;
+        account_by_name(&self.pool, name).await
+    }
 
-        Ok(row.map(Account::from))
+    async fn find_by_name_in(&self, unit: &mut UnitOfWork, name: &str) -> Result<Option<Account>> {
+        account_by_name(unit.connection(), name).await
     }
 
     async fn create(&self, account: Account) -> Result<Account> {
-        self.insert(account, None).await
+        self.insert(account).await
     }
 
-    async fn create_by_agent(&self, account: Account, mark: AgentRecording) -> Result<Account> {
-        self.insert(account, Some(mark)).await
+    async fn create_in(
+        &self,
+        unit: &mut UnitOfWork,
+        account: &mut Account,
+        mark: Option<AgentRecording>,
+    ) -> Result<()> {
+        let conn = unit.connection();
+        self.insert_on(conn, account, mark).await?;
+        self.persist_pending(conn, account, Capture::Record).await
     }
 
     async fn agent_creations(&self) -> Result<Vec<(String, AgentRecording)>> {
@@ -827,20 +886,16 @@ impl AccountRepository for SqliteAccountRepository {
     }
 
     async fn save_all<'a>(&self, accounts: &mut [&'a mut Account]) -> Result<()> {
-        let mut db_tx = self
-            .pool
-            .begin()
-            .await
-            .context("Failed to begin DB transaction for a write of several accounts")?;
-        for account in accounts.iter_mut() {
-            self.persist_pending(&mut db_tx, account, Capture::Record)
-                .await?;
-        }
-        db_tx
-            .commit()
-            .await
-            .context("Failed to commit a write of several accounts")?;
-        Ok(())
+        self.write_all(accounts, None).await
+    }
+
+    async fn save_all_marked<'a>(
+        &self,
+        accounts: &mut [&'a mut Account],
+        marked: &[String],
+        mark: &AgentRecording,
+    ) -> Result<()> {
+        self.write_all(accounts, Some((marked, mark))).await
     }
 
     async fn transfer_accounts(&self, transfer_id: &str) -> Result<Vec<String>> {

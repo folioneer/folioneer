@@ -8,6 +8,7 @@ use super::transaction::{
 use super::wrapper::{country_well_formed, wrapper_known, PORTFOLIO_COUNTRY};
 use crate::context::account::error::AccountError;
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
+use crate::shared::infrastructure::uow::UnitOfWork;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use iso_currency::Currency;
@@ -2452,10 +2453,18 @@ pub trait AccountRepository: Send + Sync {
     async fn get_by_id(&self, id: &str) -> Result<Option<Account>>;
     /// Finds an account by name (case-insensitive, R3).
     async fn find_by_name(&self, name: &str) -> Result<Option<Account>>;
+    /// `find_by_name` inside `unit`, seeing what it wrote (ADR-006).
+    async fn find_by_name_in(&self, unit: &mut UnitOfWork, name: &str) -> Result<Option<Account>>;
     /// Persists a new account.
     async fn create(&self, account: Account) -> Result<Account>;
-    /// AGT-068 — persists a new account an agent created, with its mark, in one write.
-    async fn create_by_agent(&self, account: Account, mark: AgentRecording) -> Result<Account>;
+    /// ACC-025 — persists a new account with its pending changes (its cash line) and, when an
+    /// agent created it, its mark (AGT-068), inside `unit`, committed with it (ADR-006).
+    async fn create_in(
+        &self,
+        unit: &mut UnitOfWork,
+        account: &mut Account,
+        mark: Option<AgentRecording>,
+    ) -> Result<()>;
     /// AGT-068 — the mark of every account an agent created on this computer, by account id.
     async fn agent_creations(&self) -> Result<Vec<(String, AgentRecording)>>;
     /// Updates an existing account.
@@ -2472,6 +2481,14 @@ pub trait AccountRepository: Send + Sync {
     /// One repository writing several aggregates of its own, not a use case opening a
     /// transaction across contexts (`docs/ddd-divergences.md` § 19, until ADR-006 lands).
     async fn save_all<'a>(&self, accounts: &mut [&'a mut Account]) -> Result<()>;
+    /// `save_all`, every transaction of `marked` marked with `mark` in the same write
+    /// (AGT-045, AGT-049): the transactions and their marks exist together or not at all.
+    async fn save_all_marked<'a>(
+        &self,
+        accounts: &mut [&'a mut Account],
+        marked: &[String],
+        mark: &AgentRecording,
+    ) -> Result<()>;
     /// The accounts holding a part of the transfer `transfer_id`, sending side first.
     async fn transfer_accounts(&self, transfer_id: &str) -> Result<Vec<String>>;
     /// Stamps `rank` on every account, transaction, fee schedule, fee catch-up position, and

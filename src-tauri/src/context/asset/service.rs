@@ -5,6 +5,7 @@ use super::domain::{
     PriceHistoryBackfillOutcome, ReportedSplit, SYSTEM_CATEGORY_ID,
 };
 use super::error::AssetError;
+use crate::shared::infrastructure::uow::UnitOfWork;
 use crate::{
     context::asset::{AddedAsset, CreateAssetDTO, NamedAsset, UpdateAssetDTO},
     core::{Event, SideEffectEventBus, BACKEND},
@@ -137,31 +138,13 @@ impl AssetService {
             .await?
         {
             Some(c) => c,
-            None => {
-                let cat = AssetCategory::with_id(
-                    crate::core::cash::SYSTEM_CASH_CATEGORY_ID.to_string(),
-                    crate::core::cash::SYSTEM_CASH_CATEGORY_LABEL.to_string(),
-                )?;
-                self.category_repo.create(cat).await?
-            }
+            None => self.category_repo.create(cash_category()?).await?,
         };
 
-        let asset = Asset::with_id(
-            asset_id.clone(),
-            AssetKind::Cash,
-            format!("Cash {}", currency.to_uppercase()),
-            AssetClass::Cash,
-            category,
-            currency.to_string(),
-            1,
-            currency.to_uppercase(),
-            None,
-            false,
-            None,
-            false,
-            false,
-        )?;
-        let asset = self.asset_repo.create(asset).await?;
+        let asset = self
+            .asset_repo
+            .create(cash_asset(currency, category)?)
+            .await?;
         tracing::info!(target: BACKEND, asset_id = %asset.id, currency = %currency, "Seeded Cash Asset");
 
         if let Some(bus) = &self.event_bus {
@@ -169,6 +152,42 @@ impl AssetService {
         }
 
         Ok(asset)
+    }
+
+    /// `seed_cash_asset` inside `unit` (ADR-006, ACC-025): nothing is published — the caller
+    /// commits, then calls `notify_asset_updated` when this returns `true`, a Cash Asset
+    /// having been created.
+    pub async fn seed_cash_asset_in(&self, unit: &mut UnitOfWork, currency: &str) -> Result<bool> {
+        let asset_id = crate::core::cash::system_cash_asset_id(currency);
+        if self
+            .asset_repo
+            .get_by_id_in(unit, &asset_id)
+            .await?
+            .is_some()
+        {
+            return Ok(false);
+        }
+        let category = match self
+            .category_repo
+            .get_by_id_in(unit, crate::core::cash::SYSTEM_CASH_CATEGORY_ID)
+            .await?
+        {
+            Some(c) => c,
+            None => self.category_repo.create_in(unit, cash_category()?).await?,
+        };
+        let asset = self
+            .asset_repo
+            .create_in(unit, cash_asset(currency, category)?)
+            .await?;
+        tracing::info!(target: BACKEND, asset_id = %asset.id, currency = %currency, "Seeded Cash Asset");
+        Ok(true)
+    }
+
+    /// Publishes `AssetUpdated` for writes a unit of work committed (ADR-006).
+    pub fn notify_asset_updated(&self) {
+        if let Some(bus) = &self.event_bus {
+            bus.publish(Event::AssetUpdated);
+        }
     }
 
     /// Creates a new asset and publishes an AssetUpdated event.
@@ -1125,6 +1144,33 @@ fn applied_write_error(context: &'static str, e: anyhow::Error) -> AssetError {
     AssetError::DatabaseError
 }
 
+/// The system Cash category (CSH-017).
+fn cash_category() -> Result<AssetCategory> {
+    Ok(AssetCategory::with_id(
+        crate::core::cash::SYSTEM_CASH_CATEGORY_ID.to_string(),
+        crate::core::cash::SYSTEM_CASH_CATEGORY_LABEL.to_string(),
+    )?)
+}
+
+/// The system Cash Asset of `currency`, in `category` (CSH-010, CSH-011).
+fn cash_asset(currency: &str, category: AssetCategory) -> Result<Asset> {
+    Ok(Asset::with_id(
+        crate::core::cash::system_cash_asset_id(currency),
+        AssetKind::Cash,
+        format!("Cash {}", currency.to_uppercase()),
+        AssetClass::Cash,
+        category,
+        currency.to_string(),
+        1,
+        currency.to_uppercase(),
+        None,
+        false,
+        None,
+        false,
+        false,
+    )?)
+}
+
 /// Asset application surface consumed by cross-BC use-case orchestrators.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -1142,6 +1188,10 @@ pub trait AssetServiceContract: Send + Sync {
     async fn get_asset_by_id(&self, asset_id: &str) -> StdResult<Option<Asset>, AssetError>;
     /// Idempotently seeds the system Cash Asset for `currency` (CSH-010, CSH-011, CSH-017).
     async fn seed_cash_asset(&self, currency: &str) -> Result<Asset>;
+    /// `seed_cash_asset` inside `unit`, nothing published; `true` when it was created (ADR-006).
+    async fn seed_cash_asset_in(&self, unit: &mut UnitOfWork, currency: &str) -> Result<bool>;
+    /// Publishes `AssetUpdated` for writes a unit of work committed (ADR-006).
+    fn notify_asset_updated(&self);
     /// Archives an asset (reversible — R6).
     async fn archive_asset(&self, asset_id: &str) -> StdResult<(), AssetError>;
     /// Soft-deletes an asset and publishes an AssetUpdated event.
@@ -1223,6 +1273,14 @@ impl AssetServiceContract for AssetService {
 
     async fn seed_cash_asset(&self, currency: &str) -> Result<Asset> {
         AssetService::seed_cash_asset(self, currency).await
+    }
+
+    async fn seed_cash_asset_in(&self, unit: &mut UnitOfWork, currency: &str) -> Result<bool> {
+        AssetService::seed_cash_asset_in(self, unit, currency).await
+    }
+
+    fn notify_asset_updated(&self) {
+        AssetService::notify_asset_updated(self)
     }
 
     async fn archive_asset(&self, asset_id: &str) -> StdResult<(), AssetError> {

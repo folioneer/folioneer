@@ -24,7 +24,7 @@ use_cases/shared/    stateless helpers shared by use cases (Global Value, price 
 core/                legacy shared bucket: db.rs, event_bus/ (Event enum), logger.rs,
                      specta_builder.rs (the command registry), cash.rs
 shared/              gold shared code: domain/record_change.rs (change-log vocabulary),
-                     infrastructure/ (app_directories, change_recorder, container, e2e_run, http, scheduler/, window_lock)
+                     infrastructure/ (app_directories, change_recorder, container, e2e_run, http, scheduler/, uow, window_lock)
 lib.rs               the crate root: modules, the headless entry, tracing — the application core
 app.rs               the Tauri shell (feature `app`, B46): wires services, use cases and dispatchers
                      into the window

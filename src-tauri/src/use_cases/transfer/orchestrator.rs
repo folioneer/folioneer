@@ -29,11 +29,8 @@ pub struct TransferFigures {
 pub enum AgentTransferError {
     /// The transfer was refused as the window's is.
     Refused(TransferError),
-    /// A part could not be marked.
-    NotMarked {
-        /// The transfer was removed again.
-        undone: bool,
-    },
+    /// The transfer and its marks could not be written: nothing was recorded.
+    NotRecorded,
 }
 
 /// Cross-BC orchestrator of the transfer (TRF).
@@ -88,8 +85,8 @@ impl TransferUseCase {
             .await?)
     }
 
-    /// AGT-045 / AGT-049 — records a transfer as `record_transfer` does and marks every part
-    /// with the agent's session; when a part cannot be marked, the transfer is undone.
+    /// AGT-045 / AGT-049 — records a transfer as `record_transfer` does, every part marked
+    /// with the agent's session in the same write: when they cannot be written, nothing is.
     pub async fn record_transfer_by_agent(
         &self,
         from_account_id: &str,
@@ -98,31 +95,32 @@ impl TransferUseCase {
         figures: TransferFigures,
         mark: &AgentRecording,
     ) -> Result<Vec<Transaction>, AgentTransferError> {
-        let parts = self
-            .record_transfer(from_account_id, to_account_id, asset_id, figures)
+        self.ensure_transferable(&asset_id)
             .await
             .map_err(AgentTransferError::Refused)?;
-        for part in &parts {
-            let Err(error) = self
-                .account_service
-                .mark_agent_recording(&part.id, mark)
-                .await
-            else {
-                continue;
-            };
-            tracing::error!(target: BACKEND, transaction = %part.id, err = ?error, "agent transfer: a part not marked, undoing the transfer");
-            let Some(transfer_id) = part.transfer_id.as_deref() else {
-                return Err(AgentTransferError::NotMarked { undone: false });
-            };
-            let undone = self.account_service.cancel_transfer(transfer_id).await;
-            if let Err(error) = &undone {
-                tracing::error!(target: BACKEND, transfer = %transfer_id, err = ?error, "agent transfer: not marked and not undone");
-            }
-            return Err(AgentTransferError::NotMarked {
-                undone: undone.is_ok(),
-            });
-        }
-        Ok(parts)
+        let rate = self
+            .rate(from_account_id, to_account_id, &figures)
+            .await
+            .map_err(AgentTransferError::Refused)?;
+        self.account_service
+            .record_transfer_by_agent(
+                from_account_id,
+                to_account_id,
+                asset_id,
+                figures.date,
+                figures.quantity_sent,
+                figures.quantity_received,
+                rate,
+                figures.note,
+                mark,
+            )
+            .await
+            // A database failure before the write is reported as one during it: either way,
+            // nothing was recorded.
+            .map_err(|error| match error {
+                AccountError::DatabaseError => AgentTransferError::NotRecorded,
+                error => AgentTransferError::Refused(error.into()),
+            })
     }
 
     /// AGT-065A — what `record_transfer` would make of the two accounts, with the same

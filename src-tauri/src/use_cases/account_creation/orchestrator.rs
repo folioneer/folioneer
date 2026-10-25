@@ -1,6 +1,7 @@
 use crate::context::account::{Account, AccountError, AccountServiceContract, AgentRecording};
 use crate::context::asset::AssetServiceContract;
 use crate::core::logger::BACKEND;
+use crate::shared::infrastructure::uow::TransactionManager;
 use std::result::Result as StdResult;
 use std::sync::Arc;
 
@@ -10,6 +11,7 @@ use std::sync::Arc;
 pub struct AccountCreationUseCase {
     account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,
+    transactions: Arc<dyn TransactionManager>,
 }
 
 impl AccountCreationUseCase {
@@ -17,21 +19,16 @@ impl AccountCreationUseCase {
     pub fn new(
         account_service: Arc<dyn AccountServiceContract>,
         asset_service: Arc<dyn AssetServiceContract>,
+        transactions: Arc<dyn TransactionManager>,
     ) -> Self {
         Self {
             account_service,
             asset_service,
+            transactions,
         }
     }
 
-    /// Creates an account and eagerly seeds its 0-balance Cash Holding
-    /// (ACC-025, CSH-010 / CSH-012).
-    ///
-    /// Three sequential commits, not a single Unit of Work: ensure Cash Asset →
-    /// create account → seed Cash Holding. This mirrors the existing non-atomic
-    /// ensure-then-write cash pattern in `holding_transaction`; a mid-sequence
-    /// failure leaves a self-healing state (the backfill migration or a re-run
-    /// repairs an account left without its Cash Holding).
+    /// Creates an account and seeds its 0-balance Cash Holding (ACC-025, CSH-010 / CSH-012).
     pub async fn create(
         &self,
         name: String,
@@ -65,37 +62,9 @@ impl AccountCreationUseCase {
     ) -> StdResult<Account, AccountError> {
         // ACC-002 / TRX-021 / ACC-041 — the account's own fields are checked before anything
         // is seeded for it: a value it refuses is answered with its own code.
-        Account::new(
-            name.clone(),
-            bank_name.clone(),
-            currency.clone(),
-            management_fees_enabled,
-        )?
-        .classified(country.clone(), wrapper.clone(), None)?;
-        // CSH-010 — the Cash Asset must exist before the Cash Holding references it (FK).
-        self.asset_service
-            .seed_cash_asset(&currency)
-            .await
-            .map_err(|e| {
-                tracing::error!(target: BACKEND, currency = %currency, err = ?e, "create_account: seed_cash_asset failed");
-                AccountError::DatabaseError
-            })?;
-        // Account row — single-write create path (enforces ACC-001 / ACC-002 /
-        // ACC-003; FEE-075's disabled default comes from the creation form).
-        let account = self
-            .account_service
-            .create_classified(
-                name,
-                bank_name,
-                currency,
-                management_fees_enabled,
-                country,
-                wrapper,
-            )
-            .await?;
-        // CSH-012 — eager 0-balance Cash Holding.
-        self.account_service.seed_cash_holding(&account.id).await?;
-        Ok(account)
+        let account = Account::new(name, bank_name, currency, management_fees_enabled)?
+            .classified(country, wrapper, None)?;
+        self.create_with_cash(account, None).await
     }
 
     /// AGT-068 — creates the account an agent asked for as the window creates one, its cash
@@ -109,23 +78,43 @@ impl AccountCreationUseCase {
         wrapper: Option<String>,
         mark: AgentRecording,
     ) -> StdResult<Account, AccountError> {
-        Account::new(name.clone(), bank_name.clone(), currency.clone(), false)?.classified(
-            country.clone(),
-            wrapper.clone(),
-            None,
-        )?;
-        self.asset_service
-            .seed_cash_asset(&currency)
+        let account =
+            Account::new(name, bank_name, currency, false)?.classified(country, wrapper, None)?;
+        self.create_with_cash(account, Some(mark)).await
+    }
+
+    /// ACC-025 — the Cash Asset of the account's currency (CSH-010), the account and its
+    /// cash line, in one unit of work (ADR-006): all of them or none.
+    async fn create_with_cash(
+        &self,
+        account: Account,
+        mark: Option<AgentRecording>,
+    ) -> StdResult<Account, AccountError> {
+        let currency = account.currency.clone();
+        let mut unit = self.transactions.begin().await.map_err(|e| {
+            tracing::error!(target: BACKEND, err = ?e, "create_account: unit of work not begun");
+            AccountError::DatabaseError
+        })?;
+        let cash_asset_created = self
+            .asset_service
+            .seed_cash_asset_in(&mut unit, &currency)
             .await
             .map_err(|e| {
-                tracing::error!(target: BACKEND, currency = %currency, err = ?e, "create_by_agent: seed_cash_asset failed");
+                tracing::error!(target: BACKEND, currency = %currency, err = ?e, "create_account: seed_cash_asset failed");
                 AccountError::DatabaseError
             })?;
         let account = self
             .account_service
-            .create_by_agent(name, bank_name, currency, country, wrapper, mark)
+            .create_in(&mut unit, account, mark)
             .await?;
-        self.account_service.seed_cash_holding(&account.id).await?;
+        unit.commit().await.map_err(|e| {
+            tracing::error!(target: BACKEND, err = ?e, "create_account: unit of work not committed");
+            AccountError::DatabaseError
+        })?;
+        if cash_asset_created {
+            self.asset_service.notify_asset_updated();
+        }
+        self.account_service.notify_account_updated();
         Ok(account)
     }
 }
@@ -141,6 +130,7 @@ mod tests {
         AssetService, SqliteAssetCategoryRepository, SqliteAssetPriceRepository,
         SqliteAssetRepository,
     };
+    use crate::shared::infrastructure::uow::SqliteTransactionManager;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn setup_pool() -> sqlx::Pool<sqlx::Sqlite> {
@@ -167,7 +157,11 @@ mod tests {
             Box::new(SqliteAssetCategoryRepository::new(pool.clone())),
             Box::new(SqliteAssetPriceRepository::new(pool.clone())),
         ));
-        AccountCreationUseCase::new(account_svc, asset_svc)
+        AccountCreationUseCase::new(
+            account_svc,
+            asset_svc,
+            Arc::new(SqliteTransactionManager::new(pool.clone())),
+        )
     }
 
     // TRX-021 — a currency that is none is refused with its own code, and nothing is
@@ -196,6 +190,61 @@ mod tests {
             .await
             .expect("count");
         assert_eq!(seeded.0, 0, "no Cash Asset is seeded");
+    }
+
+    // ACC-025 / ADR-006 — the Cash Asset, the account and its cash line are one unit of work:
+    // when the cash line cannot be written, nothing is, and the same account can be created
+    // again instead of being refused as a duplicate.
+    #[tokio::test]
+    async fn acc_025_a_failed_cash_line_leaves_nothing_and_a_retry_succeeds() {
+        let pool = setup_pool().await;
+        let uc = make_uc(&pool);
+        sqlx::query(
+            "CREATE TRIGGER refuse_holdings BEFORE INSERT ON holdings
+             BEGIN SELECT RAISE(ABORT, 'refused'); END",
+        )
+        .execute(&pool)
+        .await
+        .expect("trigger");
+
+        let failed = uc
+            .create(
+                "Brokerage".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                false,
+            )
+            .await;
+
+        assert!(
+            matches!(failed, Err(AccountError::DatabaseError)),
+            "{failed:?}"
+        );
+        let count = |table: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(&format!("SELECT COUNT(*) FROM {table}"))
+                    .fetch_one(&pool)
+                    .await
+                    .expect("count")
+            }
+        };
+        assert_eq!(count("accounts").await, 0, "no account is left");
+        assert_eq!(count("assets").await, 0, "no Cash Asset is left");
+
+        sqlx::query("DROP TRIGGER refuse_holdings")
+            .execute(&pool)
+            .await
+            .expect("drop trigger");
+        uc.create(
+            "Brokerage".to_string(),
+            String::new(),
+            "EUR".to_string(),
+            false,
+        )
+        .await
+        .expect("the retry creates the account");
+        assert_eq!(count("holdings").await, 1, "with its cash line");
     }
 
     // ACC-025 / CSH-010 / CSH-012 — create seeds the Cash Asset and a 0-balance Cash Holding.

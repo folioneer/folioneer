@@ -5,6 +5,7 @@ use super::isin::validate_isin;
 use super::reported_split::ReportedSplit;
 use crate::context::asset::error::AssetError;
 use crate::shared::domain::{Rank, RecordKind, SyncedRecord};
+use crate::shared::infrastructure::uow::UnitOfWork;
 use anyhow::Result;
 use async_trait::async_trait;
 use iso_currency::Currency;
@@ -1502,6 +1503,10 @@ pub trait AssetRepository: Send + Sync {
     async fn get_by_id(&self, id: &str) -> Result<Option<Asset>>;
     /// Persists a new asset.
     async fn create(&self, asset: Asset) -> Result<Asset>;
+    /// `get_by_id` inside `unit`, seeing what it wrote (ADR-006).
+    async fn get_by_id_in(&self, unit: &mut UnitOfWork, id: &str) -> Result<Option<Asset>>;
+    /// `create` inside `unit`, committed with it (ADR-006).
+    async fn create_in(&self, unit: &mut UnitOfWork, asset: Asset) -> Result<Asset>;
     /// Updates an existing asset.
     async fn update(&self, asset: Asset) -> Result<Asset>;
     /// Soft-deletes an asset.

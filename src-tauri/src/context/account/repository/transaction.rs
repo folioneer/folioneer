@@ -90,6 +90,31 @@ impl SqliteTransactionRepository {
     }
 }
 
+/// AGT-045 — marks `transaction_id` as recorded by `recording`'s agent and session, on
+/// `executor`: the pool, or the transaction that writes the transaction itself.
+pub(crate) async fn insert_agent_recording<'e>(
+    executor: impl sqlx::Executor<'e, Database = Sqlite>,
+    transaction_id: &str,
+    recording: &AgentRecording,
+) -> Result<()> {
+    sqlx::query!(
+        r#"INSERT INTO agent_recordings (transaction_id, agent, session, session_started_at)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(transaction_id) DO UPDATE SET
+                   agent = excluded.agent,
+                   session = excluded.session,
+                   session_started_at = excluded.session_started_at"#,
+        transaction_id,
+        recording.agent,
+        recording.session,
+        recording.session_started_at
+    )
+    .execute(executor)
+    .await
+    .with_context(|| format!("Failed to mark transaction {transaction_id} as an agent's"))?;
+    Ok(())
+}
+
 #[async_trait]
 impl TransactionRepository for SqliteTransactionRepository {
     async fn get_by_id(&self, id: &str) -> Result<Option<Transaction>> {
@@ -192,22 +217,7 @@ impl TransactionRepository for SqliteTransactionRepository {
         transaction_id: &str,
         recording: &AgentRecording,
     ) -> Result<()> {
-        sqlx::query!(
-            r#"INSERT INTO agent_recordings (transaction_id, agent, session, session_started_at)
-               VALUES (?, ?, ?, ?)
-               ON CONFLICT(transaction_id) DO UPDATE SET
-                   agent = excluded.agent,
-                   session = excluded.session,
-                   session_started_at = excluded.session_started_at"#,
-            transaction_id,
-            recording.agent,
-            recording.session,
-            recording.session_started_at
-        )
-        .execute(&self.pool)
-        .await
-        .with_context(|| format!("Failed to mark transaction {transaction_id} as an agent's"))?;
-        Ok(())
+        insert_agent_recording(&self.pool, transaction_id, recording).await
     }
 
     async fn transfer_other_accounts(&self, account_id: &str) -> Result<Vec<(String, String)>> {

@@ -201,10 +201,11 @@ mod tests {
             Arc::clone(&container.account_service) as _;
         let assets: Arc<dyn crate::context::asset::AssetServiceContract> =
             Arc::clone(&container.asset_service) as _;
-        let account = AccountCreationUseCase::new(accounts, assets)
-            .create("PEA".to_string(), String::new(), "EUR".to_string(), false)
-            .await
-            .expect("account");
+        let account =
+            AccountCreationUseCase::new(accounts, assets, Arc::clone(&container.transactions))
+                .create("PEA".to_string(), String::new(), "EUR".to_string(), false)
+                .await
+                .expect("account");
         container
             .account_service
             .record_deposit(&account.id, "2026-01-02".to_string(), 5_000 * M, None)

@@ -193,6 +193,7 @@ pub fn run() {
                     account_service,
                     asset_service,
                     currency_service,
+                    transactions,
                 } = AppContainer::build(
                     db.pool.clone(),
                     Some(providers.rate),
@@ -241,6 +242,7 @@ pub fn run() {
                 let account_creation_uc = AccountCreationUseCase::new(
                     account_service.clone(),
                     asset_service.clone(),
+                    Arc::clone(&transactions),
                 );
 
                 let holding_transaction_uc = HoldingTransactionUseCase::new(
@@ -381,6 +383,7 @@ pub fn run() {
                         account_service.clone(),
                         asset_service.clone(),
                         Arc::clone(&currency_service),
+                        Arc::clone(&transactions),
                         agent_connections,
                     )),
                 ));
@@ -574,6 +577,7 @@ mod tests {
             account_service,
             asset_service,
             currency_service,
+            ..
         } = AppContainer::build(pool.clone(), None, None, None, recorder);
         PriceFetchingParts {
             price_fetch_log: Arc::new(SqlitePriceFetchLogRepository::new(pool.clone())),

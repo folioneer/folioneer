@@ -14,6 +14,7 @@ use crate::shared::domain::{
 use crate::shared::infrastructure::change_recorder::{
     rank_from_columns, ChangeRecorder, NoopChangeRecorder, RankColumns,
 };
+use crate::shared::infrastructure::uow::UnitOfWork;
 use anyhow::{Context, Result};
 use sqlx::{Pool, Sqlite, SqliteConnection};
 
@@ -228,6 +229,33 @@ impl SqliteAssetRepository {
         Ok(())
     }
 
+    /// Inserts a new asset on `conn` and records its creation (CFR-014).
+    async fn insert_on(&self, conn: &mut SqliteConnection, asset: Asset) -> Result<Asset> {
+        let asset_class_str = asset.class.to_string();
+        let kind = asset.kind.to_string();
+        let exchange_code = asset.exchange.as_ref().map(|e| e.code.clone());
+        sqlx::query!(
+            r#"INSERT INTO assets (id, kind, name, reference, isin, asset_class, currency, risk_level, is_deleted, is_archived, category_id, exchange_code, interest_bearing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)"#,
+            asset.id,
+            kind,
+            asset.name,
+            asset.reference,
+            asset.isin,
+            asset_class_str,
+            asset.currency,
+            asset.risk_level,
+            asset.category.id,
+            exchange_code,
+            asset.interest_bearing
+        )
+        .execute(&mut *conn)
+        .await
+        .with_context(|| format!("Failed to create asset: {}", asset.name))?;
+        self.record_asset_state(conn, &asset, Operation::Created, None)
+            .await?;
+        Ok(asset)
+    }
+
     /// One id-only column update (archive, unarchive, block, unblock), recorded as an
     /// Updated change of the asset's full state.
     async fn update_flag(&self, id: &str, statement: &str, what: &str) -> Result<()> {
@@ -249,6 +277,35 @@ impl SqliteAssetRepository {
             .with_context(|| format!("Failed to commit asset {what}"))?;
         Ok(())
     }
+}
+
+/// `AssetRepository::get_by_id` on `executor` — the pool, or a unit of work's connection.
+async fn asset_by_id<'e>(
+    executor: impl sqlx::Executor<'e, Database = Sqlite>,
+    id: &str,
+) -> Result<Option<Asset>> {
+    let row = sqlx::query_as!(
+        AssetRow,
+        r#"
+            SELECT
+                a.id, a.kind, a.name, a.reference, a.isin, a.asset_class, a.currency, a.risk_level,
+                c.id as "category_id?: String",
+                c.name as "category_name?: String",
+                a.is_archived as "is_archived: bool",
+                a.exchange_code,
+                a.price_refresh_blocked as "price_refresh_blocked: bool",
+                a.interest_bearing as "interest_bearing: bool"
+            FROM assets a
+            LEFT JOIN categories c ON a.category_id = c.id AND c.is_deleted = 0
+            WHERE a.id = ? AND a.is_deleted = 0
+            "#,
+        id
+    )
+    .fetch_optional(executor)
+    .await
+    .with_context(|| format!("Failed to fetch asset with id: {}", id))?;
+
+    Ok(row.map(Asset::from))
 }
 
 #[async_trait::async_trait]
@@ -346,60 +403,26 @@ impl AssetRepository for SqliteAssetRepository {
     }
 
     async fn get_by_id(&self, id: &str) -> Result<Option<Asset>> {
-        let row = sqlx::query_as!(
-            AssetRow,
-            r#"
-            SELECT
-                a.id, a.kind, a.name, a.reference, a.isin, a.asset_class, a.currency, a.risk_level,
-                c.id as "category_id?: String",
-                c.name as "category_name?: String",
-                a.is_archived as "is_archived: bool",
-                a.exchange_code,
-                a.price_refresh_blocked as "price_refresh_blocked: bool",
-                a.interest_bearing as "interest_bearing: bool"
-            FROM assets a
-            LEFT JOIN categories c ON a.category_id = c.id AND c.is_deleted = 0
-            WHERE a.id = ? AND a.is_deleted = 0
-            "#,
-            id
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .with_context(|| format!("Failed to fetch asset with id: {}", id))?;
+        asset_by_id(&self.pool, id).await
+    }
 
-        Ok(row.map(Asset::from))
+    async fn get_by_id_in(&self, unit: &mut UnitOfWork, id: &str) -> Result<Option<Asset>> {
+        asset_by_id(unit.connection(), id).await
     }
 
     async fn create(&self, asset: Asset) -> Result<Asset> {
-        let asset_class_str = asset.class.to_string();
-        let kind = asset.kind.to_string();
-        let exchange_code = asset.exchange.as_ref().map(|e| e.code.clone());
         let mut tx = self
             .pool
             .begin()
             .await
             .context("Failed to begin asset create")?;
-        sqlx::query!(
-            r#"INSERT INTO assets (id, kind, name, reference, isin, asset_class, currency, risk_level, is_deleted, is_archived, category_id, exchange_code, interest_bearing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)"#,
-            asset.id,
-            kind,
-            asset.name,
-            asset.reference,
-            asset.isin,
-            asset_class_str,
-            asset.currency,
-            asset.risk_level,
-            asset.category.id,
-            exchange_code,
-            asset.interest_bearing
-        )
-        .execute(&mut *tx)
-        .await
-        .with_context(|| format!("Failed to create asset: {}", asset.name))?;
-        self.record_asset_state(&mut tx, &asset, Operation::Created, None)
-            .await?;
+        let asset = self.insert_on(&mut tx, asset).await?;
         tx.commit().await.context("Failed to commit asset create")?;
         Ok(asset)
+    }
+
+    async fn create_in(&self, unit: &mut UnitOfWork, asset: Asset) -> Result<Asset> {
+        self.insert_on(unit.connection(), asset).await
     }
 
     async fn update(&self, asset: Asset) -> Result<Asset> {

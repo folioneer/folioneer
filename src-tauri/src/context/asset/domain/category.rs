@@ -1,5 +1,6 @@
 use crate::context::asset::error::AssetError;
 use crate::core::cash::SYSTEM_CASH_CATEGORY_ID;
+use crate::shared::infrastructure::uow::UnitOfWork;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -190,6 +191,14 @@ pub trait AssetCategoryRepository: Send + Sync {
     async fn find_by_name(&self, name: &str) -> Result<Option<AssetCategory>>;
     /// Persists a new category.
     async fn create(&self, category: AssetCategory) -> Result<AssetCategory>;
+    /// `get_by_id` inside `unit`, seeing what it wrote (ADR-006).
+    async fn get_by_id_in(&self, unit: &mut UnitOfWork, id: &str) -> Result<Option<AssetCategory>>;
+    /// `create` inside `unit`, committed with it (ADR-006).
+    async fn create_in(
+        &self,
+        unit: &mut UnitOfWork,
+        category: AssetCategory,
+    ) -> Result<AssetCategory>;
     /// Updates an existing category.
     async fn update(&self, category: AssetCategory) -> Result<AssetCategory>;
     /// Reassigns all assets from category_id to fallback_id, then soft-deletes the category.

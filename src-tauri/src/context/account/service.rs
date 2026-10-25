@@ -9,6 +9,7 @@ use super::error::AccountError;
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
 use crate::shared::infrastructure::change_recorder::LocalWriteOutranked;
+use crate::shared::infrastructure::uow::UnitOfWork;
 use crate::use_cases::holding_transaction::OpenHoldingError;
 use async_trait::async_trait;
 use chrono::NaiveDate;
@@ -280,22 +281,6 @@ impl AccountService {
         self.create_account(account).await
     }
 
-    /// AGT-068 / AGT-069 — creates a new account an agent asked for, with its mark, as the
-    /// window creates one: management fees off (FEE-075), the country and wrapper optional.
-    pub async fn create_by_agent(
-        &self,
-        name: String,
-        bank_name: String,
-        currency: String,
-        country: Option<String>,
-        wrapper: Option<String>,
-        mark: AgentRecording,
-    ) -> Result<Account, AccountError> {
-        let account =
-            Account::new(name, bank_name, currency, false)?.classified(country, wrapper, None)?;
-        self.store_new_account(account, Some(mark)).await
-    }
-
     /// AGT-069 — the mark of every account an agent created on this computer, by account id.
     pub async fn agent_creations(
         &self,
@@ -309,33 +294,57 @@ impl AccountService {
 
     /// ACC-003 — stores a valid new account whose name no other account has.
     async fn create_account(&self, account: Account) -> Result<Account, AccountError> {
-        self.store_new_account(account, None).await
-    }
-
-    /// ACC-003 — stores a valid new account whose name no other account has, with the mark
-    /// of the agent that created it, if one did (AGT-069).
-    async fn store_new_account(
-        &self,
-        account: Account,
-        mark: Option<AgentRecording>,
-    ) -> Result<Account, AccountError> {
         if find_account_by_name(&*self.account_repo, &account.name)
             .await?
             .is_some()
         {
             return Err(AccountError::NameAlreadyExists);
         }
-        info!(target: BACKEND, account_id = %account.id, name = %account.name, by_agent = mark.is_some(), "creating account");
-        let written = match mark {
-            Some(mark) => self.account_repo.create_by_agent(account, mark).await,
-            None => self.account_repo.create(account).await,
-        };
-        let created = written.map_err(|e| {
+        info!(target: BACKEND, account_id = %account.id, name = %account.name, "creating account");
+        let created = self.account_repo.create(account).await.map_err(|e| {
             tracing::error!(target: BACKEND, err = ?e, "create: repository failure");
             AccountError::DatabaseError
         })?;
         self.emit_account_updated();
         Ok(created)
+    }
+
+    /// ACC-025 — stores the valid new `account` with its 0-balance Cash Holding (CSH-012) and,
+    /// when an agent created it, its mark (AGT-069), inside `unit` (ADR-006): the account
+    /// exists with its cash line or not at all. Its name is checked first (ACC-003). Nothing
+    /// is published — the caller commits, then calls `notify_account_updated`.
+    pub async fn create_in(
+        &self,
+        unit: &mut UnitOfWork,
+        mut account: Account,
+        mark: Option<AgentRecording>,
+    ) -> Result<Account, AccountError> {
+        let clashing = self
+            .account_repo
+            .find_by_name_in(unit, &account.name)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, name = %account.name, err = ?e, "find_by_name: repository failure");
+                AccountError::DatabaseError
+            })?;
+        if clashing.is_some() {
+            return Err(AccountError::NameAlreadyExists);
+        }
+        info!(target: BACKEND, account_id = %account.id, name = %account.name, by_agent = mark.is_some(), "creating account");
+        account.seed_cash_holding();
+        self.account_repo
+            .create_in(unit, &mut account, mark)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, err = ?e, "create_in: repository failure");
+                AccountError::DatabaseError
+            })?;
+        Ok(account)
+    }
+
+    /// Publishes `AccountUpdated` for writes a unit of work committed (ADR-006).
+    pub fn notify_account_updated(&self) {
+        self.emit_account_updated();
     }
 
     /// Seeds the account's 0-balance Cash Holding (CSH-012). Called by the
@@ -1232,6 +1241,45 @@ impl AccountService {
                     exchange_rate,
                     note,
                 },
+                None,
+            )
+            .await?;
+        self.emit_transaction_updated();
+        Ok(parts)
+    }
+
+    /// AGT-045 / AGT-049 — records a transfer as `record_transfer` does, every part marked
+    /// with the agent's session in the same write: a mark that cannot be written leaves
+    /// nothing recorded.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn record_transfer_by_agent(
+        &self,
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+        mark: &AgentRecording,
+    ) -> Result<Vec<Transaction>, AccountError> {
+        info!(target: BACKEND, from = %from_account_id, to = %to_account_id, asset_id = %asset_id, "record_transfer_by_agent");
+        let transfer_id = Uuid::new_v4().to_string();
+        let parts = self
+            .place_transfer(
+                &transfer_id,
+                from_account_id,
+                to_account_id,
+                TransferFigures {
+                    asset_id,
+                    date,
+                    quantity_sent,
+                    quantity_received,
+                    exchange_rate,
+                    note,
+                },
+                Some(mark),
             )
             .await?;
         self.emit_transaction_updated();
@@ -1265,6 +1313,7 @@ impl AccountService {
                     exchange_rate,
                     note,
                 },
+                None,
             )
             .await?;
         self.emit_transaction_updated();
@@ -1391,12 +1440,19 @@ impl AccountService {
         from_account_id: &str,
         to_account_id: &str,
         figures: TransferFigures,
+        mark: Option<&AgentRecording>,
     ) -> Result<Vec<Transaction>, AccountError> {
         let mut staged = self
             .stage_transfer(transfer_id, from_account_id, to_account_id, figures)
             .await?;
+        let ids: Vec<String> = staged.parts.iter().map(|part| part.id.clone()).collect();
         let mut written = vec![&mut staged.sending, &mut staged.receiving];
-        save_accounts(&*self.account_repo, &mut written).await?;
+        save_accounts_marked(
+            &*self.account_repo,
+            &mut written,
+            mark.map(|mark| (ids.as_slice(), mark)),
+        )
+        .await?;
         Ok(staged.parts)
     }
 
@@ -2652,22 +2708,21 @@ pub trait AccountServiceContract: Send + Sync {
         country: Option<String>,
         wrapper: Option<String>,
     ) -> StdResult<Account, AccountError>;
-    /// AGT-068 / AGT-069 — creates a new account an agent asked for, with its mark.
-    async fn create_by_agent(
-        &self,
-        name: String,
-        bank_name: String,
-        currency: String,
-        country: Option<String>,
-        wrapper: Option<String>,
-        mark: AgentRecording,
-    ) -> StdResult<Account, AccountError>;
     /// AGT-069 — the mark of every account an agent created on this computer, by account id.
     async fn agent_creations(
         &self,
     ) -> StdResult<std::collections::HashMap<String, AgentRecording>, AccountError>;
     /// Seeds the account's 0-balance Cash Holding (CSH-012).
     async fn seed_cash_holding(&self, account_id: &str) -> StdResult<(), AccountError>;
+    /// ACC-025 — stores a new account with its cash line inside `unit` (ADR-006).
+    async fn create_in(
+        &self,
+        unit: &mut UnitOfWork,
+        account: Account,
+        mark: Option<AgentRecording>,
+    ) -> StdResult<Account, AccountError>;
+    /// Publishes `AccountUpdated` for writes a unit of work committed (ADR-006).
+    fn notify_account_updated(&self);
     /// Retrieves all holdings for a given account (ACD-022, B24).
     async fn get_holdings_for_account(
         &self,
@@ -2853,6 +2908,20 @@ pub trait AccountServiceContract: Send + Sync {
         quantity_received: i64,
         exchange_rate: i64,
         note: Option<String>,
+    ) -> StdResult<Vec<Transaction>, AccountError>;
+    /// AGT-045 / AGT-049 — records a transfer with every part marked, in one write.
+    #[allow(clippy::too_many_arguments)]
+    async fn record_transfer_by_agent(
+        &self,
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+        mark: &AgentRecording,
     ) -> StdResult<Vec<Transaction>, AccountError>;
     /// Corrects a transfer's date, quantities, rate and note as one operation (TRF-030).
     async fn correct_transfer(
@@ -3084,19 +3153,6 @@ impl AccountServiceContract for AccountService {
         AccountService::create(self, name, bank_name, currency, management_fees_enabled).await
     }
 
-    async fn create_by_agent(
-        &self,
-        name: String,
-        bank_name: String,
-        currency: String,
-        country: Option<String>,
-        wrapper: Option<String>,
-        mark: AgentRecording,
-    ) -> StdResult<Account, AccountError> {
-        AccountService::create_by_agent(self, name, bank_name, currency, country, wrapper, mark)
-            .await
-    }
-
     async fn agent_creations(
         &self,
     ) -> StdResult<std::collections::HashMap<String, AgentRecording>, AccountError> {
@@ -3126,6 +3182,19 @@ impl AccountServiceContract for AccountService {
 
     async fn seed_cash_holding(&self, account_id: &str) -> StdResult<(), AccountError> {
         AccountService::seed_cash_holding(self, account_id).await
+    }
+
+    async fn create_in(
+        &self,
+        unit: &mut UnitOfWork,
+        account: Account,
+        mark: Option<AgentRecording>,
+    ) -> StdResult<Account, AccountError> {
+        AccountService::create_in(self, unit, account, mark).await
+    }
+
+    fn notify_account_updated(&self) {
+        AccountService::notify_account_updated(self)
     }
 
     async fn get_holdings_for_account(
@@ -3392,6 +3461,33 @@ impl AccountServiceContract for AccountService {
     ) -> StdResult<Transaction, AccountError> {
         AccountService::correct_write_off(self, account_id, tx_id, date, quantity, reason, note)
             .await
+    }
+
+    async fn record_transfer_by_agent(
+        &self,
+        from_account_id: &str,
+        to_account_id: &str,
+        asset_id: String,
+        date: String,
+        quantity_sent: i64,
+        quantity_received: i64,
+        exchange_rate: i64,
+        note: Option<String>,
+        mark: &AgentRecording,
+    ) -> StdResult<Vec<Transaction>, AccountError> {
+        AccountService::record_transfer_by_agent(
+            self,
+            from_account_id,
+            to_account_id,
+            asset_id,
+            date,
+            quantity_sent,
+            quantity_received,
+            exchange_rate,
+            note,
+            mark,
+        )
+        .await
     }
 
     async fn record_transfer(
@@ -3822,15 +3918,27 @@ async fn save_accounts(
     repo: &dyn AccountRepository,
     accounts: &mut [&mut Account],
 ) -> Result<(), AccountError> {
+    save_accounts_marked(repo, accounts, None).await
+}
+
+/// `save_accounts`, the transactions of `marked` marked with its agent's session in the
+/// same write (AGT-045, AGT-049).
+async fn save_accounts_marked(
+    repo: &dyn AccountRepository,
+    accounts: &mut [&mut Account],
+    marked: Option<(&[String], &AgentRecording)>,
+) -> Result<(), AccountError> {
     let mut followers = follow_transfers(repo, accounts).await?;
     let mut written: Vec<&mut Account> = accounts
         .iter_mut()
         .map(|account| &mut **account)
         .chain(followers.iter_mut())
         .collect();
-    repo.save_all(&mut written)
-        .await
-        .map_err(|e| save_error("save_accounts", e))
+    let saved = match marked {
+        Some((ids, mark)) => repo.save_all_marked(&mut written, ids, mark).await,
+        None => repo.save_all(&mut written).await,
+    };
+    saved.map_err(|e| save_error("save_accounts", e))
 }
 
 /// Persists an Account aggregate's pending changes for the holding-transaction

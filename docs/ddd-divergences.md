@@ -196,9 +196,9 @@ Read this when:
 
 **Practice**: `ChangeRecorder` (`shared/infrastructure/change_recorder.rs`), `RankStamper` (`context/sync/domain/rank_stamper.rs`), `ChangeLogRepository` (`context/sync/domain/change_log.rs`) and the `stamp_sync_rank(conn, rank)` method on the account, asset and currency repository traits all take a `&mut sqlx::SqliteConnection`; `use_cases/portfolio_sync/rank_stamper.rs` forwards that connection to the three services. `ChangeRecorder` sits under `shared/infrastructure/`, not `shared/domain/`, for the same reason: its signature names a persistence handle.
 
-**Trade**: A record and its change row must commit together (SYN-020), and the first publish must write the header's first segment, stamp every existing row in three bounded contexts and enrol the device in **one** transaction (SYN-013: "rolled back on failure"). Without a unit of work (ADR-006 is unimplemented — see ticket #412), the only way to keep those writes atomic is to hand the live transaction through the ports. Each context still owns its own SQL; the use case only carries the handle.
+**Trade**: A record and its change row must commit together (SYN-020), and the first publish must write the header's first segment, stamp every existing row in three bounded contexts and enrol the device in **one** transaction (SYN-013: "rolled back on failure"). These ports predate the unit of work (ADR-006, `shared/infrastructure/uow.rs`): the live transaction is handed through them. Each context still owns its own SQL; the use case only carries the handle.
 
-**When to revisit**: When ADR-006's unit of work lands, the ports take the unit of work instead of a raw connection and the use case stops seeing sqlx types.
+**When to revisit**: The unit of work now exists; moving these ports onto it, so the use case stops seeing sqlx types, is a task of its own.
 
 ---
 
@@ -232,9 +232,21 @@ Read this when:
 
 **Practice**: `AccountRepository::save_all` persists the pending changes of several `Account` aggregates in one SQLite transaction that the repository opens itself, as `save` does for one. The account service calls it for a transfer (TRF-020, TRF-030, TRF-040) and for the transfers in a re-costed transfer out reaches (TRF-025). No use case touches a connection, and no other bounded context takes part.
 
-**Trade**: A transfer's two sides must commit together or not at all, and they live in two accounts. Without ADR-006's unit of work (#412), the repository that owns the `Account` tables is the only place that can make that write atomic without handing a connection to the service.
+**Trade**: A transfer's two sides must commit together or not at all, and they live in two accounts. The repository that owns the `Account` tables makes that write atomic without a unit of work, since no other bounded context takes part; an agent's transfer adds its marks to the same write (`save_all_marked`, AGT-049).
 
-**When to revisit**: When ADR-006's unit of work lands, `save_all` becomes a run of `save` inside it.
+**When to revisit**: When a transfer must write in another bounded context too, `save_all` becomes a run of `save` inside a unit of work.
+
+---
+
+## 20. The unit of work is a handle, not a closure
+
+**Pattern**: ADR-006 — a `TransactionManager::run(|uow| …)` closure over a per-use-case `AppUnitOfWork` super-trait, which a `SqlxUnitOfWork` implements by repeating the repositories' SQL over one transaction.
+
+**Practice**: `shared/infrastructure/uow.rs` — `TransactionManager::begin` hands the use case an opaque `UnitOfWork`; the use case passes it to each service's `…_in` method, the repositories write through its connection with their own SQL (`create_in`, `get_by_id_in`, …), and the use case calls `commit`, then each service's `notify_…`. Dropped without `commit`, it rolls back. Account creation (ACC-025) is its first use.
+
+**Trade**: The handle keeps `TransactionManager` object-safe (`Arc<dyn TransactionManager>`, no higher-ranked closure) and every write in the repository that owns it, recorded for sync on the same connection (SYN-020). The cost: a repository trait names `UnitOfWork`, an infrastructure type, and the use case could reach its connection; only repositories call `connection()`.
+
+**When to revisit**: If a use case is found calling `connection()`, or a repository's `…_in` method grows apart from its pool twin.
 
 ---
 

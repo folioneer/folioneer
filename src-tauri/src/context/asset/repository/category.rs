@@ -8,6 +8,7 @@ use crate::shared::domain::{
 use crate::shared::infrastructure::change_recorder::{
     ChangeRecorder, NoopChangeRecorder, RankColumns,
 };
+use crate::shared::infrastructure::uow::UnitOfWork;
 use anyhow::{Context, Result};
 use sqlx::{Pool, Sqlite, SqliteConnection, Transaction};
 
@@ -43,6 +44,25 @@ impl SqliteAssetCategoryRepository {
     pub fn with_change_recorder(mut self, change_recorder: Arc<dyn ChangeRecorder>) -> Self {
         self.change_recorder = change_recorder;
         self
+    }
+
+    /// Inserts a new category on `conn` and records its creation (CFR-014).
+    async fn insert_on(
+        &self,
+        conn: &mut SqliteConnection,
+        category: AssetCategory,
+    ) -> Result<AssetCategory> {
+        sqlx::query!(
+            r#"INSERT INTO categories (id, name, is_deleted) VALUES (?, ?, 0)"#,
+            category.id,
+            category.name,
+        )
+        .execute(&mut *conn)
+        .await
+        .with_context(|| format!("Failed to create category: {}", category.name))?;
+        self.record_category_state(conn, &category, Operation::Created, None)
+            .await?;
+        Ok(category)
     }
 
     async fn record_category_state(
@@ -100,6 +120,27 @@ async fn current_category_timestamp(
         .and_then(|timestamp| LogicalTimestamp::from_wire(&timestamp)))
 }
 
+/// `AssetCategoryRepository::get_by_id` on `executor` — the pool, or a unit of work's connection.
+async fn category_by_id<'e>(
+    executor: impl sqlx::Executor<'e, Database = Sqlite>,
+    id: &str,
+) -> Result<Option<AssetCategory>> {
+    let row = sqlx::query_as!(
+        CategoryRow,
+        r#"
+            SELECT id, name
+            FROM categories 
+            WHERE id = ? AND is_deleted = 0
+            "#,
+        id
+    )
+    .fetch_optional(executor)
+    .await
+    .with_context(|| format!("Failed to fetch category with id {}", id))?;
+
+    Ok(row.map(AssetCategory::from))
+}
+
 #[async_trait::async_trait]
 impl AssetCategoryRepository for SqliteAssetCategoryRepository {
     async fn get_all(&self) -> Result<Vec<AssetCategory>> {
@@ -136,20 +177,11 @@ impl AssetCategoryRepository for SqliteAssetCategoryRepository {
     }
 
     async fn get_by_id(&self, id: &str) -> Result<Option<AssetCategory>> {
-        let row = sqlx::query_as!(
-            CategoryRow,
-            r#"
-            SELECT id, name
-            FROM categories 
-            WHERE id = ? AND is_deleted = 0
-            "#,
-            id
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .with_context(|| format!("Failed to fetch category with id {}", id))?;
+        category_by_id(&self.pool, id).await
+    }
 
-        Ok(row.map(AssetCategory::from))
+    async fn get_by_id_in(&self, unit: &mut UnitOfWork, id: &str) -> Result<Option<AssetCategory>> {
+        category_by_id(unit.connection(), id).await
     }
 
     async fn create(&self, category: AssetCategory) -> Result<AssetCategory> {
@@ -158,21 +190,20 @@ impl AssetCategoryRepository for SqliteAssetCategoryRepository {
             .begin()
             .await
             .context("Failed to begin category create")?;
-        sqlx::query!(
-            r#"INSERT INTO categories (id, name, is_deleted) VALUES (?, ?, 0)"#,
-            category.id,
-            category.name,
-        )
-        .execute(&mut *tx)
-        .await
-        .with_context(|| format!("Failed to create category: {}", category.name))?;
-        self.record_category_state(&mut tx, &category, Operation::Created, None)
-            .await?;
+        let category = self.insert_on(&mut tx, category).await?;
         tx.commit()
             .await
             .context("Failed to commit category create")?;
 
         Ok(category)
+    }
+
+    async fn create_in(
+        &self,
+        unit: &mut UnitOfWork,
+        category: AssetCategory,
+    ) -> Result<AssetCategory> {
+        self.insert_on(unit.connection(), category).await
     }
 
     async fn update(&self, category: AssetCategory) -> Result<AssetCategory> {

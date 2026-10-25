@@ -56,10 +56,14 @@ async fn application_with_accounts(
     let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&container.account_service) as _;
     let assets: Arc<dyn AssetServiceContract> = Arc::clone(&container.asset_service) as _;
     if accounts.get_all().await.expect("accounts").is_empty() {
-        let account = AccountCreationUseCase::new(Arc::clone(&accounts), Arc::clone(&assets))
-            .create("PEA".to_string(), String::new(), "EUR".to_string(), false)
-            .await
-            .expect("account");
+        let account = AccountCreationUseCase::new(
+            Arc::clone(&accounts),
+            Arc::clone(&assets),
+            Arc::clone(&container.transactions),
+        )
+        .create("PEA".to_string(), String::new(), "EUR".to_string(), false)
+        .await
+        .expect("account");
         container
             .account_service
             .record_deposit(&account.id, "2026-01-02".to_string(), 5_000 * M, None)
@@ -90,6 +94,7 @@ async fn application_with_accounts(
             accounts,
             assets,
             Arc::clone(&container.currency_service),
+            Arc::clone(&container.transactions),
             connections,
         )),
     ));
@@ -133,6 +138,7 @@ async fn owner_on_bus(data_dir: &Path) -> OnBus {
             Arc::clone(&container.account_service) as _,
             Arc::clone(&container.asset_service) as _,
             Arc::clone(&container.currency_service),
+            Arc::clone(&container.transactions),
             connections,
         )),
     ));
@@ -702,6 +708,8 @@ struct Workbench {
     transfers: crate::use_cases::transfer::TransferUseCase,
     /// The portfolio's database, for a test that makes it unreadable.
     pool: sqlx::SqlitePool,
+    /// The units of work of the window's account creation (ADR-006).
+    transactions: Arc<dyn crate::shared::infrastructure::uow::TransactionManager>,
 }
 
 async fn workbench(data_dir: &Path) -> Workbench {
@@ -721,6 +729,7 @@ async fn workbench(data_dir: &Path) -> Workbench {
             Arc::clone(&accounts),
             Arc::clone(&assets),
             Arc::clone(&container.currency_service),
+            Arc::clone(&container.transactions),
             Arc::clone(&connections),
         ),
         connections,
@@ -735,6 +744,7 @@ async fn workbench(data_dir: &Path) -> Workbench {
             accounts, assets,
         ),
         pool,
+        transactions: container.transactions,
     }
 }
 
@@ -5363,7 +5373,7 @@ async fn agt_072_the_cash_of_an_account_built_from_opening_balances_is_previewed
     let bench = workbench(data_dir.path()).await;
     let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&bench.accounts) as _;
     let assets: Arc<dyn AssetServiceContract> = Arc::clone(&bench.assets) as _;
-    AccountCreationUseCase::new(accounts, assets)
+    AccountCreationUseCase::new(accounts, assets, Arc::clone(&bench.transactions))
         .create("CTO".to_string(), String::new(), "EUR".to_string(), false)
         .await
         .expect("account");
@@ -5799,7 +5809,7 @@ async fn agt_065a_a_session_records_a_transfer() {
     };
     let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&bench.accounts) as _;
     let assets: Arc<dyn AssetServiceContract> = Arc::clone(&bench.assets) as _;
-    AccountCreationUseCase::new(accounts, assets)
+    AccountCreationUseCase::new(accounts, assets, Arc::clone(&bench.transactions))
         .create(
             "Wallet".to_string(),
             String::new(),
@@ -5977,7 +5987,7 @@ async fn agt_065a_a_session_records_a_transfer() {
     // TRF-022 — between currencies a rate is needed: none stored refuses the transfer.
     let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&bench.accounts) as _;
     let assets: Arc<dyn AssetServiceContract> = Arc::clone(&bench.assets) as _;
-    AccountCreationUseCase::new(accounts, assets)
+    AccountCreationUseCase::new(accounts, assets, Arc::clone(&bench.transactions))
         .create(
             "US Broker".to_string(),
             String::new(),
@@ -6032,7 +6042,7 @@ async fn agt_065a_a_transfer_fits_within_the_limit() {
     let granted = session(&bench.connections).await;
     let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&bench.accounts) as _;
     let assets: Arc<dyn AssetServiceContract> = Arc::clone(&bench.assets) as _;
-    AccountCreationUseCase::new(accounts, assets)
+    AccountCreationUseCase::new(accounts, assets, Arc::clone(&bench.transactions))
         .create(
             "Wallet".to_string(),
             String::new(),
@@ -6077,15 +6087,16 @@ async fn agt_065a_a_transfer_fits_within_the_limit() {
     assert!(!granted.may_record_one_more());
 }
 
-// AGT-049 / AGT-065A — a transfer whose parts cannot be marked is undone whole.
+// AGT-049 / AGT-065A — a transfer whose parts cannot be marked is not recorded: the parts and
+// their marks are one write.
 #[tokio::test]
-async fn agt_065a_a_transfer_that_cannot_be_marked_is_undone() {
+async fn agt_065a_a_transfer_that_cannot_be_marked_is_not_recorded() {
     let data_dir = tempfile::tempdir().expect("tempdir");
     let bench = workbench(data_dir.path()).await;
     let granted = session(&bench.connections).await;
     let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&bench.accounts) as _;
     let assets: Arc<dyn AssetServiceContract> = Arc::clone(&bench.assets) as _;
-    AccountCreationUseCase::new(accounts, assets)
+    AccountCreationUseCase::new(accounts, assets, Arc::clone(&bench.transactions))
         .create(
             "Wallet".to_string(),
             String::new(),
@@ -6130,7 +6141,7 @@ async fn agt_065a_a_transfer_that_cannot_be_marked_is_undone() {
             .fetch_one(&bench.pool)
             .await
             .expect("count");
-    assert_eq!(parts, 0, "the transfer is undone whole");
+    assert_eq!(parts, 0, "nothing of the transfer is written");
 }
 
 /// The first replacement request waiting.
@@ -6150,7 +6161,7 @@ async fn replacement_waiting(
 async fn euro_account(bench: &Workbench, name: &str) -> String {
     let accounts: Arc<dyn AccountServiceContract> = Arc::clone(&bench.accounts) as _;
     let assets: Arc<dyn AssetServiceContract> = Arc::clone(&bench.assets) as _;
-    AccountCreationUseCase::new(accounts, assets)
+    AccountCreationUseCase::new(accounts, assets, Arc::clone(&bench.transactions))
         .create(name.to_string(), String::new(), "EUR".to_string(), false)
         .await
         .expect("account")
