@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-10-25
+
+### Added
+
+- the owner answers an agent's ask to replace four with a transfer
+- an agent asks to replace four typed transactions with a transfer
+- the journals read a transfer as one, edited and deleted whole
+- transfer a holding to another account from its row
+- a transfer is read as one, with its rate and its other account
+- an agent records a transfer between two accounts
+- a transfer moves a holding between accounts at its cost
+- an agent creates the account a statement names
+- every account offers the month view, and has no update frequency
+- an agent corrects any transaction it recorded, as the window does
+
+### Fixed
+
+- the shipped crates carry no known vulnerability
+- an agent's removal never takes a whole transfer for one line
+- a split is read even for an asset served no new close
+- a write-off without a reason is never given one when corrected
+- an agent's note is shown as written, its other text bounded
+- a refused sale or write-off names what was held on its date
+
 ## [0.14.0] - 2026-10-20
 
 ### Added
