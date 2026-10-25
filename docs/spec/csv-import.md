@@ -28,11 +28,25 @@ How one broker's export is read, saved under a name and reused for every file of
 
 ### Preview (computed, never stored)
 
-What reading a file through a mapping shows: the encoding, separator, decimal mark and date format it was read with, detected or chosen (IMP-011 to IMP-014, IMP-018); the file's columns, named by its header; its operation labels, each with the operation type the mapping gives it or none (IMP-022); every import row; and the count of rows of each status (IMP-030).
+What reading a file through a mapping shows, nothing written (IMP-017).
+
+| Field    | Business meaning                                                                                                                                                                                  |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `file`   | How the file was read: its encoding, separator, decimal mark and date format, detected or chosen (IMP-011 to IMP-014, IMP-018), the date format possibly not detected (IMP-014), and its columns. |
+| `rows`   | Every import row, in the file's order; a label the mapping gives no type shows on its rows, rejected with it (IMP-022).                                                                           |
+| `counts` | How many rows hold each status; a trade tax joined to its purchase counts with it (IMP-030, IMP-034).                                                                                             |
 
 ### Import row (computed, never stored)
 
-One line of the file once read through a mapping: its line number, its operation type, its date, its asset, its figures — the quantity, the unit price and the fees (the trade tax joined, IMP-034) of a purchase or a sale, the amount of a dividend, a deposit or a withdrawal, each that read — and its **status** — ready, rejected with its reason, unknown asset, already recorded, or not imported with its reason (IMP-030).
+One line of the file that is not blank, once read through a mapping and judged.
+
+| Field       | Business meaning                                                                                                                                                                                                       |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `line`      | Its line number in the file, the header being line 1.                                                                                                                                                                  |
+| `operation` | Its operation type, date, asset as read and figures — the quantity, unit price and fees (a joined trade tax included, IMP-034) of a purchase or a sale, the amount of a dividend, a deposit or a withdrawal (IMP-031). |
+| `asset`     | The asset of the portfolio it was matched to, none for a deposit and a withdrawal (IMP-032).                                                                                                                           |
+| `status`    | **Ready**, **rejected** with its reason, **unknown asset**, **already recorded** or **not imported** with its label (IMP-030); a joined trade tax names its purchase's line instead.                                   |
+| `funding`   | For a ready purchase the cash cannot fund, the deposit it needs (IMP-038); none for any other row.                                                                                                                     |
 
 ---
 
@@ -40,7 +54,7 @@ One line of the file once read through a mapping: its line number, its operation
 
 ### Reading the file (010–019)
 
-**IMP-010 — A file is read for one account (backend)**: An import reads one file for one account the user picks. It is rejected with a specific error when the account is unknown, and when the file cannot be read, is empty, holds a header and no row — blank lines (IMP-016) are no row —, or is larger than 10 MB.
+**IMP-010 — A file is read for one account (backend)**: An import reads one file for one account the user picks; only the file the user picked is read. It is rejected with a specific error when the account is unknown, and when the file cannot be read, is empty, holds a header and no row — blank lines (IMP-016) are no row —, or is larger than 10 MB.
 
 **IMP-011 — The encoding is detected (backend)**: A file whose bytes read as UTF-8 is read as UTF-8, its byte order mark dropped; any other file is read as Windows-1252, which reads every byte and reads an ISO-8859-1 file as written. A file read as UTF-8 by the user's choice or a saved mapping's (IMP-018, IMP-020) whose bytes are not UTF-8 is rejected with a specific error.
 
@@ -52,7 +66,7 @@ One line of the file once read through a mapping: its line number, its operation
 
 **IMP-013A — How a figure is read (backend)**: A figure is read with its sign, which is then ignored (IMP-031), its decimals after the decimal mark, spaces between its thousands — a space, a no-break space or a narrow no-break space — and, with the decimal comma, dots between its thousands; any other character, a comma under the decimal dot among them ("1,234.56"), makes it a figure that does not read; it is held in micro-units, a seventh decimal rounded down (TRX-024). An empty field is no figure.
 
-**IMP-014 — The date format is detected once the date column is known (backend)**: The date format is the first of day/month/year, year-month-day and month/day/year under which every field of the date column (IMP-021) that is not empty, on the lines that are not blank, reads as a real day; the parts of a date are separated by `/`, `-` or `.`, the year has four digits, and a time after the date is ignored. When none reads all of them, it is day/month/year, said to be not detected, and the preview rejects each row whose date does not read (IMP-030).
+**IMP-014 — The date format is detected once the date column is known (backend)**: The date format is the first of day/month/year, year-month-day and month/day/year under which every field of the date column (IMP-021) that is not empty, on the lines that are not blank, reads as a real day; the parts of a date are separated by `/`, `-` or `.`, the year has four digits, and a time after the date is ignored. When none reads all of them, or the column holds no date, it is day/month/year, said to be not detected, and the preview rejects each row whose date does not read (IMP-030).
 
 **IMP-015 — The header names the columns (backend)**: The first line of the file is its header; each column is named by its header field, trimmed. A file whose header holds a name twice, compared trimmed and case ignored (IMP-021), is rejected with a specific error; an empty header field names no column and is never a name held twice.
 
@@ -84,7 +98,7 @@ One line of the file once read through a mapping: its line number, its operation
 
 ### Rows and the preview (030–039)
 
-**IMP-030 — The preview judges every row (backend)**: The preview reads every row of the file through the mapping in use, in the file's order, and gives each its status: **ready**; **rejected**, with its reason; **unknown asset**, with the name, ISIN or reference read (IMP-032); **already recorded** (IMP-036); or **not imported**, with its reason (IMP-022). It also counts the rows of each status. A date or a figure that does not read is a rejection naming its column.
+**IMP-030 — The preview judges every row (backend)**: The preview reads every row of the file through the mapping in use, in the file's order, and gives each its status: **ready**; **rejected**, with its reason; **unknown asset**, with the name, ISIN or reference read (IMP-032); **already recorded** (IMP-036); **not imported**, with its label (IMP-022); or, for a trade tax joined to its purchase, that purchase's line (IMP-034). It also counts the rows of each status. A date or a figure that does not read is a rejection naming its column.
 
 **IMP-031 — The figures of each type (backend)**: Signs are ignored: the type gives the direction. A **purchase** and a **sale** read the quantity, the unit price — or, when the row has no unit price, the gross amount divided by the quantity, rounded down to the micro-unit, a quantity of zero being rejected first (TRX-020) — and the fees, zero when the column is absent or empty; the file's net amount is not checked. A **dividend**, a **deposit** and a **withdrawal** read the net amount when the mapping names its column and the row's field is not empty, and the gross amount otherwise. A figure the type needs and the row lacks is a rejection naming it.
 
@@ -92,7 +106,7 @@ One line of the file once read through a mapping: its line number, its operation
 
 **IMP-033 — An unknown asset is matched once (backend)**: The user matches an unknown asset's name, ISIN or reference to an asset of the portfolio; the match is part of the mapping in use, kept when it is saved, so the next file of that broker matches it. A match is compared as the field it was read from is (IMP-032). Every row of that name, ISIN or reference then takes that asset, and the preview judges them again. A match to an asset unknown to the portfolio is rejected with a specific error when it is made. Saving a mapping keeps its matches as they are. A mapping refers to no other record, so a synced one is applied at once (SYN-041 does not hold it back): a match whose asset this device has not received yet leaves its rows unknown until the asset arrives. Creating the asset from the row instead comes with the confirmation (#502).
 
-**IMP-034 — A trade tax joins its purchase (backend)**: A trade-tax row is added to the fees of the purchase in the file with the same asset — the same ISIN, reference and name as read —, on the same date, of the same quantity when the tax row has one; its amount is its net amount, or its gross amount. The tax row then shows as part of that purchase, not as a row of its own, and takes that purchase's status. When several purchases fit, the first in the file's order not yet holding one takes it: a purchase takes one trade tax at most, and a second tax row of the same asset, date and quantity takes the next such purchase. A trade-tax row with no such purchase is rejected — "no purchase of this asset, date and quantity in the file".
+**IMP-034 — A trade tax joins its purchase (backend)**: A trade-tax row is added to the fees of the purchase in the file with the same asset — the same ISIN, reference and name as read —, on the same date, of the same quantity when the tax row has one; its amount is its net amount, or its gross amount. The tax row keeps its own line in the preview, its status naming the purchase's line, and is counted and recorded with that purchase. When several purchases fit, the first in the file's order not yet holding one takes it: a purchase takes one trade tax at most, and a second tax row of the same asset, date and quantity takes the next such purchase. A trade-tax row with no such purchase is rejected — "no purchase of this asset, date and quantity in the file".
 
 **IMP-035 — Rows follow the rules of manual entry (backend)**: The ready rows are judged in date order, the file's order within one day, as each would be judged typed by hand into the account in that order, after the ready rows before it: every rule of manual entry for its type applies — among them the date (TRX-020), the asset's currency being the account's (IMP-037), a sale of nothing held on its date (SEL-012), above what is held then (SEL-021) or leaving a later transaction short (SEL-032), a sale of an archived asset (SEL-037), a dividend of an asset not held as DIV-011 states it — held today, the ready rows included, until #688 makes it held on the dividend's date —, a withdrawal above the cash (CSH-031). A row these rules refuse is rejected with the reason manual entry gives. A row already recorded (IMP-036) is not judged again: it stands among the rows before the next ones as the transaction it matches. The cash a purchase needs is the one exception (IMP-038).
 
@@ -100,7 +114,7 @@ One line of the file once read through a mapping: its line number, its operation
 
 **IMP-037 — One currency in this version (backend)**: A row whose asset's currency, or whose own currency when the file has one, is not the account's is rejected — "another currency: record it by hand". The exchange rate is therefore always 1.
 
-**IMP-038 — A purchase the cash cannot fund (backend)**: A ready purchase the account's cash cannot fund, as CSH-041 judges it after the rows before it, is not rejected: it stays ready, and the confirmation adds the deposit it needs or leaves it out, by the user's choice (#502). The rows after it are judged as if that deposit were added.
+**IMP-038 — A purchase the cash cannot fund (backend)**: A ready purchase the account's cash cannot fund, as CSH-041 judges it after the rows before it, is not rejected: it stays ready, the preview showing the smallest deposit on its date that funds it, and the confirmation adds the deposit it needs or leaves it out, by the user's choice (#502). The rows after it are judged as if that deposit were added.
 
 ### Deletion (040–049)
 

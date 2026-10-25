@@ -162,6 +162,26 @@ pub struct ColumnMappingDraft {
     pub asset_matches: Vec<AssetMatch>,
 }
 
+impl MappedColumns {
+    /// IMP-021 — the date and the operation column are named, and at least one asset column.
+    pub fn check(&self) -> Result<(), ImportError> {
+        if self.date.trim().is_empty() || self.operation.trim().is_empty() {
+            return Err(ImportError::MappingColumnMissing);
+        }
+        if [&self.isin, &self.reference, &self.name]
+            .iter()
+            .all(|column| {
+                column
+                    .as_deref()
+                    .is_none_or(|header| header.trim().is_empty())
+            })
+        {
+            return Err(ImportError::MappingColumnMissing);
+        }
+        Ok(())
+    }
+}
+
 impl ColumnMapping {
     /// IMP-020 / IMP-021 / IMP-024 / IMP-024A — a new mapping, its id generated.
     pub fn new(draft: ColumnMappingDraft) -> Result<Self, ImportError> {
@@ -175,19 +195,7 @@ impl ColumnMapping {
             return Err(ImportError::MappingNameEmpty);
         }
         let columns = draft.columns;
-        if columns.date.trim().is_empty() || columns.operation.trim().is_empty() {
-            return Err(ImportError::MappingColumnMissing);
-        }
-        if [&columns.isin, &columns.reference, &columns.name]
-            .iter()
-            .all(|column| {
-                column
-                    .as_deref()
-                    .is_none_or(|header| header.trim().is_empty())
-            })
-        {
-            return Err(ImportError::MappingColumnMissing);
-        }
+        columns.check()?;
         let texts = [&name, &columns.date, &columns.operation]
             .into_iter()
             .chain(

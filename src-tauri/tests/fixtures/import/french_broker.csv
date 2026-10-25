@@ -1,0 +1,8 @@
+libellé;Opération;Place;Date;Qté;Prix d'éxé;Montant brut;Courtage/Prélèvement;Montant net;Devise;
+ACME MONDE;Achat Comptant;PARIS;03/01/2024;10;12.5;-125.0;1.95;-126.95;EUR;
+ACME MONDE;TAXE TRANSAC FINAN;PARIS;03/01/2024;10;;;;-0.38;EUR;
+BETA ENERGIE;Achat Comptant;PARIS;05/01/2024;4;50.0;-200.0;1.0;-201.0;EUR;
+ACME MONDE;Vente Comptant;PARIS;10/01/2024;3;13.0;39.0;1.0;38.0;EUR;
+BETA ENERGIE;Encaissement coupons intérêt/dividende;PARIS;15/01/2024;;;;;6.40;EUR;
+BETA ENERGIE;OST de création de coupons - Détachement coupon optionnel;PARIS;15/01/2024;4;;;;;EUR;
+INCONNUE SA;Achat Comptant;PARIS;16/01/2024;1;10.0;-10.0;0;-10.0;EUR;

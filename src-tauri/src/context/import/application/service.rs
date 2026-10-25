@@ -68,6 +68,20 @@ impl ImportService {
         Ok(mapping)
     }
 
+    /// IMP-020 — the saved mapping `mapping_id`, refused when it is no longer held.
+    pub async fn get_column_mapping(
+        &self,
+        mapping_id: &str,
+    ) -> StdResult<ColumnMapping, ImportError> {
+        self.mapping_repo
+            .get_by_id(mapping_id)
+            .await
+            .map_err(|e| repository_error("get_column_mapping", e))?
+            .ok_or_else(|| ImportError::MappingNotFound {
+                mapping_id: mapping_id.to_string(),
+            })
+    }
+
     /// IMP-040 — deletes the mapping `mapping_id`.
     pub async fn delete_column_mapping(&self, mapping_id: &str) -> StdResult<(), ImportError> {
         self.held(mapping_id).await?;

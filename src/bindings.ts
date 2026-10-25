@@ -523,6 +523,43 @@ async deleteColumnMapping(mappingId: string) : Promise<Result<null, ImportError>
 }
 },
 /**
+ * IMP-010 — the system dialog opened for the user to pick a file: the path the other two
+ * commands take, or `None` when the user closed the dialog. Only a file picked here is read.
+ */
+async pickImportFile() : Promise<Result<string | null, CsvImportError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("pick_import_file") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * How the file at `path` reads for `account_id`: its format, detected or chosen, and its
+ * columns (IMP-010 to IMP-016, IMP-018).
+ */
+async readImportFile(accountId: string, path: string, choices: ReadingChoices) : Promise<Result<FileRead, CsvImportError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("read_import_file", { accountId, path, choices }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The file at `path` read through `mapping` for `account_id`, every row judged, nothing
+ * written (IMP-017, IMP-020, IMP-030). `mapping_id` names the saved mapping it was picked
+ * from, when it was.
+ */
+async previewImport(accountId: string, path: string, mappingId: string | null, mapping: ColumnMappingDraft) : Promise<Result<ImportPreview, CsvImportError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("preview_import", { accountId, path, mappingId, mapping }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Pauses sync on this device (SYN-070).
  */
 async pauseSync() : Promise<Result<SyncStatusView, SyncError>> {
@@ -1304,8 +1341,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
+export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 
 /** user-defined types **/
 
@@ -2394,6 +2431,22 @@ export type AssetPriceSource =
  */
 "Agent"
 /**
+ * The asset a row names, each field as read, trimmed; empty ones are `None` (IMP-032).
+ */
+export type AssetRead = { 
+/**
+ * The ISIN read.
+ */
+isin: string | null; 
+/**
+ * The reference read.
+ */
+reference: string | null; 
+/**
+ * The name read.
+ */
+name: string | null }
+/**
  * An asset the rules of its kind would refuse today, and the first rule it breaks (AST-035).
  */
 export type AssetToSettle = { 
@@ -2891,6 +2944,47 @@ start_date: string;
  */
 end_date: string | null }
 /**
+ * Use-case composite for the import failure surface.
+ * 
+ * - `ImportError` — the file's content and the mapping (IMP-010 to IMP-021).
+ * - `AccountError` — the account the file is read for (`AccountNotFound`, IMP-010).
+ * - `CsvImportTask` — use-case-owned (this file).
+ */
+export type CsvImportError = 
+/**
+ * Import-BC rejection.
+ */
+ImportError | 
+/**
+ * Account-BC rejection.
+ */
+AccountError | 
+/**
+ * Use-case-layer rejection.
+ */
+CsvImportTask
+/**
+ * Use-case rejections of an import: reading the file the user picked and the matches made
+ * now (IMP-010, IMP-033).
+ */
+export type CsvImportTask = 
+/**
+ * The file cannot be read (IMP-010).
+ */
+{ code: "FileUnreadable" } | 
+/**
+ * The file was not picked by the user in the system dialog (IMP-010).
+ */
+{ code: "FileNotPicked" } | 
+/**
+ * An invariant of the use case broke: a bug, logged where it happened.
+ */
+{ code: "UnknownError" } | 
+/**
+ * A match made to an asset the portfolio does not hold (IMP-033).
+ */
+{ code: "MatchedAssetNotFound"; asset_id: string }
+/**
  * Single flat error enum for the `currency` bounded context (gold error model).
  * 
  * Every failure the BC can raise — validation, lookup, and infrastructure —
@@ -3037,6 +3131,18 @@ export type DateFormat =
  * Year, month, day.
  */
 "YearMonthDay"
+/**
+ * The date format a file is read with, and whether it was detected (IMP-014).
+ */
+export type DateReading = { 
+/**
+ * The format.
+ */
+format: DateFormat; 
+/**
+ * False when no format read every date and day/month/year was taken.
+ */
+detected: boolean }
 /**
  * The mark before a figure's decimals (IMP-013).
  */
@@ -3483,6 +3589,35 @@ export type FetchTrigger =
  */
 "Manual"
 /**
+ * IMP-010 to IMP-016 — how a file was read: its format, detected or chosen, and its columns.
+ */
+export type FileRead = { 
+/**
+ * The encoding it was read with.
+ */
+encoding: Encoding; 
+/**
+ * The separator between its fields.
+ */
+separator: Separator; 
+/**
+ * The mark before a figure's decimals.
+ */
+decimal_mark: DecimalMark; 
+/**
+ * The date format, once the date column is known; `None` before.
+ */
+date_reading: DateReading | null; 
+/**
+ * The columns, named by the header, in the file's order; an empty header field names
+ * no column and is left out.
+ */
+columns: string[]; 
+/**
+ * How many lines after the header are not blank.
+ */
+rows: number }
+/**
  * Why a folder cannot be used (SYN-019/069). Structured so the frontend can translate it.
  */
 export type FolderProblem = 
@@ -3915,6 +4050,22 @@ export type ImportError =
  * An infrastructure failure; the diagnostic is logged server-side, never sent.
  */
 { code: "DatabaseError" }
+/**
+ * IMP-030 — a file read through a mapping, each row judged; nothing written (IMP-017).
+ */
+export type ImportPreview = { 
+/**
+ * How the file was read.
+ */
+file: FileRead; 
+/**
+ * Every row that is not blank, in the file's order.
+ */
+rows: PreviewRow[]; 
+/**
+ * How many rows hold each status.
+ */
+counts: PreviewCounts }
 /**
  * One inconsistent holding surfaced in sync status (SYN-040).
  */
@@ -4383,6 +4534,26 @@ label: string;
  */
 transaction_type: OperationType }
 /**
+ * A row read as an operation, before it is matched and judged (IMP-030).
+ */
+export type OperationRead = { 
+/**
+ * The day, `YYYY-MM-DD`.
+ */
+date: string; 
+/**
+ * The asset as read; all `None` for a deposit and a withdrawal (IMP-032).
+ */
+asset: AssetRead; 
+/**
+ * The row's own currency, when the mapping names its column and the field holds one.
+ */
+currency: string | null; 
+/**
+ * Its figures.
+ */
+figures: RowFigures }
+/**
  * The operation type an operation label stands for (IMP-022).
  */
 export type OperationType = 
@@ -4584,6 +4755,42 @@ incomplete: boolean;
  * MKT-206 — how many holdings have an outdated price, over every account.
  */
 outdated_price_count: number }
+/**
+ * How many rows hold each status; a joined trade tax counts with its purchase (IMP-030).
+ */
+export type PreviewCounts = { 
+/**
+ * Ready rows.
+ */
+ready: number; 
+/**
+ * Rejected rows.
+ */
+rejected: number; 
+/**
+ * Rows of an unknown asset.
+ */
+unknown_asset: number; 
+/**
+ * Rows already recorded.
+ */
+already_recorded: number; 
+/**
+ * Rows not imported.
+ */
+not_imported: number }
+/**
+ * A row of the file in the preview.
+ */
+export type PreviewRow = { 
+/**
+ * Its line number in the file, from 1 for the header.
+ */
+line: number; 
+/**
+ * Its status.
+ */
+status: RowStatus }
 /**
  * MKT-220 — the last failure recorded for one asset on this installation.
  */
@@ -4816,6 +5023,31 @@ export type RateRefreshError =
  */
 { code: "DatabaseError" }
 /**
+ * IMP-018 — what the user picked instead of the detected format, and the date column the
+ * date format is detected on (IMP-014). Each left out is detected.
+ */
+export type ReadingChoices = { 
+/**
+ * The encoding picked.
+ */
+encoding: Encoding | null; 
+/**
+ * The separator picked.
+ */
+separator: Separator | null; 
+/**
+ * The decimal mark picked.
+ */
+decimal_mark: DecimalMark | null; 
+/**
+ * The date format picked.
+ */
+date_format: DateFormat | null; 
+/**
+ * The header of the date column, once mapped (IMP-021).
+ */
+date_column: string | null }
+/**
  * Parameters for recording an interest credit on a held asset or the account's
  * cash line (INT-020). The amount is either a rate or a direct quantity —
  * exactly one of the two must be provided (INT-021). No money changes hands.
@@ -5044,6 +5276,118 @@ last_applied_at: string | null;
  * 0 when it has joined and published nothing yet.
  */
 published_changes: number }
+/**
+ * IMP-031 — a row's figures for its type, in micro-units, signs ignored.
+ */
+export type RowFigures = 
+/**
+ * A purchase: its quantity, unit price and fees, a joined trade tax included (IMP-034).
+ */
+{ type: "Purchase"; quantity: number; unit_price: number; fees: number } | 
+/**
+ * A sale: its quantity, unit price and fees.
+ */
+{ type: "Sale"; quantity: number; unit_price: number; fees: number } | 
+/**
+ * A dividend's amount.
+ */
+{ type: "Dividend"; amount: number } | 
+/**
+ * A deposit's amount.
+ */
+{ type: "Deposit"; amount: number } | 
+/**
+ * A withdrawal's amount.
+ */
+{ type: "Withdrawal"; amount: number } | 
+/**
+ * A trade tax: its amount, and its quantity when the row has one (IMP-034).
+ */
+{ type: "TradeTax"; amount: number; quantity: number | null }
+/**
+ * Why a row is rejected (IMP-030).
+ */
+export type RowReason = 
+/**
+ * It does not read through the mapping in use (IMP-016, IMP-022, IMP-030, IMP-031,
+ * IMP-034).
+ */
+{ code: "Unread"; rejection: RowRejection } | 
+/**
+ * Its asset's currency, or its own, is not the account's (IMP-037).
+ */
+{ code: "OtherCurrency" } | 
+/**
+ * A dividend of an asset the account does not hold (DIV-011).
+ */
+{ code: "AssetNotHeld" } | 
+/**
+ * Manual entry refuses it, with the reason it gives (IMP-035).
+ */
+{ code: "ManualEntry"; refusal: AccountError }
+/**
+ * Why a row is rejected before it is matched and judged (IMP-016, IMP-022, IMP-030,
+ * IMP-031, IMP-034).
+ */
+export type RowRejection = 
+/**
+ * The line holds fewer fields than the header (IMP-016).
+ */
+{ code: "LineTooShort" } | 
+/**
+ * The operation label has no operation type in the mapping (IMP-022).
+ */
+{ code: "OperationTypeMissing"; label: string } | 
+/**
+ * The date does not read in the date format (IMP-030).
+ */
+{ code: "DateUnreadable"; column: string } | 
+/**
+ * A figure does not read (IMP-030).
+ */
+{ code: "FigureUnreadable"; column: string } | 
+/**
+ * A figure the type needs is missing; `field` names the mapped field (IMP-031).
+ */
+{ code: "FigureMissing"; field: string } | 
+/**
+ * A purchase or a sale of a quantity of zero (TRX-020).
+ */
+{ code: "QuantityZero" } | 
+/**
+ * A trade tax with no purchase of its asset, date and quantity in the file (IMP-034).
+ */
+{ code: "TradeTaxUnpaired" }
+/**
+ * A row's status in the preview (IMP-030).
+ */
+export type RowStatus = 
+/**
+ * Recorded on confirmation (#502); `funding` is the deposit a purchase the cash cannot
+ * fund needs (IMP-038).
+ */
+{ status: "Ready"; operation: OperationRead; asset_id: string | null; funding: number | null } | 
+/**
+ * Not recorded, with its reason.
+ */
+{ status: "Rejected"; reason: RowReason } | 
+/**
+ * No asset of the portfolio matches it (IMP-032).
+ */
+{ status: "UnknownAsset"; asset: AssetRead } | 
+/**
+ * The account holds it already (IMP-036).
+ */
+{ status: "AlreadyRecorded"; operation: OperationRead; asset_id: string | null } | 
+/**
+ * A label the mapping leaves to record by hand (IMP-022).
+ */
+{ status: "NotImported"; label: string } | 
+/**
+ * A trade tax added to the purchase on line `purchase_line`, of that purchase's status
+ * (IMP-034).
+ */
+{ status: "JoinedTradeTax"; purchase_line: number }
 /**
  * The device-wide configuration of the daily download (SPF-010). Exactly one
  * configuration exists (singleton row, migration-seeded).

@@ -30,6 +30,7 @@ use crate::use_cases::asset_price_fetch::dispatcher::Dispatcher as PriceFetchDis
 use crate::use_cases::asset_price_fetch::{AssetPriceFetchUseCase, FetchGuard};
 use crate::use_cases::asset_web_lookup::AssetWebLookupUseCase;
 use crate::use_cases::capabilities::Capabilities;
+use crate::use_cases::csv_import::CsvImportUseCase;
 use crate::use_cases::delete_asset::DeleteAssetUseCase;
 use crate::use_cases::fee_generation::{FeeGenerationOrchestrator, LaunchSyncSurface};
 use crate::use_cases::global_performance::GlobalPerformanceUseCase;
@@ -251,6 +252,12 @@ pub fn run() {
                     asset_service.clone(),
                 );
 
+                let csv_import_uc = CsvImportUseCase::new(
+                    Arc::clone(&import_service),
+                    account_service.clone(),
+                    asset_service.clone(),
+                );
+
                 let transfer_uc = TransferUseCase::new(
                     account_service.clone(),
                     asset_service.clone(),
@@ -313,6 +320,7 @@ pub fn run() {
                 app_handle.manage(account_creation_uc);
                 app_handle.manage(holding_transaction_uc);
                 app_handle.manage(transfer_uc);
+                app_handle.manage(csv_import_uc);
                 app_handle.manage(fee_generation_uc);
 
                 app_handle.manage(AssetWebLookupUseCase::new(providers.asset_lookup));
