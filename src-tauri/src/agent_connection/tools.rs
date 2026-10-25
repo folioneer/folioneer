@@ -1,6 +1,7 @@
 //! Running the tools an agent may call (AGT-046), in the running application: each reads or
 //! writes through the queries and commands the window uses.
 
+use crate::shared::infrastructure::uow::TransactionManager;
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -116,12 +117,14 @@ impl AgentTools {
         account_service: Arc<dyn AccountServiceContract>,
         asset_service: Arc<dyn AssetServiceContract>,
         currency_service: Arc<CurrencyService>,
+        transactions: Arc<dyn TransactionManager>,
         connections: Arc<AgentConnections>,
     ) -> Self {
         Self {
             creation: Arc::new(AccountCreationUseCase::new(
                 Arc::clone(&account_service),
                 Arc::clone(&asset_service),
+                transactions,
             )),
             recorder: Arc::new(HoldingTransactionUseCase::new(
                 Arc::clone(&account_service),

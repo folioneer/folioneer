@@ -2,6 +2,7 @@
 //! their owning application services so every process entry point (Tauri app,
 //! headless scheduled fetch) shares one wiring path.
 
+use crate::shared::infrastructure::uow::{SqliteTransactionManager, TransactionManager};
 use std::sync::Arc;
 
 use sqlx::{Pool, Sqlite};
@@ -38,6 +39,8 @@ pub struct AppContainer {
     pub asset_service: Arc<AssetService>,
     /// Currency pair and rate service.
     pub currency_service: Arc<CurrencyService>,
+    /// Opens the units of work of cross-context writes (ADR-006).
+    pub transactions: Arc<dyn TransactionManager>,
 }
 
 impl AppContainer {
@@ -56,6 +59,8 @@ impl AppContainer {
         event_bus: Option<Arc<SideEffectEventBus>>,
         change_recorder: Arc<dyn ChangeRecorder>,
     ) -> Self {
+        let transactions: Arc<dyn TransactionManager> =
+            Arc::new(SqliteTransactionManager::new(pool.clone()));
         let mut asset_service = AssetService::new(
             Box::new(
                 SqliteAssetRepository::new(pool.clone())
@@ -125,6 +130,7 @@ impl AppContainer {
             account_service: Arc::new(account_service),
             asset_service: Arc::new(asset_service),
             currency_service: Arc::new(currency_service),
+            transactions,
         }
     }
 

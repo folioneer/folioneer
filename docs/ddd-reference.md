@@ -147,15 +147,16 @@ aggregates in one DB transaction.
 
 ### TransactionManager
 
-A shared application infrastructure trait (lives in `shared/infrastructure/`). Wraps the DB pool and provides
-a closure-based API: `run(|uow| { ... })` — begins a transaction, executes the closure, commits
-on success, rolls back on failure.
+A shared application infrastructure trait (`shared/infrastructure/uow.rs`). `begin()` returns a
+`UnitOfWork`: an opaque handle on one transaction, committed by `commit()`, rolled back when
+dropped without it.
 
-### AppUnitOfWork
+### Writing through a unit of work
 
-A use-case-specific super-trait combining the repository traits needed for one atomic operation.
-e.g. `AppUnitOfWork: OrderRepository + InventoryRepository`. Lives in the use case folder.
-Implemented by `SqlxUnitOfWork` in infrastructure (holds a shared `sqlx::Transaction`).
+The use case passes the `UnitOfWork` to each service's `…_in` method; the service reaches its
+repositories' `…_in` methods, which write through the unit's connection with their own SQL.
+After `commit()`, the use case calls each service's `notify_…` method. See
+`docs/ddd-divergences.md` § 20 for how this differs from ADR-006's closure.
 
 ### When to use
 

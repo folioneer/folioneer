@@ -79,14 +79,7 @@ impl AgentTools {
             tracing::error!(target: BACKEND, err = ?error, "agent transfer: the task ended early");
             portfolio_unreadable()
         })?;
-        let parts = outcome.inspect_err(|refusal| {
-            // Parts that stayed without their mark were recorded all the same (AGT-047).
-            if refusal.code == "RecordedNotMarked" {
-                for _ in 0..part_count {
-                    granted.count_recording();
-                }
-            }
-        })?;
+        let parts = outcome?;
         for _ in &parts {
             granted.count_marked_transaction();
         }
@@ -188,24 +181,16 @@ fn transfer_of(arguments: &Value) -> Result<TypedTransfer, Refusal> {
     })
 }
 
-/// AGT-049 — a transfer refused, or not marked and undone or not.
+/// AGT-049 — a transfer refused, or not written with its marks.
 fn refusal_from_agent_transfer(error: &AgentTransferError) -> Refusal {
     match error {
         AgentTransferError::Refused(error) => refusal_from_transfer(error),
-        AgentTransferError::NotMarked { undone: true } => Refusal {
+        AgentTransferError::NotRecorded => Refusal {
             code: "NotRecorded".to_string(),
             message:
-                "the transfer could not be marked as an agent's, so nothing was recorded: try again"
+                "the transfer could not be recorded and marked as an agent's, so nothing was recorded: try again"
                     .to_string(),
         },
-        AgentTransferError::NotMarked { undone: false } => not_undone(),
-    }
-}
-
-fn not_undone() -> Refusal {
-    Refusal {
-        code: "RecordedNotMarked".to_string(),
-        message: "the transfer was recorded, but could not be marked as recorded by an agent: tell the owner".to_string(),
     }
 }
 
