@@ -242,6 +242,7 @@ impl AgentTools {
             }
             "list_transactions" => self.list_transactions(granted, arguments).await,
             "get_price" => self.get_price(arguments).await,
+            "list_prices" => self.list_prices(arguments).await,
             "list_holdings" => {
                 let account = text(arguments, "account")?;
                 // AGT-043 — a date that is not text is refused, never read as today.
@@ -462,6 +463,45 @@ impl AgentTools {
                 "date": split.date,
                 "new": split.new,
                 "old": split.old,
+            })).collect::<Vec<_>>(),
+        }))
+    }
+
+    /// AGT-075 — the prices of an asset over a period, oldest first, one page at a time,
+    /// each with its date and its source.
+    async fn list_prices(&self, arguments: &Value) -> Result<Value, Refusal> {
+        let asset = text(arguments, "asset")?;
+        // A date that is not text is refused, never read as no bound (AGT-043).
+        let date = |name: &str| {
+            optional_text(arguments, name).map_err(|_| Refusal {
+                code: "InvalidDate".to_string(),
+                message: format!("{name} is not a date written YYYY-MM-DD"),
+            })
+        };
+        let listed = self
+            .recorder
+            .prices_listed(
+                asset,
+                date("from")?.as_deref(),
+                date("to")?.as_deref(),
+                page(arguments)?,
+            )
+            .await
+            .map_err(|refusal| Refusal {
+                code: refusal.code,
+                message: refusal.message,
+            })?;
+        Ok(serde_json::json!({
+            "status": "listed",
+            "asset": listed.asset.reference,
+            "currency": listed.asset.currency,
+            "total": listed.total,
+            "page": listed.page,
+            "pages": listed.pages,
+            "prices": listed.prices.iter().map(|price| serde_json::json!({
+                "date": price.date,
+                "price": price.price,
+                "source": price.source,
             })).collect::<Vec<_>>(),
         }))
     }
