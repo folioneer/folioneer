@@ -2570,7 +2570,7 @@ encoding: Encoding;
  */
 columns: MappedColumns; 
 /**
- * Each operation label and its transaction type.
+ * Each operation label and its operation type.
  */
 operation_types: OperationLabel[]; 
 /**
@@ -2578,7 +2578,8 @@ operation_types: OperationLabel[];
  */
 asset_matches: AssetMatch[] }
 /**
- * What a mapping holds besides its identity: what the user saves (IMP-020).
+ * What a mapping holds besides its identity: what the user saves (IMP-020). A field the
+ * window does not send is refused, never ignored.
  */
 export type ColumnMappingDraft = { 
 /**
@@ -2606,7 +2607,7 @@ encoding: Encoding;
  */
 columns: MappedColumns; 
 /**
- * Each operation label and its transaction type.
+ * Each operation label and its operation type.
  */
 operation_types: OperationLabel[]; 
 /**
@@ -3875,7 +3876,7 @@ export type ImportError =
  */
 { code: "MappingColumnMissing" } | 
 /**
- * A text of the mapping is longer than `MAPPING_TEXT_LENGTH` characters (IMP-024).
+ * A text of the mapping is longer than `MAPPING_TEXT_LENGTH` characters (IMP-024A).
  */
 { code: "MappingTextTooLong" } | 
 /**
@@ -4342,7 +4343,7 @@ export type OpeningBalancePreview = {
  */
 zero_cost: boolean }
 /**
- * One operation label of the file and the transaction type it stands for (IMP-022).
+ * One operation label of the file and the operation type it stands for (IMP-022).
  */
 export type OperationLabel = { 
 /**
@@ -4350,11 +4351,11 @@ export type OperationLabel = {
  */
 label: string; 
 /**
- * The transaction type it stands for.
+ * The operation type it stands for.
  */
 transaction_type: OperationType }
 /**
- * The transaction type an operation label stands for (IMP-022).
+ * The operation type an operation label stands for (IMP-022).
  */
 export type OperationType = 
 /**

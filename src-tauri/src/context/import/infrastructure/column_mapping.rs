@@ -60,10 +60,8 @@ fn read<T: DeserializeOwned>(text: &str, what: &str) -> Result<T> {
 }
 
 fn read_name<T: DeserializeOwned>(text: &str, what: &str) -> Result<T> {
-    read(
-        &serde_json::Value::String(text.to_string()).to_string(),
-        what,
-    )
+    serde_json::from_value(serde_json::Value::String(text.to_string()))
+        .with_context(|| format!("Failed to read a column mapping's {what}"))
 }
 
 impl TryFrom<MappingRow> for ColumnMapping {

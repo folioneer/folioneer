@@ -139,8 +139,10 @@ pub struct ColumnMapping {
     pub asset_matches: Vec<AssetMatch>,
 }
 
-/// What a mapping holds besides its identity: what the user saves (IMP-020).
+/// What a mapping holds besides its identity: what the user saves (IMP-020). A field the
+/// window does not send is refused, never ignored.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(deny_unknown_fields)]
 pub struct ColumnMappingDraft {
     /// What the user calls it.
     pub name: String,
@@ -399,5 +401,13 @@ mod tests {
             asset_id: "asset-1".to_string(),
         });
         assert!(ColumnMapping::new(exact).is_ok());
+    }
+
+    // A draft carrying a field it does not have is refused when read.
+    #[test]
+    fn a_draft_with_an_unknown_field_is_refused() {
+        let mut sent = serde_json::to_value(draft("A")).expect("serializes");
+        sent["extra"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<ColumnMappingDraft>(sent).is_err());
     }
 }
