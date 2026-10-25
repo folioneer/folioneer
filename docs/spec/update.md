@@ -166,7 +166,7 @@ Fixed banner integrated into the application shell (header or footer), visible a
 - **Download error**: error message + "Retry" button (UPD-023)
 - **Access refused**: message naming the refusal + "Dismiss" button, no "Retry" (UPD-029)
 - **Migration in progress**: loading screen outside the banner ("Updating database…") (UPD-017)
-- **Migration error**: critical error message, application blocked at startup, outside the banner; after the copy was put back, it says nothing was lost and names the copies' folder (UPD-018, UPD-035)
+- **Migration error**: critical error message, application blocked at startup, outside the banner; after the copy was put back, it says nothing was lost and names the `backups` folder (UPD-018, UPD-035)
 - **Up to date** / **Check failed**: contextual message on the "About" page, outside the banner (UPD-027)
 
 ### User flow
