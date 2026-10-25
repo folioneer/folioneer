@@ -84,3 +84,29 @@ describe("i18n locales — staleness labels carry the age alone (TODO-004)", () 
     expect(locale.currency.rate_staleness_days_old).toBe(daysAgo);
   });
 });
+
+function collectValues(obj: Record<string, unknown>): string[] {
+  return Object.values(obj).flatMap((value) =>
+    value !== null && typeof value === "object"
+      ? collectValues(value as Record<string, unknown>)
+      : [String(value)],
+  );
+}
+
+// #673 — a reader may picture a person behind "agent": every string says "AI agent" /
+// "agent IA" (the `{{agent}}` placeholder is the program's own name, not the word).
+describe("i18n locales — an agent is always an AI agent", () => {
+  it("never says agent alone in English", () => {
+    const bare = collectValues(en)
+      .map((text) => text.replaceAll("{{agent}}", ""))
+      .filter((text) => /(?<!AI )\bagents?\b/i.test(text));
+    expect(bare).toEqual([]);
+  });
+
+  it("never says agent alone in French", () => {
+    const bare = collectValues(fr)
+      .map((text) => text.replaceAll("{{agent}}", ""))
+      .filter((text) => /\bagents?\b(?! IA)/i.test(text));
+    expect(bare).toEqual([]);
+  });
+});

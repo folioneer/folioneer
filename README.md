@@ -148,14 +148,14 @@ folioneer holding buy --help  # one command's options and defaults
   `/mnt/c/Users/<you>/AppData/Local/Folioneer/folioneer-cli.exe holding …`
   (the Linux program run inside WSL keeps a separate portfolio of its own, and refuses while none exists).
 
-## Agents (Model Context Protocol)
+## AI Agents (Model Context Protocol)
 
-An agent — Claude Code, Claude Desktop — can read the portfolio, an account's transactions and an asset's price at a date included, add an asset it does not have yet and record opening balances, purchases, sales, dividends, deposits, withdrawals, splits, free shares and prices through the application while it is open, on Linux and on Windows. Nothing answers when Folioneer is closed.
+An AI agent — Claude Code, Claude Desktop — can read the portfolio, an account's transactions and an asset's price at a date included, add an asset it does not have yet and record opening balances, purchases, sales, dividends, deposits, withdrawals, splits, free shares and prices through the application while it is open, on Linux and on Windows. Nothing answers when Folioneer is closed.
 
-1. In Folioneer, **Settings → Allow agents to connect** (off by default).
-2. Tell the agent how to start the bridge, which is the installed program with `--mcp`:
+1. In Folioneer, **Settings → Allow AI agents to connect** (off by default).
+2. Tell the AI agent how to start the bridge, which is the installed program with `--mcp`:
    - **Claude Code**: `claude mcp add folioneer -- folioneer --mcp` (with the AppImage: `claude mcp add folioneer -- ~/Applications/Folioneer.AppImage --mcp`; on Windows, from PowerShell: `claude mcp add folioneer -- "$env:LOCALAPPDATA\Folioneer\folioneer.exe" --mcp`).
-   - **Claude Desktop**, with the Windows installer or the `.deb`: download `Folioneer-<version>.mcpb` from the same release and open it; Claude Desktop installs Folioneer's tools after one confirmation. With the AppImage, or for another agent client, add the bridge to its configuration — for Claude Desktop, `~/.config/Claude/claude_desktop_config.json` (on Windows `%APPDATA%\Claude\claude_desktop_config.json`), with the program's full path as the command, then restart it:
+   - **Claude Desktop**, with the Windows installer or the `.deb`: download `Folioneer-<version>.mcpb` from the same release and open it; Claude Desktop installs Folioneer's tools after one confirmation. With the AppImage, or for another AI agent client, add the bridge to its configuration — for Claude Desktop, `~/.config/Claude/claude_desktop_config.json` (on Windows `%APPDATA%\Claude\claude_desktop_config.json`), with the program's full path as the command, then restart it:
 
      ```json
      {
@@ -165,9 +165,9 @@ An agent — Claude Code, Claude Desktop — can read the portfolio, an account'
      }
      ```
 
-3. At the agent's first call, Folioneer asks you to allow or refuse the connection. A yes lasts until you click **Disconnect** in the header or close Folioneer.
+3. At the AI agent's first call, Folioneer asks you to allow or refuse the connection. A yes lasts until you click **Disconnect** in the header or close Folioneer.
 
-What an agent recorded is marked in the account journal ("Recorded by"). An agent can correct or cancel what it recorded in its own session; for a transaction you typed it can only ask you, one at a time — Folioneer shows it in full and you remove it or refuse. It reads no file.
+What an AI agent recorded is marked in the account journal ("Recorded by"). An AI agent can correct or cancel what it recorded in its own session; for a transaction you typed it can only ask you, one at a time — Folioneer shows it in full and you remove it or refuse. It reads no file.
 
 ## Documentation
 

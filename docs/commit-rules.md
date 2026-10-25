@@ -50,7 +50,7 @@ A scope is optional. When given, it names the part of Folioneer the change is ab
 | `fee`          | Management Fees    |
 | `price`        | AssetPrice         |
 | `rate`         | CurrencyRate       |
-| `agent`        | Agent              |
+| `agent`        | AI agent           |
 | `sync`         | Sync               |
 | `performance`  | Performance        |
 | `import`       | Import             |
