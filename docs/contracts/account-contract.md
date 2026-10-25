@@ -833,12 +833,12 @@ struct AccountJournal {
 
 ### Published
 
-| Event                | Payload | Rule                                                          |
-| -------------------- | ------- | ------------------------------------------------------------- |
-| `AccountUpdated`     | —       | ACC-022                                                       |
-| `TransactionUpdated` | —       | TRX-037, DIV-026, FSD-026, FEE-026, AGT-044, AGT-045, TRF-029 |
-| `FeeScheduleUpdated` | —       | FEE-064                                                       |
-| `HoldingNoteUpdated` | —       | HNO-020, HNO-021                                              |
+| Event                | Payload | Rule                                                                   |
+| -------------------- | ------- | ---------------------------------------------------------------------- |
+| `AccountUpdated`     | —       | ACC-022                                                                |
+| `TransactionUpdated` | —       | TRX-037, DIV-026, FSD-026, FEE-026, AGT-044, AGT-045, TRF-029, IMP-050 |
+| `FeeScheduleUpdated` | —       | FEE-064                                                                |
+| `HoldingNoteUpdated` | —       | HNO-020, HNO-021                                                       |
 
 ### Subscribed (frontend re-fetch triggers)
 

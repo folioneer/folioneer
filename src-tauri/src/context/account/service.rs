@@ -4200,10 +4200,6 @@ fn holds(account: &Account, op: &RecordingOp) -> bool {
         .any(|holding| holding.asset_id == *asset_id && holding.quantity > 0)
 }
 
-/// One step applied to a copy of `account`: the judgment, and the account it leaves when
-/// manual entry takes it. A purchase the cash cannot fund takes, on its date, the smallest
-/// deposit that funds it (IMP-038): a deposit of its own total always does, the account
-/// having been funded without it.
 /// IMP-035 / IMP-036 — each step judged in order on `account`, every one taken applied to
 /// it: already recorded when it matches a transaction the account held, each matched once.
 /// `fund`: a purchase the cash cannot fund is taken after the deposit it needs (IMP-038).
@@ -4241,6 +4237,10 @@ fn judge_all(
     judgments
 }
 
+/// One step applied to a copy of `account`: the judgment, and the account it leaves when
+/// manual entry takes it. A purchase the cash cannot fund takes, on its date, the smallest
+/// deposit that funds it (IMP-038): a deposit of its own total always does, the account
+/// having been funded without it.
 fn judge_step(
     account: &Account,
     op: RecordingOp,

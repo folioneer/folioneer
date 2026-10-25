@@ -63,6 +63,7 @@ A cash inflow from outside the application's tracked world (salary, wire transfe
 | `total_amount`     | Equal to `quantity` in v1.                                                                               |
 | `note`             | Free-text note (optional).                                                                               |
 | `realized_pnl`     | Always `None`. A deposit never realises a P&L.                                                           |
+| `added_deposit`    | Whether an import added it before a purchase the file left unfunded (IMP-051); `false` when typed.       |
 
 ### Withdrawal Transaction (new `TransactionType` variant)
 
