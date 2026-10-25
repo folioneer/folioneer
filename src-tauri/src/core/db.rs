@@ -219,7 +219,8 @@ async fn back_up(conn: &mut SqliteConnection, backups_dir: &Path) -> anyhow::Res
     Ok(copy)
 }
 
-/// UPD-033 — deletes all but the newest `kept` copies (their names sort by time).
+/// UPD-033 — deletes all but the newest `kept` copies (their names sort by time); a copy
+/// that cannot be deleted is left, and the others are still deleted.
 fn prune_backups(backups_dir: &Path, kept: usize, current: &Path) -> anyhow::Result<()> {
     let prefix = format!("{DATABASE_FILENAME}-");
     let mut copies: Vec<PathBuf> = fs::read_dir(backups_dir)
@@ -235,7 +236,9 @@ fn prune_backups(backups_dir: &Path, kept: usize, current: &Path) -> anyhow::Res
     let excess = copies.len().saturating_sub(kept);
     // The copy just made is never pruned, even when the clock went back.
     for old in copies.iter().take(excess).filter(|old| *old != current) {
-        fs::remove_file(old).with_context(|| format!("Failed to delete {:?}", old))?;
+        if let Err(e) = fs::remove_file(old) {
+            tracing::warn!(target: BACKEND, copy = %old.display(), err = %e, "Older portfolio copy not deleted (UPD-033)");
+        }
     }
     Ok(())
 }
@@ -437,6 +440,57 @@ mod tests {
             .err()
             .expect("the broken migration fails");
         assert_eq!(MigrationFailure::from_error(&error).backups_dir, None);
+    }
+
+    // UPD-018 / UPD-032 — a copy that cannot be made stops the launch before any migration,
+    // and the failure names no folder.
+    #[tokio::test]
+    async fn no_migration_runs_when_the_copy_cannot_be_made() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let (_m1, first) = migrator_of(&[FIRST]).await;
+        Database::open_with(dir.path().to_path_buf(), &first)
+            .await
+            .expect("v1")
+            .pool
+            .close()
+            .await;
+        fs::write(dir.path().join(BACKUPS_DIRNAME), "").expect("a file where the folder goes");
+
+        let (_m2, second) = migrator_of(&[FIRST, SECOND]).await;
+        let error = Database::open_with(dir.path().to_path_buf(), &second)
+            .await
+            .err()
+            .expect("no copy, no launch");
+        assert_eq!(MigrationFailure::from_error(&error).backups_dir, None);
+
+        fs::remove_file(dir.path().join(BACKUPS_DIRNAME)).expect("clear");
+        let db = Database::open_with(dir.path().to_path_buf(), &first)
+            .await
+            .expect("v1 again");
+        assert!(!table_exists(&db, "added").await, "nothing was migrated");
+    }
+
+    // UPD-033 — a copy that cannot be deleted is left; the older ones are still deleted.
+    #[test]
+    fn a_copy_that_cannot_be_deleted_leaves_the_others_pruned() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = |stamp: u32| {
+            dir.path()
+                .join(format!("{DATABASE_FILENAME}-2026102{stamp}T000000000Z"))
+        };
+        fs::create_dir(path(1)).expect("a copy that cannot be deleted as a file");
+        for stamp in 2..=4 {
+            fs::write(path(stamp), "").expect("copy");
+        }
+
+        prune_backups(dir.path(), 1, &path(4)).expect("prune");
+
+        assert!(path(1).exists(), "the undeletable copy is left");
+        assert!(
+            !path(2).exists() && !path(3).exists(),
+            "the others are deleted"
+        );
+        assert!(path(4).exists());
     }
 
     // UPD-033 — the copy just made is kept even when the clock went back.
