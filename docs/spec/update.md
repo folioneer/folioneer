@@ -58,7 +58,7 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-033 — Five copies kept (backend)**: After a copy (UPD-032), only the 5 most recent copies in the `backups` folder are kept; older ones are deleted. The copy just made is never deleted; an older copy that cannot be deleted is left, and the launch goes on.
 
-**UPD-034 — A failed migration puts the copy back (backend)**: When a migration fails, the launch's copy (UPD-032) is put back in place of the portfolio's database, which is then as it was before the update — whatever migrations of that launch had already succeeded. The failure says that the copy was put back and names the `backups` folder. When the copy cannot be put back, it stays in the `backups` folder, and the error the screen shows names it (UPD-035).
+**UPD-034 — A failed migration puts the copy back (backend)**: When a migration fails, the launch's copy (UPD-032) is put back in place of the portfolio's database, which is then as it was before the update — whatever migrations of that launch had already succeeded. The failure says that the copy was put back and names the `backups` folder. When the copy cannot be put back, it stays in the `backups` folder.
 
 **UPD-035 — The migration error screen (frontend)**: After a failed migration whose copy was put back (UPD-034), the error screen says: "This version could not update your portfolio. Nothing was lost: it is back as it was before the update. Reinstall the previous version and report the problem.", names the `backups` folder, and shows the error. In any other migration failure — no copy made, a new portfolio, or the copy not put back — it says: "A database migration error occurred. Please contact support." and shows the error.
 
@@ -136,7 +136,7 @@ The application is distributed as a desktop executable. When a new version is pu
                                                       → DB migration if needed (UPD-016, UPD-017), a copy first (UPD-032, UPD-033)
                                                            ├─ Copy failed → no migration, critical error, app blocked (UPD-018, UPD-035)
                                                            ├─ Failure → copy put back, critical error, app blocked (UPD-018, UPD-034, UPD-035)
-                                                           ├─ Put-back failed → critical error naming the copy, app blocked (UPD-018, UPD-034, UPD-035)
+                                                           ├─ Put-back failed → critical error, app blocked (UPD-018, UPD-034, UPD-035)
                                                            └─ Success → installation + restart (UPD-013)
 ```
 
