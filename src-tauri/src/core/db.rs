@@ -24,23 +24,13 @@ const BACKUPS_KEPT: usize = 5;
 static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
 /// UPD-034 — a migration failed and the copy made before it was put back.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
+#[error("Failed to run database migrations")]
 pub struct MigrationRestored {
     /// The folder that holds the copies.
     pub backups_dir: PathBuf,
+    #[source]
     source: sqlx::migrate::MigrateError,
-}
-
-impl std::fmt::Display for MigrationRestored {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Failed to run database migrations")
-    }
-}
-
-impl std::error::Error for MigrationRestored {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.source)
-    }
 }
 
 /// UPD-018 / UPD-035 — what the window is told when the portfolio could not be opened.
