@@ -1,4 +1,4 @@
-use crate::context::import::domain::{ColumnMapping, ColumnMappingRepository};
+use crate::context::import::domain::{ColumnMapping, ColumnMappingDraft, ColumnMappingRepository};
 use crate::shared::domain::{
     ChangeDraft, LogicalTimestamp, Operation, Origin, Rank, RecordIdentity, RecordKind,
     SyncedRecord,
@@ -70,17 +70,19 @@ impl TryFrom<MappingRow> for ColumnMapping {
     type Error = anyhow::Error;
 
     fn try_from(row: MappingRow) -> Result<Self> {
-        Ok(ColumnMapping {
-            id: row.id,
-            name: row.name,
-            separator: read_name(&row.separator, "separator")?,
-            decimal_mark: read_name(&row.decimal_mark, "decimal mark")?,
-            date_format: read_name(&row.date_format, "date format")?,
-            encoding: read_name(&row.encoding, "encoding")?,
-            columns: read(&row.columns, "columns")?,
-            operation_types: read(&row.operation_types, "operation types")?,
-            asset_matches: read(&row.asset_matches, "asset matches")?,
-        })
+        Ok(ColumnMapping::restore(
+            row.id,
+            ColumnMappingDraft {
+                name: row.name,
+                separator: read_name(&row.separator, "separator")?,
+                decimal_mark: read_name(&row.decimal_mark, "decimal mark")?,
+                date_format: read_name(&row.date_format, "date format")?,
+                encoding: read_name(&row.encoding, "encoding")?,
+                columns: read(&row.columns, "columns")?,
+                operation_types: read(&row.operation_types, "operation types")?,
+                asset_matches: read(&row.asset_matches, "asset matches")?,
+            },
+        ))
     }
 }
 

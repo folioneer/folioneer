@@ -234,6 +234,21 @@ impl ColumnMapping {
         })
     }
 
+    /// Rebuilds a stored mapping under its id, no validation (repository only).
+    pub fn restore(id: String, stored: ColumnMappingDraft) -> Self {
+        Self {
+            id,
+            name: stored.name,
+            separator: stored.separator,
+            decimal_mark: stored.decimal_mark,
+            date_format: stored.date_format,
+            encoding: stored.encoding,
+            columns: stored.columns,
+            operation_types: stored.operation_types,
+            asset_matches: stored.asset_matches,
+        }
+    }
+
     /// IMP-024 — whether this mapping's name is `name`, case and accents ignored.
     pub fn is_named(&self, name: &str) -> bool {
         folded(&self.name) == folded(name)
