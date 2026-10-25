@@ -182,7 +182,7 @@ Read this when:
 
 **Pattern**: A bounded context never imports another bounded context (B13); tests of a repository exercise that repository's own dependencies only.
 
-**Practice**: The inline `mod tests` of the synced repositories in `context/account/`, `context/asset/`, and `context/currency/` import `crate::context::sync::SqliteChangeRecorder` (test-only) to assert that a write leaves real `changes` / `tombstones` rows and stamps the rank columns.
+**Practice**: The inline `mod tests` of the synced repositories in `context/account/`, `context/asset/`, `context/currency/` and `context/import/` import `crate::context::sync::SqliteChangeRecorder` (test-only) to assert that a write leaves real `changes` / `tombstones` rows and stamps the rank columns.
 
 **Trade**: The production code of those repositories depends on `shared::infrastructure::change_recorder::ChangeRecorder` only — the port — so B13 holds where it matters. A mock recorder can prove the port was called, but not that the change and the record exist together in one transaction (SYN-020); that needs the real implementation, which the `sync` bounded context owns. The import is confined to `#[cfg(test)]`.
 
