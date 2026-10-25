@@ -16,7 +16,7 @@ export interface UseAgentsAllowedResult {
 }
 
 /**
- * AGT-022 — the owner's setting "Allow agents to connect": read from the core, switched
+ * AGT-022 — the owner's setting "Allow AI agents to connect": read from the core, switched
  * through it, and shown as the core answers.
  */
 export function useAgentsAllowed(): UseAgentsAllowedResult {

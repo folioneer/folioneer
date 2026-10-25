@@ -60,15 +60,15 @@ The total of every account, read together with the account summaries (ACC-027). 
 
 **ACC-008 — Table columns (frontend)** _(formerly R8 — column definition)_: The account table exposes the following columns:
 
-| Column          | Content                                                                                                                 | Sortable                                  |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Name            | `account.name`, then a robot icon for an account an agent created, its hint naming the agent and the session (AGT-069)  | Yes                                       |
-| Bank            | Bank or broker name (ACC-026); "—" when unset                                                                           | Yes — unset sorts last in both directions |
-| Wrapper         | The account's wrapper (ACC-046); "—" without one                                                                        | No                                        |
-| Global Value    | `total_global_value` formatted in the account's own currency (ACC-021); 0 shown for empty accounts                      | Yes                                       |
-| Unrealized P&L  | `total_unrealized_pnl` formatted in the account's own currency (ACC-023); "—" when no holding has a computable value    | Yes — null values sort last               |
-| YTD Performance | Year-to-date net-of-flows performance since Jan 1 as a percentage (ACC-024); "—" when the year-start baseline is absent | Yes — null values sort last               |
-| Actions         | Edit button + Delete button                                                                                             | No                                        |
+| Column          | Content                                                                                                                      | Sortable                                  |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Name            | `account.name`, then a robot icon for an account an AI agent created, its hint naming the AI agent and the session (AGT-069) | Yes                                       |
+| Bank            | Bank or broker name (ACC-026); "—" when unset                                                                                | Yes — unset sorts last in both directions |
+| Wrapper         | The account's wrapper (ACC-046); "—" without one                                                                             | No                                        |
+| Global Value    | `total_global_value` formatted in the account's own currency (ACC-021); 0 shown for empty accounts                           | Yes                                       |
+| Unrealized P&L  | `total_unrealized_pnl` formatted in the account's own currency (ACC-023); "—" when no holding has a computable value         | Yes — null values sort last               |
+| YTD Performance | Year-to-date net-of-flows performance since Jan 1 as a percentage (ACC-024); "—" when the year-start baseline is absent      | Yes — null values sort last               |
+| Actions         | Edit button + Delete button                                                                                                  | No                                        |
 
 The account section title is displayed in the application shell header, not in the page body. A real-time search field (partial match, case-insensitive) filters the table by name. The table closes with a portfolio total row (ACC-030 to ACC-032).
 
@@ -102,7 +102,7 @@ The account section title is displayed in the application shell header, not in t
 
 **ACC-020 — Pre-deletion count query (backend)** _(new)_: A backend command `get_account_deletion_summary(account_id)` returns the number of active holdings and the number of transactions associated with the account. Because this read spans `context/account/` (holdings) and `context/transaction/` (transactions), it must be implemented as a use case in `use_cases/` — not as a bounded-context command — per B18 and B24.
 
-**ACC-021 — Account summaries with global value (backend + frontend)** _(new)_: A backend command `get_account_summaries()` returns a list of `AccountSummary` records — each `Account` enriched with its `total_global_value` (micros, computed in the account's own currency per CSH-094: `cash_holding.quantity + Σ_h (h.quantity × latest_price(h))` over same-currency priced active non-cash holdings; unpriced non-cash holdings, and foreign ones with no usable rate (FXR-041), contribute 0; empty accounts return 0). This read spans `context/account/` and `context/asset/`, so it lives as a use case in `use_cases/` per B18 and B24. The Accounts table (ACC-008) renders the value in a Global Value column formatted in the account's own currency. Each record also carries the mark of an account an agent created on this computer, or none (AGT-069).
+**ACC-021 — Account summaries with global value (backend + frontend)** _(new)_: A backend command `get_account_summaries()` returns a list of `AccountSummary` records — each `Account` enriched with its `total_global_value` (micros, computed in the account's own currency per CSH-094: `cash_holding.quantity + Σ_h (h.quantity × latest_price(h))` over same-currency priced active non-cash holdings; unpriced non-cash holdings, and foreign ones with no usable rate (FXR-041), contribute 0; empty accounts return 0). This read spans `context/account/` and `context/asset/`, so it lives as a use case in `use_cases/` per B18 and B24. The Accounts table (ACC-008) renders the value in a Global Value column formatted in the account's own currency. Each record also carries the mark of an account an AI agent created on this computer, or none (AGT-069).
 
 **ACC-023 — Account-wide unrealized P&L on the summary (backend + frontend)** _(new)_: `AccountSummary` carries `total_unrealized_pnl` — the account-wide unrealized gain/loss in the account's own currency (micros), computed identically to `AccountDetailsResponse.total_unrealized_pnl` (MKT-040 as amended by FXR-040): the sum of per-holding unrealized P&L over active non-cash holdings for which the value is computable (same-currency, or foreign with a usable rate, and a recorded price), with the others excluded. It is `None` when no holding qualifies (empty account, or no priced/valuable holding). The Accounts table renders it in an "Unrealized P&L" column (ACC-008), formatted in the account's own currency, showing "—" when `None`.
 
@@ -138,7 +138,7 @@ The tax wrapper an account sits in — a PEA, an assurance vie, a Depot — is a
 
 **ACC-041 — An account's country (backend)**: An account may carry a country of its own — two upper-case letters (ISO 3166-1 alpha-2), refused otherwise; whether the code is assigned is not checked (`XX` is accepted) — stored as given. Without one, the account's country is the portfolio's: France, fixed until the first run asks it (TODO-092).
 
-**ACC-042 — An agent reads them (backend)**: An agent's list of accounts gives each account's country — its own, or the portfolio's — and its wrapper's identifier, or none (AGT-040). An agent sets them when it creates an account (AGT-068).
+**ACC-042 — An AI agent reads them (backend)**: An AI agent's list of accounts gives each account's country — its own, or the portfolio's — and its wrapper's identifier, or none (AGT-040). An AI agent sets them when it creates an account (AGT-068).
 
 **ACC-043 — An account's wrapper (backend)**: An account may carry any wrapper the lists hold, whatever its country — a French PEA in an account of another country is the user's choice (owner, 2026-10-18). A wrapper's identifier is free text wherever it is stored or synced, so a device whose lists do not know one keeps it. Setting a wrapper the lists do not hold is refused, unless it is the one the account already carries: an edit keeps a wrapper another device's newer lists set.
 

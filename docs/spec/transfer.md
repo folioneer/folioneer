@@ -4,7 +4,7 @@
 
 Moving an asset between two accounts of the portfolio — an exchange to a hardware wallet, one broker to another — has no transaction kind today: the owner records a sale at cost, a withdrawal, a deposit and a purchase, which show trades that never happened, cash that never existed and a distorted net cash input in both accounts (gh275, #393).
 
-A transfer is one operation of two sides: a **transfer out** of the sending account and a **transfer in** to the receiving one, of the same asset on the same day. It moves quantity and cost, never cash, and realizes nothing. A quantity received below the quantity sent is a **fee in kind**: a write-off with the reason `NetworkFee` on the sending side (WOF), part of the transfer. This spec holds the core's rules; the window's form (#511), the agent connection (#512) and the replacement of four past recordings (#513) add theirs.
+A transfer is one operation of two sides: a **transfer out** of the sending account and a **transfer in** to the receiving one, of the same asset on the same day. It moves quantity and cost, never cash, and realizes nothing. A quantity received below the quantity sent is a **fee in kind**: a write-off with the reason `NetworkFee` on the sending side (WOF), part of the transfer. This spec holds the core's rules; the window's form (#511), the AI agent connection (#512) and the replacement of four past recordings (#513) add theirs.
 
 Figures follow TRX-024. Assets only: moving cash between accounts is its own feature (#619). A transfer whose two sides land on different days is not covered: the owner records it on the day it arrives.
 

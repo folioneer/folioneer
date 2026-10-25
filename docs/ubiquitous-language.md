@@ -9,7 +9,7 @@ The authoritative dictionary of domain terms for this project.
 **Rules:**
 
 - All terms MUST be agreed with the user before use in code, tests, or docs.
-- The agent MUST NOT invent or assume domain terms — propose and wait for confirmation.
+- The AI agent MUST NOT invent or assume domain terms — propose and wait for confirmation.
 - Terms marked `confirmed` are proposals awaiting user validation.
 - Once confirmed, the term MUST be used consistently everywhere (code, comments, specs, UI).
 
@@ -113,7 +113,7 @@ recorded Stock Split rescales a position. In French: "Division signalée" (owner
 ### Unrecorded split
 
 A reported split that an account holding the asset on the day before it has not recorded
-as a Stock Split within 5 days of that date (MKT-231); the holding row and an agent say so. In French:
+as a Stock Split within 5 days of that date (MKT-231); the holding row and an AI agent say so. In French:
 "Division non enregistrée" (owner, 2026-10-19).
 
 > Status: confirmed
@@ -179,7 +179,7 @@ An asset whose price the owner types and no fetch replaces: every fetch task lea
 
 ### AssetPriceSource
 
-A value-object enum qualifying the provenance of an `AssetPrice` record. Variants: `Manual` (user-entered via manual entry or transaction auto-record), `YahooFinance` (written by a fetch through a Yahoo Finance provider, as in the owner's private build) and `Agent` (recorded by an agent the owner allowed — the Mark of a price; owner, 2026-10-10). Metadata for traceability per ADR-012 — does not influence read/write precedence (latest-write-wins).
+A value-object enum qualifying the provenance of an `AssetPrice` record. Variants: `Manual` (user-entered via manual entry or transaction auto-record), `YahooFinance` (written by a fetch through a Yahoo Finance provider, as in the owner's private build) and `Agent` (recorded by an AI agent the owner allowed — the Mark of a price; owner, 2026-10-10). Metadata for traceability per ADR-012 — does not influence read/write precedence (latest-write-wins).
 
 > Status: confirmed
 
@@ -395,7 +395,7 @@ The `…Updated` events are raised by changes made on this device. Changes appli
 | `FeeScheduleUpdated`       | Account BC             | A fee schedule was created, changed, paused, resumed or deleted                                                                                              | confirmed |
 | `HoldingNoteUpdated`       | Account BC             | A holding note was written or deleted on this device                                                                                                         | confirmed |
 | `SyncCompleted`            | Sync BC                | A sync applied changes from the user's other devices, or changed this device's sync failures or paused state; carries nothing                                | confirmed |
-| `AgentConnectionChanged`   | Agent connection       | An agent asked to connect, was answered, connected, called a tool or left, or the owner switched the setting; carries nothing                                | confirmed |
+| `AgentConnectionChanged`   | AI agent connection    | An AI agent asked to connect, was answered, connected, called a tool or left, or the owner switched the setting; carries nothing                             | confirmed |
 
 ---
 
@@ -528,55 +528,55 @@ A third-party HTTP service that returns current asset prices and their daily-clo
 
 ---
 
-## Agent Connection Concepts (introduced by AGT spec)
+## AI Agent Connection Concepts (introduced by AGT spec)
 
-### Agent
+### AI agent
 
 > Status: confirmed
 
-A program working for the owner that reads the portfolio and records in it through the application's tools, such as Claude Code or Claude Desktop. It reaches the portfolio only through the open application, and only once the owner allowed it. In French: "Agent".
+A program working for the owner that reads the portfolio and records in it through the application's tools, such as Claude Code or Claude Desktop. It reaches the portfolio only through the open application, and only once the owner allowed it. Always "AI agent" where a person reads it — "agent" alone may read as a person; code identifiers, tool names and error codes keep `agent`. In French: "agent IA".
 
 ### Bridge
 
 > Status: confirmed
 
-The program an agent client starts to reach the application. It holds no data: it passes each call to the open application and returns the answer. Never shown on screen. In French: "Passerelle".
+The program an AI agent client starts to reach the application. It holds no data: it passes each call to the open application and returns the answer. Never shown on screen. In French: "Passerelle".
 
 ### Connection request
 
 > Status: confirmed
 
-An agent waiting for the owner's answer in the window. Nothing is served to it until the owner allows; refusing gives it nothing. In French: "Demande de connexion".
+An AI agent waiting for the owner's answer in the window. Nothing is served to it until the owner allows; refusing gives it nothing. In French: "Demande de connexion".
 
 ### Removal request
 
 > Status: confirmed
 
-An agent asking the owner, in the window, to remove one transaction the owner typed: the transaction is shown in full with what would become of it, refusing is the default, and the answer covers that one transaction only. The agent calls `request_removal`. In French: "Demande de suppression" (owner, 2026-10-14).
+An AI agent asking the owner, in the window, to remove one transaction the owner typed: the transaction is shown in full with what would become of it, refusing is the default, and the answer covers that one transaction only. The AI agent calls `request_removal`. In French: "Demande de suppression" (owner, 2026-10-14).
 
 ### Change request
 
 > Status: confirmed
 
-An agent asking the owner, in the window, to change one transaction the owner typed, of any kind: the transaction is shown as it is and as it would become, refusing is the default, and the answer covers that one change only. The agent calls `request_change`. In French: "Demande de modification" (owner, 2026-10-17).
+An AI agent asking the owner, in the window, to change one transaction the owner typed, of any kind: the transaction is shown as it is and as it would become, refusing is the default, and the answer covers that one change only. The AI agent calls `request_change`. In French: "Demande de modification" (owner, 2026-10-17).
 
 ### Replacement request
 
 > Status: confirmed
 
-An agent asking the owner, in the window, to replace four transactions the owner typed — a sale, a withdrawal, a deposit and a purchase, a transfer recorded the four-step way — with one transfer: the four are shown struck through above the transfer recorded in their place, refusing is the default, and the answer covers those four only (AGT-090 to AGT-092). The agent calls `request_transfer_replacement`. In French: "Demande de remplacement" (owner, 2026-10-24).
+An AI agent asking the owner, in the window, to replace four transactions the owner typed — a sale, a withdrawal, a deposit and a purchase, a transfer recorded the four-step way — with one transfer: the four are shown struck through above the transfer recorded in their place, refusing is the default, and the answer covers those four only (AGT-090 to AGT-092). The AI agent calls `request_transfer_replacement`. In French: "Demande de remplacement" (owner, 2026-10-24).
 
-### Agent session
+### AI agent session
 
 > Status: confirmed
 
-What one "Allow for this session" opens: the agent's calls are served without another question until the owner disconnects it, it leaves, or the application closes. Nothing of it is remembered afterwards, except on what it recorded: every transaction an agent records is marked with its session. In French: "Session".
+What one "Allow for this session" opens: the AI agent's calls are served without another question until the owner disconnects it, it leaves, or the application closes. Nothing of it is remembered afterwards, except on what it recorded: every transaction an AI agent records is marked with its session. In French: "Session".
 
 ### Mark
 
 > Status: confirmed
 
-What a transaction or a price an agent recorded carries (widened to a price by the owner, 2026-10-10). A transaction carries the agent's name and its session: the account journal shows it in the column "Recorded by" ("Enregistré par"); a transaction the owner typed has none. A price carries the source "Agent", shown in the price history. In code: `AgentRecording`, `recorded_by`; `AssetPriceSource::Agent`. In French: "Marque".
+What a transaction or a price an AI agent recorded carries (widened to a price by the owner, 2026-10-10). A transaction carries the AI agent's name and its session: the account journal shows it in the column "Recorded by" ("Enregistré par"); a transaction the owner typed has none. A price carries the source "AI agent", shown in the price history. In code: `AgentRecording`, `recorded_by`; `AssetPriceSource::Agent`. In French: "Marque".
 
 ## Multi-Device Sync Concepts (introduced by SYN spec)
 

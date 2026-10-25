@@ -130,7 +130,7 @@
 ### Write-off
 
 > `record_write_off` takes a quantity out of a held asset without proceeds, at its cost, no cash
-> moving (WOF-020/021); it runs the same use case as the agent connection's tool (WOF-056,
+> moving (WOF-020/021); it runs the same use case as the AI agent connection's tool (WOF-056,
 > AGT-065), its error `WriteOffError` being `AccountError` plus the use case's `AssetNotFound`
 > and `ArchivedAsset`. `correct_write_off` corrects a write-off's date, quantity, reason and note
 > (WOF-030); the reason is one of `NetworkFee`, `Dust`, `Lost`, `Other` (`WriteOffReason`).
@@ -860,11 +860,11 @@ struct AccountJournal {
 - 2026-10-24 — #510 (TRF): `record_transfer` (`TransferDTO`, `TransferError`), `correct_transfer` (`CorrectTransferDTO`) and `cancel_transfer`; `TransactionType` gains `TransferOut` and `TransferIn`, `Transaction` gains `transfer_id`; `AccountError` gains `TransferToSameAccount`, `TransferReceivedAboveSent`, `TransferRateMissing { from_currency, to_currency }`, `TransferRateNotOne`, `PartOfTransfer` and `TransferNotFound`. `correct_transaction` and `correct_write_off` refuse a part of a transfer; `cancel_transaction` removes the whole transfer. Data format version 9 (SYN-038).
 
 - 2026-10-24 — #405 (ACC-004, PRF-013, GPF-014): `Account`, `CreateAccountDTO`, `UpdateAccountDTO` and `AccountSummary` lose `update_frequency`, and the `UpdateFrequency` type goes; `AccountPerformanceResponse` loses `month_view_available`, its `monthly` series always filled.
-- 2026-10-24 — #386: `AccountSummary` gains `created_by: Option<AgentRecording>`, the agent session that created the account (AGT-069). No command or error changes.
+- 2026-10-24 — #386: `AccountSummary` gains `created_by: Option<AgentRecording>`, the AI agent session that created the account (AGT-069). No command or error changes.
 - 2026-10-24 — #599 (WOF-033): `correct_transaction` gains `WriteOffWithoutReason` — a stored write-off without a reason is refused, never given `Other`.
 - 2026-10-24 — #607 (SEL-012, SEL-021, SEL-030, SEL-032, TRX-062, WOF-030): a sale or a write-off is refused against what was held on its date — for a correction, what was held just before it, itself left out — with `ClosedPosition` or `Oversell { available, requested }`, `available` the quantity held then; `CascadingOversell` only for a later transaction left short. `sell_holding` reads the sale's date instead of today's holding; `validate_transaction_draft` records a new sale in memory, so it returns what `sell_holding` would. No type changed.
-- 2026-10-19 — #551 (WOF-056): `record_write_off` (`WriteOffDTO`, `WriteOffError`) and `correct_write_off` (`CorrectWriteOffDTO`), over the agent connection's use case.
-- 2026-10-19 — #550 (WOF): `TransactionType` gains `WriteOff`, `Transaction` gains `write_off_reason` with the new `WriteOffReason` type, `HoldingDetail` gains `realized_lost`. No command added: the window's commands and their rows come with #551, the agent's with #552; `correct_transaction` and `cancel_transaction` cite WOF-032 / WOF-040.
+- 2026-10-19 — #551 (WOF-056): `record_write_off` (`WriteOffDTO`, `WriteOffError`) and `correct_write_off` (`CorrectWriteOffDTO`), over the AI agent connection's use case.
+- 2026-10-19 — #550 (WOF): `TransactionType` gains `WriteOff`, `Transaction` gains `write_off_reason` with the new `WriteOffReason` type, `HoldingDetail` gains `realized_lost`. No command added: the window's commands and their rows come with #551, the AI agent's with #552; `correct_transaction` and `cancel_transaction` cite WOF-032 / WOF-040.
 - 2026-10-19 — #529 (MKT-231): `HoldingDetail.unrecorded_splits` and the `UnrecordedSplit { date: String, new: i64, old: i64 }` type, a read model of the split factor new : old (SPL-062). No command changed.
 - 2026-10-18 — TODO-091 (ACC-040, ACC-043): `WrapperLists.countries` holds every country; `offered` only the portfolio's and the listed countries; `WrapperNotAvailable` now means a wrapper the lists do not hold, any known wrapper fitting any country.
 - 2026-10-18 — TODO-091 (ACC-046): `AccountSummary.wrapper`, for the accounts list; `WrapperLists` gains `countries`, `offered` and `generic`, with the new `CountryWrappers` type. No command added.
@@ -900,5 +900,5 @@ struct AccountJournal {
 - 2026-09-14 — Amended by `account` spec (ACC-027/028): `get_account_summaries` returns `AccountSummaries` — the rows plus a `PortfolioTotal` in the reference currency, flagged incomplete when an account with no usable rate held a non-zero figure; the accounts list re-fetches on `CurrencyRateUpdated` and `CurrencyPairUpdated` (ACC-033). No new command or error.
 - 2026-09-28 — TXL-060: `get_account_journal(account_id, JournalFilter) -> AccountJournal` — the account's transactions oldest first with `cash_out` / `cash_in` / `cash_balance` from the cash balance rules (interest on the cash line included, INT-023); the filter picks rows (and `newest_first` their order), the balance runs over all.
 - 2026-09-28 — PRF-087: `AccountPerformanceResponse` (returned by `get_account_performance` and `get_global_performance`) gains `lifetime_unavailable: Option<LifetimeUnavailable>` — the earliest zero-cost opening balance in scope, or no invested capital.
-- 2026-10-09 — AGT-045: `JournalRow` gains `recorded_by: Option<AgentRecording>`, the agent session that recorded the transaction.
+- 2026-10-09 — AGT-045: `JournalRow` gains `recorded_by: Option<AgentRecording>`, the AI agent session that recorded the transaction.
 - 2026-10-24 — #511 (TRF-060 to TRF-062): `get_transfer -> TransferView` and `get_transfer_rate -> Option<i64>`, both `TransferError`; `JournalRow` gains `transfer_account_id: Option<String>`.

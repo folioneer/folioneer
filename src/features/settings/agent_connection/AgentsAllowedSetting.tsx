@@ -3,7 +3,7 @@ import { CheckboxField } from "@/ui/components/field/CheckboxField";
 import { useAgentsAllowed } from "./useAgentsAllowed";
 
 /**
- * AGT-022 — "Allow agents to connect": off unless the owner switched it on. On a system
+ * AGT-022 — "Allow AI agents to connect": off unless the owner switched it on. On a system
  * without an agent connection (AGT-023) it cannot be switched and says so.
  */
 export function AgentsAllowedSetting() {

@@ -4,7 +4,7 @@
 
 A write-off records a quantity that leaves a holding **without proceeds**: a network fee paid in the asset itself, dust left behind by a conversion, coins sent to a wallet the portfolio does not track or lost for good. Without it the owner records a sale at a symbolic price and a withdrawal, which invents cash and pads the realized gains of a history that matters for tax (gh273, #394).
 
-The feature adds a write-off variant to `TransactionType`. A write-off is attributed to the asset it takes out of; it moves no cash and touches no price. The window (#551) and the agent connection (#552) record it; this spec holds the core's rules and the window's (050–059), the agent connection its own (AGT-065).
+The feature adds a write-off variant to `TransactionType`. A write-off is attributed to the asset it takes out of; it moves no cash and touches no price. The window (#551) and the AI agent connection (#552) record it; this spec holds the core's rules and the window's (050–059), the AI agent connection its own (AGT-065).
 
 Figures follow TRX-024. A fund's ongoing charges taken in units are a management fee deduction (FEE), which keeps the cost basis and realizes nothing; a fee paid in the asset for one operation — a network fee for a transfer — is a write-off with the reason `NetworkFee`. In French a write-off is a « Sortie sans contrepartie » (owner, 2026-10-19).
 
@@ -84,7 +84,7 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 
 **WOF-055 — Its refusals (frontend)**: A refusal for lack of units — a quantity above what was held on the chosen date, a date on which nothing was held, a later sale, write-off or management fee left short — shows under the quantity with the wording of SEL-046, for a recording and a correction alike. Any other refusal shows below the form as the message for that refusal. The record action stays inactive while the form shows a refusal, until the date, the quantity or the reason changes.
 
-**WOF-056 — What the window records (backend)**: The window records a write-off under WOF-010 to WOF-012 and WOF-020, with their refusals, as the agent connection does (AGT-065), and corrects one under WOF-030, taking its date, quantity, reason and note. A fee in kind is the transfer's, never the window's write-off (TRF-031).
+**WOF-056 — What the window records (backend)**: The window records a write-off under WOF-010 to WOF-012 and WOF-020, with their refusals, as the AI agent connection does (AGT-065), and corrects one under WOF-030, taking its date, quantity, reason and note. A fee in kind is the transfer's, never the window's write-off (TRF-031).
 
 **WOF-057 — In the journals (frontend)**: A write-off's Type reads with its short reason — "Write-off · Network fee", "· Dust", "· Lost", "· Other" (FR « Sortie sans contrepartie · Frais de réseau », « · Reste », « · Perdu », « · Autre »). Its Quantity shows the quantity written off; Unit Price and Total Amount the neutral placeholder `—`; Exchange Rate and Fees their stored values, not a placeholder, as for free shares; Realized P&L its realized P&L (WOF-021), as for a sale (TXL-022).
 
