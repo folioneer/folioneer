@@ -639,3 +639,43 @@ The secret every device sharing a portfolio holds, from which the key that encry
 > Status: confirmed
 
 A holding whose merged transactions, each valid on the device that recorded it, together break an invariant (for example an oversold position). Kept visible with its reason until the user corrects or removes one of the transactions.
+
+---
+
+## Application Areas (named by the commit scopes, `docs/commit-rules.md`)
+
+### Performance
+
+> Status: confirmed
+
+How much an account, or the whole portfolio, gained or lost over each month or year, the owner's own deposits and withdrawals left out. In French: "Performance".
+
+### Import
+
+> Status: confirmed
+
+A file's rows brought into one account, previewed, then confirmed. In French: "Import".
+
+### Command line
+
+> Status: confirmed
+
+The installed program run from a terminal or a script, recording without opening a window. In French: "Ligne de commande".
+
+### Settings
+
+> Status: confirmed
+
+The page where the owner makes the application's choices: language, theme, reference currency, sync, AI agents. In French: "Paramètres".
+
+### Sync
+
+> Status: confirmed
+
+Keeping one portfolio the same on the owner's computers, through a folder they share, each computer publishing its changes and applying the others'. In French: "Synchronisation".
+
+### Update
+
+> Status: confirmed
+
+A newer version of Folioneer, found, proposed and installed from the application, the portfolio kept. In French: "Mise à jour".

@@ -105,7 +105,7 @@ Written to read the same in every repository that works this way.
 - `scripts/commit-check.sh` — refuses a commit that breaks `docs/commit-rules.md`,
   its author included, on a pull request and on `main` since the last release. Never: exempts an
   author other than a bot.
-- `scripts/release.py` — computes the version, writes the changelog, lands them through
+- `scripts/release.py` — computes the version, writes the changelog (each line's scope before it), lands them through
   a pull request and tags what merged, for the owner. Never: run by the agent (its own:
   `just batch-end` tags, `just batch-ends` lists), nor pushes to `main`.
 - `scripts/mcpb-bundle.py` — builds the Claude Desktop bundle the release attaches, from
@@ -121,8 +121,8 @@ Written to read the same in every repository that works this way.
 
 - `.githooks/pre-commit` — refuses a commit on the main branch, then runs the fast
   checks of the staged files. Never: tests.
-- `.githooks/commit-msg` — refuses a title outside the commit format or an attribution
-  line. Never: rewrites the message.
+- `.githooks/commit-msg` — refuses a title outside the commit format (its description's
+  length and its scope included) or an attribution line. Never: rewrites the message.
 - `.githooks/pre-push` — the fast checks of the pushed commits. Never: what CI owns.
 - `.githooks/pre-merge-commit` — refuses a merge commit, so history stays linear.
   Never: blocks a fast-forward.
