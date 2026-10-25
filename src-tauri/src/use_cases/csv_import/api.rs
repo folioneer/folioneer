@@ -4,6 +4,7 @@
 use super::error::{CsvImportError, CsvImportTask};
 use super::orchestrator::{CsvImportUseCase, ImportPreview};
 use crate::context::import::{ColumnMappingDraft, FileRead, ReadingChoices};
+use crate::core::logger::BACKEND;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
@@ -22,9 +23,10 @@ pub async fn pick_import_file(
     let Some(file) = receiver.await.ok().flatten() else {
         return Ok(None);
     };
-    let path = file
-        .into_path()
-        .map_err(|_| CsvImportTask::FileUnreadable)?;
+    let path = file.into_path().map_err(|e| {
+        tracing::warn!(target: BACKEND, err = %e, "import: the picked file has no path");
+        CsvImportTask::FileUnreadable
+    })?;
     use_case.allow_file(&path).await.map(Some)
 }
 

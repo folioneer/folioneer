@@ -30,11 +30,11 @@ How one broker's export is read, saved under a name and reused for every file of
 
 What reading a file through a mapping shows, nothing written (IMP-017).
 
-| Field    | Business meaning                                                                                                                                                                                                  |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `file`   | How the file was read: its encoding, separator, decimal mark and date format, detected or chosen (IMP-011 to IMP-014, IMP-018) — the date format said not detected when none reads every date —, and its columns. |
-| `rows`   | Every import row, in the file's order; a label the mapping gives no type shows on its rows, rejected with it (IMP-022).                                                                                           |
-| `counts` | How many rows hold each status; a trade tax joined to its purchase counts with it (IMP-030, IMP-034).                                                                                                             |
+| Field    | Business meaning                                                                                                                                                                                  |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `file`   | How the file was read: its encoding, separator, decimal mark and date format, detected or chosen (IMP-011 to IMP-014, IMP-018), the date format possibly not detected (IMP-014), and its columns. |
+| `rows`   | Every import row, in the file's order; a label the mapping gives no type shows on its rows, rejected with it (IMP-022).                                                                           |
+| `counts` | How many rows hold each status; a trade tax joined to its purchase counts with it (IMP-030, IMP-034).                                                                                             |
 
 ### Import row (computed, never stored)
 
@@ -46,7 +46,7 @@ One line of the file that is not blank, once read through a mapping and judged.
 | `operation` | Its operation type, date, asset as read and figures — the quantity, unit price and fees (a joined trade tax included, IMP-034) of a purchase or a sale, the amount of a dividend, a deposit or a withdrawal (IMP-031). |
 | `asset`     | The asset of the portfolio it was matched to, none for a deposit and a withdrawal (IMP-032).                                                                                                                           |
 | `status`    | **Ready**, **rejected** with its reason, **unknown asset**, **already recorded** or **not imported** with its label (IMP-030); a joined trade tax names its purchase's line instead.                                   |
-| `funding`   | For a ready purchase the cash cannot fund, the deposit it needs (IMP-038).                                                                                                                                             |
+| `funding`   | For a ready purchase the cash cannot fund, the deposit it needs (IMP-038); none for any other row.                                                                                                                     |
 
 ---
 
@@ -114,7 +114,7 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 **IMP-037 — One currency in this version (backend)**: A row whose asset's currency, or whose own currency when the file has one, is not the account's is rejected — "another currency: record it by hand". The exchange rate is therefore always 1.
 
-**IMP-038 — A purchase the cash cannot fund (backend)**: A ready purchase the account's cash cannot fund, as CSH-041 judges it after the rows before it, is not rejected: it stays ready, and the confirmation adds the deposit it needs or leaves it out, by the user's choice (#502). The rows after it are judged as if that deposit were added.
+**IMP-038 — A purchase the cash cannot fund (backend)**: A ready purchase the account's cash cannot fund, as CSH-041 judges it after the rows before it, is not rejected: it stays ready, the preview showing the smallest deposit on its date that funds it, and the confirmation adds the deposit it needs or leaves it out, by the user's choice (#502). The rows after it are judged as if that deposit were added.
 
 ### Deletion (040–049)
 
