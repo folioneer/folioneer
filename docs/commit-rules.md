@@ -32,7 +32,7 @@ Must be one of the following:
 
 ### Scope
 
-A scope is optional. When given, it names the part of Folioneer the change is about, in one word from the list below, each a term of [`ubiquitous-language.md`](ubiquitous-language.md); the hooks refuse any other (a bot's own scope, such as Dependabot's `deps`, is let through). `CHANGELOG.md` writes it before the line: `feat(transfer): …` becomes `- [transfer] …`. A scope missing from the list is added here, with its vocabulary entry, in the pull request that first needs it.
+A scope is optional. When given, it names the part of Folioneer the change is about, in one word from the list below, each a term of [`ubiquitous-language.md`](ubiquitous-language.md); the hooks refuse any other (a bot's own scope, such as Dependabot's `deps`, is let through). `CHANGELOG.md` writes it before the line: `feat(transfer): …` becomes `- [transfer] …`. A scope missing from the list is added here, with its vocabulary entry and its English and French names in [`whats-new.md`](spec/whats-new.md) WNW-092, in the pull request that first needs it.
 
 <!-- scopes:start -->
 

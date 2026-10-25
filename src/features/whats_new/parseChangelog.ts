@@ -6,6 +6,45 @@ export interface ChangelogSection {
   body: string[];
 }
 
+/** The areas a changelog line can carry: the scopes of `docs/commit-rules.md` § Scope (WNW-090). */
+export const AREAS = [
+  "account",
+  "holding",
+  "asset",
+  "transaction",
+  "transfer",
+  "write-off",
+  "split",
+  "dividend",
+  "cash",
+  "fee",
+  "price",
+  "rate",
+  "agent",
+  "sync",
+  "performance",
+  "import",
+  "command-line",
+  "settings",
+  "update",
+] as const;
+
+export type Area = (typeof AREAS)[number];
+
+const AREA_TAG_PATTERN = /^\[([a-z-]+)\] +(\S.*)$/;
+
+function isArea(word: string): word is Area {
+  return (AREAS as readonly string[]).includes(word);
+}
+
+/** A bullet's area tag and its sentence; a line with no tag, or one outside the list, as written (WNW-090). */
+export function splitAreaTag(item: string): { area: Area | null; text: string } {
+  const match = AREA_TAG_PATTERN.exec(item);
+  const word = match?.[1];
+  if (match === null || word === undefined || !isArea(word)) return { area: null, text: item };
+  return { area: word, text: match[2] ?? "" };
+}
+
 type ParsedVersion = [number, number, number];
 
 const SECTION_HEADER_PATTERN = /^## \[([^\]]+)\](?:\s*-\s*(.*))?$/;

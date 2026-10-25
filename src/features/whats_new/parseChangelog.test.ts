@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { extractSectionFor, extractSectionsBetween } from "./parseChangelog";
+import commitRules from "../../../docs/commit-rules.md?raw";
+import en from "../../i18n/locales/en/common.json";
+import fr from "../../i18n/locales/fr/common.json";
+import { AREAS, extractSectionFor, extractSectionsBetween, splitAreaTag } from "./parseChangelog";
 
 const CHANGELOG_FIXTURE = `# Changelog
 
@@ -106,5 +109,60 @@ describe("extractSectionFor", () => {
 
   it("treats a missing patch segment as zero", () => {
     expect(extractSectionFor(CHANGELOG_FIXTURE, "0.34").map((s) => s.version)).toEqual(["0.34.0"]);
+  });
+});
+
+describe("splitAreaTag (WNW-090)", () => {
+  it("splits a known area tag from the sentence", () => {
+    expect(splitAreaTag("[transfer] Move a holding to another account")).toEqual({
+      area: "transfer",
+      text: "Move a holding to another account",
+    });
+    expect(splitAreaTag("[command-line] Record a price from a terminal").area).toBe("command-line");
+  });
+
+  it("leaves a line with no tag as written (WNW-091)", () => {
+    expect(splitAreaTag("A refused sale now says how much you held")).toEqual({
+      area: null,
+      text: "A refused sale now says how much you held",
+    });
+  });
+
+  it("reads a tag only when it is exact, lowercase and followed by a space", () => {
+    expect(splitAreaTag("[Transfer] Move a holding").area).toBeNull();
+    expect(splitAreaTag("[agent][transfer] Move a holding").area).toBeNull();
+  });
+
+  it("drops every space after the tag and keeps a second tag in the sentence (WNW-090)", () => {
+    expect(splitAreaTag("[transfer]   Move a holding").text).toBe("Move a holding");
+    expect(splitAreaTag("[transfer] [price] Move a holding")).toEqual({
+      area: "transfer",
+      text: "[price] Move a holding",
+    });
+  });
+
+  it("leaves a tag with no sentence as written (WNW-091)", () => {
+    expect(splitAreaTag("[transfer] ")).toEqual({ area: null, text: "[transfer] " });
+  });
+
+  it("leaves a line whose tag is not an area as written (WNW-091)", () => {
+    expect(splitAreaTag("[deps] bump a crate")).toEqual({
+      area: null,
+      text: "[deps] bump a crate",
+    });
+  });
+
+  it("knows exactly the scopes of docs/commit-rules.md § Scope", () => {
+    const table = commitRules.split("<!-- scopes:start -->")[1]?.split("<!-- scopes:end -->")[0];
+    const scopes = [...(table ?? "").matchAll(/^\| *`([a-z-]+)`/gm)].map((match) => match[1]);
+    expect(scopes.length).toBeGreaterThan(0);
+    expect([...AREAS].sort()).toEqual(scopes.sort());
+  });
+
+  it("names every area in English and French (WNW-092)", () => {
+    for (const area of AREAS) {
+      expect(en.whats_new.areas[area], `en ${area}`).toBeTruthy();
+      expect(fr.whats_new.areas[area], `fr ${area}`).toBeTruthy();
+    }
   });
 });

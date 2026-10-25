@@ -52,4 +52,22 @@ describe("WhatsNewDialog", () => {
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
+
+  it("shows a line's area tag before its sentence, translated (WNW-090)", () => {
+    const tagged: ChangelogSection[] = [
+      {
+        version: "0.16.0",
+        date: "2026-10-26",
+        body: ["### Added", "- [transfer] Move a holding to another account", "- an untagged line"],
+      },
+    ];
+    render(<WhatsNewDialog version="0.16.0" sections={tagged} onDismiss={vi.fn()} />);
+
+    expect(screen.getByTestId("whats-new-area-0.16.0-transfer").textContent).toBe(
+      "whats_new.areas.transfer",
+    );
+    expect(screen.getByText("Move a holding to another account")).toBeTruthy();
+    expect(screen.getByText("an untagged line")).toBeTruthy();
+    expect(screen.queryByText(/\[transfer\]/)).toBeNull();
+  });
 });

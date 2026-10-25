@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Button } from "@/ui/components/button/Button";
 import { Dialog } from "@/ui/components/modal/Dialog";
-import type { ChangelogSection } from "./parseChangelog";
+import { type ChangelogSection, splitAreaTag } from "./parseChangelog";
 
 interface WhatsNewDialogProps {
   version: string;
@@ -39,7 +39,8 @@ function groupBodyLines(lines: string[]): BodyBlock[] {
  * Once-per-upgrade release-notes dialog (WNW-020). Stacks every changelog section
  * released between the last acknowledged version and the current one, newest first
  * (WNW-040). Section content is English-only by design (WNW-060); only the chrome
- * is translated. The single action acknowledges the current version (WNW-050).
+ * and each line's area tag (WNW-090) are translated. The single action acknowledges
+ * the current version (WNW-050).
  */
 export function WhatsNewDialog({ version, sections, onDismiss }: WhatsNewDialogProps) {
   const { t } = useTranslation();
@@ -80,9 +81,22 @@ export function WhatsNewDialog({ version, sections, onDismiss }: WhatsNewDialogP
               if (block.kind === "bullets") {
                 return (
                   <ul key={key} className="mt-1 list-disc pl-5 text-sm leading-relaxed">
-                    {block.items.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
+                    {block.items.map((item) => {
+                      const { area, text } = splitAreaTag(item);
+                      return (
+                        <li key={item}>
+                          {area && (
+                            <span
+                              id={`whats-new-area-${section.version}-${area}`}
+                              className="mr-2 inline-block rounded-md bg-m3-secondary-container px-2 py-0.5 text-xs text-m3-on-secondary-container"
+                            >
+                              {t(`whats_new.areas.${area}`)}
+                            </span>
+                          )}
+                          {text}
+                        </li>
+                      );
+                    })}
                   </ul>
                 );
               }
