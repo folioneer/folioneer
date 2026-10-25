@@ -118,7 +118,7 @@ pub fn read_file(
     if lines.is_empty() {
         return Err(ImportError::FileHasNoRow);
     }
-    let mut named: Vec<String> = Vec::new();
+    let mut named: Vec<String> = Vec::with_capacity(header.len());
     for name in header.iter().filter(|name| !name.is_empty()) {
         if named
             .iter()

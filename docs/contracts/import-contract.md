@@ -13,9 +13,10 @@
 
 > A column mapping says how one broker's export is read (IMP-020): saved under a name, reused for
 > the next file, synced (IMP-023). Reading and previewing a file come with the next amendment;
-> `ImportError` already carries the reading errors that command returns: `FileTooLarge`, `FileEmpty`,
+> `ImportError` already carries the errors of a file's content: `FileTooLarge`, `FileEmpty`,
 > `FileHasNoRow` (IMP-010), `FileNotUtf8` (IMP-011), `SeparatorNotFound` (IMP-012),
 > `HeaderNameRepeated { name }` (IMP-015), `MappedColumnNotInFile { column }` (IMP-021).
+> The unknown account and the file that cannot be read (IMP-010) come with the command.
 
 | Command                 | Args                                                    | Return               | Errors                                                                                                                                                                                              |
 | ----------------------- | ------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
