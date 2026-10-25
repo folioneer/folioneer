@@ -1,6 +1,6 @@
 use crate::{
     agent_connection,
-    context::{account, asset, currency, sync},
+    context::{account, asset, currency, import, sync},
     core::{logger, Event},
     use_cases::{
         account_creation, account_deletion, account_details, account_performance, account_summary,
@@ -53,6 +53,18 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .typ::<currency::CurrencyPairSummary>()
         .typ::<currency::ReferenceCurrency>()
         .typ::<currency::CurrencyError>()
+        // ----- import BC (IMP) -----
+        .typ::<import::ColumnMapping>()
+        .typ::<import::ColumnMappingDraft>()
+        .typ::<import::MappedColumns>()
+        .typ::<import::OperationLabel>()
+        .typ::<import::AssetMatch>()
+        .typ::<import::Separator>()
+        .typ::<import::DecimalMark>()
+        .typ::<import::DateFormat>()
+        .typ::<import::Encoding>()
+        .typ::<import::OperationType>()
+        .typ::<import::ImportError>()
         // ----- sync BC (SYN/CFR) -----
         .typ::<sync::SyncFolderState>()
         .typ::<sync::FolderProblem>()
@@ -162,6 +174,10 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             currency::get_reference_currency,
             currency::set_reference_currency,
             currency::get_currency_rates,
+            // ----- import BC (IMP) -----
+            import::list_column_mappings,
+            import::save_column_mapping,
+            import::delete_column_mapping,
             // ----- sync BC (SYN/CFR) -----
             sync::pause_sync,
             sync::leave_sync,

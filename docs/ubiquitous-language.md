@@ -642,6 +642,28 @@ A holding whose merged transactions, each valid on the device that recorded it, 
 
 ---
 
+## Import Concepts (introduced by IMP spec)
+
+### Column mapping
+
+How one broker's export is read, saved under a name and reused for every file of that shape: which column is what, each operation label's operation type, the asset each unknown name stands for (IMP-020). In French: « Correspondance des colonnes » (owner, 2026-10-25).
+
+> Status: confirmed
+
+### Trade tax
+
+A tax charged on a purchase and written on its own row of a broker's file, added to that purchase's fees (IMP-034). In French: « Taxe sur la transaction » (owner, 2026-10-25).
+
+> Status: confirmed
+
+### Added deposit
+
+A deposit the import adds, dated with a purchase the file left unfunded, and marked as added (#502). In French: « Dépôt ajouté » (owner, 2026-10-25).
+
+> Status: confirmed
+
+---
+
 ## Application Areas (named by the commit scopes, `docs/commit-rules.md`)
 
 ### Performance

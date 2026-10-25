@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE column_mappings SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n             WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "359aa1d4d443e767f4f368a50975a4867102bb2cc0daffed9b4f86c76b8275a6"
+}

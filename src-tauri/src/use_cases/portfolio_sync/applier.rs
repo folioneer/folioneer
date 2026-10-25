@@ -1,5 +1,5 @@
-//! `ServiceChangeApplier` — the `ChangeApplier` port over the account, asset, and currency
-//! services (B24, CFR-017): routes each synced record kind to the service that owns it,
+//! `ServiceChangeApplier` — the `ChangeApplier` port over the account, asset, currency and
+//! import services (B24, CFR-017): routes each synced record kind to the service that owns it,
 //! reads the state it holds, and writes prevailing changes through the services' apply
 //! entry points, which run no entry guards. The cash asset a change refers to is seeded
 //! first (SYN-027/CFR-033). Every call rides the apply transaction's connection (SYN-065).
@@ -11,6 +11,7 @@ use sqlx::SqliteConnection;
 use crate::context::account::AccountService;
 use crate::context::asset::AssetService;
 use crate::context::currency::CurrencyService;
+use crate::context::import::ImportService;
 use crate::context::sync::{Change, ChangeApplier, SyncError};
 use crate::core::cash::is_cash_asset;
 use crate::core::logger::BACKEND;
@@ -21,6 +22,7 @@ pub struct ServiceChangeApplier {
     account_service: Arc<AccountService>,
     asset_service: Arc<AssetService>,
     currency_service: Arc<CurrencyService>,
+    import_service: Arc<ImportService>,
 }
 
 /// The currency of a system cash asset id (`system-cash-<ccy>`), when `asset_id` is one.
@@ -31,16 +33,18 @@ fn cash_currency(asset_id: &str) -> Option<String> {
 }
 
 impl ServiceChangeApplier {
-    /// Creates the applier over the three services that own synced records.
+    /// Creates the applier over the four services that own synced records.
     pub fn new(
         account_service: Arc<AccountService>,
         asset_service: Arc<AssetService>,
         currency_service: Arc<CurrencyService>,
+        import_service: Arc<ImportService>,
     ) -> Self {
         Self {
             account_service,
             asset_service,
             currency_service,
+            import_service,
         }
     }
 
@@ -93,6 +97,11 @@ impl ChangeApplier for ServiceChangeApplier {
                     .await
                     .map_err(|error| SyncError::database("apply: currency record not read", error))
             }
+            RecordKind::ColumnMapping => self
+                .import_service
+                .synced_record(conn, identity)
+                .await
+                .map_err(|error| SyncError::database("apply: column mapping not read", error)),
         }
     }
 
@@ -165,6 +174,13 @@ impl ChangeApplier for ServiceChangeApplier {
                     .await
                     .map_err(|error| {
                         SyncError::database("apply: currency removal not written", error)
+                    }),
+                RecordKind::ColumnMapping => self
+                    .import_service
+                    .apply_removal(conn, identity)
+                    .await
+                    .map_err(|error| {
+                        SyncError::database("apply: column mapping removal not written", error)
                     }),
             };
         }
@@ -260,6 +276,15 @@ impl ChangeApplier for ServiceChangeApplier {
                     .await
                     .map_err(|error| {
                         SyncError::database("apply: currency rate not written", error)
+                    });
+            }
+            RecordKind::ColumnMapping => {
+                return self
+                    .import_service
+                    .apply_column_mapping(conn, content, rank)
+                    .await
+                    .map_err(|error| {
+                        SyncError::database("apply: column mapping not written", error)
                     });
             }
         }

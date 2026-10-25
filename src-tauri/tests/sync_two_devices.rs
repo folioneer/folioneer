@@ -22,6 +22,7 @@ use folioneer_lib::context::currency::{
     CurrencyService, SqliteCurrencyPairRepository, SqliteCurrencyRateRepository,
     SqlitePortfolioSettingRepository,
 };
+use folioneer_lib::context::import::{ImportService, SqliteColumnMappingRepository};
 use folioneer_lib::context::sync::{
     FirstPublish, FsFolderStore, SqliteChangeLogRepository, SqliteChangeRecorder,
     SqliteSyncStateRepository, SyncFailure, SyncRun, SyncService, SyncStateRepository,
@@ -55,6 +56,7 @@ struct Ctx {
     account_service: Arc<AccountService>,
     asset_service: Arc<AssetService>,
     currency_service: Arc<CurrencyService>,
+    import_service: Arc<ImportService>,
     pool: sqlx::Pool<sqlx::Sqlite>,
 }
 
@@ -121,6 +123,12 @@ async fn build_ctx_on_bus(folder: &std::path::Path, bus: Arc<SideEffectEventBus>
         ))
         .with_event_bus(bus.clone()),
     );
+    let import_service = Arc::new(
+        ImportService::new(Box::new(
+            SqliteColumnMappingRepository::new(pool.clone()).with_change_recorder(recorder.clone()),
+        ))
+        .with_event_bus(bus.clone()),
+    );
     let state_repo: Arc<dyn SyncStateRepository> =
         Arc::new(SqliteSyncStateRepository::new(pool.clone()));
     let folder_store = Arc::new(FsFolderStore::new(folder));
@@ -140,11 +148,13 @@ async fn build_ctx_on_bus(folder: &std::path::Path, bus: Arc<SideEffectEventBus>
         account_service.clone(),
         asset_service.clone(),
         currency_service.clone(),
+        import_service.clone(),
     ));
     let rank_stamper = Arc::new(ServiceRankStamper::new(
         account_service.clone(),
         asset_service.clone(),
         currency_service.clone(),
+        import_service.clone(),
     ));
     let first_publish = Arc::new(FirstPublish::new(
         change_log,
@@ -157,6 +167,7 @@ async fn build_ctx_on_bus(folder: &std::path::Path, bus: Arc<SideEffectEventBus>
         account_service: account_service.clone(),
         asset_service: asset_service.clone(),
         currency_service: currency_service.clone(),
+        import_service: import_service.clone(),
         sync_service: sync_service.clone(),
         first_publish,
         sync_run,
@@ -169,6 +180,7 @@ async fn build_ctx_on_bus(folder: &std::path::Path, bus: Arc<SideEffectEventBus>
         account_service,
         asset_service,
         currency_service,
+        import_service,
         pool,
     }
 }
@@ -955,6 +967,100 @@ async fn syn_021_the_reference_currency_chosen_on_one_device_is_the_others() {
         laptop.currency_service.reference_currency().await.unwrap(),
         "USD"
     );
+}
+
+// IMP-023 — a column mapping saved before sync travels with the first publish; renamed on
+// the device that joined, it is renamed on the first, and deleted there, it is gone on both.
+#[tokio::test]
+async fn imp_023_a_column_mapping_saved_on_one_device_is_the_others() {
+    use folioneer_lib::context::import::{
+        ColumnMapping, ColumnMappingDraft, DateFormat, DecimalMark, Encoding, MappedColumns,
+        Separator,
+    };
+    let draft = |name: &str| ColumnMappingDraft {
+        name: name.into(),
+        separator: Separator::Semicolon,
+        decimal_mark: DecimalMark::Comma,
+        date_format: DateFormat::DayMonthYear,
+        encoding: Encoding::Windows1252,
+        columns: MappedColumns {
+            date: "Date".into(),
+            operation: "Operation".into(),
+            isin: Some("ISIN".into()),
+            reference: None,
+            name: None,
+            quantity: Some("Quantity".into()),
+            unit_price: None,
+            gross_amount: None,
+            fees: None,
+            net_amount: Some("Net".into()),
+            currency: None,
+        },
+        operation_types: Vec::new(),
+        asset_matches: Vec::new(),
+    };
+    let names = |mappings: Vec<ColumnMapping>| {
+        mappings
+            .into_iter()
+            .map(|mapping| (mapping.id, mapping.name))
+            .collect::<Vec<_>>()
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let desktop = build_ctx(dir.path()).await;
+    let saved = desktop
+        .import_service
+        .save_column_mapping(None, draft("Broker"))
+        .await
+        .unwrap();
+    desktop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Desktop".into(),
+        )
+        .await
+        .expect("Desktop must enable as the first device");
+    let laptop = build_ctx(dir.path()).await;
+    laptop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Laptop".into(),
+        )
+        .await
+        .expect("Laptop must join the shared portfolio");
+    assert_eq!(
+        names(laptop.import_service.list_column_mappings().await.unwrap()),
+        vec![(saved.id.clone(), "Broker".to_string())]
+    );
+
+    laptop
+        .import_service
+        .save_column_mapping(Some(saved.id.clone()), draft("Broker PEA"))
+        .await
+        .unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    assert_eq!(
+        names(desktop.import_service.list_column_mappings().await.unwrap()),
+        vec![(saved.id.clone(), "Broker PEA".to_string())]
+    );
+
+    desktop
+        .import_service
+        .delete_column_mapping(&saved.id)
+        .await
+        .unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+    assert!(laptop
+        .import_service
+        .list_column_mappings()
+        .await
+        .unwrap()
+        .is_empty());
 }
 
 // SYN-021 / MKT-230 (#529) — the reported splits a device keeps travel to the other: those
@@ -1784,6 +1890,47 @@ async fn written_form_of_every_record_kind() -> serde_json::Value {
         .set_reference_currency("CHF")
         .await
         .unwrap();
+    {
+        use folioneer_lib::context::import::{
+            AssetMatch, ColumnMappingDraft, DateFormat, DecimalMark, Encoding, MappedColumns,
+            OperationLabel, OperationType, Separator,
+        };
+        let column = |header: &str| Some(header.to_string());
+        ctx.import_service
+            .save_column_mapping(
+                None,
+                ColumnMappingDraft {
+                    name: "Broker".into(),
+                    separator: Separator::Semicolon,
+                    decimal_mark: DecimalMark::Comma,
+                    date_format: DateFormat::DayMonthYear,
+                    encoding: Encoding::Windows1252,
+                    columns: MappedColumns {
+                        date: "Date".into(),
+                        operation: "Operation".into(),
+                        isin: column("ISIN"),
+                        reference: column("Reference"),
+                        name: column("Name"),
+                        quantity: column("Quantity"),
+                        unit_price: column("Price"),
+                        gross_amount: column("Gross"),
+                        fees: column("Fees"),
+                        net_amount: column("Net"),
+                        currency: column("Currency"),
+                    },
+                    operation_types: vec![OperationLabel {
+                        label: "Buy".into(),
+                        transaction_type: OperationType::Purchase,
+                    }],
+                    asset_matches: vec![AssetMatch {
+                        read: "AIR LIQUIDE".into(),
+                        asset_id: asset.id.clone(),
+                    }],
+                },
+            )
+            .await
+            .unwrap();
+    }
 
     let rows: Vec<(String, String)> = sqlx::query_as(
         "SELECT record_kind, content FROM changes WHERE content IS NOT NULL ORDER BY sequence",
@@ -1811,6 +1958,9 @@ fn written_values_of_every_synced_enum() -> serde_json::Value {
     use folioneer_lib::context::account::{FeeFrequency, ThresholdDirection, TransactionType};
     use folioneer_lib::context::asset::{AssetKind, AssetPriceSource};
     use folioneer_lib::context::currency::CurrencyRateSource;
+    use folioneer_lib::context::import::{
+        DateFormat, DecimalMark, Encoding, OperationType, Separator,
+    };
     use folioneer_lib::shared::domain::{Operation, Origin, RecordKind};
 
     serde_json::json!({
@@ -1819,6 +1969,7 @@ fn written_values_of_every_synced_enum() -> serde_json::Value {
             RecordKind::Transaction, RecordKind::FeeSchedule, RecordKind::FeeCatchUpPosition,
             RecordKind::AssetPrice, RecordKind::CurrencyPair, RecordKind::CurrencyRate,
             RecordKind::HoldingNote, RecordKind::PortfolioSetting, RecordKind::ReportedSplit,
+            RecordKind::ColumnMapping,
         ]),
         "Operation": written_values!(Operation, [
             Operation::Created, Operation::Updated, Operation::Removed,
@@ -1850,6 +2001,19 @@ fn written_values_of_every_synced_enum() -> serde_json::Value {
             TransactionType::FreeShares, TransactionType::ManagementFee, TransactionType::Split,
             TransactionType::Interest, TransactionType::WriteOff, TransactionType::TransferOut,
             TransactionType::TransferIn,
+        ]),
+        "Separator": written_values!(Separator, [
+            Separator::Semicolon, Separator::Comma, Separator::Tab,
+        ]),
+        "DecimalMark": written_values!(DecimalMark, [DecimalMark::Dot, DecimalMark::Comma]),
+        "DateFormat": written_values!(DateFormat, [
+            DateFormat::DayMonthYear, DateFormat::MonthDayYear, DateFormat::YearMonthDay,
+        ]),
+        "Encoding": written_values!(Encoding, [Encoding::Utf8, Encoding::Windows1252]),
+        "OperationType": written_values!(OperationType, [
+            OperationType::Purchase, OperationType::Sale, OperationType::Dividend,
+            OperationType::Deposit, OperationType::Withdrawal, OperationType::TradeTax,
+            OperationType::NotImported,
         ]),
         "WriteOffReason": written_values!(folioneer_lib::context::account::WriteOffReason, [
             folioneer_lib::context::account::WriteOffReason::NetworkFee,
