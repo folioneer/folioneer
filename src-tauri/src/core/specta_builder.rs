@@ -72,6 +72,8 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .typ::<import::AssetRead>()
         .typ::<import::RowFigures>()
         .typ::<import::RowRejection>()
+        .typ::<csv_import::CsvImportError>()
+        .typ::<csv_import::CsvImportTask>()
         .typ::<csv_import::ImportPreview>()
         .typ::<csv_import::PreviewRow>()
         .typ::<csv_import::RowStatus>()

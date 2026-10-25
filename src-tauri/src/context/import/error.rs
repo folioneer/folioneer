@@ -31,24 +31,6 @@ pub enum ImportError {
         mapping_id: String,
     },
 
-    /// The account the file is read for is unknown (IMP-010).
-    #[error("Account not found: {account_id}")]
-    AccountNotFound {
-        /// The account asked for.
-        account_id: String,
-    },
-
-    /// The file cannot be read (IMP-010).
-    #[error("The file cannot be read")]
-    FileUnreadable,
-
-    /// A match made to an asset the portfolio does not hold (IMP-033).
-    #[error("Asset not found: {asset_id}")]
-    MatchedAssetNotFound {
-        /// The asset the match names.
-        asset_id: String,
-    },
-
     /// The file is larger than 10 MB (IMP-010).
     #[error("The file is larger than 10 MB")]
     FileTooLarge,
@@ -133,22 +115,7 @@ mod tests {
             .expect("serializes"),
             json!({ "code": "MappedColumnNotInFile", "column": "Qté" })
         );
-        assert_eq!(
-            to_value(ImportError::AccountNotFound {
-                account_id: "a-1".into()
-            })
-            .expect("serializes"),
-            json!({ "code": "AccountNotFound", "account_id": "a-1" })
-        );
-        assert_eq!(
-            to_value(ImportError::MatchedAssetNotFound {
-                asset_id: "x-1".into()
-            })
-            .expect("serializes"),
-            json!({ "code": "MatchedAssetNotFound", "asset_id": "x-1" })
-        );
         for (error, code) in [
-            (ImportError::FileUnreadable, "FileUnreadable"),
             (ImportError::FileTooLarge, "FileTooLarge"),
             (ImportError::FileEmpty, "FileEmpty"),
             (ImportError::FileHasNoRow, "FileHasNoRow"),

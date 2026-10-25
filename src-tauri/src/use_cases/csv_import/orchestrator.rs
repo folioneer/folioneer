@@ -1,12 +1,12 @@
+use super::error::{CsvImportError, CsvImportTask};
 use crate::context::account::{
     AccountError, AccountServiceContract, ImportJudgment, ImportStep, RecordingOp, TradeOp,
 };
 use crate::context::asset::{Asset, AssetServiceContract};
-use crate::context::import::domain::column_mapping::folded;
-use crate::context::import::domain::file::LARGEST_FILE;
 use crate::context::import::{
-    read_file, read_rows, AssetMatch, AssetRead, ColumnMappingDraft, FileRead, ImportError,
+    folded, read_file, read_rows, AssetMatch, AssetRead, ColumnMappingDraft, FileRead, ImportError,
     ImportService, OperationRead, ReadingChoices, RowFigures, RowFormat, RowRead, RowRejection,
+    LARGEST_FILE,
 };
 use crate::core::logger::BACKEND;
 use serde::Serialize;
@@ -155,10 +155,10 @@ impl CsvImportUseCase {
         account_id: &str,
         path: &str,
         choices: &ReadingChoices,
-    ) -> Result<FileRead, ImportError> {
+    ) -> Result<FileRead, CsvImportError> {
         self.account_currency(account_id).await?;
         let bytes = read_bytes(path).await?;
-        read_file(&bytes, choices).map(|(_, read)| read)
+        Ok(read_file(&bytes, choices).map(|(_, read)| read)?)
     }
 
     /// IMP-030 — the file at `path` read through `mapping` for `account_id`, every row
@@ -170,7 +170,7 @@ impl CsvImportUseCase {
         path: &str,
         mapping_id: Option<&str>,
         mapping: &ColumnMappingDraft,
-    ) -> Result<ImportPreview, ImportError> {
+    ) -> Result<ImportPreview, CsvImportError> {
         let currency = self.account_currency(account_id).await?;
         mapping.columns.check()?;
         let saved: Vec<AssetMatch> = match mapping_id {
@@ -196,9 +196,10 @@ impl CsvImportUseCase {
             .iter()
             .find(|matched| !saved.contains(matched) && !known.contains(matched.asset_id.as_str()))
         {
-            return Err(ImportError::MatchedAssetNotFound {
+            return Err(CsvImportTask::MatchedAssetNotFound {
                 asset_id: made.asset_id.clone(),
-            });
+            }
+            .into());
         }
         let choices = ReadingChoices {
             encoding: Some(mapping.encoding),
@@ -230,16 +231,12 @@ impl CsvImportUseCase {
     }
 
     /// The account's currency, refused when the account is unknown (IMP-010).
-    async fn account_currency(&self, account_id: &str) -> Result<String, ImportError> {
+    async fn account_currency(&self, account_id: &str) -> Result<String, AccountError> {
         self.account_service
             .get_by_id(account_id)
-            .await
-            .map_err(|e| {
-                tracing::error!(target: BACKEND, account_id = %account_id, err = ?e, "import: account");
-                ImportError::DatabaseError
-            })?
+            .await?
             .map(|account| account.currency)
-            .ok_or_else(|| ImportError::AccountNotFound {
+            .ok_or_else(|| AccountError::AccountNotFound {
                 account_id: account_id.to_string(),
             })
     }
@@ -250,7 +247,7 @@ impl CsvImportUseCase {
         &self,
         account_id: &str,
         pending: Vec<(u32, Pending)>,
-    ) -> Result<Vec<PreviewRow>, ImportError> {
+    ) -> Result<Vec<PreviewRow>, CsvImportError> {
         let mut order: Vec<usize> = pending
             .iter()
             .enumerate()
@@ -269,19 +266,7 @@ impl CsvImportUseCase {
                 _ => None,
             })
             .collect();
-        let judgments = self
-            .account_service
-            .judge_import(account_id, steps)
-            .await
-            .map_err(|e| match e {
-                AccountError::AccountNotFound { account_id } => {
-                    ImportError::AccountNotFound { account_id }
-                }
-                other => {
-                    tracing::error!(target: BACKEND, err = ?other, "preview_import: judge");
-                    ImportError::DatabaseError
-                }
-            })?;
+        let judgments = self.account_service.judge_import(account_id, steps).await?;
         let mut judged: Vec<Option<ImportJudgment>> = vec![None; pending.len()];
         for (index, judgment) in order.into_iter().zip(judgments) {
             if let Some(slot) = judged.get_mut(index) {
@@ -304,7 +289,7 @@ impl CsvImportUseCase {
                     ) => status_of(operation, asset_id, judgment),
                     (Pending::Judged { .. }, None) => {
                         tracing::error!(target: BACKEND, line, "preview_import: a step not judged");
-                        return Err(ImportError::DatabaseError);
+                        return Err(ImportError::DatabaseError.into());
                     }
                 };
                 Ok(PreviewRow { line, status })
@@ -314,16 +299,16 @@ impl CsvImportUseCase {
 }
 
 /// IMP-010 — the file's bytes, refused when it is larger than 10 MB or cannot be read.
-async fn read_bytes(path: &str) -> Result<Vec<u8>, ImportError> {
-    let metadata = tokio::fs::metadata(path)
-        .await
-        .map_err(|_| ImportError::FileUnreadable)?;
+async fn read_bytes(path: &str) -> Result<Vec<u8>, CsvImportError> {
+    let unreadable = |e: std::io::Error| {
+        tracing::warn!(target: BACKEND, err = %e, "import: the file cannot be read");
+        CsvImportTask::FileUnreadable
+    };
+    let metadata = tokio::fs::metadata(path).await.map_err(unreadable)?;
     if metadata.len() > LARGEST_FILE {
-        return Err(ImportError::FileTooLarge);
+        return Err(ImportError::FileTooLarge.into());
     }
-    tokio::fs::read(path)
-        .await
-        .map_err(|_| ImportError::FileUnreadable)
+    Ok(tokio::fs::read(path).await.map_err(unreadable)?)
 }
 
 /// A row read: its status when matching or the currency settles it (IMP-032, IMP-037),

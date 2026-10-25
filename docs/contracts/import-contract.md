@@ -29,6 +29,8 @@
 > that mapping (IMP-018). `mapping_id` names the saved mapping it was picked from: its asset
 > matches stand, any other was made now and must name an asset of the portfolio (IMP-033).
 
+Both commands return `CsvImportError`: the codes of `ImportError`, of `AccountError` (`AccountNotFound`, `DatabaseError`) and of the use case's own `CsvImportTask` (`FileUnreadable`, `MatchedAssetNotFound`), each on the wire as `{ "code": … }`.
+
 **File errors** (both commands): `AccountNotFound { account_id }`, `FileUnreadable`, `FileTooLarge`, `FileEmpty`, `FileHasNoRow` (IMP-010), `FileNotUtf8` (IMP-011), `SeparatorNotFound` (IMP-012), `HeaderNameRepeated { name }` (IMP-015), `DatabaseError`.
 
 | Command            | Args                                                                                        | Return          | Errors                                                                                                                                                                                     |

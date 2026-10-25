@@ -20,7 +20,8 @@ use folioneer_lib::context::import::{
     SqliteColumnMappingRepository,
 };
 use folioneer_lib::use_cases::csv_import::{
-    CsvImportUseCase, ImportPreview, PreviewCounts, RowReason, RowStatus,
+    CsvImportError, CsvImportTask, CsvImportUseCase, ImportPreview, PreviewCounts, RowReason,
+    RowStatus,
 };
 use folioneer_lib::use_cases::holding_transaction::HoldingTransactionUseCase;
 use std::io::Write;
@@ -483,7 +484,7 @@ async fn imp_033_an_unknown_asset_is_matched_once() {
         .await;
     assert!(matches!(
         refused,
-        Err(ImportError::MatchedAssetNotFound { asset_id }) if asset_id == "not-an-asset"
+        Err(CsvImportError::UseCase(CsvImportTask::MatchedAssetNotFound { asset_id })) if asset_id == "not-an-asset"
     ));
     let saved = ctx
         .mappings
@@ -513,25 +514,34 @@ async fn imp_010_what_cannot_be_read_is_refused() {
         .read_import_file("nope", path(&file), &ReadingChoices::default())
         .await;
     assert!(
-        matches!(unknown, Err(ImportError::AccountNotFound { account_id }) if account_id == "nope")
+        matches!(unknown, Err(CsvImportError::Account(AccountError::AccountNotFound { account_id })) if account_id == "nope")
     );
     let missing = ctx
         .import
         .read_import_file(&account_id, "/no/such/file.csv", &ReadingChoices::default())
         .await;
-    assert!(matches!(missing, Err(ImportError::FileUnreadable)));
+    assert!(matches!(
+        missing,
+        Err(CsvImportError::UseCase(CsvImportTask::FileUnreadable))
+    ));
     let gone = ctx
         .import
         .preview_import(&account_id, path(&file), Some("gone"), &english_mapping())
         .await;
-    assert!(matches!(gone, Err(ImportError::MappingNotFound { .. })));
+    assert!(matches!(
+        gone,
+        Err(CsvImportError::Import(ImportError::MappingNotFound { .. }))
+    ));
     let mut no_date = english_mapping();
     no_date.columns.date = " ".to_string();
     let refused = ctx
         .import
         .preview_import(&account_id, path(&file), None, &no_date)
         .await;
-    assert!(matches!(refused, Err(ImportError::MappingColumnMissing)));
+    assert!(matches!(
+        refused,
+        Err(CsvImportError::Import(ImportError::MappingColumnMissing))
+    ));
     let mut absent = english_mapping();
     absent.columns.fees = header("Fees");
     let refused = ctx
@@ -539,7 +549,7 @@ async fn imp_010_what_cannot_be_read_is_refused() {
         .preview_import(&account_id, path(&file), None, &absent)
         .await;
     assert!(
-        matches!(refused, Err(ImportError::MappedColumnNotInFile { column }) if column == "Fees")
+        matches!(refused, Err(CsvImportError::Import(ImportError::MappedColumnNotInFile { column })) if column == "Fees")
     );
     let mut untyped = english_mapping();
     untyped.operation_types.retain(|label| label.label != "Buy");

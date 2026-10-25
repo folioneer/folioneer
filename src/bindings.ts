@@ -526,7 +526,7 @@ async deleteColumnMapping(mappingId: string) : Promise<Result<null, ImportError>
  * How the file at `path` reads for `account_id`: its format, detected or chosen, and its
  * columns (IMP-010 to IMP-016, IMP-018).
  */
-async readImportFile(accountId: string, path: string, choices: ReadingChoices) : Promise<Result<FileRead, ImportError>> {
+async readImportFile(accountId: string, path: string, choices: ReadingChoices) : Promise<Result<FileRead, CsvImportError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("read_import_file", { accountId, path, choices }) };
 } catch (e) {
@@ -539,7 +539,7 @@ async readImportFile(accountId: string, path: string, choices: ReadingChoices) :
  * written (IMP-017, IMP-020, IMP-030). `mapping_id` names the saved mapping it was picked
  * from, when it was.
  */
-async previewImport(accountId: string, path: string, mappingId: string | null, mapping: ColumnMappingDraft) : Promise<Result<ImportPreview, ImportError>> {
+async previewImport(accountId: string, path: string, mappingId: string | null, mapping: ColumnMappingDraft) : Promise<Result<ImportPreview, CsvImportError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("preview_import", { accountId, path, mappingId, mapping }) };
 } catch (e) {
@@ -1329,8 +1329,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
+export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 
 /** user-defined types **/
 
@@ -2932,6 +2932,39 @@ start_date: string;
  */
 end_date: string | null }
 /**
+ * Use-case composite for the import failure surface.
+ * 
+ * - `ImportError` — the file's content and the mapping (IMP-010 to IMP-021).
+ * - `AccountError` — the account the file is read for (`AccountNotFound`, IMP-010).
+ * - `CsvImportTask` — use-case-owned (this file).
+ */
+export type CsvImportError = 
+/**
+ * Import-BC rejection.
+ */
+ImportError | 
+/**
+ * Account-BC rejection.
+ */
+AccountError | 
+/**
+ * Use-case-layer rejection.
+ */
+CsvImportTask
+/**
+ * Use-case rejections of an import: reading the file the user picked and the matches made
+ * now (IMP-010, IMP-033).
+ */
+export type CsvImportTask = 
+/**
+ * The file cannot be read (IMP-010).
+ */
+{ code: "FileUnreadable" } | 
+/**
+ * A match made to an asset the portfolio does not hold (IMP-033).
+ */
+{ code: "MatchedAssetNotFound"; asset_id: string }
+/**
  * Single flat error enum for the `currency` bounded context (gold error model).
  * 
  * Every failure the BC can raise — validation, lookup, and infrastructure —
@@ -3965,18 +3998,6 @@ export type ImportError =
  * The mapping is no longer held (IMP-025, IMP-040).
  */
 { code: "MappingNotFound"; mapping_id: string } | 
-/**
- * The account the file is read for is unknown (IMP-010).
- */
-{ code: "AccountNotFound"; account_id: string } | 
-/**
- * The file cannot be read (IMP-010).
- */
-{ code: "FileUnreadable" } | 
-/**
- * A match made to an asset the portfolio does not hold (IMP-033).
- */
-{ code: "MatchedAssetNotFound"; asset_id: string } | 
 /**
  * The file is larger than 10 MB (IMP-010).
  */

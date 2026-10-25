@@ -7,11 +7,14 @@
 /// Tauri command handlers for the import preview.
 #[cfg(feature = "app")]
 mod api;
+/// The use case's failure surface.
+mod error;
 /// Cross-BC orchestrator.
 mod orchestrator;
 
 #[cfg(feature = "app")]
 pub use api::*;
+pub use error::{CsvImportError, CsvImportTask};
 pub use orchestrator::{
     CsvImportUseCase, ImportPreview, PreviewCounts, PreviewRow, RowReason, RowStatus,
 };
