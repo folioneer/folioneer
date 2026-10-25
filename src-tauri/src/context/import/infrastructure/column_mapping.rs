@@ -350,7 +350,7 @@ mod tests {
     fn imp_024a_the_text_bound_is_the_sync_bound() {
         assert_eq!(
             crate::context::import::domain::MAPPING_TEXT_LENGTH,
-            crate::context::sync::domain::received_change::TEXT_BOUND
+            crate::context::sync::TEXT_BOUND
         );
     }
 
