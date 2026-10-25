@@ -85,6 +85,7 @@ struct TransactionRow {
     created_at: String,
     write_off_reason: Option<String>,
     transfer_id: Option<String>,
+    added_deposit: bool,
 }
 
 impl TryFrom<TransactionRow> for Transaction {
@@ -118,7 +119,8 @@ impl TryFrom<TransactionRow> for Transaction {
             row.created_at,
         )
         .with_write_off_reason(write_off_reason)
-        .with_transfer_id(row.transfer_id))
+        .with_transfer_id(row.transfer_id)
+        .with_added_deposit(row.added_deposit))
     }
 }
 
@@ -324,11 +326,12 @@ impl SqliteAccountRepository {
                         r#"UPDATE transactions SET account_id = ?, asset_id = ?, transaction_type = ?,
                                date = ?, quantity = ?, unit_price = ?, exchange_rate = ?, fees = ?,
                                total_amount = ?, note = ?, realized_pnl = ?, write_off_reason = ?,
-                               transfer_id = ?
+                               transfer_id = ?, added_deposit = ?
                            WHERE id = ?"#,
                         tx.account_id, tx.asset_id, tx_type, tx.date, tx.quantity,
                         tx.unit_price, tx.exchange_rate, tx.fees, tx.total_amount,
-                        tx.note, tx.realized_pnl, write_off_reason, tx.transfer_id, tx.id
+                        tx.note, tx.realized_pnl, write_off_reason, tx.transfer_id,
+                        tx.added_deposit, tx.id
                     )
                     .execute(&mut *conn)
                     .await
@@ -545,8 +548,8 @@ async fn insert_transaction(conn: &mut SqliteConnection, tx: &Transaction) -> Re
     sqlx::query!(
         r#"INSERT INTO transactions (id, account_id, asset_id, transaction_type, date, quantity,
                unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at,
-               write_off_reason, transfer_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+               write_off_reason, transfer_id, added_deposit)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
         tx.id,
         tx.account_id,
         tx.asset_id,
@@ -561,7 +564,8 @@ async fn insert_transaction(conn: &mut SqliteConnection, tx: &Transaction) -> Re
         tx.realized_pnl,
         tx.created_at,
         write_off_reason,
-        tx.transfer_id
+        tx.transfer_id,
+        tx.added_deposit
     )
     .execute(conn)
     .await
@@ -601,7 +605,8 @@ async fn load_aggregate_on(conn: &mut SqliteConnection, id: &str) -> Result<Opti
     let tx_rows = sqlx::query_as!(
         TransactionRow,
         r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price,
-                  exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id
+                  exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id,
+                  added_deposit AS "added_deposit: bool"
            FROM transactions WHERE account_id = ?
            ORDER BY date ASC, created_at ASC, id ASC"#,
         id
@@ -954,7 +959,8 @@ impl AccountRepository for SqliteAccountRepository {
                 let row = sqlx::query!(
                     r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price,
                               exchange_rate, fees, total_amount, note, realized_pnl, created_at,
-                              write_off_reason, transfer_id, sync_logical_timestamp, sync_origin, sync_device_id
+                              write_off_reason, transfer_id, added_deposit AS "added_deposit: bool",
+                              sync_logical_timestamp, sync_origin, sync_device_id
                        FROM transactions WHERE id = ?"#,
                     identity
                 )
@@ -983,6 +989,7 @@ impl AccountRepository for SqliteAccountRepository {
                         created_at: row.created_at,
                         write_off_reason: row.write_off_reason,
                         transfer_id: row.transfer_id,
+                        added_deposit: row.added_deposit,
                     })?;
                     Ok(SyncedRecord {
                         rank,

@@ -659,7 +659,7 @@ A tax charged on a purchase and written on its own row of a broker's file, added
 
 ### Added deposit
 
-A deposit the import adds, dated with a purchase the file left unfunded, and marked as added (#502). In French: « Dépôt ajouté » (owner, 2026-10-25).
+A deposit the import adds, dated with a purchase the file left unfunded, and marked as added (IMP-051). In French: « Dépôt ajouté » (owner, 2026-10-25).
 
 > Status: confirmed
 

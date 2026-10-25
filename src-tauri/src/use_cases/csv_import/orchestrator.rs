@@ -43,7 +43,7 @@ pub enum RowReason {
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(tag = "status")]
 pub enum RowStatus {
-    /// Recorded on confirmation (#502); `funding` is the deposit a purchase the cash cannot
+    /// Recorded on confirmation (IMP-050); `funding` is the deposit a purchase the cash cannot
     /// fund needs (IMP-038).
     Ready {
         /// The operation read.
@@ -190,6 +190,36 @@ impl CsvImportUseCase {
         mapping_id: Option<&str>,
         mapping: &ColumnMappingDraft,
     ) -> Result<ImportPreview, CsvImportError> {
+        self.run(account_id, path, mapping_id, mapping, None).await
+    }
+
+    /// IMP-050 — the file read and judged again as `preview_import` does, against the account
+    /// as it is now, then every ready row recorded at once; the rows as judged then, the ready
+    /// ones being those recorded. `add_deposits`: each purchase the cash cannot fund is
+    /// recorded after the deposit it needs, marked as added (IMP-051); otherwise it is
+    /// rejected as manual entry rejects it.
+    pub async fn confirm_import(
+        &self,
+        account_id: &str,
+        path: &str,
+        mapping_id: Option<&str>,
+        mapping: &ColumnMappingDraft,
+        add_deposits: bool,
+    ) -> Result<ImportPreview, CsvImportError> {
+        self.run(account_id, path, mapping_id, mapping, Some(add_deposits))
+            .await
+    }
+
+    /// The file read through `mapping` and every row judged; with `record`, the rows taken
+    /// recorded, `record` saying whether the deposits a purchase needs are added.
+    async fn run(
+        &self,
+        account_id: &str,
+        path: &str,
+        mapping_id: Option<&str>,
+        mapping: &ColumnMappingDraft,
+        record: Option<bool>,
+    ) -> Result<ImportPreview, CsvImportError> {
         let currency = self.account_currency(account_id).await?;
         mapping.columns.check()?;
         let saved: Vec<AssetMatch> = match mapping_id {
@@ -241,7 +271,17 @@ impl CsvImportUseCase {
                 (row.line, pending)
             })
             .collect();
-        let rows = self.judge(account_id, pending).await?;
+        if record.is_some() {
+            // CSH-010 — a deposit, an added one included, needs the account's Cash Asset.
+            self.asset_service
+                .seed_cash_asset(&currency)
+                .await
+                .map_err(|e| {
+                    tracing::error!(target: BACKEND, err = ?e, "confirm_import: cash asset");
+                    ImportError::DatabaseError
+                })?;
+        }
+        let rows = self.judge(account_id, pending, record).await?;
         Ok(ImportPreview {
             counts: count(&rows),
             file: read,
@@ -266,6 +306,7 @@ impl CsvImportUseCase {
         &self,
         account_id: &str,
         pending: Vec<(u32, Pending)>,
+        record: Option<bool>,
     ) -> Result<Vec<PreviewRow>, CsvImportError> {
         let mut order: Vec<usize> = pending
             .iter()
@@ -285,10 +326,18 @@ impl CsvImportUseCase {
                 _ => None,
             })
             .collect();
-        let judgments = self
-            .account_service
-            .judge_recordings(account_id, steps)
-            .await?;
+        let judgments = match record {
+            None => {
+                self.account_service
+                    .judge_recordings(account_id, steps)
+                    .await?
+            }
+            Some(add_deposits) => {
+                self.account_service
+                    .record_recordings(account_id, steps, add_deposits)
+                    .await?
+            }
+        };
         let mut judged: Vec<Option<RecordingJudgment>> = vec![None; pending.len()];
         for (index, judgment) in order.into_iter().zip(judgments) {
             if let Some(slot) = judged.get_mut(index) {

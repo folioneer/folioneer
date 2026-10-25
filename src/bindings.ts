@@ -560,6 +560,19 @@ async previewImport(accountId: string, path: string, mappingId: string | null, m
 }
 },
 /**
+ * The file at `path` read and judged again for `account_id`, then every ready row recorded
+ * at once (IMP-050): the rows as judged then. `add_deposits`: the deposits the purchases
+ * need are added, marked as added (IMP-051).
+ */
+async confirmImport(accountId: string, path: string, mappingId: string | null, mapping: ColumnMappingDraft, addDeposits: boolean) : Promise<Result<ImportPreview, CsvImportError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("confirm_import", { accountId, path, mappingId, mapping, addDeposits }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Pauses sync on this device (SYN-070).
  */
 async pauseSync() : Promise<Result<SyncStatusView, SyncError>> {
@@ -5363,7 +5376,7 @@ export type RowRejection =
  */
 export type RowStatus = 
 /**
- * Recorded on confirmation (#502); `funding` is the deposit a purchase the cash cannot
+ * Recorded on confirmation (IMP-050); `funding` is the deposit a purchase the cash cannot
  * fund needs (IMP-038).
  */
 { status: "Ready"; operation: OperationRead; asset_id: string | null; funding: number | null } | 
@@ -6117,7 +6130,12 @@ write_off_reason?: WriteOffReason | null;
  * The transfer this transaction is a part of (TRF entity): its two sides and its fee in
  * kind share it; `None` on every other transaction, and on a change written before it.
  */
-transfer_id?: string | null }
+transfer_id?: string | null; 
+/**
+ * IMP-051 — a deposit the import added before a purchase the file left unfunded;
+ * `false` on every other transaction, and on a change written before data format 11.
+ */
+added_deposit?: boolean }
 /**
  * A transaction draft: a purchase or sale as the user is still entering it (TRX-062).
  * Empty strings are fields not filled yet; amounts are in micros.

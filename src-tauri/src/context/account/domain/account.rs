@@ -488,6 +488,8 @@ impl Account {
         let tx_type = existing.transaction_type;
         let asset_id = existing.asset_id.clone();
         let created_at = existing.created_at.clone();
+        // IMP-051 — a corrected deposit stays an added deposit.
+        let added_deposit = existing.added_deposit;
 
         let updated_tx = if tx_type == TransactionType::FreeShares {
             // FSD-040 — the zero-cost convention carries total_amount = 0, which the
@@ -622,6 +624,7 @@ impl Account {
                 None, // realized_pnl recomputed below
                 created_at,
             )?
+            .with_added_deposit(added_deposit)
         };
 
         self.splice_correction(tx_id, updated_tx)

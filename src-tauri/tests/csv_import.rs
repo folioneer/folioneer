@@ -10,6 +10,7 @@ use folioneer_lib::context::account::{
     AccountError, AccountService, SqliteAccountRepository, SqliteHoldingRepository,
     SqliteTransactionRepository,
 };
+use folioneer_lib::context::account::{Transaction, TransactionType};
 use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
     SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
@@ -19,6 +20,8 @@ use folioneer_lib::context::import::{
     MappedColumns, OperationLabel, OperationType, ReadingChoices, RowRejection, Separator,
     SqliteColumnMappingRepository,
 };
+use folioneer_lib::core::event_bus::Event;
+use folioneer_lib::core::SideEffectEventBus;
 use folioneer_lib::use_cases::csv_import::{
     CsvImportError, CsvImportTask, CsvImportUseCase, ImportPreview, PreviewCounts, RowReason,
     RowStatus,
@@ -38,6 +41,7 @@ struct Ctx {
     recording: HoldingTransactionUseCase,
     account_service: Arc<AccountService>,
     asset_service: Arc<AssetService>,
+    bus: Arc<SideEffectEventBus>,
 }
 
 async fn build_ctx() -> Ctx {
@@ -50,11 +54,15 @@ async fn build_ctx() -> Ctx {
         .run(&pool)
         .await
         .expect("migrations");
-    let account_service = Arc::new(AccountService::new(
-        Box::new(SqliteAccountRepository::new(pool.clone())),
-        Box::new(SqliteHoldingRepository::new(pool.clone())),
-        Box::new(SqliteTransactionRepository::new(pool.clone())),
-    ));
+    let bus = Arc::new(SideEffectEventBus::new());
+    let account_service = Arc::new(
+        AccountService::new(
+            Box::new(SqliteAccountRepository::new(pool.clone())),
+            Box::new(SqliteHoldingRepository::new(pool.clone())),
+            Box::new(SqliteTransactionRepository::new(pool.clone())),
+        )
+        .with_event_bus(Arc::clone(&bus)),
+    );
     let asset_service = Arc::new(AssetService::new(
         Box::new(SqliteAssetRepository::new(pool.clone())),
         Box::new(SqliteAssetCategoryRepository::new(pool.clone())),
@@ -73,6 +81,7 @@ async fn build_ctx() -> Ctx {
         recording: HoldingTransactionUseCase::new(account_service.clone(), asset_service.clone()),
         account_service,
         asset_service,
+        bus,
     }
 }
 
@@ -578,4 +587,191 @@ async fn imp_010_what_cannot_be_read_is_refused() {
         RowStatus::Rejected { reason: RowReason::Unread { rejection: RowRejection::OperationTypeMissing { label } } }
             if label == "Buy"
     ));
+}
+
+async fn transactions(ctx: &Ctx, account_id: &str) -> Vec<Transaction> {
+    ctx.account_service
+        .get_all_transactions_for_account(account_id)
+        .await
+        .expect("transactions")
+}
+
+fn deposits(transactions: &[Transaction]) -> Vec<&Transaction> {
+    transactions
+        .iter()
+        .filter(|t| t.transaction_type == TransactionType::Deposit)
+        .collect()
+}
+
+async fn confirm(
+    ctx: &Ctx,
+    account_id: &str,
+    file: &NamedTempFile,
+    mapping: &ColumnMappingDraft,
+    add_deposits: bool,
+) -> ImportPreview {
+    ctx.import
+        .confirm_import(account_id, path(file), None, mapping, add_deposits)
+        .await
+        .expect("confirmed")
+}
+
+/// The English fixture's portfolio: its two assets and an account with no cash.
+async fn english_portfolio(ctx: &Ctx) -> String {
+    asset(ctx, "Acme World", "ACM", Some("FR0000000010"), "EUR").await;
+    asset(ctx, "Beta Power", "BTP", Some("FR0000000002"), "EUR").await;
+    account(ctx, 0).await
+}
+
+// IMP-050 / IMP-051 — the ready rows are recorded at once, in date order, raising one
+// `TransactionUpdated`; the deposit a purchase needs is added before it, on its date, marked
+// as added; the rows the preview rejects are left out.
+#[tokio::test]
+async fn imp_050_a_confirmed_import_records_every_ready_row_at_once() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    let mut events = ctx.bus.subscribe();
+    let confirmed = confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    let updated = events
+        .drain()
+        .into_iter()
+        .filter(|event| *event == Event::TransactionUpdated)
+        .count();
+    assert_eq!(
+        updated, 1,
+        "IMP-050: one TransactionUpdated for the whole import"
+    );
+    assert_eq!(confirmed.counts.ready, 3);
+    assert!(matches!(status(&confirmed, 4), RowStatus::Rejected { .. }));
+    let recorded = transactions(&ctx, &account_id).await;
+    let kinds: Vec<(TransactionType, &str, bool)> = recorded
+        .iter()
+        .map(|t| (t.transaction_type, t.date.as_str(), t.added_deposit))
+        .collect();
+    assert_eq!(
+        kinds,
+        vec![
+            (TransactionType::Deposit, "2024-02-01", false),
+            (TransactionType::Purchase, "2024-02-02", false),
+            (TransactionType::Deposit, "2024-02-07", true),
+            (TransactionType::Purchase, "2024-02-07", false),
+        ],
+        "IMP-050 / IMP-051: the ready rows in date order, the added deposit before its purchase"
+    );
+    let added = deposits(&recorded)
+        .into_iter()
+        .find(|t| t.added_deposit)
+        .expect("added deposit");
+    assert_eq!(
+        added.total_amount,
+        micro(701),
+        "IMP-051: the deposit the preview showed"
+    );
+}
+
+// IMP-051 — left out by the user's choice, no deposit is added, and the purchase the cash
+// cannot fund is rejected as manual entry rejects it (CSH-041).
+#[tokio::test]
+async fn imp_051_the_added_deposits_can_be_left_out() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    let confirmed = confirm(&ctx, &account_id, &file, &english_mapping(), false).await;
+    assert!(matches!(
+        status(&confirmed, 8),
+        RowStatus::Rejected {
+            reason: RowReason::ManualEntry {
+                refusal: AccountError::InsufficientCash { .. }
+            }
+        }
+    ));
+    let recorded = transactions(&ctx, &account_id).await;
+    assert_eq!(recorded.len(), 2, "the deposit and the first purchase only");
+    assert!(recorded.iter().all(|t| !t.added_deposit));
+}
+
+// IMP-053 — importing the same file twice records nothing new: every row the first import
+// recorded is already recorded, and no event is raised.
+#[tokio::test]
+async fn imp_053_the_same_file_imported_twice_records_nothing_new() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    let once = transactions(&ctx, &account_id).await;
+    let mut events = ctx.bus.subscribe();
+    let again = confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    assert_eq!(transactions(&ctx, &account_id).await.len(), once.len());
+    assert_eq!(again.counts.ready, 0);
+    assert_eq!(again.counts.already_recorded, 3);
+    assert!(
+        events.drain().is_empty(),
+        "nothing recorded, nothing announced"
+    );
+    let french = build_ctx().await;
+    let (account_id, _, _) = french_portfolio(&french).await;
+    let file = picked(&french, &fixture("french_broker.csv"), true).await;
+    let first = confirm(&french, &account_id, &file, &french_mapping(), true).await;
+    let again = confirm(&french, &account_id, &file, &french_mapping(), true).await;
+    assert_eq!(again.counts.ready, 0, "IMP-053: {:?}", again.rows);
+    assert_eq!(again.counts.already_recorded, first.counts.ready);
+}
+
+// IMP-052 — an unknown asset created from its row before confirming takes its rows, which
+// are then recorded.
+#[tokio::test]
+async fn imp_052_an_unknown_asset_created_from_its_row_is_recorded() {
+    let ctx = build_ctx().await;
+    let (account_id, _, _) = french_portfolio(&ctx).await;
+    let file = picked(&ctx, &fixture("french_broker.csv"), true).await;
+    let preview = preview(&ctx, &account_id, &file, &french_mapping()).await;
+    let RowStatus::UnknownAsset { asset: read } = status(&preview, 8) else {
+        panic!("line 8 is unknown");
+    };
+    let name = read.name.clone().expect("the name read");
+    let created = asset(&ctx, &name, "INC", None, "EUR").await;
+    let confirmed = confirm(&ctx, &account_id, &file, &french_mapping(), true).await;
+    assert!(
+        matches!(status(&confirmed, 8), RowStatus::Ready { asset_id: Some(id), .. } if *id == created)
+    );
+    assert!(transactions(&ctx, &account_id)
+        .await
+        .iter()
+        .any(|t| t.asset_id == created && t.transaction_type == TransactionType::Purchase));
+}
+
+// IMP-051 — a corrected added deposit stays marked as added.
+#[tokio::test]
+async fn imp_051_a_corrected_added_deposit_stays_added() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    let added = deposits(&transactions(&ctx, &account_id).await)
+        .into_iter()
+        .find(|t| t.added_deposit)
+        .cloned()
+        .expect("added deposit");
+    ctx.account_service
+        .correct_transaction(
+            &account_id,
+            &added.id,
+            added.date.clone(),
+            micro(800), // a deposit's amount travels as its quantity
+            added.unit_price,
+            added.exchange_rate,
+            0,
+            None,
+            Some("topped up".to_string()),
+        )
+        .await
+        .expect("corrected");
+    let corrected = transactions(&ctx, &account_id)
+        .await
+        .into_iter()
+        .find(|t| t.id == added.id)
+        .expect("still there");
+    assert!(corrected.added_deposit);
+    assert_eq!(corrected.total_amount, micro(800));
 }
