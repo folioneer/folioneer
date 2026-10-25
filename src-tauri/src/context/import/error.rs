@@ -31,6 +31,40 @@ pub enum ImportError {
         mapping_id: String,
     },
 
+    /// The file is larger than 10 MB (IMP-010).
+    #[error("The file is larger than 10 MB")]
+    FileTooLarge,
+
+    /// The file holds nothing, or its first line is blank (IMP-010).
+    #[error("The file is empty")]
+    FileEmpty,
+
+    /// The file holds a header and no row that is not blank (IMP-010, IMP-016).
+    #[error("The file holds no row after its header")]
+    FileHasNoRow,
+
+    /// The file was to be read as UTF-8 and its bytes are not (IMP-011).
+    #[error("The file is not written in UTF-8")]
+    FileNotUtf8,
+
+    /// No separator splits the header and the lines alike (IMP-012).
+    #[error("No separator was found in the file")]
+    SeparatorNotFound,
+
+    /// The header holds a name twice, case ignored (IMP-015).
+    #[error("The header names the column {name} twice")]
+    HeaderNameRepeated {
+        /// The name held twice, as written the second time.
+        name: String,
+    },
+
+    /// The mapping in use names a column the file lacks (IMP-021).
+    #[error("The file has no column {column}")]
+    MappedColumnNotInFile {
+        /// The column's header, as the mapping names it.
+        column: String,
+    },
+
     /// An infrastructure failure; the diagnostic is logged server-side, never sent.
     #[error("An unexpected database error occurred")]
     DatabaseError,
@@ -67,6 +101,32 @@ mod tests {
             .expect("serializes"),
             json!({ "code": "MappingNotFound", "mapping_id": "m-1" })
         );
+        assert_eq!(
+            to_value(ImportError::HeaderNameRepeated {
+                name: "Date".into()
+            })
+            .expect("serializes"),
+            json!({ "code": "HeaderNameRepeated", "name": "Date" })
+        );
+        assert_eq!(
+            to_value(ImportError::MappedColumnNotInFile {
+                column: "Qté".into()
+            })
+            .expect("serializes"),
+            json!({ "code": "MappedColumnNotInFile", "column": "Qté" })
+        );
+        for (error, code) in [
+            (ImportError::FileTooLarge, "FileTooLarge"),
+            (ImportError::FileEmpty, "FileEmpty"),
+            (ImportError::FileHasNoRow, "FileHasNoRow"),
+            (ImportError::FileNotUtf8, "FileNotUtf8"),
+            (ImportError::SeparatorNotFound, "SeparatorNotFound"),
+        ] {
+            assert_eq!(
+                to_value(error).expect("serializes"),
+                json!({ "code": code })
+            );
+        }
         assert_eq!(
             to_value(ImportError::DatabaseError).expect("serializes"),
             json!({ "code": "DatabaseError" })

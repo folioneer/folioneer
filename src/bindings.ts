@@ -1304,8 +1304,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
+export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 
 /** user-defined types **/
 
@@ -3883,6 +3883,34 @@ export type ImportError =
  * The mapping is no longer held (IMP-025, IMP-040).
  */
 { code: "MappingNotFound"; mapping_id: string } | 
+/**
+ * The file is larger than 10 MB (IMP-010).
+ */
+{ code: "FileTooLarge" } | 
+/**
+ * The file holds nothing, or its first line is blank (IMP-010).
+ */
+{ code: "FileEmpty" } | 
+/**
+ * The file holds a header and no row that is not blank (IMP-010, IMP-016).
+ */
+{ code: "FileHasNoRow" } | 
+/**
+ * The file was to be read as UTF-8 and its bytes are not (IMP-011).
+ */
+{ code: "FileNotUtf8" } | 
+/**
+ * No separator splits the header and the lines alike (IMP-012).
+ */
+{ code: "SeparatorNotFound" } | 
+/**
+ * The header holds a name twice, case ignored (IMP-015).
+ */
+{ code: "HeaderNameRepeated"; name: string } | 
+/**
+ * The mapping in use names a column the file lacks (IMP-021).
+ */
+{ code: "MappedColumnNotInFile"; column: string } | 
 /**
  * An infrastructure failure; the diagnostic is logged server-side, never sent.
  */

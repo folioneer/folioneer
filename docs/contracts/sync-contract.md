@@ -179,7 +179,7 @@ struct SyncReportView {
 }
 ```
 
-Record identity per kind follows CFR-012: accounts, categories, assets, transactions by id; fee schedules and catch-up positions by `account_id + asset_id`; currency pairs by `from + to`; prices by `asset_id + date`; rates by `pair + date`; holding notes by `account_id + asset_id`; portfolio settings by `name`; reported splits by `asset_id + date`. On the wire `record_identity` is the canonical string form of that key.
+Record identity per kind follows CFR-012: accounts, categories, assets, transactions, column mappings by id; fee schedules and catch-up positions by `account_id + asset_id`; currency pairs by `from + to`; prices by `asset_id + date`; rates by `pair + date`; holding notes by `account_id + asset_id`; portfolio settings by `name`; reported splits by `asset_id + date`. On the wire `record_identity` is the canonical string form of that key.
 
 ---
 
