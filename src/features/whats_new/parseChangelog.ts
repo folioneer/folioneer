@@ -6,8 +6,8 @@ export interface ChangelogSection {
   body: string[];
 }
 
-/** The areas a changelog line can carry: the scopes of `docs/commit-rules.md` § Scope (WNW-090). */
-export const AREAS = [
+/** The application areas a changelog line can carry: the scopes of `docs/commit-rules.md` § Scope (WNW-090). */
+export const APPLICATION_AREAS = [
   "account",
   "holding",
   "asset",
@@ -29,23 +29,26 @@ export const AREAS = [
   "update",
 ] as const;
 
-export type Area = (typeof AREAS)[number];
+export type ApplicationArea = (typeof APPLICATION_AREAS)[number];
 
-const AREA_TAG_PATTERN = /^\[([a-z-]+)\] +(\S.*)$/;
+const APPLICATION_AREA_TAG_PATTERN = /^\[([a-z-]+)\] +(\S.*)$/;
 
-function isArea(word: string): word is Area {
-  return (AREAS as readonly string[]).includes(word);
+function isApplicationArea(word: string): word is ApplicationArea {
+  return (APPLICATION_AREAS as readonly string[]).includes(word);
 }
 
-/** A bullet's area tag and its sentence; a line with no tag, or one outside the list, as written (WNW-090). */
-export function splitAreaTag(item: string): { area: Area | null; text: string } {
-  const [, word = "", text = ""] = AREA_TAG_PATTERN.exec(item) ?? [];
-  return isArea(word) ? { area: word, text } : { area: null, text: item };
+/** A bullet's application area tag and its sentence; a line with no tag, or one outside the list, as written (WNW-090). */
+export function splitApplicationAreaTag(item: string): {
+  area: ApplicationArea | null;
+  text: string;
+} {
+  const [, word = "", text = ""] = APPLICATION_AREA_TAG_PATTERN.exec(item) ?? [];
+  return isApplicationArea(word) ? { area: word, text } : { area: null, text: item };
 }
 
-/** The translation key of an area's name (WNW-092): i18n keys are snake_case. */
-export function areaLabelKey(area: Area): string {
-  return `whats_new.areas.${area.replaceAll("-", "_")}`;
+/** The translation key of an application area's name (WNW-092): i18n keys are snake_case. */
+export function applicationAreaLabelKey(area: ApplicationArea): string {
+  return `whats_new.application_areas.${area.replaceAll("-", "_")}`;
 }
 
 type ParsedVersion = [number, number, number];

@@ -3,11 +3,11 @@ import commitRules from "../../../docs/commit-rules.md?raw";
 import en from "../../i18n/locales/en/common.json";
 import fr from "../../i18n/locales/fr/common.json";
 import {
-  AREAS,
-  areaLabelKey,
+  APPLICATION_AREAS,
+  applicationAreaLabelKey,
   extractSectionFor,
   extractSectionsBetween,
-  splitAreaTag,
+  splitApplicationAreaTag,
 } from "./parseChangelog";
 
 const CHANGELOG_FIXTURE = `# Changelog
@@ -118,41 +118,43 @@ describe("extractSectionFor", () => {
   });
 });
 
-describe("splitAreaTag (WNW-090)", () => {
-  it("splits a known area tag from the sentence", () => {
-    expect(splitAreaTag("[transfer] Move a holding to another account")).toEqual({
+describe("splitApplicationAreaTag (WNW-090)", () => {
+  it("splits a known application area tag from the sentence", () => {
+    expect(splitApplicationAreaTag("[transfer] Move a holding to another account")).toEqual({
       area: "transfer",
       text: "Move a holding to another account",
     });
-    expect(splitAreaTag("[command-line] Record a price from a terminal").area).toBe("command-line");
+    expect(splitApplicationAreaTag("[command-line] Record a price from a terminal").area).toBe(
+      "command-line",
+    );
   });
 
   it("leaves a line with no tag as written (WNW-091)", () => {
-    expect(splitAreaTag("A refused sale now says how much you held")).toEqual({
+    expect(splitApplicationAreaTag("A refused sale now says how much you held")).toEqual({
       area: null,
       text: "A refused sale now says how much you held",
     });
   });
 
   it("reads a tag only when it is exact, lowercase and followed by a space", () => {
-    expect(splitAreaTag("[Transfer] Move a holding").area).toBeNull();
-    expect(splitAreaTag("[agent][transfer] Move a holding").area).toBeNull();
+    expect(splitApplicationAreaTag("[Transfer] Move a holding").area).toBeNull();
+    expect(splitApplicationAreaTag("[agent][transfer] Move a holding").area).toBeNull();
   });
 
   it("drops every space after the tag and keeps a second tag in the sentence (WNW-090)", () => {
-    expect(splitAreaTag("[transfer]   Move a holding").text).toBe("Move a holding");
-    expect(splitAreaTag("[transfer] [price] Move a holding")).toEqual({
+    expect(splitApplicationAreaTag("[transfer]   Move a holding").text).toBe("Move a holding");
+    expect(splitApplicationAreaTag("[transfer] [price] Move a holding")).toEqual({
       area: "transfer",
       text: "[price] Move a holding",
     });
   });
 
   it("leaves a tag with no sentence as written (WNW-091)", () => {
-    expect(splitAreaTag("[transfer] ")).toEqual({ area: null, text: "[transfer] " });
+    expect(splitApplicationAreaTag("[transfer] ")).toEqual({ area: null, text: "[transfer] " });
   });
 
-  it("leaves a line whose tag is not an area as written (WNW-091)", () => {
-    expect(splitAreaTag("[deps] bump a crate")).toEqual({
+  it("leaves a line whose tag is not an application area as written (WNW-091)", () => {
+    expect(splitApplicationAreaTag("[deps] bump a crate")).toEqual({
       area: null,
       text: "[deps] bump a crate",
     });
@@ -162,14 +164,20 @@ describe("splitAreaTag (WNW-090)", () => {
     const table = commitRules.split("<!-- scopes:start -->")[1]?.split("<!-- scopes:end -->")[0];
     const scopes = [...(table ?? "").matchAll(/^\| *`([a-z-]+)`/gm)].map((match) => match[1]);
     expect(scopes.length).toBeGreaterThan(0);
-    expect([...AREAS].sort()).toEqual(scopes.sort());
+    expect([...APPLICATION_AREAS].sort()).toEqual(scopes.sort());
   });
 
-  it("names every area in English and French (WNW-092)", () => {
-    for (const area of AREAS) {
-      const key = areaLabelKey(area).replace("whats_new.areas.", "");
-      expect((en.whats_new.areas as Record<string, string>)[key], `en ${area}`).toBeTruthy();
-      expect((fr.whats_new.areas as Record<string, string>)[key], `fr ${area}`).toBeTruthy();
+  it("names every application area in English and French (WNW-092)", () => {
+    for (const area of APPLICATION_AREAS) {
+      const key = applicationAreaLabelKey(area).replace("whats_new.application_areas.", "");
+      expect(
+        (en.whats_new.application_areas as Record<string, string>)[key],
+        `en ${area}`,
+      ).toBeTruthy();
+      expect(
+        (fr.whats_new.application_areas as Record<string, string>)[key],
+        `fr ${area}`,
+      ).toBeTruthy();
     }
   });
 });

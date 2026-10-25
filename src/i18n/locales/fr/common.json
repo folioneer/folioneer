@@ -798,7 +798,7 @@
   "whats_new": {
     "title": "Nouveautés ({{version}})",
     "dismiss": "Compris",
-    "areas": {
+    "application_areas": {
       "account": "Compte",
       "holding": "Position",
       "asset": "Actif",
