@@ -24,19 +24,21 @@
 
 > A file is read for one account (IMP-010), its format detected or chosen (IMP-011 to IMP-018),
 > then previewed through the mapping in use, every row judged and nothing written (IMP-017,
-> IMP-030). `path` is the file the user picked in the system dialog. The preview reads the file
+> IMP-030). `path` is what `pick_import_file` returned: a file the user did not pick there is
+> refused (IMP-010). The preview reads the file
 > with the mapping's own format, none detected (IMP-020); a choice the user makes is an edit of
 > that mapping (IMP-018). `mapping_id` names the saved mapping it was picked from: its asset
 > matches stand, any other was made now and must name an asset of the portfolio (IMP-033).
 
-Both commands return `CsvImportError`: the codes of `ImportError`, of `AccountError` (`AccountNotFound`, `DatabaseError`) and of the use case's own `CsvImportTask` (`FileUnreadable`, `MatchedAssetNotFound`), each on the wire as `{ "code": … }`.
+The three commands return `CsvImportError`: the codes of `ImportError`, of `AccountError` (`AccountNotFound`, `DatabaseError`) and of the use case's own `CsvImportTask` (`FileUnreadable`, `FileNotPicked`, `MatchedAssetNotFound`, `UnknownError` — a broken invariant, logged), each on the wire as `{ "code": … }`.
 
-**File errors** (both commands): `AccountNotFound { account_id }`, `FileUnreadable`, `FileTooLarge`, `FileEmpty`, `FileHasNoRow` (IMP-010), `FileNotUtf8` (IMP-011), `SeparatorNotFound` (IMP-012), `HeaderNameRepeated { name }` (IMP-015), `DatabaseError`.
+**File errors** (`read_import_file`, `preview_import`): `AccountNotFound { account_id }`, `FileUnreadable`, `FileNotPicked`, `FileTooLarge`, `FileEmpty`, `FileHasNoRow` (IMP-010), `FileNotUtf8` (IMP-011), `SeparatorNotFound` (IMP-012), `HeaderNameRepeated { name }` (IMP-015), `DatabaseError`.
 
-| Command            | Args                                                                                        | Return          | Errors                                                                                                                                                                                     |
-| ------------------ | ------------------------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `read_import_file` | `account_id: String, path: String, choices: ReadingChoices`                                 | `FileRead`      | the file errors                                                                                                                                                                            |
-| `preview_import`   | `account_id: String, path: String, mapping_id: Option<String>, mapping: ColumnMappingDraft` | `ImportPreview` | the file errors, `MappingColumnMissing` (IMP-021), `MappedColumnNotInFile { column }` (IMP-021), `MappingNotFound { mapping_id }` (IMP-020), `MatchedAssetNotFound { asset_id }` (IMP-033) |
+| Command            | Args                                                                                        | Return           | Errors                                                                                                                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pick_import_file` | —                                                                                           | `Option<String>` | `FileUnreadable` _(IMP-010 — the system dialog; `None` when the user closes it)_                                                                                                           |
+| `read_import_file` | `account_id: String, path: String, choices: ReadingChoices`                                 | `FileRead`       | the file errors                                                                                                                                                                            |
+| `preview_import`   | `account_id: String, path: String, mapping_id: Option<String>, mapping: ColumnMappingDraft` | `ImportPreview`  | the file errors, `MappingColumnMissing` (IMP-021), `MappedColumnNotInFile { column }` (IMP-021), `MappingNotFound { mapping_id }` (IMP-020), `MatchedAssetNotFound { asset_id }` (IMP-033) |
 
 ---
 

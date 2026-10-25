@@ -192,6 +192,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             import::list_column_mappings,
             import::save_column_mapping,
             import::delete_column_mapping,
+            csv_import::pick_import_file,
             csv_import::read_import_file,
             csv_import::preview_import,
             // ----- sync BC (SYN/CFR) -----

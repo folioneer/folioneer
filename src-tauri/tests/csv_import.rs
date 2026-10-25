@@ -227,6 +227,13 @@ fn file_of(text: &str, latin: bool) -> NamedTempFile {
     file
 }
 
+/// `text` in a temporary file, as `file_of` writes it, picked by the user.
+async fn picked(ctx: &Ctx, text: &str, latin: bool) -> NamedTempFile {
+    let file = file_of(text, latin);
+    ctx.import.allow_file(file.path()).await.expect("picked");
+    file
+}
+
 async fn preview(
     ctx: &Ctx,
     account_id: &str,
@@ -267,7 +274,7 @@ async fn french_portfolio(ctx: &Ctx) -> (String, String, String) {
 async fn imp_030_the_preview_judges_every_row_of_a_french_export() {
     let ctx = build_ctx().await;
     let (account_id, acme, beta) = french_portfolio(&ctx).await;
-    let file = file_of(&fixture("french_broker.csv"), true);
+    let file = picked(&ctx, &fixture("french_broker.csv"), true).await;
     let read = ctx
         .import
         .read_import_file(&account_id, path(&file), &ReadingChoices::default())
@@ -316,7 +323,7 @@ async fn imp_030_the_preview_judges_every_row_of_a_french_export() {
 async fn imp_036_a_row_already_recorded_is_shown_so() {
     let ctx = build_ctx().await;
     let (account_id, acme, _) = french_portfolio(&ctx).await;
-    let file = file_of(&fixture("french_broker.csv"), true);
+    let file = picked(&ctx, &fixture("french_broker.csv"), true).await;
     let before = ctx
         .account_service
         .get_all_transactions_for_account(&account_id)
@@ -364,7 +371,7 @@ async fn imp_035_rows_follow_the_rules_of_manual_entry() {
     asset(&ctx, "Acme World", "ACM", Some("FR0000000010"), "EUR").await;
     asset(&ctx, "Beta Power", "BTP", Some("FR0000000002"), "EUR").await;
     let account_id = account(&ctx, 0).await;
-    let file = file_of(&fixture("english_broker.csv"), false);
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
     let preview = preview(&ctx, &account_id, &file, &english_mapping()).await;
     assert!(matches!(
         status(&preview, 2),
@@ -430,7 +437,7 @@ async fn imp_032_each_row_is_matched_to_an_asset() {
                 2024-02-02,Buy,FR0000000010,,Acme World,1,10,10,0,EUR\n\
                 2024-02-02,Buy,,,Acme World,1,10,10,0,EUR\n\
                 2024-02-03,Sell,FR0000000010,,,1,10,10,0,EUR\n";
-    let file = file_of(rows, false);
+    let file = picked(&ctx, rows, false).await;
     let preview_once = preview(&ctx, &account_id, &file, &english_mapping()).await;
     assert!(
         matches!(status(&preview_once, 2), RowStatus::Ready { asset_id: Some(id), .. } if *id == by_isin)
@@ -464,7 +471,7 @@ async fn imp_032_each_row_is_matched_to_an_asset() {
 async fn imp_033_an_unknown_asset_is_matched_once() {
     let ctx = build_ctx().await;
     let (account_id, _, beta) = french_portfolio(&ctx).await;
-    let file = file_of(&fixture("french_broker.csv"), true);
+    let file = picked(&ctx, &fixture("french_broker.csv"), true).await;
     let mut mapping = french_mapping();
     mapping.asset_matches = vec![AssetMatch {
         read: "inconnue sa".to_string(),
@@ -502,13 +509,13 @@ async fn imp_033_an_unknown_asset_is_matched_once() {
     ));
 }
 
-// IMP-010 / IMP-020 / IMP-021 — an unknown account, a file that cannot be read, a saved
-// mapping no longer held and a mapping without its date column are refused.
+// IMP-010 / IMP-020 / IMP-021 — an unknown account, a file that cannot be read or was not
+// picked, a saved mapping no longer held and a mapping without its date column are refused.
 #[tokio::test]
 async fn imp_010_what_cannot_be_read_is_refused() {
     let ctx = build_ctx().await;
     let account_id = account(&ctx, 0).await;
-    let file = file_of(&fixture("english_broker.csv"), false);
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
     let unknown = ctx
         .import
         .read_import_file("nope", path(&file), &ReadingChoices::default())
@@ -524,6 +531,18 @@ async fn imp_010_what_cannot_be_read_is_refused() {
         missing,
         Err(CsvImportError::UseCase(CsvImportTask::FileUnreadable))
     ));
+    let unpicked = file_of(&fixture("english_broker.csv"), false);
+    let refused = ctx
+        .import
+        .read_import_file(&account_id, path(&unpicked), &ReadingChoices::default())
+        .await;
+    assert!(
+        matches!(
+            refused,
+            Err(CsvImportError::UseCase(CsvImportTask::FileNotPicked))
+        ),
+        "IMP-010: only a file the user picked is read"
+    );
     let gone = ctx
         .import
         .preview_import(&account_id, path(&file), Some("gone"), &english_mapping())

@@ -12,7 +12,8 @@ use crate::core::logger::BACKEND;
 use serde::Serialize;
 use specta::Type;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, PoisonError};
 
 /// An exchange rate of one (micro-units): one currency in this version (IMP-037).
 const SAME_CURRENCY: i64 = 1_000_000;
@@ -122,6 +123,8 @@ pub struct CsvImportUseCase {
     import_service: Arc<ImportService>,
     account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,
+    /// IMP-010 — the files the user picked in the system dialog, the only ones read.
+    picked: Mutex<HashSet<PathBuf>>,
 }
 
 /// A row on its way to the preview: its status once known, or the step it stands for.
@@ -145,7 +148,23 @@ impl CsvImportUseCase {
             import_service,
             account_service,
             asset_service,
+            picked: Mutex::new(HashSet::new()),
         }
+    }
+
+    /// IMP-010 — `path`, picked by the user in the system dialog, may be read; the path the
+    /// other commands take, returned.
+    pub async fn allow_file(&self, path: &Path) -> Result<String, CsvImportError> {
+        let canonical = tokio::fs::canonicalize(path).await.map_err(unreadable)?;
+        let shown = canonical
+            .to_str()
+            .ok_or(CsvImportTask::FileUnreadable)?
+            .to_string();
+        self.picked
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(canonical);
+        Ok(shown)
     }
 
     /// IMP-010 to IMP-016 — how the file at `path` reads for `account_id`, with what the user
@@ -157,7 +176,7 @@ impl CsvImportUseCase {
         choices: &ReadingChoices,
     ) -> Result<FileRead, CsvImportError> {
         self.account_currency(account_id).await?;
-        let bytes = read_bytes(path).await?;
+        let bytes = self.read_bytes(path).await?;
         Ok(read_file(&bytes, choices).map(|(_, read)| read)?)
     }
 
@@ -208,7 +227,7 @@ impl CsvImportUseCase {
             date_format: Some(mapping.date_format),
             date_column: Some(mapping.columns.date.clone()),
         };
-        let bytes = read_bytes(path).await?;
+        let bytes = self.read_bytes(path).await?;
         let (file, read) = read_file(&bytes, &choices)?;
         let format = RowFormat {
             decimal_mark: mapping.decimal_mark,
@@ -289,26 +308,39 @@ impl CsvImportUseCase {
                     ) => status_of(operation, asset_id, judgment),
                     (Pending::Judged { .. }, None) => {
                         tracing::error!(target: BACKEND, line, "preview_import: a step not judged");
-                        return Err(ImportError::DatabaseError.into());
+                        return Err(CsvImportTask::UnknownError.into());
                     }
                 };
                 Ok(PreviewRow { line, status })
             })
             .collect()
     }
+
+    /// IMP-010 — the file's bytes, refused when the user did not pick it, when it is larger
+    /// than 10 MB or cannot be read.
+    async fn read_bytes(&self, path: &str) -> Result<Vec<u8>, CsvImportError> {
+        let canonical = tokio::fs::canonicalize(path).await.map_err(unreadable)?;
+        let picked = self
+            .picked
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(&canonical);
+        if !picked {
+            tracing::warn!(target: BACKEND, "import: a file the user did not pick");
+            return Err(CsvImportTask::FileNotPicked.into());
+        }
+        let metadata = tokio::fs::metadata(&canonical).await.map_err(unreadable)?;
+        if metadata.len() > LARGEST_FILE {
+            return Err(ImportError::FileTooLarge.into());
+        }
+        Ok(tokio::fs::read(&canonical).await.map_err(unreadable)?)
+    }
 }
 
-/// IMP-010 — the file's bytes, refused when it is larger than 10 MB or cannot be read.
-async fn read_bytes(path: &str) -> Result<Vec<u8>, CsvImportError> {
-    let unreadable = |e: std::io::Error| {
-        tracing::warn!(target: BACKEND, err = %e, "import: the file cannot be read");
-        CsvImportTask::FileUnreadable
-    };
-    let metadata = tokio::fs::metadata(path).await.map_err(unreadable)?;
-    if metadata.len() > LARGEST_FILE {
-        return Err(ImportError::FileTooLarge.into());
-    }
-    Ok(tokio::fs::read(path).await.map_err(unreadable)?)
+/// IMP-010 — a file that cannot be read, its cause logged.
+fn unreadable(e: std::io::Error) -> CsvImportTask {
+    tracing::warn!(target: BACKEND, err = %e, "import: the file cannot be read");
+    CsvImportTask::FileUnreadable
 }
 
 /// A row read: its status when matching or the currency settles it (IMP-032, IMP-037),

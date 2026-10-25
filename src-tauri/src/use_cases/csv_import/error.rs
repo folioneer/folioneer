@@ -9,6 +9,12 @@ pub enum CsvImportTask {
     /// The file cannot be read (IMP-010).
     #[error("The file cannot be read")]
     FileUnreadable,
+    /// The file was not picked by the user in the system dialog (IMP-010).
+    #[error("The file was not picked")]
+    FileNotPicked,
+    /// An invariant of the use case broke: a bug, logged where it happened.
+    #[error("Unexpected error")]
+    UnknownError,
     /// A match made to an asset the portfolio does not hold (IMP-033).
     #[error("Asset not found: {asset_id}")]
     MatchedAssetNotFound {
@@ -67,5 +73,24 @@ mod tests {
             to_value(CsvImportError::Import(ImportError::FileEmpty)).expect("serializes"),
             json!({ "code": "FileEmpty" })
         );
+        for task in [CsvImportTask::FileNotPicked, CsvImportTask::UnknownError] {
+            let code = format!("{task:?}");
+            assert_eq!(
+                to_value(CsvImportError::UseCase(task)).expect("serializes"),
+                json!({ "code": code })
+            );
+        }
+    }
+
+    // Both contexts' `DatabaseError` reach the window as one code, on purpose: the window
+    // shows the same message whichever database failed.
+    #[test]
+    fn a_database_error_shares_one_code_across_both_contexts() {
+        let import =
+            to_value(CsvImportError::Import(ImportError::DatabaseError)).expect("serializes");
+        let account =
+            to_value(CsvImportError::Account(AccountError::DatabaseError)).expect("serializes");
+        assert_eq!(import, json!({ "code": "DatabaseError" }));
+        assert_eq!(import, account);
     }
 }

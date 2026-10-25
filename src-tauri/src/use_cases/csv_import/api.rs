@@ -1,10 +1,32 @@
 // Allow unreachable lint as tauri::command and specta::specta macros generate false positives
 #![allow(clippy::unreachable)]
 
-use super::error::CsvImportError;
+use super::error::{CsvImportError, CsvImportTask};
 use super::orchestrator::{CsvImportUseCase, ImportPreview};
 use crate::context::import::{ColumnMappingDraft, FileRead, ReadingChoices};
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_dialog::DialogExt;
+
+/// IMP-010 — the system dialog opened for the user to pick a file: the path the other two
+/// commands take, or `None` when the user closed the dialog. Only a file picked here is read.
+#[tauri::command]
+#[specta::specta]
+pub async fn pick_import_file(
+    app: AppHandle,
+    use_case: State<'_, CsvImportUseCase>,
+) -> Result<Option<String>, CsvImportError> {
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.dialog().file().pick_file(move |file| {
+        let _ = sender.send(file);
+    });
+    let Some(file) = receiver.await.ok().flatten() else {
+        return Ok(None);
+    };
+    let path = file
+        .into_path()
+        .map_err(|_| CsvImportTask::FileUnreadable)?;
+    use_case.allow_file(&path).await.map(Some)
+}
 
 /// How the file at `path` reads for `account_id`: its format, detected or chosen, and its
 /// columns (IMP-010 to IMP-016, IMP-018).
