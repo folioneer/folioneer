@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-10-26
+
+### Added
+
+- [import): a confirmed import records its rows at once, adding the deposits its purchases need
+  confirm_import (IMP-050 to IMP-053] the ready rows in date order in one write and one event;
+- [import): a broker's file is previewed row by row, each matched to its asset and checked as if typed
+  read_import_file and preview_import (IMP-010 to IMP-038] rows matched to assets, judged in
+- [import] a broker's export is read whatever its encoding, separator, decimal mark and date format
+- [agent): an AI agent reads an asset's price history over a period, with each price's source
+  list_prices (AGT-075] an asset's prices between two dates, oldest first, 100 to a page,
+- [import] a column mapping is saved under a name and is the same on each of your computers
+- [update] a failed update puts your portfolio back as it was before, and says so
+- [update] What's new shows which part of Folioneer each change is about
+- [agent] the app says "AI agent" where it said agent, in English and French
+
 ## [0.15.0] - 2026-10-25
 
 ### Added
