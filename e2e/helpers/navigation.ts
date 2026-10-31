@@ -70,8 +70,8 @@ export async function closeSettings(): Promise<void> {
 }
 
 /**
- * Opens the sync page the way a user does: Settings, then its "Open sync" link (TODO-010).
- * Waits for the page's own content — "Enable sync" while disabled, the status otherwise.
+ * Opens Settings on its Sync section, the way a user does. Waits for the section's own
+ * content — "Enable sync" while disabled, the status otherwise.
  */
 export async function navigateToSync(): Promise<void> {
   await openSettingsSection("sync");
