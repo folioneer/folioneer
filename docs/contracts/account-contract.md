@@ -508,7 +508,7 @@ struct Transaction {
     created_at: String,             // ISO 8601 timestamp; chronological tie-breaking (TRX-036, SEL-024)
     write_off_reason: Option<WriteOffReason>, // WOF entity — Some on a WriteOff only; a WriteOff stores unit_price 0, exchange_rate 1_000_000, fees 0, total_amount 0
     transfer_id: Option<String>,    // TRF entity — Some on the parts of a transfer only: its two sides and its fee in kind
-    added_deposit: bool,            // IMP-051 — true on a deposit an import added before a purchase; kept by a correction
+    added_deposit: bool,            // IMP-051, IMP-051A — true on a deposit an import added before a purchase; kept by a correction
 }
 ```
 
@@ -833,12 +833,12 @@ struct AccountJournal {
 
 ### Published
 
-| Event                | Payload | Rule                                                                   |
-| -------------------- | ------- | ---------------------------------------------------------------------- |
-| `AccountUpdated`     | —       | ACC-022                                                                |
-| `TransactionUpdated` | —       | TRX-037, DIV-026, FSD-026, FEE-026, AGT-044, AGT-045, TRF-029, IMP-050 |
-| `FeeScheduleUpdated` | —       | FEE-064                                                                |
-| `HoldingNoteUpdated` | —       | HNO-020, HNO-021                                                       |
+| Event                | Payload | Rule                                                                    |
+| -------------------- | ------- | ----------------------------------------------------------------------- |
+| `AccountUpdated`     | —       | ACC-022                                                                 |
+| `TransactionUpdated` | —       | TRX-037, DIV-026, FSD-026, FEE-026, AGT-044, AGT-045, TRF-029, IMP-050A |
+| `FeeScheduleUpdated` | —       | FEE-064                                                                 |
+| `HoldingNoteUpdated` | —       | HNO-020, HNO-021                                                        |
 
 ### Subscribed (frontend re-fetch triggers)
 

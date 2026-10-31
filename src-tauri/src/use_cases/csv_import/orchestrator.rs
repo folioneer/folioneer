@@ -125,8 +125,8 @@ pub struct CsvImportUseCase {
     account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,
     transactions: Arc<dyn TransactionManager>,
-    /// IMP-010 — the files the user picked in the system dialog, the only ones read.
-    picked: Mutex<HashSet<PathBuf>>,
+    /// IMP-010 — the file the user last picked in the system dialog, the only one read.
+    picked: Mutex<Option<PathBuf>>,
 }
 
 /// A row on its way to the preview: its status once known, or the step it stands for.
@@ -152,7 +152,7 @@ impl CsvImportUseCase {
             account_service,
             asset_service,
             transactions,
-            picked: Mutex::new(HashSet::new()),
+            picked: Mutex::new(None),
         }
     }
 
@@ -164,10 +164,7 @@ impl CsvImportUseCase {
             .to_str()
             .ok_or(CsvImportTask::FileUnreadable)?
             .to_string();
-        self.picked
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .insert(canonical);
+        *self.picked.lock().unwrap_or_else(PoisonError::into_inner) = Some(canonical);
         Ok(shown)
     }
 
@@ -341,8 +338,8 @@ impl CsvImportUseCase {
         Ok(prepared.judgments)
     }
 
-    /// IMP-035 — the steps judged in date order, the file's order within one day, then each
-    /// row's status in the file's order.
+    /// IMP-035A — the steps judged in date order, within one day the inflows first, then each
+    /// in the file's order; then each row's status in the file's order.
     async fn judge(
         &self,
         account_id: &str,
@@ -356,11 +353,22 @@ impl CsvImportUseCase {
             .filter(|(_, (_, row))| matches!(row, Pending::Judged { .. }))
             .map(|(index, _)| index)
             .collect();
-        let date = |index: &usize| match pending.get(*index) {
-            Some((_, Pending::Judged { operation, .. })) => operation.date.clone(),
-            _ => String::new(),
+        let place = |index: &usize| match pending.get(*index) {
+            Some((
+                _,
+                Pending::Judged {
+                    operation, step, ..
+                },
+            )) => (
+                operation.date.clone(),
+                !matches!(
+                    step.op,
+                    RecordingOp::Deposit { .. } | RecordingOp::Dividend { .. }
+                ),
+            ),
+            _ => (String::new(), false),
         };
-        order.sort_by_key(date);
+        order.sort_by_key(place);
         let steps: Vec<RecordingStep> = order
             .iter()
             .filter_map(|index| match pending.get(*index) {
@@ -417,7 +425,8 @@ impl CsvImportUseCase {
             .picked
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .contains(&canonical);
+            .as_ref()
+            == Some(&canonical);
         if !picked {
             tracing::warn!(target: BACKEND, "import: a file the user did not pick");
             return Err(CsvImportTask::FileNotPicked.into());
@@ -463,6 +472,7 @@ fn pend(read: RowRead, matches: &[AssetMatch], assets: &[Asset], currency: &str)
     }
     let date = operation.date.clone();
     let cash = |op: RecordingOp| (op, false);
+    let mut archived_sale = false;
     let (step, asset_id) = match &operation.figures {
         RowFigures::Deposit { amount } => (
             cash(RecordingOp::Deposit {
@@ -510,14 +520,7 @@ fn pend(read: RowRead, matches: &[AssetMatch], assets: &[Asset], currency: &str)
                     unit_price,
                     fees,
                 } => {
-                    // SEL-037 — an archived asset is not sold.
-                    if asset.is_archived {
-                        return Pending::Done(RowStatus::Rejected {
-                            reason: RowReason::ManualEntry {
-                                refusal: AccountError::ArchivedAssetSell,
-                            },
-                        });
-                    }
+                    archived_sale = asset.is_archived;
                     (RecordingOp::Sell(trade(quantity, unit_price, fees)), false)
                 }
                 RowFigures::Dividend { amount } => (
@@ -547,7 +550,11 @@ fn pend(read: RowRead, matches: &[AssetMatch], assets: &[Asset], currency: &str)
     Pending::Judged {
         operation,
         asset_id,
-        step: RecordingStep { op, needs_held },
+        step: RecordingStep {
+            op,
+            needs_held,
+            archived_sale,
+        },
     }
 }
 

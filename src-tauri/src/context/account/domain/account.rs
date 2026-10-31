@@ -81,6 +81,13 @@ pub struct ManagementFeeRemoval {
     pub percent_micros: i64,
 }
 
+/// Where an account stood before new transactions were tried on it (`Account::attempt`).
+struct RecordingMark {
+    transactions: usize,
+    pending_changes: usize,
+    holdings: Vec<Holding>,
+}
+
 /// Represents a financial account — the Aggregate Root of the Account bounded context.
 /// Owns all holdings and transactions for this account.
 ///
@@ -488,7 +495,7 @@ impl Account {
         let tx_type = existing.transaction_type;
         let asset_id = existing.asset_id.clone();
         let created_at = existing.created_at.clone();
-        // IMP-051 — a corrected deposit stays an added deposit.
+        // IMP-051A — a corrected deposit stays an added deposit.
         let added_deposit = existing.added_deposit;
 
         let updated_tx = if tx_type == TransactionType::FreeShares {
@@ -896,6 +903,50 @@ impl Account {
         self.pending_changes
             .push(AccountChange::HoldingUpserted(holding.clone()));
         self.upsert_holding_in_memory(holding);
+    }
+
+    /// What `back_to` needs to undo the recording of new transactions, which leaves the
+    /// earlier ones as they are.
+    fn mark(&self) -> RecordingMark {
+        RecordingMark {
+            transactions: self.transactions.len(),
+            pending_changes: self.pending_changes.len(),
+            holdings: self.holdings.clone(),
+        }
+    }
+
+    fn back_to(&mut self, mark: RecordingMark) {
+        debug_assert!(self.transactions.len() >= mark.transactions);
+        self.transactions.truncate(mark.transactions);
+        self.pending_changes.truncate(mark.pending_changes);
+        self.holdings = mark.holdings;
+    }
+
+    /// New transactions tried on this account: refused, it is left as it was. `record` only
+    /// appends transactions and touches only them, the holdings and the queued changes; not
+    /// for `correct_transaction`, which changes earlier ones: its callers discard the aggregate.
+    pub fn attempt<T>(
+        &mut self,
+        record: impl FnOnce(&mut Self) -> StdResult<T, AccountError>,
+    ) -> StdResult<T, AccountError> {
+        let mark = self.mark();
+        let recorded = record(self);
+        if recorded.is_err() {
+            self.back_to(mark);
+        }
+        recorded
+    }
+
+    /// Whether this account would take new transactions, `record` as `attempt` limits it; it
+    /// is left as it was either way.
+    pub fn would_take<T>(
+        &mut self,
+        record: impl FnOnce(&mut Self) -> StdResult<T, AccountError>,
+    ) -> bool {
+        let mark = self.mark();
+        let taken = record(self).is_ok();
+        self.back_to(mark);
+        taken
     }
 
     /// Aggregate-root method: applies a pre-built Deposit transaction to this
@@ -4588,6 +4639,57 @@ mod tests {
             )),
             "cash holding must be upserted at zero"
         );
+    }
+
+    // IMP-035 — a refused purchase leaves the account as it was: its transaction, its queued
+    // changes and the holding its replay had already upserted all gone.
+    #[test]
+    fn attempt_leaves_the_account_as_it_was_when_refused() {
+        let mut acc = base_account();
+        acc.seed_cash_holding();
+        let (transactions, pending, holdings) = (
+            acc.transactions.len(),
+            acc.pending_changes.len(),
+            acc.holdings.len(),
+        );
+        let refused = acc.attempt(|account| {
+            account
+                .buy_holding(
+                    "asset-1".to_string(),
+                    "2024-01-02".to_string(),
+                    1_000_000,
+                    1_000_000,
+                    1_000_000,
+                    0,
+                    None,
+                    None,
+                )
+                .map(|_| ())
+                .map_err(|_| AccountError::DatabaseError)
+        });
+        assert!(refused.is_err());
+        assert_eq!(acc.transactions.len(), transactions);
+        assert_eq!(acc.pending_changes.len(), pending);
+        assert_eq!(acc.holdings.len(), holdings);
+    }
+
+    // IMP-038 — a funding probe leaves the account as it was, taken or not.
+    #[test]
+    fn would_take_leaves_the_account_as_it_was_when_taken() {
+        let mut acc = cash_seeded_account();
+        let transactions = acc.transactions.len();
+        let deposit = Transaction::new_deposit(
+            acc.id.clone(),
+            acc.cash_asset_id(),
+            "2024-01-02".to_string(),
+            1_000_000,
+            None,
+        )
+        .expect("deposit");
+        let before = acc.cash_holding_quantity();
+        assert!(acc.would_take(|account| account.apply_deposit(deposit)));
+        assert_eq!(acc.cash_holding_quantity(), before);
+        assert_eq!(acc.transactions.len(), transactions);
     }
 
     // CSH-012 — eager seed: a fresh account gains a 0-balance cash holding and an

@@ -657,6 +657,12 @@ A tax charged on a purchase and written on its own row of a broker's file, added
 
 > Status: confirmed
 
+### Row status
+
+What the preview says of a row of a file (IMP-030): **Ready** (« Prêt »), **Rejected** (« Rejeté »), **Unknown asset** (« Actif inconnu »), **Already recorded** (« Déjà enregistré »), **Not imported** (« Non importé ») (owner, 2026-10-31). A trade tax joined to its purchase holds none: it names that purchase's line.
+
+> Status: confirmed
+
 ### Added deposit
 
 A deposit the import adds, dated with a purchase the file left unfunded, and marked as added (IMP-051). In French: « Dépôt ajouté » (owner, 2026-10-25).

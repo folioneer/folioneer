@@ -264,8 +264,6 @@ impl SqliteAccountRepository {
         Ok(())
     }
 
-    /// Writes the aggregate's pending changes on `conn`, recording or stamping per
-    /// `capture`, and clears them afterward.
     /// Writes several accounts, and the marks of the transactions `marks` names, in one
     /// transaction.
     async fn write_all(
@@ -294,6 +292,8 @@ impl SqliteAccountRepository {
         Ok(())
     }
 
+    /// Writes the aggregate's pending changes on `conn`, recording or stamping per
+    /// `capture`, and clears them afterward.
     async fn persist_pending(
         &self,
         conn: &mut SqliteConnection,
