@@ -46,7 +46,8 @@ pub enum ImportError {
         reason: String,
     },
 
-    /// The mappers folder cannot be read or written; the cause is logged, never sent.
+    /// The mappers folder cannot be read or written; the cause is logged, never sent. Apart from
+    /// `DatabaseError` (IMP-020): the user can act on a folder that is full or read-only.
     #[error("The import mappers folder cannot be read or written")]
     MapperFolderFailed,
 

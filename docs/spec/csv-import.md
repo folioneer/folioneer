@@ -16,7 +16,7 @@ How one provider's export is read, saved under that provider and reused for ever
 
 | Field             | Business meaning                                                                                                                                        |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`              | The mapper's own identity, its file's name, set when it is first written: a change of provider keeps it.                                                |
+| `id`              | The mapper's own identity, set when it is first written: a change of provider keeps it.                                                                 |
 | `provider`        | Who the export comes from ("Fortuneo PEA"), in the file's info entry: not empty once trimmed, unique among mappers, case and accents ignored (IMP-024). |
 | `separator`       | The character between two fields: `;`, `,` or a tab.                                                                                                    |
 | `decimal_mark`    | The mark before a figure's decimals: a dot or a comma.                                                                                                  |
@@ -78,7 +78,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 ### Import mapper (020–029)
 
-**IMP-020 — A mapper is a file (backend)**: An import mapper is a JSON file in the mappers folder of the data folder, on this computer: its info entry (the provider), its format, its columns, its operation types and its asset matches. Saving a new mapper writes its file, under a file name of its own drawn from its provider, or the plain word mapper when the provider gives none: it never replaces a file of the folder. A write that fails is rejected with a specific error and leaves the folder's files as they were.
+**IMP-020 — A mapper is a file (backend)**: An import mapper is a JSON file in the mappers folder of the data folder, on this computer: its info entry (the provider), its format, its columns, its operation types and its asset matches. Saving a new mapper writes its file, under a file name of its own: it never replaces a file of the folder. A write that fails is rejected with a specific error and leaves the folder's files as they were.
 
 **IMP-020A — The list is what the folder holds (backend)**: The saved mappers are the `.json` files the folder holds, read each time the list is asked for, sorted by provider, case and accents ignored, then by identity; no folder, no mapper. A file that cannot be read, larger than 1 MB, not JSON, holding a field a mapper does not have, lacking one it needs or with a value outside the ones allowed, or breaking IMP-021, the empty provider of IMP-024 or IMP-024A does not read as a mapper: it is left out of the list and left in place, and the failure is logged. A folder that cannot be read is rejected with a specific error.
 
@@ -110,7 +110,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 **IMP-032 — Each row is matched to an asset (backend)**: A row of a purchase, a sale, a dividend or a trade tax is matched to an asset of the portfolio, archived ones included: first by the mapper's asset matches (IMP-033, IMP-033A), then by its own ISIN and then its reference, each trimmed and case ignored, then its exact name, case and accents ignored: each that the row holds is tried in that order, and the first matching exactly one asset gives it. A row that none matches to exactly one asset is an **unknown asset**. A deposit and a withdrawal are the account's cash and take no asset.
 
-**IMP-033 — An unknown asset is matched once (backend)**: The user matches an unknown asset's name, ISIN or reference to an asset of the portfolio; the match is part of the mapper in use, kept when it is saved, so the next file of that broker matches it. A match is compared as the field it was read from is (IMP-032). Every row of that name, ISIN or reference then takes that asset, and the preview judges them again. A match to an asset unknown to the portfolio is rejected with a specific error when it is made. Saving a mapper keeps its matches as they are. The user may create the asset from the row instead (IMP-052).
+**IMP-033 — An unknown asset is matched once (backend)**: The user matches an unknown asset's name, ISIN or reference to an asset of the portfolio; the match is part of the mapper in use, kept when it is saved, so the next file of that provider matches it. A match is compared as the field it was read from is (IMP-032). Every row of that name, ISIN or reference then takes that asset, and the preview judges them again. A match to an asset unknown to the portfolio is rejected with a specific error when it is made. Saving a mapper keeps its matches as they are. The user may create the asset from the row instead (IMP-052).
 
 **IMP-033A — A match whose asset is not held is passed over (backend)**: A saved match whose asset the portfolio does not hold, as in a mapper written elsewhere, is passed over: the next matches of IMP-032 apply, and the row is unknown if none does. Of two matches for one text, the first whose asset is held applies.
 

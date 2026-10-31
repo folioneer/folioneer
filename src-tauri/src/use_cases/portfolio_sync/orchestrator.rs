@@ -42,7 +42,6 @@ pub struct PortfolioSyncDependencies {
     pub asset_service: Arc<AssetService>,
     /// Owner of currency pairs and rates.
     pub currency_service: Arc<CurrencyService>,
-    /// Owner of the saved column mappings.
     /// This device's sync lifecycle and status (pause, resume, rename, leave).
     pub sync_service: Arc<SyncService>,
     /// Enabling as the first device (SYN-013).
@@ -130,9 +129,8 @@ impl PortfolioSyncOrchestrator {
     }
 
     /// Whether this installation holds user-entered records (SYN-014): any account, any
-    /// user-created asset or category, any currency rate the user typed, any saved column
-    /// mapping (IMP-020). System-seeded records (SYN-027), declared currency pairs and
-    /// fetched rates (SYN-083) do not count.
+    /// user-created asset or category, any currency rate the user typed. System-seeded records
+    /// (SYN-027), declared currency pairs and fetched rates (SYN-083) do not count.
     async fn installation_holds_user_data(&self) -> Result<bool, PortfolioSyncError> {
         if !self.account_service.get_all().await?.is_empty() {
             return Ok(true);
@@ -629,8 +627,6 @@ mod tests {
             "a rate the user typed is user data"
         );
     }
-
-    // SYN-014 / IMP-020 — a saved column mapping is user data: the installation may not join.
 
     // SYN-019 — a fresh installation and a missing folder: the problem is reported, never
     // thrown.
