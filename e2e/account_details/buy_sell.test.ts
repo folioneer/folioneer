@@ -15,7 +15,7 @@
  */
 
 import assert from "node:assert";
-import { $ } from "@wdio/globals";
+import { $, browser } from "@wdio/globals";
 import { isoToDisplayDate } from "../helpers/date";
 import { dismissLeftoverModal } from "../helpers/modal";
 import { navigateToAccountDetails, navigateToAccounts } from "../helpers/navigation";
@@ -39,6 +39,12 @@ const DATES = {
 
 describe("buy_sell", () => {
   beforeEach(async () => {
+    // A snackbar outlives its scenario and can cover the next one's row: the header wraps at
+    // this window's width. Its live region stays; what it shows goes after four seconds.
+    await browser.waitUntil(async () => !(await $('[role="status"] > div').isExisting()), {
+      timeout: 8000,
+      timeoutMsg: "The previous scenario's snackbar must have gone",
+    });
     await dismissLeftoverModal();
   });
 
@@ -150,12 +156,6 @@ describe("buy_sell", () => {
 
     await navigateToAccounts();
     await navigateToAccountDetails(accId);
-
-    // The previous scenario's snackbar outlives the navigation and can cover this row.
-    await browser.waitUntil(async () => !(await $('[role="status"]').isExisting()), {
-      timeout: 15000,
-      timeoutMsg: "The previous scenario's snackbar must have gone",
-    });
 
     const sellBtn = await $(`#action-sell-${astId}`);
     await sellBtn.waitForExist({ timeout: 10000 });

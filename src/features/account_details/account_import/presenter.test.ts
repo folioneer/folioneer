@@ -93,6 +93,14 @@ describe("account import presenter", () => {
       key: "account_import.error.mapper_file_invalid",
       vars: { reason: "no date" },
     });
-    expect(accountImportErrorToI18n({ code: "DatabaseError" })).toEqual({ key: "error.Unknown" });
+    expect(accountImportErrorToI18n({ code: "DatabaseError" })).toEqual({
+      key: "error.DatabaseError",
+    });
+    expect(accountImportErrorToI18n({ code: "AccountNotFound", account_id: "a" })).toEqual({
+      key: "error.AccountNotFound",
+    });
+    expect(accountImportErrorToI18n({ code: "UnreadableFile" } as never)).toEqual({
+      key: "error.Unknown",
+    });
   });
 });

@@ -194,7 +194,7 @@ confirm: the ready rows recorded at once (IMP-050), the added deposits by defaul
 
 ## UX Draft
 
-Mock: [folioneer-design/503](https://github.com/folioneer/folioneer-design/tree/main/503). The preview itself is #504, with its mock.
+The validated mock is on #503 (folioneer/folioneer-design, `503/`). The preview itself is #504, with its mock.
 
 ### Entry Point
 
@@ -222,7 +222,7 @@ Pick a file → the mapper → Preview.
 - SYN-038 adds version 11: a transaction carries the added-deposit mark (IMP-051).
 - SYN-023: the import mapper each imported file's folder remembers stays on the device (IMP-020C).
 - SYN-038 adds version 12: the column mappings of version 10 are no longer a kind of synced record; no device ever held one, since no window offered it. A mapper's file is not synced for now (#715).
-- DIV-012: the account header's record actions gain Import, after Open balance (TRX-055) (IMP-060).
+- DIV-012: the account header's record actions gain Import, after New position (TRX-055) (IMP-060).
 - CSH: a deposit may be an added deposit, marked as such (IMP-051).
 - TXL-060: a journal row carries the added-deposit mark (IMP-051). TXL-061: its Recorded by column shows the chip (IMP-054). AGT-045: that chip is not an AI agent's mark; an added deposit has no session.
 

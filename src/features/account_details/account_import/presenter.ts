@@ -211,6 +211,10 @@ export function accountImportErrorToI18n(error: CsvImportError | AccountImportEr
       };
     case "MatchedAssetNotFound":
       return { key: "account_import.error.matched_asset_not_found" };
+    case "AccountNotFound":
+      return { key: "error.AccountNotFound" };
+    case "DatabaseError":
+      return { key: "error.DatabaseError" };
     default:
       return { key: "error.Unknown" };
   }
