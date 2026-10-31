@@ -2,25 +2,8 @@ import { useTranslation } from "react-i18next";
 import { microToFormattedQuantity } from "@/lib/microUnits";
 import { formatIsoDateNumeric } from "@/ui/format/date";
 import { messageText } from "@/ui/format/i18n";
-import { moneyOf, type PreviewRowView, type RowTone } from "./previewPresenter";
-
-const TONES: Record<RowTone, string> = {
-  ready: "bg-m3-primary text-m3-on-primary",
-  neutral: "bg-m3-surface-container-highest text-m3-on-surface-variant",
-  unknown: "bg-m3-warning-container text-m3-on-warning-container",
-  rejected: "bg-m3-error-container text-m3-on-error-container",
-};
-
-const CHIP = "inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium";
-
-/** A count or a status, in its status's colours (IMP-066). */
-export function StatusChip({ tone, label, id }: { tone: RowTone; label: string; id?: string }) {
-  return (
-    <span id={id} className={`${CHIP} ${TONES[tone]}`}>
-      {label}
-    </span>
-  );
-}
+import { moneyOf, type PreviewRowView } from "./previewPresenter";
+import { StatusChip } from "./StatusChip";
 
 interface ImportPreviewTableProps {
   rows: PreviewRowView[];
@@ -60,18 +43,14 @@ export function ImportPreviewTable({ rows, currency, onUnknown }: ImportPreviewT
               <tr>
                 <td className="m3-td">{row.line}</td>
                 <td className="m3-td">
-                  {onUnknown && row.opensAsset ? (
-                    <button
-                      id={`account-import-unknown-${row.line}`}
-                      type="button"
-                      className={`${CHIP} ${TONES[row.tone]} cursor-pointer underline-offset-2 hover:underline`}
-                      onClick={() => onUnknown(row.line)}
-                    >
-                      {status}
-                    </button>
-                  ) : (
-                    <StatusChip tone={row.tone} label={status} />
-                  )}
+                  <StatusChip
+                    id={
+                      onUnknown && row.opensAsset ? `account-import-unknown-${row.line}` : undefined
+                    }
+                    tone={row.tone}
+                    label={status}
+                    onClick={onUnknown && row.opensAsset ? () => onUnknown(row.line) : undefined}
+                  />
                 </td>
                 <td className="m3-td whitespace-nowrap">
                   {row.date ? formatIsoDateNumeric(row.date, i18n.language) : ""}

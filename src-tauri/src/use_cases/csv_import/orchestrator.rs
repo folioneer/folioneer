@@ -615,7 +615,7 @@ fn pend(read: RowRead, matches: &[AssetMatch], assets: &[Asset], currency: &str)
             let Some(asset) = matched(&operation.asset, matches, assets) else {
                 return Pending::Done(RowStatus::UnknownAsset {
                     asset: operation.asset.clone(),
-                    operation: operation.clone(),
+                    operation,
                 });
             };
             if !asset.currency.eq_ignore_ascii_case(currency) {

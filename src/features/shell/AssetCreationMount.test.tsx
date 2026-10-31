@@ -20,7 +20,7 @@ vi.mock("@/features/assets/add_asset/AddAsset", () => ({
     onClose: () => void;
   }) => (
     <>
-      <button type="button" data-testid="kind" onClick={() => onKindChange("Custom")}>
+      <button type="button" data-testid="kind" onClick={() => onKindChange("Crypto")}>
         {kind}
       </button>
       <button
@@ -65,14 +65,18 @@ describe("AssetCreationMount", () => {
     expect(useAssetCreationRequest.getState().request).toBeNull();
   });
 
-  it("starts each request from the default kind", () => {
+  it("starts each request from the kind its prefill can fill", () => {
     render(<AssetCreationMount />);
-    const open = () => act(() => useAssetCreationRequest.getState().open({ prefill, onCreated }));
-    open();
-    fireEvent.click(screen.getByTestId("kind"));
+    const open = (isin: string | null) =>
+      act(() =>
+        useAssetCreationRequest.getState().open({ prefill: { ...prefill, isin }, onCreated }),
+      );
+    open(null);
     expect(screen.getByTestId("kind").textContent).toBe("Custom");
+    fireEvent.click(screen.getByTestId("kind"));
+    expect(screen.getByTestId("kind").textContent).toBe("Crypto");
     act(() => useAssetCreationRequest.getState().close());
-    open();
+    open("FR0000000001");
     expect(screen.getByTestId("kind").textContent).toBe("Listed");
   });
 });

@@ -147,7 +147,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 **IMP-051B — The added deposits can be left out (frontend + backend)**: The added deposits are on by default; the user may leave them out for this account import: such a purchase is then judged without one and rejected as manual entry rejects it (CSH-041).
 
-**IMP-052 — An unknown asset is created from its row (frontend)**: From an unknown-asset row the user opens the usual asset form, prefilled with what the row read — its name, ISIN and reference — and the account's currency; its kind, class and category are chosen there, every field stays editable, and the form's refusals hold (AST-001, AST-031, AST-032).
+**IMP-052 — An unknown asset is created from its row (frontend)**: From an unknown-asset row the user opens the usual asset form, prefilled with what the row read — its name, ISIN and reference — and the account's currency; its kind, class and category are chosen there, every field stays editable, and the form's refusals hold (AST-001, AST-031, AST-032). It opens on a listed asset when the row read an ISIN, on a custom asset otherwise.
 
 **IMP-052A — The asset created takes its row (frontend + backend)**: The window asks for the asset created from a row to be matched (IMP-033) to the first the row read of its ISIN, its reference and its name, whatever was edited in the form, and the preview judges the rows again (IMP-032); created in another currency, they are rejected (IMP-037).
 

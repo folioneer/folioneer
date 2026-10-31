@@ -5,8 +5,9 @@ import { Button } from "@/ui/components/button/Button";
 import { SelectField } from "@/ui/components/field/SelectField";
 import { FormModal } from "@/ui/components/modal/FormModal";
 import { messageText } from "@/ui/format/i18n";
-import { ImportPreviewTable, StatusChip } from "./ImportPreviewTable";
+import { ImportPreviewTable } from "./ImportPreviewTable";
 import { moneyOf, type RowTone } from "./previewPresenter";
+import { StatusChip } from "./StatusChip";
 import type { useAccountImport } from "./useAccountImport";
 
 type View = ReturnType<typeof useAccountImport>;

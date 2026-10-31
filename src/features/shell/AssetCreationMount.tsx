@@ -18,7 +18,7 @@ export function AssetCreationMount() {
   return <AssetCreationForm request={request} onClose={close} />;
 }
 
-/** One request's form: its kind starts over with each request. */
+/** One request's form: a Listed asset needs an ISIN, so a request without one starts Custom. */
 function AssetCreationForm({
   request,
   onClose,
@@ -26,7 +26,7 @@ function AssetCreationForm({
   request: AssetCreationRequest;
   onClose: () => void;
 }) {
-  const [kind, setKind] = useState<AssetKind>("Listed");
+  const [kind, setKind] = useState<AssetKind>(request.prefill.isin ? "Listed" : "Custom");
   return (
     <AddAssetModal
       isOpen
