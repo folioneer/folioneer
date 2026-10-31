@@ -16,7 +16,7 @@ export interface UsePriceProviderResult {
   /** The source whose notice is shown; it is not the choice yet. */
   awaitingAcknowledgement: string | null;
   isLoading: boolean;
-  /** True while a choice is being saved. */
+  /** MKT-216 — true while a choice is being saved. */
   isSaving: boolean;
   /** A failed read or a refused choice; the choice stays as it was. */
   error: I18nMessage | null;
@@ -39,8 +39,8 @@ async function startFetching(): Promise<void> {
 /**
  * MKT-215 — the choice of a price source on this computer: choosing a provider asks for its
  * notice's acknowledgement before anything is saved; Off is saved at once. A saved choice
- * makes the interface ask again what it was told (MKT-211), and a source turned on starts
- * fetching.
+ * makes the interface ask again what it was told (MKT-217), and a source turned on starts
+ * fetching (MKT-218).
  */
 export function usePriceProvider(): UsePriceProviderResult {
   const refreshExternalProvider = useAppStore((state) => state.refreshExternalProvider);

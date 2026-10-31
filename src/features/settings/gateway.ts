@@ -35,7 +35,7 @@ export async function setPriceProviderChoice(
   return await commands.setPriceProviderChoice(chosen);
 }
 
-/** MKT-215 — a source just turned on starts fetching, as at launch (MKT-121). */
+/** MKT-218 — a provider just chosen starts one fetch, under the launch's trigger (MKT-121). */
 export async function fetchAllAssetPrices(): Promise<Result<null, FetchAllAssetPricesError>> {
   return await commands.fetchAllAssetPrices("Launch");
 }

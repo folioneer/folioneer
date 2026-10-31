@@ -3,7 +3,7 @@
  * commands. The suite's build starts with its no-data provider on (TODO-038), so the scenario
  * turns it off, then on again through the notice, and leaves it on for the specs after it.
  *
- * Spec rules covered: MKT-212, MKT-214, MKT-215, SPF-071.
+ * Spec rules covered: MKT-212, MKT-214, MKT-215, MKT-217, SPF-071.
  */
 import assert from "node:assert";
 import { $, browser } from "@wdio/globals";
@@ -42,7 +42,7 @@ describe("the price source", () => {
     await notice.waitForExist({ timeout: 10000, reverse: true });
     await browser.waitUntil(async () => (await source.getValue()) === "yahoo_finance", {
       timeout: 5000,
-      timeoutMsg: "MKT-215 — the list must show the provider once chosen",
+      timeoutMsg: "MKT-217 — the list must show the provider once chosen",
     });
     await captureScreen("price-provider-on");
 
