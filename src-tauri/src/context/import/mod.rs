@@ -3,7 +3,7 @@
 pub mod api;
 /// Application layer (the `ImportService` orchestrator).
 pub mod application;
-/// The column mapping aggregate and its repository port.
+/// The import mapper aggregate and its ports.
 pub mod domain;
 /// Flat BC error enum (`ImportError`).
 pub mod error;
@@ -20,8 +20,9 @@ pub use domain::{
     RowFigures, RowFormat, RowRead, RowRejection, LARGEST_FILE,
 };
 pub use domain::{
-    AssetMatch, ColumnMapping, ColumnMappingDraft, ColumnMappingRepository, DateFormat,
-    DecimalMark, Encoding, MappedColumns, OperationLabel, OperationType, Separator,
+    AssetMatch, DateFormat, DecimalMark, Encoding, ImportMapper, ImportMapperDraft,
+    ImportMapperStore, MappedColumns, MapperChoiceRepository, MapperInfo, OperationLabel,
+    OperationType, Separator,
 };
 pub use error::ImportError;
-pub use infrastructure::SqliteColumnMappingRepository;
+pub use infrastructure::{FsImportMapperStore, SqliteMapperChoiceRepository};

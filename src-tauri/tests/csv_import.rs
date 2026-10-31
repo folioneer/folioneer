@@ -1,5 +1,5 @@
 //! Integration tests for the CSV import preview (IMP spec): a broker's export read through a
-//! column mapping, each row matched to an asset and judged as manual entry would judge it.
+//! import mapper, each row matched to an asset and judged as manual entry would judge it.
 //!
 //! Exercises the full stack through the public `folioneer_lib` API:
 //! `CsvImportUseCase` → `ImportService` / `AccountService` / `AssetService` → real
@@ -16,9 +16,9 @@ use folioneer_lib::context::asset::{
     SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
 };
 use folioneer_lib::context::import::{
-    AssetMatch, ColumnMappingDraft, DateFormat, DecimalMark, Encoding, ImportError, ImportService,
-    MappedColumns, OperationLabel, OperationType, ReadingChoices, RowRejection, Separator,
-    SqliteColumnMappingRepository,
+    AssetMatch, DateFormat, DecimalMark, Encoding, FsImportMapperStore, ImportError,
+    ImportMapperDraft, ImportService, MappedColumns, MapperInfo, OperationLabel, OperationType,
+    ReadingChoices, RowRejection, Separator, SqliteMapperChoiceRepository,
 };
 use folioneer_lib::core::event_bus::Event;
 use folioneer_lib::core::SideEffectEventBus;
@@ -38,7 +38,8 @@ fn micro(v: i64) -> i64 {
 
 struct Ctx {
     import: CsvImportUseCase,
-    mappings: Arc<ImportService>,
+    mappers: Arc<ImportService>,
+    mappers_dir: tempfile::TempDir,
     recording: HoldingTransactionUseCase,
     account_service: Arc<AccountService>,
     asset_service: Arc<AssetService>,
@@ -73,17 +74,22 @@ async fn build_ctx() -> Ctx {
         )
         .with_event_bus(Arc::clone(&bus)),
     );
-    let mappings = Arc::new(ImportService::new(Box::new(
-        SqliteColumnMappingRepository::new(pool.clone()),
-    )));
+    let mappers_dir = tempfile::tempdir().expect("mappers folder");
+    let mappers = Arc::new(ImportService::new(
+        Box::new(FsImportMapperStore::new(
+            mappers_dir.path().join("import-mappers"),
+        )),
+        Box::new(SqliteMapperChoiceRepository::new(pool.clone())),
+    ));
     Ctx {
         import: CsvImportUseCase::new(
-            Arc::clone(&mappings),
+            Arc::clone(&mappers),
             account_service.clone(),
             asset_service.clone(),
             Arc::new(SqliteTransactionManager::new(pool.clone())),
         ),
-        mappings,
+        mappers,
+        mappers_dir,
         recording: HoldingTransactionUseCase::new(account_service.clone(), asset_service.clone()),
         account_service,
         asset_service,
@@ -147,11 +153,13 @@ fn header(name: &str) -> Option<String> {
     Some(name.to_string())
 }
 
-/// The French broker's mapping: `;`, Windows-1252, decimal dot, day/month/year, no ISIN.
+/// The French broker's mapper: `;`, Windows-1252, decimal dot, day/month/year, no ISIN.
 /// "Vente Comptant" is a plausible sale label, not one read in a real export.
-fn french_mapping() -> ColumnMappingDraft {
-    ColumnMappingDraft {
-        name: "Courtier".to_string(),
+fn french_mapper() -> ImportMapperDraft {
+    ImportMapperDraft {
+        info: MapperInfo {
+            provider: "Courtier".to_string(),
+        },
         separator: Separator::Semicolon,
         decimal_mark: DecimalMark::Dot,
         date_format: DateFormat::DayMonthYear,
@@ -186,10 +194,12 @@ fn french_mapping() -> ColumnMappingDraft {
     }
 }
 
-/// The English broker's mapping: `,`, UTF-8, decimal dot, year-month-day, ISIN and ticker.
-fn english_mapping() -> ColumnMappingDraft {
-    ColumnMappingDraft {
-        name: "Broker".to_string(),
+/// The English broker's mapper: `,`, UTF-8, decimal dot, year-month-day, ISIN and ticker.
+fn english_mapper() -> ImportMapperDraft {
+    ImportMapperDraft {
+        info: MapperInfo {
+            provider: "Broker".to_string(),
+        },
         separator: Separator::Comma,
         decimal_mark: DecimalMark::Dot,
         date_format: DateFormat::YearMonthDay,
@@ -254,10 +264,10 @@ async fn preview(
     ctx: &Ctx,
     account_id: &str,
     file: &NamedTempFile,
-    mapping: &ColumnMappingDraft,
+    mapper: &ImportMapperDraft,
 ) -> ImportPreview {
     ctx.import
-        .preview_import(account_id, path(file), None, mapping)
+        .preview_import(account_id, path(file), None, mapper)
         .await
         .expect("preview")
 }
@@ -284,7 +294,7 @@ async fn french_portfolio(ctx: &Ctx) -> (String, String, String) {
 }
 
 // IMP-010 / IMP-011 / IMP-030 / IMP-032 / IMP-034 — the French export, in Latin-1, read
-// through its mapping: each row ready, joined, not imported or unknown, names matched with
+// through its mapper: each row ready, joined, not imported or unknown, names matched with
 // case and accents ignored, the trade tax in its purchase's fees.
 #[tokio::test]
 async fn imp_030_the_preview_judges_every_row_of_a_french_export() {
@@ -300,7 +310,7 @@ async fn imp_030_the_preview_judges_every_row_of_a_french_export() {
     assert_eq!(read.separator, Separator::Semicolon);
     assert_eq!(read.decimal_mark, DecimalMark::Dot);
     assert_eq!(read.columns.first().map(String::as_str), Some("libellé"));
-    let preview = preview(&ctx, &account_id, &file, &french_mapping()).await;
+    let preview = preview(&ctx, &account_id, &file, &french_mapper()).await;
     assert!(matches!(
         status(&preview, 2),
         RowStatus::Ready { asset_id: Some(id), funding: None, operation }
@@ -346,7 +356,7 @@ async fn imp_036_a_row_already_recorded_is_shown_so() {
         .await
         .expect("transactions")
         .len();
-    preview(&ctx, &account_id, &file, &french_mapping()).await;
+    preview(&ctx, &account_id, &file, &french_mapper()).await;
     let after = ctx
         .account_service
         .get_all_transactions_for_account(&account_id)
@@ -368,7 +378,7 @@ async fn imp_036_a_row_already_recorded_is_shown_so() {
         )
         .await
         .expect("buy");
-    let preview = preview(&ctx, &account_id, &file, &french_mapping()).await;
+    let preview = preview(&ctx, &account_id, &file, &french_mapper()).await;
     assert!(matches!(
         status(&preview, 2),
         RowStatus::AlreadyRecorded { .. }
@@ -388,7 +398,7 @@ async fn imp_035_rows_follow_the_rules_of_manual_entry() {
     asset(&ctx, "Beta Power", "BTP", Some("FR0000000002"), "EUR").await;
     let account_id = account(&ctx, 0).await;
     let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
-    let preview = preview(&ctx, &account_id, &file, &english_mapping()).await;
+    let preview = preview(&ctx, &account_id, &file, &english_mapper()).await;
     assert!(matches!(
         status(&preview, 2),
         RowStatus::Ready { asset_id: None, .. }
@@ -454,7 +464,7 @@ async fn imp_032_each_row_is_matched_to_an_asset() {
                 2024-02-02,Buy,,,Acme World,1,10,10,0,EUR\n\
                 2024-02-03,Sell,FR0000000010,,,1,10,10,0,EUR\n";
     let file = picked(&ctx, rows, false).await;
-    let preview_once = preview(&ctx, &account_id, &file, &english_mapping()).await;
+    let preview_once = preview(&ctx, &account_id, &file, &english_mapper()).await;
     assert!(
         matches!(status(&preview_once, 2), RowStatus::Ready { asset_id: Some(id), .. } if *id == by_isin)
     );
@@ -466,7 +476,7 @@ async fn imp_032_each_row_is_matched_to_an_asset() {
         .archive_asset(&by_isin)
         .await
         .expect("archive");
-    let archived = preview(&ctx, &account_id, &file, &english_mapping()).await;
+    let archived = preview(&ctx, &account_id, &file, &english_mapper()).await;
     assert!(
         matches!(status(&archived, 2), RowStatus::Ready { .. }),
         "an archived asset is matched"
@@ -481,42 +491,42 @@ async fn imp_032_each_row_is_matched_to_an_asset() {
     ));
 }
 
-// IMP-033 — an unknown asset matched once takes its asset; a match made to an asset the
-// portfolio lacks is refused, a saved one whose asset has not arrived leaves its rows unknown.
+// IMP-033 / IMP-033A — an unknown asset matched once takes its asset; a match made to an asset
+// the portfolio lacks is refused, a saved one whose asset has not arrived is passed over.
 #[tokio::test]
 async fn imp_033_an_unknown_asset_is_matched_once() {
     let ctx = build_ctx().await;
     let (account_id, _, beta) = french_portfolio(&ctx).await;
     let file = picked(&ctx, &fixture("french_broker.csv"), true).await;
-    let mut mapping = french_mapping();
-    mapping.asset_matches = vec![AssetMatch {
+    let mut mapper = french_mapper();
+    mapper.asset_matches = vec![AssetMatch {
         read: "inconnue sa".to_string(),
         asset_id: beta.clone(),
     }];
-    let matched = preview(&ctx, &account_id, &file, &mapping).await;
+    let matched = preview(&ctx, &account_id, &file, &mapper).await;
     assert!(
         matches!(status(&matched, 8), RowStatus::Ready { asset_id: Some(id), .. } if *id == beta)
     );
-    mapping.asset_matches = vec![AssetMatch {
+    mapper.asset_matches = vec![AssetMatch {
         read: "INCONNUE SA".to_string(),
         asset_id: "not-an-asset".to_string(),
     }];
     let refused = ctx
         .import
-        .preview_import(&account_id, path(&file), None, &mapping)
+        .preview_import(&account_id, path(&file), None, &mapper)
         .await;
     assert!(matches!(
         refused,
         Err(CsvImportError::UseCase(CsvImportTask::MatchedAssetNotFound { asset_id })) if asset_id == "not-an-asset"
     ));
     let saved = ctx
-        .mappings
-        .save_column_mapping(None, mapping.clone())
+        .mappers
+        .save_import_mapper(None, mapper.clone())
         .await
         .expect("saved");
     let waiting = ctx
         .import
-        .preview_import(&account_id, path(&file), Some(&saved.id), &mapping)
+        .preview_import(&account_id, path(&file), Some(&saved.id), &mapper)
         .await
         .expect("preview");
     assert!(matches!(
@@ -525,8 +535,8 @@ async fn imp_033_an_unknown_asset_is_matched_once() {
     ));
 }
 
-// IMP-010 / IMP-020 / IMP-021 — an unknown account, a file that cannot be read or was not
-// picked, a saved mapping no longer held and a mapping without its date column are refused.
+// IMP-010 / IMP-020E / IMP-021 — an unknown account, a file that cannot be read or was not
+// picked, a saved mapper no longer held and a mapper without its date column are refused.
 #[tokio::test]
 async fn imp_010_what_cannot_be_read_is_refused() {
     let ctx = build_ctx().await;
@@ -561,13 +571,13 @@ async fn imp_010_what_cannot_be_read_is_refused() {
     );
     let gone = ctx
         .import
-        .preview_import(&account_id, path(&file), Some("gone"), &english_mapping())
+        .preview_import(&account_id, path(&file), Some("gone"), &english_mapper())
         .await;
     assert!(matches!(
         gone,
-        Err(CsvImportError::Import(ImportError::MappingNotFound { .. }))
+        Err(CsvImportError::Import(ImportError::MapperNotFound { .. }))
     ));
-    let mut no_date = english_mapping();
+    let mut no_date = english_mapper();
     no_date.columns.date = " ".to_string();
     let refused = ctx
         .import
@@ -575,9 +585,9 @@ async fn imp_010_what_cannot_be_read_is_refused() {
         .await;
     assert!(matches!(
         refused,
-        Err(CsvImportError::Import(ImportError::MappingColumnMissing))
+        Err(CsvImportError::Import(ImportError::MapperColumnMissing))
     ));
-    let mut absent = english_mapping();
+    let mut absent = english_mapper();
     absent.columns.fees = header("Fees");
     let refused = ctx
         .import
@@ -586,7 +596,7 @@ async fn imp_010_what_cannot_be_read_is_refused() {
     assert!(
         matches!(refused, Err(CsvImportError::Import(ImportError::MappedColumnNotInFile { column })) if column == "Fees")
     );
-    let mut untyped = english_mapping();
+    let mut untyped = english_mapper();
     untyped.operation_types.retain(|label| label.label != "Buy");
     let preview = preview(&ctx, &account_id, &file, &untyped).await;
     assert!(matches!(
@@ -614,11 +624,11 @@ async fn confirm(
     ctx: &Ctx,
     account_id: &str,
     file: &NamedTempFile,
-    mapping: &ColumnMappingDraft,
+    mapper: &ImportMapperDraft,
     add_deposits: bool,
 ) -> ImportPreview {
     ctx.import
-        .confirm_import(account_id, path(file), None, mapping, add_deposits)
+        .confirm_import(account_id, path(file), None, mapper, add_deposits)
         .await
         .expect("confirmed")
 }
@@ -639,7 +649,7 @@ async fn imp_050_a_confirmed_import_records_every_ready_row_at_once() {
     let account_id = english_portfolio(&ctx).await;
     let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
     let mut events = ctx.bus.subscribe();
-    let confirmed = confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    let confirmed = confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
     let raised = events.drain();
     let updated = raised
         .iter()
@@ -694,7 +704,7 @@ async fn imp_035a_a_days_own_deposit_funds_its_purchases() {
          2024-02-01,Deposit,,,,,,201.00,,EUR\n"
     );
     let file = picked(&ctx, &rows, false).await;
-    let previewed = preview(&ctx, &account_id, &file, &english_mapping()).await;
+    let previewed = preview(&ctx, &account_id, &file, &english_mapper()).await;
     assert!(
         matches!(
             status(&previewed, 2),
@@ -702,7 +712,7 @@ async fn imp_035a_a_days_own_deposit_funds_its_purchases() {
         ),
         "IMP-038: the day's own deposit funds the purchase"
     );
-    confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
     let recorded = transactions(&ctx, &account_id).await;
     let kinds: Vec<(TransactionType, bool)> = recorded
         .iter()
@@ -730,12 +740,12 @@ async fn imp_036_a_recorded_sale_of_an_asset_since_archived_is_already_recorded(
          2024-02-02,Sell,FR0000000010,ACM,Acme World,2,110.00,220.00,0,EUR\n"
     );
     let file = picked(&ctx, &rows, false).await;
-    confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
     ctx.asset_service
         .archive_asset(&acme)
         .await
         .expect("archived");
-    let again = preview(&ctx, &account_id, &file, &english_mapping()).await;
+    let again = preview(&ctx, &account_id, &file, &english_mapper()).await;
     assert!(matches!(
         status(&again, 3),
         RowStatus::AlreadyRecorded { .. }
@@ -743,7 +753,7 @@ async fn imp_036_a_recorded_sale_of_an_asset_since_archived_is_already_recorded(
     let new_sale =
         format!("{HEADER}2024-02-03,Sell,FR0000000010,ACM,Acme World,1,110.00,110.00,0,EUR\n");
     let later = picked(&ctx, &new_sale, false).await;
-    let refused = preview(&ctx, &account_id, &later, &english_mapping()).await;
+    let refused = preview(&ctx, &account_id, &later, &english_mapper()).await;
     assert!(
         matches!(
             status(&refused, 2),
@@ -767,14 +777,14 @@ async fn imp_036_each_transaction_matches_one_row() {
          2024-02-02,Withdrawal,,,,,,10.00,,EUR\n"
     );
     let first = picked(&ctx, &rows, false).await;
-    confirm(&ctx, &account_id, &first, &english_mapping(), true).await;
+    confirm(&ctx, &account_id, &first, &english_mapper(), true).await;
     let twice = format!(
         "{HEADER}2024-02-01,Deposit,,,,,,50.00,,EUR\n\
          2024-02-01,Deposit,,,,,,50.00,,EUR\n\
          2024-02-02,Withdrawal,,,,,,10.00,,EUR\n"
     );
     let later = picked(&ctx, &twice, false).await;
-    let previewed = preview(&ctx, &account_id, &later, &english_mapping()).await;
+    let previewed = preview(&ctx, &account_id, &later, &english_mapper()).await;
     assert!(matches!(
         status(&previewed, 2),
         RowStatus::AlreadyRecorded { .. }
@@ -803,7 +813,7 @@ async fn imp_035a_the_order_of_a_days_rows() {
          2024-02-05,Dividend,FR0000000002,,,,,1.00,,EUR\n"
     );
     let file = picked(&ctx, &rows, false).await;
-    let previewed = preview(&ctx, &account_id, &file, &english_mapping()).await;
+    let previewed = preview(&ctx, &account_id, &file, &english_mapper()).await;
     assert!(
         matches!(
             status(&previewed, 2),
@@ -841,7 +851,7 @@ async fn imp_038_each_funding_counts_what_came_before() {
          2024-02-02,Buy,FR0000000010,ACM,Acme World,1,100.00,100.00,0,EUR\n"
     );
     let file = picked(&ctx, &rows, false).await;
-    let previewed = preview(&ctx, &account_id, &file, &english_mapping()).await;
+    let previewed = preview(&ctx, &account_id, &file, &english_mapper()).await;
     let funding = |line| match status(&previewed, line) {
         RowStatus::Ready { funding, .. } => *funding,
         other => panic!("line {line}: {other:?}"),
@@ -852,7 +862,7 @@ async fn imp_038_each_funding_counts_what_came_before() {
         "what the day's deposit leaves"
     );
     assert_eq!(funding(4), Some(micro(100)), "nothing left of the first");
-    let confirmed = confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    let confirmed = confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
     assert_eq!(confirmed.counts.ready, 3);
     let recorded = transactions(&ctx, &account_id).await;
     assert_eq!(deposits(&recorded).len(), 3, "the file's and the two added");
@@ -868,8 +878,556 @@ async fn imp_050a_no_asset_event_when_the_cash_asset_exists() {
         format!("{HEADER}2024-02-01,Buy,FR0000000010,ACM,Acme World,2,100.00,200.00,0,EUR\n");
     let file = picked(&ctx, &rows, false).await;
     let mut events = ctx.bus.subscribe();
-    confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
     assert!(!events.drain().contains(&Event::AssetUpdated));
+}
+
+/// The file a mapper from elsewhere arrives in.
+fn mapper_file(text: &str) -> NamedTempFile {
+    let mut file = NamedTempFile::new().expect("temp file");
+    file.write_all(text.as_bytes()).expect("written");
+    file
+}
+
+fn mappers_folder(ctx: &Ctx) -> std::path::PathBuf {
+    ctx.mappers_dir.path().join("import-mappers")
+}
+
+// IMP-020 / IMP-020A / IMP-025 / IMP-040 — saving writes a JSON file holding what the mapper
+// is; the list is what the folder holds, by provider; a change of provider keeps the file;
+// deleted, it is gone.
+#[tokio::test]
+async fn imp_020_a_saved_mapper_is_a_file_of_the_folder() {
+    let ctx = build_ctx().await;
+    assert!(ctx
+        .mappers
+        .list_import_mappers()
+        .await
+        .expect("no folder")
+        .is_empty());
+    let saved = ctx
+        .mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    assert_eq!(saved.id, "broker");
+    let file = mappers_folder(&ctx).join("broker.json");
+    let written: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&file).expect("the file")).expect("JSON");
+    assert_eq!(written["info"]["provider"], "Broker");
+    assert_eq!(written["separator"], "Comma");
+    assert_eq!(written["columns"]["date"], "Date");
+    assert!(written["operation_types"].is_array() && written["asset_matches"].is_array());
+    assert!(
+        written.get("id").is_none(),
+        "its identity is its file's name"
+    );
+
+    let mut renamed = english_mapper();
+    renamed.info.provider = "Another".to_string();
+    let again = ctx
+        .mappers
+        .save_import_mapper(Some(saved.id.clone()), renamed)
+        .await
+        .expect("saved again");
+    assert_eq!(again.id, "broker");
+    ctx.mappers
+        .save_import_mapper(None, french_mapper())
+        .await
+        .expect("second");
+    let providers: Vec<String> = ctx
+        .mappers
+        .list_import_mappers()
+        .await
+        .expect("listed")
+        .into_iter()
+        .map(|mapper| mapper.info.provider)
+        .collect();
+    assert_eq!(providers, ["Another", "Courtier"]);
+
+    ctx.mappers
+        .delete_import_mapper("broker")
+        .await
+        .expect("deleted");
+    assert!(!file.exists());
+    assert!(matches!(
+        ctx.mappers.delete_import_mapper("broker").await,
+        Err(ImportError::MapperNotFound { .. })
+    ));
+    assert!(matches!(
+        ctx.mappers
+            .save_import_mapper(Some("broker".to_string()), english_mapper())
+            .await,
+        Err(ImportError::MapperNotFound { .. })
+    ));
+}
+
+// IMP-024 / IMP-027 — a provider another mapper holds is refused when set; two files copied
+// by hand with one provider are both listed, and either may be saved under it.
+#[tokio::test]
+async fn imp_024_a_provider_is_held_once_unless_files_were_copied_by_hand() {
+    let ctx = build_ctx().await;
+    let first = ctx
+        .mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    let mut same = english_mapper();
+    same.info.provider = " BROKER ".to_string();
+    assert!(matches!(
+        ctx.mappers.save_import_mapper(None, same).await,
+        Err(ImportError::MapperProviderTaken { .. })
+    ));
+    std::fs::copy(
+        mappers_folder(&ctx).join("broker.json"),
+        mappers_folder(&ctx).join("copy.json"),
+    )
+    .expect("copied by hand");
+    let listed = ctx.mappers.list_import_mappers().await.expect("listed");
+    assert_eq!(listed.len(), 2);
+    assert_eq!(listed[0].id, "broker", "same provider, by identity");
+    ctx.mappers
+        .save_import_mapper(Some(first.id), english_mapper())
+        .await
+        .expect("its own provider is no conflict");
+}
+
+// IMP-020A — what the folder holds that does not read as a mapper is left out and left there.
+#[tokio::test]
+async fn imp_020a_a_file_that_does_not_read_is_left_out_and_left_there() {
+    let ctx = build_ctx().await;
+    ctx.mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    std::fs::create_dir(mappers_folder(&ctx).join("folder.json")).expect("a subfolder");
+    let bad = mappers_folder(&ctx).join("bad.json");
+    std::fs::write(&bad, "not a mapper").expect("written");
+    let big = mappers_folder(&ctx).join("big.json");
+    std::fs::write(&big, " ".repeat(1_000_001)).expect("written");
+    let listed = ctx.mappers.list_import_mappers().await.expect("listed");
+    assert_eq!(listed.len(), 1);
+    assert!(bad.exists() && big.exists());
+}
+
+// IMP-020B — a mapper's file from elsewhere joins the list under a name of its provider, and
+// a later file of the same broker reads through it; what does not read is refused with why,
+// nothing written.
+#[tokio::test]
+async fn imp_020b_a_mapper_from_elsewhere_is_added_from_its_file() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let shared = serde_json::to_string(&english_mapper()).expect("JSON");
+    let added = ctx
+        .mappers
+        .add_import_mapper_from(mapper_file(&shared).path())
+        .await
+        .expect("added");
+    assert_eq!(added.id, "broker");
+    assert_eq!(added.info.provider, "Broker");
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    let previewed = ctx
+        .import
+        .preview_import(&account_id, path(&file), Some(&added.id), &english_mapper())
+        .await
+        .expect("previewed");
+    assert!(!previewed.rows.is_empty());
+
+    assert!(matches!(
+        ctx.mappers
+            .add_import_mapper_from(mapper_file(&shared).path())
+            .await,
+        Err(ImportError::MapperProviderTaken { .. })
+    ));
+    let mut with_extra: serde_json::Value = serde_json::from_str(&shared).expect("JSON");
+    with_extra["extra"] = serde_json::json!(1);
+    for (bad, what) in [
+        ("not json".to_string(), "not JSON"),
+        (with_extra.to_string(), "a field a mapper does not have"),
+        (
+            r#"{"info":{"provider":"A"}}"#.to_string(),
+            "fields it needs missing",
+        ),
+    ] {
+        match ctx
+            .mappers
+            .add_import_mapper_from(mapper_file(&bad).path())
+            .await
+        {
+            Err(ImportError::MapperFileInvalid { reason }) => assert!(!reason.is_empty(), "{what}"),
+            other => panic!("{what}: {other:?}"),
+        }
+    }
+    let mut no_column = english_mapper();
+    no_column.info.provider = "Other".to_string();
+    no_column.columns.date = String::new();
+    assert!(matches!(
+        ctx.mappers
+            .add_import_mapper_from(
+                mapper_file(&serde_json::to_string(&no_column).expect("JSON")).path()
+            )
+            .await,
+        Err(ImportError::MapperColumnMissing)
+    ));
+    assert!(matches!(
+        ctx.mappers
+            .add_import_mapper_from(mapper_file(&" ".repeat(1_000_001)).path())
+            .await,
+        Err(ImportError::MapperFileTooLarge)
+    ));
+    assert!(matches!(
+        ctx.mappers
+            .add_import_mapper_from(&mappers_folder(&ctx).join("none.json"))
+            .await,
+        Err(ImportError::MapperFileUnreadable)
+    ));
+    assert_eq!(
+        ctx.mappers
+            .list_import_mappers()
+            .await
+            .expect("listed")
+            .len(),
+        1
+    );
+}
+
+// IMP-020C / IMP-020D — a confirmation with a saved mapper remembers it for the file's folder,
+// preselected for the next file there; another folder, or a mapper gone, preselects none;
+// a preview remembers nothing (IMP-017), a later confirmation replaces it.
+#[tokio::test]
+async fn imp_020c_the_mapper_chosen_is_remembered_for_its_folder() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let saved = ctx
+        .mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    let mut other = english_mapper();
+    other.info.provider = "Other".to_string();
+    let second = ctx
+        .mappers
+        .save_import_mapper(None, other)
+        .await
+        .expect("saved");
+
+    let folder = tempfile::tempdir().expect("folder");
+    let in_folder = |name: &str| {
+        let file = folder.path().join(name);
+        std::fs::write(&file, fixture("english_broker.csv")).expect("written");
+        file
+    };
+    let first = in_folder("january.csv");
+    let first_path = ctx.import.allow_file(&first).await.expect("picked");
+    assert_eq!(
+        ctx.import
+            .remembered_import_mapper(&first_path)
+            .await
+            .expect("none"),
+        None
+    );
+    ctx.import
+        .preview_import(&account_id, &first_path, Some(&saved.id), &english_mapper())
+        .await
+        .expect("previewed");
+    assert_eq!(
+        ctx.import
+            .remembered_import_mapper(&first_path)
+            .await
+            .expect("none"),
+        None,
+        "a preview writes nothing"
+    );
+    ctx.import
+        .confirm_import(
+            &account_id,
+            &first_path,
+            Some(&saved.id),
+            &english_mapper(),
+            true,
+        )
+        .await
+        .expect("confirmed");
+
+    let next = in_folder("february.csv");
+    let next_path = ctx.import.allow_file(&next).await.expect("picked");
+    assert_eq!(
+        ctx.import
+            .remembered_import_mapper(&next_path)
+            .await
+            .expect("read"),
+        Some(saved.id.clone()),
+        "another file of that folder"
+    );
+    ctx.import
+        .confirm_import(
+            &account_id,
+            &next_path,
+            Some(&second.id),
+            &english_mapper(),
+            true,
+        )
+        .await
+        .expect("confirmed");
+    assert_eq!(
+        ctx.import
+            .remembered_import_mapper(&next_path)
+            .await
+            .expect("read"),
+        Some(second.id.clone()),
+        "the later choice replaces it"
+    );
+
+    let elsewhere = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    assert_eq!(
+        ctx.import
+            .remembered_import_mapper(path(&elsewhere))
+            .await
+            .expect("read"),
+        None,
+        "another folder"
+    );
+    ctx.import.allow_file(&next).await.expect("picked");
+    ctx.mappers
+        .delete_import_mapper(&second.id)
+        .await
+        .expect("deleted");
+    assert_eq!(
+        ctx.import
+            .remembered_import_mapper(&next_path)
+            .await
+            .expect("read"),
+        None,
+        "a mapper no longer held"
+    );
+    assert!(matches!(
+        ctx.import.remembered_import_mapper(path(&elsewhere)).await,
+        Err(CsvImportError::UseCase(CsvImportTask::FileNotPicked))
+    ));
+}
+
+// IMP-020 / IMP-020B — a new mapper never takes another's file: one renamed keeps its file
+// name, and a file of its old provider takes a name of its own. A provider is written trimmed.
+#[tokio::test]
+async fn imp_020_a_new_mapper_never_replaces_a_file() {
+    let ctx = build_ctx().await;
+    let saved = ctx
+        .mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    let mut renamed = english_mapper();
+    renamed.info.provider = "Another".to_string();
+    ctx.mappers
+        .save_import_mapper(Some(saved.id), renamed)
+        .await
+        .expect("renamed");
+
+    let mut shared = english_mapper();
+    shared.info.provider = "  Broker ".to_string();
+    let added = ctx
+        .mappers
+        .add_import_mapper_from(mapper_file(&serde_json::to_string(&shared).expect("JSON")).path())
+        .await
+        .expect("added");
+    assert_eq!(added.id, "broker-2");
+    let read = |name: &str| -> serde_json::Value {
+        serde_json::from_slice(&std::fs::read(mappers_folder(&ctx).join(name)).expect("file"))
+            .expect("JSON")
+    };
+    assert_eq!(read("broker.json")["info"]["provider"], "Another");
+    assert_eq!(read("broker-2.json")["info"]["provider"], "Broker");
+}
+
+// IMP-020 / IMP-020A / IMP-040 — a folder that cannot be read or written is told, not hidden.
+#[tokio::test]
+async fn imp_020_a_folder_that_fails_is_rejected() {
+    let ctx = build_ctx().await;
+    std::fs::write(mappers_folder(&ctx), "a file where the folder goes").expect("written");
+    assert!(matches!(
+        ctx.mappers.list_import_mappers().await,
+        Err(ImportError::MapperFolderFailed)
+    ));
+    assert!(matches!(
+        ctx.mappers.save_import_mapper(None, english_mapper()).await,
+        Err(ImportError::MapperFolderFailed)
+    ));
+    assert!(matches!(
+        ctx.mappers.delete_import_mapper("broker").await,
+        Err(ImportError::MapperFolderFailed)
+    ));
+}
+
+// IMP-020B — a folder is not a mapper's file.
+#[tokio::test]
+async fn imp_020b_a_folder_picked_is_refused() {
+    let ctx = build_ctx().await;
+    let dir = tempfile::tempdir().expect("dir");
+    assert!(matches!(
+        ctx.mappers.add_import_mapper_from(dir.path()).await,
+        Err(ImportError::MapperFileUnreadable)
+    ));
+}
+
+// IMP-020E / IMP-025 — a held file that no longer reads is refused when picked or saved over.
+#[tokio::test]
+async fn imp_020e_a_mapper_that_no_longer_reads_is_refused() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let saved = ctx
+        .mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    std::fs::write(mappers_folder(&ctx).join("broker.json"), "broken").expect("written");
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    assert!(matches!(
+        ctx.import
+            .preview_import(&account_id, path(&file), Some(&saved.id), &english_mapper())
+            .await,
+        Err(CsvImportError::Import(
+            ImportError::MapperFileInvalid { .. }
+        ))
+    ));
+    assert!(matches!(
+        ctx.mappers
+            .save_import_mapper(Some(saved.id), english_mapper())
+            .await,
+        Err(ImportError::MapperFileInvalid { .. })
+    ));
+}
+
+// IMP-033A — of two matches for one text, the first whose asset is held applies.
+#[tokio::test]
+async fn imp_033a_the_first_match_whose_asset_is_held_applies() {
+    let ctx = build_ctx().await;
+    let (account_id, _, beta) = french_portfolio(&ctx).await;
+    let file = picked(&ctx, &fixture("french_broker.csv"), true).await;
+    let mut mapper = french_mapper();
+    mapper.asset_matches = vec![
+        AssetMatch {
+            read: "inconnue sa".to_string(),
+            asset_id: "not-an-asset".to_string(),
+        },
+        AssetMatch {
+            read: "inconnue sa".to_string(),
+            asset_id: beta.clone(),
+        },
+    ];
+    let saved = ctx
+        .mappers
+        .save_import_mapper(None, mapper.clone())
+        .await
+        .expect("saved");
+    let preview = ctx
+        .import
+        .preview_import(&account_id, path(&file), Some(&saved.id), &mapper)
+        .await
+        .expect("preview");
+    assert!(
+        matches!(status(&preview, 8), RowStatus::Ready { asset_id: Some(id), .. } if *id == beta)
+    );
+}
+
+// IMP-022 — a mapper's file giving one label two types reads with the first.
+#[tokio::test]
+async fn imp_022_a_label_given_two_types_reads_with_the_first() {
+    let ctx = build_ctx().await;
+    let (account_id, _, _) = french_portfolio(&ctx).await;
+    let file = picked(&ctx, &fixture("french_broker.csv"), true).await;
+    let mut mapper = french_mapper();
+    let before = preview(&ctx, &account_id, &file, &mapper).await;
+    let mut first = mapper.operation_types[0].clone();
+    first.transaction_type = OperationType::NotImported;
+    mapper.operation_types.insert(0, first);
+    let after = preview(&ctx, &account_id, &file, &mapper).await;
+    assert!(after.counts.not_imported > before.counts.not_imported);
+}
+
+// IMP-020D — a memory that cannot be read preselects none.
+#[tokio::test]
+async fn imp_020d_a_memory_that_cannot_be_read_preselects_none() {
+    let ctx = build_ctx().await;
+    sqlx::query("DROP TABLE import_mapper_choices")
+        .execute(&ctx.pool)
+        .await
+        .expect("dropped");
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    assert_eq!(
+        ctx.import
+            .remembered_import_mapper(path(&file))
+            .await
+            .expect("read"),
+        None
+    );
+}
+
+// IMP-020C — an import stands when remembering fails.
+#[tokio::test]
+async fn imp_020c_an_import_stands_when_remembering_fails() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let saved = ctx
+        .mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    sqlx::query("DROP TABLE import_mapper_choices")
+        .execute(&ctx.pool)
+        .await
+        .expect("dropped");
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    let preview = ctx
+        .import
+        .confirm_import(
+            &account_id,
+            path(&file),
+            Some(&saved.id),
+            &english_mapper(),
+            true,
+        )
+        .await
+        .expect("the import stands");
+    assert!(preview.counts.ready > 0);
+}
+
+// IMP-020D — a remembered mapper whose file no longer reads, for any reason, preselects none.
+#[tokio::test]
+async fn imp_020d_a_mapper_that_no_longer_reads_preselects_none() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let saved = ctx
+        .mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    ctx.import
+        .confirm_import(
+            &account_id,
+            path(&file),
+            Some(&saved.id),
+            &english_mapper(),
+            true,
+        )
+        .await
+        .expect("confirmed");
+    let mut no_date = english_mapper();
+    no_date.columns.date = String::new();
+    for broken in [
+        "not a mapper".to_string(),
+        " ".repeat(1_000_001),
+        serde_json::to_string(&no_date).expect("JSON"),
+    ] {
+        std::fs::write(mappers_folder(&ctx).join("broker.json"), broken).expect("written");
+        assert_eq!(
+            ctx.import
+                .remembered_import_mapper(path(&file))
+                .await
+                .expect("read"),
+            None
+        );
+    }
 }
 
 // IMP-010 — only the file last picked is read.
@@ -881,7 +1439,7 @@ async fn imp_010_only_the_file_last_picked_is_read() {
     let _last = picked(&ctx, &fixture("english_broker.csv"), false).await;
     let refused = ctx
         .import
-        .preview_import(&account_id, path(&earlier), None, &english_mapping())
+        .preview_import(&account_id, path(&earlier), None, &english_mapper())
         .await;
     assert!(matches!(
         refused,
@@ -901,7 +1459,7 @@ async fn imp_035_a_row_is_judged_as_if_typed() {
          2024-03-02,Sell,FR0000000010,ACM,Acme World,2,100.00,200.00,0,EUR\n"
     );
     let file = picked(&ctx, &first, false).await;
-    confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
     let rows = format!(
         "{HEADER}2099-01-01,Deposit,,,,,,10.00,,EUR\n\
          2024-02-01,Sell,FR0000000002,BTP,Beta Power,1,100.00,100.00,0,EUR\n\
@@ -909,7 +1467,7 @@ async fn imp_035_a_row_is_judged_as_if_typed() {
          2024-02-02,Buy,US0378331005,USF,Dollar Fund,1,100.00,100.00,0,EUR\n"
     );
     let later = picked(&ctx, &rows, false).await;
-    let previewed = preview(&ctx, &account_id, &later, &english_mapping()).await;
+    let previewed = preview(&ctx, &account_id, &later, &english_mapper()).await;
     for (line, what) in [
         (2, "TRX-020: a future date"),
         (3, "SEL-012: nothing held"),
@@ -943,10 +1501,10 @@ async fn imp_036a_a_later_files_deposit_row_matches_an_added_deposit() {
     let purchase =
         format!("{HEADER}2024-02-01,Buy,FR0000000010,ACM,Acme World,2,100.00,200.00,1.00,EUR\n");
     let first = picked(&ctx, &purchase, false).await;
-    confirm(&ctx, &account_id, &first, &english_mapping(), true).await;
+    confirm(&ctx, &account_id, &first, &english_mapper(), true).await;
     let deposit = format!("{HEADER}2024-02-01,Deposit,,,,,,201.00,,EUR\n");
     let later = picked(&ctx, &deposit, false).await;
-    let confirmed = confirm(&ctx, &account_id, &later, &english_mapping(), true).await;
+    let confirmed = confirm(&ctx, &account_id, &later, &english_mapper(), true).await;
     assert!(matches!(
         status(&confirmed, 2),
         RowStatus::AlreadyRecorded { .. }
@@ -977,7 +1535,7 @@ async fn imp_050_a_failed_write_records_nothing() {
     let mut events = ctx.bus.subscribe();
     let failed = ctx
         .import
-        .confirm_import(&account_id, path(&file), None, &english_mapping(), true)
+        .confirm_import(&account_id, path(&file), None, &english_mapper(), true)
         .await;
     assert!(failed.is_err(), "IMP-050: the failed write is told");
     assert!(
@@ -997,7 +1555,7 @@ async fn imp_051b_the_added_deposits_can_be_left_out() {
     let ctx = build_ctx().await;
     let account_id = english_portfolio(&ctx).await;
     let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
-    let confirmed = confirm(&ctx, &account_id, &file, &english_mapping(), false).await;
+    let confirmed = confirm(&ctx, &account_id, &file, &english_mapper(), false).await;
     assert!(matches!(
         status(&confirmed, 8),
         RowStatus::Rejected {
@@ -1018,10 +1576,10 @@ async fn imp_053_the_same_file_imported_twice_records_nothing_new() {
     let ctx = build_ctx().await;
     let account_id = english_portfolio(&ctx).await;
     let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
-    confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
     let once = transactions(&ctx, &account_id).await;
     let mut events = ctx.bus.subscribe();
-    let again = confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    let again = confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
     assert_eq!(transactions(&ctx, &account_id).await.len(), once.len());
     assert_eq!(again.counts.ready, 0);
     assert_eq!(again.counts.already_recorded, 3);
@@ -1032,8 +1590,8 @@ async fn imp_053_the_same_file_imported_twice_records_nothing_new() {
     let french = build_ctx().await;
     let (account_id, _, _) = french_portfolio(&french).await;
     let file = picked(&french, &fixture("french_broker.csv"), true).await;
-    let first = confirm(&french, &account_id, &file, &french_mapping(), true).await;
-    let again = confirm(&french, &account_id, &file, &french_mapping(), true).await;
+    let first = confirm(&french, &account_id, &file, &french_mapper(), true).await;
+    let again = confirm(&french, &account_id, &file, &french_mapper(), true).await;
     assert_eq!(again.counts.ready, 0, "IMP-053: {:?}", again.rows);
     assert_eq!(again.counts.already_recorded, first.counts.ready);
 }
@@ -1045,13 +1603,13 @@ async fn imp_052_an_unknown_asset_created_from_its_row_is_recorded() {
     let ctx = build_ctx().await;
     let (account_id, _, _) = french_portfolio(&ctx).await;
     let file = picked(&ctx, &fixture("french_broker.csv"), true).await;
-    let preview = preview(&ctx, &account_id, &file, &french_mapping()).await;
+    let preview = preview(&ctx, &account_id, &file, &french_mapper()).await;
     let RowStatus::UnknownAsset { asset: read } = status(&preview, 8) else {
         panic!("line 8 is unknown");
     };
     let name = read.name.clone().expect("the name read");
     let created = asset(&ctx, &name, "INC", None, "EUR").await;
-    let confirmed = confirm(&ctx, &account_id, &file, &french_mapping(), true).await;
+    let confirmed = confirm(&ctx, &account_id, &file, &french_mapper(), true).await;
     assert!(
         matches!(status(&confirmed, 8), RowStatus::Ready { asset_id: Some(id), .. } if *id == created)
     );
@@ -1067,7 +1625,7 @@ async fn imp_051a_a_corrected_added_deposit_stays_added() {
     let ctx = build_ctx().await;
     let account_id = english_portfolio(&ctx).await;
     let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
-    confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
     let added = deposits(&transactions(&ctx, &account_id).await)
         .into_iter()
         .find(|t| t.added_deposit)

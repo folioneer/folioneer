@@ -1,198 +1,226 @@
-use crate::context::import::domain::{ColumnMapping, ColumnMappingDraft, ColumnMappingRepository};
+use crate::context::import::domain::{
+    ImportMapper, ImportMapperDraft, ImportMapperStore, MapperChoiceRepository, PickedMapperFile,
+    LARGEST_MAPPER_FILE,
+};
 use crate::context::import::error::ImportError;
-use crate::core::{Event, SideEffectEventBus, BACKEND};
-use crate::shared::domain::{Rank, SyncedRecord};
-use sqlx::SqliteConnection;
+use crate::core::BACKEND;
+use std::path::Path;
 use std::result::Result as StdResult;
-use std::sync::Arc;
 
-/// The application service of the `import` bounded context: the saved column mappings
-/// (IMP-020 to IMP-026, IMP-040) and their sync entry points (CFR-014, CFR-017).
+/// The application service of the `import` bounded context: the import mappers, files of the
+/// mappers folder (IMP-020 to IMP-027, IMP-040).
 pub struct ImportService {
-    mapping_repo: Box<dyn ColumnMappingRepository>,
-    event_bus: Option<Arc<SideEffectEventBus>>,
+    store: Box<dyn ImportMapperStore>,
+    choices: Box<dyn MapperChoiceRepository>,
+    /// Held across a check of the folder and the write it allows (IMP-020, IMP-024).
+    writing: tokio::sync::Mutex<()>,
 }
 
 impl ImportService {
-    /// Creates the service over its mapping repository.
-    pub fn new(mapping_repo: Box<dyn ColumnMappingRepository>) -> Self {
+    /// Creates the service over the mappers folder and what each folder remembers.
+    pub fn new(
+        store: Box<dyn ImportMapperStore>,
+        choices: Box<dyn MapperChoiceRepository>,
+    ) -> Self {
         Self {
-            mapping_repo,
-            event_bus: None,
+            store,
+            choices,
+            writing: tokio::sync::Mutex::new(()),
         }
     }
 
-    /// Attaches the bus `ColumnMappingUpdated` is published on (IMP-026).
-    pub fn with_event_bus(mut self, bus: Arc<SideEffectEventBus>) -> Self {
-        self.event_bus = Some(bus);
-        self
+    /// IMP-020A — the mappers the folder holds, by provider; a file that does not read as a
+    /// mapper is left out, its failure logged.
+    pub async fn list_import_mappers(&self) -> StdResult<Vec<ImportMapper>, ImportError> {
+        let ids = self.store.ids().await.map_err(store_error("list"))?;
+        let mut mappers = Vec::with_capacity(ids.len());
+        for id in ids {
+            let bytes = match self.store.read(&id).await {
+                Ok(Some(bytes)) => bytes,
+                Ok(None) => continue,
+                Err(e) => {
+                    tracing::warn!(target: BACKEND, mapper = %id, err = ?e, "mapper file left out");
+                    continue;
+                }
+            };
+            match read_mapper(&id, &bytes) {
+                Ok(mapper) => mappers.push(mapper),
+                Err(e) => {
+                    tracing::warn!(target: BACKEND, mapper = %id, err = %e, "mapper file left out")
+                }
+            }
+        }
+        mappers.sort_by_cached_key(|mapper| {
+            (
+                crate::context::import::folded(&mapper.info.provider),
+                mapper.id.clone(),
+            )
+        });
+        Ok(mappers)
     }
 
-    /// IMP-020 — every saved mapping, by name.
-    pub async fn list_column_mappings(&self) -> StdResult<Vec<ColumnMapping>, ImportError> {
-        self.mapping_repo
-            .list()
-            .await
-            .map_err(|e| repository_error("list_column_mappings", e))
-    }
-
-    /// IMP-020 / IMP-025 — saves `draft` as a new mapping, or, given `mapping_id`, as the
-    /// mapping it names, keeping its id. The name is checked only when it is being set: a
-    /// mapping a merge left sharing its name keeps it (IMP-027).
-    pub async fn save_column_mapping(
+    /// IMP-020 / IMP-025 — writes `draft` as a new mapper, or, given `mapper_id`, as the
+    /// mapper it names, keeping its file. The provider is checked only when it is being set:
+    /// a mapper sharing its provider keeps it (IMP-027).
+    pub async fn save_import_mapper(
         &self,
-        mapping_id: Option<String>,
-        draft: ColumnMappingDraft,
-    ) -> StdResult<ColumnMapping, ImportError> {
-        let (mapping, held) = match mapping_id {
-            None => (ColumnMapping::new(draft)?, None),
-            Some(mapping_id) => {
-                let held = self.held(&mapping_id).await?;
-                (ColumnMapping::with_id(mapping_id, draft)?, Some(held))
+        mapper_id: Option<String>,
+        draft: ImportMapperDraft,
+    ) -> StdResult<ImportMapper, ImportError> {
+        let _writing = self.writing.lock().await;
+        let held = match &mapper_id {
+            Some(id) => Some(self.get_import_mapper(id).await?),
+            None => None,
+        };
+        let id = mapper_id.unwrap_or_default();
+        let checked = ImportMapper::with_id(id, draft)?;
+        let provider_kept = held.is_some_and(|held| held.has_provider(&checked.info.provider));
+        if !provider_kept {
+            self.check_provider_free(&checked).await?;
+        }
+        self.write_mapper(checked).await
+    }
+
+    /// IMP-020B — the mapper's file at `path` copied into the folder; refused with why, nothing
+    /// written.
+    pub async fn add_import_mapper_from(
+        &self,
+        path: &Path,
+    ) -> StdResult<ImportMapper, ImportError> {
+        let picked = self
+            .store
+            .read_picked(path, LARGEST_MAPPER_FILE)
+            .await
+            .map_err(|e| {
+                tracing::warn!(target: BACKEND, err = ?e, "mapper file cannot be read");
+                ImportError::MapperFileUnreadable
+            })?;
+        let PickedMapperFile::Read(bytes) = picked else {
+            return Err(ImportError::MapperFileTooLarge);
+        };
+        let _writing = self.writing.lock().await;
+        let checked = ImportMapper::with_id(String::new(), ImportMapperDraft::from_file(&bytes)?)?;
+        self.check_provider_free(&checked).await?;
+        self.write_mapper(checked).await
+    }
+
+    /// IMP-020 — the mapper `mapper_id`, refused when it is no longer held or no longer reads.
+    pub async fn get_import_mapper(&self, mapper_id: &str) -> StdResult<ImportMapper, ImportError> {
+        let bytes = self
+            .store
+            .read(mapper_id)
+            .await
+            .map_err(store_error("read"))?
+            .ok_or_else(|| ImportError::MapperNotFound {
+                mapper_id: mapper_id.to_string(),
+            })?;
+        read_mapper(mapper_id, &bytes)
+    }
+
+    /// IMP-040 — removes the file of the mapper `mapper_id`.
+    pub async fn delete_import_mapper(&self, mapper_id: &str) -> StdResult<(), ImportError> {
+        let _writing = self.writing.lock().await;
+        let held = self
+            .store
+            .read(mapper_id)
+            .await
+            .map_err(store_error("read"))?;
+        if held.is_none() {
+            return Err(ImportError::MapperNotFound {
+                mapper_id: mapper_id.to_string(),
+            });
+        }
+        self.store
+            .delete(mapper_id)
+            .await
+            .map_err(store_error("delete"))
+    }
+
+    /// IMP-020D — the mapper `folder` remembers, when it is still held and reads.
+    pub async fn remembered_import_mapper(&self, folder: &str) -> Option<String> {
+        let id = match self.choices.remembered(folder).await {
+            Ok(id) => id?,
+            Err(e) => {
+                tracing::warn!(target: BACKEND, err = ?e, "mapper choice not read");
+                return None;
             }
         };
-        let name_kept = held.is_some_and(|held| held.is_named(&mapping.name));
-        let others = self.list_column_mappings().await?;
-        if !name_kept
-            && others
-                .iter()
-                .any(|other| other.id != mapping.id && other.is_named(&mapping.name))
-        {
-            return Err(ImportError::MappingNameTaken { name: mapping.name });
+        match self.get_import_mapper(&id).await {
+            Ok(_) => Some(id),
+            Err(e) => {
+                tracing::warn!(target: BACKEND, mapper = %id, err = %e, "remembered mapper not preselected");
+                None
+            }
         }
-        self.mapping_repo
-            .save(&mapping)
-            .await
-            .map_err(|e| repository_error("save_column_mapping", e))?;
-        self.notify_updated();
-        Ok(mapping)
     }
 
-    /// IMP-020 — the saved mapping `mapping_id`, refused when it is no longer held.
-    pub async fn get_column_mapping(
-        &self,
-        mapping_id: &str,
-    ) -> StdResult<ColumnMapping, ImportError> {
-        self.mapping_repo
-            .get_by_id(mapping_id)
-            .await
-            .map_err(|e| repository_error("get_column_mapping", e))?
-            .ok_or_else(|| ImportError::MappingNotFound {
-                mapping_id: mapping_id.to_string(),
-            })
+    /// IMP-020C — `folder` now remembers `mapper_id`. A failure is logged and goes no further:
+    /// the import it follows stands.
+    pub async fn remember_import_mapper(&self, folder: &str, mapper_id: &str) {
+        if let Err(e) = self.choices.remember(folder, mapper_id).await {
+            tracing::warn!(target: BACKEND, err = ?e, "mapper choice not remembered");
+        }
     }
 
-    /// IMP-040 — deletes the mapping `mapping_id`.
-    pub async fn delete_column_mapping(&self, mapping_id: &str) -> StdResult<(), ImportError> {
-        self.held(mapping_id).await?;
-        self.mapping_repo
-            .delete(mapping_id)
-            .await
-            .map_err(|e| repository_error("delete_column_mapping", e))?;
-        self.notify_updated();
+    /// IMP-024 — refused when another mapper holds its provider.
+    async fn check_provider_free(&self, mapper: &ImportMapper) -> StdResult<(), ImportError> {
+        let others = self.list_import_mappers().await?;
+        if others
+            .iter()
+            .any(|other| other.id != mapper.id && other.has_provider(&mapper.info.provider))
+        {
+            return Err(ImportError::MapperProviderTaken {
+                provider: mapper.info.provider.clone(),
+            });
+        }
         Ok(())
     }
 
-    async fn held(&self, mapping_id: &str) -> StdResult<ColumnMapping, ImportError> {
-        let held = self
-            .mapping_repo
-            .get_by_id(mapping_id)
+    /// IMP-020 — writes the mapper's file; one with no id yet takes its file name here.
+    async fn write_mapper(&self, mapper: ImportMapper) -> StdResult<ImportMapper, ImportError> {
+        let held = self.store.ids().await.map_err(store_error("list"))?;
+        let mapper = mapper.named_among(&held);
+        let bytes = mapper.to_file().map_err(store_error("serialize"))?;
+        self.store
+            .write(&mapper.id, &bytes)
             .await
-            .map_err(|e| repository_error("column mapping read", e))?;
-        match held {
-            Some(held) => Ok(held),
-            None => Err(ImportError::MappingNotFound {
-                mapping_id: mapping_id.to_string(),
-            }),
-        }
-    }
-
-    fn notify_updated(&self) {
-        if let Some(bus) = &self.event_bus {
-            bus.publish(Event::ColumnMappingUpdated);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Sync entry points (CFR-014, CFR-017) — merge executor writes; no entry guards run
-    // -------------------------------------------------------------------------
-
-    /// Stamps `rank` on every mapping never ranked (CFR-014, D6), on the first publish's
-    /// enrolment transaction (SYN-013); how many were stamped.
-    pub async fn stamp_sync_rank(
-        &self,
-        conn: &mut SqliteConnection,
-        rank: &Rank,
-    ) -> StdResult<u64, ImportError> {
-        self.mapping_repo
-            .stamp_sync_rank(conn, rank)
-            .await
-            .map_err(|e| repository_error("stamp_sync_rank", e))
-    }
-
-    /// The synced mapping this device holds for `identity` (CFR-014), on the apply
-    /// transaction's connection; `None` when it holds none.
-    pub async fn synced_record(
-        &self,
-        conn: &mut SqliteConnection,
-        identity: &str,
-    ) -> StdResult<Option<SyncedRecord>, ImportError> {
-        self.mapping_repo
-            .synced_record(conn, identity)
-            .await
-            .map_err(|e| repository_error("synced_record", e))
-    }
-
-    /// Applies an incoming mapping verbatim (CFR-017): the later change wins, and a name
-    /// another mapping holds is kept (IMP-023).
-    pub async fn apply_column_mapping(
-        &self,
-        conn: &mut SqliteConnection,
-        content: &str,
-        rank: Rank,
-    ) -> StdResult<(), ImportError> {
-        let mapping: ColumnMapping = serde_json::from_str(content).map_err(|e| {
-            tracing::error!(target: BACKEND, err = %e, "synced content: malformed payload");
-            ImportError::DatabaseError
-        })?;
-        self.mapping_repo
-            .apply(conn, &mapping, &rank)
-            .await
-            .map_err(|e| repository_error("apply_column_mapping", e))
-    }
-
-    /// Applies an incoming removal of the mapping `identity` (CFR-017).
-    pub async fn apply_removal(
-        &self,
-        conn: &mut SqliteConnection,
-        identity: &str,
-    ) -> StdResult<(), ImportError> {
-        self.mapping_repo
-            .remove_synced(conn, identity)
-            .await
-            .map_err(|e| repository_error("apply_removal", e))
+            .map_err(store_error("write"))?;
+        Ok(mapper)
     }
 }
 
-/// Translates a repository failure into `DatabaseError` after logging it.
-fn repository_error(context: &'static str, e: anyhow::Error) -> ImportError {
-    tracing::error!(target: BACKEND, err = ?e, "{context}: repository failure");
-    ImportError::DatabaseError
+/// IMP-020A — the file `id` read as a mapper, and valid.
+fn read_mapper(id: &str, bytes: &[u8]) -> StdResult<ImportMapper, ImportError> {
+    if bytes.len() as u64 > LARGEST_MAPPER_FILE {
+        return Err(ImportError::MapperFileTooLarge);
+    }
+    ImportMapper::with_id(id.to_string(), ImportMapperDraft::from_file(bytes)?)
+}
+
+/// A failure of the mappers folder: its cause logged, never sent.
+fn store_error(step: &'static str) -> impl Fn(anyhow::Error) -> ImportError {
+    move |e| {
+        tracing::error!(target: BACKEND, step = %step, err = ?e, "mappers folder failure");
+        ImportError::MapperFolderFailed
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::context::import::domain::{
-        DateFormat, DecimalMark, Encoding, MappedColumns, MockColumnMappingRepository, Separator,
+        DateFormat, DecimalMark, Encoding, MappedColumns, MapperInfo, MockImportMapperStore,
+        MockMapperChoiceRepository, Separator,
     };
 
-    fn draft(name: &str) -> ColumnMappingDraft {
-        ColumnMappingDraft {
-            name: name.to_string(),
-            separator: Separator::Semicolon,
+    fn draft() -> ImportMapperDraft {
+        ImportMapperDraft {
+            info: MapperInfo {
+                provider: "Broker".to_string(),
+            },
+            separator: Separator::Comma,
             decimal_mark: DecimalMark::Dot,
-            date_format: DateFormat::DayMonthYear,
+            date_format: DateFormat::YearMonthDay,
             encoding: Encoding::Utf8,
             columns: MappedColumns {
                 date: "Date".to_string(),
@@ -212,105 +240,57 @@ mod tests {
         }
     }
 
-    fn held(id: &str, name: &str) -> ColumnMapping {
-        ColumnMapping::with_id(id.to_string(), draft(name)).expect("valid")
-    }
-
-    // IMP-024 — a name another mapping holds, case and accents ignored, is refused and
-    // nothing is saved.
+    // IMP-020 — a write that fails is rejected with a specific error.
     #[tokio::test]
-    async fn imp_024_a_name_another_mapping_holds_is_refused() {
-        let mut repo = MockColumnMappingRepository::new();
-        repo.expect_list()
-            .returning(|| Ok(vec![held("m-1", "Société")]));
-        repo.expect_save().never();
-        let service = ImportService::new(Box::new(repo));
-
-        let refused = service.save_column_mapping(None, draft(" SOCIETE ")).await;
-
+    async fn imp_020_a_write_that_fails_is_rejected() {
+        let mut store = MockImportMapperStore::new();
+        store.expect_ids().returning(|| Ok(Vec::new()));
+        store
+            .expect_write()
+            .returning(|_, _| Err(anyhow::anyhow!("disk full")));
+        let service =
+            ImportService::new(Box::new(store), Box::new(MockMapperChoiceRepository::new()));
         assert!(matches!(
-            refused,
-            Err(ImportError::MappingNameTaken { name }) if name == "SOCIETE"
+            service.save_import_mapper(None, draft()).await,
+            Err(ImportError::MapperFolderFailed)
         ));
     }
 
-    // IMP-025 / IMP-026 — a saved mapping renamed keeps its id, may keep its own name, and
-    // tells the change.
+    // IMP-020A — a file that cannot be read is left out; the others stay listed.
     #[tokio::test]
-    async fn imp_025_a_saved_mapping_is_replaced_under_its_id() {
-        let mut repo = MockColumnMappingRepository::new();
-        repo.expect_get_by_id()
-            .returning(|_| Ok(Some(held("m-1", "Broker"))));
-        repo.expect_list()
-            .returning(|| Ok(vec![held("m-1", "Broker")]));
-        repo.expect_save()
-            .withf(|mapping| mapping.id == "m-1" && mapping.name == "broker")
-            .times(1)
-            .returning(|_| Ok(()));
-        let bus = Arc::new(SideEffectEventBus::new());
-        let mut events = bus.subscribe();
-        let service = ImportService::new(Box::new(repo)).with_event_bus(Arc::clone(&bus));
-
-        let saved = service
-            .save_column_mapping(Some("m-1".to_string()), draft("broker"))
-            .await
-            .expect("saved");
-
-        assert_eq!(saved.id, "m-1");
-        let event = events
-            .drain()
-            .pop()
-            .expect("ColumnMappingUpdated published");
-        assert_eq!(event, Event::ColumnMappingUpdated);
-    }
-
-    // IMP-027 — a mapping a merge left sharing its name is saved again under it; renaming it
-    // into a name another holds is still refused.
-    #[tokio::test]
-    async fn imp_027_a_shared_name_is_kept_not_taken() {
-        let mut repo = MockColumnMappingRepository::new();
-        repo.expect_get_by_id()
-            .returning(|id| Ok(Some(held(id, if id == "m-1" { "PEA" } else { "CTO" }))));
-        repo.expect_list().returning(|| {
-            Ok(vec![
-                held("m-1", "PEA"),
-                held("m-2", "PEA"),
-                held("m-3", "CTO"),
-            ])
+    async fn imp_020a_a_file_that_cannot_be_read_is_left_out() {
+        let file = draft();
+        let held = ImportMapper::with_id("held".to_string(), file)
+            .expect("valid")
+            .to_file()
+            .expect("written");
+        let mut store = MockImportMapperStore::new();
+        store
+            .expect_ids()
+            .returning(|| Ok(vec!["locked".to_string(), "held".to_string()]));
+        store.expect_read().returning(move |id| {
+            if id == "locked" {
+                Err(anyhow::anyhow!("permission denied"))
+            } else {
+                Ok(Some(held.clone()))
+            }
         });
-        repo.expect_save().times(1).returning(|_| Ok(()));
-        let service = ImportService::new(Box::new(repo));
-
-        assert!(service
-            .save_column_mapping(Some("m-1".to_string()), draft("pea"))
-            .await
-            .is_ok());
-        assert!(matches!(
-            service
-                .save_column_mapping(Some("m-3".to_string()), draft("PEA"))
-                .await,
-            Err(ImportError::MappingNameTaken { .. })
-        ));
+        let service =
+            ImportService::new(Box::new(store), Box::new(MockMapperChoiceRepository::new()));
+        let listed = service.list_import_mappers().await.expect("listed");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, "held");
     }
 
-    // IMP-025 / IMP-040 — saving or deleting a mapping no longer held is refused.
+    // IMP-020C — a failure to remember goes no further.
     #[tokio::test]
-    async fn imp_040_a_mapping_no_longer_held_is_refused() {
-        let mut repo = MockColumnMappingRepository::new();
-        repo.expect_get_by_id().returning(|_| Ok(None));
-        repo.expect_save().never();
-        repo.expect_delete().never();
-        let service = ImportService::new(Box::new(repo));
-
-        assert!(matches!(
-            service
-                .save_column_mapping(Some("gone".to_string()), draft("A"))
-                .await,
-            Err(ImportError::MappingNotFound { mapping_id }) if mapping_id == "gone"
-        ));
-        assert!(matches!(
-            service.delete_column_mapping("gone").await,
-            Err(ImportError::MappingNotFound { .. })
-        ));
+    async fn imp_020c_a_failure_to_remember_goes_no_further() {
+        let mut choices = MockMapperChoiceRepository::new();
+        choices
+            .expect_remember()
+            .times(1)
+            .returning(|_, _| Err(anyhow::anyhow!("database locked")));
+        let service = ImportService::new(Box::new(MockImportMapperStore::new()), Box::new(choices));
+        service.remember_import_mapper("/folder", "broker").await;
     }
 }

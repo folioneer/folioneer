@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO import_mapper_choices (folder, mapper_id) VALUES (?, ?)\n             ON CONFLICT(folder) DO UPDATE SET mapper_id = excluded.mapper_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "457745d248cdec4a95f5b53aa8efba03df1c34b941c1f689bc7853ccac63d87c"
+}

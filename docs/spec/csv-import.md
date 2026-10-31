@@ -2,43 +2,43 @@
 
 ## Context
 
-Every transaction is typed by hand today, which stops anyone with years of history from starting (#369). Brokers export CSV files, and none agree on columns, separators, number and date formats or encoding. An **Import** brings a file's rows into one account in two steps: the file is read through a **Column mapping** and previewed row by row, nothing written; then the user confirms, and the rows are recorded at once (IMP-050).
+Every transaction is typed by hand today, which stops anyone with years of history from starting (#369). Brokers export CSV files, and none agree on columns, separators, number and date formats or encoding. An **Import** brings a file's rows into one account in two steps: the file is read through an **Import mapper** and previewed row by row, nothing written; then the user confirms, and the rows are recorded at once (IMP-050).
 
-This spec holds the reading, the column mapping and the preview (#501), the confirmation and the **Added deposit** (#502); the screens come with #503 and #504. The import is a surface beside the window, the command line and the AI agent connection: any of them may start it, and its rows are judged and recorded through the same recorder as theirs, by the same rules — every transaction follows them, whatever records it (owner, 2026-10-25): the purchase (TRX), the sale (SEL), the dividend (DIV), the deposit and the withdrawal (CSH). This version starts it from the window (#503). Figures follow TRX-024. No mapping ships with the application: the user saves the first. The reading rules were checked against a French broker's securities export: one file, ISO-8859-1 (read as Windows-1252, IMP-011), `;` with a trailing `;`, a decimal dot, no ISIN column, the trade tax on its own row (owner, 2026-10-25).
+This spec holds the reading, the import mapper and the preview (#501), the confirmation and the **Added deposit** (#502); the screens come with #503 and #504. The import is a surface beside the window, the command line and the AI agent connection: any of them may start it, and its rows are judged and recorded through the same recorder as theirs, by the same rules — every transaction follows them, whatever records it (owner, 2026-10-25): the purchase (TRX), the sale (SEL), the dividend (DIV), the deposit and the withdrawal (CSH). This version starts it from the window (#503). Figures follow TRX-024. No mapper ships with the application: the user saves or adds the first. The reading rules were checked against a French broker's securities export: one file, ISO-8859-1 (read as Windows-1252, IMP-011), `;` with a trailing `;`, a decimal dot, no ISIN column, the trade tax on its own row (owner, 2026-10-25).
 
 ---
 
 ## Entity Definition
 
-### ColumnMapping
+### ImportMapper
 
-How one broker's export is read, saved under a name and reused for every file of that shape. It belongs to no account: one mapping serves every account the broker's files go into.
+How one provider's export is read, saved under that provider and reused for every file of that shape. It belongs to no account: one mapper serves every account the provider's files go into.
 
-| Field             | Business meaning                                                                                                            |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `id`              | The mapping's own identity, independent of its name: a rename keeps it.                                                     |
-| `name`            | What the user calls it ("Fortuneo PEA"): not empty once trimmed, unique among mappings, case and accents ignored (IMP-024). |
-| `separator`       | The character between two fields: `;`, `,` or a tab.                                                                        |
-| `decimal_mark`    | The mark before a figure's decimals: a dot or a comma.                                                                      |
-| `date_format`     | The order a date is written in: day/month/year, month/day/year or year-month-day (IMP-014).                                 |
-| `encoding`        | How the file's text is written: UTF-8 or Windows-1252, which reads an ISO-8859-1 file too.                                  |
-| `columns`         | Which column of the file holds each field of a row (IMP-021), each named by its header.                                     |
-| `operation_types` | Each operation label of the file and the operation type it stands for (IMP-022).                                            |
-| `asset_matches`   | Each name, ISIN or reference of the file the user matched to an asset, and that asset (IMP-033).                            |
+| Field             | Business meaning                                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`              | The mapper's own identity, set when it is first written: a change of provider keeps it.                                                                 |
+| `provider`        | Who the export comes from ("Fortuneo PEA"), in the file's info entry: not empty once trimmed, unique among mappers, case and accents ignored (IMP-024). |
+| `separator`       | The character between two fields: `;`, `,` or a tab.                                                                                                    |
+| `decimal_mark`    | The mark before a figure's decimals: a dot or a comma.                                                                                                  |
+| `date_format`     | The order a date is written in: day/month/year, month/day/year or year-month-day (IMP-014).                                                             |
+| `encoding`        | How the file's text is written: UTF-8 or Windows-1252, which reads an ISO-8859-1 file too.                                                              |
+| `columns`         | Which column of the file holds each field of a row (IMP-021), each named by its header.                                                                 |
+| `operation_types` | Each operation label of the file and the operation type it stands for (IMP-022).                                                                        |
+| `asset_matches`   | Each name, ISIN or reference of the file the user matched to an asset, and that asset (IMP-033).                                                        |
 
 ### Preview (computed, never stored)
 
-What reading a file through a mapping shows, nothing written (IMP-017).
+What reading a file through a mapper shows, nothing written (IMP-017).
 
 | Field    | Business meaning                                                                                                                                                                                  |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `file`   | How the file was read: its encoding, separator, decimal mark and date format, detected or chosen (IMP-011 to IMP-014, IMP-018), the date format possibly not detected (IMP-014), and its columns. |
-| `rows`   | Every PreviewRow, in the file's order; a label the mapping gives no type shows on its rows, rejected with it (IMP-022).                                                                           |
+| `rows`   | Every PreviewRow, in the file's order; a label the mapper gives no type shows on its rows, rejected with it (IMP-022).                                                                            |
 | `counts` | How many rows hold each status; a trade tax joined to its purchase counts with it (IMP-030, IMP-034).                                                                                             |
 
 ### PreviewRow (computed, never stored)
 
-One line of the file that is not blank, once read through a mapping and judged.
+One line of the file that is not blank, once read through a mapper and judged.
 
 | Field       | Business meaning                                                                                                                                                                                                       |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -56,7 +56,7 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 **IMP-010 — A file is read for one account (backend)**: An import reads one file for one account the user picks; only the file the user last picked is read. It is rejected with a specific error when the account is unknown, when the file is not the one last picked, and when the file cannot be read, is empty, holds a header and no row — blank lines (IMP-016) are no row —, or is larger than 10 MB.
 
-**IMP-011 — The encoding is detected (backend)**: A file whose bytes read as UTF-8 is read as UTF-8, its byte order mark dropped; any other file is read as Windows-1252, which reads every byte and reads an ISO-8859-1 file as written. A file read as UTF-8 by the user's choice or a saved mapping's (IMP-018, IMP-020) whose bytes are not UTF-8 is rejected with a specific error.
+**IMP-011 — The encoding is detected (backend)**: A file whose bytes read as UTF-8 is read as UTF-8, its byte order mark dropped; any other file is read as Windows-1252, which reads every byte and reads an ISO-8859-1 file as written. A file read as UTF-8 by the user's choice or a saved mapper's (IMP-018, IMP-020E) whose bytes are not UTF-8 is rejected with a specific error.
 
 **IMP-012 — The separator is detected (backend)**: The separator is the one of `;`, tab and `,` that splits the header into more than one field and each of the first 20 lines after it that are not blank (IMP-016) into at least as many; when several do, the first in that order. When none does, the file is rejected with a specific error, unless the user picks one (IMP-018).
 
@@ -72,39 +72,47 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 **IMP-016 — Blank and short lines (backend)**: A line whose fields are all empty once trimmed — a line of separators only among them — is blank and skipped. A line with fewer fields than the header is rejected in the preview, its reason naming the line; a line's fields beyond the header's are ignored.
 
-**IMP-017 — Reading and previewing write nothing (backend)**: Reading a file and previewing it write nothing: no transaction, asset, holding or mapping. The portfolio is unchanged until the user confirms (IMP-050), but for an asset the user creates (IMP-052); a mapping is written only when saved (IMP-020).
+**IMP-017 — Reading and previewing write nothing (backend)**: Reading a file and previewing it write nothing: no transaction, asset, holding or mapper. The portfolio is unchanged until the user confirms (IMP-050), but for an asset the user creates (IMP-052); a mapper is written only when saved or added (IMP-020, IMP-020B).
 
-**IMP-018 — The user's choice replaces the detected one (backend)**: An encoding, separator, decimal mark or date format the user picks replaces the detected one, or the saved mapping's, and the file is read again with it; the choice is part of the mapping in use, kept when it is saved.
+**IMP-018 — The user's choice replaces the detected one (backend)**: An encoding, separator, decimal mark or date format the user picks replaces the detected one, or the saved mapper's, and the file is read again with it; the choice is part of the mapper in use, kept when it is saved.
 
-### Column mapping (020–029)
+### Import mapper (020–029)
 
-**IMP-020 — A mapping is saved and reused (backend)**: The user saves the mapping in use under a name (ColumnMapping): its format, its columns, its operation types and its asset matches. A saved mapping picked for the next file reads it with its own separator, decimal mark, date format and encoding, none detected. The preview runs with the mapping in use, saved or not. Picking a mapping that is no longer held is rejected with a specific error.
+**IMP-020 — A mapper is a file (backend)**: An import mapper is a JSON file in the mappers folder of the data folder, on this computer: its info entry (the provider), its format, its columns, its operation types and its asset matches. Saving a new mapper writes its file, under a file name of its own: it never replaces a file of the folder. A folder not there yet is created. A write that fails is rejected with a specific error and leaves the folder's files as they were.
 
-**IMP-021 — The columns a row needs (backend)**: A mapping names the column of each field a row reads, by its header, compared trimmed and case ignored: the date and the operation, always; the asset by one or more of its ISIN, its reference and its name, at least one; the quantity, the unit price, the gross amount, the fees, the net amount and the currency, each optional. One column may serve two fields. A mapping without the date or the operation column, or without any asset column, is rejected with a specific error when saved or used; one naming a column the file lacks is rejected with a specific error when used on that file.
+**IMP-020A — The list is what the folder holds (backend)**: The saved mappers are the `.json` files the folder holds, read each time the list is asked for, sorted by provider, case and accents ignored, then by identity; no folder, no mapper. A file that cannot be read, larger than 1 MB, not JSON, holding a field a mapper does not have, lacking one it needs or with a value outside the ones allowed, or breaking IMP-021, the empty provider of IMP-024 or IMP-024A does not read as a mapper: it is left out of the list and left in place, and the failure is logged. A folder that cannot be read is rejected with a specific error.
 
-**IMP-022 — Each operation label has its operation type (backend)**: A mapping gives each operation label of the file, compared trimmed and case ignored, one operation type: purchase, sale, dividend, deposit, withdrawal, trade tax, or not imported — a corporate action this version leaves to record by hand. A row whose label the mapping in use gives no type is rejected with its label as reason, until the user gives it one; the type given is part of the mapping in use, kept when it is saved.
+**IMP-020B — A mapper from elsewhere is added from its file (backend)**: The user picks a mapper's file in the system dialog; it is written into the folder as IMP-020 says, whatever the picked file was called, its provider trimmed, and joins the list. A file that cannot be read or does not read as a mapper (IMP-020A), or whose trimmed provider another mapper holds (IMP-024), is refused with a specific error saying why, and nothing is written; a write that fails is rejected as in IMP-020. Its asset matches are kept as they are (IMP-033).
 
-**IMP-023 — A mapping is synced (backend)**: A column mapping is a synced record (SYN-021), identified by its id (CFR-012): saved, renamed or deleted on one of the owner's computers, it is the same on the others, the later change winning (CFR-020), a deletion leaving a tombstone (SYN-024).
+**IMP-020C — The mapper chosen is remembered for its folder (backend)**: A completed confirmation made with a saved mapper remembers that mapper for the folder the file sits in, replacing what that folder remembered, on this computer and never synced — whether or not the user changed the mapper in use or any row was recorded. A folder is its full path as the system resolves it: moved or renamed, it remembers nothing. If remembering fails the import stands, and the failure is logged.
 
-**IMP-024 — A mapping's name (backend)**: A name empty once trimmed is rejected with a specific error, and so is a name another mapping holds, case and accents ignored — a name being set, not one the mapping already holds (IMP-027). A name is stored trimmed.
+**IMP-020D — A folder's mapper is preselected (frontend + backend)**: A file picked from a folder has the mapper it remembers preselected; the user may pick another. A folder that remembers nothing, a mapper no longer held or that no longer reads, or a memory or folder that cannot be read, preselects none, and a failure is logged.
 
-**IMP-024A — A mapping's texts are bounded (backend)**: Every text of a mapping — its name, its column headers, its operation labels, its matched names, ISINs and references — is at most 500 characters, the longest text a device takes in from another (the holding note's cap, HNO-011); a longer one is rejected with a specific error.
+**IMP-020E — A saved mapper is reused (backend)**: A saved mapper picked for the next file reads it with its own separator, decimal mark, date format and encoding, none detected. The preview runs with the mapper in use, saved or not. Picking a mapper that is no longer held or no longer reads (IMP-020A) is rejected with a specific error.
 
-**IMP-025 — A saved mapping is changed or renamed (backend)**: Saving a mapping that is already saved replaces what it holds, under its name or a new one, keeping its id. Saving a mapping that is no longer held is rejected with a specific error.
+**IMP-021 — The columns a row needs (backend)**: A mapper names the column of each field a row reads, by its header, compared trimmed and case ignored: the date and the operation, always; the asset by one or more of its ISIN, its reference and its name, at least one; the quantity, the unit price, the gross amount, the fees, the net amount and the currency, each optional. One column may serve two fields. A mapper without the date or the operation column, or without any asset column, is rejected with a specific error when saved or used; one naming a column the file lacks is rejected with a specific error when used on that file.
 
-**IMP-026 — A change to the mappings is told (backend)**: A mapping saved, changed, renamed or deleted on this computer raises the `ColumnMappingUpdated` event; one changed by a sync is announced with the sync (SYN-064).
+**IMP-022 — Each operation label has its operation type (backend)**: A mapper gives each operation label of the file, compared trimmed and case ignored, one operation type: purchase, sale, dividend, deposit, withdrawal, trade tax, or not imported — a corporate action this version leaves to record by hand. A row whose label the mapper in use gives no type is rejected with its label as reason, until the user gives it one; the type given is part of the mapper in use, kept when it is saved. A mapper's file giving one label two types reads with the first.
 
-**IMP-027 — Two mappings of one name (backend)**: Two mappings that a merge leaves with the same name both survive, each with its id, and nothing is reported: a duplicate name is reported for accounts and categories (CFR-035), not for mappings (CFR-060). Either may be saved again under that name; the user renames one.
+**IMP-024 — A mapper's provider (backend)**: A provider empty once trimmed is rejected with a specific error, and so is a provider another mapper holds, case and accents ignored — a provider being set, not one the mapper already holds (IMP-027). A provider is stored trimmed.
+
+**IMP-024A — A mapper's texts are bounded (backend)**: Every text of a mapper — its provider, its column headers, its operation labels, its matched names, ISINs and references — is at most 500 characters; a longer one is rejected with a specific error.
+
+**IMP-025 — A saved mapper is changed (backend)**: Saving a mapper that is already saved replaces its file, under its provider or a new one, keeping its identity. Saving over a mapper that is no longer held or no longer reads (IMP-020A) is rejected with a specific error.
+
+**IMP-027 — Two mappers of one provider (backend)**: Files copied into the folder by hand may share a provider: both are listed (IMP-020A), each with its identity, and nothing is reported. Either may be saved again under that provider; the user renames one.
 
 ### Rows and the preview (030–039)
 
-**IMP-030 — The preview judges every row (backend)**: The preview reads every row of the file through the mapping in use, in the file's order, and gives each its status: **ready**; **rejected**, with its reason; **unknown asset**, with the name, ISIN or reference read (IMP-032); **already recorded** (IMP-036); **not imported**, with its label (IMP-022); or, for a trade tax joined to its purchase, that purchase's line (IMP-034). It also counts the rows of each status. A date or a figure that does not read is a rejection naming its column.
+**IMP-030 — The preview judges every row (backend)**: The preview reads every row of the file through the mapper in use, in the file's order, and gives each its status: **ready**; **rejected**, with its reason; **unknown asset**, with the name, ISIN or reference read (IMP-032); **already recorded** (IMP-036); **not imported**, with its label (IMP-022); or, for a trade tax joined to its purchase, that purchase's line (IMP-034). It also counts the rows of each status. A date or a figure that does not read is a rejection naming its column.
 
-**IMP-031 — The figures of each type (backend)**: Signs are ignored: the type gives the direction. A **purchase** and a **sale** read the quantity, the unit price — or, when the row has no unit price, the gross amount divided by the quantity, rounded down to the micro-unit, a quantity of zero being rejected first (TRX-020) — and the fees, zero when the column is absent or empty; the file's net amount is not checked. A **dividend**, a **deposit** and a **withdrawal** read the net amount when the mapping names its column and the row's field is not empty, and the gross amount otherwise. A figure the type needs and the row lacks is a rejection naming it.
+**IMP-031 — The figures of each type (backend)**: Signs are ignored: the type gives the direction. A **purchase** and a **sale** read the quantity, the unit price — or, when the row has no unit price, the gross amount divided by the quantity, rounded down to the micro-unit, a quantity of zero being rejected first (TRX-020) — and the fees, zero when the column is absent or empty; the file's net amount is not checked. A **dividend**, a **deposit** and a **withdrawal** read the net amount when the mapper names its column and the row's field is not empty, and the gross amount otherwise. A figure the type needs and the row lacks is a rejection naming it.
 
-**IMP-032 — Each row is matched to an asset (backend)**: A row of a purchase, a sale, a dividend or a trade tax is matched to an asset of the portfolio, archived ones included: first by the mapping's asset matches (IMP-033), then by its own ISIN and then its reference, each trimmed and case ignored, then its exact name, case and accents ignored: each that the row holds is tried in that order, and the first matching exactly one asset gives it. A row that none matches to exactly one asset is an **unknown asset**. A deposit and a withdrawal are the account's cash and take no asset.
+**IMP-032 — Each row is matched to an asset (backend)**: A row of a purchase, a sale, a dividend or a trade tax is matched to an asset of the portfolio, archived ones included: first by the mapper's asset matches (IMP-033, IMP-033A), then by its own ISIN and then its reference, each trimmed and case ignored, then its exact name, case and accents ignored: each that the row holds is tried in that order, and the first matching exactly one asset gives it. A row that none matches to exactly one asset is an **unknown asset**. A deposit and a withdrawal are the account's cash and take no asset.
 
-**IMP-033 — An unknown asset is matched once (backend)**: The user matches an unknown asset's name, ISIN or reference to an asset of the portfolio; the match is part of the mapping in use, kept when it is saved, so the next file of that broker matches it. A match is compared as the field it was read from is (IMP-032). Every row of that name, ISIN or reference then takes that asset, and the preview judges them again. A match to an asset unknown to the portfolio is rejected with a specific error when it is made. Saving a mapping keeps its matches as they are. A mapping refers to no other record, so a synced one is applied at once (SYN-041 does not hold it back): a match whose asset this device has not received yet leaves its rows unknown until the asset arrives. The user may create the asset from the row instead (IMP-052).
+**IMP-033 — An unknown asset is matched once (backend)**: The user matches an unknown asset's name, ISIN or reference to an asset of the portfolio; the match is part of the mapper in use, kept when it is saved, so the next file of that provider matches it. A match is compared as the field it was read from is (IMP-032). Every row of that name, ISIN or reference then takes that asset, and the preview judges them again. A match to an asset unknown to the portfolio is rejected with a specific error when it is made. Saving a mapper keeps its matches as they are. The user may create the asset from the row instead (IMP-052).
+
+**IMP-033A — A match whose asset is not held is passed over (backend)**: A saved match whose asset the portfolio does not hold, as in a mapper written elsewhere, is passed over: the next matches of IMP-032 apply, and the row is unknown if none does. Of two matches for one text, the first whose asset is held applies.
 
 **IMP-034 — A trade tax joins its purchase (backend)**: A trade-tax row is added to the fees of the purchase in the file with the same asset — the same ISIN, reference and name as read —, on the same date, of the same quantity when the tax row has one; its amount is its net amount, or its gross amount. The tax row keeps its own line in the preview, its status naming the purchase's line, and is counted and recorded with that purchase. When several purchases fit, the first in the file's order not yet holding one takes it: a purchase takes one trade tax at most, and a second tax row of the same asset, date and quantity takes the next such purchase. A trade-tax row with no such purchase is rejected — "no purchase of this asset, date and quantity in the file".
 
@@ -122,7 +130,7 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 ### Deletion (040–049)
 
-**IMP-040 — A mapping is deleted (backend)**: The user deletes a saved mapping; nothing already recorded changes. Deleting a mapping that is no longer held is rejected with a specific error.
+**IMP-040 — A mapper is deleted (backend)**: The user deletes a saved mapper; nothing already recorded changes. Deleting a mapper that is no longer held, or a file that cannot be removed, is rejected with a specific error.
 
 ### Confirmation (050–059)
 
@@ -149,14 +157,14 @@ One line of the file that is not blank, once read through a mapping and judged.
 ## Workflow
 
 ```
-pick an account and a file
+pick an account and a file; its folder's mapper preselected (IMP-020D)
         │
         ▼
 read: encoding, separator, decimal mark detected (IMP-011 to IMP-013)
-        │  — or a saved mapping's (IMP-020), or the user's choice (IMP-018)
+        │  — or a saved mapper's (IMP-020E), or the user's choice (IMP-018)
         ▼
 map the columns, the operation labels (IMP-021, IMP-022); the date format follows (IMP-014)
-        │                                                   ── save the mapping (IMP-020)
+        │                                                   ── save the mapper (IMP-020)
         ▼
 preview: each row ready / rejected / unknown asset / already recorded / not imported (IMP-030)
         │  match an unknown asset (IMP-033) or create it (IMP-052) → judged again
@@ -168,27 +176,25 @@ confirm: the ready rows recorded at once (IMP-050), the added deposits by defaul
 
 ## UX Draft
 
-The screens are #503 (picking the file, mapping the columns) and #504 (the preview); their mocks come with those issues. This spec's rules are the core's, but for leaving the added deposits out (IMP-051B), the prefilled asset form (IMP-052, IMP-052A) and the journal's chip (IMP-054).
+The screens are #503 (picking the file, mapping the columns) and #504 (the preview); their mocks come with those issues. This spec's rules are the core's, but for leaving the added deposits out (IMP-051B), the preselected mapper (IMP-020D), the prefilled asset form (IMP-052, IMP-052A) and the journal's chip (IMP-054).
 
 ---
 
 ## Cross-amendments
 
-- SYN-021 lists column mappings among the synced records; CFR-012 gives their identity; SYN-038 adds version 10.
 - SYN-038 adds version 11: a transaction carries the added-deposit mark (IMP-051).
+- SYN-023: the import mapper each folder remembers stays on the device (IMP-020C).
+- SYN-038 adds version 12: the column mappings of version 10 are no longer a kind of synced record; no device ever held one, since no window offered it. A mapper's file is not synced for now (#715).
 - CSH: a deposit may be an added deposit, marked as such (IMP-051).
-- SYN-014 counts a saved column mapping as user data: the user made it, and a rebuild would not replace it.
-- SYN-064 lists `ColumnMappingUpdated` among the events raised by this device's own writes (IMP-026).
-- CFR-060 does not report two column mappings left with the same name (IMP-027).
-- SYN-041 does not hold back a column mapping for an asset it matches that this device has not received (IMP-033).
 - TXL-060: a journal row carries the added-deposit mark (IMP-051). TXL-061: its Recorded by column shows the chip (IMP-054). AGT-045: that chip is not an AI agent's mark; an added deposit has no session.
 
 ---
 
 ## Open Questions
 
-- [x] Where does an asset come from when the file has no ISIN? — Its exact name, case and accents ignored; one matching none or two is an unknown asset, matched once and remembered by the mapping (owner, 2026-10-25).
-- [x] Is a saved mapping synced? — Yes, as accounts and assets are, the later change winning (owner, 2026-10-25).
+- [x] Where does an asset come from when the file has no ISIN? — Its exact name, case and accents ignored; one matching none or two is an unknown asset, matched once and remembered by the mapper (owner, 2026-10-25).
+- [x] When is the mapper chosen remembered? — At the confirmation, not at the choice, so a file only previewed changes nothing (IMP-017) (agent's reading of the owner's 2026-10-31 decision).
+- [x] Where does a saved mapper live? — In a JSON file in the mappers folder of the data folder, never the database, so there is one source of truth and the community can add its own; its sync is #715 (owner, 2026-10-31).
 - [x] Where does a trade tax on its own row go? — Into the fees of the purchase of the same asset, date and quantity; one with no such purchase is rejected (owner, 2026-10-25).
 - [x] Within one day, are inflows judged before purchases? — Yes: deposits and dividends first, so a day's own deposit funds its purchases (owner, 2026-10-26).
 - [x] Can a later file's deposit row match an added deposit? — Yes, by date and amount, and the mark stays (owner, 2026-10-26).

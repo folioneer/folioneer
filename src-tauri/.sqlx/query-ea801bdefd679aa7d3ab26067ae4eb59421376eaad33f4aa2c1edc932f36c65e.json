@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT mapper_id FROM import_mapper_choices WHERE folder = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "mapper_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ea801bdefd679aa7d3ab26067ae4eb59421376eaad33f4aa2c1edc932f36c65e"
+}

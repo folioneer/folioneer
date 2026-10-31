@@ -1,4 +1,4 @@
-/// SQLite implementation of the column mapping repository.
-pub mod column_mapping;
+/// The mappers folder and the mapper each folder remembers.
+pub mod import_mapper;
 
-pub use column_mapping::SqliteColumnMappingRepository;
+pub use import_mapper::{FsImportMapperStore, SqliteMapperChoiceRepository};

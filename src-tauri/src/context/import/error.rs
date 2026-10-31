@@ -5,31 +5,51 @@
 #[derive(Debug, thiserror::Error, serde::Serialize, specta::Type, Clone)]
 #[serde(tag = "code")]
 pub enum ImportError {
-    /// The mapping's name is empty once trimmed (IMP-024).
-    #[error("A column mapping needs a name")]
-    MappingNameEmpty,
+    /// The mapper's provider is empty once trimmed (IMP-024).
+    #[error("An import mapper needs a provider")]
+    MapperProviderEmpty,
 
-    /// Another mapping holds the name, case and accents ignored (IMP-024).
-    #[error("Another column mapping is named {name}")]
-    MappingNameTaken {
-        /// The name asked for.
-        name: String,
+    /// Another mapper holds the provider, case and accents ignored (IMP-024).
+    #[error("Another import mapper is of the provider {provider}")]
+    MapperProviderTaken {
+        /// The provider asked for.
+        provider: String,
     },
 
-    /// The mapping names no date column, no operation column, or no asset column (IMP-021).
-    #[error("A column mapping needs the date, the operation and an asset column")]
-    MappingColumnMissing,
+    /// The mapper names no date column, no operation column, or no asset column (IMP-021).
+    #[error("An import mapper needs the date, the operation and an asset column")]
+    MapperColumnMissing,
 
-    /// A text of the mapping is longer than `MAPPING_TEXT_LENGTH` characters (IMP-024A).
-    #[error("A text of the column mapping is too long")]
-    MappingTextTooLong,
+    /// A text of the mapper is longer than `MAPPER_TEXT_LENGTH` characters (IMP-024A).
+    #[error("A text of the import mapper is too long")]
+    MapperTextTooLong,
 
-    /// The mapping is no longer held (IMP-025, IMP-040).
-    #[error("Column mapping not found: {mapping_id}")]
-    MappingNotFound {
-        /// The mapping asked for.
-        mapping_id: String,
+    /// The mapper is no longer held (IMP-020, IMP-025, IMP-040).
+    #[error("Import mapper not found: {mapper_id}")]
+    MapperNotFound {
+        /// The mapper asked for.
+        mapper_id: String,
     },
+
+    /// The mapper's file cannot be read (IMP-020B).
+    #[error("The import mapper's file cannot be read")]
+    MapperFileUnreadable,
+
+    /// The mapper's file is larger than `LARGEST_MAPPER_FILE` (IMP-020B).
+    #[error("The import mapper's file is larger than 1 MB")]
+    MapperFileTooLarge,
+
+    /// The file does not read as a mapper (IMP-020B).
+    #[error("The file does not read as an import mapper: {reason}")]
+    MapperFileInvalid {
+        /// Why, as the reader says it: what is wrong and where.
+        reason: String,
+    },
+
+    /// The mappers folder cannot be read or written; the cause is logged, never sent. Apart from
+    /// `DatabaseError` (IMP-020): the user can act on a folder that is full or read-only.
+    #[error("The import mappers folder cannot be read or written")]
+    MapperFolderFailed,
 
     /// The file is larger than 10 MB (IMP-010).
     #[error("The file is larger than 10 MB")]
@@ -58,10 +78,10 @@ pub enum ImportError {
         name: String,
     },
 
-    /// The mapping in use names a column the file lacks (IMP-021).
+    /// The mapper in use names a column the file lacks (IMP-021).
     #[error("The file has no column {column}")]
     MappedColumnNotInFile {
-        /// The column's header, as the mapping names it.
+        /// The column's header, as the mapper names it.
         column: String,
     },
 
@@ -79,27 +99,37 @@ mod tests {
     #[test]
     fn each_variant_emits_a_code() {
         assert_eq!(
-            to_value(ImportError::MappingNameEmpty).expect("serializes"),
-            json!({ "code": "MappingNameEmpty" })
+            to_value(ImportError::MapperProviderEmpty).expect("serializes"),
+            json!({ "code": "MapperProviderEmpty" })
         );
         assert_eq!(
-            to_value(ImportError::MappingNameTaken { name: "PEA".into() }).expect("serializes"),
-            json!({ "code": "MappingNameTaken", "name": "PEA" })
-        );
-        assert_eq!(
-            to_value(ImportError::MappingColumnMissing).expect("serializes"),
-            json!({ "code": "MappingColumnMissing" })
-        );
-        assert_eq!(
-            to_value(ImportError::MappingTextTooLong).expect("serializes"),
-            json!({ "code": "MappingTextTooLong" })
-        );
-        assert_eq!(
-            to_value(ImportError::MappingNotFound {
-                mapping_id: "m-1".into()
+            to_value(ImportError::MapperProviderTaken {
+                provider: "PEA".into()
             })
             .expect("serializes"),
-            json!({ "code": "MappingNotFound", "mapping_id": "m-1" })
+            json!({ "code": "MapperProviderTaken", "provider": "PEA" })
+        );
+        assert_eq!(
+            to_value(ImportError::MapperColumnMissing).expect("serializes"),
+            json!({ "code": "MapperColumnMissing" })
+        );
+        assert_eq!(
+            to_value(ImportError::MapperTextTooLong).expect("serializes"),
+            json!({ "code": "MapperTextTooLong" })
+        );
+        assert_eq!(
+            to_value(ImportError::MapperNotFound {
+                mapper_id: "m-1".into()
+            })
+            .expect("serializes"),
+            json!({ "code": "MapperNotFound", "mapper_id": "m-1" })
+        );
+        assert_eq!(
+            to_value(ImportError::MapperFileInvalid {
+                reason: "line 1".into()
+            })
+            .expect("serializes"),
+            json!({ "code": "MapperFileInvalid", "reason": "line 1" })
         );
         assert_eq!(
             to_value(ImportError::HeaderNameRepeated {
@@ -116,6 +146,9 @@ mod tests {
             json!({ "code": "MappedColumnNotInFile", "column": "Qté" })
         );
         for (error, code) in [
+            (ImportError::MapperFileUnreadable, "MapperFileUnreadable"),
+            (ImportError::MapperFileTooLarge, "MapperFileTooLarge"),
+            (ImportError::MapperFolderFailed, "MapperFolderFailed"),
             (ImportError::FileTooLarge, "FileTooLarge"),
             (ImportError::FileEmpty, "FileEmpty"),
             (ImportError::FileHasNoRow, "FileHasNoRow"),

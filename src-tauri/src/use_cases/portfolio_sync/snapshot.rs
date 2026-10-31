@@ -8,7 +8,6 @@ use std::sync::Arc;
 use crate::context::account::{AccountService, FeeSchedule};
 use crate::context::asset::{AssetService, SYSTEM_CATEGORY_IDS};
 use crate::context::currency::{CurrencyPair, CurrencyService};
-use crate::context::import::ImportService;
 use crate::context::sync::{PortfolioRecord, PortfolioSnapshot, SyncError};
 use crate::core::cash::is_cash_asset;
 use crate::shared::domain::{RecordIdentity, RecordKind};
@@ -18,7 +17,6 @@ pub struct ServicePortfolioSnapshot {
     account_service: Arc<AccountService>,
     asset_service: Arc<AssetService>,
     currency_service: Arc<CurrencyService>,
-    import_service: Arc<ImportService>,
 }
 
 fn record<T: serde::Serialize>(
@@ -55,13 +53,11 @@ impl ServicePortfolioSnapshot {
         account_service: Arc<AccountService>,
         asset_service: Arc<AssetService>,
         currency_service: Arc<CurrencyService>,
-        import_service: Arc<ImportService>,
     ) -> Self {
         Self {
             account_service,
             asset_service,
             currency_service,
-            import_service,
         }
     }
 }
@@ -219,15 +215,6 @@ impl PortfolioSnapshot for ServicePortfolioSnapshot {
             )?);
         }
 
-        let mappings = self
-            .import_service
-            .list_column_mappings()
-            .await
-            .map_err(|error| SyncError::database("snapshot: column mappings", error))?;
-        for mapping in &mappings {
-            records.push(record(RecordKind::ColumnMapping, &[&mapping.id], mapping)?);
-        }
-
         Ok(records)
     }
 }
@@ -245,7 +232,6 @@ mod tests {
         SqliteAssetRepository,
     };
     use crate::context::currency::{SqliteCurrencyPairRepository, SqliteCurrencyRateRepository};
-    use crate::context::import::SqliteColumnMappingRepository;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn make_pool() -> sqlx::Pool<sqlx::Sqlite> {
@@ -287,14 +273,10 @@ mod tests {
             Box::new(SqliteCurrencyPairRepository::new(pool.clone())),
             Box::new(SqliteCurrencyRateRepository::new(pool.clone())),
         ));
-        let import_service = Arc::new(ImportService::new(Box::new(
-            SqliteColumnMappingRepository::new(pool.clone()),
-        )));
         let snapshot = ServicePortfolioSnapshot::new(
             Arc::clone(&account_service),
             Arc::clone(&asset_service),
             currency_service,
-            import_service,
         );
         (account_service, asset_service, snapshot)
     }

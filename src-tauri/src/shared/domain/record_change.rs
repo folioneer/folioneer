@@ -48,8 +48,6 @@ pub enum RecordKind {
     PortfolioSetting,
     /// A split a price provider reports for an asset, identified by (asset_id, date) (MKT-230).
     ReportedSplit,
-    /// A column mapping, identified by its own id (IMP-023).
-    ColumnMapping,
 }
 
 /// Whether the user made the change or the application generated it on its own (CFR-016).

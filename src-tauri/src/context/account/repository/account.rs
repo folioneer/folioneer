@@ -1122,8 +1122,7 @@ impl AccountRepository for SqliteAccountRepository {
             | RecordKind::ReportedSplit
             | RecordKind::CurrencyPair
             | RecordKind::CurrencyRate
-            | RecordKind::PortfolioSetting
-            | RecordKind::ColumnMapping => Ok(None),
+            | RecordKind::PortfolioSetting => Ok(None),
         }
     }
 
