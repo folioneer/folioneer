@@ -535,7 +535,7 @@ pub fn backfill_window(
 ///
 /// Failures are logged, never surfaced: this runs at start-up, and a schedule that
 /// could not be removed is retried at the next one.
-pub async fn drop_schedule_without_provider(scheduler: &dyn DailyFetchScheduler) {
+async fn drop_schedule_without_provider(scheduler: &dyn DailyFetchScheduler) {
     match scheduler.is_registered().await {
         Ok(false) => {}
         Ok(true) => {

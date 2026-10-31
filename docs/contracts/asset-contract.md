@@ -1,7 +1,7 @@
 # Contract — Asset
 
 > Domain: `asset`
-> Last updated by: market-price (MKT-103, MKT-190–213, MKT-230–232), financial-asset-transaction (TRX-064), asset (AST-030–040)
+> Last updated by: market-price (MKT-103, MKT-190–214, MKT-230–232), financial-asset-transaction (TRX-064), asset (AST-030–040)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Per-command reachable codes are listed in the "Errors" column of each table below. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic chain preserved server-side via `tracing::error!`).
 >
