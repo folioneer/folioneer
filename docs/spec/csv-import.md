@@ -78,7 +78,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 ### Import mapper (020–029)
 
-**IMP-020 — A mapper is a file (backend)**: An import mapper is a JSON file in the mappers folder of the data folder, on this computer: its info entry (the provider), its format, its columns, its operation types and its asset matches. Saving a new mapper writes its file, under a file name of its own: it never replaces a file of the folder. A write that fails is rejected with a specific error and leaves the folder's files as they were.
+**IMP-020 — A mapper is a file (backend)**: An import mapper is a JSON file in the mappers folder of the data folder, on this computer: its info entry (the provider), its format, its columns, its operation types and its asset matches. Saving a new mapper writes its file, under a file name of its own: it never replaces a file of the folder. A folder not there yet is created. A write that fails is rejected with a specific error and leaves the folder's files as they were.
 
 **IMP-020A — The list is what the folder holds (backend)**: The saved mappers are the `.json` files the folder holds, read each time the list is asked for, sorted by provider, case and accents ignored, then by identity; no folder, no mapper. A file that cannot be read, larger than 1 MB, not JSON, holding a field a mapper does not have, lacking one it needs or with a value outside the ones allowed, or breaking IMP-021, the empty provider of IMP-024 or IMP-024A does not read as a mapper: it is left out of the list and left in place, and the failure is logged. A folder that cannot be read is rejected with a specific error.
 
