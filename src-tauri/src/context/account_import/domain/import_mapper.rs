@@ -1,4 +1,4 @@
-use crate::context::import::error::ImportError;
+use crate::context::account_import::error::AccountImportError;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -176,9 +176,9 @@ pub struct ImportMapperDraft {
 impl ImportMapperDraft {
     /// IMP-020B — a draft read from a mapper's file, a byte order mark dropped; `reason` says
     /// why it does not read.
-    pub fn from_file(bytes: &[u8]) -> Result<Self, ImportError> {
+    pub fn from_file(bytes: &[u8]) -> Result<Self, AccountImportError> {
         let text = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
-        serde_json::from_slice(text).map_err(|e| ImportError::MapperFileInvalid {
+        serde_json::from_slice(text).map_err(|e| AccountImportError::MapperFileInvalid {
             reason: e.to_string().chars().take(REASON_LENGTH).collect(),
         })
     }
@@ -186,9 +186,9 @@ impl ImportMapperDraft {
 
 impl MappedColumns {
     /// IMP-021 — the date and the operation column are named, and at least one asset column.
-    pub fn check(&self) -> Result<(), ImportError> {
+    pub fn check(&self) -> Result<(), AccountImportError> {
         if self.date.trim().is_empty() || self.operation.trim().is_empty() {
-            return Err(ImportError::MapperColumnMissing);
+            return Err(AccountImportError::MapperColumnMissing);
         }
         if [&self.isin, &self.reference, &self.name]
             .iter()
@@ -198,7 +198,7 @@ impl MappedColumns {
                     .is_none_or(|header| header.trim().is_empty())
             })
         {
-            return Err(ImportError::MapperColumnMissing);
+            return Err(AccountImportError::MapperColumnMissing);
         }
         Ok(())
     }
@@ -206,10 +206,10 @@ impl MappedColumns {
 
 impl ImportMapper {
     /// IMP-021 / IMP-024 / IMP-024A — a mapper under the id of its file, validated.
-    pub fn with_id(id: String, draft: ImportMapperDraft) -> Result<Self, ImportError> {
+    pub fn with_id(id: String, draft: ImportMapperDraft) -> Result<Self, AccountImportError> {
         let provider = draft.info.provider.trim().to_string();
         if provider.is_empty() {
-            return Err(ImportError::MapperProviderEmpty);
+            return Err(AccountImportError::MapperProviderEmpty);
         }
         let columns = draft.columns;
         columns.check()?;
@@ -246,7 +246,7 @@ impl ImportMapper {
             .into_iter()
             .any(|text| text.chars().count() > MAPPER_TEXT_LENGTH)
         {
-            return Err(ImportError::MapperTextTooLong);
+            return Err(AccountImportError::MapperTextTooLong);
         }
         Ok(Self {
             id,
@@ -396,7 +396,7 @@ pub trait MapperChoiceRepository: Send + Sync {
 mod tests {
     use super::*;
 
-    fn mapper(draft: ImportMapperDraft) -> Result<ImportMapper, ImportError> {
+    fn mapper(draft: ImportMapperDraft) -> Result<ImportMapper, AccountImportError> {
         ImportMapper::with_id("broker".to_string(), draft)
     }
 
@@ -434,7 +434,7 @@ mod tests {
         assert_eq!(held.info.provider, "Broker PEA");
         assert!(matches!(
             mapper(draft("   ")),
-            Err(ImportError::MapperProviderEmpty)
+            Err(AccountImportError::MapperProviderEmpty)
         ));
     }
 
@@ -453,13 +453,13 @@ mod tests {
         no_date.columns.date = " ".to_string();
         assert!(matches!(
             mapper(no_date),
-            Err(ImportError::MapperColumnMissing)
+            Err(AccountImportError::MapperColumnMissing)
         ));
         let mut no_asset = draft("B");
         no_asset.columns.name = Some(String::new());
         assert!(matches!(
             mapper(no_asset),
-            Err(ImportError::MapperColumnMissing)
+            Err(AccountImportError::MapperColumnMissing)
         ));
         let mut by_isin = draft("C");
         by_isin.columns.name = None;
@@ -477,13 +477,13 @@ mod tests {
         });
         assert!(matches!(
             mapper(long_label),
-            Err(ImportError::MapperTextTooLong)
+            Err(AccountImportError::MapperTextTooLong)
         ));
         let mut long_header = draft("B");
         long_header.columns.fees = Some("x".repeat(MAPPER_TEXT_LENGTH + 1));
         assert!(matches!(
             mapper(long_header),
-            Err(ImportError::MapperTextTooLong)
+            Err(AccountImportError::MapperTextTooLong)
         ));
         let mut exact = draft(&"é".repeat(MAPPER_TEXT_LENGTH));
         exact.asset_matches.push(AssetMatch {
@@ -516,7 +516,7 @@ mod tests {
         for bad in [&b"not json"[..], br#"{"info":{"provider":"A"}}"#] {
             assert!(matches!(
                 ImportMapperDraft::from_file(bad),
-                Err(ImportError::MapperFileInvalid { reason }) if !reason.is_empty()
+                Err(AccountImportError::MapperFileInvalid { reason }) if !reason.is_empty()
             ));
         }
     }
@@ -540,7 +540,7 @@ mod tests {
     fn imp_020b_a_reason_is_bounded() {
         let field = "x".repeat(5_000);
         let file = format!(r#"{{"{field}":1}}"#);
-        let Err(ImportError::MapperFileInvalid { reason }) =
+        let Err(AccountImportError::MapperFileInvalid { reason }) =
             ImportMapperDraft::from_file(file.as_bytes())
         else {
             panic!("refused");

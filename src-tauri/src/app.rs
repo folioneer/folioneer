@@ -5,11 +5,13 @@ use crate::agent_connection::connections::AgentConnections;
 use crate::agent_connection::gate::AgentGate;
 use crate::agent_connection::tools::AgentTools;
 use crate::context::account::AccountService;
+use crate::context::account_import::{
+    AccountImportService, FsImportMapperStore, SqliteMapperChoiceRepository,
+};
 use crate::context::asset::{
     AssetPriceRepository, AssetService, PriceProvider, SqliteAssetPriceRepository,
 };
 use crate::context::currency::CurrencyService;
-use crate::context::import::{FsImportMapperStore, ImportService, SqliteMapperChoiceRepository};
 use crate::context::sync::{
     ChangeLogRepository, FirstPublish, FolderStore, FsFolderStore, Publisher,
     SqliteChangeLogRepository, SqliteChangeRecorder, SqliteSyncStateRepository, SyncRun,
@@ -254,13 +256,13 @@ pub fn run() {
                 );
 
                 // IMP-020 — the mappers are files of the user data; no sync reads them.
-                let import_service = Arc::new(ImportService::new(
+                let account_import_service = Arc::new(AccountImportService::new(
                     Box::new(FsImportMapperStore::new(mappers_folder)),
                     Box::new(SqliteMapperChoiceRepository::new(db.pool.clone())),
                 ));
 
                 let csv_import_uc = CsvImportUseCase::new(
-                    Arc::clone(&import_service),
+                    Arc::clone(&account_import_service),
                     account_service.clone(),
                     asset_service.clone(),
                     Arc::clone(&transactions),
@@ -408,7 +410,7 @@ pub fn run() {
                 app_handle.manage(agent_gate);
 
                 app_handle.manage(Arc::clone(&currency_service));
-                app_handle.manage(import_service);
+                app_handle.manage(account_import_service);
 
                 app_handle.manage(AppState {
                     db,

@@ -30,27 +30,27 @@ After the in-app updater (see [update.md](update.md)) installs a new version, th
 
 **WNW-092 — Application area names (frontend)**: Each application area is shown under the name the interface gives it, in the interface's language:
 
-| Key            | English       | French                   |
-| -------------- | ------------- | ------------------------ |
-| `account`      | Account       | Compte                   |
-| `holding`      | Holding       | Position                 |
-| `asset`        | Asset         | Actif                    |
-| `transaction`  | Transaction   | Transaction              |
-| `transfer`     | Transfer      | Transfert                |
-| `write-off`    | Write-off     | Sortie sans contrepartie |
-| `split`        | Split         | Division                 |
-| `dividend`     | Dividend      | Dividende                |
-| `cash`         | Cash          | Liquidités               |
-| `fee`          | Fees          | Frais                    |
-| `price`        | Price         | Prix                     |
-| `rate`         | Currency rate | Taux de change           |
-| `agent`        | AI agent      | Agent IA                 |
-| `sync`         | Sync          | Synchronisation          |
-| `performance`  | Performance   | Performance              |
-| `import`       | Import        | Import                   |
-| `command-line` | Command line  | Ligne de commande        |
-| `settings`     | Settings      | Paramètres               |
-| `update`       | Update        | Mise à jour              |
+| Key            | English        | French                   |
+| -------------- | -------------- | ------------------------ |
+| `account`      | Account        | Compte                   |
+| `holding`      | Holding        | Position                 |
+| `asset`        | Asset          | Actif                    |
+| `transaction`  | Transaction    | Transaction              |
+| `transfer`     | Transfer       | Transfert                |
+| `write-off`    | Write-off      | Sortie sans contrepartie |
+| `split`        | Split          | Division                 |
+| `dividend`     | Dividend       | Dividende                |
+| `cash`         | Cash           | Liquidités               |
+| `fee`          | Fees           | Frais                    |
+| `price`        | Price          | Prix                     |
+| `rate`         | Currency rate  | Taux de change           |
+| `agent`        | AI agent       | Agent IA                 |
+| `sync`         | Sync           | Synchronisation          |
+| `performance`  | Performance    | Performance              |
+| `import`       | Account import | Import de compte         |
+| `command-line` | Command line   | Ligne de commande        |
+| `settings`     | Settings       | Paramètres               |
+| `update`       | Update         | Mise à jour              |
 
 ### On-demand re-read
 

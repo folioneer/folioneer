@@ -1,4 +1,4 @@
-use crate::context::import::domain::{
+use crate::context::account_import::domain::{
     names_a_file, ImportMapperStore, MapperChoiceRepository, PickedMapperFile, LARGEST_MAPPER_FILE,
 };
 use crate::core::BACKEND;

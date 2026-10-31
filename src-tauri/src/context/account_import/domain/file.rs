@@ -1,5 +1,5 @@
-use crate::context::import::domain::{DateFormat, DecimalMark, Encoding, Separator};
-use crate::context::import::error::ImportError;
+use crate::context::account_import::domain::{DateFormat, DecimalMark, Encoding, Separator};
+use crate::context::account_import::error::AccountImportError;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -86,9 +86,9 @@ impl ImportFile {
 pub fn read_file(
     bytes: &[u8],
     choices: &ReadingChoices,
-) -> Result<(ImportFile, FileRead), ImportError> {
+) -> Result<(ImportFile, FileRead), AccountImportError> {
     if bytes.len() as u64 > LARGEST_FILE {
-        return Err(ImportError::FileTooLarge);
+        return Err(AccountImportError::FileTooLarge);
     }
     let (text, encoding) = decode(bytes, choices.encoding)?;
     let raw: Vec<&str> = text
@@ -99,11 +99,11 @@ pub fn read_file(
         .split_first()
         .filter(|(header, _)| !header.trim().is_empty())
     else {
-        return Err(ImportError::FileEmpty);
+        return Err(AccountImportError::FileEmpty);
     };
     let separator = match choices.separator {
         Some(separator) => separator,
-        None => detect_separator(header_line, body).ok_or(ImportError::SeparatorNotFound)?,
+        None => detect_separator(header_line, body).ok_or(AccountImportError::SeparatorNotFound)?,
     };
     let header = split_header(header_line, separator);
     let lines: Vec<FileLine> = body
@@ -116,7 +116,7 @@ pub fn read_file(
         .filter(|line| line.fields.iter().any(|field| !field.is_empty()))
         .collect();
     if lines.is_empty() {
-        return Err(ImportError::FileHasNoRow);
+        return Err(AccountImportError::FileHasNoRow);
     }
     let mut named: Vec<String> = Vec::with_capacity(header.len());
     for name in header.iter().filter(|name| !name.is_empty()) {
@@ -124,7 +124,7 @@ pub fn read_file(
             .iter()
             .any(|seen| seen.to_lowercase() == name.to_lowercase())
         {
-            return Err(ImportError::HeaderNameRepeated { name: name.clone() });
+            return Err(AccountImportError::HeaderNameRepeated { name: name.clone() });
         }
         named.push(name.clone());
     }
@@ -160,13 +160,16 @@ pub fn read_file(
 
 /// IMP-011 — the file's text: UTF-8 when its bytes are, its byte order mark dropped,
 /// otherwise Windows-1252; a chosen UTF-8 the bytes are not is refused.
-pub fn decode(bytes: &[u8], chosen: Option<Encoding>) -> Result<(String, Encoding), ImportError> {
+pub fn decode(
+    bytes: &[u8],
+    chosen: Option<Encoding>,
+) -> Result<(String, Encoding), AccountImportError> {
     match (chosen, std::str::from_utf8(bytes)) {
         (Some(Encoding::Utf8) | None, Ok(text)) => Ok((
             text.strip_prefix('\u{feff}').unwrap_or(text).to_string(),
             Encoding::Utf8,
         )),
-        (Some(Encoding::Utf8), Err(_)) => Err(ImportError::FileNotUtf8),
+        (Some(Encoding::Utf8), Err(_)) => Err(AccountImportError::FileNotUtf8),
         (Some(Encoding::Windows1252) | None, _) => Ok((
             bytes.iter().map(|byte| windows_1252(*byte)).collect(),
             Encoding::Windows1252,
@@ -350,7 +353,7 @@ pub fn read_date(text: &str, format: DateFormat) -> Option<NaiveDate> {
 mod tests {
     use super::*;
 
-    fn read(text: &str) -> Result<(ImportFile, FileRead), ImportError> {
+    fn read(text: &str) -> Result<(ImportFile, FileRead), AccountImportError> {
         read_file(text.as_bytes(), &ReadingChoices::default())
     }
 
@@ -368,7 +371,7 @@ mod tests {
         );
         assert!(matches!(
             decode(&latin, Some(Encoding::Utf8)),
-            Err(ImportError::FileNotUtf8)
+            Err(AccountImportError::FileNotUtf8)
         ));
         let (text, _) = decode("é".as_bytes(), Some(Encoding::Windows1252)).expect("read");
         assert_eq!(text, "Ã©");
@@ -386,12 +389,12 @@ mod tests {
         assert_eq!(tab.separator, Separator::Tab);
         assert!(matches!(
             read("Date Operation\n2024-02-01 Buy\n"),
-            Err(ImportError::SeparatorNotFound)
+            Err(AccountImportError::SeparatorNotFound)
         ));
         // A short line among the first 20 defeats a separator; the user can still pick it.
         assert!(matches!(
             read("A;B;C\n1;2;3\n4\n"),
-            Err(ImportError::SeparatorNotFound)
+            Err(AccountImportError::SeparatorNotFound)
         ));
         let chosen = ReadingChoices {
             separator: Some(Separator::Semicolon),
@@ -496,7 +499,7 @@ mod tests {
     fn imp_015_the_header_names_the_columns() {
         assert!(matches!(
             read("Date;date\n1;2\n"),
-            Err(ImportError::HeaderNameRepeated { name }) if name == "date"
+            Err(AccountImportError::HeaderNameRepeated { name }) if name == "date"
         ));
         let (file, found) = read("Date;;X;;\n1;2;3;4\n").expect("read");
         assert_eq!(found.columns, ["Date", "X"]);
@@ -511,12 +514,15 @@ mod tests {
         let (file, found) = read("A;B\r\n\r\n;;\r\n1;2\r\n").expect("read");
         assert_eq!(found.rows, 1);
         assert_eq!(file.lines[0].number, 4);
-        assert!(matches!(read(""), Err(ImportError::FileEmpty)));
-        assert!(matches!(read("A;B\n;\n\n"), Err(ImportError::FileHasNoRow)));
+        assert!(matches!(read(""), Err(AccountImportError::FileEmpty)));
+        assert!(matches!(
+            read("A;B\n;\n\n"),
+            Err(AccountImportError::FileHasNoRow)
+        ));
         let large = vec![b'a'; (LARGEST_FILE + 1) as usize];
         assert!(matches!(
             read_file(&large, &ReadingChoices::default()),
-            Err(ImportError::FileTooLarge)
+            Err(AccountImportError::FileTooLarge)
         ));
     }
 

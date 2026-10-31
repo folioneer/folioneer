@@ -2,12 +2,12 @@ use super::error::{CsvImportError, CsvImportTask};
 use crate::context::account::{
     AccountError, AccountServiceContract, RecordingJudgment, RecordingOp, RecordingStep, TradeOp,
 };
-use crate::context::asset::{Asset, AssetServiceContract};
-use crate::context::import::{
-    folded, read_file, read_rows, AssetMatch, AssetRead, FileRead, ImportError, ImportMapperDraft,
-    ImportService, OperationRead, ReadingChoices, RowFigures, RowFormat, RowRead, RowRejection,
-    LARGEST_FILE,
+use crate::context::account_import::{
+    folded, read_file, read_rows, AccountImportError, AccountImportService, AssetMatch, AssetRead,
+    FileRead, ImportMapperDraft, OperationRead, ReadingChoices, RowFigures, RowFormat, RowRead,
+    RowRejection, LARGEST_FILE,
 };
+use crate::context::asset::{Asset, AssetServiceContract};
 use crate::core::logger::BACKEND;
 use crate::shared::infrastructure::uow::TransactionManager;
 use serde::Serialize;
@@ -121,7 +121,7 @@ pub struct ImportPreview {
 
 /// Reads a broker's export for an account and previews it (IMP-010 to IMP-038).
 pub struct CsvImportUseCase {
-    import_service: Arc<ImportService>,
+    account_import_service: Arc<AccountImportService>,
     account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,
     transactions: Arc<dyn TransactionManager>,
@@ -142,13 +142,13 @@ enum Pending {
 impl CsvImportUseCase {
     /// Creates a new CsvImportUseCase.
     pub fn new(
-        import_service: Arc<ImportService>,
+        account_import_service: Arc<AccountImportService>,
         account_service: Arc<dyn AccountServiceContract>,
         asset_service: Arc<dyn AssetServiceContract>,
         transactions: Arc<dyn TransactionManager>,
     ) -> Self {
         Self {
-            import_service,
+            account_import_service,
             account_service,
             asset_service,
             transactions,
@@ -174,7 +174,10 @@ impl CsvImportUseCase {
         path: &str,
     ) -> Result<Option<String>, CsvImportError> {
         let folder = self.folder_of(path).await?;
-        Ok(self.import_service.remembered_import_mapper(&folder).await)
+        Ok(self
+            .account_import_service
+            .remembered_import_mapper(&folder)
+            .await)
     }
 
     /// IMP-010 to IMP-016 — how the file at `path` reads for `account_id`, with what the user
@@ -225,7 +228,7 @@ impl CsvImportUseCase {
             .run(account_id, path, mapper_id, mapper, Some(add_deposits))
             .await?;
         if let (Some(folder), Some(mapper_id)) = (folder, mapper_id) {
-            self.import_service
+            self.account_import_service
                 .remember_import_mapper(&folder, mapper_id)
                 .await;
         }
@@ -246,7 +249,7 @@ impl CsvImportUseCase {
         mapper.columns.check()?;
         let saved: Vec<AssetMatch> = match mapper_id {
             Some(id) => {
-                self.import_service
+                self.account_import_service
                     .get_import_mapper(id)
                     .await?
                     .asset_matches
@@ -259,7 +262,7 @@ impl CsvImportUseCase {
             .await
             .map_err(|e| {
                 tracing::error!(target: BACKEND, err = ?e, "preview_import: assets");
-                ImportError::DatabaseError
+                AccountImportError::DatabaseError
             })?;
         let known: HashSet<&str> = assets.iter().map(|asset| asset.id.as_str()).collect();
         if let Some(made) = mapper
@@ -324,7 +327,7 @@ impl CsvImportUseCase {
         let unit_failed = |step: &'static str| {
             move |e: anyhow::Error| {
                 tracing::error!(target: BACKEND, step = %step, err = ?e, "confirm_import: unit of work");
-                ImportError::DatabaseError
+                AccountImportError::DatabaseError
             }
         };
         let mut prepared = self
@@ -470,7 +473,7 @@ impl CsvImportUseCase {
         let canonical = self.picked_file(path).await?;
         let metadata = tokio::fs::metadata(&canonical).await.map_err(unreadable)?;
         if metadata.len() > LARGEST_FILE {
-            return Err(ImportError::FileTooLarge.into());
+            return Err(AccountImportError::FileTooLarge.into());
         }
         Ok(tokio::fs::read(&canonical).await.map_err(unreadable)?)
     }

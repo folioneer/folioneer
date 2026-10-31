@@ -1,22 +1,22 @@
-use crate::context::import::domain::{
+use crate::context::account_import::domain::{
     ImportMapper, ImportMapperDraft, ImportMapperStore, MapperChoiceRepository, PickedMapperFile,
     LARGEST_MAPPER_FILE,
 };
-use crate::context::import::error::ImportError;
+use crate::context::account_import::error::AccountImportError;
 use crate::core::BACKEND;
 use std::path::Path;
 use std::result::Result as StdResult;
 
-/// The application service of the `import` bounded context: the import mappers, files of the
+/// The application service of the `account_import` bounded context: the import mappers, files of the
 /// mappers folder (IMP-020 to IMP-027, IMP-040).
-pub struct ImportService {
+pub struct AccountImportService {
     store: Box<dyn ImportMapperStore>,
     choices: Box<dyn MapperChoiceRepository>,
     /// Held across a check of the folder and the write it allows (IMP-020, IMP-024).
     writing: tokio::sync::Mutex<()>,
 }
 
-impl ImportService {
+impl AccountImportService {
     /// Creates the service over the mappers folder and what each folder remembers.
     pub fn new(
         store: Box<dyn ImportMapperStore>,
@@ -31,7 +31,7 @@ impl ImportService {
 
     /// IMP-020A — the mappers the folder holds, by provider; a file that does not read as a
     /// mapper is left out, its failure logged.
-    pub async fn list_import_mappers(&self) -> StdResult<Vec<ImportMapper>, ImportError> {
+    pub async fn list_import_mappers(&self) -> StdResult<Vec<ImportMapper>, AccountImportError> {
         let ids = self.store.ids().await.map_err(store_error("list"))?;
         let mut mappers = Vec::with_capacity(ids.len());
         for id in ids {
@@ -52,7 +52,7 @@ impl ImportService {
         }
         mappers.sort_by_cached_key(|mapper| {
             (
-                crate::context::import::folded(&mapper.info.provider),
+                crate::context::account_import::folded(&mapper.info.provider),
                 mapper.id.clone(),
             )
         });
@@ -66,7 +66,7 @@ impl ImportService {
         &self,
         mapper_id: Option<String>,
         draft: ImportMapperDraft,
-    ) -> StdResult<ImportMapper, ImportError> {
+    ) -> StdResult<ImportMapper, AccountImportError> {
         let _writing = self.writing.lock().await;
         let held = match &mapper_id {
             Some(id) => Some(self.get_import_mapper(id).await?),
@@ -86,17 +86,17 @@ impl ImportService {
     pub async fn add_import_mapper_from(
         &self,
         path: &Path,
-    ) -> StdResult<ImportMapper, ImportError> {
+    ) -> StdResult<ImportMapper, AccountImportError> {
         let picked = self
             .store
             .read_picked(path, LARGEST_MAPPER_FILE)
             .await
             .map_err(|e| {
                 tracing::warn!(target: BACKEND, err = ?e, "mapper file cannot be read");
-                ImportError::MapperFileUnreadable
+                AccountImportError::MapperFileUnreadable
             })?;
         let PickedMapperFile::Read(bytes) = picked else {
-            return Err(ImportError::MapperFileTooLarge);
+            return Err(AccountImportError::MapperFileTooLarge);
         };
         let _writing = self.writing.lock().await;
         let checked = ImportMapper::with_id(String::new(), ImportMapperDraft::from_file(&bytes)?)?;
@@ -105,20 +105,23 @@ impl ImportService {
     }
 
     /// IMP-020 — the mapper `mapper_id`, refused when it is no longer held or no longer reads.
-    pub async fn get_import_mapper(&self, mapper_id: &str) -> StdResult<ImportMapper, ImportError> {
+    pub async fn get_import_mapper(
+        &self,
+        mapper_id: &str,
+    ) -> StdResult<ImportMapper, AccountImportError> {
         let bytes = self
             .store
             .read(mapper_id)
             .await
             .map_err(store_error("read"))?
-            .ok_or_else(|| ImportError::MapperNotFound {
+            .ok_or_else(|| AccountImportError::MapperNotFound {
                 mapper_id: mapper_id.to_string(),
             })?;
         read_mapper(mapper_id, &bytes)
     }
 
     /// IMP-040 — removes the file of the mapper `mapper_id`.
-    pub async fn delete_import_mapper(&self, mapper_id: &str) -> StdResult<(), ImportError> {
+    pub async fn delete_import_mapper(&self, mapper_id: &str) -> StdResult<(), AccountImportError> {
         let _writing = self.writing.lock().await;
         let held = self
             .store
@@ -126,7 +129,7 @@ impl ImportService {
             .await
             .map_err(store_error("read"))?;
         if held.is_none() {
-            return Err(ImportError::MapperNotFound {
+            return Err(AccountImportError::MapperNotFound {
                 mapper_id: mapper_id.to_string(),
             });
         }
@@ -163,13 +166,16 @@ impl ImportService {
     }
 
     /// IMP-024 — refused when another mapper holds its provider.
-    async fn check_provider_free(&self, mapper: &ImportMapper) -> StdResult<(), ImportError> {
+    async fn check_provider_free(
+        &self,
+        mapper: &ImportMapper,
+    ) -> StdResult<(), AccountImportError> {
         let others = self.list_import_mappers().await?;
         if others
             .iter()
             .any(|other| other.id != mapper.id && other.has_provider(&mapper.info.provider))
         {
-            return Err(ImportError::MapperProviderTaken {
+            return Err(AccountImportError::MapperProviderTaken {
                 provider: mapper.info.provider.clone(),
             });
         }
@@ -177,7 +183,10 @@ impl ImportService {
     }
 
     /// IMP-020 — writes the mapper's file; one with no id yet takes its file name here.
-    async fn write_mapper(&self, mapper: ImportMapper) -> StdResult<ImportMapper, ImportError> {
+    async fn write_mapper(
+        &self,
+        mapper: ImportMapper,
+    ) -> StdResult<ImportMapper, AccountImportError> {
         let held = self.store.ids().await.map_err(store_error("list"))?;
         let mapper = mapper.named_among(&held);
         let bytes = mapper.to_file().map_err(store_error("serialize"))?;
@@ -190,25 +199,25 @@ impl ImportService {
 }
 
 /// IMP-020A — the file `id` read as a mapper, and valid.
-fn read_mapper(id: &str, bytes: &[u8]) -> StdResult<ImportMapper, ImportError> {
+fn read_mapper(id: &str, bytes: &[u8]) -> StdResult<ImportMapper, AccountImportError> {
     if bytes.len() as u64 > LARGEST_MAPPER_FILE {
-        return Err(ImportError::MapperFileTooLarge);
+        return Err(AccountImportError::MapperFileTooLarge);
     }
     ImportMapper::with_id(id.to_string(), ImportMapperDraft::from_file(bytes)?)
 }
 
 /// A failure of the mappers folder: its cause logged, never sent.
-fn store_error(step: &'static str) -> impl Fn(anyhow::Error) -> ImportError {
+fn store_error(step: &'static str) -> impl Fn(anyhow::Error) -> AccountImportError {
     move |e| {
         tracing::error!(target: BACKEND, step = %step, err = ?e, "mappers folder failure");
-        ImportError::MapperFolderFailed
+        AccountImportError::MapperFolderFailed
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::import::domain::{
+    use crate::context::account_import::domain::{
         DateFormat, DecimalMark, Encoding, MappedColumns, MapperInfo, MockImportMapperStore,
         MockMapperChoiceRepository, Separator,
     };
@@ -249,10 +258,10 @@ mod tests {
             .expect_write()
             .returning(|_, _| Err(anyhow::anyhow!("disk full")));
         let service =
-            ImportService::new(Box::new(store), Box::new(MockMapperChoiceRepository::new()));
+            AccountImportService::new(Box::new(store), Box::new(MockMapperChoiceRepository::new()));
         assert!(matches!(
             service.save_import_mapper(None, draft()).await,
-            Err(ImportError::MapperFolderFailed)
+            Err(AccountImportError::MapperFolderFailed)
         ));
     }
 
@@ -276,7 +285,7 @@ mod tests {
             }
         });
         let service =
-            ImportService::new(Box::new(store), Box::new(MockMapperChoiceRepository::new()));
+            AccountImportService::new(Box::new(store), Box::new(MockMapperChoiceRepository::new()));
         let listed = service.list_import_mappers().await.expect("listed");
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].id, "held");
@@ -290,7 +299,8 @@ mod tests {
             .expect_remember()
             .times(1)
             .returning(|_, _| Err(anyhow::anyhow!("database locked")));
-        let service = ImportService::new(Box::new(MockImportMapperStore::new()), Box::new(choices));
+        let service =
+            AccountImportService::new(Box::new(MockImportMapperStore::new()), Box::new(choices));
         service.remember_import_mapper("/folder", "broker").await;
     }
 }

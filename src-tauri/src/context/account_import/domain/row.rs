@@ -1,8 +1,8 @@
-use crate::context::import::domain::file::{read_date, FileLine, ImportFile};
-use crate::context::import::domain::{
+use crate::context::account_import::domain::file::{read_date, FileLine, ImportFile};
+use crate::context::account_import::domain::{
     DateFormat, DecimalMark, MappedColumns, OperationLabel, OperationType,
 };
-use crate::context::import::error::ImportError;
+use crate::context::account_import::error::AccountImportError;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -158,10 +158,13 @@ struct Located<'a> {
 }
 
 /// IMP-021 — the position of every mapped column, a column the file lacks refused.
-fn locate<'a>(columns: &'a MappedColumns, file: &ImportFile) -> Result<Located<'a>, ImportError> {
+fn locate<'a>(
+    columns: &'a MappedColumns,
+    file: &ImportFile,
+) -> Result<Located<'a>, AccountImportError> {
     let find = |name: &str| {
         file.column(name)
-            .ok_or_else(|| ImportError::MappedColumnNotInFile {
+            .ok_or_else(|| AccountImportError::MappedColumnNotInFile {
                 column: name.trim().to_string(),
             })
     };
@@ -198,7 +201,7 @@ pub fn read_rows(
     columns: &MappedColumns,
     labels: &[OperationLabel],
     format: RowFormat,
-) -> Result<Vec<Row>, ImportError> {
+) -> Result<Vec<Row>, AccountImportError> {
     let located = locate(columns, file)?;
     let mut rows: Vec<Row> = file
         .lines
@@ -421,7 +424,7 @@ fn join_trade_taxes(rows: &mut [Row]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::import::domain::file::{read_file, ReadingChoices};
+    use crate::context::account_import::domain::file::{read_file, ReadingChoices};
 
     const DOT_DAY_FIRST: RowFormat = RowFormat {
         decimal_mark: DecimalMark::Dot,
@@ -469,7 +472,7 @@ mod tests {
         // The mapper's separator, as a saved one gives it (IMP-020E): a short line would
         // otherwise defeat detection (IMP-012).
         let choices = ReadingChoices {
-            separator: Some(crate::context::import::domain::Separator::Semicolon),
+            separator: Some(crate::context::account_import::domain::Separator::Semicolon),
             ..ReadingChoices::default()
         };
         let (file, _) = read_file(text.as_bytes(), &choices).expect("read");
@@ -547,7 +550,7 @@ mod tests {
         let refused = read_rows(&file, &mapped, &labels(), DOT_DAY_FIRST);
         assert!(matches!(
             refused,
-            Err(ImportError::MappedColumnNotInFile { column }) if column == "libellé"
+            Err(AccountImportError::MappedColumnNotInFile { column }) if column == "libellé"
         ));
     }
 

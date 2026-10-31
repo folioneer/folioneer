@@ -491,7 +491,7 @@ async getCurrencyRates(fromCurrency: string, toCurrency: string) : Promise<Resul
 /**
  * The mappers the folder holds, by provider (IMP-020A).
  */
-async listImportMappers() : Promise<Result<ImportMapper[], ImportError>> {
+async listImportMappers() : Promise<Result<ImportMapper[], AccountImportError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_import_mappers") };
 } catch (e) {
@@ -503,7 +503,7 @@ async listImportMappers() : Promise<Result<ImportMapper[], ImportError>> {
  * Writes a mapper's file: a new one without `mapper_id`, else the one it names (IMP-020,
  * IMP-024, IMP-025).
  */
-async saveImportMapper(mapperId: string | null, draft: ImportMapperDraft) : Promise<Result<ImportMapper, ImportError>> {
+async saveImportMapper(mapperId: string | null, draft: ImportMapperDraft) : Promise<Result<ImportMapper, AccountImportError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("save_import_mapper", { mapperId, draft }) };
 } catch (e) {
@@ -515,7 +515,7 @@ async saveImportMapper(mapperId: string | null, draft: ImportMapperDraft) : Prom
  * IMP-020B — the system dialog opened for the user to pick a mapper's file, copied into the
  * mappers folder: the mapper it holds, or `None` when the user closed the dialog.
  */
-async addImportMapperFromFile() : Promise<Result<ImportMapper | null, ImportError>> {
+async addImportMapperFromFile() : Promise<Result<ImportMapper | null, AccountImportError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("add_import_mapper_from_file") };
 } catch (e) {
@@ -526,7 +526,7 @@ async addImportMapperFromFile() : Promise<Result<ImportMapper | null, ImportErro
 /**
  * Removes a mapper's file (IMP-040).
  */
-async deleteImportMapper(mapperId: string) : Promise<Result<null, ImportError>> {
+async deleteImportMapper(mapperId: string) : Promise<Result<null, AccountImportError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("delete_import_mapper", { mapperId }) };
 } catch (e) {
@@ -1762,6 +1762,82 @@ export type AccountError =
  */
 { code: "DatabaseError" }
 /**
+ * Single flat error enum for the `account_import` bounded context (gold error model).
+ * 
+ * `#[serde(tag = "code")]` makes each variant serialize as `{ "code": "VariantName", ... }`
+ * on the wire.
+ */
+export type AccountImportError = 
+/**
+ * The mapper's provider is empty once trimmed (IMP-024).
+ */
+{ code: "MapperProviderEmpty" } | 
+/**
+ * Another mapper holds the provider, case and accents ignored (IMP-024).
+ */
+{ code: "MapperProviderTaken"; provider: string } | 
+/**
+ * The mapper names no date column, no operation column, or no asset column (IMP-021).
+ */
+{ code: "MapperColumnMissing" } | 
+/**
+ * A text of the mapper is longer than `MAPPER_TEXT_LENGTH` characters (IMP-024A).
+ */
+{ code: "MapperTextTooLong" } | 
+/**
+ * The mapper is no longer held (IMP-020, IMP-025, IMP-040).
+ */
+{ code: "MapperNotFound"; mapper_id: string } | 
+/**
+ * The mapper's file cannot be read (IMP-020B).
+ */
+{ code: "MapperFileUnreadable" } | 
+/**
+ * The mapper's file is larger than `LARGEST_MAPPER_FILE` (IMP-020B).
+ */
+{ code: "MapperFileTooLarge" } | 
+/**
+ * The file does not read as a mapper (IMP-020B).
+ */
+{ code: "MapperFileInvalid"; reason: string } | 
+/**
+ * The mappers folder cannot be read or written; the cause is logged, never sent. Apart from
+ * `DatabaseError` (IMP-020): the user can act on a folder that is full or read-only.
+ */
+{ code: "MapperFolderFailed" } | 
+/**
+ * The file is larger than 10 MB (IMP-010).
+ */
+{ code: "FileTooLarge" } | 
+/**
+ * The file holds nothing, or its first line is blank (IMP-010).
+ */
+{ code: "FileEmpty" } | 
+/**
+ * The file holds a header and no row that is not blank (IMP-010, IMP-016).
+ */
+{ code: "FileHasNoRow" } | 
+/**
+ * The file was to be read as UTF-8 and its bytes are not (IMP-011).
+ */
+{ code: "FileNotUtf8" } | 
+/**
+ * No separator splits the header and the lines alike (IMP-012).
+ */
+{ code: "SeparatorNotFound" } | 
+/**
+ * The header holds a name twice, case ignored (IMP-015).
+ */
+{ code: "HeaderNameRepeated"; name: string } | 
+/**
+ * The mapper in use names a column the file lacks (IMP-021).
+ */
+{ code: "MappedColumnNotInFile"; column: string } | 
+/**
+ * An infrastructure failure; the diagnostic is logged server-side, never sent.
+ */
+{ code: "DatabaseError" }
+/**
  * The account journal of one account, filtered (TXL-060).
  */
 export type AccountJournal = { 
@@ -2905,15 +2981,15 @@ end_date: string | null }
 /**
  * Use-case composite for the import failure surface.
  * 
- * - `ImportError` — the file's content and the mapper (IMP-010 to IMP-021).
+ * - `AccountImportError` — the file's content and the mapper (IMP-010 to IMP-021).
  * - `AccountError` — the account the file is read for (`AccountNotFound`, IMP-010).
  * - `CsvImportTask` — use-case-owned (this file).
  */
 export type CsvImportError = 
 /**
- * Import-BC rejection.
+ * Account import rejection.
  */
-ImportError | 
+AccountImportError | 
 /**
  * Account-BC rejection.
  */
@@ -3946,81 +4022,6 @@ quantity: number;
  * VWAP cost basis per unit, account currency (micro-units), 0 when never held.
  */
 average_price: number }
-/**
- * Single flat error enum for the `import` bounded context (gold error model).
- * 
- * `#[serde(tag = "code")]` makes each variant serialize as `{ "code": "VariantName", ... }`
- * on the wire.
- */
-export type ImportError = 
-/**
- * The mapper's provider is empty once trimmed (IMP-024).
- */
-{ code: "MapperProviderEmpty" } | 
-/**
- * Another mapper holds the provider, case and accents ignored (IMP-024).
- */
-{ code: "MapperProviderTaken"; provider: string } | 
-/**
- * The mapper names no date column, no operation column, or no asset column (IMP-021).
- */
-{ code: "MapperColumnMissing" } | 
-/**
- * A text of the mapper is longer than `MAPPER_TEXT_LENGTH` characters (IMP-024A).
- */
-{ code: "MapperTextTooLong" } | 
-/**
- * The mapper is no longer held (IMP-020, IMP-025, IMP-040).
- */
-{ code: "MapperNotFound"; mapper_id: string } | 
-/**
- * The mapper's file cannot be read (IMP-020B).
- */
-{ code: "MapperFileUnreadable" } | 
-/**
- * The mapper's file is larger than `LARGEST_MAPPER_FILE` (IMP-020B).
- */
-{ code: "MapperFileTooLarge" } | 
-/**
- * The file does not read as a mapper (IMP-020B).
- */
-{ code: "MapperFileInvalid"; reason: string } | 
-/**
- * The mappers folder cannot be read or written; the cause is logged, never sent.
- */
-{ code: "MapperFolderFailed" } | 
-/**
- * The file is larger than 10 MB (IMP-010).
- */
-{ code: "FileTooLarge" } | 
-/**
- * The file holds nothing, or its first line is blank (IMP-010).
- */
-{ code: "FileEmpty" } | 
-/**
- * The file holds a header and no row that is not blank (IMP-010, IMP-016).
- */
-{ code: "FileHasNoRow" } | 
-/**
- * The file was to be read as UTF-8 and its bytes are not (IMP-011).
- */
-{ code: "FileNotUtf8" } | 
-/**
- * No separator splits the header and the lines alike (IMP-012).
- */
-{ code: "SeparatorNotFound" } | 
-/**
- * The header holds a name twice, case ignored (IMP-015).
- */
-{ code: "HeaderNameRepeated"; name: string } | 
-/**
- * The mapper in use names a column the file lacks (IMP-021).
- */
-{ code: "MappedColumnNotInFile"; column: string } | 
-/**
- * An infrastructure failure; the diagnostic is logged server-side, never sent.
- */
-{ code: "DatabaseError" }
 /**
  * IMP-020 — how one provider's export is read: a file in the mappers folder, reused.
  */

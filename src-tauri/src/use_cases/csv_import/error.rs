@@ -1,5 +1,5 @@
 use crate::context::account::AccountError;
-use crate::context::import::ImportError;
+use crate::context::account_import::AccountImportError;
 
 /// Use-case rejections of an import: reading the file the user picked and the matches made
 /// now (IMP-010, IMP-033).
@@ -25,15 +25,15 @@ pub enum CsvImportTask {
 
 /// Use-case composite for the import failure surface.
 ///
-/// - `ImportError` — the file's content and the mapper (IMP-010 to IMP-021).
+/// - `AccountImportError` — the file's content and the mapper (IMP-010 to IMP-021).
 /// - `AccountError` — the account the file is read for (`AccountNotFound`, IMP-010).
 /// - `CsvImportTask` — use-case-owned (this file).
 #[derive(Debug, thiserror::Error, serde::Serialize, specta::Type)]
 #[serde(untagged)]
 pub enum CsvImportError {
-    /// Import-BC rejection.
+    /// Account import rejection.
     #[error(transparent)]
-    Import(#[from] ImportError),
+    AccountImport(#[from] AccountImportError),
     /// Account-BC rejection.
     #[error(transparent)]
     Account(#[from] AccountError),
@@ -70,7 +70,8 @@ mod tests {
             json!({ "code": "AccountNotFound", "account_id": "a-1" })
         );
         assert_eq!(
-            to_value(CsvImportError::Import(ImportError::FileEmpty)).expect("serializes"),
+            to_value(CsvImportError::AccountImport(AccountImportError::FileEmpty))
+                .expect("serializes"),
             json!({ "code": "FileEmpty" })
         );
         for task in [CsvImportTask::FileNotPicked, CsvImportTask::UnknownError] {
@@ -86,8 +87,10 @@ mod tests {
     // shows the same message whichever database failed.
     #[test]
     fn a_database_error_shares_one_code_across_both_contexts() {
-        let import =
-            to_value(CsvImportError::Import(ImportError::DatabaseError)).expect("serializes");
+        let import = to_value(CsvImportError::AccountImport(
+            AccountImportError::DatabaseError,
+        ))
+        .expect("serializes");
         let account =
             to_value(CsvImportError::Account(AccountError::DatabaseError)).expect("serializes");
         assert_eq!(import, json!({ "code": "DatabaseError" }));
