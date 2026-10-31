@@ -160,7 +160,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 **IMP-060 — The window opens from the account (frontend)**: The live view of an account's details, even one holding nothing, has an Import action in its header, absent from the as-of view. Each opening starts from picking a file, nothing of the last opening kept; a dialog closed unpicked changes nothing.
 
-**IMP-061 — A new mapper is filled in the window (frontend)**: With no mapper preselected, the window shows the file's format as read, each to change (IMP-018); a select per field of IMP-021, listing the file's columns; each label of the file with its count and a select of operation types (IMP-022, IMP-022A); and the provider, to save the mapper with (IMP-024). A saved mapper says so; a refused one says why. A date format not detected says so (IMP-014). A file that cannot be read, at first or after a change, shows why and only its format, so that it can be changed.
+**IMP-061 — A new mapper is filled in the window (frontend)**: With no mapper preselected, the window shows the file's format as read, each to change (IMP-018); a select per field of IMP-021, listing the file's columns; once the operation column is chosen, each label of the file with its count and a select of operation types (IMP-022, IMP-022A), and no list before; no column is guessed; and the provider, to save the mapper with (IMP-024). A saved mapper says so; a refused one says why. A date format not detected says so (IMP-014). A file that cannot be read, at first or after a change, shows why and only its format, so that it can be changed.
 
 **IMP-062 — A saved mapper is checked at once (frontend)**: A saved mapper in use, preselected (IMP-020D) or picked, is run on the file straight away. The preselected one names the folder it was remembered for. A file it reads says it matches, the form folded behind Edit the mapper; another refusal is shown, and Edit the mapper stays offered.
 
@@ -194,7 +194,26 @@ confirm: the ready rows recorded at once (IMP-050), the added deposits by defaul
 
 ## UX Draft
 
-**Entry point:** the Import action of the account details header (IMP-060). **Main component:** `AccountImportModal`. **States:** picking a file, new mapper, remembered mapper, file not matching, mapper file refused (IMP-060 to IMP-065). **Flow:** pick a file → the mapper → Preview. Mock: [folioneer-design/503](https://github.com/folioneer/folioneer-design/tree/main/503). The preview itself is #504, with its mock.
+Mock: [folioneer-design/503](https://github.com/folioneer/folioneer-design/tree/main/503). The preview itself is #504, with its mock.
+
+### Entry Point
+
+The Import action of the account details header (IMP-060).
+
+### Main Component
+
+`AccountImportModal`.
+
+### States
+
+- **Empty:** picking a file (IMP-060).
+- **Loading:** Preview shows the window working (IMP-065).
+- **Error:** a file not read (IMP-061), a file not matching (IMP-063), a mapper file refused (IMP-064).
+- **Success:** a new mapper's form (IMP-061), a saved mapper matching (IMP-062), the row counts (IMP-065).
+
+### User Flow
+
+Pick a file → the mapper → Preview.
 
 ---
 
