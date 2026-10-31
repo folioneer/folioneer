@@ -8,6 +8,7 @@
 
 import assert from "node:assert";
 import { $ } from "@wdio/globals";
+import { dismissLeftoverModal } from "../helpers/modal";
 import {
   clickHeaderAction,
   navigateToAccountDetails,
@@ -21,6 +22,10 @@ describe("account_import", () => {
 
   before(async () => {
     accountId = await seedAccount("E2E Import Account", "EUR");
+  });
+
+  beforeEach(async () => {
+    await dismissLeftoverModal();
   });
 
   it("IMP-060: an empty account's header opens the import window, and Cancel closes it", async () => {
