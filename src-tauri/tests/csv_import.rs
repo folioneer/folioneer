@@ -598,7 +598,7 @@ async fn imp_010_what_cannot_be_read_is_refused() {
         .preview_import(&account_id, path(&file), None, &absent)
         .await;
     assert!(
-        matches!(refused, Err(CsvImportError::AccountImport(AccountImportError::MappedColumnNotInFile { column })) if column == "Fees")
+        matches!(refused, Err(CsvImportError::AccountImport(AccountImportError::MappedColumnsNotInFile { columns })) if columns == ["Fees"])
     );
     let mut untyped = english_mapper();
     untyped.operation_types.retain(|label| label.label != "Buy");
@@ -1365,6 +1365,25 @@ async fn imp_020d_a_memory_that_cannot_be_read_preselects_none() {
             .await
             .expect("read"),
         None
+    );
+}
+
+// IMP-021 — every column the file lacks is named, each once.
+#[tokio::test]
+async fn imp_021_every_column_the_file_lacks_is_named() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    let mut absent = english_mapper();
+    absent.columns.fees = header("Charges");
+    absent.columns.quantity = header("Qté");
+    absent.columns.currency = header("Qté");
+    let refused = ctx
+        .import
+        .preview_import(&account_id, path(&file), None, &absent)
+        .await;
+    assert!(
+        matches!(refused, Err(CsvImportError::AccountImport(AccountImportError::MappedColumnsNotInFile { columns })) if columns == ["Qté", "Charges"])
     );
 }
 

@@ -1377,8 +1377,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
+export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 
 /** user-defined types **/
 
@@ -1830,9 +1830,9 @@ export type AccountImportError =
  */
 { code: "HeaderNameRepeated"; name: string } | 
 /**
- * The mapper in use names a column the file lacks (IMP-021).
+ * The mapper in use names columns the file lacks (IMP-021).
  */
-{ code: "MappedColumnNotInFile"; column: string } | 
+{ code: "MappedColumnsNotInFile"; columns: string[] } | 
 /**
  * An infrastructure failure; the diagnostic is logged server-side, never sent.
  */
@@ -3620,6 +3620,18 @@ export type FetchTrigger =
  */
 "Manual"
 /**
+ * IMP-022A — a label the operation column holds, and how many rows hold it.
+ */
+export type FileOperationLabel = { 
+/**
+ * The label, written as first met.
+ */
+label: string; 
+/**
+ * How many rows hold it, case ignored.
+ */
+rows: number }
+/**
  * IMP-010 to IMP-016 — how a file was read: its format, detected or chosen, and its columns.
  */
 export type FileRead = { 
@@ -3647,7 +3659,11 @@ columns: string[];
 /**
  * How many lines after the header are not blank.
  */
-rows: number }
+rows: number; 
+/**
+ * The labels of the operation column, once it is known; empty before (IMP-022A).
+ */
+operation_labels: FileOperationLabel[] }
 /**
  * Why a folder cannot be used (SYN-019/069). Structured so the frontend can translate it.
  */
@@ -5080,8 +5096,9 @@ export type RateRefreshError =
  */
 { code: "DatabaseError" }
 /**
- * IMP-018 — what the user picked instead of the detected format, and the date column the
- * date format is detected on (IMP-014). Each left out is detected.
+ * IMP-018 — what the user picked instead of the detected format, each left out detected; the
+ * date column the date format is detected on (IMP-014); the operation column whose labels are
+ * told (IMP-022A), never detected: left out, or one the file lacks, it tells no label.
  */
 export type ReadingChoices = { 
 /**
@@ -5103,7 +5120,11 @@ date_format: DateFormat | null;
 /**
  * The header of the date column, once mapped (IMP-021).
  */
-date_column: string | null }
+date_column: string | null; 
+/**
+ * The header of the operation column, once mapped (IMP-022A).
+ */
+operation_column: string | null }
 /**
  * Parameters for recording an interest credit on a held asset or the account's
  * cash line (INT-020). The amount is either a rate or a direct quantity —

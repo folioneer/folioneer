@@ -188,6 +188,7 @@ describe("AccountDetailsView — header actions (DIV-012)", () => {
     // The former consolidated dropdown is gone; actions are direct icon buttons.
     expect(document.querySelector("#account-details-add-menu")).toBeNull();
     expect(document.querySelector("#add-menu-open-balance")).toBeInTheDocument();
+    expect(document.querySelector("#add-menu-import")).toBeInTheDocument();
     expect(document.querySelector("#add-menu-dividend")).toBeInTheDocument();
     expect(document.querySelector("#add-menu-free-shares")).toBeInTheDocument();
   });
@@ -467,6 +468,7 @@ describe("AccountDetailsView — read-only as-of view", () => {
     // Mutating controls hidden.
     expect(document.querySelector("#account-details-refresh-prices")).toBeNull();
     expect(document.querySelector("#add-menu-open-balance")).toBeNull();
+    expect(document.querySelector("#add-menu-import")).toBeNull();
     expect(document.querySelector("#add-menu-dividend")).toBeNull();
     expect(document.querySelector("#add-menu-free-shares")).toBeNull();
     expect(document.querySelector("#account-details-add-transaction-fab")).toBeNull();

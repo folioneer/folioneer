@@ -17,7 +17,7 @@
 import assert from "node:assert";
 import { $ } from "@wdio/globals";
 import { isoToDisplayDate } from "../helpers/date";
-import { dismissLeftoverModal } from "../helpers/modal";
+import { dismissLeftoverModal, waitForSnackbarGone } from "../helpers/modal";
 import { navigateToAccountDetails, navigateToAccounts } from "../helpers/navigation";
 import { setReactInputValue } from "../helpers/react";
 import { captureScreen } from "../helpers/screenshot";
@@ -39,6 +39,7 @@ const DATES = {
 
 describe("buy_sell", () => {
   beforeEach(async () => {
+    await waitForSnackbarGone();
     await dismissLeftoverModal();
   });
 

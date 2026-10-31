@@ -281,6 +281,7 @@ impl CsvImportUseCase {
             decimal_mark: Some(mapper.decimal_mark),
             date_format: Some(mapper.date_format),
             date_column: Some(mapper.columns.date.clone()),
+            operation_column: Some(mapper.columns.operation.clone()),
         };
         let bytes = self.read_bytes(path).await?;
         let (file, read) = read_file(&bytes, &choices)?;

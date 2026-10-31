@@ -78,11 +78,11 @@ pub enum AccountImportError {
         name: String,
     },
 
-    /// The mapper in use names a column the file lacks (IMP-021).
-    #[error("The file has no column {column}")]
-    MappedColumnNotInFile {
-        /// The column's header, as the mapper names it.
-        column: String,
+    /// The mapper in use names columns the file lacks (IMP-021).
+    #[error("The file lacks the columns {columns:?}")]
+    MappedColumnsNotInFile {
+        /// Each column's header, as the mapper names it.
+        columns: Vec<String>,
     },
 
     /// An infrastructure failure; the diagnostic is logged server-side, never sent.
@@ -139,11 +139,11 @@ mod tests {
             json!({ "code": "HeaderNameRepeated", "name": "Date" })
         );
         assert_eq!(
-            to_value(AccountImportError::MappedColumnNotInFile {
-                column: "Qté".into()
+            to_value(AccountImportError::MappedColumnsNotInFile {
+                columns: vec!["Qté".into()]
             })
             .expect("serializes"),
-            json!({ "code": "MappedColumnNotInFile", "column": "Qté" })
+            json!({ "code": "MappedColumnsNotInFile", "columns": ["Qté"] })
         );
         for (error, code) in [
             (
