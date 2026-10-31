@@ -37,7 +37,10 @@ impl AccountImportService {
         for id in ids {
             let bytes = match self.store.read(&id).await {
                 Ok(Some(bytes)) => bytes,
-                Ok(None) => continue,
+                Ok(None) => {
+                    tracing::warn!(target: BACKEND, mapper = %id, "mapper file left out: not found");
+                    continue;
+                }
                 Err(e) => {
                     tracing::warn!(target: BACKEND, mapper = %id, err = ?e, "mapper file left out");
                     continue;

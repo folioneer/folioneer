@@ -37,17 +37,15 @@ impl ImportMapperStore for FsImportMapperStore {
         let mut ids = Vec::new();
         while let Some(entry) = entries.next_entry().await.context("mappers folder entry")? {
             let path = entry.path();
-            if path
+            let is_json = path
                 .extension()
-                .is_some_and(|extension| extension == "json")
-            {
-                if let Some(id) = path.file_stem().and_then(|stem| stem.to_str()) {
-                    if self.file(id).is_some() {
-                        ids.push(id.to_string());
-                    } else {
-                        tracing::warn!(target: BACKEND, file = %id, "mapper file name left out");
-                    }
-                }
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("json"));
+            if !is_json {
+                continue;
+            }
+            match path.file_stem().and_then(|stem| stem.to_str()) {
+                Some(id) if self.file(id).is_some() => ids.push(id.to_string()),
+                _ => tracing::warn!(target: BACKEND, file = ?path, "mapper file name left out"),
             }
         }
         Ok(ids)
@@ -57,11 +55,16 @@ impl ImportMapperStore for FsImportMapperStore {
         let Some(file) = self.file(id) else {
             return Ok(None);
         };
-        let opened = match tokio::fs::File::open(&file).await {
-            Ok(opened) => opened,
+        // Checked before it is opened: opening a pipe would wait for a writer.
+        let metadata = match tokio::fs::metadata(&file).await {
+            Ok(metadata) => metadata,
             Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
-            Err(e) => return Err(e).context("mapper file not opened"),
+            Err(e) => return Err(e).context("mapper file not found"),
         };
+        anyhow::ensure!(metadata.is_file(), "a mapper file is a plain file");
+        let opened = tokio::fs::File::open(&file)
+            .await
+            .context("mapper file not opened")?;
         // Read one byte past the limit: enough to tell a file too large (IMP-020A).
         let mut bytes = Vec::new();
         opened
@@ -81,12 +84,17 @@ impl ImportMapperStore for FsImportMapperStore {
             .context("mappers folder not created")?;
         // Written aside then moved, so a failure never leaves half a file in the list.
         let aside = self.folder.join(format!(".{id}.tmp"));
-        tokio::fs::write(&aside, bytes)
-            .await
-            .context("mapper file not written")?;
-        tokio::fs::rename(&aside, &file)
-            .await
-            .context("mapper file not moved in place")
+        let written = match tokio::fs::write(&aside, bytes).await {
+            Ok(()) => tokio::fs::rename(&aside, &file)
+                .await
+                .context("mapper file not moved in place"),
+            Err(e) => Err(e).context("mapper file not written"),
+        };
+        if written.is_err() {
+            // The folder stays as it was (IMP-020); a failure here changes nothing further.
+            let _ = tokio::fs::remove_file(&aside).await;
+        }
+        written
     }
 
     async fn delete(&self, id: &str) -> Result<()> {
@@ -214,5 +222,63 @@ mod tests {
             PickedMapperFile::TooLarge
         );
         assert!(store.read_picked(dir.path(), 5).await.is_err());
+    }
+
+    // IMP-020 — a write that fails leaves the folder's files as they were.
+    #[tokio::test]
+    async fn imp_020_a_failed_write_leaves_the_folder_as_it_was() {
+        let dir = tempfile::tempdir().expect("dir");
+        let store = FsImportMapperStore::new(dir.path().to_path_buf());
+        // The move fails: a folder holds the file's place. Nothing is left aside.
+        std::fs::create_dir_all(dir.path().join("taken.json/inner")).expect("folder");
+        assert!(store.write("taken", b"{}").await.is_err());
+        assert!(!dir.path().join(".taken.tmp").exists());
+        // The write aside fails: the mapper already there keeps its content.
+        store.write("broker", b"first").await.expect("written");
+        std::fs::create_dir(dir.path().join(".broker.tmp")).expect("folder");
+        assert!(store.write("broker", b"second").await.is_err());
+        assert_eq!(
+            store.read("broker").await.expect("read"),
+            Some(b"first".to_vec())
+        );
+    }
+
+    // IMP-020 / IMP-020A — an extension in another case still holds its name, so no new mapper
+    // replaces it where names ignore case; a name no mapper can take is left out.
+    #[tokio::test]
+    async fn imp_020a_the_names_the_folder_lists() {
+        let dir = tempfile::tempdir().expect("dir");
+        let store = FsImportMapperStore::new(dir.path().to_path_buf());
+        std::fs::write(dir.path().join("broker.JSON"), "{}").expect("written");
+        std::fs::write(dir.path().join("con.json"), "{}").expect("written");
+        assert_eq!(
+            store.ids().await.expect("listed"),
+            vec!["broker".to_string()]
+        );
+    }
+
+    // IMP-020A — a pipe named as a mapper fails at once rather than waiting for a writer.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn imp_020a_a_pipe_does_not_hang_the_list() {
+        let dir = tempfile::tempdir().expect("dir");
+        let store = FsImportMapperStore::new(dir.path().to_path_buf());
+        let pipe = dir.path().join("pipe.json");
+        let made = std::process::Command::new("mkfifo")
+            .arg(&pipe)
+            .status()
+            .expect("mkfifo");
+        assert!(made.success());
+        let read =
+            tokio::time::timeout(std::time::Duration::from_secs(5), store.read("pipe")).await;
+        let Ok(read) = read else {
+            // Lets the waiting open return, so the test fails instead of hanging at its end.
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(&pipe)
+                .expect("writer");
+            panic!("the read waited for a writer");
+        };
+        assert!(read.is_err());
     }
 }

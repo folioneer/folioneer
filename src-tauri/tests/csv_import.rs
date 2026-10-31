@@ -1,4 +1,4 @@
-//! Integration tests for the CSV import preview (IMP spec): a broker's export read through a
+//! Integration tests for the CSV import preview (IMP spec): a broker's export read through an
 //! import mapper, each row matched to an asset and judged as manual entry would judge it.
 //!
 //! Exercises the full stack through the public `folioneer_lib` API:
@@ -1359,6 +1359,152 @@ async fn imp_020d_a_memory_that_cannot_be_read_preselects_none() {
         .await
         .expect("dropped");
     let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    assert_eq!(
+        ctx.import
+            .remembered_import_mapper(path(&file))
+            .await
+            .expect("read"),
+        None
+    );
+}
+
+// IMP-020A — the list sorts by provider, case and accents ignored.
+#[tokio::test]
+async fn imp_020a_the_list_sorts_case_and_accents_ignored() {
+    let ctx = build_ctx().await;
+    for provider in ["zeta", "Élan", "alpha"] {
+        let mut mapper = english_mapper();
+        mapper.info.provider = provider.to_string();
+        ctx.mappers
+            .save_import_mapper(None, mapper)
+            .await
+            .expect("saved");
+    }
+    let providers: Vec<String> = ctx
+        .mappers
+        .list_import_mappers()
+        .await
+        .expect("listed")
+        .into_iter()
+        .map(|mapper| mapper.info.provider)
+        .collect();
+    assert_eq!(providers, ["alpha", "Élan", "zeta"]);
+}
+
+// IMP-020B / IMP-022 / IMP-033 — a file's operation types and asset matches are kept, whether
+// or not the asset is held.
+#[tokio::test]
+async fn imp_020b_operation_types_and_matches_are_kept() {
+    let ctx = build_ctx().await;
+    let mut shared = english_mapper();
+    shared.asset_matches = vec![AssetMatch {
+        read: "Somewhere".to_string(),
+        asset_id: "not-here".to_string(),
+    }];
+    assert!(!shared.operation_types.is_empty());
+    let text = serde_json::to_string(&shared).expect("JSON");
+    let added = ctx
+        .mappers
+        .add_import_mapper_from(mapper_file(&text).path())
+        .await
+        .expect("added");
+    let read = ctx
+        .mappers
+        .get_import_mapper(&added.id)
+        .await
+        .expect("read");
+    assert_eq!(read.asset_matches, shared.asset_matches);
+    assert_eq!(read.operation_types, shared.operation_types);
+}
+
+// IMP-024 / IMP-025 — a change of provider onto one another mapper holds is refused, the file
+// unchanged.
+#[tokio::test]
+async fn imp_025_a_provider_another_holds_is_refused() {
+    let ctx = build_ctx().await;
+    ctx.mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    let second = ctx
+        .mappers
+        .save_import_mapper(None, french_mapper())
+        .await
+        .expect("saved");
+    let mut taken = french_mapper();
+    taken.info.provider = "broker".to_string();
+    assert!(matches!(
+        ctx.mappers
+            .save_import_mapper(Some(second.id.clone()), taken)
+            .await,
+        Err(AccountImportError::MapperProviderTaken { .. })
+    ));
+    let read = ctx
+        .mappers
+        .get_import_mapper(&second.id)
+        .await
+        .expect("read");
+    assert_eq!(read.info.provider, french_mapper().info.provider);
+}
+
+// IMP-040 — deleting a mapper changes nothing already recorded.
+#[tokio::test]
+async fn imp_040_a_deleted_mapper_leaves_the_records() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let saved = ctx
+        .mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
+    let before = transactions(&ctx, &account_id).await.len();
+    assert!(before > 0);
+    ctx.mappers
+        .delete_import_mapper(&saved.id)
+        .await
+        .expect("deleted");
+    assert_eq!(transactions(&ctx, &account_id).await.len(), before);
+}
+
+// IMP-020C — a confirmation with no saved mapper remembers nothing.
+#[tokio::test]
+async fn imp_020c_no_saved_mapper_nothing_remembered() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
+    let remembered: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM import_mapper_choices")
+        .fetch_one(&ctx.pool)
+        .await
+        .expect("counted");
+    assert_eq!(remembered, 0);
+}
+
+// IMP-020D — a mappers folder that cannot be read preselects none.
+#[tokio::test]
+async fn imp_020d_a_mappers_folder_that_cannot_be_read_preselects_none() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let saved = ctx
+        .mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    ctx.import
+        .confirm_import(
+            &account_id,
+            path(&file),
+            Some(&saved.id),
+            &english_mapper(),
+            true,
+        )
+        .await
+        .expect("confirmed");
+    std::fs::remove_dir_all(mappers_folder(&ctx)).expect("removed");
+    std::fs::write(mappers_folder(&ctx), "a file where the folder goes").expect("written");
     assert_eq!(
         ctx.import
             .remembered_import_mapper(path(&file))
