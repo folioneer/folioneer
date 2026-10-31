@@ -151,6 +151,12 @@ describe("buy_sell", () => {
     await navigateToAccounts();
     await navigateToAccountDetails(accId);
 
+    // The previous scenario's snackbar outlives the navigation and can cover this row.
+    await browser.waitUntil(async () => !(await $('[role="status"]').isExisting()), {
+      timeout: 15000,
+      timeoutMsg: "The previous scenario's snackbar must have gone",
+    });
+
     const sellBtn = await $(`#action-sell-${astId}`);
     await sellBtn.waitForExist({ timeout: 10000 });
     await sellBtn.click();
