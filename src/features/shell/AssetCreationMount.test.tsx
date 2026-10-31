@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAssetCreationRequest } from "@/lib/assetCreationRequest";
 import { AssetCreationMount } from "./AssetCreationMount";
@@ -8,22 +8,31 @@ vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn() } }));
 vi.mock("@/features/assets/add_asset/AddAsset", () => ({
   AddAssetModal: ({
     prefill,
+    kind,
+    onKindChange,
     onSuccess,
     onClose,
   }: {
     prefill: { name: string };
+    kind: string;
+    onKindChange: (kind: string) => void;
     onSuccess: (id: string) => void;
     onClose: () => void;
   }) => (
-    <button
-      type="button"
-      onClick={() => {
-        onSuccess("created");
-        onClose();
-      }}
-    >
-      {prefill.name}
-    </button>
+    <>
+      <button type="button" data-testid="kind" onClick={() => onKindChange("Custom")}>
+        {kind}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          onSuccess("created");
+          onClose();
+        }}
+      >
+        {prefill.name}
+      </button>
+    </>
   ),
 }));
 
@@ -54,5 +63,16 @@ describe("AssetCreationMount", () => {
     act(() => screen.getByText("Exemple").click());
     expect(onCreated).toHaveBeenCalledWith("created");
     expect(useAssetCreationRequest.getState().request).toBeNull();
+  });
+
+  it("starts each request from the default kind", () => {
+    render(<AssetCreationMount />);
+    const open = () => act(() => useAssetCreationRequest.getState().open({ prefill, onCreated }));
+    open();
+    fireEvent.click(screen.getByTestId("kind"));
+    expect(screen.getByTestId("kind").textContent).toBe("Custom");
+    act(() => useAssetCreationRequest.getState().close());
+    open();
+    expect(screen.getByTestId("kind").textContent).toBe("Listed");
   });
 });

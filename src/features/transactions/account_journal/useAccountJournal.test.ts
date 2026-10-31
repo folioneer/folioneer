@@ -144,6 +144,30 @@ describe("useAccountJournal", () => {
     expect(purchase?.recordedBy).toBeNull();
   });
 
+  // IMP-054 — the journal marks a deposit an account import added.
+  it("marks a deposit an import added", async () => {
+    mockGetJournal.mockResolvedValue({
+      status: "ok",
+      data: {
+        ...JOURNAL,
+        rows: [
+          {
+            ...JOURNAL.rows[1],
+            transaction: tx({ id: "added", transaction_type: "Deposit", added_deposit: true }),
+          },
+          { ...JOURNAL.rows[1], transaction: tx({ id: "plain", transaction_type: "Deposit" }) },
+        ],
+      },
+    });
+    const { result } = renderHook(() => useAccountJournal());
+    await act(async () => {});
+
+    expect(result.current.filteredSortedRows.map((r) => [r.id, r.addedDeposit])).toEqual([
+      ["added", true],
+      ["plain", false],
+    ]);
+  });
+
   // TRF-056 / TRF-062 — a part of a transfer carries its other account, read with the journal
   it("names the other account of a part of a transfer", async () => {
     useAppStore.setState({

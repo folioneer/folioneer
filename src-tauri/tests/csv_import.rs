@@ -1835,6 +1835,174 @@ async fn imp_052_an_unknown_asset_created_from_its_row_is_recorded() {
         .any(|t| t.asset_id == created && t.transaction_type == TransactionType::Purchase));
 }
 
+// IMP-052A — a created asset takes its rows through a match, whatever its name; in another
+// currency, they are rejected through that match.
+#[tokio::test]
+async fn imp_052a_a_created_asset_takes_its_rows_through_a_match() {
+    let ctx = build_ctx().await;
+    let (account_id, _, _) = french_portfolio(&ctx).await;
+    let file = picked(&ctx, &fixture("french_broker.csv"), true).await;
+    let mut mapper = french_mapper();
+    let created = asset(&ctx, "Renamed by the user", "RNM", None, "EUR").await;
+    mapper.asset_matches = vec![AssetMatch {
+        read: "INCONNUE SA".to_string(),
+        asset_id: created.clone(),
+    }];
+    let matched = preview(&ctx, &account_id, &file, &mapper).await;
+    assert!(
+        matches!(status(&matched, 8), RowStatus::Ready { asset_id: Some(id), .. } if *id == created)
+    );
+    assert!(matched.unknown_assets.is_empty());
+    let dollars = asset(&ctx, "Other currency", "USDO", None, "USD").await;
+    mapper.asset_matches = vec![AssetMatch {
+        read: "INCONNUE SA".to_string(),
+        asset_id: dollars,
+    }];
+    let rejected = preview(&ctx, &account_id, &file, &mapper).await;
+    assert!(
+        matches!(status(&rejected, 8), RowStatus::Rejected { .. }),
+        "{:?}",
+        status(&rejected, 8)
+    );
+}
+
+const JUDGED: &str = "Date,Type,ISIN,Ticker,Name,Quantity,Price,Amount,Commission,Currency
+2025-01-06,Deposit,,,,,,500,,EUR
+2025-01-07,Buy,FR0000000010,ACM,Acme World,10,100,,0,EUR
+2025-01-08,Dividend,FR0000000010,ACM,Acme World,,,25,,EUR
+2025-01-09,Withdrawal,,,,,,10,,EUR
+2025-01-10,Sell,FR0000000010,ACM,Acme World,99,10,,0,EUR
+2025-01-11,Buy,FR0000000099,ZZZ,Societe Nouvelle,1,10,,0,EUR
+2025-01-12,Buy,FR0000000099,,Another Name,1,10,,0,EUR
+2025-01-13,Buy,,ZZZ2,Societe Nouvelle,1,10,,0,EUR
+2025-01-14,Buy,,,societe nouvelle,1,10,,0,EUR
+2025-01-15,Buy,,,SOCIÉTÉ NOUVELLE,1,10,,0,EUR
+2025-01-16,Buy,,,,1,10,,0,EUR
+";
+
+// IMP-030 / IMP-038 / IMP-067 / IMP-068 — what the preview adds up for the window: each row's
+// amount, the deposits needed, and the unknown assets each with its rows under its first read.
+#[tokio::test]
+async fn imp_067_the_preview_groups_unknown_assets_and_sums_the_deposits() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let file = picked(&ctx, JUDGED, false).await;
+    let judged = preview(&ctx, &account_id, &file, &english_mapper()).await;
+    let amount = |line: u32| {
+        judged
+            .rows
+            .iter()
+            .find(|row| row.line == line)
+            .and_then(|row| row.amount)
+    };
+    assert_eq!(amount(2), Some(micro(500)), "a deposit");
+    assert_eq!(amount(4), Some(micro(25)), "a dividend");
+    assert_eq!(amount(5), Some(micro(10)), "a withdrawal");
+    assert!(
+        matches!(status(&judged, 6), RowStatus::Rejected { .. }),
+        "{:?}",
+        status(&judged, 6)
+    );
+    assert_eq!(
+        amount(6),
+        Some(micro(990)),
+        "a rejected sale keeps its total"
+    );
+
+    assert_eq!(judged.deposits.count, 1, "{:?}", status(&judged, 3));
+    assert_eq!(judged.deposits.total, micro(500));
+    assert_eq!(
+        judged.deposits.ready_without,
+        judged.counts.ready - 1,
+        "without the deposit, one row less"
+    );
+
+    let groups: Vec<(&str, &[u32])> = judged
+        .unknown_assets
+        .iter()
+        .map(|group| (group.read.as_str(), group.lines.as_slice()))
+        .collect();
+    assert_eq!(
+        groups,
+        vec![
+            ("FR0000000099", &[7, 8][..]),
+            ("ZZZ2", &[9][..]),
+            ("societe nouvelle", &[10, 11][..]),
+        ],
+        "the ISIN, else the reference, else the name, accents and case aside; no group for line 12"
+    );
+
+    // IMP-033 — a match is compared against what each row read, accents and case aside.
+    let mut mapper = english_mapper();
+    let acme = judged.matchable_assets[0].id.clone();
+    mapper.asset_matches = vec![
+        AssetMatch {
+            read: "fr0000000099".to_string(),
+            asset_id: acme.clone(),
+        },
+        AssetMatch {
+            read: "zzz2".to_string(),
+            asset_id: acme.clone(),
+        },
+        AssetMatch {
+            read: "Société Nouvelle".to_string(),
+            asset_id: acme,
+        },
+    ];
+    let matched = preview(&ctx, &account_id, &file, &mapper).await;
+    for line in [7, 8, 9, 10, 11] {
+        assert!(
+            !matches!(status(&matched, line), RowStatus::UnknownAsset { .. }),
+            "line {line}"
+        );
+    }
+}
+
+// IMP-032 / IMP-067 — an unknown asset can be matched to an archived asset, never to a Cash
+// Asset; the choices come by name.
+#[tokio::test]
+async fn imp_067_the_assets_to_match_hold_the_archived_and_no_cash() {
+    let ctx = build_ctx().await;
+    let beta = asset(&ctx, "beta", "BET", None, "EUR").await;
+    asset(&ctx, "Alpha", "ALP", None, "EUR").await;
+    ctx.asset_service
+        .archive_asset(&beta)
+        .await
+        .expect("archived");
+    let account_id = account(&ctx, micro(100)).await;
+    let file = picked(&ctx, "Date,Type,ISIN,Ticker,Name,Quantity,Price,Amount,Commission,Currency\n2025-01-06,Deposit,,,,,,500,,EUR\n", false).await;
+    let judged = preview(&ctx, &account_id, &file, &english_mapper()).await;
+    let names: Vec<&str> = judged
+        .matchable_assets
+        .iter()
+        .map(|asset| asset.name.as_str())
+        .collect();
+    assert_eq!(names, vec!["Alpha", "beta"]);
+    assert!(
+        ctx.asset_service
+            .get_all_assets()
+            .await
+            .expect("assets")
+            .iter()
+            .any(|asset| asset.class == AssetClass::Cash),
+        "the account's Cash Asset exists and is left out"
+    );
+}
+
+// IMP-053 / IMP-066 — a file whose every row is recorded says so.
+#[tokio::test]
+async fn imp_066_a_file_recorded_whole_is_all_recorded() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let text = "Date,Type,ISIN,Ticker,Name,Quantity,Price,Amount,Commission,Currency\n2025-01-06,Deposit,,,,,,500,,EUR\n";
+    let file = picked(&ctx, text, false).await;
+    let first = preview(&ctx, &account_id, &file, &english_mapper()).await;
+    assert!(!first.all_recorded);
+    confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
+    let again = preview(&ctx, &account_id, &file, &english_mapper()).await;
+    assert!(again.all_recorded, "{:?}", again.counts);
+}
+
 // IMP-051A — a corrected added deposit stays marked as added.
 #[tokio::test]
 async fn imp_051a_a_corrected_added_deposit_stays_added() {

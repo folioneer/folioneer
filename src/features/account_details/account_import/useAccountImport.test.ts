@@ -105,6 +105,37 @@ describe("useAccountImport", () => {
     expect(gateway.readImportFile).not.toHaveBeenCalled();
   });
 
+  // IMP-060 — a dialog closed unpicked changes nothing.
+  it("keeps the current file when choosing another is closed unpicked", async () => {
+    const { result } = await picked();
+    gateway.pickImportFile.mockResolvedValue(ok(null));
+    await act(() => result.current.chooseFile());
+    expect(result.current.path).toBe(PATH);
+  });
+
+  // IMP-063 — the alert stays until another mapper or a change in the open form.
+  describe("a file the mapper does not match", () => {
+    const lacking = refused({ code: "MappedColumnsNotInFile", columns: ["ISIN"] });
+
+    it("lists the columns, and a change in the form lifts them", async () => {
+      const { result } = await picked();
+      gateway.previewImport.mockResolvedValue(lacking);
+      await act(async () => result.current.runPreview());
+      expect(result.current.lackingColumns).toEqual(["ISIN"]);
+      act(() => result.current.changeProvider("Other"));
+      expect(result.current.lackingColumns).toEqual([]);
+    });
+
+    it("lifts them when another mapper is picked", async () => {
+      const { result } = await picked();
+      gateway.previewImport.mockResolvedValue(lacking);
+      await act(async () => result.current.runPreview());
+      gateway.previewImport.mockResolvedValue(ok(judged()));
+      await act(async () => result.current.selectMapper("fortuneo"));
+      expect(result.current.lackingColumns).toEqual([]);
+    });
+  });
+
   // IMP-061 — no memory: a new mapper over what was detected.
   it("opens a new mapper over the format detected", async () => {
     const { result } = await picked();
@@ -432,6 +463,37 @@ describe("useAccountImport", () => {
       expect(result.current.preview).toBeNull();
       expect(result.current.path).toBe(PATH);
       expect(result.current.draft).toBe(draft);
+    });
+
+    // IMP-033 — a refused match stays out of the mapper, so later previews still run.
+    it("leaves a refused match out of the mapper and shows the refusal", async () => {
+      const { result } = await previewed();
+      gateway.previewImport.mockResolvedValue(
+        refused({ code: "MatchedAssetNotFound", asset_id: "gone" }),
+      );
+      await act(async () => result.current.step.match("FR0001", "gone"));
+      expect(result.current.draft?.asset_matches).toEqual([]);
+      expect(result.current.problem).not.toBeNull();
+      expect(result.current.preview).not.toBeNull();
+    });
+
+    // IMP-066 — back to the mapper keeps a match just made.
+    it("keeps a new match when going back to the mapper", async () => {
+      const { result } = await previewed();
+      await act(async () => result.current.step.match("FR0001", "asset-1"));
+      act(() => result.current.backToMapper());
+      expect(result.current.draft?.asset_matches).toEqual([
+        { read: "FR0001", asset_id: "asset-1" },
+      ]);
+    });
+
+    // IMP-068 — a confirmation that recorded nothing says so.
+    it("says when the confirmation recorded nothing", async () => {
+      const { result } = await previewed();
+      gateway.confirmImport.mockResolvedValue(ok(judged({ counts: { ...counts, ready: 0 } })));
+      await act(async () => result.current.step.confirm());
+      expect(showSnackbar).toHaveBeenCalledWith("account_import.recorded_none", "info");
+      expect(onRecorded).toHaveBeenCalledOnce();
     });
 
     // IMP-067 — a match joins the mapper in use and the rows are judged again.

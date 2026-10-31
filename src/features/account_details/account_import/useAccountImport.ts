@@ -247,6 +247,7 @@ export function useAccountImport(
   const changeProvider = useCallback((provider: string) => {
     setProblem(null);
     setAddRefusal(null);
+    setLackingColumns([]);
     setSaved(false);
     setDraft((held) => held && { ...held, info: { provider } });
   }, []);
@@ -309,17 +310,18 @@ export function useAccountImport(
     setPreview(null);
   }, []);
 
-  // IMP-033 — the rows judged again; the preview stays until the new one replaces it.
+  // IMP-033 — the rows judged again; the preview stays until the new one replaces it, and a
+  // refused match does not join the mapper.
   const rejudge = useCallback(
     (next: ImportMapperDraft) => {
       if (!path) return;
       setProblem(null);
-      setDraft(next);
       const reading = ++latestReading.current;
       void withBusy(async () => {
         const result = await accountImportGateway.previewImport(accountId, path, mapperId, next);
         if (reading !== latestReading.current) return;
         if (result.status === "ok") {
+          setDraft(next);
           setPreview(result.data);
         } else {
           refuse(result.error);

@@ -31,6 +31,37 @@ describe("ModalContainer", () => {
     expect(screen.queryByRole("button", { name: "Close modal" })).not.toBeInTheDocument();
   });
 
+  // IMP-052 — the asset form over the import window: Escape leaves the window open.
+  it("closes only the top modal of a stack on Escape", async () => {
+    const closeUnder = vi.fn();
+    const closeOver = vi.fn();
+    const user = userEvent.setup();
+    const stack = (over: boolean) => (
+      <>
+        <ModalContainer isOpen onClose={closeUnder}>
+          under
+        </ModalContainer>
+        <ModalContainer isOpen={over} onClose={closeOver}>
+          over
+        </ModalContainer>
+      </>
+    );
+    const { rerender, unmount } = render(stack(false));
+    rerender(stack(true));
+
+    await user.keyboard("{Escape}");
+    expect(closeOver).toHaveBeenCalledOnce();
+    expect(closeUnder).not.toHaveBeenCalled();
+
+    rerender(stack(false));
+    expect(document.body.style.overflow).toBe("hidden");
+    await user.keyboard("{Escape}");
+    expect(closeUnder).toHaveBeenCalledOnce();
+
+    unmount();
+    expect(document.body.style.overflow).toBe("auto");
+  });
+
   it("renders nothing when isOpen is false", () => {
     const { container } = render(
       <ModalContainer isOpen={false} onClose={vi.fn()}>

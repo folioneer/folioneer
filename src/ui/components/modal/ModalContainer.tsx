@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 interface ModalContainerProps {
@@ -12,6 +12,9 @@ interface ModalContainerProps {
   titleId?: string;
 }
 
+/** The open modals, the last opened last: Escape and the page's scroll follow the top one. */
+const openModals: object[] = [];
+
 /**
  * ModalContainer: Base modal wrapper with consistent overlay and close handling
  *
@@ -19,7 +22,7 @@ interface ModalContainerProps {
  * - Fixed overlay with centered positioning
  * - Consistent backdrop styling
  * - Body scroll prevention
- * - Escape key handling
+ * - Escape key handling: only the top modal of a stack closes
  *
  * Use this for simple modals or as a wrapper for more complex patterns.
  */
@@ -34,24 +37,27 @@ export function ModalContainer({
 }: ModalContainerProps) {
   const { t } = useTranslation("common");
 
+  const self = useRef({});
+
+  // Its own effect: a parent's new `onClose` must not move this modal up the stack.
   useEffect(() => {
-    const handleEscapeKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isOpen) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      document.addEventListener("keydown", handleEscapeKey);
-    }
-
+    if (!isOpen) return;
+    const modal = self.current;
+    openModals.push(modal);
+    document.body.style.overflow = "hidden";
     return () => {
-      if (isOpen) {
-        document.body.style.overflow = "auto";
-      }
-      document.removeEventListener("keydown", handleEscapeKey);
+      openModals.splice(openModals.indexOf(modal), 1);
+      if (openModals.length === 0) document.body.style.overflow = "auto";
     };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && openModals.at(-1) === self.current) onClose();
+    };
+    document.addEventListener("keydown", handleEscapeKey);
+    return () => document.removeEventListener("keydown", handleEscapeKey);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;

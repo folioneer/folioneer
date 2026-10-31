@@ -5,3 +5,4 @@ Date;Operation;Name;Quantity;Price;Fees;Net
 03/03/2025;Buy;SOCIETE EXEMPLE SA;10;42;0;420
 12/03/2025;Sale;E2E Import Asset;500;10;0;5000
 20/03/2025;DIVISION;E2E Import Asset;;;;
+25/03/2025;Buy;AUTRE NOUVELLE SA;5;10;0;50

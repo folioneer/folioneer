@@ -3,18 +3,19 @@
  *
  * Spec rules covered: IMP-060 — the window opens from an account's header, even one holding
  * nothing. IMP-066 to IMP-068, IMP-054 — a fixture file (the run names it, the system dialog
- * being outside what a test can drive) previewed, an unknown asset matched, the rows recorded,
- * the added deposit marked in the journal.
+ * being outside what a test can drive) previewed, an unknown asset matched, another created, the rows
+ * recorded, the added deposit marked in the journal.
  */
 
 import assert from "node:assert";
-import { $ } from "@wdio/globals";
+import { $, browser } from "@wdio/globals";
 import { dismissLeftoverModal, waitForSnackbarGone } from "../helpers/modal";
 import {
   clickHeaderAction,
   navigateToAccountDetails,
   navigateToAccounts,
 } from "../helpers/navigation";
+import { setReactInputValue } from "../helpers/react";
 import { captureScreen } from "../helpers/screenshot";
 import { seedAccount, seedAsset, seedCategory, seedImportMapper } from "../helpers/seed";
 
@@ -74,6 +75,22 @@ describe("account_import", () => {
     await asset.selectByAttribute("value", matchedId);
     await (await $("#account-import-match")).click();
     await unknown.waitForExist({ timeout: 8000, reverse: true });
+
+    // IMP-052 — the asset form opens over the window; Escape closes only the form.
+    const toCreate = await $("#account-import-unknown-8");
+    await toCreate.click();
+    await (await $("#account-import-create-asset")).click();
+    const form = await $("form#add-asset-form");
+    await form.waitForExist({ timeout: 5000 });
+    await browser.keys("Escape");
+    await form.waitForExist({ timeout: 5000, reverse: true });
+    await (await $("#account-import-create-asset")).click();
+    await form.waitForExist({ timeout: 5000 });
+    await captureScreen("account-import-create-asset");
+    await setReactInputValue("add-asset-reference", "E2EANS");
+    await (await $('button[type="submit"][form="add-asset-form"]')).click();
+    await form.waitForExist({ timeout: 8000, reverse: true });
+    await toCreate.waitForExist({ timeout: 8000, reverse: true });
 
     await (await $("#account-import-record")).click();
     const modal = await $("#account-import-rows");

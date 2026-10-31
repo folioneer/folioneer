@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import type { AssetKind } from "@/bindings";
 import { AddAssetModal } from "@/features/assets/add_asset/AddAsset";
-import { useAssetCreationRequest } from "@/lib/assetCreationRequest";
+import { type AssetCreationRequest, useAssetCreationRequest } from "@/lib/assetCreationRequest";
 import { logger } from "@/lib/logger";
 
 /** Shell-level mount of the usual asset form, for a feature that asks for it (IMP-052). */
 export function AssetCreationMount() {
   const request = useAssetCreationRequest((state) => state.request);
   const close = useAssetCreationRequest((state) => state.close);
-  const [kind, setKind] = useState<AssetKind>("Listed");
 
   useEffect(() => {
     logger.info("[AssetCreationMount] mounted");
@@ -16,10 +15,22 @@ export function AssetCreationMount() {
 
   if (!request) return null;
 
+  return <AssetCreationForm request={request} onClose={close} />;
+}
+
+/** One request's form: its kind starts over with each request. */
+function AssetCreationForm({
+  request,
+  onClose,
+}: {
+  request: AssetCreationRequest;
+  onClose: () => void;
+}) {
+  const [kind, setKind] = useState<AssetKind>("Listed");
   return (
     <AddAssetModal
       isOpen
-      onClose={close}
+      onClose={onClose}
       kind={kind}
       onKindChange={setKind}
       prefill={request.prefill}

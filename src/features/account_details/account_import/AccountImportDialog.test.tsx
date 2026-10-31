@@ -140,7 +140,7 @@ describe("AccountImportDialog", () => {
 
   // IMP-065 — the counts, and the action while the window works.
   it("shows the work under way", () => {
-    show({ busy: true, canPreview: false });
+    show({ busy: true, canPreview: true });
     expect(byId("account-import-preview")).toBeDisabled();
   });
 
@@ -193,6 +193,31 @@ describe("AccountImportDialog", () => {
     });
 
     // IMP-053, IMP-066, IMP-068 — the same file twice records nothing, and says so.
+    it("says nothing is recorded until confirming", () => {
+      show({ preview: previewOf({ ready: 1 }), step });
+      expect(document.getElementById("account-import-preview-hint")?.textContent).toBe(
+        "account_import.preview_hint",
+      );
+    });
+
+    // IMP-068 — a confirmation refused on an unknown asset's step is shown there.
+    it("shows a refusal on an unknown asset's step", () => {
+      show({
+        preview: previewOf({ unknown_asset: 1 }),
+        problem: { key: "account_import.problem" } as never,
+        step: {
+          ...step,
+          focused: {
+            read: "EXEMPLE",
+            asset: { isin: null, reference: null, name: "EXEMPLE" },
+            lines: [6],
+          },
+        },
+      });
+      expect(document.getElementById("account-import-match")).not.toBeNull();
+      expect(document.getElementById("account-import-problem")).not.toBeNull();
+    });
+
     it("says nothing is left to record when every row is recorded", () => {
       show({ preview: previewOf({ already_recorded: 57 }, { all_recorded: true }), step });
       expect(byId("account-import-preview-hint")).toHaveTextContent("preview_all_recorded");
@@ -210,6 +235,8 @@ describe("AccountImportDialog", () => {
         preview: previewOf({ ready: 1 }, { deposits: { count: 3, total: 3, ready_without: 0 } }),
         step: { ...step, recordable: 1, setAddDeposits },
       });
+      expect(byId("account-import-add-deposits")).toBeChecked();
+      expect(byId("account-import-deposits-detail")?.textContent).toContain('"count":3');
       fireEvent.click(byId("account-import-add-deposits") as HTMLElement);
       expect(setAddDeposits).toHaveBeenCalledWith(false);
     });

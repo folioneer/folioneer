@@ -149,7 +149,7 @@ struct ImportPreview {
     rows: Vec<PreviewRow>, // every line that is not blank, in the file's order
     counts: PreviewCounts, // a joined trade tax counts with its purchase
     all_recorded: bool,    // IMP-053, IMP-066 — rows, and every one already recorded
-    deposits: DepositsNeeded,
+    deposits: DepositsNeeded, // IMP-038, IMP-068
     unknown_assets: Vec<UnknownAssetRows>, // IMP-067 — as first met
     matchable_assets: Vec<MatchableAsset>, // IMP-032, IMP-067 — by name, archived included, no Cash Asset
 }

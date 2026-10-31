@@ -133,6 +133,11 @@ export function AccountImportPreview({
       footer={footer}
       maxWidth="max-w-4xl"
     >
+      {problem && (
+        <p id="account-import-problem" role="alert" className="text-sm text-m3-error">
+          {messageText(t, problem)}
+        </p>
+      )}
       {step.focused ? (
         <UnknownAssetStep
           key={step.focused.read}
@@ -163,11 +168,6 @@ export function AccountImportPreview({
                 ),
             )}
           </div>
-          {problem && (
-            <p id="account-import-problem" role="alert" className="text-sm text-m3-error">
-              {messageText(t, problem)}
-            </p>
-          )}
           <ImportPreviewTable rows={step.rows} currency={accountCurrency} onUnknown={step.focus} />
           {preview.deposits.count > 0 && (
             <label

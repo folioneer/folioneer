@@ -57,6 +57,20 @@ describe("previewPresenter", () => {
     });
   });
 
+  it("keeps what a rejected row read, under its reason", () => {
+    const view = rowViewOf(
+      row({
+        status: "Rejected",
+        reason: { code: "ManualEntry", refusal: { code: "Oversell", available: 1, requested: 2 } },
+        operation: purchase,
+      }),
+    );
+    expect(view.date).toBe(purchase.date);
+    expect(view.tone).toBe("rejected");
+    expect(view.note).not.toBeNull();
+    expect(view.quantity).not.toBeNull();
+  });
+
   it("shows a rejected row without an operation by its reason alone", () => {
     const view = rowViewOf(
       row(
