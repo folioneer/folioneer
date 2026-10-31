@@ -10,15 +10,6 @@ async function closeButtonExists(): Promise<boolean | null> {
 }
 
 /**
- * Defensively close any leftover modal from a previous test.
- *
- * Use in beforeEach to guarantee a clean starting state for the next test.
- * A modal may unmount at any step — while its close button is looked up, between
- * the lookup and the click, or during the click — and the driver then reports a
- * stale element. Every step is therefore taken on a fresh lookup, and a step the
- * page changed under is taken again until the page holds no close button.
- */
-/**
  * Waits out a snackbar left by the previous scenario: it can cover a row of the next one. Its
  * live region stays in the page; what it shows goes after four seconds.
  */
@@ -29,6 +20,15 @@ export async function waitForSnackbarGone(): Promise<void> {
   });
 }
 
+/**
+ * Defensively close any leftover modal from a previous test.
+ *
+ * Use in beforeEach to guarantee a clean starting state for the next test.
+ * A modal may unmount at any step — while its close button is looked up, between
+ * the lookup and the click, or during the click — and the driver then reports a
+ * stale element. Every step is therefore taken on a fresh lookup, and a step the
+ * page changed under is taken again until the page holds no close button.
+ */
 export async function dismissLeftoverModal(): Promise<void> {
   await browser
     .waitUntil(
