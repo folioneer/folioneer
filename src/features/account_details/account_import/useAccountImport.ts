@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  AccountImportError,
+  CsvImportError,
   FileRead,
   ImportMapper,
   ImportMapperDraft,
@@ -52,6 +54,12 @@ export function useAccountImport(accountId: string) {
     logger.info("[AccountImportModal] mounted");
   }, []);
 
+  // F14 — a refusal is logged with its code, then said in the window.
+  const refuse = useCallback((error: CsvImportError | AccountImportError) => {
+    logger.error("[useAccountImport] refused", { error });
+    setProblem(accountImportErrorToI18n(error));
+  }, []);
+
   const clearOutcome = useCallback(() => {
     latestReading.current += 1;
     setProblem(null);
@@ -74,13 +82,13 @@ export function useAccountImport(accountId: string) {
       if (result.status === "error") {
         // IMP-061 — a refused reading leaves no columns or labels of the one before it.
         setFile(null);
-        setProblem(accountImportErrorToI18n(result.error));
+        refuse(result.error);
         return null;
       }
       setFile(result.data);
       return result.data;
     },
-    [accountId],
+    [accountId, refuse],
   );
 
   const startNewMapper = useCallback(
@@ -121,10 +129,10 @@ export function useAccountImport(accountId: string) {
       } else if (result.error.code === "MappedColumnsNotInFile") {
         setLackingColumns(result.error.columns);
       } else {
-        setProblem(accountImportErrorToI18n(result.error));
+        refuse(result.error);
       }
     },
-    [accountId, read],
+    [accountId, read, refuse],
   );
 
   const withBusy = useCallback(async (work: () => Promise<void>) => {
@@ -139,19 +147,19 @@ export function useAccountImport(accountId: string) {
   const listMappers = useCallback(async () => {
     const result = await accountImportGateway.listImportMappers();
     if (result.status === "error") {
-      setProblem(accountImportErrorToI18n(result.error));
+      refuse(result.error);
       return [];
     }
     setMappers(result.data);
     return result.data;
-  }, []);
+  }, [refuse]);
 
   const chooseFile = useCallback(
     () =>
       withBusy(async () => {
         const picked = await accountImportGateway.pickImportFile();
         if (picked.status === "error") {
-          setProblem(accountImportErrorToI18n(picked.error));
+          refuse(picked.error);
           return;
         }
         if (picked.data === null) return;
@@ -170,7 +178,7 @@ export function useAccountImport(accountId: string) {
         const mapper = held.find((candidate) => candidate.id === id);
         await (mapper ? applySavedMapper(at, mapper) : startNewMapper(at));
       }),
-    [clearOutcome, listMappers, startNewMapper, applySavedMapper, withBusy],
+    [clearOutcome, listMappers, refuse, startNewMapper, applySavedMapper, withBusy],
   );
 
   const selectMapper = useCallback(
@@ -244,7 +252,7 @@ export function useAccountImport(accountId: string) {
     void withBusy(async () => {
       const result = await accountImportGateway.saveImportMapper(mapperId, draft);
       if (result.status === "error") {
-        setProblem(accountImportErrorToI18n(result.error));
+        refuse(result.error);
         return;
       }
       setMapperId(result.data.id);
@@ -252,13 +260,14 @@ export function useAccountImport(accountId: string) {
       await listMappers();
       setSaved(true);
     });
-  }, [draft, listMappers, mapperId, withBusy]);
+  }, [draft, listMappers, mapperId, refuse, withBusy]);
 
   // IMP-020B — a refused file says why; nothing changes in the window.
   const addMapperFromFile = useCallback(() => {
     void withBusy(async () => {
       const result = await accountImportGateway.addImportMapperFromFile();
       if (result.status === "error") {
+        logger.error("[useAccountImport] mapper file refused", { error: result.error });
         setAddRefusal(mapperFileRefusalToI18n(result.error));
         return;
       }
@@ -282,10 +291,10 @@ export function useAccountImport(accountId: string) {
       } else if (result.error.code === "MappedColumnsNotInFile") {
         setLackingColumns(result.error.columns);
       } else {
-        setProblem(accountImportErrorToI18n(result.error));
+        refuse(result.error);
       }
     });
-  }, [accountId, draft, mapperId, path, withBusy]);
+  }, [accountId, draft, mapperId, path, refuse, withBusy]);
 
   const edit = useCallback(() => setEditing(true), []);
 
