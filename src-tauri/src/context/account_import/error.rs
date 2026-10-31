@@ -1,10 +1,10 @@
-/// Single flat error enum for the `import` bounded context (gold error model).
+/// Single flat error enum for the `account_import` bounded context (gold error model).
 ///
 /// `#[serde(tag = "code")]` makes each variant serialize as `{ "code": "VariantName", ... }`
 /// on the wire.
 #[derive(Debug, thiserror::Error, serde::Serialize, specta::Type, Clone)]
 #[serde(tag = "code")]
-pub enum ImportError {
+pub enum AccountImportError {
     /// The mapper's provider is empty once trimmed (IMP-024).
     #[error("An import mapper needs a provider")]
     MapperProviderEmpty,
@@ -99,61 +99,64 @@ mod tests {
     #[test]
     fn each_variant_emits_a_code() {
         assert_eq!(
-            to_value(ImportError::MapperProviderEmpty).expect("serializes"),
+            to_value(AccountImportError::MapperProviderEmpty).expect("serializes"),
             json!({ "code": "MapperProviderEmpty" })
         );
         assert_eq!(
-            to_value(ImportError::MapperProviderTaken {
+            to_value(AccountImportError::MapperProviderTaken {
                 provider: "PEA".into()
             })
             .expect("serializes"),
             json!({ "code": "MapperProviderTaken", "provider": "PEA" })
         );
         assert_eq!(
-            to_value(ImportError::MapperColumnMissing).expect("serializes"),
+            to_value(AccountImportError::MapperColumnMissing).expect("serializes"),
             json!({ "code": "MapperColumnMissing" })
         );
         assert_eq!(
-            to_value(ImportError::MapperTextTooLong).expect("serializes"),
+            to_value(AccountImportError::MapperTextTooLong).expect("serializes"),
             json!({ "code": "MapperTextTooLong" })
         );
         assert_eq!(
-            to_value(ImportError::MapperNotFound {
+            to_value(AccountImportError::MapperNotFound {
                 mapper_id: "m-1".into()
             })
             .expect("serializes"),
             json!({ "code": "MapperNotFound", "mapper_id": "m-1" })
         );
         assert_eq!(
-            to_value(ImportError::MapperFileInvalid {
+            to_value(AccountImportError::MapperFileInvalid {
                 reason: "line 1".into()
             })
             .expect("serializes"),
             json!({ "code": "MapperFileInvalid", "reason": "line 1" })
         );
         assert_eq!(
-            to_value(ImportError::HeaderNameRepeated {
+            to_value(AccountImportError::HeaderNameRepeated {
                 name: "Date".into()
             })
             .expect("serializes"),
             json!({ "code": "HeaderNameRepeated", "name": "Date" })
         );
         assert_eq!(
-            to_value(ImportError::MappedColumnNotInFile {
+            to_value(AccountImportError::MappedColumnNotInFile {
                 column: "Qté".into()
             })
             .expect("serializes"),
             json!({ "code": "MappedColumnNotInFile", "column": "Qté" })
         );
         for (error, code) in [
-            (ImportError::MapperFileUnreadable, "MapperFileUnreadable"),
-            (ImportError::MapperFileTooLarge, "MapperFileTooLarge"),
-            (ImportError::MapperFolderFailed, "MapperFolderFailed"),
-            (ImportError::FileTooLarge, "FileTooLarge"),
-            (ImportError::FileEmpty, "FileEmpty"),
-            (ImportError::FileHasNoRow, "FileHasNoRow"),
-            (ImportError::FileNotUtf8, "FileNotUtf8"),
-            (ImportError::SeparatorNotFound, "SeparatorNotFound"),
+            (
+                AccountImportError::MapperFileUnreadable,
+                "MapperFileUnreadable",
+            ),
+            (AccountImportError::MapperFileTooLarge, "MapperFileTooLarge"),
+            (AccountImportError::MapperFolderFailed, "MapperFolderFailed"),
+            (AccountImportError::FileTooLarge, "FileTooLarge"),
+            (AccountImportError::FileEmpty, "FileEmpty"),
+            (AccountImportError::FileHasNoRow, "FileHasNoRow"),
+            (AccountImportError::FileNotUtf8, "FileNotUtf8"),
+            (AccountImportError::SeparatorNotFound, "SeparatorNotFound"),
         ] {
             assert_eq!(
                 to_value(error).expect("serializes"),
@@ -161,7 +164,7 @@ mod tests {
             );
         }
         assert_eq!(
-            to_value(ImportError::DatabaseError).expect("serializes"),
+            to_value(AccountImportError::DatabaseError).expect("serializes"),
             json!({ "code": "DatabaseError" })
         );
     }

@@ -3,9 +3,9 @@
 // module, consistent with the other BCs' `api.rs`.
 #![allow(clippy::unreachable)]
 
-use crate::context::import::application::ImportService;
-use crate::context::import::domain::{ImportMapper, ImportMapperDraft};
-use crate::context::import::error::ImportError;
+use crate::context::account_import::application::AccountImportService;
+use crate::context::account_import::domain::{ImportMapper, ImportMapperDraft};
+use crate::context::account_import::error::AccountImportError;
 use crate::core::BACKEND;
 
 use std::result::Result as StdResult;
@@ -17,8 +17,8 @@ use tauri_plugin_dialog::DialogExt;
 #[tauri::command]
 #[specta::specta]
 pub async fn list_import_mappers(
-    svc: tauri::State<'_, Arc<ImportService>>,
-) -> StdResult<Vec<ImportMapper>, ImportError> {
+    svc: tauri::State<'_, Arc<AccountImportService>>,
+) -> StdResult<Vec<ImportMapper>, AccountImportError> {
     svc.list_import_mappers().await
 }
 
@@ -27,10 +27,10 @@ pub async fn list_import_mappers(
 #[tauri::command]
 #[specta::specta]
 pub async fn save_import_mapper(
-    svc: tauri::State<'_, Arc<ImportService>>,
+    svc: tauri::State<'_, Arc<AccountImportService>>,
     mapper_id: Option<String>,
     draft: ImportMapperDraft,
-) -> StdResult<ImportMapper, ImportError> {
+) -> StdResult<ImportMapper, AccountImportError> {
     svc.save_import_mapper(mapper_id, draft).await
 }
 
@@ -40,8 +40,8 @@ pub async fn save_import_mapper(
 #[specta::specta]
 pub async fn add_import_mapper_from_file(
     app: AppHandle,
-    svc: tauri::State<'_, Arc<ImportService>>,
-) -> StdResult<Option<ImportMapper>, ImportError> {
+    svc: tauri::State<'_, Arc<AccountImportService>>,
+) -> StdResult<Option<ImportMapper>, AccountImportError> {
     let (sender, receiver) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
@@ -54,7 +54,7 @@ pub async fn add_import_mapper_from_file(
     };
     let path = file.into_path().map_err(|e| {
         tracing::warn!(target: BACKEND, err = %e, "the picked mapper file has no path");
-        ImportError::MapperFileUnreadable
+        AccountImportError::MapperFileUnreadable
     })?;
     svc.add_import_mapper_from(&path).await.map(Some)
 }
@@ -63,8 +63,8 @@ pub async fn add_import_mapper_from_file(
 #[tauri::command]
 #[specta::specta]
 pub async fn delete_import_mapper(
-    svc: tauri::State<'_, Arc<ImportService>>,
+    svc: tauri::State<'_, Arc<AccountImportService>>,
     mapper_id: String,
-) -> StdResult<(), ImportError> {
+) -> StdResult<(), AccountImportError> {
     svc.delete_import_mapper(&mapper_id).await
 }

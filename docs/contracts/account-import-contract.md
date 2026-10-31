@@ -1,6 +1,6 @@
-# Contract — Import
+# Contract — Account import
 
-> Domain: `import`
+> Domain: `account_import`
 > Last updated by: `csv-import` spec
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Infrastructure failures surface as `{ code: "DatabaseError" }`, or `{ code: "MapperFolderFailed" }` for the mappers folder (no payload; diagnostic logged server-side), consistent with the other contracts.
@@ -17,7 +17,7 @@
 | Command                       | Args                                                  | Return                 | Errors                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------- | ----------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `list_import_mappers`         | —                                                     | `Vec<ImportMapper>`    | `MapperFolderFailed` _(IMP-020A — by provider; empty when none; a file that does not read is left out)_                                                                                                                                                                                                                        |
-| `save_import_mapper`          | `mapper_id: Option<String>, draft: ImportMapperDraft` | `ImportMapper`         | `MapperProviderEmpty` (IMP-024), `MapperProviderTaken { provider }` (IMP-024), `MapperColumnMissing` (IMP-021), `MapperTextTooLong` (IMP-024A), `MapperNotFound { mapper_id }`, `MapperFileInvalid { reason }`, `MapperFileTooLarge` (IMP-025), `MapperFolderFailed` (IMP-020)                                                 |
+| `save_import_mapper`          | `mapper_id: Option<String>, draft: ImportMapperDraft` | `ImportMapper`         | `MapperProviderEmpty` (IMP-024), `MapperProviderTaken { provider }` (IMP-024), `MapperColumnMissing` (IMP-021), `MapperTextTooLong` (IMP-024A), `MapperNotFound { mapper_id }`, `MapperFileInvalid { reason }`, `MapperFileTooLarge` (all IMP-025), `MapperFolderFailed` (IMP-020)                                             |
 | `add_import_mapper_from_file` | —                                                     | `Option<ImportMapper>` | `MapperFileUnreadable`, `MapperFileTooLarge`, `MapperFileInvalid { reason }` (IMP-020B), `MapperProviderEmpty` (IMP-024), `MapperProviderTaken { provider }` (IMP-024), `MapperColumnMissing` (IMP-021), `MapperTextTooLong` (IMP-024A), `MapperFolderFailed` _(IMP-020B — the system dialog; `None` when the user closed it)_ |
 | `delete_import_mapper`        | `mapper_id: String`                                   | `()`                   | `MapperNotFound { mapper_id }` (IMP-040), `MapperFolderFailed`                                                                                                                                                                                                                                                                 |
 
@@ -32,7 +32,7 @@
 > matches stand, any other was made now and must name an asset of the portfolio (IMP-033);
 > saving a mapper keeps its matches as they are, unchecked.
 
-The five commands return `CsvImportError`: the codes of `ImportError`, of `AccountError` (`AccountNotFound`, `DatabaseError`) and of the use case's own `CsvImportTask` (`FileUnreadable`, `FileNotPicked`, `MatchedAssetNotFound`, `UnknownError` — a broken invariant, logged), each on the wire as `{ "code": … }`.
+The five commands return `CsvImportError`: the codes of `AccountImportError`, of `AccountError` (`AccountNotFound`, `DatabaseError`) and of the use case's own `CsvImportTask` (`FileUnreadable`, `FileNotPicked`, `MatchedAssetNotFound`, `UnknownError` — a broken invariant, logged), each on the wire as `{ "code": … }`.
 
 **File errors** (`read_import_file`, `preview_import`): `AccountNotFound { account_id }`, `FileUnreadable`, `FileNotPicked`, `FileTooLarge`, `FileEmpty`, `FileHasNoRow` (IMP-010), `FileNotUtf8` (IMP-011), `SeparatorNotFound` (IMP-012), `HeaderNameRepeated { name }` (IMP-015), `DatabaseError`.
 
@@ -220,3 +220,4 @@ enum RowFigures {
 - 2026-10-25 — Amended by `csv-import` (#502): `confirm_import` (IMP-050 to IMP-053).
 - 2026-10-31 — Amended by `csv-import` (#696): the events `confirm_import` publishes; saving keeps matches unchecked.
 - 2026-10-31 — Amended by `csv-import` (#714): a column mapping becomes an import mapper, a JSON file: `list_import_mappers`, `save_import_mapper`, `delete_import_mapper` replace the column mapping commands; `add_import_mapper_from_file`, `remembered_import_mapper` added; event `ColumnMappingUpdated` removed.
+- 2026-10-31 — Amended by `csv-import` (#714): the domain is `account_import`; `ImportError` is `AccountImportError`, its codes unchanged.

@@ -3,7 +3,7 @@
 
 use super::error::{CsvImportError, CsvImportTask};
 use super::orchestrator::{CsvImportUseCase, ImportPreview};
-use crate::context::import::{FileRead, ImportMapperDraft, ReadingChoices};
+use crate::context::account_import::{FileRead, ImportMapperDraft, ReadingChoices};
 use crate::core::logger::BACKEND;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;

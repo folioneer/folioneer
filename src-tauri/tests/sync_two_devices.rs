@@ -961,9 +961,9 @@ async fn syn_021_the_reference_currency_chosen_on_one_device_is_the_others() {
 #[tokio::test]
 async fn imp_051a_an_added_deposits_mark_is_the_other_devices() {
     use folioneer_lib::context::account::TransactionType;
-    use folioneer_lib::context::import::{
-        DateFormat, DecimalMark, Encoding, FsImportMapperStore, ImportMapperDraft, ImportService,
-        MappedColumns, MapperInfo, OperationLabel, OperationType, Separator,
+    use folioneer_lib::context::account_import::{
+        AccountImportService, DateFormat, DecimalMark, Encoding, FsImportMapperStore,
+        ImportMapperDraft, MappedColumns, MapperInfo, OperationLabel, OperationType, Separator,
         SqliteMapperChoiceRepository,
     };
     use folioneer_lib::shared::infrastructure::uow::SqliteTransactionManager;
@@ -973,7 +973,7 @@ async fn imp_051a_an_added_deposits_mark_is_the_other_devices() {
     let dir = tempfile::tempdir().unwrap();
     let (desktop, laptop, account_id, _) = two_devices_sharing(dir.path()).await;
     let import = CsvImportUseCase::new(
-        Arc::new(ImportService::new(
+        Arc::new(AccountImportService::new(
             Box::new(FsImportMapperStore::new(dir.path().join("import-mappers"))),
             Box::new(SqliteMapperChoiceRepository::new(desktop.pool.clone())),
         )),

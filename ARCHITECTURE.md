@@ -17,7 +17,7 @@ This file is a **map** — where code lives and what each place holds. Rules liv
 
 ```
 context/{bc}/        bounded contexts: account/, asset/ (older layout: domain/, repository/, service.rs)
-                     currency/, import/, sync/ (gold layout: application/, domain/, infrastructure/) — each with
+                     currency/, account_import/, sync/ (gold layout: application/, domain/, infrastructure/) — each with
                      api.rs (its Tauri commands), error.rs, mod.rs (its public surface)
 use_cases/{name}/    cross-context orchestrators: orchestrator.rs, api.rs, error.rs, mod.rs
 use_cases/shared/    stateless helpers shared by use cases (Global Value, price movement, fetch scope)

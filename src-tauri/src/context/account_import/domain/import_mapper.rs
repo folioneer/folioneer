@@ -1,4 +1,4 @@
-use crate::context::import::error::ImportError;
+use crate::context::account_import::error::AccountImportError;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -73,6 +73,7 @@ pub enum OperationType {
 /// Which column of the file holds each field of a row, by its header (IMP-021). An absent
 /// optional column is one the file does not have.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(deny_unknown_fields)]
 pub struct MappedColumns {
     /// The date's column.
     pub date: String,
@@ -100,6 +101,7 @@ pub struct MappedColumns {
 
 /// One operation label of the file and the operation type it stands for (IMP-022).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(deny_unknown_fields)]
 pub struct OperationLabel {
     /// The label as the file writes it.
     pub label: String,
@@ -109,6 +111,7 @@ pub struct OperationLabel {
 
 /// A name, ISIN or reference of the file the user matched to an asset (IMP-033).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(deny_unknown_fields)]
 pub struct AssetMatch {
     /// The name, ISIN or reference as the file writes it.
     pub read: String,
@@ -176,9 +179,9 @@ pub struct ImportMapperDraft {
 impl ImportMapperDraft {
     /// IMP-020B — a draft read from a mapper's file, a byte order mark dropped; `reason` says
     /// why it does not read.
-    pub fn from_file(bytes: &[u8]) -> Result<Self, ImportError> {
+    pub fn from_file(bytes: &[u8]) -> Result<Self, AccountImportError> {
         let text = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
-        serde_json::from_slice(text).map_err(|e| ImportError::MapperFileInvalid {
+        serde_json::from_slice(text).map_err(|e| AccountImportError::MapperFileInvalid {
             reason: e.to_string().chars().take(REASON_LENGTH).collect(),
         })
     }
@@ -186,9 +189,9 @@ impl ImportMapperDraft {
 
 impl MappedColumns {
     /// IMP-021 — the date and the operation column are named, and at least one asset column.
-    pub fn check(&self) -> Result<(), ImportError> {
+    pub fn check(&self) -> Result<(), AccountImportError> {
         if self.date.trim().is_empty() || self.operation.trim().is_empty() {
-            return Err(ImportError::MapperColumnMissing);
+            return Err(AccountImportError::MapperColumnMissing);
         }
         if [&self.isin, &self.reference, &self.name]
             .iter()
@@ -198,7 +201,7 @@ impl MappedColumns {
                     .is_none_or(|header| header.trim().is_empty())
             })
         {
-            return Err(ImportError::MapperColumnMissing);
+            return Err(AccountImportError::MapperColumnMissing);
         }
         Ok(())
     }
@@ -206,10 +209,10 @@ impl MappedColumns {
 
 impl ImportMapper {
     /// IMP-021 / IMP-024 / IMP-024A — a mapper under the id of its file, validated.
-    pub fn with_id(id: String, draft: ImportMapperDraft) -> Result<Self, ImportError> {
+    pub fn with_id(id: String, draft: ImportMapperDraft) -> Result<Self, AccountImportError> {
         let provider = draft.info.provider.trim().to_string();
         if provider.is_empty() {
-            return Err(ImportError::MapperProviderEmpty);
+            return Err(AccountImportError::MapperProviderEmpty);
         }
         let columns = draft.columns;
         columns.check()?;
@@ -246,7 +249,7 @@ impl ImportMapper {
             .into_iter()
             .any(|text| text.chars().count() > MAPPER_TEXT_LENGTH)
         {
-            return Err(ImportError::MapperTextTooLong);
+            return Err(AccountImportError::MapperTextTooLong);
         }
         Ok(Self {
             id,
@@ -396,7 +399,7 @@ pub trait MapperChoiceRepository: Send + Sync {
 mod tests {
     use super::*;
 
-    fn mapper(draft: ImportMapperDraft) -> Result<ImportMapper, ImportError> {
+    fn mapper(draft: ImportMapperDraft) -> Result<ImportMapper, AccountImportError> {
         ImportMapper::with_id("broker".to_string(), draft)
     }
 
@@ -434,7 +437,7 @@ mod tests {
         assert_eq!(held.info.provider, "Broker PEA");
         assert!(matches!(
             mapper(draft("   ")),
-            Err(ImportError::MapperProviderEmpty)
+            Err(AccountImportError::MapperProviderEmpty)
         ));
     }
 
@@ -453,13 +456,13 @@ mod tests {
         no_date.columns.date = " ".to_string();
         assert!(matches!(
             mapper(no_date),
-            Err(ImportError::MapperColumnMissing)
+            Err(AccountImportError::MapperColumnMissing)
         ));
         let mut no_asset = draft("B");
         no_asset.columns.name = Some(String::new());
         assert!(matches!(
             mapper(no_asset),
-            Err(ImportError::MapperColumnMissing)
+            Err(AccountImportError::MapperColumnMissing)
         ));
         let mut by_isin = draft("C");
         by_isin.columns.name = None;
@@ -477,13 +480,13 @@ mod tests {
         });
         assert!(matches!(
             mapper(long_label),
-            Err(ImportError::MapperTextTooLong)
+            Err(AccountImportError::MapperTextTooLong)
         ));
         let mut long_header = draft("B");
         long_header.columns.fees = Some("x".repeat(MAPPER_TEXT_LENGTH + 1));
         assert!(matches!(
             mapper(long_header),
-            Err(ImportError::MapperTextTooLong)
+            Err(AccountImportError::MapperTextTooLong)
         ));
         let mut exact = draft(&"é".repeat(MAPPER_TEXT_LENGTH));
         exact.asset_matches.push(AssetMatch {
@@ -504,7 +507,7 @@ mod tests {
     // IMP-020 / IMP-020B — a mapper's file reads back as what was written, a byte order mark
     // aside; what does not read says why.
     #[test]
-    fn imp_023_a_file_reads_back_and_a_bad_one_says_why() {
+    fn imp_020b_a_file_reads_back_and_a_bad_one_says_why() {
         let held = mapper(draft("Broker")).expect("valid");
         let file = held.to_file().expect("written");
         assert_eq!(
@@ -516,7 +519,7 @@ mod tests {
         for bad in [&b"not json"[..], br#"{"info":{"provider":"A"}}"#] {
             assert!(matches!(
                 ImportMapperDraft::from_file(bad),
-                Err(ImportError::MapperFileInvalid { reason }) if !reason.is_empty()
+                Err(AccountImportError::MapperFileInvalid { reason }) if !reason.is_empty()
             ));
         }
     }
@@ -540,7 +543,7 @@ mod tests {
     fn imp_020b_a_reason_is_bounded() {
         let field = "x".repeat(5_000);
         let file = format!(r#"{{"{field}":1}}"#);
-        let Err(ImportError::MapperFileInvalid { reason }) =
+        let Err(AccountImportError::MapperFileInvalid { reason }) =
             ImportMapperDraft::from_file(file.as_bytes())
         else {
             panic!("refused");
@@ -557,5 +560,39 @@ mod tests {
             assert!(!names_a_file(id), "{id}");
         }
         assert!(names_a_file("console"));
+    }
+
+    // IMP-020B — a field a mapper does not have is refused at any depth, never dropped.
+    #[test]
+    fn imp_020b_a_nested_unknown_field_is_refused() {
+        let mut with_lists = draft("Broker");
+        with_lists.operation_types = vec![OperationLabel {
+            label: "Buy".to_string(),
+            transaction_type: OperationType::Purchase,
+        }];
+        with_lists.asset_matches = vec![AssetMatch {
+            read: "Name".to_string(),
+            asset_id: "a-1".to_string(),
+        }];
+        let written = serde_json::to_string(&with_lists).expect("JSON");
+        assert!(ImportMapperDraft::from_file(written.as_bytes()).is_ok());
+        let value: serde_json::Value = serde_json::from_str(&written).expect("JSON");
+        for pointer in [
+            "/info",
+            "/columns",
+            "/operation_types/0",
+            "/asset_matches/0",
+        ] {
+            let mut changed = value.clone();
+            changed
+                .pointer_mut(pointer)
+                .and_then(serde_json::Value::as_object_mut)
+                .expect("an object")
+                .insert("extra".to_string(), serde_json::json!(1));
+            assert!(
+                ImportMapperDraft::from_file(changed.to_string().as_bytes()).is_err(),
+                "{pointer}"
+            );
+        }
     }
 }

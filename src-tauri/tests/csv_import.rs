@@ -1,8 +1,8 @@
-//! Integration tests for the CSV import preview (IMP spec): a broker's export read through a
+//! Integration tests for the CSV import preview (IMP spec): a broker's export read through an
 //! import mapper, each row matched to an asset and judged as manual entry would judge it.
 //!
 //! Exercises the full stack through the public `folioneer_lib` API:
-//! `CsvImportUseCase` → `ImportService` / `AccountService` / `AssetService` → real
+//! `CsvImportUseCase` → `AccountImportService` / `AccountService` / `AssetService` → real
 //! in-memory SQLite. No mocks — per test-rules.md Tier 3 constraint. The two fixtures are
 //! invented data in the shape of a French broker's export and of an English one.
 
@@ -11,14 +11,14 @@ use folioneer_lib::context::account::{
     SqliteTransactionRepository,
 };
 use folioneer_lib::context::account::{Transaction, TransactionType};
+use folioneer_lib::context::account_import::{
+    AccountImportError, AccountImportService, AssetMatch, DateFormat, DecimalMark, Encoding,
+    FsImportMapperStore, ImportMapperDraft, MappedColumns, MapperInfo, OperationLabel,
+    OperationType, ReadingChoices, RowRejection, Separator, SqliteMapperChoiceRepository,
+};
 use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
     SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
-};
-use folioneer_lib::context::import::{
-    AssetMatch, DateFormat, DecimalMark, Encoding, FsImportMapperStore, ImportError,
-    ImportMapperDraft, ImportService, MappedColumns, MapperInfo, OperationLabel, OperationType,
-    ReadingChoices, RowRejection, Separator, SqliteMapperChoiceRepository,
 };
 use folioneer_lib::core::event_bus::Event;
 use folioneer_lib::core::SideEffectEventBus;
@@ -38,7 +38,7 @@ fn micro(v: i64) -> i64 {
 
 struct Ctx {
     import: CsvImportUseCase,
-    mappers: Arc<ImportService>,
+    mappers: Arc<AccountImportService>,
     mappers_dir: tempfile::TempDir,
     recording: HoldingTransactionUseCase,
     account_service: Arc<AccountService>,
@@ -75,7 +75,7 @@ async fn build_ctx() -> Ctx {
         .with_event_bus(Arc::clone(&bus)),
     );
     let mappers_dir = tempfile::tempdir().expect("mappers folder");
-    let mappers = Arc::new(ImportService::new(
+    let mappers = Arc::new(AccountImportService::new(
         Box::new(FsImportMapperStore::new(
             mappers_dir.path().join("import-mappers"),
         )),
@@ -315,7 +315,7 @@ async fn imp_030_the_preview_judges_every_row_of_a_french_export() {
         status(&preview, 2),
         RowStatus::Ready { asset_id: Some(id), funding: None, operation }
             if *id == acme
-                && matches!(operation.figures, folioneer_lib::context::import::RowFigures::Purchase { fees, .. } if fees == 2_330_000)
+                && matches!(operation.figures, folioneer_lib::context::account_import::RowFigures::Purchase { fees, .. } if fees == 2_330_000)
     ));
     assert!(matches!(
         status(&preview, 3),
@@ -575,7 +575,9 @@ async fn imp_010_what_cannot_be_read_is_refused() {
         .await;
     assert!(matches!(
         gone,
-        Err(CsvImportError::Import(ImportError::MapperNotFound { .. }))
+        Err(CsvImportError::AccountImport(
+            AccountImportError::MapperNotFound { .. }
+        ))
     ));
     let mut no_date = english_mapper();
     no_date.columns.date = " ".to_string();
@@ -585,7 +587,9 @@ async fn imp_010_what_cannot_be_read_is_refused() {
         .await;
     assert!(matches!(
         refused,
-        Err(CsvImportError::Import(ImportError::MapperColumnMissing))
+        Err(CsvImportError::AccountImport(
+            AccountImportError::MapperColumnMissing
+        ))
     ));
     let mut absent = english_mapper();
     absent.columns.fees = header("Fees");
@@ -594,7 +598,7 @@ async fn imp_010_what_cannot_be_read_is_refused() {
         .preview_import(&account_id, path(&file), None, &absent)
         .await;
     assert!(
-        matches!(refused, Err(CsvImportError::Import(ImportError::MappedColumnNotInFile { column })) if column == "Fees")
+        matches!(refused, Err(CsvImportError::AccountImport(AccountImportError::MappedColumnNotInFile { column })) if column == "Fees")
     );
     let mut untyped = english_mapper();
     untyped.operation_types.retain(|label| label.label != "Buy");
@@ -952,13 +956,13 @@ async fn imp_020_a_saved_mapper_is_a_file_of_the_folder() {
     assert!(!file.exists());
     assert!(matches!(
         ctx.mappers.delete_import_mapper("broker").await,
-        Err(ImportError::MapperNotFound { .. })
+        Err(AccountImportError::MapperNotFound { .. })
     ));
     assert!(matches!(
         ctx.mappers
             .save_import_mapper(Some("broker".to_string()), english_mapper())
             .await,
-        Err(ImportError::MapperNotFound { .. })
+        Err(AccountImportError::MapperNotFound { .. })
     ));
 }
 
@@ -976,7 +980,7 @@ async fn imp_024_a_provider_is_held_once_unless_files_were_copied_by_hand() {
     same.info.provider = " BROKER ".to_string();
     assert!(matches!(
         ctx.mappers.save_import_mapper(None, same).await,
-        Err(ImportError::MapperProviderTaken { .. })
+        Err(AccountImportError::MapperProviderTaken { .. })
     ));
     std::fs::copy(
         mappers_folder(&ctx).join("broker.json"),
@@ -1037,7 +1041,7 @@ async fn imp_020b_a_mapper_from_elsewhere_is_added_from_its_file() {
         ctx.mappers
             .add_import_mapper_from(mapper_file(&shared).path())
             .await,
-        Err(ImportError::MapperProviderTaken { .. })
+        Err(AccountImportError::MapperProviderTaken { .. })
     ));
     let mut with_extra: serde_json::Value = serde_json::from_str(&shared).expect("JSON");
     with_extra["extra"] = serde_json::json!(1);
@@ -1054,7 +1058,9 @@ async fn imp_020b_a_mapper_from_elsewhere_is_added_from_its_file() {
             .add_import_mapper_from(mapper_file(&bad).path())
             .await
         {
-            Err(ImportError::MapperFileInvalid { reason }) => assert!(!reason.is_empty(), "{what}"),
+            Err(AccountImportError::MapperFileInvalid { reason }) => {
+                assert!(!reason.is_empty(), "{what}")
+            }
             other => panic!("{what}: {other:?}"),
         }
     }
@@ -1067,19 +1073,19 @@ async fn imp_020b_a_mapper_from_elsewhere_is_added_from_its_file() {
                 mapper_file(&serde_json::to_string(&no_column).expect("JSON")).path()
             )
             .await,
-        Err(ImportError::MapperColumnMissing)
+        Err(AccountImportError::MapperColumnMissing)
     ));
     assert!(matches!(
         ctx.mappers
             .add_import_mapper_from(mapper_file(&" ".repeat(1_000_001)).path())
             .await,
-        Err(ImportError::MapperFileTooLarge)
+        Err(AccountImportError::MapperFileTooLarge)
     ));
     assert!(matches!(
         ctx.mappers
             .add_import_mapper_from(&mappers_folder(&ctx).join("none.json"))
             .await,
-        Err(ImportError::MapperFileUnreadable)
+        Err(AccountImportError::MapperFileUnreadable)
     ));
     assert_eq!(
         ctx.mappers
@@ -1246,15 +1252,15 @@ async fn imp_020_a_folder_that_fails_is_rejected() {
     std::fs::write(mappers_folder(&ctx), "a file where the folder goes").expect("written");
     assert!(matches!(
         ctx.mappers.list_import_mappers().await,
-        Err(ImportError::MapperFolderFailed)
+        Err(AccountImportError::MapperFolderFailed)
     ));
     assert!(matches!(
         ctx.mappers.save_import_mapper(None, english_mapper()).await,
-        Err(ImportError::MapperFolderFailed)
+        Err(AccountImportError::MapperFolderFailed)
     ));
     assert!(matches!(
         ctx.mappers.delete_import_mapper("broker").await,
-        Err(ImportError::MapperFolderFailed)
+        Err(AccountImportError::MapperFolderFailed)
     ));
 }
 
@@ -1265,7 +1271,7 @@ async fn imp_020b_a_folder_picked_is_refused() {
     let dir = tempfile::tempdir().expect("dir");
     assert!(matches!(
         ctx.mappers.add_import_mapper_from(dir.path()).await,
-        Err(ImportError::MapperFileUnreadable)
+        Err(AccountImportError::MapperFileUnreadable)
     ));
 }
 
@@ -1285,15 +1291,15 @@ async fn imp_020e_a_mapper_that_no_longer_reads_is_refused() {
         ctx.import
             .preview_import(&account_id, path(&file), Some(&saved.id), &english_mapper())
             .await,
-        Err(CsvImportError::Import(
-            ImportError::MapperFileInvalid { .. }
+        Err(CsvImportError::AccountImport(
+            AccountImportError::MapperFileInvalid { .. }
         ))
     ));
     assert!(matches!(
         ctx.mappers
             .save_import_mapper(Some(saved.id), english_mapper())
             .await,
-        Err(ImportError::MapperFileInvalid { .. })
+        Err(AccountImportError::MapperFileInvalid { .. })
     ));
 }
 
@@ -1353,6 +1359,152 @@ async fn imp_020d_a_memory_that_cannot_be_read_preselects_none() {
         .await
         .expect("dropped");
     let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    assert_eq!(
+        ctx.import
+            .remembered_import_mapper(path(&file))
+            .await
+            .expect("read"),
+        None
+    );
+}
+
+// IMP-020A — the list sorts by provider, case and accents ignored.
+#[tokio::test]
+async fn imp_020a_the_list_sorts_case_and_accents_ignored() {
+    let ctx = build_ctx().await;
+    for provider in ["zeta", "Élan", "alpha"] {
+        let mut mapper = english_mapper();
+        mapper.info.provider = provider.to_string();
+        ctx.mappers
+            .save_import_mapper(None, mapper)
+            .await
+            .expect("saved");
+    }
+    let providers: Vec<String> = ctx
+        .mappers
+        .list_import_mappers()
+        .await
+        .expect("listed")
+        .into_iter()
+        .map(|mapper| mapper.info.provider)
+        .collect();
+    assert_eq!(providers, ["alpha", "Élan", "zeta"]);
+}
+
+// IMP-020B / IMP-022 / IMP-033 — a file's operation types and asset matches are kept, whether
+// or not the asset is held.
+#[tokio::test]
+async fn imp_020b_operation_types_and_matches_are_kept() {
+    let ctx = build_ctx().await;
+    let mut shared = english_mapper();
+    shared.asset_matches = vec![AssetMatch {
+        read: "Somewhere".to_string(),
+        asset_id: "not-here".to_string(),
+    }];
+    assert!(!shared.operation_types.is_empty());
+    let text = serde_json::to_string(&shared).expect("JSON");
+    let added = ctx
+        .mappers
+        .add_import_mapper_from(mapper_file(&text).path())
+        .await
+        .expect("added");
+    let read = ctx
+        .mappers
+        .get_import_mapper(&added.id)
+        .await
+        .expect("read");
+    assert_eq!(read.asset_matches, shared.asset_matches);
+    assert_eq!(read.operation_types, shared.operation_types);
+}
+
+// IMP-024 / IMP-025 — a change of provider onto one another mapper holds is refused, the file
+// unchanged.
+#[tokio::test]
+async fn imp_025_a_provider_another_holds_is_refused() {
+    let ctx = build_ctx().await;
+    ctx.mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    let second = ctx
+        .mappers
+        .save_import_mapper(None, french_mapper())
+        .await
+        .expect("saved");
+    let mut taken = french_mapper();
+    taken.info.provider = "broker".to_string();
+    assert!(matches!(
+        ctx.mappers
+            .save_import_mapper(Some(second.id.clone()), taken)
+            .await,
+        Err(AccountImportError::MapperProviderTaken { .. })
+    ));
+    let read = ctx
+        .mappers
+        .get_import_mapper(&second.id)
+        .await
+        .expect("read");
+    assert_eq!(read.info.provider, french_mapper().info.provider);
+}
+
+// IMP-040 — deleting a mapper changes nothing already recorded.
+#[tokio::test]
+async fn imp_040_a_deleted_mapper_leaves_the_records() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let saved = ctx
+        .mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
+    let before = transactions(&ctx, &account_id).await.len();
+    assert!(before > 0);
+    ctx.mappers
+        .delete_import_mapper(&saved.id)
+        .await
+        .expect("deleted");
+    assert_eq!(transactions(&ctx, &account_id).await.len(), before);
+}
+
+// IMP-020C — a confirmation with no saved mapper remembers nothing.
+#[tokio::test]
+async fn imp_020c_no_saved_mapper_nothing_remembered() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    confirm(&ctx, &account_id, &file, &english_mapper(), true).await;
+    let remembered: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM import_mapper_choices")
+        .fetch_one(&ctx.pool)
+        .await
+        .expect("counted");
+    assert_eq!(remembered, 0);
+}
+
+// IMP-020D — a mappers folder that cannot be read preselects none.
+#[tokio::test]
+async fn imp_020d_a_mappers_folder_that_cannot_be_read_preselects_none() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let saved = ctx
+        .mappers
+        .save_import_mapper(None, english_mapper())
+        .await
+        .expect("saved");
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    ctx.import
+        .confirm_import(
+            &account_id,
+            path(&file),
+            Some(&saved.id),
+            &english_mapper(),
+            true,
+        )
+        .await
+        .expect("confirmed");
+    std::fs::remove_dir_all(mappers_folder(&ctx)).expect("removed");
+    std::fs::write(mappers_folder(&ctx), "a file where the folder goes").expect("written");
     assert_eq!(
         ctx.import
             .remembered_import_mapper(path(&file))

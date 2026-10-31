@@ -53,7 +53,7 @@ A scope is optional. When given, it names the part of Folioneer the change is ab
 | `agent`        | AI agent           |
 | `sync`         | Sync               |
 | `performance`  | Performance        |
-| `import`       | Import             |
+| `import`       | Account import     |
 | `command-line` | Command line       |
 | `settings`     | Settings           |
 | `update`       | Update             |

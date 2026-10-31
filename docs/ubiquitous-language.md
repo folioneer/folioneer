@@ -642,7 +642,7 @@ A holding whose merged transactions, each valid on the device that recorded it, 
 
 ---
 
-## Import Concepts (introduced by IMP spec)
+## Account Import Concepts (introduced by IMP spec)
 
 ### Import mapper
 
@@ -664,7 +664,7 @@ What the preview says of a row of a file (IMP-030): **Ready** (« Prêt »), **R
 
 ### Added deposit
 
-A deposit the import adds, dated with a purchase the file left unfunded, and marked as added (IMP-051). In French: « Dépôt ajouté » (owner, 2026-10-25).
+A deposit the account import adds, dated with a purchase the file left unfunded, and marked as added (IMP-051). In French: « Dépôt ajouté » (owner, 2026-10-25).
 
 > Status: confirmed
 
@@ -678,11 +678,11 @@ A deposit the import adds, dated with a purchase the file left unfunded, and mar
 
 How much an account, or the whole portfolio, gained or lost over each month or year, the owner's own deposits and withdrawals left out. In French: "Performance".
 
-### Import
+### Account import
 
 > Status: confirmed
 
-A file's rows brought into one account, previewed, then confirmed. In French: "Import".
+A file's rows brought into one account, previewed, then confirmed. In French: « Import de compte » (owner, 2026-10-31).
 
 ### Command line
 

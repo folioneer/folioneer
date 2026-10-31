@@ -1,6 +1,6 @@
 use crate::{
     agent_connection,
-    context::{account, asset, currency, import, sync},
+    context::{account, account_import, asset, currency, sync},
     core::{logger, Event},
     use_cases::{
         account_creation, account_deletion, account_details, account_performance, account_summary,
@@ -53,26 +53,26 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .typ::<currency::CurrencyPairSummary>()
         .typ::<currency::ReferenceCurrency>()
         .typ::<currency::CurrencyError>()
-        // ----- import BC (IMP) -----
-        .typ::<import::ImportMapper>()
-        .typ::<import::ImportMapperDraft>()
-        .typ::<import::MapperInfo>()
-        .typ::<import::MappedColumns>()
-        .typ::<import::OperationLabel>()
-        .typ::<import::AssetMatch>()
-        .typ::<import::Separator>()
-        .typ::<import::DecimalMark>()
-        .typ::<import::DateFormat>()
-        .typ::<import::Encoding>()
-        .typ::<import::OperationType>()
-        .typ::<import::ImportError>()
-        .typ::<import::ReadingChoices>()
-        .typ::<import::FileRead>()
-        .typ::<import::DateReading>()
-        .typ::<import::OperationRead>()
-        .typ::<import::AssetRead>()
-        .typ::<import::RowFigures>()
-        .typ::<import::RowRejection>()
+        // ----- account_import BC (IMP) -----
+        .typ::<account_import::ImportMapper>()
+        .typ::<account_import::ImportMapperDraft>()
+        .typ::<account_import::MapperInfo>()
+        .typ::<account_import::MappedColumns>()
+        .typ::<account_import::OperationLabel>()
+        .typ::<account_import::AssetMatch>()
+        .typ::<account_import::Separator>()
+        .typ::<account_import::DecimalMark>()
+        .typ::<account_import::DateFormat>()
+        .typ::<account_import::Encoding>()
+        .typ::<account_import::OperationType>()
+        .typ::<account_import::AccountImportError>()
+        .typ::<account_import::ReadingChoices>()
+        .typ::<account_import::FileRead>()
+        .typ::<account_import::DateReading>()
+        .typ::<account_import::OperationRead>()
+        .typ::<account_import::AssetRead>()
+        .typ::<account_import::RowFigures>()
+        .typ::<account_import::RowRejection>()
         .typ::<csv_import::CsvImportError>()
         .typ::<csv_import::CsvImportTask>()
         .typ::<csv_import::ImportPreview>()
@@ -189,11 +189,11 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             currency::get_reference_currency,
             currency::set_reference_currency,
             currency::get_currency_rates,
-            // ----- import BC (IMP) -----
-            import::list_import_mappers,
-            import::save_import_mapper,
-            import::add_import_mapper_from_file,
-            import::delete_import_mapper,
+            // ----- account_import BC (IMP) -----
+            account_import::list_import_mappers,
+            account_import::save_import_mapper,
+            account_import::add_import_mapper_from_file,
+            account_import::delete_import_mapper,
             csv_import::remembered_import_mapper,
             csv_import::pick_import_file,
             csv_import::read_import_file,

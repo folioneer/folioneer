@@ -50,20 +50,20 @@ A `Holding` whose `asset_id` points to a Cash Asset. There is at most one Cash H
 
 A cash inflow from outside the application's tracked world (salary, wire transfer, broker top-up).
 
-| Field              | Business meaning                                                                                         |
-| ------------------ | -------------------------------------------------------------------------------------------------------- |
-| `transaction_type` | `TransactionType::Deposit`.                                                                              |
-| `account_id`       | The account receiving the cash.                                                                          |
-| `asset_id`         | The Cash Asset matching the account's currency. Filled by the backend; the user does not pick an asset.  |
-| `date`             | Business date of the deposit (must not be in the future, must not be older than the existing TRX bound). |
-| `quantity`         | The deposited amount in account currency (i64 micros). Equals `total_amount`.                            |
-| `unit_price`       | Always `1` (i.e. `1_000_000`).                                                                           |
-| `exchange_rate`    | Always `1`.                                                                                              |
-| `fees`             | Always `0` in v1.                                                                                        |
-| `total_amount`     | Equal to `quantity` in v1.                                                                               |
-| `note`             | Free-text note (optional).                                                                               |
-| `realized_pnl`     | Always `None`. A deposit never realises a P&L.                                                           |
-| `added_deposit`    | Whether an import added it before a purchase the file left unfunded (IMP-051); `false` when typed.       |
+| Field              | Business meaning                                                                                           |
+| ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `transaction_type` | `TransactionType::Deposit`.                                                                                |
+| `account_id`       | The account receiving the cash.                                                                            |
+| `asset_id`         | The Cash Asset matching the account's currency. Filled by the backend; the user does not pick an asset.    |
+| `date`             | Business date of the deposit (must not be in the future, must not be older than the existing TRX bound).   |
+| `quantity`         | The deposited amount in account currency (i64 micros). Equals `total_amount`.                              |
+| `unit_price`       | Always `1` (i.e. `1_000_000`).                                                                             |
+| `exchange_rate`    | Always `1`.                                                                                                |
+| `fees`             | Always `0` in v1.                                                                                          |
+| `total_amount`     | Equal to `quantity` in v1.                                                                                 |
+| `note`             | Free-text note (optional).                                                                                 |
+| `realized_pnl`     | Always `None`. A deposit never realises a P&L.                                                             |
+| `added_deposit`    | Whether an account import added it before a purchase the file left unfunded (IMP-051); `false` when typed. |
 
 ### Withdrawal Transaction (new `TransactionType` variant)
 
