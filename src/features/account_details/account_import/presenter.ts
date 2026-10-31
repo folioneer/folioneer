@@ -156,6 +156,18 @@ export function withLabelType(
   };
 }
 
+/** IMP-064 — a mapper's file refused says what the file lacks: nothing is there to choose. */
+export function mapperFileRefusalToI18n(error: AccountImportError): I18nMessage {
+  switch (error.code) {
+    case "MapperColumnMissing":
+      return { key: "account_import.error.mapper_file_no_columns" };
+    case "MapperProviderEmpty":
+      return { key: "account_import.error.mapper_file_no_provider" };
+    default:
+      return accountImportErrorToI18n(error);
+  }
+}
+
 /** F27 — the i18n message of a backend refusal. */
 export function accountImportErrorToI18n(error: CsvImportError | AccountImportError): I18nMessage {
   switch (error.code) {

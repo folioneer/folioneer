@@ -6,6 +6,7 @@ import {
   columnAsInFile,
   fileNameOf,
   folderOf,
+  mapperFileRefusalToI18n,
   typeOfLabel,
   withFormatOf,
   withLabelType,
@@ -66,6 +67,19 @@ describe("account import presenter", () => {
     expect(changed.operation_types).toHaveLength(2);
     const removed = withLabelType(draft(), "achat", null);
     expect(removed.operation_types).toEqual([{ label: "Vente", transaction_type: "Sale" }]);
+  });
+
+  // IMP-064 — a refused file is not asked to choose anything.
+  it("words a mapper's file refused for what it lacks", () => {
+    expect(mapperFileRefusalToI18n({ code: "MapperColumnMissing" }).key).toBe(
+      "account_import.error.mapper_file_no_columns",
+    );
+    expect(mapperFileRefusalToI18n({ code: "MapperProviderEmpty" }).key).toBe(
+      "account_import.error.mapper_file_no_provider",
+    );
+    expect(mapperFileRefusalToI18n({ code: "MapperFileTooLarge" }).key).toBe(
+      "account_import.error.mapper_file_too_large",
+    );
   });
 
   it("gives each refusal its message and its vars", () => {

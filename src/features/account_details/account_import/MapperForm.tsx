@@ -75,6 +75,11 @@ export function MapperForm({
             />
           ))}
         </div>
+        {file?.date_reading?.detected === false && (
+          <p id="account-import-date-undetected" className="text-xs text-m3-on-surface-variant">
+            {t("account_import.date_not_detected")}
+          </p>
+        )}
       </section>
 
       {file && (

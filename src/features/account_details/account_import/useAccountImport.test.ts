@@ -171,6 +171,7 @@ describe("useAccountImport", () => {
     const { result } = await picked("fortuneo");
     expect(result.current.matches).toBe(false);
     expect(result.current.canEdit).toBe(true);
+    expect(result.current.problem?.key).toBe("account_import.error.separator_not_found");
     expect(gateway.previewImport).not.toHaveBeenCalled();
   });
 
@@ -182,7 +183,7 @@ describe("useAccountImport", () => {
     await waitFor(() =>
       expect(result.current.problem).toEqual({ key: "account_import.error.file_not_utf8" }),
     );
-    expect(result.current.file).toEqual(fileRead);
+    expect(result.current.file).toBeNull();
 
     gateway.readImportFile.mockResolvedValue(ok({ ...fileRead, encoding: "Windows1252" }));
     act(() => result.current.changeFormat("encoding", "Windows1252"));
@@ -193,6 +194,39 @@ describe("useAccountImport", () => {
       PATH,
       expect.objectContaining({ encoding: "Windows1252", separator: null }),
     );
+  });
+
+  // IMP-018, IMP-061 — the select shows what was chosen, so a refused choice can be changed back.
+  it("shows a refused format as chosen, the detected one still to pick", async () => {
+    gateway.readImportFile.mockResolvedValueOnce(ok({ ...fileRead, encoding: "Windows1252" }));
+    const { result } = await picked();
+    expect(result.current.draft?.encoding).toBe("Windows1252");
+    gateway.readImportFile.mockResolvedValueOnce(refused({ code: "FileNotUtf8" }));
+    act(() => result.current.changeFormat("encoding", "Utf8"));
+    expect(result.current.draft?.encoding).toBe("Utf8");
+    expect(result.current.busy).toBe(true);
+    await waitFor(() => expect(result.current.problem).not.toBeNull());
+    expect(result.current.busy).toBe(false);
+    expect(result.current.draft?.encoding).toBe("Utf8");
+  });
+
+  // IMP-065 — a change overtakes a preview running; its result is dropped.
+  it("drops a preview a later change overtook, and the counts of the one before", async () => {
+    const { result } = await picked();
+    await act(async () => result.current.runPreview());
+    await waitFor(() => expect(result.current.preview).not.toBeNull());
+    let finish: (value: unknown) => void = () => {};
+    gateway.previewImport.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    act(() => result.current.runPreview());
+    expect(result.current.preview).toBeNull();
+    act(() => result.current.changeLabelType("Buy", "Sale"));
+    await act(async () => finish(ok({ file: fileRead, rows: [], counts })));
+    await waitFor(() => expect(result.current.busy).toBe(false));
+    expect(result.current.preview).toBeNull();
   });
 
   // Only the latest reading stands: an earlier one finishing after it changes nothing.
@@ -284,6 +318,7 @@ describe("useAccountImport", () => {
       }),
     );
     expect(result.current.canPreview).toBe(false);
+    expect(result.current.mapperId).toBeNull();
 
     gateway.addImportMapperFromFile.mockResolvedValueOnce(ok(saved));
     await act(async () => result.current.addMapperFromFile());

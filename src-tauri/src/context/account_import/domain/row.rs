@@ -255,7 +255,9 @@ fn read_line(
     let label = field(located.operation);
     let operation_type = labels
         .iter()
-        .find(|known| known.label.trim().to_lowercase() == label.to_lowercase())
+        .find(|known| {
+            !label.is_empty() && known.label.trim().to_lowercase() == label.to_lowercase()
+        })
         .map(|known| known.transaction_type)
         .ok_or_else(|| RowRejection::OperationTypeMissing {
             label: label.to_string(),
@@ -480,6 +482,8 @@ mod tests {
             ("Retrait", OperationType::Withdrawal),
             ("TAXE TRANSAC FINAN", OperationType::TradeTax),
             ("OST détachement", OperationType::NotImported),
+            // A mapper's file may give an empty label a type; no row takes it (IMP-022).
+            ("", OperationType::Deposit),
         ]
         .into_iter()
         .map(|(label, transaction_type)| OperationLabel {

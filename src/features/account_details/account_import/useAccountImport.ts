@@ -16,6 +16,7 @@ import {
   draftOf,
   type FormatChoices,
   type FormatValue,
+  mapperFileRefusalToI18n,
   NO_CHOICES,
   withFormatOf,
   withLabelType,
@@ -43,8 +44,8 @@ export function useAccountImport(accountId: string) {
   const [addRefusal, setAddRefusal] = useState<I18nMessage | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [saved, setSaved] = useState(false);
-  const [busy, setBusy] = useState(false);
-  // Only the latest reading stands: a change made while one runs replaces it.
+  const [working, setWorking] = useState(0);
+  // Only the latest work stands: a change made while a reading or a preview runs replaces it.
   const latestReading = useRef(0);
 
   useEffect(() => {
@@ -52,6 +53,7 @@ export function useAccountImport(accountId: string) {
   }, []);
 
   const clearOutcome = useCallback(() => {
+    latestReading.current += 1;
     setProblem(null);
     setAddRefusal(null);
     setLackingColumns([]);
@@ -70,6 +72,8 @@ export function useAccountImport(accountId: string) {
       });
       if (reading !== latestReading.current) return null;
       if (result.status === "error") {
+        // IMP-061 — a refused reading leaves no columns or labels of the one before it.
+        setFile(null);
         setProblem(accountImportErrorToI18n(result.error));
         return null;
       }
@@ -109,7 +113,9 @@ export function useAccountImport(accountId: string) {
       setDraft(saved);
       const fileRead = await read(at, saved, format);
       if (!fileRead) return;
+      const reading = latestReading.current;
       const result = await accountImportGateway.previewImport(accountId, at, mapper.id, saved);
+      if (reading !== latestReading.current) return;
       if (result.status === "ok") {
         setMatches(true);
       } else if (result.error.code === "MappedColumnsNotInFile") {
@@ -122,11 +128,11 @@ export function useAccountImport(accountId: string) {
   );
 
   const withBusy = useCallback(async (work: () => Promise<void>) => {
-    setBusy(true);
+    setWorking((count) => count + 1);
     try {
       await work();
     } finally {
-      setBusy(false);
+      setWorking((count) => count - 1);
     }
   }, []);
 
@@ -183,12 +189,15 @@ export function useAccountImport(accountId: string) {
       if (!path || !draft) return;
       clearOutcome();
       const format = { ...choices, [field]: value };
+      const next: ImportMapperDraft = { ...draft, [field]: value };
       setChoices(format);
-      void read(path, draft, format).then((fileRead) => {
+      setDraft(next);
+      void withBusy(async () => {
+        const fileRead = await read(path, next, format);
         if (fileRead) setDraft((held) => held && withFormatOf(held, fileRead));
       });
     },
-    [choices, clearOutcome, draft, path, read],
+    [choices, clearOutcome, draft, path, read, withBusy],
   );
 
   // IMP-014, IMP-022A — the date and operation columns are what the file is read again for.
@@ -205,12 +214,13 @@ export function useAccountImport(accountId: string) {
       };
       setDraft(next);
       if (field === "date" || field === "operation") {
-        void read(path, next, choices).then((fileRead) => {
+        void withBusy(async () => {
+          const fileRead = await read(path, next, choices);
           if (fileRead) setDraft((held) => held && withFormatOf(held, fileRead));
         });
       }
     },
-    [choices, clearOutcome, draft, path, read],
+    [choices, clearOutcome, draft, path, read, withBusy],
   );
 
   const changeLabelType = useCallback(
@@ -249,7 +259,7 @@ export function useAccountImport(accountId: string) {
     void withBusy(async () => {
       const result = await accountImportGateway.addImportMapperFromFile();
       if (result.status === "error") {
-        setAddRefusal(accountImportErrorToI18n(result.error));
+        setAddRefusal(mapperFileRefusalToI18n(result.error));
         return;
       }
       if (result.data === null || !path) return;
@@ -262,8 +272,11 @@ export function useAccountImport(accountId: string) {
   const runPreview = useCallback(() => {
     if (!path || !draft) return;
     setProblem(null);
+    setPreview(null);
+    const reading = ++latestReading.current;
     void withBusy(async () => {
       const result = await accountImportGateway.previewImport(accountId, path, mapperId, draft);
+      if (reading !== latestReading.current) return;
       if (result.status === "ok") {
         setPreview(result.data);
       } else if (result.error.code === "MappedColumnsNotInFile") {
@@ -275,6 +288,8 @@ export function useAccountImport(accountId: string) {
   }, [accountId, draft, mapperId, path, withBusy]);
 
   const edit = useCallback(() => setEditing(true), []);
+
+  const busy = working > 0;
 
   return {
     path,

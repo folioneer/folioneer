@@ -613,5 +613,12 @@ mod tests {
             .map(|label| (label.label.as_str(), label.rows))
             .collect();
         assert_eq!(labels, [("Buy", 2), ("SELL", 1)]);
+        let lacking = ReadingChoices {
+            operation_column: Some("Libellé".to_string()),
+            ..ReadingChoices::default()
+        };
+        let (_, read) =
+            read_file(bytes, &lacking).expect("a column the file lacks refuses nothing");
+        assert!(read.operation_labels.is_empty());
     }
 }
