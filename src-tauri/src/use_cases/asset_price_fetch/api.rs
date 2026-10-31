@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use tauri::State;
 
-use crate::use_cases::price_provider_choice::ChosenPriceProvider;
+use crate::use_cases::shared::chosen_price_provider::ChosenPriceProvider;
 
 use super::error::{FetchAccountAssetPricesError, FetchAllAssetPricesError, FetchPriceTask};
 use super::orchestrator::AssetPriceFetchUseCase;

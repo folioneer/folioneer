@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use super::chosen::{save_choice, ChosenPriceProvider};
 use super::error::PriceProviderChoiceError;
 use crate::core::logger::BACKEND;
+use crate::use_cases::shared::chosen_price_provider::{save_choice, ChosenPriceProvider};
 
 /// MKT-214 — the External provider chosen on this computer, and what the build offers.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
@@ -81,9 +81,11 @@ impl PriceProviderChoiceUseCase {
 
 #[cfg(test)]
 mod tests {
-    use super::super::chosen::{choice_file, OfferedPriceProvider, PriceProviders};
     use super::*;
     use crate::context::asset::MockPriceProvider;
+    use crate::use_cases::shared::chosen_price_provider::{
+        choice_file, OfferedPriceProvider, PriceProviders,
+    };
 
     fn offered() -> PriceProviders {
         PriceProviders {
@@ -158,6 +160,7 @@ mod tests {
             use_case.set(Some("gone".to_string())).await,
             Err(PriceProviderChoiceError::NotOffered)
         );
+        assert!(!choice_file(folder.path()).exists(), "nothing was written");
 
         // A file whose folder cannot exist: under a file.
         let blocker = folder.path().join("blocker");

@@ -20,7 +20,7 @@ context/{bc}/        bounded contexts: account/, asset/ (older layout: domain/, 
                      currency/, account_import/, sync/ (gold layout: application/, domain/, infrastructure/) — each with
                      api.rs (its Tauri commands), error.rs, mod.rs (its public surface)
 use_cases/{name}/    cross-context orchestrators: orchestrator.rs, api.rs, error.rs, mod.rs
-use_cases/shared/    stateless helpers shared by use cases (Global Value, price movement, fetch scope)
+use_cases/shared/    what use cases share (Global Value, price movement, fetch scope, the chosen External provider)
 core/                legacy shared bucket: db.rs, event_bus/ (Event enum), logger.rs,
                      specta_builder.rs (the command registry), cash.rs
 shared/              gold shared code: domain/record_change.rs (change-log vocabulary),

@@ -26,7 +26,7 @@ Terms are quoted as read on the date beside each one. They change; re-read befor
 - **Redistribution**: §2.8 forbids reproducing or distributing any portion of the Services for commercial purposes.
 - **What this means here**: the usual reading — "fine while it is a free personal tool" — does not survive §2.4.9. An application that fetches prices on a schedule is automated access whether or not anyone is paid. So this is not only a question of what may be sold; the free application is already outside these terms today.
 - **Decision** (2026-10-31, ADR-024): the public build offers it, off by default. Each user turns it on for their own computer, after a notice saying it is unofficial and under Yahoo's terms, and every request goes from that computer for that person's own holdings; the project runs no server between them. That is what the endpoint is tolerated for in practice, but it is not what §2.4.9 permits, and this document does not pretend otherwise. It left the public build on 2026-09-27 (TODO-038) and came back on these terms.
-- **Also**: the endpoint can change shape or disappear without notice (ADR-017), which is a second, independent reason not to build anything sold on it.
+- **Also**: the endpoint can change shape or disappear without notice, which is a second, independent reason not to build anything sold on it.
 
 ### Frankfurter
 

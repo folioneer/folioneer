@@ -20,7 +20,7 @@ pub enum FetchPriceTask {
     #[error("No fetchable holdings in scope")]
     NoFetchableHoldings,
     /// No External provider is chosen on this computer (MKT-210).
-    #[error("No price provider is chosen on this computer")]
+    #[error("No External provider is chosen on this computer")]
     NoExternalProvider,
     /// Catch-all for unexpected runtime failures not attributable to a specific BC.
     #[error("Unexpected error")]

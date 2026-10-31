@@ -3,7 +3,7 @@
 #[serde(tag = "code")]
 pub enum PriceProviderChoiceError {
     /// This build does not offer that External provider.
-    #[error("This build does not offer that price provider")]
+    #[error("This build does not offer that External provider")]
     NotOffered,
     /// The choice could not be kept on this computer; nothing changed.
     #[error("The choice could not be saved on this computer")]

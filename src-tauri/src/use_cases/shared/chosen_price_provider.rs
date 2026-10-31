@@ -57,20 +57,36 @@ impl ChosenPriceProvider {
     /// The list of a build, on the choice kept in `data_dir`: the build's default when this
     /// computer never chose, off when what it holds is not on offer.
     pub fn of(providers: PriceProviders, data_dir: Option<&Path>) -> Self {
-        let saved = data_dir.and_then(|dir| std::fs::read_to_string(choice_file(dir)).ok());
-        let id = match saved.as_deref().map(str::trim) {
+        let saved = data_dir.map(|dir| std::fs::read_to_string(choice_file(dir)));
+        let id = match saved {
             None => providers.default,
-            Some(OFF) => None,
-            Some(id) => Some(id),
+            Some(Err(error)) if error.kind() == std::io::ErrorKind::NotFound => providers.default,
+            // A file that cannot be read is no choice to act on: off, not the default.
+            Some(Err(_)) => None,
+            Some(Ok(content)) => match content.trim() {
+                OFF => None,
+                id => providers
+                    .offered
+                    .iter()
+                    .map(|offered| offered.id)
+                    .find(|offered| *offered == id)
+                    .or_else(|| {
+                        tracing::warn!(target: BACKEND, id, "price provider not on offer: off");
+                        None
+                    }),
+            },
         };
-        let chosen = position_in(&providers.offered, id);
-        if chosen.is_none() {
-            tracing::warn!(target: BACKEND, id = ?id, "price provider choice not on offer: off");
-        }
+        let chosen = position_in(&providers.offered, id).unwrap_or(NO_PROVIDER);
         Self {
             offered: providers.offered,
-            chosen: AtomicUsize::new(chosen.unwrap_or(NO_PROVIDER)),
+            chosen: AtomicUsize::new(chosen),
         }
+    }
+
+    /// SPF-072 — what the headless run fetches through: nothing with none chosen.
+    pub fn into_active(self) -> Option<Arc<dyn PriceProvider>> {
+        self.is_on()
+            .then(|| Arc::new(self) as Arc<dyn PriceProvider>)
     }
 
     /// Whether a provider is chosen.
@@ -239,6 +255,31 @@ mod tests {
         assert_eq!(of(Some("second")).chosen_id(), None);
         save_choice(&file, Some("gone")).expect("saved");
         assert_eq!(of(Some("second")).chosen_id(), None);
+    }
+
+    // ADR-024 — a mistake fails closed: a file that cannot be read is off, not the default.
+    #[test]
+    fn an_unreadable_choice_is_off() {
+        let folder = tempfile::tempdir().expect("folder");
+        let of = || {
+            let mut providers = two(quoting(1, 0), quoting(2, 0));
+            providers.default = Some("second");
+            ChosenPriceProvider::of(providers, Some(folder.path()))
+        };
+        std::fs::write(choice_file(folder.path()), [0xff, 0xfe]).expect("written");
+        assert_eq!(of().chosen_id(), None);
+    }
+
+    // SPF-072 — the headless run gets nothing to fetch through with none chosen.
+    #[test]
+    fn only_a_chosen_provider_reaches_the_headless_run() {
+        let off = ChosenPriceProvider::of(two(quoting(1, 0), quoting(2, 0)), None);
+        assert!(off.into_active().is_none());
+
+        let mut providers = two(quoting(1, 0), quoting(2, 0));
+        providers.default = Some("first");
+        let on = ChosenPriceProvider::of(providers, None);
+        assert!(on.into_active().is_some());
     }
 
     #[test]

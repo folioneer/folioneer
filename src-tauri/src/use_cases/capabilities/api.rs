@@ -4,7 +4,7 @@
 use std::sync::Arc;
 use tauri::State;
 
-use crate::use_cases::price_provider_choice::ChosenPriceProvider;
+use crate::use_cases::shared::chosen_price_provider::ChosenPriceProvider;
 
 /// What the interface is told: whether this computer has an External provider chosen, and
 /// which distribution channel the build belongs to (MKT-211, UPD-030).

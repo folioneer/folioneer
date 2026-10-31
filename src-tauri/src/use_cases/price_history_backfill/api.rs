@@ -6,7 +6,7 @@ use tauri::State;
 
 use crate::context::asset::PriceHistoryBackfillOutcome;
 
-use crate::use_cases::price_provider_choice::ChosenPriceProvider;
+use crate::use_cases::shared::chosen_price_provider::ChosenPriceProvider;
 
 use super::error::{PriceHistoryBackfillError, PriceHistoryBackfillTask};
 use super::orchestrator::PriceHistoryBackfillUseCase;

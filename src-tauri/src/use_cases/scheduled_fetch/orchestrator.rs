@@ -7,7 +7,6 @@ use crate::context::account::AccountServiceContract;
 use crate::context::asset::{AssetServiceContract, PriceProvider};
 use crate::context::currency::CurrencyService;
 use crate::shared::infrastructure::scheduler::DailyFetchScheduler;
-use crate::use_cases::price_provider_choice::FetchScheduleFollower;
 use crate::use_cases::shared::price_fetch_failures::{
     PriceFetchFailureReason, PriceFetchFailureRepository,
 };
@@ -186,6 +185,16 @@ impl ScheduledFetchOrchestrator {
         };
         if let Err(error) = outcome {
             tracing::warn!(target: crate::core::logger::BACKEND, err = ?error, "self-heal: OS schedule repair failed");
+        }
+    }
+
+    /// SPF-015, SPF-070 — the schedule follows whether an External provider is chosen: back
+    /// as configured with one, gone without. The stored configuration is never written.
+    pub async fn follow_provider(&self, on: bool) {
+        if on {
+            self.self_heal().await;
+        } else {
+            drop_schedule_without_provider(self.scheduler.as_ref()).await;
         }
     }
 
@@ -517,17 +526,6 @@ pub fn backfill_window(
         None => capped_from,
     };
     (from, today)
-}
-
-#[async_trait::async_trait]
-impl FetchScheduleFollower for ScheduledFetchOrchestrator {
-    async fn follow(&self, on: bool) {
-        if on {
-            self.self_heal().await;
-        } else {
-            drop_schedule_without_provider(self.scheduler.as_ref()).await;
-        }
-    }
 }
 
 /// SPF-070 — with no External provider chosen, a computer owns no scheduled fetch: it
@@ -919,6 +917,59 @@ mod tests {
         );
 
         orchestrator.self_heal().await;
+    }
+
+    // SPF-070 — turned off, the schedule goes; the configuration is neither read nor written
+    // (the repository mock has no expectation).
+    #[tokio::test]
+    async fn with_no_provider_the_schedule_goes_and_the_configuration_stays() {
+        let mut scheduler = MockDailyFetchScheduler::new();
+        scheduler
+            .expect_is_registered()
+            .times(1)
+            .returning(|| Ok(true));
+        scheduler.expect_remove().times(1).returning(|| Ok(()));
+        let orchestrator = make_orchestrator(
+            MockAccountServiceContract::new(),
+            MockAssetServiceContract::new(),
+            MockPriceProvider::new(),
+            MockScheduledFetchRepository::new(),
+            scheduler,
+            now_after_trigger(),
+        );
+
+        orchestrator.follow_provider(false).await;
+    }
+
+    // SPF-015, SPF-070 — chosen again, the stored configuration comes back, unwritten.
+    #[tokio::test]
+    async fn with_a_provider_the_schedule_comes_back_as_configured() {
+        let mut repository = MockScheduledFetchRepository::new();
+        repository
+            .expect_get_configuration()
+            .times(1)
+            .returning(|| {
+                Ok(ScheduledFetchConfiguration::restore(
+                    true,
+                    "19:00".to_string(),
+                ))
+            });
+        let mut scheduler = MockDailyFetchScheduler::new();
+        scheduler
+            .expect_register()
+            .times(1)
+            .withf(|trigger_time| trigger_time == "19:00")
+            .returning(|_| Ok(()));
+        let orchestrator = make_orchestrator(
+            MockAccountServiceContract::new(),
+            MockAssetServiceContract::new(),
+            MockPriceProvider::new(),
+            repository,
+            scheduler,
+            now_after_trigger(),
+        );
+
+        orchestrator.follow_provider(true).await;
     }
 
     // SPF-015 — a disabled configuration silently removes a leftover schedule.

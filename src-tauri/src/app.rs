@@ -45,15 +45,13 @@ use crate::use_cases::portfolio_sync::{
 use crate::use_cases::price_fetch_failures::PriceFetchFailuresUseCase;
 use crate::use_cases::price_freshness::PriceFreshnessUseCase;
 use crate::use_cases::price_history_backfill::PriceHistoryBackfillUseCase;
-use crate::use_cases::price_provider_choice::chosen::choice_file;
-use crate::use_cases::price_provider_choice::{
-    ChosenPriceProvider, FetchScheduleFollower, PriceProviderChoiceUseCase,
-};
+use crate::use_cases::price_provider_choice::{FetchScheduleFollower, PriceProviderChoiceUseCase};
 use crate::use_cases::rate_history_backfill::RateHistoryBackfillUseCase;
 use crate::use_cases::rate_refresh::RateRefreshUseCase;
 use crate::use_cases::scheduled_fetch::{
     ScheduledFetchOrchestrator, SqliteScheduledFetchRepository,
 };
+use crate::use_cases::shared::chosen_price_provider::{choice_file, ChosenPriceProvider};
 use crate::use_cases::shared::price_fetch_failures::{
     PriceFetchFailureRepository, SqlitePriceFetchFailureRepository,
 };
@@ -516,12 +514,14 @@ fn manage_price_fetching<R: tauri::Runtime>(
     let start_follower = Arc::clone(&scheduled_fetch_orchestrator);
     let on = chosen.is_on();
     tauri::async_runtime::spawn(async move {
-        start_follower.follow(on).await;
+        start_follower.follow_provider(on).await;
     });
     app_handle.manage(Arc::new(PriceProviderChoiceUseCase::new(
         Arc::clone(&chosen),
         choice_file,
-        Arc::clone(&scheduled_fetch_orchestrator) as Arc<dyn FetchScheduleFollower>,
+        Arc::new(ScheduleFollowsChoice(Arc::clone(
+            &scheduled_fetch_orchestrator,
+        ))),
     )));
     app_handle.manage(chosen);
     app_handle.manage(scheduled_fetch_orchestrator);
@@ -533,6 +533,17 @@ fn manage_price_fetching<R: tauri::Runtime>(
         price_provider,
         Arc::new(|| chrono::Local::now().date_naive()),
     )));
+}
+
+/// SPF-070 — the schedule follows the choice of External provider, composed here so neither
+/// use case imports the other (B18).
+struct ScheduleFollowsChoice(Arc<ScheduledFetchOrchestrator>);
+
+#[async_trait::async_trait]
+impl FetchScheduleFollower for ScheduleFollowsChoice {
+    async fn follow(&self, on: bool) {
+        self.0.follow_provider(on).await;
+    }
 }
 
 /// SYN-060/D9 — the launch sync the fee-generation use case runs before generating: one
@@ -594,7 +605,7 @@ fn create_app_dirs(app: &tauri::AppHandle) -> anyhow::Result<AppDirectories> {
 mod tests {
     use super::*;
     use crate::context::asset::MockPriceProvider;
-    use crate::use_cases::price_provider_choice::{OfferedPriceProvider, PriceProviders};
+    use crate::use_cases::shared::chosen_price_provider::{OfferedPriceProvider, PriceProviders};
 
     async fn parts() -> PriceFetchingParts {
         let pool = sqlx::sqlite::SqlitePoolOptions::new()

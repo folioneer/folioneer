@@ -58,14 +58,12 @@ pub fn run_scheduled_fetch_headless() -> i32 {
     exit_code_on_new_runtime(headless::run(|| {
         extensions::providers().map(|providers| {
             let data_dir = shared::infrastructure::app_directories::resolve_local_data_dir();
-            let chosen = use_cases::price_provider_choice::ChosenPriceProvider::of(
-                providers.price,
-                data_dir.as_deref(),
-            );
             HeadlessProviders {
-                price: chosen
-                    .is_on()
-                    .then(|| Arc::new(chosen) as Arc<dyn context::asset::PriceProvider>),
+                price: use_cases::shared::chosen_price_provider::ChosenPriceProvider::of(
+                    providers.price,
+                    data_dir.as_deref(),
+                )
+                .into_active(),
                 rate_history: providers.rate_history,
             }
         })

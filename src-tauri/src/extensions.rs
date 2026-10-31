@@ -12,7 +12,7 @@ use crate::context::currency::{
 };
 use crate::shared::infrastructure::e2e_run;
 use crate::use_cases::asset_web_lookup::{OpenFigiClient, ReqwestOpenFigiClient};
-use crate::use_cases::price_provider_choice::{OfferedPriceProvider, PriceProviders};
+use crate::use_cases::shared::chosen_price_provider::{OfferedPriceProvider, PriceProviders};
 #[cfg(feature = "app")]
 use crate::use_cases::update_checker::UpdateChannel;
 
