@@ -208,7 +208,7 @@ The Import action of the account details header (IMP-060).
 
 - **Empty:** picking a file (IMP-060).
 - **Loading:** Preview shows the window working (IMP-065).
-- **Error:** a file not read (IMP-061), a file not matching (IMP-063), a mapper file refused (IMP-064).
+- **Error:** a file not read (IMP-061), a file not matching (IMP-063), a mapper file refused (IMP-064), a preview refused (IMP-065).
 - **Success:** a new mapper's form (IMP-061), a saved mapper matching (IMP-062), the row counts (IMP-065).
 
 ### User Flow
@@ -222,6 +222,7 @@ Pick a file → the mapper → Preview.
 - SYN-038 adds version 11: a transaction carries the added-deposit mark (IMP-051).
 - SYN-023: the import mapper each imported file's folder remembers stays on the device (IMP-020C).
 - SYN-038 adds version 12: the column mappings of version 10 are no longer a kind of synced record; no device ever held one, since no window offered it. A mapper's file is not synced for now (#715).
+- ACD UX Draft: the live view's header gains the Import action, after Open balance (IMP-060).
 - CSH: a deposit may be an added deposit, marked as such (IMP-051).
 - TXL-060: a journal row carries the added-deposit mark (IMP-051). TXL-061: its Recorded by column shows the chip (IMP-054). AGT-045: that chip is not an AI agent's mark; an added deposit has no session.
 
