@@ -42,15 +42,31 @@ export async function navigateToAccountDetails(accountId: string): Promise<void>
 }
 
 /**
- * Navigates to the Settings page via the sidebar nav button (`#nav-settings`),
- * waiting for the scheduled-fetch section to confirm the route rendered.
+ * Opens the Settings dialog on one of its sections, the way a user does: the sidebar
+ * button (`#nav-settings`), then the section.
  */
-export async function navigateToSettings(): Promise<void> {
+async function openSettingsSection(section: "prices" | "sync"): Promise<void> {
   const settingsNav = await $("#nav-settings");
   await settingsNav.waitForExist({ timeout: 15000 });
   await settingsNav.click();
+  const sectionButton = await $(`#settings-section-${section}`);
+  await sectionButton.waitForExist({ timeout: 10000 });
+  await sectionButton.click();
+}
+
+/** Opens Settings on Prices, waiting for the scheduled fetch to show. */
+export async function navigateToSettings(): Promise<void> {
+  await openSettingsSection("prices");
   const toggle = await $("#scheduled-fetch-toggle");
   await toggle.waitForExist({ timeout: 10000 });
+}
+
+/** Closes the Settings dialog, which covers everything under it. */
+export async function closeSettings(): Promise<void> {
+  const close = await $("#settings-close");
+  await close.waitForExist({ timeout: 10000 });
+  await close.click();
+  await close.waitForExist({ timeout: 10000, reverse: true });
 }
 
 /**
@@ -58,7 +74,8 @@ export async function navigateToSettings(): Promise<void> {
  * Waits for the page's own content — "Enable sync" while disabled, the status otherwise.
  */
 export async function navigateToSync(): Promise<void> {
-  await navigateToSettings();
+  await openSettingsSection("sync");
+  // Open sync closes the dialog on its way to the page.
   const openSync = await $("#settings-open-sync");
   await openSync.waitForExist({ timeout: 10000 });
   await openSync.click();

@@ -3,6 +3,7 @@ import { Info, Menu, Settings, TrendingUp, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AboutModal } from "@/features/about";
+import { SettingsDialog } from "@/features/settings";
 import { logger } from "@/lib/logger";
 import { useAppStore } from "@/lib/store";
 import { IconButton } from "@/ui/components";
@@ -21,6 +22,7 @@ export function Sidebar({ isOpen, toggleDrawer }: SidebarProps) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     logger.info("[Sidebar] mounted");
@@ -94,13 +96,9 @@ export function Sidebar({ isOpen, toggleDrawer }: SidebarProps) {
         <button
           type="button"
           id="nav-settings"
-          onClick={() => navigate({ to: "/settings" })}
+          onClick={() => setSettingsOpen(true)}
           aria-label={t("nav.settings")}
-          className={`
-            w-full m3-navigation-item
-            ${pathname === "/settings" ? "m3-navigation-item-active" : ""}
-            ${!isOpen && "justify-center px-0"}
-          `}
+          className={`w-full m3-navigation-item ${settingsOpen ? "m3-navigation-item-active" : ""} ${!isOpen && "justify-center px-0"}`}
         >
           <Settings size={24} />
           {isOpen && <span>{t("nav.settings")}</span>}
@@ -114,6 +112,7 @@ export function Sidebar({ isOpen, toggleDrawer }: SidebarProps) {
       />
 
       <AboutModal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <SettingsDialog isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </aside>
   );
 }

@@ -4,7 +4,7 @@
 
 Today, market prices are downloaded only while the app is running (launch auto-fetch and manual refreshes, MKT-110+). The user wants prices to arrive **once per day at a chosen time — even when the app is closed** — so that opening the app any morning shows yesterday's closing values without any manual action.
 
-The feature schedules a daily download with the operating system: at the configured time the application runs invisibly, records the day's closing prices (and refreshes exchange rates), and exits. There is no resident process, no tray icon, and no OS setup by the user — everything is configured from the app's Settings page. Recorded values are always **daily closes**, never live intraday quotes: a run that executes late (machine off at the trigger) still records the close of each missed trading day, backfilled up to 30 days.
+The feature schedules a daily download with the operating system: at the configured time the application runs invisibly, records the day's closing prices (and refreshes exchange rates), and exits. There is no resident process, no tray icon, and no OS setup by the user — everything is configured from the app's Settings dialog. Recorded values are always **daily closes**, never live intraday quotes: a run that executes late (machine off at the trigger) still records the close of each missed trading day, backfilled up to 30 days.
 
 This spec is a **feature spec**: it extends the price-write model owned by the `asset` bounded context (MKT spec) and the rate-fetch path owned by the `currency` bounded context (FXR spec), and adds a scheduling/configuration surface of its own. The two entities below (`ScheduledFetchConfiguration`, `ScheduledFetchRun`) are owned by the **scheduled-fetch use case** — a deliberate lightweight divergence from the "use cases orchestrate, contexts own persistence" norm: they are operational records of the orchestration itself, belong to no existing bounded context, and are too small to justify a new one (to be recorded in `docs/ddd-divergences.md` at implementation).
 
@@ -43,7 +43,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 ### Configuration & Scheduling (010–019)
 
-**SPF-010 — Settings surface (frontend)**: The Settings page gains a "Daily price download" section with an enable toggle (default OFF) and a time-of-day field for the trigger time. The time field is editable only while the toggle is on.
+**SPF-010 — Settings surface (frontend)**: The Prices section of the Settings dialog gains a "Daily price download" setting with an enable toggle (default OFF) and a time-of-day field for the trigger time. The time field is editable only while the toggle is on.
 
 **SPF-011 — Configuration lives with the application data (backend)**: The configuration persists with the application's data — not the interface session — so it remains authoritative for runs that happen while the application is closed.
 
@@ -119,13 +119,13 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-060 — Configure in-flight state (frontend)**: While a configuration change (enable, disable, or time change) is being acknowledged, the toggle and time field are disabled and a pending indicator is shown, preventing double submission — consistent with MKT-027.
 
-**SPF-061 — Status loading state (frontend)**: While the section's status is being loaded, a loading indicator is shown in place of the status line. A load failure shows an inline error within the section; the rest of the Settings page is unaffected.
+**SPF-061 — Status loading state (frontend)**: While the section's status is being loaded, a loading indicator is shown in place of the status line. A load failure shows an inline error within the section; the rest of the Settings dialog is unaffected.
 
 ### Without an External provider (070–079)
 
 **SPF-070 — No External provider, no scheduled fetch (backend)**: With no External provider chosen (MKT-210, MKT-214) a computer registers no scheduled fetch with the operating system, and removes one left behind, at start-up and when the provider is turned off — and with it the scheduled refresh of exchange rates (SPF-035); rates still refresh at launch (FXR-075). The stored configuration is left as it is, so choosing a provider again honours it: the self-heal of SPF-015 puts the schedule back, at once.
 
-**SPF-071 — No scheduled fetch section (frontend)**: With no External provider chosen (MKT-211) the Settings page shows no scheduled fetch section (SPF-010) — neither the toggle and trigger time nor the last-run status (SPF-052).
+**SPF-071 — No scheduled fetch section (frontend)**: With no External provider chosen (MKT-211) the Settings dialog shows no scheduled fetch section (SPF-010) — neither the toggle and trigger time nor the last-run status (SPF-052).
 
 **SPF-072 — A leftover that fires does nothing (backend)**: A scheduled fetch that fires with no External provider chosen, before anything removed it (SPF-070), finds nothing to fetch: it records no run (SPF-050) and exits successfully.
 
@@ -136,7 +136,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 ## Workflow
 
 ```
-Settings page
+Settings dialog
     → "Daily price download" toggle ON + trigger time (default OFF)      (SPF-010)
         backend: persist configuration with app data                     (SPF-011)
         backend: register daily OS schedule at local trigger time        (SPF-012)
@@ -172,7 +172,7 @@ App opened later
 
 ### Entry Point
 
-Settings page — new "Daily price download" section, alongside the existing price-related settings (auto-fetch on launch MKT-120, auto-record toggle MKT-050).
+Settings dialog — "Daily price download" in the Prices section, beside auto-fetch on launch (MKT-120).
 
 ### Main Component
 

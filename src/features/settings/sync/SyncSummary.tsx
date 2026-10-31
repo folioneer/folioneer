@@ -6,9 +6,9 @@ import { useSyncSummary } from "./useSyncSummary";
 
 /**
  * SYN-063 — what the settings keep of sync: whether it is enabled or paused on this
- * computer, and the way to its page.
+ * computer, and the way to its page, which `onLeave` makes room for.
  */
-export function SyncSummary() {
+export function SyncSummary({ onLeave }: { onLeave: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { stateKey, loadError } = useSyncSummary();
@@ -31,7 +31,10 @@ export function SyncSummary() {
           data-testid="settings-open-sync"
           variant="outline"
           size="sm"
-          onClick={() => void navigate({ to: "/sync" })}
+          onClick={() => {
+            onLeave();
+            void navigate({ to: "/sync" });
+          }}
         >
           {t("sync.open_page")}
         </Button>

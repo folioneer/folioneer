@@ -1,4 +1,6 @@
 import { useTranslation } from "react-i18next";
+import { CheckboxField } from "@/ui/components/field/CheckboxField";
+import { TextField } from "@/ui/components/field/TextField";
 import { formatIsoDateTime } from "@/ui/format/date";
 import { formatScheduledFetchStatusLine } from "../shared/presenter";
 import { useScheduledFetchSection } from "./useScheduledFetchSection";
@@ -33,54 +35,37 @@ export function ScheduledFetchSection() {
 
   return (
     <section className="flex flex-col gap-2">
-      <label className="flex items-start gap-3 cursor-pointer group">
-        <input
-          id="scheduled-fetch-toggle"
-          data-testid="scheduled-fetch-toggle"
-          type="checkbox"
-          checked={enabled}
-          disabled={isConfiguring || isLoading}
-          onChange={() => void configure(!enabled, triggerTime)}
-          className="accent-m3-primary w-4 h-4 mt-1"
-        />
-        <span className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-m3-on-surface group-hover:text-m3-primary transition-colors">
-            {t("settings.scheduled_fetch_label")}
-          </span>
-          <span className="text-xs text-m3-on-surface-variant">
-            {t("settings.scheduled_fetch_description")}
-          </span>
-        </span>
-      </label>
+      <CheckboxField
+        id="scheduled-fetch-toggle"
+        label={t("settings.scheduled_fetch_label")}
+        description={t("settings.scheduled_fetch_description")}
+        checked={enabled}
+        disabled={isConfiguring || isLoading}
+        onChange={(checked) => void configure(checked, triggerTime)}
+      />
 
       {enabled && (
-        <label className="flex items-center gap-3 pl-7">
-          <span className="text-sm text-m3-on-surface-variant">
-            {t("settings.scheduled_fetch_time_label")}
-          </span>
-          <input
+        <div className="w-44">
+          <TextField
             id="scheduled-fetch-time"
             data-testid="scheduled-fetch-time"
+            label={t("settings.scheduled_fetch_time_label")}
             type="time"
             value={triggerTime}
             disabled={isConfiguring}
             onChange={(event) => void configure(enabled, event.target.value)}
-            className="rounded-lg border border-m3-outline-variant bg-m3-surface px-2 py-1 text-sm text-m3-on-surface"
           />
-        </label>
+        </div>
       )}
 
       {isLoading && (
-        <span
-          data-testid="scheduled-fetch-loading"
-          className="pl-7 text-xs text-m3-on-surface-variant"
-        >
+        <span data-testid="scheduled-fetch-loading" className="text-xs text-m3-on-surface-variant">
           {t("settings.scheduled_fetch.loading")}
         </span>
       )}
 
       {!isLoading && loadError && (
-        <span data-testid="scheduled-fetch-load-error" className="pl-7 text-xs text-m3-error">
+        <span data-testid="scheduled-fetch-load-error" className="text-xs text-m3-error">
           {t(loadError.key, loadError.vars)}
         </span>
       )}
@@ -89,14 +74,14 @@ export function ScheduledFetchSection() {
         <span
           id="scheduled-fetch-status"
           data-testid="scheduled-fetch-status"
-          className="pl-7 text-xs text-m3-on-surface-variant"
+          className="text-xs text-m3-on-surface-variant"
         >
           {t(statusLine.key, statusVars)}
         </span>
       )}
 
       {configureError && (
-        <span data-testid="scheduled-fetch-configure-error" className="pl-7 text-xs text-m3-error">
+        <span data-testid="scheduled-fetch-configure-error" className="text-xs text-m3-error">
           {t(configureError.key, configureError.vars)}
         </span>
       )}

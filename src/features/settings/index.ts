@@ -1,3 +1,3 @@
 export * as settingsGateway from "./gateway";
-export { SettingsPage } from "./SettingsPage";
+export { SettingsDialog } from "./SettingsDialog";
 export { SyncPage } from "./sync/SyncPage";

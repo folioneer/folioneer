@@ -1,9 +1,12 @@
 import { $, browser } from "@wdio/globals";
 
+/** The close button of any dialog, the Settings dialog's included. */
+const CLOSE_BUTTONS = "#modal-close-btn, #settings-close";
+
 /** Whether a modal's close button is on the page; `null` when the page changed under the lookup. */
 async function closeButtonExists(): Promise<boolean | null> {
   try {
-    return await (await $("#modal-close-btn")).isExisting();
+    return await (await $(CLOSE_BUTTONS)).isExisting();
   } catch {
     return null;
   }
@@ -36,7 +39,7 @@ export async function dismissLeftoverModal(): Promise<void> {
         const exists = await closeButtonExists();
         if (exists !== true) return exists === false;
         try {
-          await (await $("#modal-close-btn")).click();
+          await (await $(CLOSE_BUTTONS)).click();
         } catch {
           // The modal unmounted under the click: the next lookup says whether it is gone.
         }
