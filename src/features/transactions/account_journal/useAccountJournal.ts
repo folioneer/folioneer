@@ -157,6 +157,7 @@ export function useAccountJournal() {
                 sessionStartedAt: row.recorded_by.session_started_at,
               }
             : null,
+          addedDeposit: row.transaction.added_deposit === true,
         };
       }),
     [journal, assets, accounts],

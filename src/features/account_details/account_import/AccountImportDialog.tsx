@@ -5,6 +5,7 @@ import { IconButton } from "@/ui/components/button/IconButton";
 import { SelectField } from "@/ui/components/field/SelectField";
 import { FormModal } from "@/ui/components/modal/FormModal";
 import { messageText } from "@/ui/format/i18n";
+import { AccountImportPreview } from "./AccountImportPreview";
 import { MapperForm } from "./MapperForm";
 import { fileNameOf, folderOf } from "./presenter";
 import type { useAccountImport } from "./useAccountImport";
@@ -29,13 +30,31 @@ interface AccountImportDialogProps {
   view: ReturnType<typeof useAccountImport>;
   onClose: () => void;
   accountName: string;
+  accountCurrency: string;
 }
 
 /** What the window shows for the state its hook holds. */
-export function AccountImportDialog({ view, onClose, accountName }: AccountImportDialogProps) {
+export function AccountImportDialog({
+  view,
+  onClose,
+  accountName,
+  accountCurrency,
+}: AccountImportDialogProps) {
   const { t } = useTranslation();
   const { path, file, draft } = view;
   const mapperName = draft?.info.provider ?? "";
+
+  if (view.preview) {
+    return (
+      <AccountImportPreview
+        view={view}
+        preview={view.preview}
+        onClose={onClose}
+        accountName={accountName}
+        accountCurrency={accountCurrency}
+      />
+    );
+  }
 
   const footer = (
     <div className="flex justify-end gap-2">
@@ -186,16 +205,6 @@ export function AccountImportDialog({ view, onClose, accountName }: AccountImpor
               onProvider={view.changeProvider}
               onSave={view.saveMapper}
             />
-          )}
-
-          {view.preview && (
-            <p
-              id="account-import-preview-counts"
-              role="status"
-              className="text-sm text-m3-on-surface"
-            >
-              {t("account_import.preview_counts", { ...view.preview.counts })}
-            </p>
           )}
         </div>
       )}

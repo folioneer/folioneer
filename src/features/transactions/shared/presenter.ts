@@ -142,6 +142,8 @@ export interface TransactionRowViewModel {
    * undefined for a transaction the owner typed.
    */
   recordedBy?: { agent: string; sessionStartedAt: string } | null;
+  /** IMP-054 — a deposit an account import added to fund a purchase. */
+  addedDeposit?: boolean;
   /**
    * Bank-statement cash columns (account-wide journal only; undefined elsewhere).
    * `cashOut`/`cashIn` are the formatted debit/credit for this row (empty string when

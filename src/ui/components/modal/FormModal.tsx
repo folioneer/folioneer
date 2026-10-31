@@ -10,7 +10,7 @@ interface FormModalProps {
   title: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  maxWidth?: "max-w-md" | "max-w-2xl" | "max-w-3xl";
+  maxWidth?: "max-w-md" | "max-w-2xl" | "max-w-3xl" | "max-w-4xl";
   maxHeight?: "max-h-[80vh]" | "max-h-[90vh]";
 }
 

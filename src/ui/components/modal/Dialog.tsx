@@ -1,8 +1,9 @@
 import { X } from "lucide-react";
 import type React from "react";
-import { useEffect, useId } from "react";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../button";
+import { useModalStack } from "./useModalStack";
 
 interface DialogProps {
   /** F25 — stable id for the dialog surface, targetable from E2E. */
@@ -28,17 +29,8 @@ export function Dialog({
 }: DialogProps) {
   const { t } = useTranslation("common");
   const titleId = useId();
-  // Prevent scrolling when dialog is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [isOpen]);
+  // In the stack, so Escape does not reach a modal under this one; it has no Escape of its own.
+  useModalStack(isOpen);
 
   if (!isOpen) return null;
 

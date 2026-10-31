@@ -336,7 +336,9 @@ parameters, in the same order, positional — never wrapped in an object.
 
 **F31** — A feature never imports a sibling feature's modal. The opener sets a `?modal=…` URL
 parameter (`openModalSearch` / `patchModalSearch` in `src/lib/modalSearch.ts`) and a mount in
-`features/shell/` renders the modal (F26 — `shell/` is the one place sibling imports are allowed).
+`features/shell/` renders the modal (F26 — `shell/` is the one place sibling imports are allowed). A request that must hand back a
+result (the id of the asset created) cannot travel in a URL: a store in `src/lib/` carries the
+callback, the shell's mount reads it (`assetCreationRequest.ts`, `AssetCreationMount`).
 
 **F32** — Feature code makes no business decision: it never validates a business rule, never
 groups, orders or filters by business meaning, and never derives a figure from others. The core

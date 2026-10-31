@@ -5,6 +5,7 @@ use super::error::{CsvImportError, CsvImportTask};
 use super::orchestrator::{CsvImportUseCase, ImportPreview};
 use crate::context::account_import::{FileRead, ImportMapperDraft, ReadingChoices};
 use crate::core::logger::BACKEND;
+use crate::shared::infrastructure::e2e_run::e2e_picked_file;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
@@ -16,6 +17,9 @@ pub async fn pick_import_file(
     app: AppHandle,
     use_case: State<'_, CsvImportUseCase>,
 ) -> Result<Option<String>, CsvImportError> {
+    if let Some(path) = e2e_picked_file() {
+        return use_case.allow_file(&path).await.map(Some);
+    }
     let (sender, receiver) = tokio::sync::oneshot::channel();
     app.dialog().file().pick_file(move |file| {
         let _ = sender.send(file);

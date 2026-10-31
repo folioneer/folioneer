@@ -122,11 +122,17 @@ pub enum RowRead {
     JoinedTradeTax {
         /// The purchase's line number.
         purchase_line: u32,
+        /// The trade tax as read.
+        operation: OperationRead,
     },
     /// A label the mapper leaves to record by hand (IMP-022).
     NotImported {
         /// The label read.
         label: String,
+        /// The date, when it reads.
+        date: Option<String>,
+        /// The asset as read.
+        asset: AssetRead,
     },
     /// Rejected before it is matched.
     Rejected(RowRejection),
@@ -277,6 +283,17 @@ fn read_line(
                     column: column.as_deref().unwrap_or_default().trim().to_string(),
                 })
         };
+    let text = |position: Option<usize>| {
+        position
+            .map(field)
+            .filter(|text| !text.is_empty())
+            .map(str::to_string)
+    };
+    let asset_read = || AssetRead {
+        isin: text(located.isin),
+        reference: text(located.reference),
+        name: text(located.name),
+    };
     let columns = located.columns;
     let quantity = figure(located.quantity, &columns.quantity)?;
     let unit_price = figure(located.unit_price, &columns.unit_price)?;
@@ -327,6 +344,9 @@ fn read_line(
         OperationType::NotImported => {
             return Ok(RowRead::NotImported {
                 label: label.to_string(),
+                date: read_date(field(located.date), format.date_format)
+                    .map(|date| date.format("%Y-%m-%d").to_string()),
+                asset: asset_read(),
             })
         }
     };
@@ -336,19 +356,9 @@ fn read_line(
         })?
         .format("%Y-%m-%d")
         .to_string();
-    let text = |position: Option<usize>| {
-        position
-            .map(field)
-            .filter(|text| !text.is_empty())
-            .map(str::to_string)
-    };
     let asset = match operation_type {
         OperationType::Deposit | OperationType::Withdrawal => AssetRead::default(),
-        _ => AssetRead {
-            isin: text(located.isin),
-            reference: text(located.reference),
-            name: text(located.name),
-        },
+        _ => asset_read(),
     };
     Ok(RowRead::Operation(OperationRead {
         date,
@@ -404,15 +414,27 @@ fn join_trade_taxes(rows: &mut [Row]) {
                 RowRead::Operation(OperationRead {
                     date,
                     asset,
+                    currency,
                     figures: RowFigures::TradeTax { amount, quantity },
-                    ..
                 }),
             ..
         }) = rows.get(tax)
         else {
             continue;
         };
-        let (date, asset, amount, quantity) = (date.clone(), asset.clone(), *amount, *quantity);
+        let (date, asset, currency, amount, quantity) = (
+            date.clone(),
+            asset.clone(),
+            currency.clone(),
+            *amount,
+            *quantity,
+        );
+        let operation = OperationRead {
+            date,
+            asset,
+            currency,
+            figures: RowFigures::TradeTax { amount, quantity },
+        };
         let purchase = rows.iter().enumerate().position(|(index, row)| {
             !taken.contains(&index)
                 && matches!(
@@ -422,8 +444,8 @@ fn join_trade_taxes(rows: &mut [Row]) {
                         asset: purchase_asset,
                         figures: RowFigures::Purchase { quantity: bought, .. },
                         ..
-                    }) if *purchase_date == date
-                        && *purchase_asset == asset
+                    }) if *purchase_date == operation.date
+                        && *purchase_asset == operation.asset
                         && quantity.is_none_or(|quantity| quantity == *bought)
                 )
         });
@@ -439,6 +461,7 @@ fn join_trade_taxes(rows: &mut [Row]) {
             }
             Some(RowRead::JoinedTradeTax {
                 purchase_line: row.line,
+                operation,
             })
         });
         if let Some(row) = rows.get_mut(tax) {
@@ -607,7 +630,13 @@ mod tests {
         assert_eq!(
             read[1],
             RowRead::NotImported {
-                label: "ost DÉTACHEMENT".into()
+                label: "ost DÉTACHEMENT".into(),
+                date: Some("2024-01-03".into()),
+                asset: AssetRead {
+                    isin: None,
+                    reference: None,
+                    name: Some("X".into()),
+                },
             }
         );
     }
@@ -716,8 +745,18 @@ mod tests {
             _ => panic!("not a purchase"),
         };
         assert_eq!((fees(&read[0]), fees(&read[1])), (1_360_000, 2_400_000));
-        assert_eq!(read[2], RowRead::JoinedTradeTax { purchase_line: 2 });
-        assert_eq!(read[3], RowRead::JoinedTradeTax { purchase_line: 3 });
+        assert!(matches!(
+            &read[2],
+            RowRead::JoinedTradeTax { purchase_line: 2, operation }
+                if matches!(operation.figures, RowFigures::TradeTax { .. })
+        ));
+        assert!(matches!(
+            read[3],
+            RowRead::JoinedTradeTax {
+                purchase_line: 3,
+                ..
+            }
+        ));
         assert_eq!(read[4], RowRead::Rejected(RowRejection::TradeTaxUnpaired));
         assert_eq!(read[5], RowRead::Rejected(RowRejection::TradeTaxUnpaired));
     }

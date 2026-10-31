@@ -45,4 +45,13 @@ export const accountImportGateway = {
   ): Promise<Result<ImportPreview, CsvImportError>> {
     return commands.previewImport(accountId, path, mapperId, mapper);
   },
+  confirmImport(
+    accountId: string,
+    path: string,
+    mapperId: string | null,
+    mapper: ImportMapperDraft,
+    addDeposits: boolean,
+  ): Promise<Result<ImportPreview, CsvImportError>> {
+    return commands.confirmImport(accountId, path, mapperId, mapper, addDeposits);
+  },
 };

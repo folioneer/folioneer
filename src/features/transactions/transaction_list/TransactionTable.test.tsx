@@ -220,6 +220,20 @@ describe("TransactionTable", () => {
 
   // AGT-045 — the journal says which agent session recorded a row, and nothing for a row
   // the owner typed; the per-asset list has no such column.
+  // IMP-054 — an added deposit shows its chip, with its hint.
+  it("marks an added deposit in the journal", () => {
+    render(
+      <TransactionTable
+        rows={[row({ id: "added", addedDeposit: true })]}
+        {...baseProps}
+        cashStatement
+      />,
+    );
+    const chip = document.getElementById("txl-added-deposit-chip-added");
+    expect(chip).toHaveTextContent("transaction.added_deposit");
+    expect(chip).toHaveAttribute("title", "transaction.added_deposit_hint");
+  });
+
   it("shows the agent session that recorded a row, in the journal only", () => {
     const rows = [
       row({

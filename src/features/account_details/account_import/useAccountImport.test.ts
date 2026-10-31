@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileRead, ImportMapper } from "@/bindings";
+import { useAssetCreationRequest } from "@/lib/assetCreationRequest";
 import { useAccountImport } from "./useAccountImport";
 
 const gateway = vi.hoisted(() => ({
@@ -11,9 +12,19 @@ const gateway = vi.hoisted(() => ({
   rememberedImportMapper: vi.fn(),
   readImportFile: vi.fn(),
   previewImport: vi.fn(),
+  confirmImport: vi.fn(),
 }));
 
 vi.mock("./gateway", () => ({ accountImportGateway: gateway }));
+const onRecorded = vi.fn();
+const showSnackbar = vi.fn();
+vi.mock("@/ui/components/snackbar/snackbarStore", () => ({ useSnackbar: () => showSnackbar }));
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string, vars?: Record<string, unknown>) =>
+      vars ? `${key} ${JSON.stringify(vars)}` : key,
+  }),
+}));
 vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
@@ -56,29 +67,73 @@ const saved: ImportMapper = {
 };
 const counts = { ready: 1, rejected: 0, unknown_asset: 0, already_recorded: 0, not_imported: 0 };
 
+const judged = (over = {}) => ({
+  file: fileRead,
+  rows: [],
+  counts,
+  all_recorded: false,
+  deposits: { count: 0, total: 0, ready_without: 0 },
+  unknown_assets: [],
+  matchable_assets: [],
+  ...over,
+});
+
 /** The window with a file picked, its folder remembering `remembered`. */
 async function picked(remembered: string | null = null) {
   gateway.pickImportFile.mockResolvedValue(ok(PATH));
   gateway.rememberedImportMapper.mockResolvedValue(ok(remembered));
-  const hook = renderHook(() => useAccountImport("acc-1"));
+  const hook = renderHook(() => useAccountImport("acc-1", "EUR", onRecorded));
   await act(() => hook.result.current.chooseFile());
   return hook;
 }
 
 describe("useAccountImport", () => {
   beforeEach(() => {
+    onRecorded.mockReset();
+    showSnackbar.mockReset();
     for (const mock of Object.values(gateway)) mock.mockReset();
     gateway.listImportMappers.mockResolvedValue(ok([saved]));
     gateway.readImportFile.mockResolvedValue(ok(fileRead));
-    gateway.previewImport.mockResolvedValue(ok({ file: fileRead, rows: [], counts }));
+    gateway.previewImport.mockResolvedValue(ok(judged()));
   });
 
   it("stays on the first step when the dialog is closed", async () => {
     gateway.pickImportFile.mockResolvedValue(ok(null));
-    const { result } = renderHook(() => useAccountImport("acc-1"));
+    const { result } = renderHook(() => useAccountImport("acc-1", "EUR", onRecorded));
     await act(() => result.current.chooseFile());
     expect(result.current.path).toBeNull();
     expect(gateway.readImportFile).not.toHaveBeenCalled();
+  });
+
+  // IMP-060 — a dialog closed unpicked changes nothing.
+  it("keeps the current file when choosing another is closed unpicked", async () => {
+    const { result } = await picked();
+    gateway.pickImportFile.mockResolvedValue(ok(null));
+    await act(() => result.current.chooseFile());
+    expect(result.current.path).toBe(PATH);
+  });
+
+  // IMP-063 — the alert stays until another mapper or a change in the open form.
+  describe("a file the mapper does not match", () => {
+    const lacking = refused({ code: "MappedColumnsNotInFile", columns: ["ISIN"] });
+
+    it("lists the columns, and a change in the form lifts them", async () => {
+      const { result } = await picked();
+      gateway.previewImport.mockResolvedValue(lacking);
+      await act(async () => result.current.runPreview());
+      expect(result.current.lackingColumns).toEqual(["ISIN"]);
+      act(() => result.current.changeProvider("Other"));
+      expect(result.current.lackingColumns).toEqual([]);
+    });
+
+    it("lifts them when another mapper is picked", async () => {
+      const { result } = await picked();
+      gateway.previewImport.mockResolvedValue(lacking);
+      await act(async () => result.current.runPreview());
+      gateway.previewImport.mockResolvedValue(ok(judged()));
+      await act(async () => result.current.selectMapper("fortuneo"));
+      expect(result.current.lackingColumns).toEqual([]);
+    });
   });
 
   // IMP-061 — no memory: a new mapper over what was detected.
@@ -224,7 +279,7 @@ describe("useAccountImport", () => {
     act(() => result.current.runPreview());
     expect(result.current.preview).toBeNull();
     act(() => result.current.changeLabelType("Buy", "Sale"));
-    await act(async () => finish(ok({ file: fileRead, rows: [], counts })));
+    await act(async () => finish(ok(judged())));
     await waitFor(() => expect(result.current.busy).toBe(false));
     expect(result.current.preview).toBeNull();
   });
@@ -366,5 +421,178 @@ describe("useAccountImport", () => {
     expect(result.current.mappers).toEqual([]);
     expect(result.current.problem?.key).toBe("account_import.error.mapper_folder_failed");
     expect(result.current.path).toBe(PATH);
+  });
+
+  describe("the preview's step", () => {
+    const asset = { isin: "FR0001", reference: null, name: "Exemple" };
+    const operation = {
+      date: "2025-03-03",
+      asset,
+      currency: null,
+      figures: { type: "Purchase" as const, quantity: 1_000_000, unit_price: 1, fees: 0 },
+    };
+    const unknownRows = {
+      file: fileRead,
+      rows: [
+        {
+          line: 2,
+          amount: 1,
+          status: { status: "UnknownAsset" as const, asset, operation },
+        },
+      ],
+      counts: { ...counts, ready: 0, unknown_asset: 1 },
+      all_recorded: false,
+      deposits: { count: 0, total: 0, ready_without: 0 },
+      unknown_assets: [{ read: "FR0001", asset, lines: [2] }],
+      matchable_assets: [],
+    };
+
+    async function previewed(answer: object = unknownRows) {
+      const hook = await picked();
+      gateway.previewImport.mockResolvedValue(ok(answer));
+      await act(async () => hook.result.current.runPreview());
+      return hook;
+    }
+
+    // IMP-066 — back to the mapper keeps the file and the mapper in use.
+    it("goes back to the mapper with nothing lost", async () => {
+      const { result } = await previewed();
+      expect(result.current.preview).not.toBeNull();
+      const draft = result.current.draft;
+      act(() => result.current.backToMapper());
+      expect(result.current.preview).toBeNull();
+      expect(result.current.path).toBe(PATH);
+      expect(result.current.draft).toBe(draft);
+    });
+
+    // IMP-033 — a refused match stays out of the mapper, so later previews still run.
+    it("leaves a refused match out of the mapper and shows the refusal", async () => {
+      const { result } = await previewed();
+      gateway.previewImport.mockResolvedValue(
+        refused({ code: "MatchedAssetNotFound", asset_id: "gone" }),
+      );
+      await act(async () => result.current.step.match("FR0001", "gone"));
+      expect(result.current.draft?.asset_matches).toEqual([]);
+      expect(result.current.problem).not.toBeNull();
+      expect(result.current.preview).not.toBeNull();
+    });
+
+    // IMP-066 — back to the mapper keeps a match just made.
+    it("keeps a new match when going back to the mapper", async () => {
+      const { result } = await previewed();
+      await act(async () => result.current.step.match("FR0001", "asset-1"));
+      act(() => result.current.backToMapper());
+      expect(result.current.draft?.asset_matches).toEqual([
+        { read: "FR0001", asset_id: "asset-1" },
+      ]);
+    });
+
+    // IMP-068 — a confirmation that recorded nothing says so.
+    it("says when the confirmation recorded nothing", async () => {
+      const { result } = await previewed();
+      gateway.confirmImport.mockResolvedValue(ok(judged({ counts: { ...counts, ready: 0 } })));
+      await act(async () => result.current.step.confirm());
+      expect(showSnackbar).toHaveBeenCalledWith("account_import.recorded_none", "info");
+      expect(onRecorded).toHaveBeenCalledOnce();
+    });
+
+    // IMP-067 — a match joins the mapper in use and the rows are judged again.
+    it("matches an unknown asset to the first text it read and judges again", async () => {
+      const { result } = await previewed();
+      act(() => result.current.step.focus(2));
+      expect(result.current.step.focused?.read).toBe("FR0001");
+      expect(result.current.step.focusedRows).toHaveLength(1);
+      await act(async () => result.current.step.match("FR0001", "asset-1"));
+
+      expect(gateway.previewImport).toHaveBeenLastCalledWith(
+        "acc-1",
+        PATH,
+        null,
+        expect.objectContaining({
+          asset_matches: [{ read: "FR0001", asset_id: "asset-1" }],
+        }),
+      );
+      expect(result.current.step.focused).toBeNull();
+      expect(result.current.draft?.asset_matches).toHaveLength(1);
+    });
+
+    // IMP-052, IMP-052A — the usual form prefilled; the asset created takes the row's text.
+    it("asks for the asset prefilled, then matches the one created", async () => {
+      const { result } = await previewed();
+      act(() => result.current.step.createAsset("FR0001", asset));
+      const { request } = useAssetCreationRequest.getState();
+      expect(request?.prefill).toEqual({
+        name: "Exemple",
+        reference: null,
+        isin: "FR0001",
+        currency: "EUR",
+        asset_class: null,
+        exchange: null,
+      });
+      await act(async () => request?.onCreated("created"));
+      expect(gateway.previewImport).toHaveBeenLastCalledWith(
+        "acc-1",
+        PATH,
+        null,
+        expect.objectContaining({
+          asset_matches: [{ read: "FR0001", asset_id: "created" }],
+        }),
+      );
+      act(() => useAssetCreationRequest.getState().close());
+    });
+
+    // IMP-051B, IMP-068 — the count follows the choice, which the confirmation carries.
+    it("records with the deposits' choice, closes and says how many", async () => {
+      const funded = {
+        file: fileRead,
+        rows: [
+          {
+            line: 2,
+            amount: 1,
+            status: { status: "Ready" as const, operation, asset_id: "a", funding: 5 },
+          },
+          {
+            line: 3,
+            amount: 1,
+            status: { status: "Ready" as const, operation, asset_id: "a", funding: null },
+          },
+        ],
+        counts: { ...counts, ready: 2 },
+        all_recorded: false,
+        deposits: { count: 1, total: 5, ready_without: 1 },
+        unknown_assets: [],
+        matchable_assets: [],
+      };
+      const { result } = await previewed(funded);
+      expect(result.current.step.recordable).toBe(2);
+
+      act(() => result.current.step.setAddDeposits(false));
+      expect(result.current.step.recordable).toBe(1);
+
+      gateway.confirmImport.mockResolvedValue(ok({ ...funded, counts: { ...counts, ready: 1 } }));
+      await act(async () => result.current.step.confirm());
+      expect(gateway.confirmImport).toHaveBeenCalledWith(
+        "acc-1",
+        PATH,
+        null,
+        expect.anything(),
+        false,
+      );
+      expect(showSnackbar).toHaveBeenCalledWith('account_import.recorded {"count":1}', "success");
+      expect(onRecorded).toHaveBeenCalledOnce();
+    });
+
+    // IMP-068 — a refusal is shown and the step stays.
+    it("stays open on a refused confirmation", async () => {
+      const { result } = await previewed();
+      gateway.confirmImport.mockResolvedValue({
+        status: "error",
+        error: { code: "DatabaseError" },
+      });
+      await act(async () => result.current.step.confirm());
+      expect(result.current.problem).toEqual({ key: "error.DatabaseError" });
+      expect(result.current.preview).not.toBeNull();
+      expect(onRecorded).not.toHaveBeenCalled();
+    });
   });
 });

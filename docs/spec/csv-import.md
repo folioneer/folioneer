@@ -44,6 +44,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `line`      | Its line number in the file, the header being line 1.                                                                                                                                                                  |
 | `operation` | Its operation type, date, asset as read and figures — the quantity, unit price and fees (a joined trade tax included, IMP-034) of a purchase or a sale, the amount of a dividend, a deposit or a withdrawal (IMP-031). |
+| `amount`    | A purchase's or a sale's total as manual entry computes it (TRX-026, SEL-023); any other row's amount as it reads, a joined trade tax showing its own; none for a row without figures (IMP-030).                       |
 | `asset`     | The asset of the portfolio it was matched to, none for a deposit and a withdrawal (IMP-032).                                                                                                                           |
 | `status`    | **Ready**, **rejected** with its reason, **unknown asset**, **already recorded** or **not imported** with its label (IMP-030); a joined trade tax names its purchase's line instead.                                   |
 | `funding`   | For a ready purchase the cash cannot fund, the deposit it needs (IMP-038); none for any other row.                                                                                                                     |
@@ -106,7 +107,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 ### Rows and the preview (030–039)
 
-**IMP-030 — The preview judges every row (backend)**: The preview reads every row of the file through the mapper in use, in the file's order, and gives each its status: **ready**; **rejected**, with its reason; **unknown asset**, with the name, ISIN or reference read (IMP-032); **already recorded** (IMP-036); **not imported**, with its label (IMP-022); or, for a trade tax joined to its purchase, that purchase's line (IMP-034). It also counts the rows of each status. A date or a figure that does not read is a rejection naming its column.
+**IMP-030 — The preview judges every row (backend)**: The preview reads every row of the file through the mapper in use, in the file's order, and gives each its status: **ready**; **rejected**, with its reason; **unknown asset**, with the name, ISIN or reference read (IMP-032); **already recorded** (IMP-036); **not imported**, with its label (IMP-022); or, for a trade tax joined to its purchase, that purchase's line (IMP-034). Each row shows what it read: its date, its operation or label, its asset, its quantity and its total as manual entry computes it (TRX-026, SEL-023), or its amount; a row that reads as no operation shows only its reason. It also counts the rows of each status. A date or a figure that does not read is a rejection naming its column.
 
 **IMP-031 — The figures of each type (backend)**: Signs are ignored: the type gives the direction. A **purchase** and a **sale** read the quantity, the unit price — or, when the row has no unit price, the gross amount divided by the quantity, rounded down to the micro-unit, a quantity of zero being rejected first (TRX-020) — and the fees, zero when the column is absent or empty; the file's net amount is not checked. A **dividend**, a **deposit** and a **withdrawal** read the net amount when the mapper names its column and the row's field is not empty, and the gross amount otherwise. A figure the type needs and the row lacks is a rejection naming it.
 
@@ -146,7 +147,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 **IMP-051B — The added deposits can be left out (frontend + backend)**: The added deposits are on by default; the user may leave them out for this account import: such a purchase is then judged without one and rejected as manual entry rejects it (CSH-041).
 
-**IMP-052 — An unknown asset is created from its row (frontend)**: From an unknown-asset row the user opens the usual asset form, prefilled with what the row read — its name, ISIN and reference — and the account's currency; its kind, class and category are chosen there, every field stays editable, and the form's refusals hold (AST-001, AST-031, AST-032).
+**IMP-052 — An unknown asset is created from its row (frontend)**: From an unknown-asset row the user opens the usual asset form, prefilled with what the row read — its name, ISIN and reference — and the account's currency; its kind, class and category are chosen there, every field stays editable, and the form's refusals hold (AST-001, AST-031, AST-032). It opens directly, without the lookup of AST-040: on a listed asset when the row read an ISIN, on a custom asset otherwise; changing the kind stays in the form, what was typed kept.
 
 **IMP-052A — The asset created takes its row (frontend + backend)**: The window asks for the asset created from a row to be matched (IMP-033) to the first the row read of its ISIN, its reference and its name, whatever was edited in the form, and the preview judges the rows again (IMP-032); created in another currency, they are rejected (IMP-037).
 
@@ -168,7 +169,13 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 **IMP-064 — A mapper file refused (frontend)**: A file that cannot be added as a mapper (IMP-020B) shows an alert with the reason and disables Preview until the next change in the window; the mapper in use stays as it was. A dialog closed unpicked changes nothing.
 
-**IMP-065 — Preview (frontend)**: Preview runs the preview with the mapper in use, saved or not (IMP-030), and says how many rows hold each status; a new run or any change takes those counts away, and work a later change overtook is dropped. A refusal is shown and disables it until the next change. While the window reads or previews, Preview shows it is working.
+**IMP-065 — Preview (frontend)**: Preview runs the preview with the mapper in use, saved or not (IMP-030), and opens its step (IMP-066); work a later change overtook is dropped. A refusal is shown and disables it until the next change. While the window reads or previews, Preview shows it is working.
+
+**IMP-066 — The preview's step (frontend)**: The step says nothing is recorded until the user confirms, or, when every row is already recorded, that importing again records nothing. It counts each status held, then lists the rows in the file's order, each with its line, status, date, operation, asset, and the quantity and amount it has (IMP-030), and under it what it has to say: the deposit it needs (IMP-038), why it is rejected, or that the mapper leaves it out; the other rows say nothing more. A trade tax says the line it joins (IMP-034). Back to the mapper returns to the window, the file and the mapper in use kept, its new matches too.
+
+**IMP-067 — An unknown asset's step (frontend + backend)**: The status of an unknown asset's row opens that asset's step, unless the row read no ISIN, reference or name: its rows, a select of the portfolio's assets, archived ones included and Cash Assets left out, and the way to create it (IMP-052). Matching adds to the mapper in use the match of the first the row read of its ISIN, its reference and its name (IMP-033); matching or creating judges the rows again and returns to the preview (IMP-052A). A refusal is shown. Back to the preview changes nothing. A row that read none of them has nothing to match: like any row still unknown, it is left out at the confirmation.
+
+**IMP-068 — Confirming (frontend)**: When a ready purchase needs a deposit, the step offers to add them, ticked, naming how many and their total (IMP-051B). The confirm action names the ready rows it will record, less the purchases needing a deposit when unticked; with none it says there is nothing to record and is disabled. On confirmation the window closes and says how many rows were recorded (IMP-050); a refusal is shown and the step stays.
 
 ---
 
@@ -194,7 +201,7 @@ confirm: the ready rows recorded at once (IMP-050), the added deposits by defaul
 
 ## UX Draft
 
-The validated mock is on #503 (folioneer/folioneer-design, `503/`). The preview itself is #504, with its mock.
+The validated mocks are on #503 and #504 (folioneer/folioneer-design, `503/`, `504/`).
 
 ### Entry Point
 
@@ -208,8 +215,8 @@ The Import action of the account details header (IMP-060).
 
 - **Empty:** picking a file (IMP-060).
 - **Loading:** Preview shows the window working (IMP-065).
-- **Error:** a file not read (IMP-061), a file not matching (IMP-063), a mapper file refused (IMP-064), a preview refused (IMP-065).
-- **Success:** a new mapper's form (IMP-061), a saved mapper matching (IMP-062), the row counts (IMP-065).
+- **Error:** a file not read (IMP-061), a file not matching (IMP-063), a mapper file refused (IMP-064), a preview refused (IMP-065), a match refused (IMP-067), a confirmation refused (IMP-068).
+- **Success:** a new mapper's form (IMP-061), a saved mapper matching (IMP-062), the preview's step (IMP-066), an unknown asset's step (IMP-067), the rows recorded (IMP-068).
 
 ### User Flow
 

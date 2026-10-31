@@ -1,4 +1,4 @@
-import { Bot, Pencil, Trash2 } from "lucide-react";
+import { Bot, FilePlus, Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IconButton } from "@/ui/components/button/IconButton";
 import { SortIcon } from "@/ui/components/SortIcon";
@@ -165,6 +165,17 @@ export function TransactionTable({
                 {/* AGT-045 — which agent session recorded the row; empty for the owner's own */}
                 {cashStatement && (
                   <td id={`txl-recorded-by-${row.id}`} className="m3-td">
+                    {/* IMP-054 — a deposit an account import added */}
+                    {row.addedDeposit && (
+                      <span
+                        id={`txl-added-deposit-chip-${row.id}`}
+                        title={t("transaction.added_deposit_hint")}
+                        className="inline-flex items-center gap-1.5 max-w-36 px-2.5 py-1 rounded-full border border-m3-outline-variant text-xs text-m3-on-surface-variant"
+                      >
+                        <FilePlus size={12} aria-hidden="true" className="shrink-0" />
+                        <span className="truncate">{t("transaction.added_deposit")}</span>
+                      </span>
+                    )}
                     {row.recordedBy && (
                       <span
                         id={`txl-recorded-by-chip-${row.id}`}

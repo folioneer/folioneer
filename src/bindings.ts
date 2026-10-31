@@ -3274,6 +3274,22 @@ amount_micros: number;
  */
 note: string | null }
 /**
+ * IMP-068 — the deposits the ready purchases need, and what is left to record without them.
+ */
+export type DepositsNeeded = { 
+/**
+ * How many purchases need one.
+ */
+count: number; 
+/**
+ * Their total (micro-units).
+ */
+total: number; 
+/**
+ * The ready rows left when the deposits are left out (IMP-051B).
+ */
+ready_without: number }
+/**
  * Parameters for recording a cash dividend attributed to a held asset (DIV-020).
  */
 export type DividendDTO = { 
@@ -4130,7 +4146,24 @@ rows: PreviewRow[];
 /**
  * How many rows hold each status.
  */
-counts: PreviewCounts }
+counts: PreviewCounts; 
+/**
+ * IMP-053, IMP-066 — the file holds rows, and every one is already recorded.
+ */
+all_recorded: boolean; 
+/**
+ * The deposits the ready purchases need (IMP-038).
+ */
+deposits: DepositsNeeded; 
+/**
+ * The unknown assets, each with its rows, as first met (IMP-067).
+ */
+unknown_assets: UnknownAssetRows[]; 
+/**
+ * What an unknown asset can be matched to, by name: archived ones included, no Cash
+ * Asset (IMP-032, IMP-067).
+ */
+matchable_assets: MatchableAsset[] }
 /**
  * One inconsistent holding surfaced in sync status (SYN-040).
  */
@@ -4481,6 +4514,18 @@ export type MapperInfo = {
  * Who the export comes from, trimmed (IMP-024).
  */
 provider: string }
+/**
+ * IMP-067 — an asset a row can be matched to.
+ */
+export type MatchableAsset = { 
+/**
+ * Its id.
+ */
+id: string; 
+/**
+ * Its name.
+ */
+name: string }
 /**
  * UPD-018 / UPD-035 — what the window is told when the portfolio could not be opened.
  */
@@ -4863,7 +4908,12 @@ line: number;
 /**
  * Its status.
  */
-status: RowStatus }
+status: RowStatus; 
+/**
+ * IMP-030 — its total as manual entry computes it (TRX-026, SEL-023), or the amount it
+ * reads (micro-units); none for a row without figures.
+ */
+amount: number | null }
 /**
  * MKT-220 — the last failure recorded for one asset on this installation.
  */
@@ -5444,11 +5494,11 @@ export type RowStatus =
 /**
  * Not recorded, with its reason.
  */
-{ status: "Rejected"; reason: RowReason } | 
+{ status: "Rejected"; reason: RowReason; operation: OperationRead | null } | 
 /**
  * No asset of the portfolio matches it (IMP-032).
  */
-{ status: "UnknownAsset"; asset: AssetRead } | 
+{ status: "UnknownAsset"; asset: AssetRead; operation: OperationRead } | 
 /**
  * The account holds it already (IMP-036).
  */
@@ -5456,12 +5506,12 @@ export type RowStatus =
 /**
  * A label the mapper leaves to record by hand (IMP-022).
  */
-{ status: "NotImported"; label: string } | 
+{ status: "NotImported"; label: string; date: string | null; asset: AssetRead } | 
 /**
  * A trade tax added to the purchase on line `purchase_line`, of that purchase's status
  * (IMP-034).
  */
-{ status: "JoinedTradeTax"; purchase_line: number }
+{ status: "JoinedTradeTax"; purchase_line: number; operation: OperationRead }
 /**
  * The device-wide configuration of the daily download (SPF-010). Exactly one
  * configuration exists (singleton row, migration-seeded).
@@ -6576,6 +6626,22 @@ exchange_rate: number;
  * The transfer in's note.
  */
 note: string | null }
+/**
+ * IMP-067 — the rows of one unknown asset: those whose first text read is the same.
+ */
+export type UnknownAssetRows = { 
+/**
+ * The first the rows read of their ISIN, reference and name: what a match stands for.
+ */
+read: string; 
+/**
+ * The asset as the first row read it.
+ */
+asset: AssetRead; 
+/**
+ * Its rows' line numbers.
+ */
+lines: number[] }
 /**
  * One asset a price-fetch task could not price (MKT-170/171), carried in the
  * `AssetPriceFetchCompleted` payload so the frontend can list it for manual entry.

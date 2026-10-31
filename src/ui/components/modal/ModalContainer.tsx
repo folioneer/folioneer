@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useModalStack } from "./useModalStack";
 
 interface ModalContainerProps {
   /** F25 — stable id for the dialog panel, targetable from E2E. */
@@ -19,7 +20,7 @@ interface ModalContainerProps {
  * - Fixed overlay with centered positioning
  * - Consistent backdrop styling
  * - Body scroll prevention
- * - Escape key handling
+ * - Escape key handling: only the top modal of a stack closes
  *
  * Use this for simple modals or as a wrapper for more complex patterns.
  */
@@ -34,25 +35,16 @@ export function ModalContainer({
 }: ModalContainerProps) {
   const { t } = useTranslation("common");
 
+  const isTop = useModalStack(isOpen);
+
   useEffect(() => {
+    if (!isOpen) return;
     const handleEscapeKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isOpen) {
-        onClose();
-      }
+      if (event.key === "Escape" && isTop()) onClose();
     };
-
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      document.addEventListener("keydown", handleEscapeKey);
-    }
-
-    return () => {
-      if (isOpen) {
-        document.body.style.overflow = "auto";
-      }
-      document.removeEventListener("keydown", handleEscapeKey);
-    };
-  }, [isOpen, onClose]);
+    document.addEventListener("keydown", handleEscapeKey);
+    return () => document.removeEventListener("keydown", handleEscapeKey);
+  }, [isOpen, isTop, onClose]);
 
   if (!isOpen) return null;
 
