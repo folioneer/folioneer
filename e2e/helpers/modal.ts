@@ -18,6 +18,17 @@ async function closeButtonExists(): Promise<boolean | null> {
  * stale element. Every step is therefore taken on a fresh lookup, and a step the
  * page changed under is taken again until the page holds no close button.
  */
+/**
+ * Waits out a snackbar left by the previous scenario: it can cover a row of the next one. Its
+ * live region stays in the page; what it shows goes after four seconds.
+ */
+export async function waitForSnackbarGone(): Promise<void> {
+  await browser.waitUntil(async () => !(await $('[role="status"] > div').isExisting()), {
+    timeout: 8000,
+    timeoutMsg: "The previous scenario's snackbar must have gone",
+  });
+}
+
 export async function dismissLeftoverModal(): Promise<void> {
   await browser
     .waitUntil(

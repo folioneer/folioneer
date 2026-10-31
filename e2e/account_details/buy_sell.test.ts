@@ -15,9 +15,9 @@
  */
 
 import assert from "node:assert";
-import { $, browser } from "@wdio/globals";
+import { $ } from "@wdio/globals";
 import { isoToDisplayDate } from "../helpers/date";
-import { dismissLeftoverModal } from "../helpers/modal";
+import { dismissLeftoverModal, waitForSnackbarGone } from "../helpers/modal";
 import { navigateToAccountDetails, navigateToAccounts } from "../helpers/navigation";
 import { setReactInputValue } from "../helpers/react";
 import { captureScreen } from "../helpers/screenshot";
@@ -39,12 +39,7 @@ const DATES = {
 
 describe("buy_sell", () => {
   beforeEach(async () => {
-    // A snackbar outlives its scenario and can cover the next one's row: the header wraps at
-    // this window's width. Its live region stays; what it shows goes after four seconds.
-    await browser.waitUntil(async () => !(await $('[role="status"] > div').isExisting()), {
-      timeout: 8000,
-      timeoutMsg: "The previous scenario's snackbar must have gone",
-    });
+    await waitForSnackbarGone();
     await dismissLeftoverModal();
   });
 
