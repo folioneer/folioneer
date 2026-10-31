@@ -430,8 +430,8 @@ fn join_trade_taxes(rows: &mut [Row]) {
             *quantity,
         );
         let operation = OperationRead {
-            date: date.clone(),
-            asset: asset.clone(),
+            date,
+            asset,
             currency,
             figures: RowFigures::TradeTax { amount, quantity },
         };
@@ -444,8 +444,8 @@ fn join_trade_taxes(rows: &mut [Row]) {
                         asset: purchase_asset,
                         figures: RowFigures::Purchase { quantity: bought, .. },
                         ..
-                    }) if *purchase_date == date
-                        && *purchase_asset == asset
+                    }) if *purchase_date == operation.date
+                        && *purchase_asset == operation.asset
                         && quantity.is_none_or(|quantity| quantity == *bought)
                 )
         });

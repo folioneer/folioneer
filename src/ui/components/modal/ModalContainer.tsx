@@ -1,5 +1,6 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useModalStack } from "./useModalStack";
 
 interface ModalContainerProps {
   /** F25 — stable id for the dialog panel, targetable from E2E. */
@@ -11,9 +12,6 @@ interface ModalContainerProps {
   maxHeight?: "max-h-[80vh]" | "max-h-[90vh]";
   titleId?: string;
 }
-
-/** The open modals, the last opened last: Escape and the page's scroll follow the top one. */
-const openModals: object[] = [];
 
 /**
  * ModalContainer: Base modal wrapper with consistent overlay and close handling
@@ -37,28 +35,16 @@ export function ModalContainer({
 }: ModalContainerProps) {
   const { t } = useTranslation("common");
 
-  const self = useRef({});
-
-  // Its own effect: a parent's new `onClose` must not move this modal up the stack.
-  useEffect(() => {
-    if (!isOpen) return;
-    const modal = self.current;
-    openModals.push(modal);
-    document.body.style.overflow = "hidden";
-    return () => {
-      openModals.splice(openModals.indexOf(modal), 1);
-      if (openModals.length === 0) document.body.style.overflow = "auto";
-    };
-  }, [isOpen]);
+  const isTop = useModalStack(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
     const handleEscapeKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && openModals.at(-1) === self.current) onClose();
+      if (event.key === "Escape" && isTop()) onClose();
     };
     document.addEventListener("keydown", handleEscapeKey);
     return () => document.removeEventListener("keydown", handleEscapeKey);
-  }, [isOpen, onClose]);
+  }, [isOpen, isTop, onClose]);
 
   if (!isOpen) return null;
 

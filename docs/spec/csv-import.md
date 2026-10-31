@@ -44,7 +44,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `line`      | Its line number in the file, the header being line 1.                                                                                                                                                                  |
 | `operation` | Its operation type, date, asset as read and figures — the quantity, unit price and fees (a joined trade tax included, IMP-034) of a purchase or a sale, the amount of a dividend, a deposit or a withdrawal (IMP-031). |
-| `amount`    | Its total as manual entry computes it (TRX-026, SEL-023), or the amount it reads; none for a row without figures (IMP-030).                                                                                            |
+| `amount`    | Its total as manual entry computes it (TRX-026, SEL-023), or the amount it reads, a joined trade tax's own included; none for a row without figures (IMP-030).                                                         |
 | `asset`     | The asset of the portfolio it was matched to, none for a deposit and a withdrawal (IMP-032).                                                                                                                           |
 | `status`    | **Ready**, **rejected** with its reason, **unknown asset**, **already recorded** or **not imported** with its label (IMP-030); a joined trade tax names its purchase's line instead.                                   |
 | `funding`   | For a ready purchase the cash cannot fund, the deposit it needs (IMP-038); none for any other row.                                                                                                                     |
@@ -173,7 +173,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 **IMP-066 — The preview's step (frontend)**: The step says nothing is recorded until the user confirms, or, when every row is already recorded, that importing again records nothing. It counts each status held, then lists the rows in the file's order, each with its line, status, date, operation, asset, and the quantity and amount it has (IMP-030), and under it what it has to say: the deposit it needs (IMP-038), why it is rejected, or that the mapper leaves it out. A trade tax says the line it joins (IMP-034). Back to the mapper returns to the window, the file and the mapper in use kept, its new matches too.
 
-**IMP-067 — An unknown asset's step (frontend + backend)**: The status of an unknown asset's row opens that asset's step, unless the row read no ISIN, reference or name: its rows, a select of the portfolio's assets, archived ones included and Cash Assets left out, and the way to create it (IMP-052). Matching adds to the mapper in use the match of the first the row read of its ISIN, its reference and its name (IMP-033); matching or creating judges the rows again and returns to the preview (IMP-052A). A refusal is shown. Back to the preview changes nothing.
+**IMP-067 — An unknown asset's step (frontend + backend)**: The status of an unknown asset's row opens that asset's step, unless the row read no ISIN, reference or name: its rows, a select of the portfolio's assets, archived ones included and Cash Assets left out, and the way to create it (IMP-052). Matching adds to the mapper in use the match of the first the row read of its ISIN, its reference and its name (IMP-033); matching or creating judges the rows again and returns to the preview (IMP-052A). A refusal is shown. Back to the preview changes nothing. A row that read none of them has nothing to match: like any row still unknown, it is left out at the confirmation.
 
 **IMP-068 — Confirming (frontend)**: When a ready purchase needs a deposit, the step offers to add them, ticked, naming how many and their total (IMP-051B). The confirm action names the ready rows it will record, less the purchases needing a deposit when unticked; with none it says there is nothing to record and is disabled. On confirmation the window closes and says how many rows were recorded (IMP-050); a refusal is shown and the step stays.
 
@@ -215,7 +215,7 @@ The Import action of the account details header (IMP-060).
 
 - **Empty:** picking a file (IMP-060).
 - **Loading:** Preview shows the window working (IMP-065).
-- **Error:** a file not read (IMP-061), a file not matching (IMP-063), a mapper file refused (IMP-064), a preview refused (IMP-065), a confirmation refused (IMP-068).
+- **Error:** a file not read (IMP-061), a file not matching (IMP-063), a mapper file refused (IMP-064), a preview refused (IMP-065), a match refused (IMP-067), a confirmation refused (IMP-068).
 - **Success:** a new mapper's form (IMP-061), a saved mapper matching (IMP-062), the preview's step (IMP-066), an unknown asset's step (IMP-067), the rows recorded (IMP-068).
 
 ### User Flow

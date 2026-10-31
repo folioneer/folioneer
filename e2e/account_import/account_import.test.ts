@@ -53,13 +53,17 @@ describe("account_import", () => {
     await navigateToAccounts();
     await navigateToAccountDetails(accountId);
     await clickHeaderAction("add-menu-import");
-    await (await $("#account-import-choose-file")).click();
+    const choose = await $("#account-import-choose-file");
+    await choose.waitForExist({ timeout: 8000 });
+    await choose.click();
 
     const mapper = await $("#account-import-mapper");
     await mapper.waitForExist({ timeout: 8000 });
     await mapper.selectByAttribute("value", mapperId);
     await (await $("#account-import-matches")).waitForExist({ timeout: 8000 });
-    await (await $("#account-import-preview")).click();
+    const previewAction = await $("#account-import-preview");
+    await previewAction.waitForEnabled({ timeout: 8000 });
+    await previewAction.click();
 
     const unknown = await $("#account-import-unknown-5");
     await unknown.waitForExist({ timeout: 8000 });
@@ -76,19 +80,19 @@ describe("account_import", () => {
     await (await $("#account-import-match")).click();
     await unknown.waitForExist({ timeout: 8000, reverse: true });
 
-    // IMP-052 — the asset form opens over the window; Escape closes only the form.
+    // IMP-052 — the asset form opens over the window, and Escape does not close the window.
     const toCreate = await $("#account-import-unknown-8");
     await toCreate.click();
     await (await $("#account-import-create-asset")).click();
     const form = await $("form#add-asset-form");
     await form.waitForExist({ timeout: 5000 });
-    await browser.keys("Escape");
-    await form.waitForExist({ timeout: 5000, reverse: true });
-    await (await $("#account-import-create-asset")).click();
-    await form.waitForExist({ timeout: 5000 });
     await captureScreen("account-import-create-asset");
+    await browser.keys("Escape");
+    assert.ok(await (await $("#account-import-create-asset")).isExisting());
     await setReactInputValue("add-asset-reference", "E2EANS");
-    await (await $('button[type="submit"][form="add-asset-form"]')).click();
+    const add = await $('button[type="submit"][form="add-asset-form"]');
+    await add.waitForEnabled({ timeout: 5000 });
+    await add.click();
     await form.waitForExist({ timeout: 8000, reverse: true });
     await toCreate.waitForExist({ timeout: 8000, reverse: true });
 

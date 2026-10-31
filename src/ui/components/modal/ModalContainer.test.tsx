@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { Dialog } from "./Dialog";
 import { ModalContainer } from "./ModalContainer";
 
 vi.mock("react-i18next", () => ({
@@ -60,6 +61,24 @@ describe("ModalContainer", () => {
 
     unmount();
     expect(document.body.style.overflow).toBe("auto");
+  });
+
+  // IMP-052 — the asset form is a Dialog, which has no Escape: the window under it stays.
+  it("leaves Escape to a Dialog opened over it", async () => {
+    const closeUnder = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <>
+        <ModalContainer isOpen onClose={closeUnder}>
+          under
+        </ModalContainer>
+        <Dialog isOpen onClose={vi.fn()} title="over">
+          over
+        </Dialog>
+      </>,
+    );
+    await user.keyboard("{Escape}");
+    expect(closeUnder).not.toHaveBeenCalled();
   });
 
   it("renders nothing when isOpen is false", () => {
