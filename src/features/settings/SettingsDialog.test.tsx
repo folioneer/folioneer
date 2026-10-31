@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const setLanguage = vi.fn();
+const toggleAutoRecordPrice = vi.fn();
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
@@ -14,7 +15,7 @@ vi.mock("./useSettings", () => ({
     currentChoice: "auto",
     setLanguage,
     autoRecordPrice: false,
-    toggleAutoRecordPrice: vi.fn(),
+    toggleAutoRecordPrice,
     autoFetch: false,
     toggleAutoFetch: vi.fn(),
   }),
@@ -73,6 +74,15 @@ describe("SettingsDialog", () => {
     fireEvent.change(element("settings-language") as HTMLElement, { target: { value: "fr" } });
 
     expect(setLanguage).toHaveBeenCalledWith("fr");
+  });
+
+  // MKT-050 — the toggle in General.
+  it("switching the auto-record calls its setting", () => {
+    render(<SettingsDialog isOpen onClose={vi.fn()} />);
+
+    open("settings-auto-record-price");
+
+    expect(toggleAutoRecordPrice).toHaveBeenCalledTimes(1);
   });
 
   // SPF-010, MKT-120 — the fetch settings sit in Prices.

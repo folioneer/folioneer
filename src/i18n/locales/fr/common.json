@@ -223,6 +223,7 @@
   },
   "settings": {
     "title": "Paramètres",
+    "sections_label": "Sections des paramètres",
     "section_general": "Général",
     "section_prices": "Prix",
     "section_sync": "Synchronisation",

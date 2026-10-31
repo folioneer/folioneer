@@ -223,6 +223,7 @@
   },
   "settings": {
     "title": "Settings",
+    "sections_label": "Settings sections",
     "section_general": "General",
     "section_prices": "Prices",
     "section_sync": "Sync",

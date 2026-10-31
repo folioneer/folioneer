@@ -694,7 +694,7 @@ The installed program run from a terminal or a script, recording without opening
 
 > Status: confirmed
 
-The page where the owner makes the application's choices: language, theme, reference currency, sync, AI agents. In French: "Paramètres".
+The dialog where the owner makes the application's choices: language, theme, reference currency, sync, AI agents. In French: "Paramètres".
 
 ### Sync
 

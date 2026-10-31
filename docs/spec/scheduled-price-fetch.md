@@ -172,7 +172,7 @@ App opened later
 
 ### Entry Point
 
-Settings dialog — new "Daily price download" section, alongside the existing price-related settings (auto-fetch on launch MKT-120, auto-record toggle MKT-050).
+Settings dialog — "Daily price download" in the Prices section, beside auto-fetch on launch (MKT-120).
 
 ### Main Component
 

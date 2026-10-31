@@ -843,7 +843,7 @@ Modal or side panel listing all recorded `AssetPrice` entries for the selected a
 
 #### Settings dialog
 
-The Settings dialog (host of MKT-050's transaction auto-record toggle) gains a second toggle: "Automatically fetch prices on launch" (MKT-120). Default OFF. Sits above the existing transaction-related toggle to group all price-related settings together.
+The Prices section of the Settings dialog holds the toggle "Automatically fetch prices on launch" (MKT-120). Default OFF. The transaction auto-record toggle (MKT-050) stays in General, since it does not need an External provider.
 
 #### Global dashboard — Refresh action
 

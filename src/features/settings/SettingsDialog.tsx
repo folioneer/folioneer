@@ -98,7 +98,7 @@ function SettingsContent({ titleId, onClose }: { titleId: string; onClose: () =>
       </header>
       <div className="flex min-h-0 flex-1">
         <nav
-          aria-label={t("settings.title")}
+          aria-label={t("settings.sections_label")}
           className="flex w-48 shrink-0 flex-col gap-1 border-r border-m3-outline/20 p-3"
         >
           {sections.map((name) => (

@@ -64,6 +64,7 @@ export async function navigateToSettings(): Promise<void> {
 /** Closes the Settings dialog, which covers everything under it. */
 export async function closeSettings(): Promise<void> {
   const close = await $("#settings-close");
+  await close.waitForExist({ timeout: 10000 });
   await close.click();
   await close.waitForExist({ timeout: 10000, reverse: true });
 }
