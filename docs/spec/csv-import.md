@@ -157,11 +157,11 @@ One line of the file that is not blank, once read through a mapper and judged.
 ## Workflow
 
 ```
-pick an account and a file
+pick an account and a file; its folder's mapper preselected (IMP-020D)
         │
         ▼
 read: encoding, separator, decimal mark detected (IMP-011 to IMP-013)
-        │  — or a saved mapper's (IMP-020E, IMP-020D), or the user's choice (IMP-018)
+        │  — or a saved mapper's (IMP-020E), or the user's choice (IMP-018)
         ▼
 map the columns, the operation labels (IMP-021, IMP-022); the date format follows (IMP-014)
         │                                                   ── save the mapper (IMP-020)
