@@ -1211,6 +1211,13 @@ describe("priceHistoryBackfillErrorToI18n (MKT-196)", () => {
     });
   });
 
+  // MKT-210 — with no External provider chosen.
+  it("NoExternalProvider maps to its flat key", () => {
+    expect(priceHistoryBackfillErrorToI18n({ code: "NoExternalProvider" })).toEqual({
+      key: "error.NoExternalProvider",
+    });
+  });
+
   it("AccountNotFound (carries account_id payload) maps to its flat key", () => {
     expect(
       priceHistoryBackfillErrorToI18n({ code: "AccountNotFound", account_id: "acc-1" }),

@@ -70,6 +70,14 @@ describe("fetchPriceErrorToI18n", () => {
     });
   });
 
+  // MKT-210 — with no External provider chosen.
+  it("NoExternalProvider dispatches info snackbar", () => {
+    expect(fetchPriceErrorToI18n({ code: "NoExternalProvider" })).toEqual({
+      key: "error.NoExternalProvider",
+      severity: "info",
+    });
+  });
+
   it("NoFetchableHoldings dispatches info snackbar", () => {
     expect(fetchPriceErrorToI18n({ code: "NoFetchableHoldings" })).toEqual({
       key: "mkt.fetch_no_holdings",

@@ -25,6 +25,8 @@ export function scheduledFetchErrorToI18n(error: ScheduledFetchError): I18nMessa
     case "ScheduleRemovalFailed":
     case "DatabaseError":
       return { key: `error.scheduled_fetch.${error.code}` };
+    case "NoExternalProvider":
+      return { key: "error.NoExternalProvider" };
     default: {
       const _exhaustive: never = error;
       return _exhaustive;

@@ -3,7 +3,9 @@
 use std::sync::Arc;
 use tauri::State;
 
-use super::error::{FetchAccountAssetPricesError, FetchAllAssetPricesError};
+use crate::use_cases::shared::chosen_price_provider::ChosenPriceProvider;
+
+use super::error::{FetchAccountAssetPricesError, FetchAllAssetPricesError, FetchPriceTask};
 use super::orchestrator::AssetPriceFetchUseCase;
 use super::trigger::FetchTrigger;
 
@@ -16,8 +18,12 @@ use super::trigger::FetchTrigger;
 #[specta::specta]
 pub async fn fetch_all_asset_prices(
     uc: State<'_, Arc<AssetPriceFetchUseCase>>,
+    chosen: State<'_, Arc<ChosenPriceProvider>>,
     trigger: FetchTrigger,
 ) -> Result<(), FetchAllAssetPricesError> {
+    if !chosen.is_on() {
+        return Err(FetchPriceTask::NoExternalProvider.into());
+    }
     uc.fetch_all(trigger).await
 }
 
@@ -27,7 +33,11 @@ pub async fn fetch_all_asset_prices(
 #[specta::specta]
 pub async fn fetch_account_asset_prices(
     uc: State<'_, Arc<AssetPriceFetchUseCase>>,
+    chosen: State<'_, Arc<ChosenPriceProvider>>,
     account_id: String,
 ) -> Result<(), FetchAccountAssetPricesError> {
+    if !chosen.is_on() {
+        return Err(FetchPriceTask::NoExternalProvider.into());
+    }
     uc.fetch_for_account(&account_id).await
 }

@@ -88,6 +88,7 @@ export function priceHistoryBackfillErrorToI18n(err: PriceHistoryBackfillError):
     case "TickerNotResolved":
     case "ProviderUnreachable":
       return { key: `mkt.backfill.error.${err.code}` };
+    case "NoExternalProvider":
     case "AccountNotFound":
     case "AssetNotFound":
     case "CashAssetNotEditable":

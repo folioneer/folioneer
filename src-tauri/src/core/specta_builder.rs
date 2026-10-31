@@ -6,8 +6,8 @@ use crate::{
         account_creation, account_deletion, account_details, account_performance, account_summary,
         archive_asset, asset_price_fetch, asset_web_lookup, capabilities, csv_import, delete_asset,
         fee_generation, global_performance, holding_transaction, portfolio_sync,
-        price_fetch_failures, price_freshness, price_history_backfill, rate_history_backfill,
-        rate_refresh, scheduled_fetch, transfer, update_checker,
+        price_fetch_failures, price_freshness, price_history_backfill, price_provider_choice,
+        rate_history_backfill, rate_refresh, scheduled_fetch, transfer, update_checker,
     },
 };
 
@@ -126,6 +126,8 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .typ::<asset_price_fetch::FetchAccountAssetPricesError>()
         .typ::<asset_price_fetch::FetchPriceTask>()
         .typ::<update_checker::UpdateInfo>()
+        .typ::<price_provider_choice::PriceProviderChoice>()
+        .typ::<price_provider_choice::PriceProviderChoiceError>()
         .typ::<scheduled_fetch::ScheduledFetchConfiguration>()
         .typ::<scheduled_fetch::ScheduledFetchRun>()
         .typ::<scheduled_fetch::ScheduledFetchOutcome>()
@@ -257,6 +259,8 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             price_freshness::get_price_freshness,
             price_history_backfill::backfill_holding_price_history,
             capabilities::get_capabilities,
+            price_provider_choice::get_price_provider_choice,
+            price_provider_choice::set_price_provider_choice,
             agent_connection::api::get_agent_connection_state,
             agent_connection::api::set_agents_allowed,
             agent_connection::api::answer_agent_connection,

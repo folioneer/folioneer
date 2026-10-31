@@ -6,7 +6,9 @@ use tauri::State;
 
 use crate::context::asset::PriceHistoryBackfillOutcome;
 
-use super::error::PriceHistoryBackfillError;
+use crate::use_cases::shared::chosen_price_provider::ChosenPriceProvider;
+
+use super::error::{PriceHistoryBackfillError, PriceHistoryBackfillTask};
 use super::orchestrator::PriceHistoryBackfillUseCase;
 
 /// Fills the price history of one holding over the held period, on the dates that
@@ -16,8 +18,12 @@ use super::orchestrator::PriceHistoryBackfillUseCase;
 #[specta::specta]
 pub async fn backfill_holding_price_history(
     uc: State<'_, Arc<PriceHistoryBackfillUseCase>>,
+    chosen: State<'_, Arc<ChosenPriceProvider>>,
     account_id: String,
     asset_id: String,
 ) -> Result<PriceHistoryBackfillOutcome, PriceHistoryBackfillError> {
+    if !chosen.is_on() {
+        return Err(PriceHistoryBackfillTask::NoExternalProvider.into());
+    }
     uc.backfill(&account_id, &asset_id).await
 }

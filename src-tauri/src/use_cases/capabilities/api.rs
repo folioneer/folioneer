@@ -1,16 +1,18 @@
 // Allow unreachable lint as tauri::command and specta::specta macros generate false positives
 #![allow(clippy::unreachable)]
 
+use std::sync::Arc;
 use tauri::State;
 
-/// What the interface is told about this build: what it can do and which distribution
-/// channel it belongs to (MKT-211, UPD-030). Settled
-/// at composition and constant for the run.
+use crate::use_cases::shared::chosen_price_provider::ChosenPriceProvider;
+
+/// What the interface is told: whether this computer has an External provider chosen, and
+/// which distribution channel the build belongs to (MKT-211, UPD-030).
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
 pub struct Capabilities {
-    /// Whether this build has an External provider. Without one no fetch task, no
-    /// scheduled fetch and no price history backfill exists (MKT-210), and the
-    /// interface offers none of them (MKT-212).
+    /// Whether an External provider is chosen on this computer. Without one no fetch task,
+    /// no scheduled fetch and no price history backfill runs (MKT-210), and the interface
+    /// offers none of them (MKT-212).
     pub external_provider: bool,
     /// The distribution channel this build belongs to, shown beside its version;
     /// `None` for the public build (UPD-030).
@@ -18,9 +20,9 @@ pub struct Capabilities {
 }
 
 impl Capabilities {
-    /// The capabilities of a build composed with or without an External provider, and
-    /// belonging to `distribution_channel`.
-    pub fn of_build(has_external_provider: bool, distribution_channel: Option<&str>) -> Self {
+    /// The answer with or without an External provider chosen, for a build belonging to
+    /// `distribution_channel`.
+    pub fn of(has_external_provider: bool, distribution_channel: Option<&str>) -> Self {
         Self {
             external_provider: has_external_provider,
             distribution_channel: distribution_channel.map(str::to_string),
@@ -28,27 +30,30 @@ impl Capabilities {
     }
 }
 
-/// Reports what this build can do, so the interface renders only what it permits
-/// (MKT-211). Infallible: the value is managed before any window exists.
+/// Reports what can run now, so the interface renders only what it permits (MKT-211).
+/// Infallible: both values are managed before any window exists.
 #[tauri::command]
 #[specta::specta]
-pub fn get_capabilities(capabilities: State<'_, Capabilities>) -> Capabilities {
-    capabilities.inner().clone()
+pub fn get_capabilities(
+    capabilities: State<'_, Capabilities>,
+    chosen: State<'_, Arc<ChosenPriceProvider>>,
+) -> Capabilities {
+    Capabilities::of(chosen.is_on(), capabilities.distribution_channel.as_deref())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // MKT-211, UPD-030 — the interface is told whether the build has an External
-    // provider and which channel it belongs to.
+    // MKT-211, UPD-030 — the interface is told whether an External provider is chosen and
+    // which channel the build belongs to.
     #[test]
     fn a_build_reports_its_provider_and_its_channel() {
-        let private = Capabilities::of_build(true, Some("private"));
+        let private = Capabilities::of(true, Some("private"));
         assert!(private.external_provider);
         assert_eq!(private.distribution_channel.as_deref(), Some("private"));
 
-        let public = Capabilities::of_build(false, None);
+        let public = Capabilities::of(false, None);
         assert!(!public.external_provider);
         assert_eq!(public.distribution_channel, None);
     }

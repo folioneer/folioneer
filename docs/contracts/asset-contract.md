@@ -1,7 +1,7 @@
 # Contract — Asset
 
 > Domain: `asset`
-> Last updated by: market-price (MKT-103, MKT-190–213, MKT-230–232), financial-asset-transaction (TRX-064), asset (AST-030–040)
+> Last updated by: market-price (MKT-103, MKT-190–214, MKT-230–232), financial-asset-transaction (TRX-064), asset (AST-030–040)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Per-command reachable codes are listed in the "Errors" column of each table below. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic chain preserved server-side via `tracing::error!`).
 >
@@ -65,20 +65,20 @@
 >
 > A fetch task that priced at least one asset records the moment it ends in this installation's fetch log before it publishes `AssetPriceFetchCompleted` (MKT-201); a failed write never fails the task.
 >
-> Both commands take no API key and no fetch-mode argument: they fetch through the build's External provider, and a build without one refuses them (MKT-210). The former `use_api_key: bool` parameter was removed when the BYOK/Stooq path was retired.
+> Both commands take no API key and no fetch-mode argument: they fetch through the External provider chosen on this computer, and with none they refuse with `NoExternalProvider` (MKT-210). The former `use_api_key: bool` parameter was removed when the BYOK/Stooq path was retired.
 
-| Command                      | Args                    | Return | Errors                                                                                                                        |
-| ---------------------------- | ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `fetch_all_asset_prices`     | `trigger: FetchTrigger` | `()`   | `FetchAlreadyRunning` (MKT-113), `NoFetchableHoldings` (MKT-111), `DatabaseError`                                             |
-| `fetch_account_asset_prices` | `account_id: String`    | `()`   | `AccountNotFound { account_id }` (MKT-132), `FetchAlreadyRunning` (MKT-113), `NoFetchableHoldings` (MKT-111), `DatabaseError` |
+| Command                      | Args                    | Return | Errors                                                                                                                                              |
+| ---------------------------- | ----------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fetch_all_asset_prices`     | `trigger: FetchTrigger` | `()`   | `FetchAlreadyRunning` (MKT-113), `NoFetchableHoldings` (MKT-111), `DatabaseError`, `NoExternalProvider`                                             |
+| `fetch_account_asset_prices` | `account_id: String`    | `()`   | `AccountNotFound { account_id }` (MKT-132), `FetchAlreadyRunning` (MKT-113), `NoFetchableHoldings` (MKT-111), `DatabaseError`, `NoExternalProvider` |
 
 ### Price History Backfill
 
 > `backfill_holding_price_history` is implemented in `use_cases/price_history_backfill/`. It fills the dates of one holding's held period (MKT-191) that carry no recorded price with the provider's daily closes, and never overwrites a recorded price (MKT-192). Every window is fetched before anything is written, so a provider failure writes nothing (MKT-195).
 
-| Command                          | Args                                   | Return                        | Errors                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| -------------------------------- | -------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `backfill_holding_price_history` | `account_id: String, asset_id: String` | `PriceHistoryBackfillOutcome` | `AccountNotFound { account_id }` (MKT-196), `AssetNotFound { id }` (MKT-196), `CashAssetNotEditable` (MKT-116/196), `Archived` (AST-006), `AssetNeverHeld` (MKT-196 — no transaction on the asset; a closed holding is accepted), `PriceRefreshBlocked` (MKT-151/196), `TickerNotResolved` (MKT-110/196 — no symbol can be derived, or the provider reports it unknown), `ProviderUnreachable` (MKT-195), `DatabaseError` (MKT-195) |
+| Command                          | Args                                   | Return                        | Errors                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------- | -------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backfill_holding_price_history` | `account_id: String, asset_id: String` | `PriceHistoryBackfillOutcome` | `AccountNotFound { account_id }` (MKT-196), `AssetNotFound { id }` (MKT-196), `CashAssetNotEditable` (MKT-116/196), `Archived` (AST-006), `AssetNeverHeld` (MKT-196 — no transaction on the asset; a closed holding is accepted), `PriceRefreshBlocked` (MKT-151/196), `TickerNotResolved` (MKT-110/196 — no symbol can be derived, or the provider reports it unknown), `ProviderUnreachable` (MKT-195), `DatabaseError` (MKT-195), `NoExternalProvider` |
 
 ### Price Freshness
 
@@ -96,13 +96,17 @@
 
 ### Capabilities
 
-> `get_capabilities` is implemented in `use_cases/capabilities/`. It returns the answer the composition root settled for the run (MKT-211): whether the build has an External provider, and the distribution channel it belongs to (UPD-030). Infallible — the value exists before any window opens.
+> `get_capabilities` is implemented in `use_cases/capabilities/`. It returns whether an External provider is chosen on this computer (MKT-211), and the distribution channel the build belongs to (UPD-030). Infallible — both values exist before any window opens. The interface asks again after the choice changes.
 >
-> In a build without one, `fetch_all_asset_prices`, `fetch_account_asset_prices` and `backfill_holding_price_history` are refused before any work is done (MKT-210): nothing is fetched or written, and the refusal carries no typed code, since no use case exists to answer. The interface never calls them there (MKT-212).
+> With none, `fetch_all_asset_prices`, `fetch_account_asset_prices` and `backfill_holding_price_history` are refused with `NoExternalProvider` before any work is done (MKT-210): nothing is fetched or written. The interface never calls them then (MKT-212).
+>
+> `get_price_provider_choice` and `set_price_provider_choice` are implemented in `use_cases/price_provider_choice/` (MKT-214). `chosen` is the id of a provider the build offers, or null for none; the answer also lists the ids on offer. A new choice holds at once and the scheduled fetch follows it (SPF-070).
 
-| Command            | Args | Return         | Errors                                           |
-| ------------------ | ---- | -------------- | ------------------------------------------------ |
-| `get_capabilities` | —    | `Capabilities` | _(none — infallible; settled at start, MKT-211)_ |
+| Command                     | Args                     | Return                | Errors                         |
+| --------------------------- | ------------------------ | --------------------- | ------------------------------ |
+| `get_capabilities`          | —                        | `Capabilities`        | _(none — infallible, MKT-211)_ |
+| `get_price_provider_choice` | —                        | `PriceProviderChoice` | _(none — infallible)_          |
+| `set_price_provider_choice` | `chosen: Option<String>` | `PriceProviderChoice` | `NotOffered`, `NotSaved`       |
 
 ### Web Lookup
 
@@ -245,13 +249,20 @@ enum PriceFetchFailureReason {
 
 ```rust
 struct Capabilities {
-    external_provider: bool, // whether this build has an External provider (MKT-211); constant for the run
+    external_provider: bool, // whether an External provider is chosen on this computer (MKT-211)
     distribution_channel: Option<String>, // the distribution channel the build belongs to, shown beside its version (UPD-030); None for the public build
 }
 ```
 
 ```rust
-// AssetPriceSource variants (MKT-100) — YahooFinance is written by a Yahoo Finance provider (the owner's private build)
+struct PriceProviderChoice {
+    chosen: Option<String>, // the id chosen on this computer; None is off (MKT-214)
+    offered: Vec<String>,   // the ids this build offers
+}
+```
+
+```rust
+// AssetPriceSource variants (MKT-100) — YahooFinance is written by the Yahoo Finance provider, once a computer chooses it (MKT-214)
 enum AssetPriceSource { Manual, YahooFinance, Agent }
 // Manual:       every user-driven write — manual entry (MKT-020+), transaction
 //               auto-record follow-up (MKT-050+), price-history edit (MKT-083+);
@@ -421,3 +432,4 @@ struct AssetClassDefault {
 - 2026-09-23 — Amended by `market-price` spec (MKT-210–213): new `get_capabilities` command and `Capabilities` shared type. In a build without an External provider the fetch and backfill commands are refused before any work, with the runtime's untyped refusal; the interface never calls them (MKT-212).
 - 2026-09-27 — Amended by `update` spec (UPD-030): `Capabilities` gains `distribution_channel`, the distribution channel the build belongs to.
 - 2026-09-28 — TRX-064: new `get_non_cash_assets` — the assets a purchase or a sale is recorded on.
+- 2026-10-31 — ADR-024, MKT-210, MKT-211, MKT-214: new `get_price_provider_choice`, `set_price_provider_choice` and `PriceProviderChoice`. With no External provider chosen the fetch and backfill commands are refused with the typed `NoExternalProvider`; `external_provider` follows the choice.

@@ -56,9 +56,16 @@ pub fn run_scheduled_fetch_headless() -> i32 {
     use use_cases::scheduled_fetch::headless::{self, HeadlessProviders};
 
     exit_code_on_new_runtime(headless::run(|| {
-        extensions::providers().map(|providers| HeadlessProviders {
-            price: providers.price,
-            rate_history: providers.rate_history,
+        extensions::providers().map(|providers| {
+            let data_dir = shared::infrastructure::app_directories::resolve_local_data_dir();
+            HeadlessProviders {
+                price: use_cases::shared::chosen_price_provider::ChosenPriceProvider::of(
+                    providers.price,
+                    data_dir.as_deref(),
+                )
+                .into_active(),
+                rate_history: providers.rate_history,
+            }
         })
     }))
 }

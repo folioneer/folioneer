@@ -17,6 +17,9 @@ pub enum ScheduledFetchError {
     /// The OS schedule could not be removed (SPF-013).
     #[error("Failed to remove the daily schedule from the operating system")]
     ScheduleRemovalFailed,
+    /// No External provider is chosen on this computer (SPF-073).
+    #[error("No External provider is chosen on this computer")]
+    NoExternalProvider,
     /// An unexpected database error occurred.
     #[error("An unexpected database error occurred")]
     DatabaseError,
@@ -41,6 +44,10 @@ mod tests {
         assert_eq!(
             to_value(ScheduledFetchError::ScheduleRemovalFailed).unwrap(),
             json!({ "code": "ScheduleRemovalFailed" })
+        );
+        assert_eq!(
+            to_value(ScheduledFetchError::NoExternalProvider).unwrap(),
+            json!({ "code": "NoExternalProvider" })
         );
         assert_eq!(
             to_value(ScheduledFetchError::DatabaseError).unwrap(),

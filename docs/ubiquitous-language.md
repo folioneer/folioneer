@@ -179,7 +179,7 @@ An asset whose price the owner types and no fetch replaces: every fetch task lea
 
 ### AssetPriceSource
 
-A value-object enum qualifying the provenance of an `AssetPrice` record. Variants: `Manual` (user-entered via manual entry or transaction auto-record), `YahooFinance` (written by a fetch through a Yahoo Finance provider, as in the owner's private build) and `Agent` (recorded by an AI agent the owner allowed — the Mark of a price; owner, 2026-10-10). Metadata for traceability per ADR-012 — does not influence read/write precedence (latest-write-wins).
+A value-object enum qualifying the provenance of an `AssetPrice` record. Variants: `Manual` (user-entered via manual entry or transaction auto-record), `YahooFinance` (written by a fetch through the Yahoo Finance provider) and `Agent` (recorded by an AI agent the owner allowed — the Mark of a price; owner, 2026-10-10). Metadata for traceability per ADR-012 — does not influence read/write precedence (latest-write-wins).
 
 > Status: confirmed
 
@@ -511,7 +511,7 @@ Recording every missed trading-day close since the last successful scheduled fet
 
 ### External provider
 
-A third-party HTTP service that returns current asset prices and their daily-close history, with no credential asked of the user. A build may have none, and then holds only prices typed by hand — the public build has none.
+A third-party HTTP service that returns current asset prices and their daily-close history, with no credential asked of the user. A build offers a list of them and each computer chooses one or none; with none it holds only prices typed by hand or recorded by an agent.
 
 > Status: confirmed
 

@@ -188,6 +188,16 @@ impl ScheduledFetchOrchestrator {
         }
     }
 
+    /// SPF-015, SPF-070 — the schedule follows whether an External provider is chosen: back
+    /// as configured with one, gone without. The stored configuration is never written.
+    pub async fn follow_provider(&self, on: bool) {
+        if on {
+            self.self_heal().await;
+        } else {
+            drop_schedule_without_provider(self.scheduler.as_ref()).await;
+        }
+    }
+
     /// Runs the scheduled-fetch sweep (SPF-020–SPF-053): resolves the latest
     /// pending trigger, exits early under the once-per-day guard (SPF-021),
     /// builds the fetch scope (SPF-040), records daily closes and FX rates
@@ -518,14 +528,14 @@ pub fn backfill_window(
     (from, today)
 }
 
-/// SPF-070 — a build with no External provider owns no scheduled fetch: it registers
-/// none, and removes one a build that had a provider left with the operating system,
-/// so nothing wakes up to fetch what cannot be fetched. The stored configuration is
-/// untouched, so a build that regains a provider honours it again (SPF-015).
+/// SPF-070 — with no External provider chosen, a computer owns no scheduled fetch: it
+/// registers none, and removes one left with the operating system, so nothing wakes up to
+/// fetch what cannot be fetched. The stored configuration is untouched, so choosing a
+/// provider again honours it (SPF-015).
 ///
 /// Failures are logged, never surfaced: this runs at start-up, and a schedule that
 /// could not be removed is retried at the next one.
-pub async fn drop_schedule_without_provider(scheduler: &dyn DailyFetchScheduler) {
+async fn drop_schedule_without_provider(scheduler: &dyn DailyFetchScheduler) {
     match scheduler.is_registered().await {
         Ok(false) => {}
         Ok(true) => {
@@ -907,6 +917,59 @@ mod tests {
         );
 
         orchestrator.self_heal().await;
+    }
+
+    // SPF-070 — turned off, the schedule goes; the configuration is neither read nor written
+    // (the repository mock has no expectation).
+    #[tokio::test]
+    async fn with_no_provider_the_schedule_goes_and_the_configuration_stays() {
+        let mut scheduler = MockDailyFetchScheduler::new();
+        scheduler
+            .expect_is_registered()
+            .times(1)
+            .returning(|| Ok(true));
+        scheduler.expect_remove().times(1).returning(|| Ok(()));
+        let orchestrator = make_orchestrator(
+            MockAccountServiceContract::new(),
+            MockAssetServiceContract::new(),
+            MockPriceProvider::new(),
+            MockScheduledFetchRepository::new(),
+            scheduler,
+            now_after_trigger(),
+        );
+
+        orchestrator.follow_provider(false).await;
+    }
+
+    // SPF-015, SPF-070 — chosen again, the stored configuration comes back, unwritten.
+    #[tokio::test]
+    async fn with_a_provider_the_schedule_comes_back_as_configured() {
+        let mut repository = MockScheduledFetchRepository::new();
+        repository
+            .expect_get_configuration()
+            .times(1)
+            .returning(|| {
+                Ok(ScheduledFetchConfiguration::restore(
+                    true,
+                    "19:00".to_string(),
+                ))
+            });
+        let mut scheduler = MockDailyFetchScheduler::new();
+        scheduler
+            .expect_register()
+            .times(1)
+            .withf(|trigger_time| trigger_time == "19:00")
+            .returning(|_| Ok(()));
+        let orchestrator = make_orchestrator(
+            MockAccountServiceContract::new(),
+            MockAssetServiceContract::new(),
+            MockPriceProvider::new(),
+            repository,
+            scheduler,
+            now_after_trigger(),
+        );
+
+        orchestrator.follow_provider(true).await;
     }
 
     // SPF-015 — a disabled configuration silently removes a leftover schedule.

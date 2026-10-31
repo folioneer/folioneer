@@ -10,7 +10,7 @@ This spec is a **feature spec**: it extends the price-write model owned by the `
 
 **Accepted limitation — uninstall leftover**: uninstalling the application without disabling the schedule first may leave the OS entry registered; it then fails harmlessly once per day. Disabling before uninstall removes it cleanly.
 
-All financial values are stored as i64 micro-units per [ADR-001](../adr/001-use-i64-for-monetary-amounts.md). Price writes follow latest-write-wins per [ADR-012](../adr/012-latest-write-wins-source-as-metadata.md); the provider is the build's External provider ([ADR-020](../adr/020-one-extension-file-per-build.md)) — none in the public build (SPF-070).
+All financial values are stored as i64 micro-units per [ADR-001](../adr/001-use-i64-for-monetary-amounts.md). Price writes follow latest-write-wins per [ADR-012](../adr/012-latest-write-wins-source-as-metadata.md); the provider is the External provider chosen on this computer ([ADR-024](../adr/024-the-public-build-offers-a-list-of-price-providers.md)) — none until one is (SPF-070).
 
 ---
 
@@ -53,7 +53,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-014 — Local time and DST (backend)**: The trigger time is a local wall-clock time in the machine's timezone. Daylight-saving shifts do not change the wall-clock trigger.
 
-**SPF-015 — Self-heal on app start (backend)**: On every app start — except in a build with no External provider (SPF-070) — when the configuration is enabled, the OS schedule is verified and silently repaired if missing or stale (e.g. the application moved after an update). When disabled, a leftover schedule is silently removed.
+**SPF-015 — Self-heal on app start and on choosing a provider (backend)**: On every app start — except with no External provider chosen (SPF-070) — and whenever a provider is chosen (MKT-214), when the configuration is enabled, the OS schedule is verified and silently repaired if missing or stale (e.g. the application moved after an update). When disabled, a leftover schedule is silently removed.
 
 **SPF-016 — No resident presence (backend)**: Outside its brief daily execution, nothing runs and nothing is visible — no tray icon, no background service, no window.
 
@@ -107,7 +107,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 ### Outcome & Visibility (050–059)
 
-**SPF-050 — Every run is recorded (backend)**: Every execution — successful, failed, or skipped by the once-per-day guard — records a `ScheduledFetchRun`, except a leftover firing in a build with no External provider (SPF-072), with its trigger date, execution time, outcome, and update/skip counts.
+**SPF-050 — Every run is recorded (backend)**: Every execution — successful, failed, or skipped by the once-per-day guard — records a `ScheduledFetchRun`, except a leftover firing with no External provider chosen (SPF-072), with its trigger date, execution time, outcome, and update/skip counts.
 
 **SPF-051 — Transient retry within a run (backend)**: A run that cannot reach the provider at all retries up to **3 attempts** (with increasing delay) within the same execution before recording a failed run. Per-asset skips (SPF-041) and per-pair skips (SPF-038) are not retried.
 
@@ -123,13 +123,13 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 ### Without an External provider (070–079)
 
-**SPF-070 — No External provider, no scheduled fetch (backend)**: A build with no External provider (MKT-210) registers no scheduled fetch with the operating system, and removes at start-up one a build that had a provider left behind — and with it the scheduled refresh of exchange rates (SPF-035); rates still refresh at launch (FXR-075). The stored configuration is left as it is, so a build that regains a provider honours it again and the self-heal of SPF-015 puts the schedule back.
+**SPF-070 — No External provider, no scheduled fetch (backend)**: With no External provider chosen (MKT-210, MKT-214) a computer registers no scheduled fetch with the operating system, and removes one left behind, at start-up and when the provider is turned off — and with it the scheduled refresh of exchange rates (SPF-035); rates still refresh at launch (FXR-075). The stored configuration is left as it is, so choosing a provider again honours it: the self-heal of SPF-015 puts the schedule back, at once.
 
-**SPF-071 — No scheduled fetch section (frontend)**: In a build with no External provider (MKT-211) the Settings page shows no scheduled fetch section (SPF-010) — neither the toggle and trigger time nor the last-run status (SPF-052).
+**SPF-071 — No scheduled fetch section (frontend)**: With no External provider chosen (MKT-211) the Settings page shows no scheduled fetch section (SPF-010) — neither the toggle and trigger time nor the last-run status (SPF-052).
 
-**SPF-072 — A leftover that fires does nothing (backend)**: A scheduled fetch that outlived its build and fires, in a build with no External provider, before the start-up that would remove it (SPF-070) finds nothing to fetch: it records no run (SPF-050) and exits successfully.
+**SPF-072 — A leftover that fires does nothing (backend)**: A scheduled fetch that fires with no External provider chosen, before anything removed it (SPF-070), finds nothing to fetch: it records no run (SPF-050) and exits successfully.
 
-**SPF-073 — Configuring is refused (backend)**: In a build with no External provider, enabling, disabling or retiming the scheduled fetch, and reading its status, are refused before any work is done: nothing is registered, removed or written. The interface never asks (SPF-071).
+**SPF-073 — Configuring is refused (backend)**: With no External provider chosen, enabling, disabling or retiming the scheduled fetch, and reading its status, are refused before any work is done: nothing is registered, removed or written. The interface never asks (SPF-071).
 
 ---
 
