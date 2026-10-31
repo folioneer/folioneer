@@ -77,7 +77,9 @@ describe("account_import", () => {
     const asset = await $("#account-import-match-asset");
     await asset.waitForExist({ timeout: 5000 });
     await asset.selectByAttribute("value", matchedId);
-    await (await $("#account-import-match")).click();
+    const matchAction = await $("#account-import-match");
+    await matchAction.waitForEnabled({ timeout: 5000 });
+    await matchAction.click();
     await unknown.waitForExist({ timeout: 8000, reverse: true });
 
     // IMP-052 — the asset form opens over the window, and Escape does not close the window.

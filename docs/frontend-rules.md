@@ -334,7 +334,7 @@ parameters, in the same order, positional — never wrapped in an object.
 > ✅ `commands.addAsset(name, assetClass, categoryId, currency, riskLevel, reference)`
 > ❌ `commands.addAsset({ name, assetClass, categoryId, currency, riskLevel, reference })`
 
-**F31** — A feature never imports a sibling feature's modal. The opener sets a `?modal=…` URL
+**F31** — A feature never imports a sibling feature's modal. The opener sets a `?modal=…` URL A request that must hand back a result (the id of the asset created) cannot travel in a URL: a store in `src/lib/` carries the callback, the shell's mount reads it (`assetCreationRequest.ts`, `AssetCreationMount`).
 parameter (`openModalSearch` / `patchModalSearch` in `src/lib/modalSearch.ts`) and a mount in
 `features/shell/` renders the modal (F26 — `shell/` is the one place sibling imports are allowed).
 
