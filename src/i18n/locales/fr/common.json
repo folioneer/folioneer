@@ -234,20 +234,20 @@
     "language_fr": "Français",
     "auto_record_price_label": "Enregistrer automatiquement le prix de transaction comme prix de marché",
     "auto_record_price_description": "Si activé, la case d'enregistrement automatique sera pré-cochée dans les nouveaux formulaires de transaction.",
-    "price_source_label": "Source des prix, sur cet ordinateur",
-    "price_source_off": "Désactivée",
-    "price_source_option": { "yahoo_finance": "Yahoo Finance — usage personnel" },
-    "price_source_notice": {
+    "price_provider_label": "Source des prix, sur cet ordinateur",
+    "price_provider_off": "Désactivée",
+    "price_provider_option": { "yahoo_finance": "Yahoo Finance — usage personnel" },
+    "price_provider_notice": {
       "yahoo_finance": "Yahoo Finance est une source non officielle. Les prix sont récupérés depuis cet ordinateur, selon les conditions de Yahoo, pour votre usage personnel, et cela peut s'arrêter à tout moment."
     },
-    "price_source_note": {
+    "price_provider_note": {
       "yahoo_finance": "Une source non officielle, selon les conditions de Yahoo, qui peut s'arrêter. Une récupération échouée conserve le dernier prix, signalé comme ancien."
     },
-    "price_source_understood_label": "J'ai compris",
-    "price_source_understood_description": "La récupération des prix commence dès que cette case est cochée. Vous pouvez désactiver la source à tout moment.",
-    "price_source_saving": "Enregistrement…",
-    "price_source_loading": "Chargement…",
-    "price_source_load_failed": "La source des prix n'a pas pu être lue.",
+    "price_provider_understood_label": "J'ai compris",
+    "price_provider_understood_description": "La récupération des prix commence dès que cette case est cochée. Vous pouvez désactiver la source à tout moment.",
+    "price_provider_saving": "Enregistrement…",
+    "price_provider_loading": "Chargement…",
+    "price_provider_load_failed": "La source des prix n'a pas pu être lue.",
     "auto_fetch_label": "Récupérer automatiquement les prix au démarrage",
     "auto_fetch_description": "Récupère les prix actuels de toutes les positions actives à chaque démarrage.",
     "scheduled_fetch_label": "Téléchargement quotidien des prix",

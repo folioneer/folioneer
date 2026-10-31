@@ -3,12 +3,12 @@ import type { PriceProviderChoice } from "@/bindings";
 import { logger } from "@/lib/logger";
 import { useAppStore } from "@/lib/store";
 import type { I18nMessage } from "@/ui/format/i18n";
-import { fetchPricesOnChoosingSource, getPriceSource, setPriceSource } from "../gateway";
+import { fetchAllAssetPrices, getPriceProviderChoice, setPriceProviderChoice } from "../gateway";
 import { priceProviderChoiceErrorToI18n } from "../shared/presenter";
 
-export const SOURCE_OFF = "off";
+export const PROVIDER_OFF = "off";
 
-export interface UsePriceSourceResult {
+export interface UsePriceProviderResult {
   /** The choice and what the build offers; null until read, or when the read failed. */
   choice: PriceProviderChoice | null;
   /** What the list shows: the source awaiting its notice's acknowledgement, or the choice. */
@@ -24,13 +24,25 @@ export interface UsePriceSourceResult {
   acknowledge: () => void;
 }
 
+/** Fire-and-forget, as the launch's auto-fetch: the shell shows its progress, a failure is logged. */
+async function startFetching(): Promise<void> {
+  try {
+    const result = await fetchAllAssetPrices();
+    if (result.status === "error") {
+      logger.warn("[usePriceProvider] the first fetch was refused", { code: result.error.code });
+    }
+  } catch (error) {
+    logger.error("[usePriceProvider] the first fetch threw", { error });
+  }
+}
+
 /**
  * MKT-215 — the choice of a price source on this computer: choosing a provider asks for its
  * notice's acknowledgement before anything is saved; Off is saved at once. A saved choice
  * makes the interface ask again what it was told (MKT-211), and a source turned on starts
  * fetching.
  */
-export function usePriceSource(): UsePriceSourceResult {
+export function usePriceProvider(): UsePriceProviderResult {
   const refreshExternalProvider = useAppStore((state) => state.refreshExternalProvider);
   const [choice, setChoice] = useState<PriceProviderChoice | null>(null);
   const [awaitingAcknowledgement, setAwaitingAcknowledgement] = useState<string | null>(null);
@@ -42,11 +54,11 @@ export function usePriceSource(): UsePriceSourceResult {
     let cancelled = false;
     void (async () => {
       try {
-        const read = await getPriceSource();
+        const read = await getPriceProviderChoice();
         if (!cancelled) setChoice(read);
       } catch (e) {
-        logger.error("[usePriceSource] failed to read the price source", e);
-        if (!cancelled) setError({ key: "settings.price_source_load_failed" });
+        logger.error("[usePriceProvider] failed to read the price source", e);
+        if (!cancelled) setError({ key: "settings.price_provider_load_failed" });
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -61,7 +73,7 @@ export function usePriceSource(): UsePriceSourceResult {
       setIsSaving(true);
       setError(null);
       try {
-        const result = await setPriceSource(chosen);
+        const result = await setPriceProviderChoice(chosen);
         if (result.status === "error") {
           setError(priceProviderChoiceErrorToI18n(result.error));
           return;
@@ -69,7 +81,10 @@ export function usePriceSource(): UsePriceSourceResult {
         setChoice(result.data);
         setAwaitingAcknowledgement(null);
         await refreshExternalProvider();
-        if (chosen !== null) void fetchPricesOnChoosingSource();
+        if (chosen !== null) void startFetching();
+      } catch (e) {
+        logger.error("[usePriceProvider] failed to save the choice", e);
+        setError({ key: "error.price_provider.NotSaved" });
       } finally {
         setIsSaving(false);
       }
@@ -80,9 +95,9 @@ export function usePriceSource(): UsePriceSourceResult {
   const select = useCallback(
     (source: string) => {
       setError(null);
-      if (source === (choice?.chosen ?? SOURCE_OFF)) {
+      if (source === (choice?.chosen ?? PROVIDER_OFF)) {
         setAwaitingAcknowledgement(null);
-      } else if (source === SOURCE_OFF) {
+      } else if (source === PROVIDER_OFF) {
         setAwaitingAcknowledgement(null);
         void save(null);
       } else {
@@ -98,7 +113,7 @@ export function usePriceSource(): UsePriceSourceResult {
 
   return {
     choice,
-    selected: awaitingAcknowledgement ?? choice?.chosen ?? SOURCE_OFF,
+    selected: awaitingAcknowledgement ?? choice?.chosen ?? PROVIDER_OFF,
     awaitingAcknowledgement,
     isLoading,
     isSaving,

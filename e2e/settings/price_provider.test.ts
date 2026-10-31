@@ -18,7 +18,7 @@ describe("the price source", () => {
 
   it("turns off at once, and on only once its notice is acknowledged", async () => {
     await navigateToSettings();
-    const source = await $("#settings-price-source");
+    const source = await $("#settings-price-provider");
     await source.waitForExist({ timeout: 10000 });
     assert.strictEqual(await source.getValue(), "yahoo_finance");
 
@@ -26,17 +26,17 @@ describe("the price source", () => {
     await source.selectByAttribute("value", "off");
     await (await $("#settings-auto-fetch")).waitForExist({ timeout: 10000, reverse: true });
     assert.strictEqual(await (await $("#scheduled-fetch-toggle")).isExisting(), false);
-    await captureScreen("price-source-off");
+    await captureScreen("price-provider-off");
 
     // Choosing the provider asks first; nothing appears yet (MKT-215).
     await source.selectByAttribute("value", "yahoo_finance");
-    const notice = await $("#settings-price-source-notice");
+    const notice = await $("#settings-price-provider-notice");
     await notice.waitForExist({ timeout: 10000 });
     assert.strictEqual(await (await $("#settings-auto-fetch")).isExisting(), false);
-    await captureScreen("price-source-notice");
+    await captureScreen("price-provider-notice");
 
     // Acknowledged: the choice holds at once, without a restart (MKT-214).
-    await (await $("#settings-price-source-understood")).click();
+    await (await $("#settings-price-provider-understood")).click();
     await (await $("#settings-auto-fetch")).waitForExist({ timeout: 10000 });
     await (await $("#scheduled-fetch-toggle")).waitForExist({ timeout: 10000 });
     await notice.waitForExist({ timeout: 10000, reverse: true });
@@ -44,7 +44,7 @@ describe("the price source", () => {
       timeout: 5000,
       timeoutMsg: "MKT-215 — the list must show the provider once chosen",
     });
-    await captureScreen("price-source-on");
+    await captureScreen("price-provider-on");
 
     await closeSettings();
   });

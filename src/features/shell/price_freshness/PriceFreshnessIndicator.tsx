@@ -7,8 +7,8 @@ import { usePriceFreshness } from "./usePriceFreshness";
 /**
  * MKT-202 — compact shell item: "Prices as of" the newest price date among the held
  * assets; on hover, when this computer last fetched prices. Shown whether or not sync
- * is enabled, and absent until its figures have been read. In a build without an
- * External provider the date stays and the item says nothing about fetching (MKT-212).
+ * is enabled, and absent until its figures have been read. With no External
+ * provider chosen the date stays and the item says nothing about fetching (MKT-212).
  */
 export function PriceFreshnessIndicator() {
   const { t, i18n } = useTranslation();

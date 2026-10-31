@@ -22,8 +22,8 @@ vi.mock("./useSettings", () => ({
 }));
 
 // Each of these reads its own state and has its own tests.
-vi.mock("./price_source/PriceSourceSection", () => ({
-  PriceSourceSection: () => <div data-testid="price-source-mounted" />,
+vi.mock("./price_provider/PriceProviderSection", () => ({
+  PriceProviderSection: () => <div data-testid="price-provider-mounted" />,
 }));
 vi.mock("./scheduled_fetch/ScheduledFetchSection", () => ({
   ScheduledFetchSection: () => <div data-testid="scheduled-fetch-section-mounted" />,
@@ -106,7 +106,7 @@ describe("SettingsDialog", () => {
 
     open("settings-section-prices");
 
-    expect(screen.getByTestId("price-source-mounted")).toBeInTheDocument();
+    expect(screen.getByTestId("price-provider-mounted")).toBeInTheDocument();
     expect(element("settings-auto-fetch")).toBeNull();
     expect(screen.queryByTestId("scheduled-fetch-section-mounted")).toBeNull();
   });

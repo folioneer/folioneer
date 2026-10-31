@@ -8,7 +8,7 @@ import { CheckboxField } from "@/ui/components/field/CheckboxField";
 import { SelectField } from "@/ui/components/field/SelectField";
 import { ModalContainer } from "@/ui/components/modal/ModalContainer";
 import { AgentsAllowedSetting } from "./agent_connection/AgentsAllowedSetting";
-import { PriceSourceSection } from "./price_source/PriceSourceSection";
+import { PriceProviderSection } from "./price_provider/PriceProviderSection";
 import { ReferenceCurrencySection } from "./reference_currency/ReferenceCurrencySection";
 import { ScheduledFetchSection } from "./scheduled_fetch/ScheduledFetchSection";
 import { SyncSection } from "./sync/SyncSection";
@@ -57,7 +57,7 @@ function PricesSection() {
 
   return (
     <>
-      <PriceSourceSection />
+      <PriceProviderSection />
       {hasExternalProvider && (
         <>
           <CheckboxField

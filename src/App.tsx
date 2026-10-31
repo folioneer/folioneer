@@ -17,8 +17,8 @@ import { router } from "./router";
  * unit-testable (the effect just awaits it once after init). Fire-and-forget:
  * dispatch-level failures are logged, never surfaced as a cold-start snackbar.
  *
- * Gated on the build having an External provider (MKT-212) and on the auto-fetch
- * setting (MKT-120). The provider is keyless (ADR-017), so there is no key check.
+ * Gated on an External provider being chosen (MKT-212) and on the auto-fetch setting
+ * (MKT-120).
  */
 export async function maybeLaunchAutoFetch(): Promise<void> {
   // MKT-212 — a computer with no External provider chosen has no auto-fetch to start.

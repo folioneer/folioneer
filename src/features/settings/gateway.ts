@@ -1,10 +1,10 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { logger } from "@/lib/logger";
 import {
   type AgentConnectionError,
   type AgentConnectionState,
   type CurrencyError,
   commands,
+  type FetchAllAssetPricesError,
   type PortfolioSyncError,
   type PriceProviderChoice,
   type PriceProviderChoiceError,
@@ -22,33 +22,22 @@ import {
 /**
  * Gateway for the Settings feature's scheduled-fetch (SPF-010–061) and sync
  * (SYN) commands. Centralizes all Tauri command calls for the feature (the only
- * file allowed to touch `commands.*`, F3). Each function is a typed `Result`
- * pass-through (F27) matching the `bindings.ts` signature.
+ * file allowed to touch `commands.*`, F3). Each function is a pass-through
+ * (F27) matching the `bindings.ts` signature.
  */
-export async function getPriceSource(): Promise<PriceProviderChoice> {
+export async function getPriceProviderChoice(): Promise<PriceProviderChoice> {
   return await commands.getPriceProviderChoice();
 }
 
-export async function setPriceSource(
+export async function setPriceProviderChoice(
   chosen: string | null,
 ): Promise<Result<PriceProviderChoice, PriceProviderChoiceError>> {
   return await commands.setPriceProviderChoice(chosen);
 }
 
-/**
- * MKT-215 — a source just turned on starts fetching. Fire-and-forget like the launch's
- * auto-fetch (MKT-121): what comes of it shows in the shell's progress, and a dispatch that
- * fails is logged.
- */
-export async function fetchPricesOnChoosingSource(): Promise<void> {
-  try {
-    const result = await commands.fetchAllAssetPrices("Launch");
-    if (result.status === "error") {
-      logger.warn("[settings] the first fetch was refused", { code: result.error.code });
-    }
-  } catch (error) {
-    logger.error("[settings] the first fetch threw", { error });
-  }
+/** MKT-215 — a source just turned on starts fetching, as at launch (MKT-121). */
+export async function fetchAllAssetPrices(): Promise<Result<null, FetchAllAssetPricesError>> {
+  return await commands.fetchAllAssetPrices("Launch");
 }
 
 export async function configureScheduledFetch(

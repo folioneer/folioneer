@@ -158,16 +158,18 @@ export const useAppStore = create<AppState>((set, get) => {
       }
     },
 
-    // FXR-128 — a failed read keeps the last known currency and is logged.
     refreshExternalProvider: async () => {
       try {
         const capabilities = await getCapabilities();
         set({ hasExternalProvider: capabilities.external_provider });
       } catch (e) {
+        // MKT-212 — what cannot be read offers nothing that could not run.
         logger.error("[store] failed to read the build's capabilities", e);
+        set({ hasExternalProvider: false });
       }
     },
 
+    // FXR-128 — a failed read keeps the last known currency and is logged.
     fetchReferenceCurrency: async () => {
       const result = await getReferenceCurrency();
       if (result.status === "ok") {
