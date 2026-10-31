@@ -261,6 +261,14 @@ impl ImportMapper {
         })
     }
 
+    /// IMP-020 — the mapper under the file name it takes among `held`, when it has none yet.
+    pub fn named_among(mut self, held: &[String]) -> Self {
+        if self.id.is_empty() {
+            self.id = new_mapper_id(&self.info.provider, held);
+        }
+        self
+    }
+
     /// IMP-020 — what its file holds.
     pub fn to_file(&self) -> Result<Vec<u8>> {
         let draft = ImportMapperDraft {

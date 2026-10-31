@@ -1,6 +1,6 @@
 use crate::context::import::domain::{
-    new_mapper_id, ImportMapper, ImportMapperDraft, ImportMapperStore, MapperChoiceRepository,
-    PickedMapperFile, LARGEST_MAPPER_FILE,
+    ImportMapper, ImportMapperDraft, ImportMapperStore, MapperChoiceRepository, PickedMapperFile,
+    LARGEST_MAPPER_FILE,
 };
 use crate::context::import::error::ImportError;
 use crate::core::BACKEND;
@@ -177,11 +177,9 @@ impl ImportService {
     }
 
     /// IMP-020 — writes the mapper's file; one with no id yet takes its file name here.
-    async fn write_mapper(&self, mut mapper: ImportMapper) -> StdResult<ImportMapper, ImportError> {
-        if mapper.id.is_empty() {
-            let held = self.store.ids().await.map_err(store_error("list"))?;
-            mapper.id = new_mapper_id(&mapper.info.provider, &held);
-        }
+    async fn write_mapper(&self, mapper: ImportMapper) -> StdResult<ImportMapper, ImportError> {
+        let held = self.store.ids().await.map_err(store_error("list"))?;
+        let mapper = mapper.named_among(&held);
         let bytes = mapper.to_file().map_err(store_error("serialize"))?;
         self.store
             .write(&mapper.id, &bytes)

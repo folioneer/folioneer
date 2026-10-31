@@ -183,6 +183,7 @@ The screens are #503 (picking the file, mapping the columns) and #504 (the previ
 ## Cross-amendments
 
 - SYN-038 adds version 11: a transaction carries the added-deposit mark (IMP-051).
+- SYN-023: the import mapper each folder remembers stays on the device (IMP-020C).
 - SYN-038 adds version 12: the column mappings of version 10 are no longer a kind of synced record; no device ever held one, since no window offered it. A mapper's file is not synced for now (#715).
 - CSH: a deposit may be an added deposit, marked as such (IMP-051).
 - TXL-060: a journal row carries the added-deposit mark (IMP-051). TXL-061: its Recorded by column shows the chip (IMP-054). AGT-045: that chip is not an AI agent's mark; an added deposit has no session.
