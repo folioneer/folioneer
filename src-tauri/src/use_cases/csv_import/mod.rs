@@ -16,5 +16,6 @@ mod orchestrator;
 pub use api::*;
 pub use error::{CsvImportError, CsvImportTask};
 pub use orchestrator::{
-    CsvImportUseCase, ImportPreview, PreviewCounts, PreviewRow, RowReason, RowStatus,
+    CsvImportUseCase, DepositsNeeded, ImportPreview, MatchableAsset, PreviewCounts, PreviewRow,
+    RowReason, RowStatus, UnknownAssetRows,
 };

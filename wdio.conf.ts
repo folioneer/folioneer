@@ -144,6 +144,8 @@ export const config: Options.Testrunner = {
       throw new Error(`Failed to create E2E data dir ${E2E_DATA_DIR}: ${err}`);
     }
     process.env.FOLIONEER_E2E_DATA_DIR = E2E_DATA_DIR;
+    // The system file dialog is outside what a test can drive: the import picks this file.
+    process.env.FOLIONEER_E2E_PICKED_FILE = resolve(__dirname, "e2e/account_import/broker.csv");
     tauriDriver = spawn(
       resolve(os.homedir(), ".cargo", "bin", "tauri-driver"),
       ["--port", String(TAURI_DRIVER_PORT), "--native-port", String(TAURI_NATIVE_PORT)],

@@ -1,13 +1,14 @@
 use super::error::{CsvImportError, CsvImportTask};
 use crate::context::account::{
-    AccountError, AccountServiceContract, RecordingJudgment, RecordingOp, RecordingStep, TradeOp,
+    Account, AccountError, AccountServiceContract, RecordingJudgment, RecordingOp, RecordingStep,
+    TradeOp,
 };
 use crate::context::account_import::{
     folded, read_file, read_rows, AccountImportError, AccountImportService, AssetMatch, AssetRead,
     FileRead, ImportMapperDraft, OperationRead, ReadingChoices, RowFigures, RowFormat, RowRead,
     RowRejection, LARGEST_FILE,
 };
-use crate::context::asset::{Asset, AssetServiceContract};
+use crate::context::asset::{Asset, AssetClass, AssetServiceContract};
 use crate::core::logger::BACKEND;
 use crate::shared::infrastructure::uow::TransactionManager;
 use serde::Serialize;
@@ -58,11 +59,15 @@ pub enum RowStatus {
     Rejected {
         /// Why.
         reason: RowReason,
+        /// The operation read; none for a row that did not read as one.
+        operation: Option<OperationRead>,
     },
     /// No asset of the portfolio matches it (IMP-032).
     UnknownAsset {
         /// The asset as read.
         asset: AssetRead,
+        /// The operation read.
+        operation: OperationRead,
     },
     /// The account holds it already (IMP-036).
     AlreadyRecorded {
@@ -75,12 +80,18 @@ pub enum RowStatus {
     NotImported {
         /// The label read.
         label: String,
+        /// The date, when it reads.
+        date: Option<String>,
+        /// The asset as read.
+        asset: AssetRead,
     },
     /// A trade tax added to the purchase on line `purchase_line`, of that purchase's status
     /// (IMP-034).
     JoinedTradeTax {
         /// The purchase's line number.
         purchase_line: u32,
+        /// The trade tax as read.
+        operation: OperationRead,
     },
 }
 
@@ -91,6 +102,9 @@ pub struct PreviewRow {
     pub line: u32,
     /// Its status.
     pub status: RowStatus,
+    /// IMP-030 — its total as manual entry computes it (TRX-026, SEL-023), or the amount it
+    /// reads (micro-units); none for a row without figures.
+    pub amount: Option<i64>,
 }
 
 /// How many rows hold each status; a joined trade tax counts with its purchase (IMP-030).
@@ -108,6 +122,37 @@ pub struct PreviewCounts {
     pub not_imported: u32,
 }
 
+/// IMP-068 — the deposits the ready purchases need, and what is left to record without them.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Type)]
+pub struct DepositsNeeded {
+    /// How many purchases need one.
+    pub count: u32,
+    /// Their total (micro-units).
+    pub total: i64,
+    /// The ready rows left when the deposits are left out (IMP-051B).
+    pub ready_without: u32,
+}
+
+/// IMP-067 — the rows of one unknown asset: those whose first text read is the same.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct UnknownAssetRows {
+    /// The first the rows read of their ISIN, reference and name: what a match stands for.
+    pub read: String,
+    /// The asset as the first row read it.
+    pub asset: AssetRead,
+    /// Its rows' line numbers.
+    pub lines: Vec<u32>,
+}
+
+/// IMP-067 — an asset a row can be matched to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct MatchableAsset {
+    /// Its id.
+    pub id: String,
+    /// Its name.
+    pub name: String,
+}
+
 /// IMP-030 — a file read through a mapper, each row judged; nothing written (IMP-017).
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct ImportPreview {
@@ -117,6 +162,15 @@ pub struct ImportPreview {
     pub rows: Vec<PreviewRow>,
     /// How many rows hold each status.
     pub counts: PreviewCounts,
+    /// IMP-053, IMP-066 — the file holds rows, and every one is already recorded.
+    pub all_recorded: bool,
+    /// The deposits the ready purchases need (IMP-038).
+    pub deposits: DepositsNeeded,
+    /// The unknown assets, each with its rows, as first met (IMP-067).
+    pub unknown_assets: Vec<UnknownAssetRows>,
+    /// What an unknown asset can be matched to, by name: archived ones included, no Cash
+    /// Asset (IMP-032, IMP-067).
+    pub matchable_assets: Vec<MatchableAsset>,
 }
 
 /// Reads a broker's export for an account and previews it (IMP-010 to IMP-038).
@@ -298,8 +352,17 @@ impl CsvImportUseCase {
             })
             .collect();
         let rows = self.judge(account_id, &currency, pending, record).await?;
+        let counts = count(&rows);
         Ok(ImportPreview {
-            counts: count(&rows),
+            all_recorded: counts.already_recorded > 0
+                && counts.ready == 0
+                && counts.rejected == 0
+                && counts.unknown_asset == 0
+                && counts.not_imported == 0,
+            deposits: deposits_needed(&rows, counts.ready),
+            unknown_assets: unknown_assets(&rows),
+            matchable_assets: matchable(&assets),
+            counts,
             file: read,
             rows,
         })
@@ -437,7 +500,12 @@ impl CsvImportUseCase {
                         return Err(CsvImportTask::UnknownError.into());
                     }
                 };
-                Ok(PreviewRow { line, status })
+                let amount = amount_of(&status);
+                Ok(PreviewRow {
+                    line,
+                    status,
+                    amount,
+                })
             })
             .collect()
     }
@@ -491,25 +559,37 @@ fn unreadable(e: std::io::Error) -> CsvImportTask {
 fn pend(read: RowRead, matches: &[AssetMatch], assets: &[Asset], currency: &str) -> Pending {
     let operation = match read {
         RowRead::Operation(operation) => operation,
-        RowRead::JoinedTradeTax { purchase_line } => {
-            return Pending::Done(RowStatus::JoinedTradeTax { purchase_line })
+        RowRead::JoinedTradeTax {
+            purchase_line,
+            operation,
+        } => {
+            return Pending::Done(RowStatus::JoinedTradeTax {
+                purchase_line,
+                operation,
+            })
         }
-        RowRead::NotImported { label } => return Pending::Done(RowStatus::NotImported { label }),
+        RowRead::NotImported { label, date, asset } => {
+            return Pending::Done(RowStatus::NotImported { label, date, asset })
+        }
         RowRead::Rejected(rejection) => {
             return Pending::Done(RowStatus::Rejected {
                 reason: RowReason::Unread { rejection },
+                operation: None,
             })
         }
     };
-    let other_currency = Pending::Done(RowStatus::Rejected {
-        reason: RowReason::OtherCurrency,
-    });
+    let other_currency = |operation: &OperationRead| {
+        Pending::Done(RowStatus::Rejected {
+            reason: RowReason::OtherCurrency,
+            operation: Some(operation.clone()),
+        })
+    };
     if operation
         .currency
         .as_deref()
         .is_some_and(|own| !own.eq_ignore_ascii_case(currency))
     {
-        return other_currency;
+        return other_currency(&operation);
     }
     let date = operation.date.clone();
     let cash = |op: RecordingOp| (op, false);
@@ -535,10 +615,11 @@ fn pend(read: RowRead, matches: &[AssetMatch], assets: &[Asset], currency: &str)
             let Some(asset) = matched(&operation.asset, matches, assets) else {
                 return Pending::Done(RowStatus::UnknownAsset {
                     asset: operation.asset.clone(),
+                    operation: operation.clone(),
                 });
             };
             if !asset.currency.eq_ignore_ascii_case(currency) {
-                return other_currency;
+                return other_currency(&operation);
             }
             let trade = |quantity: i64, unit_price: i64, fees: i64| TradeOp {
                 asset_id: asset.id.clone(),
@@ -581,6 +662,7 @@ fn pend(read: RowRead, matches: &[AssetMatch], assets: &[Asset], currency: &str)
                         reason: RowReason::Unread {
                             rejection: RowRejection::TradeTaxUnpaired,
                         },
+                        operation: Some(operation.clone()),
                     })
                 }
             };
@@ -663,11 +745,101 @@ fn status_of(
         },
         RecordingJudgment::NotHeld => RowStatus::Rejected {
             reason: RowReason::AssetNotHeld,
+            operation: Some(operation),
         },
         RecordingJudgment::Refused(refusal) => RowStatus::Rejected {
             reason: RowReason::ManualEntry { refusal },
+            operation: Some(operation),
         },
     }
+}
+
+/// IMP-068 — how many ready purchases need a deposit, how much, and what is left without them.
+fn deposits_needed(rows: &[PreviewRow], ready: u32) -> DepositsNeeded {
+    let (count, total) = rows
+        .iter()
+        .fold((0_u32, 0_i64), |(count, total), row| match row.status {
+            RowStatus::Ready {
+                funding: Some(funding),
+                ..
+            } => (count.saturating_add(1), total.saturating_add(funding)),
+            _ => (count, total),
+        });
+    DepositsNeeded {
+        count,
+        total,
+        ready_without: ready.saturating_sub(count),
+    }
+}
+
+/// IMP-067 — each unknown asset once, with its rows; a row reading nothing has no group.
+fn unknown_assets(rows: &[PreviewRow]) -> Vec<UnknownAssetRows> {
+    let mut groups: Vec<UnknownAssetRows> = Vec::new();
+    for row in rows {
+        let RowStatus::UnknownAsset { asset, .. } = &row.status else {
+            continue;
+        };
+        let Some(read) = asset
+            .isin
+            .as_ref()
+            .or(asset.reference.as_ref())
+            .or(asset.name.as_ref())
+        else {
+            continue;
+        };
+        let key = folded(read);
+        match groups.iter_mut().find(|group| folded(&group.read) == key) {
+            Some(group) => group.lines.push(row.line),
+            None => groups.push(UnknownAssetRows {
+                read: read.clone(),
+                asset: asset.clone(),
+                lines: vec![row.line],
+            }),
+        }
+    }
+    groups
+}
+
+/// IMP-032, IMP-067 — every asset of the portfolio but the Cash Assets, by name.
+fn matchable(assets: &[Asset]) -> Vec<MatchableAsset> {
+    let mut held: Vec<MatchableAsset> = assets
+        .iter()
+        .filter(|asset| asset.class != AssetClass::Cash)
+        .map(|asset| MatchableAsset {
+            id: asset.id.clone(),
+            name: asset.name.clone(),
+        })
+        .collect();
+    held.sort_by_key(|asset| folded(&asset.name));
+    held
+}
+
+/// IMP-030 — what a row's amount column shows; manual entry's own totals for a trade.
+fn amount_of(status: &RowStatus) -> Option<i64> {
+    let operation = match status {
+        RowStatus::Ready { operation, .. }
+        | RowStatus::AlreadyRecorded { operation, .. }
+        | RowStatus::UnknownAsset { operation, .. }
+        | RowStatus::JoinedTradeTax { operation, .. } => operation,
+        RowStatus::Rejected { operation, .. } => operation.as_ref()?,
+        RowStatus::NotImported { .. } => return None,
+    };
+    Some(match operation.figures {
+        RowFigures::Purchase {
+            quantity,
+            unit_price,
+            fees,
+        } => Account::compute_purchase_total(quantity, unit_price, SAME_CURRENCY, fees),
+        RowFigures::Sale {
+            quantity,
+            unit_price,
+            fees,
+        } => Account::compute_sell_total(quantity, unit_price, SAME_CURRENCY, fees),
+        RowFigures::Dividend { amount }
+        | RowFigures::Deposit { amount }
+        | RowFigures::Withdrawal { amount }
+        | RowFigures::TradeTax { amount, .. } => amount,
+    })
 }
 
 /// IMP-030 — the rows of each status; a joined trade tax counts with its purchase.

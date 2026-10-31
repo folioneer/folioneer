@@ -147,7 +147,14 @@ export function MapperForm({
             </section>
           )}
 
-          <section className="grid grid-cols-[1fr_auto] items-end gap-3">
+          <form
+            id="account-import-mapper-form"
+            className="grid grid-cols-[1fr_auto] items-end gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSave();
+            }}
+          >
             <TextField
               id="account-import-provider"
               label={t("account_import.provider_label")}
@@ -156,7 +163,7 @@ export function MapperForm({
               onChange={(e) => onProvider(e.target.value)}
               placeholder={t("account_import.provider_placeholder")}
             />
-            <Button id="account-import-save" variant="tonal" loading={busy} onClick={onSave}>
+            <Button id="account-import-save" type="submit" variant="tonal" loading={busy}>
               {t("account_import.action_save")}
             </Button>
             {saved && (
@@ -168,7 +175,7 @@ export function MapperForm({
                 {t("account_import.saved")}
               </p>
             )}
-          </section>
+          </form>
         </>
       )}
     </div>

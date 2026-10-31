@@ -162,3 +162,5 @@ WebDriver's synthetic key events are not trusted, so they cannot drive the Headl
 - When the form can open with the asset pre-populated (a buy opened from a holding row), seed the data through IPC and use that path.
 - When the form cannot be submitted without typing into the combobox, the submit test calls the backend command directly (`browser.executeAsync` → `window.__TAURI_INTERNALS__.invoke(...)`); the frontend guard checks stay.
 - The full fill-and-submit flow is covered by RTL component tests.
+
+**System file dialog** — no test can drive it. A debug build takes the file `FOLIONEER_E2E_PICKED_FILE` names instead (`wdio.conf.ts`: `e2e/account_import/broker.csv`); a release build never reads it.

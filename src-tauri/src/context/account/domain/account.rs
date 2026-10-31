@@ -2323,7 +2323,7 @@ impl Account {
 
     /// Computes total_amount for a Purchase (TRX-026).
     /// Formula: floor(floor(qty × price / MICRO) × rate / MICRO) + fees
-    fn compute_purchase_total(
+    pub fn compute_purchase_total(
         quantity: i64,
         unit_price: i64,
         exchange_rate: i64,
@@ -2338,7 +2338,12 @@ impl Account {
 
     /// Computes total_amount for a Sell (SEL-023).
     /// Formula: floor(floor(qty × price / MICRO) × rate / MICRO) - fees
-    fn compute_sell_total(quantity: i64, unit_price: i64, exchange_rate: i64, fees: i64) -> i64 {
+    pub fn compute_sell_total(
+        quantity: i64,
+        unit_price: i64,
+        exchange_rate: i64,
+        fees: i64,
+    ) -> i64 {
         const MICRO: i128 = 1_000_000;
         let qty = quantity as i128;
         let price = unit_price as i128;

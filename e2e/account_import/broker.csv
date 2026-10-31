@@ -1,0 +1,7 @@
+Date;Operation;Name;Quantity;Price;Fees;Net
+06/01/2025;Deposit;;;;;2000
+08/01/2025;Buy;E2E Import Asset;20;90;0;1800
+14/02/2025;Buy;E2E Import Asset;30;50;0;1500
+03/03/2025;Buy;SOCIETE EXEMPLE SA;10;42;0;420
+12/03/2025;Sale;E2E Import Asset;500;10;0;5000
+20/03/2025;DIVISION;E2E Import Asset;;;;

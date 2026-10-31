@@ -23,6 +23,7 @@ import {
   withFormatOf,
   withLabelType,
 } from "./presenter";
+import { useImportPreviewStep } from "./useImportPreviewStep";
 
 type FormatField = keyof FormatChoices;
 
@@ -31,7 +32,11 @@ type FormatField = keyof FormatChoices;
  * format, columns and operations (IMP-018, IMP-020 to IMP-022). Holds view state only: every
  * reading and refusal is the core's.
  */
-export function useAccountImport(accountId: string) {
+export function useAccountImport(
+  accountId: string,
+  accountCurrency: string,
+  onRecorded: () => void,
+) {
   const [path, setPath] = useState<string | null>(null);
   const [file, setFile] = useState<FileRead | null>(null);
   const [mappers, setMappers] = useState<ImportMapper[]>([]);
@@ -298,6 +303,45 @@ export function useAccountImport(accountId: string) {
 
   const edit = useCallback(() => setEditing(true), []);
 
+  // IMP-066 — back to the mapper, with everything in it kept, its new matches too.
+  const backToMapper = useCallback(() => {
+    setProblem(null);
+    setPreview(null);
+  }, []);
+
+  // IMP-033 — the rows judged again; the preview stays until the new one replaces it.
+  const rejudge = useCallback(
+    (next: ImportMapperDraft) => {
+      if (!path) return;
+      setProblem(null);
+      setDraft(next);
+      const reading = ++latestReading.current;
+      void withBusy(async () => {
+        const result = await accountImportGateway.previewImport(accountId, path, mapperId, next);
+        if (reading !== latestReading.current) return;
+        if (result.status === "ok") {
+          setPreview(result.data);
+        } else {
+          refuse(result.error);
+        }
+      });
+    },
+    [accountId, mapperId, path, refuse, withBusy],
+  );
+
+  const step = useImportPreviewStep({
+    accountId,
+    accountCurrency,
+    path,
+    mapperId,
+    draft,
+    preview,
+    rejudge,
+    withBusy,
+    onRefused: refuse,
+    onRecorded,
+  });
+
   const busy = working > 0;
 
   return {
@@ -334,5 +378,7 @@ export function useAccountImport(accountId: string) {
     saveMapper,
     addMapperFromFile,
     runPreview,
+    backToMapper,
+    step,
   };
 }

@@ -148,20 +148,36 @@ struct ImportPreview {
     file: FileRead,
     rows: Vec<PreviewRow>, // every line that is not blank, in the file's order
     counts: PreviewCounts, // a joined trade tax counts with its purchase
+    all_recorded: bool,    // IMP-053, IMP-066 — rows, and every one already recorded
+    deposits: DepositsNeeded,
+    unknown_assets: Vec<UnknownAssetRows>, // IMP-067 — as first met
+    matchable_assets: Vec<MatchableAsset>, // IMP-032, IMP-067 — by name, archived included, no Cash Asset
 }
 
-struct PreviewRow { line: u32 /* from 1 for the header */, status: RowStatus }
+// IMP-068 — `ready_without`: the ready rows left when the deposits are left out (IMP-051B).
+struct DepositsNeeded { count: u32, total: i64, ready_without: u32 }
+
+// IMP-067 — `read`: the first the rows read of ISIN, reference and name, what a match stands for.
+struct UnknownAssetRows { read: String, asset: AssetRead, lines: Vec<u32> }
+
+struct MatchableAsset { id: String, name: String }
+
+struct PreviewRow {
+    line: u32,           // from 1 for the header
+    status: RowStatus,
+    amount: Option<i64>, // IMP-030 — its total as manual entry computes it (TRX-026, SEL-023), or its amount
+}
 
 struct PreviewCounts { ready: u32, rejected: u32, unknown_asset: u32, already_recorded: u32, not_imported: u32 }
 
 // IMP-030 — on the wire `{ "status": "Ready", ... }`.
 enum RowStatus {
     Ready { operation: OperationRead, asset_id: Option<String>, funding: Option<i64> }, // funding: IMP-038
-    Rejected { reason: RowReason },
-    UnknownAsset { asset: AssetRead },                                                  // IMP-032
+    Rejected { reason: RowReason, operation: Option<OperationRead> },                   // none: the row read as no operation
+    UnknownAsset { asset: AssetRead, operation: OperationRead },                        // IMP-032
     AlreadyRecorded { operation: OperationRead, asset_id: Option<String> },             // IMP-036
-    NotImported { label: String },                                                      // IMP-022
-    JoinedTradeTax { purchase_line: u32 },                                              // IMP-034
+    NotImported { label: String, date: Option<String>, asset: AssetRead },              // IMP-022
+    JoinedTradeTax { purchase_line: u32, operation: OperationRead },                    // IMP-034
 }
 
 // On the wire `{ "code": "Unread", ... }`.
@@ -227,3 +243,4 @@ enum RowFigures {
 - 2026-10-31 — Amended by `csv-import` (#714): a column mapping becomes an import mapper, a JSON file: `list_import_mappers`, `save_import_mapper`, `delete_import_mapper` replace the column mapping commands; `add_import_mapper_from_file`, `remembered_import_mapper` added; event `ColumnMappingUpdated` removed.
 - 2026-10-31 — Amended by `csv-import` (#714): the domain is `account_import`; `ImportError` is `AccountImportError`, its codes unchanged.
 - 2026-10-31 — Amended by `csv-import` (#503): `MappedColumnNotInFile { column }` becomes `MappedColumnsNotInFile { columns }`, naming every column the file lacks (IMP-021); `ReadingChoices` gains `operation_column` and `FileRead` gains `operation_labels` (IMP-022A).
+- 2026-10-31 — Amended by `csv-import` (#504): each previewed row carries what it read and its amount (IMP-030); the preview adds `all_recorded`, `deposits`, `unknown_assets`, `matchable_assets` (IMP-066 to IMP-068).

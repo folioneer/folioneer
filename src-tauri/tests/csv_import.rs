@@ -319,7 +319,7 @@ async fn imp_030_the_preview_judges_every_row_of_a_french_export() {
     ));
     assert!(matches!(
         status(&preview, 3),
-        RowStatus::JoinedTradeTax { purchase_line: 2 }
+        RowStatus::JoinedTradeTax { purchase_line: 2, operation } if operation.date == "2024-01-03"
     ));
     assert!(
         matches!(status(&preview, 4), RowStatus::Ready { asset_id: Some(id), .. } if *id == beta)
@@ -329,7 +329,7 @@ async fn imp_030_the_preview_judges_every_row_of_a_french_export() {
     assert!(matches!(status(&preview, 7), RowStatus::NotImported { .. }));
     assert!(matches!(
         status(&preview, 8),
-        RowStatus::UnknownAsset { asset } if asset.name.as_deref() == Some("INCONNUE SA")
+        RowStatus::UnknownAsset { asset, .. } if asset.name.as_deref() == Some("INCONNUE SA")
     ));
     assert_eq!(
         preview.counts,
@@ -341,6 +341,41 @@ async fn imp_030_the_preview_judges_every_row_of_a_french_export() {
             not_imported: 1,
         }
     );
+    // IMP-030 — each row shows its total as manual entry computes it, or none without figures.
+    let amount = |line: u32| {
+        preview
+            .rows
+            .iter()
+            .find(|row| row.line == line)
+            .and_then(|row| row.amount)
+    };
+    assert_eq!(amount(2), Some(127_330_000), "125 + 1.95 + the joined 0.38");
+    assert_eq!(amount(3), Some(380_000));
+    assert_eq!(amount(5), Some(38_000_000), "39 less the 1 of fees");
+    // IMP-067 — the unknown asset with its rows, the assets to match it to, no deposit needed.
+    assert_eq!(preview.unknown_assets.len(), 1);
+    assert_eq!(preview.unknown_assets[0].read, "INCONNUE SA");
+    assert_eq!(preview.unknown_assets[0].lines, vec![8]);
+    assert_eq!(
+        preview.deposits.ready_without,
+        preview.counts.ready - preview.deposits.count
+    );
+    assert!(!preview.all_recorded);
+    let names: Vec<&str> = preview
+        .matchable_assets
+        .iter()
+        .map(|asset| asset.name.as_str())
+        .collect();
+    assert!(names.contains(&"Acme Monde"), "{names:?}");
+    assert_eq!(amount(7), None);
+    assert!(
+        amount(8).is_some(),
+        "an unknown asset's row shows its amount"
+    );
+    assert!(matches!(
+        status(&preview, 7),
+        RowStatus::NotImported { date: Some(_), .. }
+    ));
 }
 
 // IMP-017 / IMP-036 — previewing writes nothing; a row the account already holds, its
@@ -413,7 +448,8 @@ async fn imp_035_rows_follow_the_rules_of_manual_entry() {
             RowStatus::Rejected {
                 reason: RowReason::ManualEntry {
                     refusal: AccountError::Oversell { .. }
-                }
+                },
+                operation: Some(_),
             }
         ),
         "SEL-021: {:?}",
@@ -425,7 +461,8 @@ async fn imp_035_rows_follow_the_rules_of_manual_entry() {
             RowStatus::Rejected {
                 reason: RowReason::ManualEntry {
                     refusal: AccountError::InsufficientCash { .. }
-                }
+                },
+                ..
             }
         ),
         "CSH-031: {:?}",
@@ -434,13 +471,15 @@ async fn imp_035_rows_follow_the_rules_of_manual_entry() {
     assert!(matches!(
         status(&preview, 6),
         RowStatus::Rejected {
-            reason: RowReason::OtherCurrency
+            reason: RowReason::OtherCurrency,
+            operation: Some(_),
         }
     ));
     assert!(matches!(
         status(&preview, 7),
         RowStatus::Rejected {
-            reason: RowReason::AssetNotHeld
+            reason: RowReason::AssetNotHeld,
+            ..
         }
     ));
     assert!(
@@ -486,7 +525,8 @@ async fn imp_032_each_row_is_matched_to_an_asset() {
         RowStatus::Rejected {
             reason: RowReason::ManualEntry {
                 refusal: AccountError::ArchivedAssetSell
-            }
+            },
+            ..
         }
     ));
 }
@@ -605,7 +645,7 @@ async fn imp_010_what_cannot_be_read_is_refused() {
     let preview = preview(&ctx, &account_id, &file, &untyped).await;
     assert!(matches!(
         status(&preview, 3),
-        RowStatus::Rejected { reason: RowReason::Unread { rejection: RowRejection::OperationTypeMissing { label } } }
+        RowStatus::Rejected { reason: RowReason::Unread { rejection: RowRejection::OperationTypeMissing { label } }, .. }
             if label == "Buy"
     ));
 }
@@ -764,7 +804,8 @@ async fn imp_036_a_recorded_sale_of_an_asset_since_archived_is_already_recorded(
             RowStatus::Rejected {
                 reason: RowReason::ManualEntry {
                     refusal: AccountError::ArchivedAssetSell
-                }
+                },
+                ..
             }
         ),
         "SEL-037: a new sale of an archived asset stays refused"
@@ -836,7 +877,8 @@ async fn imp_035a_the_order_of_a_days_rows() {
         matches!(
             status(&previewed, 9),
             RowStatus::Rejected {
-                reason: RowReason::AssetNotHeld
+                reason: RowReason::AssetNotHeld,
+                ..
             }
         ),
         "IMP-035A: the dividend comes before the day's first purchase"
@@ -1648,7 +1690,8 @@ async fn imp_035_a_row_is_judged_as_if_typed() {
             matches!(
                 status(&previewed, line),
                 RowStatus::Rejected {
-                    reason: RowReason::ManualEntry { .. }
+                    reason: RowReason::ManualEntry { .. },
+                    ..
                 }
             ),
             "{what}: {:?}",
@@ -1658,7 +1701,8 @@ async fn imp_035_a_row_is_judged_as_if_typed() {
     assert!(matches!(
         status(&previewed, 5),
         RowStatus::Rejected {
-            reason: RowReason::OtherCurrency
+            reason: RowReason::OtherCurrency,
+            ..
         }
     ));
 }
@@ -1732,7 +1776,8 @@ async fn imp_051b_the_added_deposits_can_be_left_out() {
         RowStatus::Rejected {
             reason: RowReason::ManualEntry {
                 refusal: AccountError::InsufficientCash { .. }
-            }
+            },
+            ..
         }
     ));
     let recorded = transactions(&ctx, &account_id).await;
@@ -1775,7 +1820,7 @@ async fn imp_052_an_unknown_asset_created_from_its_row_is_recorded() {
     let (account_id, _, _) = french_portfolio(&ctx).await;
     let file = picked(&ctx, &fixture("french_broker.csv"), true).await;
     let preview = preview(&ctx, &account_id, &file, &french_mapper()).await;
-    let RowStatus::UnknownAsset { asset: read } = status(&preview, 8) else {
+    let RowStatus::UnknownAsset { asset: read, .. } = status(&preview, 8) else {
         panic!("line 8 is unknown");
     };
     let name = read.name.clone().expect("the name read");

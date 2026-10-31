@@ -606,6 +606,7 @@ export function AccountDetailsView() {
           onClose={view.handleImportClose}
           accountId={accountId}
           accountName={view.summary?.accountName ?? ""}
+          accountCurrency={view.accountCurrency}
         />
       )}
 

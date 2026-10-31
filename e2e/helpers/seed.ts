@@ -75,6 +75,48 @@ export async function seedAsset(
   return asset.id;
 }
 
+/** Saves the import mapper of `e2e/account_import/broker.csv` (IMP-020); returns its id. */
+export async function seedImportMapper(provider: string): Promise<string> {
+  const mapper = (await browser.executeAsync((name: string, done: (r: unknown) => void) => {
+    // @ts-expect-error __TAURI_INTERNALS__ injected by Tauri WebView
+    window.__TAURI_INTERNALS__
+      .invoke("save_import_mapper", {
+        mapperId: null,
+        draft: {
+          info: { provider: name },
+          separator: "Semicolon",
+          decimal_mark: "Dot",
+          date_format: "DayMonthYear",
+          encoding: "Utf8",
+          columns: {
+            date: "Date",
+            operation: "Operation",
+            isin: null,
+            reference: null,
+            name: "Name",
+            quantity: "Quantity",
+            unit_price: "Price",
+            gross_amount: null,
+            fees: "Fees",
+            net_amount: "Net",
+            currency: null,
+          },
+          operation_types: [
+            { label: "Deposit", transaction_type: "Deposit" },
+            { label: "Buy", transaction_type: "Purchase" },
+            { label: "Sale", transaction_type: "Sale" },
+            { label: "DIVISION", transaction_type: "NotImported" },
+          ],
+          asset_matches: [],
+        },
+      })
+      .then(done)
+      .catch((err: unknown) => done({ __error: String(err) }));
+  }, provider)) as { id: string };
+  assert.ok(!("__error" in mapper), `seedImportMapper failed: ${JSON.stringify(mapper)}`);
+  return mapper.id;
+}
+
 /**
  * Records a cash deposit on the given account (CSH-022). Used both as a
  * dedicated seed helper for cash flows and internally by `seedBuy` to satisfy

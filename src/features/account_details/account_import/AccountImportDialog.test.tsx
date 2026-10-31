@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { FileRead, ImportMapperDraft } from "@/bindings";
@@ -9,6 +9,7 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, vars?: Record<string, unknown>) =>
       vars ? `${key} ${JSON.stringify(vars)}` : key,
+    i18n: { language: "en" },
   }),
 }));
 
@@ -52,10 +53,31 @@ const view = (overrides: Partial<View>): View => ({
   saveMapper: noop,
   addMapperFromFile: noop,
   runPreview: noop,
+  backToMapper: noop,
+  step: {
+    rows: [],
+    addDeposits: true,
+    setAddDeposits: noop,
+    focused: null,
+    focusedRows: [],
+    focus: noop,
+    unfocus: noop,
+    recordable: 0,
+    match: noop,
+    createAsset: noop,
+    confirm: noop,
+  },
   ...overrides,
 });
 const show = (overrides: Partial<View>) =>
-  render(<AccountImportDialog view={view(overrides)} onClose={noop} accountName="PEA" />);
+  render(
+    <AccountImportDialog
+      view={view(overrides)}
+      onClose={noop}
+      accountName="PEA"
+      accountCurrency="EUR"
+    />,
+  );
 const byId = (id: string) => document.getElementById(id);
 
 describe("AccountImportDialog", () => {
@@ -117,18 +139,108 @@ describe("AccountImportDialog", () => {
   });
 
   // IMP-065 — the counts, and the action while the window works.
-  it("shows the counts and the work under way", () => {
+  it("shows the work under way", () => {
+    show({ busy: true, canPreview: false });
+    expect(byId("account-import-preview")).toBeDisabled();
+  });
+
+  describe("the preview's step", () => {
     const counts = {
-      ready: 2,
-      rejected: 1,
+      ready: 0,
+      rejected: 0,
       unknown_asset: 0,
       already_recorded: 0,
       not_imported: 0,
     };
-    const { unmount } = show({ preview: { file, rows: [], counts } });
-    expect(byId("account-import-preview-counts")).toHaveTextContent('"ready":2');
-    unmount();
-    show({ busy: true, canPreview: false });
-    expect(byId("account-import-preview")).toBeDisabled();
+    const previewOf = (over: Partial<typeof counts>, more = {}) => ({
+      file,
+      rows: [],
+      counts: { ...counts, ...over },
+      all_recorded: false,
+      deposits: { count: 0, total: 0, ready_without: 0 },
+      unknown_assets: [],
+      matchable_assets: [{ id: "a", name: "Demo Bank" }],
+      ...more,
+    });
+    const row = {
+      line: 6,
+      status: { key: "account_import.status_unknown_asset" },
+      tone: "unknown" as const,
+      date: "2025-03-03",
+      operation: { key: "account_import.type_purchase" },
+      assetName: "EXEMPLE",
+      quantity: 10_000_000,
+      amount: 420_000_000,
+      funding: null,
+      note: null,
+      opensAsset: true,
+    };
+    const step = view({}).step;
+
+    // IMP-066, IMP-068 — the counts held, the rows, the action naming what it records.
+    it("lists the rows, the counts held and what confirming records", () => {
+      const focus = vi.fn();
+      show({
+        preview: previewOf({ ready: 41, unknown_asset: 1 }),
+        step: { ...step, rows: [row], recordable: 41, focus },
+      });
+      expect(byId("account-import-count-ready")).toBeInTheDocument();
+      expect(byId("account-import-count-rejected")).toBeNull();
+      expect(byId("account-import-row-6")).toHaveTextContent("EXEMPLE");
+      expect(byId("account-import-record")).toHaveTextContent('action_record {"count":41}');
+      fireEvent.click(byId("account-import-unknown-6") as HTMLElement);
+      expect(focus).toHaveBeenCalledWith(6);
+    });
+
+    // IMP-053, IMP-066, IMP-068 — the same file twice records nothing, and says so.
+    it("says nothing is left to record when every row is recorded", () => {
+      show({ preview: previewOf({ already_recorded: 57 }, { all_recorded: true }), step });
+      expect(byId("account-import-preview-hint")).toHaveTextContent("preview_all_recorded");
+      expect(byId("account-import-record")).toHaveTextContent("action_nothing");
+      expect(byId("account-import-record")).toBeDisabled();
+    });
+
+    // IMP-051B — offered only when a purchase needs a deposit.
+    it("offers the deposits only when a purchase needs one", () => {
+      const setAddDeposits = vi.fn();
+      show({ preview: previewOf({ ready: 1 }), step: { ...step, recordable: 1 } });
+      expect(byId("account-import-add-deposits")).toBeNull();
+      cleanup();
+      show({
+        preview: previewOf({ ready: 1 }, { deposits: { count: 3, total: 3, ready_without: 0 } }),
+        step: { ...step, recordable: 1, setAddDeposits },
+      });
+      fireEvent.click(byId("account-import-add-deposits") as HTMLElement);
+      expect(setAddDeposits).toHaveBeenCalledWith(false);
+    });
+
+    // IMP-067 — the asset's step: its rows, the match, and Back to the preview.
+    it("shows an unknown asset's step, matching only once an asset is chosen", () => {
+      const match = vi.fn();
+      const unfocus = vi.fn();
+      show({
+        preview: previewOf({ unknown_asset: 1 }),
+        step: {
+          ...step,
+          focused: {
+            read: "EXEMPLE",
+            asset: { isin: null, reference: null, name: "EXEMPLE" },
+            lines: [6],
+          },
+          focusedRows: [row],
+          match,
+          unfocus,
+        },
+      });
+      expect(byId("account-import-unknown-title")).toHaveTextContent("EXEMPLE");
+      expect(byId("account-import-match")).toBeDisabled();
+      const select = byId("account-import-match-asset") as HTMLSelectElement;
+      expect(Array.from(select.options).map((o) => o.value)).toEqual(["", "a"]);
+      fireEvent.change(select, { target: { value: "a" } });
+      fireEvent.click(byId("account-import-match") as HTMLElement);
+      expect(match).toHaveBeenCalledWith("EXEMPLE", "a");
+      fireEvent.click(byId("account-import-back") as HTMLElement);
+      expect(unfocus).toHaveBeenCalled();
+    });
   });
 });
