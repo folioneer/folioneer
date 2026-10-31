@@ -84,8 +84,11 @@ describe("account_import", () => {
 
     // IMP-052 — the asset form opens over the window, and Escape does not close the window.
     const toCreate = await $("#account-import-unknown-8");
+    await toCreate.waitForExist({ timeout: 8000 });
     await toCreate.click();
-    await (await $("#account-import-create-asset")).click();
+    const createAction = await $("#account-import-create-asset");
+    await createAction.waitForEnabled({ timeout: 5000 });
+    await createAction.click();
     const form = await $("form#add-asset-form");
     await form.waitForExist({ timeout: 5000 });
     await captureScreen("account-import-create-asset");
