@@ -8,12 +8,15 @@ import { CheckboxField } from "@/ui/components/field/CheckboxField";
 import { SelectField } from "@/ui/components/field/SelectField";
 import { ModalContainer } from "@/ui/components/modal/ModalContainer";
 import { AgentsAllowedSetting } from "./agent_connection/AgentsAllowedSetting";
+import { PriceSourceSection } from "./price_source/PriceSourceSection";
 import { ReferenceCurrencySection } from "./reference_currency/ReferenceCurrencySection";
 import { ScheduledFetchSection } from "./scheduled_fetch/ScheduledFetchSection";
 import { SyncSection } from "./sync/SyncSection";
 import { type LanguageChoice, useSettings } from "./useSettings";
 
 type SettingsSection = "general" | "prices" | "sync" | "agents";
+
+const SECTIONS: SettingsSection[] = ["general", "prices", "sync", "agents"];
 
 const LANGUAGE_OPTIONS: { value: LanguageChoice; labelKey: string }[] = [
   { value: "auto", labelKey: "settings.language_auto" },
@@ -49,17 +52,24 @@ function GeneralSection() {
 function PricesSection() {
   const { t } = useTranslation();
   const { autoFetch, toggleAutoFetch } = useSettings();
+  // MKT-212, SPF-071 — with no External provider chosen, only the choice itself remains.
+  const hasExternalProvider = useAppStore(selectHasExternalProvider);
 
   return (
     <>
-      <CheckboxField
-        id="settings-auto-fetch"
-        label={t("settings.auto_fetch_label")}
-        description={t("settings.auto_fetch_description")}
-        checked={autoFetch}
-        onChange={toggleAutoFetch}
-      />
-      <ScheduledFetchSection />
+      <PriceSourceSection />
+      {hasExternalProvider && (
+        <>
+          <CheckboxField
+            id="settings-auto-fetch"
+            label={t("settings.auto_fetch_label")}
+            description={t("settings.auto_fetch_description")}
+            checked={autoFetch}
+            onChange={toggleAutoFetch}
+          />
+          <ScheduledFetchSection />
+        </>
+      )}
     </>
   );
 }
@@ -68,14 +78,6 @@ function PricesSection() {
 function SettingsContent({ titleId, onClose }: { titleId: string; onClose: () => void }) {
   const { t } = useTranslation();
   const [section, setSection] = useState<SettingsSection>("general");
-  // MKT-212, SPF-071 — without an External provider, Prices has nothing to show.
-  const hasExternalProvider = useAppStore(selectHasExternalProvider);
-  const sections: SettingsSection[] = [
-    "general",
-    ...(hasExternalProvider ? (["prices"] as const) : []),
-    "sync",
-    "agents",
-  ];
 
   useEffect(() => {
     logger.info("[SettingsDialog] opened");
@@ -100,7 +102,7 @@ function SettingsContent({ titleId, onClose }: { titleId: string; onClose: () =>
           aria-label={t("settings.sections_label")}
           className="flex w-48 shrink-0 flex-col gap-1 border-r border-m3-outline/20 p-3"
         >
-          {sections.map((name) => (
+          {SECTIONS.map((name) => (
             <button
               type="button"
               key={name}

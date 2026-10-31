@@ -161,7 +161,7 @@ describe("AccountManager — without an External provider (MKT-212)", () => {
     expect(document.querySelector("#account-manager-refresh-prices")).toBeInTheDocument();
   });
 
-  it("offers no global refresh in a build without one", () => {
+  it("offers no global refresh with none chosen", () => {
     mockStoreState.hasExternalProvider = false;
     render(<AccountManager />);
     expect(document.querySelector("#account-manager-refresh-prices")).toBeNull();

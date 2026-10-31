@@ -483,6 +483,29 @@ describe("store — the build's capabilities (MKT-211)", () => {
     expect(useAppStore.getState().hasExternalProvider).toBe(false);
     cleanup();
   });
+  // MKT-212 — a failed read offers nothing that could not run.
+  it("has no External provider when the answer cannot be read", async () => {
+    useAppStore.setState({ hasExternalProvider: false });
+    mockGetCapabilities.mockRejectedValueOnce(new Error("gone"));
+
+    const cleanup = useAppStore.getState().init();
+    await vi.waitFor(() => expect(useAppStore.getState().isInitialized).toBe(true));
+
+    expect(useAppStore.getState().hasExternalProvider).toBe(false);
+    cleanup();
+  });
+  // MKT-211 — the interface asks again when the choice changes.
+  it("follows the choice when asked again", async () => {
+    useAppStore.setState({ hasExternalProvider: false });
+    mockGetCapabilities.mockResolvedValueOnce({
+      external_provider: true,
+      distribution_channel: null,
+    });
+
+    await useAppStore.getState().refreshExternalProvider();
+
+    expect(useAppStore.getState().hasExternalProvider).toBe(true);
+  });
   // FXR-128 — the reference currency is read at launch, for the forms to preselect.
   it("holds the reference currency once initialised", async () => {
     const cleanup = useAppStore.getState().init();

@@ -340,3 +340,11 @@ describe("rosterToViewModel", () => {
     ]);
   });
 });
+
+describe("priceProviderChoiceErrorToI18n (MKT-214)", () => {
+  it.each(["NotOffered", "NotSaved"] as const)("maps %s", (code) => {
+    expect(presenter.priceProviderChoiceErrorToI18n({ code })).toEqual({
+      key: `error.price_provider.${code}`,
+    });
+  });
+});

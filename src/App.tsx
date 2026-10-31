@@ -21,7 +21,7 @@ import { router } from "./router";
  * setting (MKT-120). The provider is keyless (ADR-017), so there is no key check.
  */
 export async function maybeLaunchAutoFetch(): Promise<void> {
-  // MKT-212 — a build without an External provider has no auto-fetch to start.
+  // MKT-212 — a computer with no External provider chosen has no auto-fetch to start.
   if (!useAppStore.getState().hasExternalProvider) return;
   if (!getAutoFetch()) return;
   try {

@@ -16,7 +16,10 @@ vi.mock("react-i18next", () => ({
 }));
 
 describe("PriceFreshnessIndicator (MKT-202)", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAppStore.setState({ hasExternalProvider: true });
+  });
 
   it("names its subject and shows the newest price date", () => {
     mockUsePriceFreshness.mockReturnValue({

@@ -80,6 +80,16 @@ export function ScheduledFetchSection() {
         </span>
       )}
 
+      {isConfiguring && (
+        <span
+          id="scheduled-fetch-pending"
+          role="status"
+          className="text-xs text-m3-on-surface-variant"
+        >
+          {t("settings.scheduled_fetch.saving")}
+        </span>
+      )}
+
       {configureError && (
         <span data-testid="scheduled-fetch-configure-error" className="text-xs text-m3-error">
           {t(configureError.key, configureError.vars)}

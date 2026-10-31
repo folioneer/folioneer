@@ -1,10 +1,13 @@
 import { open } from "@tauri-apps/plugin-dialog";
+import { logger } from "@/lib/logger";
 import {
   type AgentConnectionError,
   type AgentConnectionState,
   type CurrencyError,
   commands,
   type PortfolioSyncError,
+  type PriceProviderChoice,
+  type PriceProviderChoiceError,
   type RateHistoryBackfillError,
   type ReferenceCurrency,
   type Result,
@@ -22,6 +25,32 @@ import {
  * file allowed to touch `commands.*`, F3). Each function is a typed `Result`
  * pass-through (F27) matching the `bindings.ts` signature.
  */
+export async function getPriceSource(): Promise<PriceProviderChoice> {
+  return await commands.getPriceProviderChoice();
+}
+
+export async function setPriceSource(
+  chosen: string | null,
+): Promise<Result<PriceProviderChoice, PriceProviderChoiceError>> {
+  return await commands.setPriceProviderChoice(chosen);
+}
+
+/**
+ * MKT-215 — a source just turned on starts fetching. Fire-and-forget like the launch's
+ * auto-fetch (MKT-121): what comes of it shows in the shell's progress, and a dispatch that
+ * fails is logged.
+ */
+export async function fetchPricesOnChoosingSource(): Promise<void> {
+  try {
+    const result = await commands.fetchAllAssetPrices("Launch");
+    if (result.status === "error") {
+      logger.warn("[settings] the first fetch was refused", { code: result.error.code });
+    }
+  } catch (error) {
+    logger.error("[settings] the first fetch threw", { error });
+  }
+}
+
 export async function configureScheduledFetch(
   enabled: boolean,
   triggerTime: string,

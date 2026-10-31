@@ -69,6 +69,8 @@ interface AppState {
   fetchCategories: () => Promise<void>;
   fetchAccounts: () => Promise<void>;
   fetchReferenceCurrency: () => Promise<void>;
+  /** MKT-211 — asks again what the interface was told, when the choice changes. */
+  refreshExternalProvider: () => Promise<void>;
 
   // MKT-177 — dismiss the manual-fill modal, clearing the unpriced list.
   clearUnpricedAssets: () => void;
@@ -104,9 +106,9 @@ export const useAppStore = create<AppState>((set, get) => {
     accounts: [],
     unpricedAssets: [],
     priceFetch: { active: false, done: 0, total: 0 },
-    // Every build has had an External provider until now; `init` reads the real answer
-    // before `isInitialized` flips, so no screen renders from this default.
-    hasExternalProvider: true,
+    // MKT-214 — none is the default; `init` reads the real answer before `isInitialized`
+    // flips, and a failed read offers nothing that could not run (MKT-212).
+    hasExternalProvider: false,
     distributionChannel: null,
     referenceCurrency: "EUR",
     isLoadingAssets: false,
@@ -157,6 +159,15 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     // FXR-128 — a failed read keeps the last known currency and is logged.
+    refreshExternalProvider: async () => {
+      try {
+        const capabilities = await getCapabilities();
+        set({ hasExternalProvider: capabilities.external_provider });
+      } catch (e) {
+        logger.error("[store] failed to read the build's capabilities", e);
+      }
+    },
+
     fetchReferenceCurrency: async () => {
       const result = await getReferenceCurrency();
       if (result.status === "ok") {
@@ -189,7 +200,8 @@ export const useAppStore = create<AppState>((set, get) => {
         }
       };
 
-      // MKT-211, UPD-030 — settled for the run; a failure keeps the defaults and is logged.
+      // MKT-211, UPD-030 — a failure keeps the defaults and is logged; the channel is settled
+      // for the run, the provider follows the choice (`refreshExternalProvider`).
       const fetchCapabilities = async () => {
         try {
           const capabilities = await getCapabilities();

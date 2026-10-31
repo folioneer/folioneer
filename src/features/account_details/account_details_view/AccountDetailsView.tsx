@@ -216,7 +216,7 @@ export function AccountDetailsView() {
                   title={t("account_details.action_journal")}
                 />
                 {/* MKT-131 — per-account "Refresh prices"; hidden in read-only as-of and
-                    in a build without an External provider (MKT-212) */}
+                    in a computer with no External provider chosen (MKT-212) */}
                 {!view.isAsOf && hasExternalProvider && (
                   <IconButton
                     id="account-details-refresh-prices"
