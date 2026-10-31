@@ -84,7 +84,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 **IMP-020B — A mapper from elsewhere is added from its file (backend)**: The user picks a mapper's file in the system dialog; it is written into the folder as IMP-020 says, whatever the picked file was called, its provider trimmed, and joins the list. A file that cannot be read or does not read as a mapper (IMP-020A), or whose trimmed provider another mapper holds (IMP-024), is refused with a specific error saying why, and nothing is written; a write that fails is rejected as in IMP-020. Its asset matches are kept as they are (IMP-033).
 
-**IMP-020C — The mapper chosen is remembered for its folder (backend)**: A completed confirmation made with a saved mapper remembers that mapper for the folder the file sits in, replacing what that folder remembered, on this computer and never synced — whether or not the user changed the mapper in use or any row was recorded. If remembering fails the import stands, and the failure is logged.
+**IMP-020C — The mapper chosen is remembered for its folder (backend)**: A completed confirmation made with a saved mapper remembers that mapper for the folder the file sits in, replacing what that folder remembered, on this computer and never synced — whether or not the user changed the mapper in use or any row was recorded. A folder is its full path as the system resolves it: moved or renamed, it remembers nothing. If remembering fails the import stands, and the failure is logged.
 
 **IMP-020D — A folder's mapper is preselected (frontend + backend)**: A file picked from a folder has the mapper it remembers preselected; the user may pick another. A folder that remembers nothing, a mapper no longer held or that no longer reads, or a memory or folder that cannot be read, preselects none, and a failure is logged.
 
@@ -182,8 +182,8 @@ The screens are #503 (picking the file, mapping the columns) and #504 (the previ
 
 ## Cross-amendments
 
-- SYN-038 adds version 12: the column mappings of version 10 are no longer a kind of synced record; no device ever held one, since no window offered it. A mapper's file is not synced for now (#715).
 - SYN-038 adds version 11: a transaction carries the added-deposit mark (IMP-051).
+- SYN-038 adds version 12: the column mappings of version 10 are no longer a kind of synced record; no device ever held one, since no window offered it. A mapper's file is not synced for now (#715).
 - CSH: a deposit may be an added deposit, marked as such (IMP-051).
 - TXL-060: a journal row carries the added-deposit mark (IMP-051). TXL-061: its Recorded by column shows the chip (IMP-054). AGT-045: that chip is not an AI agent's mark; an added deposit has no session.
 

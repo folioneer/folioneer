@@ -206,3 +206,93 @@ fn store_error(step: &'static str) -> impl Fn(anyhow::Error) -> ImportError {
         ImportError::MapperFolderFailed
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::import::domain::{
+        DateFormat, DecimalMark, Encoding, MappedColumns, MapperInfo, MockImportMapperStore,
+        MockMapperChoiceRepository, Separator,
+    };
+
+    fn draft() -> ImportMapperDraft {
+        ImportMapperDraft {
+            info: MapperInfo {
+                provider: "Broker".to_string(),
+            },
+            separator: Separator::Comma,
+            decimal_mark: DecimalMark::Dot,
+            date_format: DateFormat::YearMonthDay,
+            encoding: Encoding::Utf8,
+            columns: MappedColumns {
+                date: "Date".to_string(),
+                operation: "Operation".to_string(),
+                isin: Some("ISIN".to_string()),
+                reference: None,
+                name: None,
+                quantity: None,
+                unit_price: None,
+                gross_amount: None,
+                fees: None,
+                net_amount: None,
+                currency: None,
+            },
+            operation_types: Vec::new(),
+            asset_matches: Vec::new(),
+        }
+    }
+
+    // IMP-020 — a write that fails is rejected with a specific error.
+    #[tokio::test]
+    async fn imp_020_a_write_that_fails_is_rejected() {
+        let mut store = MockImportMapperStore::new();
+        store.expect_ids().returning(|| Ok(Vec::new()));
+        store
+            .expect_write()
+            .returning(|_, _| Err(anyhow::anyhow!("disk full")));
+        let service =
+            ImportService::new(Box::new(store), Box::new(MockMapperChoiceRepository::new()));
+        assert!(matches!(
+            service.save_import_mapper(None, draft()).await,
+            Err(ImportError::MapperFolderFailed)
+        ));
+    }
+
+    // IMP-020A — a file that cannot be read is left out; the others stay listed.
+    #[tokio::test]
+    async fn imp_020a_a_file_that_cannot_be_read_is_left_out() {
+        let file = draft();
+        let held = ImportMapper::with_id("held".to_string(), file)
+            .expect("valid")
+            .to_file()
+            .expect("written");
+        let mut store = MockImportMapperStore::new();
+        store
+            .expect_ids()
+            .returning(|| Ok(vec!["locked".to_string(), "held".to_string()]));
+        store.expect_read().returning(move |id| {
+            if id == "locked" {
+                Err(anyhow::anyhow!("permission denied"))
+            } else {
+                Ok(Some(held.clone()))
+            }
+        });
+        let service =
+            ImportService::new(Box::new(store), Box::new(MockMapperChoiceRepository::new()));
+        let listed = service.list_import_mappers().await.expect("listed");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, "held");
+    }
+
+    // IMP-020C — a failure to remember goes no further.
+    #[tokio::test]
+    async fn imp_020c_a_failure_to_remember_goes_no_further() {
+        let mut choices = MockMapperChoiceRepository::new();
+        choices
+            .expect_remember()
+            .times(1)
+            .returning(|_, _| Err(anyhow::anyhow!("database locked")));
+        let service = ImportService::new(Box::new(MockImportMapperStore::new()), Box::new(choices));
+        service.remember_import_mapper("/folder", "broker").await;
+    }
+}

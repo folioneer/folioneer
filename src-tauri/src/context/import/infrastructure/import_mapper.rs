@@ -1,5 +1,5 @@
 use crate::context::import::domain::{
-    names_a_file, ImportMapperStore, MapperChoiceRepository, PickedMapperFile,
+    names_a_file, ImportMapperStore, MapperChoiceRepository, PickedMapperFile, LARGEST_MAPPER_FILE,
 };
 use crate::core::BACKEND;
 use anyhow::{Context, Result};
@@ -57,11 +57,19 @@ impl ImportMapperStore for FsImportMapperStore {
         let Some(file) = self.file(id) else {
             return Ok(None);
         };
-        match tokio::fs::read(&file).await {
-            Ok(bytes) => Ok(Some(bytes)),
-            Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(e).context("mapper file not read"),
-        }
+        let opened = match tokio::fs::File::open(&file).await {
+            Ok(opened) => opened,
+            Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(e).context("mapper file not opened"),
+        };
+        // Read one byte past the limit: enough to tell a file too large (IMP-020A).
+        let mut bytes = Vec::new();
+        opened
+            .take(LARGEST_MAPPER_FILE + 1)
+            .read_to_end(&mut bytes)
+            .await
+            .context("mapper file not read")?;
+        Ok(Some(bytes))
     }
 
     async fn write(&self, id: &str, bytes: &[u8]) -> Result<()> {
