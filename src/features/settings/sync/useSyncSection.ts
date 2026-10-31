@@ -23,7 +23,7 @@ import {
 } from "../gateway";
 import { type RosterEntryViewModel, rosterToViewModel, syncErrorToI18n } from "../shared/presenter";
 
-export interface UseSyncPageResult {
+export interface UseSyncSectionResult {
   isLoading: boolean;
   loadError: I18nMessage | null;
   enabled: boolean;
@@ -100,7 +100,7 @@ const DISABLED_STATUS: SyncStatusView = {
  * mount and exposes every device-side action. Each action's result carries the
  * fresh status (or the run report's status), which replaces the displayed one.
  */
-export function useSyncPage(): UseSyncPageResult {
+export function useSyncSection(): UseSyncSectionResult {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<I18nMessage | null>(null);
   const [status, setStatus] = useState<SyncStatusView>(DISABLED_STATUS);
@@ -183,7 +183,7 @@ export function useSyncPage(): UseSyncPageResult {
         }
       } catch (e) {
         // A folder that could not be read goes to the change, which says why.
-        logger.error("[useSyncPage] folder not inspected", { error: e });
+        logger.error("[useSyncSection] folder not inspected", { error: e });
       }
       return applyStatusResult(() => changeSyncFolder(folder));
     },

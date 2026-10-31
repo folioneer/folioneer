@@ -12,7 +12,6 @@ import { CategoryManager } from "@/features/categories";
 import { CurrencyRatesView } from "@/features/currency";
 import { DesignSystemPage } from "@/features/design-system";
 import { AccountPerformancePage, GlobalPerformancePage } from "@/features/performance";
-import { SyncPage } from "@/features/settings";
 import {
   AccountJournalPage,
   AddTransactionPage,
@@ -119,12 +118,6 @@ const designSystemRoute = createRoute({
   component: import.meta.env.DEV ? DesignSystemPage : () => null,
 });
 
-const syncRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/sync",
-  component: SyncPage,
-});
-
 const routeTree = rootRoute.addChildren([
   indexRoute,
   assetsRoute,
@@ -138,7 +131,6 @@ const routeTree = rootRoute.addChildren([
   categoriesRoute,
   currencyRatesRoute,
   designSystemRoute,
-  syncRoute,
 ]);
 
 export const router = createRouter({

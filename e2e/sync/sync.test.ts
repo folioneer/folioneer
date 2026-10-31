@@ -31,7 +31,7 @@
  *   precondition-guard error variant (`AlreadyEnabled`, `SyncPaused`, `NotPaused`, …) —
  *   see `PortfolioSyncOrchestrator`'s and `SyncService`'s inline `#[cfg(test)]` modules
  *   and the Tier-3 two-device integration test. This E2E scenario locks in the one thing
- *   only a real running app can prove: the sync page's enable → status → sync now
+ *   only a real running app can prove: the Sync section's enable → status → sync now
  *   → pause → resume → rename → leave chain genuinely reaches `enable_sync` /
  *   `sync_now` / `pause_sync` / `resume_sync` / `rename_sync_device` / `leave_sync` /
  *   `get_sync_status` on the real Rust backend, and that the backend actually writes the
@@ -89,7 +89,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $, browser } from "@wdio/globals";
 import { dismissLeftoverModal } from "../helpers/modal";
-import { navigateToSync } from "../helpers/navigation";
+import { closeSettings, navigateToSync } from "../helpers/navigation";
 import { setReactInputValue } from "../helpers/react";
 import { captureScreen } from "../helpers/screenshot";
 import { seedAccount } from "../helpers/seed";
@@ -353,6 +353,7 @@ describe("sync", () => {
       FIRST_DEVICE_NAME,
       "SYN-072 — the rename prompt must pre-fill the device's current name",
     );
+    await captureScreen("sync-rename-over-settings");
 
     await setReactInputValue("sync-rename-value", RENAMED_DEVICE_NAME);
     const promptSubmit = await $("#sync-rename-submit");
@@ -462,5 +463,7 @@ describe("sync", () => {
       segmentFilesAfterLeave.some((name) => name.startsWith("seg-")),
       "SYN-037/082 — leave_sync must keep the device's segment file; its area stays in the folder",
     );
+
+    await closeSettings();
   });
 });

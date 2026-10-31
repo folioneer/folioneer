@@ -344,7 +344,6 @@
     "notice_added": "{{agent}} added an asset: {{name}} ({{reference}})"
   },
   "sync": {
-    "title": "Multi-device sync",
     "local_copy_note": "The copy published to the shared folder is encrypted with your sync passphrase. The copy kept on this computer is not encrypted.",
     "no_recovery_note": "If you forget the passphrase, the published copy cannot be decrypted and there is no way to recover it. You can still start over from any computer that holds the portfolio.",
     "metadata_exposure_note": "Whoever hosts the folder can see file names, sizes and dates — so when and roughly how much the portfolio is used, and how many computers share it — but not your accounts, holdings or amounts.",
@@ -358,10 +357,6 @@
     "leave": "Leave sync",
     "start_over": "Start over",
     "loading": "Loading sync status…",
-    "status_enabled": "Enabled",
-    "status_paused": "Paused",
-    "status_disabled": "Not enabled on this computer",
-    "open_page": "Open sync",
     "health": {
       "up_to_date": "Up to date",
       "needs_attention": "Needs attention",
