@@ -3,6 +3,7 @@ import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
 import { selectHasExternalProvider, useAppStore } from "@/lib/store";
+import { IconButton } from "@/ui/components/button/IconButton";
 import { CheckboxField } from "@/ui/components/field/CheckboxField";
 import { SelectField } from "@/ui/components/field/SelectField";
 import { ModalContainer } from "@/ui/components/modal/ModalContainer";
@@ -86,15 +87,13 @@ function SettingsContent({ titleId, onClose }: { titleId: string; onClose: () =>
         <h2 id={titleId} className="text-xl font-medium text-m3-on-surface">
           {t("settings.title")}
         </h2>
-        <button
-          type="button"
+        <IconButton
           id="settings-close"
+          shape="round"
           onClick={onClose}
           aria-label={t("action.close")}
-          className="rounded-full p-2 text-m3-on-surface-variant transition-colors hover:bg-m3-on-surface/5"
-        >
-          <X size={20} />
-        </button>
+          icon={<X size={20} />}
+        />
       </header>
       <div className="flex min-h-0 flex-1">
         <nav
