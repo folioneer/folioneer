@@ -83,7 +83,7 @@ describe("ScheduledFetchSection — toggle and trigger-time field (SPF-010)", ()
     mockUseScheduledFetchSection.mockReturnValue(makeState({ configure }));
     render(<ScheduledFetchSection />);
 
-    fireEvent.click(screen.getByTestId("scheduled-fetch-toggle"));
+    fireEvent.click(screen.getByLabelText(/settings.scheduled_fetch_label/));
 
     expect(configure).toHaveBeenCalledWith(true, "22:15");
   });
@@ -160,7 +160,7 @@ describe("ScheduledFetchSection — configure in-flight and errors (SPF-013/060)
     mockUseScheduledFetchSection.mockReturnValue(makeState({ enabled: true, isConfiguring: true }));
     render(<ScheduledFetchSection />);
 
-    expect(screen.getByTestId("scheduled-fetch-toggle")).toBeDisabled();
+    expect(screen.getByLabelText(/settings.scheduled_fetch_label/)).toBeDisabled();
     expect(screen.getByTestId("scheduled-fetch-time")).toBeDisabled();
   });
 

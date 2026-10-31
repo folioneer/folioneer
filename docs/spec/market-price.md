@@ -209,7 +209,7 @@ The `Asset` entity (owned by the AST spec) gains one field for this feature.
 
 This section extends the buy/sell transaction flow defined in `docs/spec/financial-asset-transaction.md` (TRX) and `docs/spec/sell-transaction.md` (SEL). When the user opts in, recording a buy or sell transaction also writes an `AssetPrice` record so the transacted unit price becomes the asset's market price for the transaction date. Standalone edit and delete of `AssetPrice` records are now supported via the price history view (MKT-070+).
 
-**MKT-050 — Global auto-record toggle (frontend)**: The Settings page exposes a toggle "Automatically record transaction price as market price". The toggle defaults to OFF. The user's choice persists across sessions on the current device. The toggle controls only the default state of the per-transaction checkbox (MKT-052); it never bypasses or replaces that checkbox.
+**MKT-050 — Global auto-record toggle (frontend)**: The Settings dialog exposes a toggle "Automatically record transaction price as market price". The toggle defaults to OFF. The user's choice persists across sessions on the current device. The toggle controls only the default state of the per-transaction checkbox (MKT-052); it never bypasses or replaces that checkbox.
 
 **MKT-051 — Per-transaction checkbox (frontend)**: The buy and sell transaction forms (both creation forms — modal and the standalone /transactions/new page — and their edit variants) display a checkbox "Use this price as the market price for {transaction date}" placed immediately before the form's primary submit action, after all data fields. The label's date placeholder reflects the form's current `date` field value and updates live when the user changes it.
 
@@ -345,7 +345,7 @@ The launch auto-fetch (MKT-121) shows no dispatch snackbar; its outcome is silen
 
 #### Auto-fetch (120–125)
 
-**MKT-120 — Auto-fetch setting (frontend)**: An auto-fetch setting is present on the Settings page. The setting defaults to `OFF` and persists across sessions on the current device. When `ON`, the auto-fetch feature is enabled; when `OFF`, it is disabled.
+**MKT-120 — Auto-fetch setting (frontend)**: An auto-fetch setting is present in the Prices section of the Settings dialog. The setting defaults to `OFF` and persists across sessions on the current device. When `ON`, the auto-fetch feature is enabled; when `OFF`, it is disabled.
 
 **MKT-121 — Auto-fetch call (frontend)**: If the setting (MKT-120) is `ON`, the frontend calls the auto-fetch task once per session, after initial app mount. The call is fire-and-forget (the frontend does not await the backend response).
 
@@ -481,7 +481,7 @@ A computer has no External provider until it chooses one ([ADR-024](../adr/024-t
 
 **MKT-211 — What the interface is told (backend)**: The application reports to its interface whether an External provider is chosen on this computer, together with the distribution channel of the build (UPD-030). The External provider answer governs every fetch task, the price history backfill and the scheduled fetch alike. It changes when the choice does (MKT-214), and the interface asks again then; the channel is settled when the application starts.
 
-**MKT-212 — The interface offers nothing that cannot run (frontend)**: With no External provider chosen (MKT-211) the interface renders no control that starts a fetch task, no price history backfill action on a holding or a closed position, and no typed-by-hand toggle (MKT-153), which only matters to a fetch; a price already typed by hand still says so (MKT-158). The Settings page shows no auto-fetch setting (MKT-120) and no scheduled fetch section (SPF-071), and the application starts no auto-fetch (MKT-121). Nothing is greyed out and nothing mentions a feature to come: the controls are absent. The header's price item (MKT-202) keeps "Prices as of" the newest price date — prices typed by hand are recorded prices — and has no tooltip: it says nothing about fetching.
+**MKT-212 — The interface offers nothing that cannot run (frontend)**: With no External provider chosen (MKT-211) the interface renders no control that starts a fetch task, no price history backfill action on a holding or a closed position, and no typed-by-hand toggle (MKT-153), which only matters to a fetch; a price already typed by hand still says so (MKT-158). The Settings dialog has no Prices section: no auto-fetch setting (MKT-120) and no scheduled fetch section (SPF-071), and the application starts no auto-fetch (MKT-121). Nothing is greyed out and nothing mentions a feature to come: the controls are absent. The header's price item (MKT-202) keeps "Prices as of" the newest price date — prices typed by hand are recorded prices — and has no tooltip: it says nothing about fetching.
 
 **MKT-213 — What remains, and what cannot be reached (frontend + backend)**: Everything computed from prices already recorded is unchanged, and so is recording a price by hand (MKT-020) and editing its history (MKT-070). What answers a fetch task cannot be reached, since none runs: the manual fill of unpriced assets (MKT-172), the fetch progress in the shell (MKT-180), the fetch-outcome snackbar (MKT-145) and the price-movement report (PMV-010). Exchange rates are unaffected: they refresh on their own, at launch (FXR-075) and through "Update rates" (FXR-110).
 
@@ -562,7 +562,7 @@ Delete row:
 ### Workflow — Auto-record from a buy/sell transaction (MKT-050+)
 
 ```
-Settings page
+Settings dialog
     → "Automatically record transaction price as market price" toggle
     → choice persisted to localStorage (default OFF)
 
@@ -753,7 +753,7 @@ Small modal dialog. No navigation — stays within Account Details.
 
 ### UX Draft — Auto-record from Transactions (MKT-050+)
 
-#### Settings page
+#### Settings dialog
 
 A new toggle row "Automatically record transaction price as market price" sits alongside the existing language preference. Default OFF. State persists across sessions on the current device.
 
@@ -841,9 +841,9 @@ Modal or side panel listing all recorded `AssetPrice` entries for the selected a
 
 ### UX Draft — Auto-Fetch from External Provider (MKT-100+)
 
-#### Settings page
+#### Settings dialog
 
-The existing Settings page (host of MKT-050's transaction auto-record toggle) gains a second toggle: "Automatically fetch prices on launch" (MKT-120). Default OFF. Sits above the existing transaction-related toggle to group all price-related settings together.
+The Settings dialog (host of MKT-050's transaction auto-record toggle) gains a second toggle: "Automatically fetch prices on launch" (MKT-120). Default OFF. Sits above the existing transaction-related toggle to group all price-related settings together.
 
 #### Global dashboard — Refresh action
 

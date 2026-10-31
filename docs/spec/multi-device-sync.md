@@ -287,7 +287,7 @@ Device A (has data)                    Folder                   Device B (fresh 
 
 ### Entry Point
 
-Sync has its own page (`/sync`); the settings keep one line — not enabled, enabled or paused — and a link to it. Disabled, the page offers "Enable sync". Enabled, it leads with one word for its health (up to date, needs attention, paused) and the last sync, beside the routine actions ("Pause sync" / "Resume sync", "Sync now"); then what needs attention; then the computers (SYN-063); then this computer's name and folder, each with its action ("Rename", "Change folder", one dialog each); then, apart, the two actions that cannot be undone ("Leave sync", "Start over"). A compact sync indicator in the application shell shows the last-sync time and surfaces failures and attention items.
+Sync has its own page (`/sync`); the Sync section of the Settings dialog keeps one line — not enabled, enabled or paused — and a link to it. Disabled, the page offers "Enable sync". Enabled, it leads with one word for its health (up to date, needs attention, paused) and the last sync, beside the routine actions ("Pause sync" / "Resume sync", "Sync now"); then what needs attention; then the computers (SYN-063); then this computer's name and folder, each with its action ("Rename", "Change folder", one dialog each); then, apart, the two actions that cannot be undone ("Leave sync", "Start over"). A compact sync indicator in the application shell shows the last-sync time and surfaces failures and attention items.
 
 ### Main Component
 

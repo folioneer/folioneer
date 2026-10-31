@@ -223,6 +223,10 @@
   },
   "settings": {
     "title": "Paramètres",
+    "section_general": "Général",
+    "section_prices": "Prix",
+    "section_sync": "Synchronisation",
+    "section_agents": "Agents IA",
     "language_label": "Langue",
     "language_auto": "Langue du système",
     "language_en": "English",

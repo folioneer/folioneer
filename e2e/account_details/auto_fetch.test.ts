@@ -53,7 +53,12 @@
 import assert from "node:assert";
 import { $, browser } from "@wdio/globals";
 import { dismissLeftoverModal } from "../helpers/modal";
-import { navigateToAccountDetails, navigateToAccounts } from "../helpers/navigation";
+import {
+  closeSettings,
+  navigateToAccountDetails,
+  navigateToAccounts,
+  navigateToSettings,
+} from "../helpers/navigation";
 import { captureScreen } from "../helpers/screenshot";
 import {
   seedAccount,
@@ -124,10 +129,7 @@ describe("MKT auto-fetch", () => {
   // This is a pure UI + localStorage test — no IPC calls involved.
   // -------------------------------------------------------------------------
   it("MKT-120: Settings auto-fetch toggle persists to localStorage", async () => {
-    // Navigate to Settings via the sidebar button (id="nav-settings").
-    const settingsNav = await $("#nav-settings");
-    await settingsNav.waitForExist({ timeout: 15000 });
-    await settingsNav.click();
+    await navigateToSettings();
 
     const checkbox = await $("#settings-auto-fetch");
     await checkbox.waitForExist({ timeout: 10000 });
@@ -158,6 +160,7 @@ describe("MKT auto-fetch", () => {
       initialValue ?? "false",
       `localStorage["auto_fetch_prices"] should be restored to "${initialValue ?? "false"}" after second toggle — got: "${afterSecondToggle}"`,
     );
+    await closeSettings();
   });
 
   // -------------------------------------------------------------------------

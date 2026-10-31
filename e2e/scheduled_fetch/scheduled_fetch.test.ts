@@ -65,7 +65,7 @@
 import assert from "node:assert";
 import { $, browser } from "@wdio/globals";
 import { dismissLeftoverModal } from "../helpers/modal";
-import { navigateToSettings } from "../helpers/navigation";
+import { closeSettings, navigateToSettings } from "../helpers/navigation";
 import { setReactInputValue } from "../helpers/react";
 import { captureScreen } from "../helpers/screenshot";
 
@@ -166,17 +166,13 @@ describe("scheduled_fetch", () => {
     );
 
     // -----------------------------------------------------------------
-    // Step 6 — Persistence (SPF-011/012): navigate away and back so the
+    // Step 6 — Persistence (SPF-011/012): close the dialog and open it again so the
     // section unmounts and remounts, forcing a fresh
     // `get_scheduled_fetch_status` read from the real SQLite database —
     // proves the value was actually persisted server-side, not just held
     // in React state.
     // -----------------------------------------------------------------
-    const accountsNav = await $("#nav-accounts");
-    await accountsNav.waitForExist({ timeout: 10000 });
-    await accountsNav.click();
-    await $("#fab-add-account").waitForExist({ timeout: 10000 });
-
+    await closeSettings();
     await navigateToSettings();
     const toggleAfterRemount = await $("#scheduled-fetch-toggle");
     await toggleAfterRemount.waitForEnabled({ timeout: 10000 });
@@ -213,5 +209,6 @@ describe("scheduled_fetch", () => {
       false,
       "SPF-010 — the time field must disappear again once the toggle is turned off",
     );
+    await closeSettings();
   });
 });

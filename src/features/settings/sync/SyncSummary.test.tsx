@@ -19,6 +19,8 @@ const status = (enabled: boolean, paused: boolean) => ({
 });
 
 // TODO-010 — the settings keep one line about sync and the way to its page.
+const onLeave = vi.fn();
+
 describe("SyncSummary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -30,7 +32,7 @@ describe("SyncSummary", () => {
     [true, true, "sync.status_paused"],
   ])("says whether sync is enabled or paused (%s, %s)", async (enabled, paused, expected) => {
     mockGetSyncStatus.mockResolvedValue(status(enabled, paused));
-    render(<SyncSummary />);
+    render(<SyncSummary onLeave={onLeave} />);
 
     await waitFor(() =>
       expect(document.getElementById("settings-sync-state")).toHaveTextContent(expected),
@@ -39,17 +41,18 @@ describe("SyncSummary", () => {
 
   it("opens the sync page", async () => {
     mockGetSyncStatus.mockResolvedValue(status(true, false));
-    render(<SyncSummary />);
+    render(<SyncSummary onLeave={onLeave} />);
 
     fireEvent.click(screen.getByTestId("settings-open-sync"));
 
+    expect(onLeave).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenCalledWith({ to: "/sync" });
   });
 
   // F27 — a status that cannot be read is said, and the way to the page stays.
   it("says so when the status cannot be read", async () => {
     mockGetSyncStatus.mockResolvedValue({ status: "error", error: { code: "DatabaseError" } });
-    render(<SyncSummary />);
+    render(<SyncSummary onLeave={onLeave} />);
 
     await waitFor(() =>
       expect(document.getElementById("settings-sync-error")).toHaveTextContent(

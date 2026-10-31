@@ -223,6 +223,10 @@
   },
   "settings": {
     "title": "Settings",
+    "section_general": "General",
+    "section_prices": "Prices",
+    "section_sync": "Sync",
+    "section_agents": "AI agents",
     "language_label": "Language",
     "language_auto": "System default",
     "language_en": "English",

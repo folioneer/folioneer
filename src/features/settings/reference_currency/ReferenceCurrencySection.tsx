@@ -15,7 +15,7 @@ export function ReferenceCurrencySection() {
   const { currency, choices, isFetchingHistory, isBusy, error, choose } = useReferenceCurrency();
 
   return (
-    <section className="flex flex-col gap-2 rounded-xl border border-m3-outline/30 p-3">
+    <section className="flex flex-col gap-2">
       {currency !== null && (
         <SelectField
           id="settings-reference-currency"
