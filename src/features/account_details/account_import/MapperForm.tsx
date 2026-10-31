@@ -163,7 +163,13 @@ export function MapperForm({
               onChange={(e) => onProvider(e.target.value)}
               placeholder={t("account_import.provider_placeholder")}
             />
-            <Button id="account-import-save" type="submit" variant="tonal" loading={busy}>
+            <Button
+              id="account-import-save"
+              type="submit"
+              form="account-import-mapper-form"
+              variant="tonal"
+              loading={busy}
+            >
               {t("account_import.action_save")}
             </Button>
             {saved && (
