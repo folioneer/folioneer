@@ -54,8 +54,9 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .typ::<currency::ReferenceCurrency>()
         .typ::<currency::CurrencyError>()
         // ----- import BC (IMP) -----
-        .typ::<import::ColumnMapping>()
-        .typ::<import::ColumnMappingDraft>()
+        .typ::<import::ImportMapper>()
+        .typ::<import::ImportMapperDraft>()
+        .typ::<import::MapperInfo>()
         .typ::<import::MappedColumns>()
         .typ::<import::OperationLabel>()
         .typ::<import::AssetMatch>()
@@ -189,9 +190,11 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             currency::set_reference_currency,
             currency::get_currency_rates,
             // ----- import BC (IMP) -----
-            import::list_column_mappings,
-            import::save_column_mapping,
-            import::delete_column_mapping,
+            import::list_import_mappers,
+            import::save_import_mapper,
+            import::add_import_mapper_from_file,
+            import::delete_import_mapper,
+            csv_import::remembered_import_mapper,
             csv_import::pick_import_file,
             csv_import::read_import_file,
             csv_import::preview_import,

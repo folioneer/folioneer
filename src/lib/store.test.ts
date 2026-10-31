@@ -133,13 +133,12 @@ describe("store — locallyHandledEvents (FXR-037)", () => {
     cleanup();
   });
 
-  // HNO-043 / FXR-056 / IMP-026 — the events raised by note, pair and mapping writes are
+  // HNO-043 / FXR-056 — the events raised by note and pair writes are
   // handled by their own views; the global store must neither re-fetch nor log them as
   // unhandled.
   it.each([
     "HoldingNoteUpdated",
     "CurrencyPairUpdated",
-    "ColumnMappingUpdated",
   ])("%s is listed as locally handled (no debug log emitted)", async (type) => {
     const cleanup = useAppStore.getState().init();
     await new Promise((r) => setTimeout(r, 0));

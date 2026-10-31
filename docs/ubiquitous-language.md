@@ -394,7 +394,6 @@ The `…Updated` events are raised by changes made on this device. Changes appli
 | `CurrencyPairUpdated`      | Currency BC            | A currency pair was declared on this device                                                                                                                  | confirmed |
 | `FeeScheduleUpdated`       | Account BC             | A fee schedule was created, changed, paused, resumed or deleted                                                                                              | confirmed |
 | `HoldingNoteUpdated`       | Account BC             | A holding note was written or deleted on this device                                                                                                         | confirmed |
-| `ColumnMappingUpdated`     | Import BC              | A column mapping was saved, changed, renamed or deleted (IMP-026)                                                                                            | proposed  |
 | `SyncCompleted`            | Sync BC                | A sync applied changes from the user's other devices, or changed this device's sync failures or paused state; carries nothing                                | confirmed |
 | `AgentConnectionChanged`   | AI agent connection    | An AI agent asked to connect, was answered, connected, called a tool or left, or the owner switched the setting; carries nothing                             | confirmed |
 
@@ -645,9 +644,9 @@ A holding whose merged transactions, each valid on the device that recorded it, 
 
 ## Import Concepts (introduced by IMP spec)
 
-### Column mapping
+### Import mapper
 
-How one broker's export is read, saved under a name and reused for every file of that shape: which column is what, each operation label's operation type, the asset each unknown name stands for (IMP-020). In French: « Correspondance des colonnes » (owner, 2026-10-25).
+How one provider's export is read, kept as a JSON file in the mappers folder of the data folder and reused for every file of that shape: which column is what, each operation label's operation type, the asset each unknown name stands for (IMP-020). The user, the community or the Folioneer team can add one. Its info entry names its provider: who the export comes from, not an External provider of prices. In French: « Modèle d'import » (owner, 2026-10-31).
 
 > Status: confirmed
 

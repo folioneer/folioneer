@@ -19,7 +19,6 @@ use folioneer_lib::context::asset::{
 use folioneer_lib::context::currency::{
     CurrencyService, SqliteCurrencyPairRepository, SqliteCurrencyRateRepository,
 };
-use folioneer_lib::context::import::{ImportService, SqliteColumnMappingRepository};
 use folioneer_lib::context::sync::{
     FirstPublish, FsFolderStore, SqliteChangeLogRepository, SqliteChangeRecorder,
     SqliteSyncStateRepository, SyncRun,
@@ -93,9 +92,6 @@ async fn build_ctx(folder: &std::path::Path) -> Ctx {
             SqliteCurrencyRateRepository::new(pool.clone()).with_change_recorder(recorder.clone()),
         ),
     ));
-    let import_service = Arc::new(ImportService::new(Box::new(
-        SqliteColumnMappingRepository::new(pool.clone()).with_change_recorder(recorder.clone()),
-    )));
     let state_repo = Arc::new(SqliteSyncStateRepository::new(pool.clone()));
     let folder_store = Arc::new(FsFolderStore::new(folder));
     let change_log = Arc::new(SqliteChangeLogRepository::new(pool.clone()));
@@ -113,13 +109,11 @@ async fn build_ctx(folder: &std::path::Path) -> Ctx {
         account_service.clone(),
         asset_service.clone(),
         currency_service.clone(),
-        import_service.clone(),
     ));
     let rank_stamper = Arc::new(ServiceRankStamper::new(
         account_service.clone(),
         asset_service.clone(),
         currency_service.clone(),
-        import_service.clone(),
     ));
     let first_publish = Arc::new(FirstPublish::new(
         change_log,
@@ -132,7 +126,6 @@ async fn build_ctx(folder: &std::path::Path) -> Ctx {
         account_service: account_service.clone(),
         asset_service: asset_service.clone(),
         currency_service,
-        import_service,
         sync_service,
         first_publish,
         sync_run,

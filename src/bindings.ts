@@ -489,34 +489,57 @@ async getCurrencyRates(fromCurrency: string, toCurrency: string) : Promise<Resul
 }
 },
 /**
- * Every saved column mapping, by name (IMP-020).
+ * The mappers the folder holds, by provider (IMP-020A).
  */
-async listColumnMappings() : Promise<Result<ColumnMapping[], ImportError>> {
+async listImportMappers() : Promise<Result<ImportMapper[], ImportError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("list_column_mappings") };
+    return { status: "ok", data: await TAURI_INVOKE("list_import_mappers") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
 /**
- * Saves a column mapping: a new one without `mapping_id`, else the one it names, under
- * its id (IMP-020, IMP-024, IMP-025).
+ * Writes a mapper's file: a new one without `mapper_id`, else the one it names (IMP-020,
+ * IMP-024, IMP-025).
  */
-async saveColumnMapping(mappingId: string | null, draft: ColumnMappingDraft) : Promise<Result<ColumnMapping, ImportError>> {
+async saveImportMapper(mapperId: string | null, draft: ImportMapperDraft) : Promise<Result<ImportMapper, ImportError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("save_column_mapping", { mappingId, draft }) };
+    return { status: "ok", data: await TAURI_INVOKE("save_import_mapper", { mapperId, draft }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
 /**
- * Deletes a saved column mapping (IMP-040).
+ * IMP-020B — the system dialog opened for the user to pick a mapper's file, copied into the
+ * mappers folder: the mapper it holds, or `None` when the user closed the dialog.
  */
-async deleteColumnMapping(mappingId: string) : Promise<Result<null, ImportError>> {
+async addImportMapperFromFile() : Promise<Result<ImportMapper | null, ImportError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("delete_column_mapping", { mappingId }) };
+    return { status: "ok", data: await TAURI_INVOKE("add_import_mapper_from_file") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Removes a mapper's file (IMP-040).
+ */
+async deleteImportMapper(mapperId: string) : Promise<Result<null, ImportError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_import_mapper", { mapperId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * IMP-020D — the mapper the folder of the file at `path` remembers, to preselect.
+ */
+async rememberedImportMapper(path: string) : Promise<Result<string | null, CsvImportError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remembered_import_mapper", { path }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -547,13 +570,13 @@ async readImportFile(accountId: string, path: string, choices: ReadingChoices) :
 }
 },
 /**
- * The file at `path` read through `mapping` for `account_id`, every row judged, nothing
- * written (IMP-017, IMP-020, IMP-030). `mapping_id` names the saved mapping it was picked
+ * The file at `path` read through `mapper` for `account_id`, every row judged, nothing
+ * written (IMP-017, IMP-020E, IMP-030). `mapper_id` names the saved mapper it was picked
  * from, when it was.
  */
-async previewImport(accountId: string, path: string, mappingId: string | null, mapping: ColumnMappingDraft) : Promise<Result<ImportPreview, CsvImportError>> {
+async previewImport(accountId: string, path: string, mapperId: string | null, mapper: ImportMapperDraft) : Promise<Result<ImportPreview, CsvImportError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("preview_import", { accountId, path, mappingId, mapping }) };
+    return { status: "ok", data: await TAURI_INVOKE("preview_import", { accountId, path, mapperId, mapper }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -564,9 +587,9 @@ async previewImport(accountId: string, path: string, mappingId: string | null, m
  * at once (IMP-050): the rows as judged then. `add_deposits`: the deposits the purchases
  * need are added, marked as added (IMP-051).
  */
-async confirmImport(accountId: string, path: string, mappingId: string | null, mapping: ColumnMappingDraft, addDeposits: boolean) : Promise<Result<ImportPreview, CsvImportError>> {
+async confirmImport(accountId: string, path: string, mapperId: string | null, mapper: ImportMapperDraft, addDeposits: boolean) : Promise<Result<ImportPreview, CsvImportError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("confirm_import", { accountId, path, mappingId, mapping, addDeposits }) };
+    return { status: "ok", data: await TAURI_INVOKE("confirm_import", { accountId, path, mapperId, mapper, addDeposits }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2604,83 +2627,6 @@ dividends_received: number;
  */
 last_sold_date: string }
 /**
- * IMP-020 — how one broker's export is read, saved under a name and reused.
- */
-export type ColumnMapping = { 
-/**
- * Its own identity: a rename keeps it (IMP-025).
- */
-id: string; 
-/**
- * What the user calls it, trimmed (IMP-024).
- */
-name: string; 
-/**
- * The character between two fields.
- */
-separator: Separator; 
-/**
- * The mark before a figure's decimals.
- */
-decimal_mark: DecimalMark; 
-/**
- * The order a date is written in.
- */
-date_format: DateFormat; 
-/**
- * How the file's text is written.
- */
-encoding: Encoding; 
-/**
- * Which column holds each field of a row.
- */
-columns: MappedColumns; 
-/**
- * Each operation label and its operation type.
- */
-operation_types: OperationLabel[]; 
-/**
- * Each name, ISIN or reference matched to an asset.
- */
-asset_matches: AssetMatch[] }
-/**
- * What a mapping holds besides its identity: what the user saves (IMP-020). A field the
- * window does not send is refused, never ignored.
- */
-export type ColumnMappingDraft = { 
-/**
- * What the user calls it.
- */
-name: string; 
-/**
- * The character between two fields.
- */
-separator: Separator; 
-/**
- * The mark before a figure's decimals.
- */
-decimal_mark: DecimalMark; 
-/**
- * The order a date is written in.
- */
-date_format: DateFormat; 
-/**
- * How the file's text is written.
- */
-encoding: Encoding; 
-/**
- * Which column holds each field of a row.
- */
-columns: MappedColumns; 
-/**
- * Each operation label and its operation type.
- */
-operation_types: OperationLabel[]; 
-/**
- * Each name, ISIN or reference matched to an asset.
- */
-asset_matches: AssetMatch[] }
-/**
  * One persisted, dismissible notice (SYN-066, CFR-060).
  */
 export type ConflictNotice = { 
@@ -2959,7 +2905,7 @@ end_date: string | null }
 /**
  * Use-case composite for the import failure surface.
  * 
- * - `ImportError` — the file's content and the mapping (IMP-010 to IMP-021).
+ * - `ImportError` — the file's content and the mapper (IMP-010 to IMP-021).
  * - `AccountError` — the account the file is read for (`AccountNotFound`, IMP-010).
  * - `CsvImportTask` — use-case-owned (this file).
  */
@@ -3420,10 +3366,6 @@ export type Event =
  * another one (SYN-064).
  */
 { type: "HoldingNoteUpdated" } | 
-/**
- * A column mapping was saved, renamed, or deleted on this device (IMP-026).
- */
-{ type: "ColumnMappingUpdated" } | 
 /**
  * A fee schedule was created, updated, paused, reactivated, or deleted (FEE-064).
  */
@@ -4012,25 +3954,41 @@ average_price: number }
  */
 export type ImportError = 
 /**
- * The mapping's name is empty once trimmed (IMP-024).
+ * The mapper's provider is empty once trimmed (IMP-024).
  */
-{ code: "MappingNameEmpty" } | 
+{ code: "MapperProviderEmpty" } | 
 /**
- * Another mapping holds the name, case and accents ignored (IMP-024).
+ * Another mapper holds the provider, case and accents ignored (IMP-024).
  */
-{ code: "MappingNameTaken"; name: string } | 
+{ code: "MapperProviderTaken"; provider: string } | 
 /**
- * The mapping names no date column, no operation column, or no asset column (IMP-021).
+ * The mapper names no date column, no operation column, or no asset column (IMP-021).
  */
-{ code: "MappingColumnMissing" } | 
+{ code: "MapperColumnMissing" } | 
 /**
- * A text of the mapping is longer than `MAPPING_TEXT_LENGTH` characters (IMP-024A).
+ * A text of the mapper is longer than `MAPPER_TEXT_LENGTH` characters (IMP-024A).
  */
-{ code: "MappingTextTooLong" } | 
+{ code: "MapperTextTooLong" } | 
 /**
- * The mapping is no longer held (IMP-025, IMP-040).
+ * The mapper is no longer held (IMP-020, IMP-025, IMP-040).
  */
-{ code: "MappingNotFound"; mapping_id: string } | 
+{ code: "MapperNotFound"; mapper_id: string } | 
+/**
+ * The mapper's file cannot be read (IMP-020B).
+ */
+{ code: "MapperFileUnreadable" } | 
+/**
+ * The mapper's file is larger than `LARGEST_MAPPER_FILE` (IMP-020B).
+ */
+{ code: "MapperFileTooLarge" } | 
+/**
+ * The file does not read as a mapper (IMP-020B).
+ */
+{ code: "MapperFileInvalid"; reason: string } | 
+/**
+ * The mappers folder cannot be read or written; the cause is logged, never sent.
+ */
+{ code: "MapperFolderFailed" } | 
 /**
  * The file is larger than 10 MB (IMP-010).
  */
@@ -4056,7 +4014,7 @@ export type ImportError =
  */
 { code: "HeaderNameRepeated"; name: string } | 
 /**
- * The mapping in use names a column the file lacks (IMP-021).
+ * The mapper in use names a column the file lacks (IMP-021).
  */
 { code: "MappedColumnNotInFile"; column: string } | 
 /**
@@ -4064,7 +4022,84 @@ export type ImportError =
  */
 { code: "DatabaseError" }
 /**
- * IMP-030 — a file read through a mapping, each row judged; nothing written (IMP-017).
+ * IMP-020 — how one provider's export is read: a file in the mappers folder, reused.
+ */
+export type ImportMapper = { 
+/**
+ * Its file's name without `.json`: a change of provider keeps it (IMP-025).
+ */
+id: string; 
+/**
+ * Who the export comes from.
+ */
+info: MapperInfo; 
+/**
+ * The character between two fields.
+ */
+separator: Separator; 
+/**
+ * The mark before a figure's decimals.
+ */
+decimal_mark: DecimalMark; 
+/**
+ * The order a date is written in.
+ */
+date_format: DateFormat; 
+/**
+ * How the file's text is written.
+ */
+encoding: Encoding; 
+/**
+ * Which column holds each field of a row.
+ */
+columns: MappedColumns; 
+/**
+ * Each operation label and its operation type.
+ */
+operation_types: OperationLabel[]; 
+/**
+ * Each name, ISIN or reference matched to an asset.
+ */
+asset_matches: AssetMatch[] }
+/**
+ * What a mapper holds besides its identity: exactly what its file holds (IMP-020). A field
+ * it does not have is refused, never ignored (IMP-020B).
+ */
+export type ImportMapperDraft = { 
+/**
+ * Who the export comes from.
+ */
+info: MapperInfo; 
+/**
+ * The character between two fields.
+ */
+separator: Separator; 
+/**
+ * The mark before a figure's decimals.
+ */
+decimal_mark: DecimalMark; 
+/**
+ * The order a date is written in.
+ */
+date_format: DateFormat; 
+/**
+ * How the file's text is written.
+ */
+encoding: Encoding; 
+/**
+ * Which column holds each field of a row.
+ */
+columns: MappedColumns; 
+/**
+ * Each operation label and its operation type.
+ */
+operation_types: OperationLabel[]; 
+/**
+ * Each name, ISIN or reference matched to an asset.
+ */
+asset_matches: AssetMatch[] }
+/**
+ * IMP-030 — a file read through a mapper, each row judged; nothing written (IMP-017).
  */
 export type ImportPreview = { 
 /**
@@ -4422,6 +4457,14 @@ net_amount: string | null;
  */
 currency: string | null }
 /**
+ * The info entry of a mapper's file (IMP-020).
+ */
+export type MapperInfo = { 
+/**
+ * Who the export comes from, trimmed (IMP-024).
+ */
+provider: string }
+/**
  * UPD-018 / UPD-035 — what the window is told when the portfolio could not be opened.
  */
 export type MigrationFailure = { 
@@ -4559,7 +4602,7 @@ date: string;
  */
 asset: AssetRead; 
 /**
- * The row's own currency, when the mapping names its column and the field holds one.
+ * The row's own currency, when the mapper names its column and the field holds one.
  */
 currency: string | null; 
 /**
@@ -5145,11 +5188,7 @@ export type RecordKind =
 /**
  * A split a price provider reports for an asset, identified by (asset_id, date) (MKT-230).
  */
-"ReportedSplit" | 
-/**
- * A column mapping, identified by its own id (IMP-023).
- */
-"ColumnMapping"
+"ReportedSplit"
 /**
  * Parameters for recording a stock split on a held asset (SPL-010).
  */
@@ -5322,7 +5361,7 @@ export type RowFigures =
  */
 export type RowReason = 
 /**
- * It does not read through the mapping in use (IMP-016, IMP-022, IMP-030, IMP-031,
+ * It does not read through the mapper in use (IMP-016, IMP-022, IMP-030, IMP-031,
  * IMP-034).
  */
 { code: "Unread"; rejection: RowRejection } | 
@@ -5348,7 +5387,7 @@ export type RowRejection =
  */
 { code: "LineTooShort" } | 
 /**
- * The operation label has no operation type in the mapping (IMP-022).
+ * The operation label has no operation type in the mapper (IMP-022).
  */
 { code: "OperationTypeMissing"; label: string } | 
 /**
@@ -5393,7 +5432,7 @@ export type RowStatus =
  */
 { status: "AlreadyRecorded"; operation: OperationRead; asset_id: string | null } | 
 /**
- * A label the mapping leaves to record by hand (IMP-022).
+ * A label the mapper leaves to record by hand (IMP-022).
  */
 { status: "NotImported"; label: string } | 
 /**

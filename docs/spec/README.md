@@ -53,7 +53,7 @@ Once assigned, a rule number never changes; a removed rule leaves its number vac
 | TDI     | Trade Dialog Insights       | Figures derived while recording a buy or a sell, shown in the trade dialog                                                                                                                       | active  |
 | WOF     | Write-off                   | A quantity leaving a holding without proceeds — a network fee, dust, coins lost — at its cost, no cash moved, lost kept apart                                                                    | active  |
 | TRF     | Transfer                    | A holding moved between two accounts at its cost — no cash, no realized result, a fee in kind, the rate between currencies recorded                                                              | active  |
-| IMP     | Import                      | A broker's CSV file read through a saved column mapping, previewed row by row, then confirmed into one account                                                                                   | active  |
+| IMP     | Import                      | A broker's CSV file read through an import mapper, previewed row by row, then confirmed into one account                                                                                         | active  |
 
 ---
 

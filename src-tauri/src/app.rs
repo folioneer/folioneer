@@ -9,6 +9,7 @@ use crate::context::asset::{
     AssetPriceRepository, AssetService, PriceProvider, SqliteAssetPriceRepository,
 };
 use crate::context::currency::CurrencyService;
+use crate::context::import::{FsImportMapperStore, ImportService, SqliteMapperChoiceRepository};
 use crate::context::sync::{
     ChangeLogRepository, FirstPublish, FolderStore, FsFolderStore, Publisher,
     SqliteChangeLogRepository, SqliteChangeRecorder, SqliteSyncStateRepository, SyncRun,
@@ -149,6 +150,7 @@ pub fn run() {
             tauri::async_runtime::block_on(async move {
                 // UPD-018 / UPD-035 — tell the window, which stays open to show the error screen
                 let agent_data_dir = dirs.local_data_dir.clone();
+                let mappers_folder = dirs.local_data_dir.join("import-mappers");
                 let db = match Database::new(dirs.local_data_dir).await {
                     Ok(db) => Arc::new(db),
                     Err(e) => {
@@ -195,7 +197,6 @@ pub fn run() {
                     asset_service,
                     currency_service,
                     transactions,
-                    import_service,
                 } = AppContainer::build(
                     db.pool.clone(),
                     Some(providers.rate),
@@ -252,6 +253,12 @@ pub fn run() {
                     asset_service.clone(),
                 );
 
+                // IMP-020 — the mappers are files of the user data; no sync reads them.
+                let import_service = Arc::new(ImportService::new(
+                    Box::new(FsImportMapperStore::new(mappers_folder)),
+                    Box::new(SqliteMapperChoiceRepository::new(db.pool.clone())),
+                ));
+
                 let csv_import_uc = CsvImportUseCase::new(
                     Arc::clone(&import_service),
                     account_service.clone(),
@@ -275,13 +282,11 @@ pub fn run() {
                         account_service.clone(),
                         asset_service.clone(),
                         Arc::clone(&currency_service),
-                        Arc::clone(&import_service),
                     )),
                     Arc::new(ServicePortfolioSnapshot::new(
                         account_service.clone(),
                         asset_service.clone(),
                         Arc::clone(&currency_service),
-                        Arc::clone(&import_service),
                     )),
                 ));
                 let portfolio_sync_uc =
@@ -289,7 +294,6 @@ pub fn run() {
                         account_service: account_service.clone(),
                         asset_service: asset_service.clone(),
                         currency_service: Arc::clone(&currency_service),
-                        import_service: Arc::clone(&import_service),
                         sync_service: Arc::clone(&sync_service),
                         first_publish,
                         sync_run,

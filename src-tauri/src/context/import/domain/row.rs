@@ -73,7 +73,7 @@ pub struct OperationRead {
     pub date: String,
     /// The asset as read; all `None` for a deposit and a withdrawal (IMP-032).
     pub asset: AssetRead,
-    /// The row's own currency, when the mapping names its column and the field holds one.
+    /// The row's own currency, when the mapper names its column and the field holds one.
     pub currency: Option<String>,
     /// Its figures.
     pub figures: RowFigures,
@@ -86,7 +86,7 @@ pub struct OperationRead {
 pub enum RowRejection {
     /// The line holds fewer fields than the header (IMP-016).
     LineTooShort,
-    /// The operation label has no operation type in the mapping (IMP-022).
+    /// The operation label has no operation type in the mapper (IMP-022).
     OperationTypeMissing {
         /// The label read.
         label: String,
@@ -123,7 +123,7 @@ pub enum RowRead {
         /// The purchase's line number.
         purchase_line: u32,
     },
-    /// A label the mapping leaves to record by hand (IMP-022).
+    /// A label the mapper leaves to record by hand (IMP-022).
     NotImported {
         /// The label read.
         label: String,
@@ -466,7 +466,7 @@ mod tests {
 
     fn rows(lines: &str) -> Vec<RowRead> {
         let text = format!("{HEADER}{lines}");
-        // The mapping's separator, as a saved one gives it (IMP-020): a short line would
+        // The mapper's separator, as a saved one gives it (IMP-020E): a short line would
         // otherwise defeat detection (IMP-012).
         let choices = ReadingChoices {
             separator: Some(crate::context::import::domain::Separator::Semicolon),

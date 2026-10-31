@@ -3,54 +3,56 @@
 > Domain: `import`
 > Last updated by: `csv-import` spec
 
-> **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic logged server-side), consistent with the other contracts.
+> **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Infrastructure failures surface as `{ code: "DatabaseError" }`, or `{ code: "MapperFolderFailed" }` for the mappers folder (no payload; diagnostic logged server-side), consistent with the other contracts.
 
 ---
 
 ## Commands
 
-### Column mappings
+### Import mappers
 
-> A column mapping says how one broker's export is read (IMP-020): saved under a name, reused for
-> the next file, synced (IMP-023).
+> An import mapper says how one provider's export is read (IMP-020): a JSON file in the mappers
+> folder of the data folder, reused for the next file, not synced for now (#715).
 
-| Command                 | Args                                                    | Return               | Errors                                                                                                                                                                                              |
-| ----------------------- | ------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_column_mappings`  | —                                                       | `Vec<ColumnMapping>` | `DatabaseError` _(IMP-020 — by name; empty when none is saved)_                                                                                                                                     |
-| `save_column_mapping`   | `mapping_id: Option<String>, draft: ColumnMappingDraft` | `ColumnMapping`      | `MappingNameEmpty` (IMP-024), `MappingNameTaken { name }` (IMP-024), `MappingColumnMissing` (IMP-021), `MappingTextTooLong` (IMP-024A), `MappingNotFound { mapping_id }` (IMP-025), `DatabaseError` |
-| `delete_column_mapping` | `mapping_id: String`                                    | `()`                 | `MappingNotFound { mapping_id }` (IMP-040), `DatabaseError`                                                                                                                                         |
+| Command                       | Args                                                  | Return                 | Errors                                                                                                                                                                                                                                                                                                               |
+| ----------------------------- | ----------------------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_import_mappers`         | —                                                     | `Vec<ImportMapper>`    | `MapperFolderFailed` _(IMP-020A — by provider; empty when none; a file that does not read is left out)_                                                                                                                                                                                                              |
+| `save_import_mapper`          | `mapper_id: Option<String>, draft: ImportMapperDraft` | `ImportMapper`         | `MapperProviderEmpty`, `MapperProviderTaken { provider }` (IMP-024), `MapperColumnMissing` (IMP-021), `MapperTextTooLong` (IMP-024A), `MapperNotFound { mapper_id }`, `MapperFileInvalid { reason }`, `MapperFileTooLarge` (IMP-025), `MapperFolderFailed` (IMP-020)                                                 |
+| `add_import_mapper_from_file` | —                                                     | `Option<ImportMapper>` | `MapperFileUnreadable`, `MapperFileTooLarge`, `MapperFileInvalid { reason }` (IMP-020B), `MapperProviderEmpty`, `MapperProviderTaken { provider }` (IMP-024), `MapperColumnMissing` (IMP-021), `MapperTextTooLong` (IMP-024A), `MapperFolderFailed` _(IMP-020B — the system dialog; `None` when the user closed it)_ |
+| `delete_import_mapper`        | `mapper_id: String`                                   | `()`                   | `MapperNotFound { mapper_id }` (IMP-040), `MapperFolderFailed`                                                                                                                                                                                                                                                       |
 
 ### Reading and previewing a file
 
 > A file is read for one account (IMP-010), its format detected or chosen (IMP-011 to IMP-018),
-> then previewed through the mapping in use, every row judged and nothing written (IMP-017,
+> then previewed through the mapper in use, every row judged and nothing written (IMP-017,
 > IMP-030). `path` is what the last `pick_import_file` returned: any other file is
 > refused (IMP-010). The preview reads the file
-> with the mapping's own format, none detected (IMP-020); a choice the user makes is an edit of
-> that mapping (IMP-018). `mapping_id` names the saved mapping it was picked from: its asset
+> with the mapper's own format, none detected (IMP-020E); a choice the user makes is an edit of
+> that mapper (IMP-018). `mapper_id` names the saved mapper it was picked from: its asset
 > matches stand, any other was made now and must name an asset of the portfolio (IMP-033);
-> saving a mapping keeps its matches as they are, unchecked.
+> saving a mapper keeps its matches as they are, unchecked.
 
-The four commands return `CsvImportError`: the codes of `ImportError`, of `AccountError` (`AccountNotFound`, `DatabaseError`) and of the use case's own `CsvImportTask` (`FileUnreadable`, `FileNotPicked`, `MatchedAssetNotFound`, `UnknownError` — a broken invariant, logged), each on the wire as `{ "code": … }`.
+The five commands return `CsvImportError`: the codes of `ImportError`, of `AccountError` (`AccountNotFound`, `DatabaseError`) and of the use case's own `CsvImportTask` (`FileUnreadable`, `FileNotPicked`, `MatchedAssetNotFound`, `UnknownError` — a broken invariant, logged), each on the wire as `{ "code": … }`.
 
 **File errors** (`read_import_file`, `preview_import`): `AccountNotFound { account_id }`, `FileUnreadable`, `FileNotPicked`, `FileTooLarge`, `FileEmpty`, `FileHasNoRow` (IMP-010), `FileNotUtf8` (IMP-011), `SeparatorNotFound` (IMP-012), `HeaderNameRepeated { name }` (IMP-015), `DatabaseError`.
 
-| Command            | Args                                                                                                            | Return           | Errors                                                                                                                                                                                                                                                                                 |
-| ------------------ | --------------------------------------------------------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pick_import_file` | —                                                                                                               | `Option<String>` | `FileUnreadable` _(IMP-010 — the system dialog; `None` when the user closes it)_                                                                                                                                                                                                       |
-| `read_import_file` | `account_id: String, path: String, choices: ReadingChoices`                                                     | `FileRead`       | the file errors                                                                                                                                                                                                                                                                        |
-| `confirm_import`   | `account_id: String, path: String, mapping_id: Option<String>, mapping: ColumnMappingDraft, add_deposits: bool` | `ImportPreview`  | the file errors, `MappingColumnMissing` (IMP-021), `MappedColumnNotInFile { column }` (IMP-021), `MappingNotFound { mapping_id }` (IMP-020), `MatchedAssetNotFound { asset_id }` (IMP-033), `UnknownError` — the rows as judged at the confirmation, the ready ones recorded (IMP-050) |
-| `preview_import`   | `account_id: String, path: String, mapping_id: Option<String>, mapping: ColumnMappingDraft`                     | `ImportPreview`  | the file errors, `MappingColumnMissing` (IMP-021), `MappedColumnNotInFile { column }` (IMP-021), `MappingNotFound { mapping_id }` (IMP-020), `MatchedAssetNotFound { asset_id }` (IMP-033), `UnknownError`                                                                             |
+| Command                    | Args                                                                                                         | Return           | Errors                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pick_import_file`         | —                                                                                                            | `Option<String>` | `FileUnreadable` _(IMP-010 — the system dialog; `None` when the user closes it)_                                                                                                                                                                                                                                                                                                                             |
+| `remembered_import_mapper` | `path: String`                                                                                               | `Option<String>` | `FileUnreadable`, `FileNotPicked` (IMP-010) _(IMP-020D — the mapper the file's folder remembers, `None` when it can't be told; `confirm_import` with a `mapper_id` remembers it, IMP-020C)_                                                                                                                                                                                                                  |
+| `read_import_file`         | `account_id: String, path: String, choices: ReadingChoices`                                                  | `FileRead`       | the file errors                                                                                                                                                                                                                                                                                                                                                                                              |
+| `confirm_import`           | `account_id: String, path: String, mapper_id: Option<String>, mapper: ImportMapperDraft, add_deposits: bool` | `ImportPreview`  | the file errors, `MapperColumnMissing` (IMP-021), `MappedColumnNotInFile { column }` (IMP-021), `MapperNotFound { mapper_id }`, `MapperFileInvalid { reason }`, `MapperFileTooLarge`, `MapperProviderEmpty`, `MapperTextTooLong`, `MapperFolderFailed` (IMP-020E), `MatchedAssetNotFound { asset_id }` (IMP-033), `UnknownError` — the rows as judged at the confirmation, the ready ones recorded (IMP-050) |
+| `preview_import`           | `account_id: String, path: String, mapper_id: Option<String>, mapper: ImportMapperDraft`                     | `ImportPreview`  | the file errors, `MapperColumnMissing` (IMP-021), `MappedColumnNotInFile { column }` (IMP-021), `MapperNotFound { mapper_id }`, `MapperFileInvalid { reason }`, `MapperFileTooLarge`, `MapperProviderEmpty`, `MapperTextTooLong`, `MapperFolderFailed` (IMP-020E), `MatchedAssetNotFound { asset_id }` (IMP-033), `UnknownError`                                                                             |
 
 ---
 
 ## Shared Types
 
 ```rust
-// IMP-020 — how one broker's export is read.
-struct ColumnMapping {
-    id: String,            // kept by a rename (IMP-025)
-    name: String,          // trimmed, unique case and accents ignored; every text ≤ 500 characters (IMP-024A)
+// IMP-020 — how one provider's export is read: a file of the mappers folder.
+struct ImportMapper {
+    id: String,            // its file's name; kept by a change of provider (IMP-025)
+    info: MapperInfo,
     separator: Separator,
     decimal_mark: DecimalMark,
     date_format: DateFormat,
@@ -60,10 +62,14 @@ struct ColumnMapping {
     asset_matches: Vec<AssetMatch>,
 }
 
-// What the user saves: a ColumnMapping without its id. `save_column_mapping` without a
-// `mapping_id` creates one; with it, replaces the mapping it names (IMP-025).
-struct ColumnMappingDraft {
-    name: String,
+struct MapperInfo {
+    provider: String,      // trimmed, unique case and accents ignored; every text ≤ 500 characters (IMP-024A)
+}
+
+// What a mapper's file holds: an ImportMapper without its id. `save_import_mapper` without a
+// `mapper_id` creates one; with it, replaces the file it names (IMP-025).
+struct ImportMapperDraft {
+    info: MapperInfo,
     separator: Separator,
     decimal_mark: DecimalMark,
     date_format: DateFormat,
@@ -96,8 +102,8 @@ struct OperationLabel {
 }
 
 // IMP-033 — a name, ISIN or reference of the file matched to an asset. The asset is checked
-// when the match is made (`preview_import`) and when it is used: a saved match whose asset is
-// gone leaves its rows unknown. Saving does not check it.
+// when the match is made (`preview_import`, `confirm_import`) and when it is used: a saved
+// match whose asset is gone is passed over (IMP-033A). Saving does not check it.
 struct AssetMatch {
     read: String,
     asset_id: String,
@@ -132,7 +138,7 @@ struct FileRead {
 // IMP-014 — `detected: false`: no format read every date, day/month/year taken.
 struct DateReading { format: DateFormat, detected: bool }
 
-// IMP-030 — the file read through the mapping, every row judged.
+// IMP-030 — the file read through the mapper, every row judged.
 struct ImportPreview {
     file: FileRead,
     rows: Vec<PreviewRow>, // every line that is not blank, in the file's order
@@ -199,11 +205,10 @@ enum RowFigures {
 
 ### Published
 
-| Event                  | Payload | Rule                                                                                                                |
-| ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
-| `ColumnMappingUpdated` | —       | IMP-026 — a mapping saved, renamed or deleted on this computer; bare signal; a synced change raises `SyncCompleted` |
-| `TransactionUpdated`   | —       | IMP-050A — `confirm_import` recorded at least one row; bare signal, once per import                                 |
-| `AssetUpdated`         | —       | IMP-050A, CSH-010 — `confirm_import` created the Cash Asset of the account's currency; bare signal                  |
+| Event                | Payload | Rule                                                                                               |
+| -------------------- | ------- | -------------------------------------------------------------------------------------------------- |
+| `TransactionUpdated` | —       | IMP-050A — `confirm_import` recorded at least one row; bare signal, once per import                |
+| `AssetUpdated`       | —       | IMP-050A, CSH-010 — `confirm_import` created the Cash Asset of the account's currency; bare signal |
 
 ---
 
@@ -214,3 +219,4 @@ enum RowFigures {
 - 2026-10-25 — Amended by `csv-import` (#501): `read_import_file`, `preview_import`, their types and errors (IMP-010 to IMP-038).
 - 2026-10-25 — Amended by `csv-import` (#502): `confirm_import` (IMP-050 to IMP-053).
 - 2026-10-31 — Amended by `csv-import` (#696): the events `confirm_import` publishes; saving keeps matches unchecked.
+- 2026-10-31 — Amended by `csv-import` (#714): a column mapping becomes an import mapper, a JSON file: `list_import_mappers`, `save_import_mapper`, `delete_import_mapper` replace the column mapping commands; `add_import_mapper_from_file`, `remembered_import_mapper` added; event `ColumnMappingUpdated` removed.

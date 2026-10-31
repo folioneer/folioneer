@@ -25,7 +25,7 @@ pub enum CsvImportTask {
 
 /// Use-case composite for the import failure surface.
 ///
-/// - `ImportError` — the file's content and the mapping (IMP-010 to IMP-021).
+/// - `ImportError` — the file's content and the mapper (IMP-010 to IMP-021).
 /// - `AccountError` — the account the file is read for (`AccountNotFound`, IMP-010).
 /// - `CsvImportTask` — use-case-owned (this file).
 #[derive(Debug, thiserror::Error, serde::Serialize, specta::Type)]

@@ -4,7 +4,7 @@ use crate::context::account::{
 };
 use crate::context::asset::{Asset, AssetServiceContract};
 use crate::context::import::{
-    folded, read_file, read_rows, AssetMatch, AssetRead, ColumnMappingDraft, FileRead, ImportError,
+    folded, read_file, read_rows, AssetMatch, AssetRead, FileRead, ImportError, ImportMapperDraft,
     ImportService, OperationRead, ReadingChoices, RowFigures, RowFormat, RowRead, RowRejection,
     LARGEST_FILE,
 };
@@ -23,7 +23,7 @@ const SAME_CURRENCY: i64 = 1_000_000;
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(tag = "code")]
 pub enum RowReason {
-    /// It does not read through the mapping in use (IMP-016, IMP-022, IMP-030, IMP-031,
+    /// It does not read through the mapper in use (IMP-016, IMP-022, IMP-030, IMP-031,
     /// IMP-034).
     Unread {
         /// What does not read.
@@ -71,7 +71,7 @@ pub enum RowStatus {
         /// The asset matched; `None` for a deposit and a withdrawal.
         asset_id: Option<String>,
     },
-    /// A label the mapping leaves to record by hand (IMP-022).
+    /// A label the mapper leaves to record by hand (IMP-022).
     NotImported {
         /// The label read.
         label: String,
@@ -108,7 +108,7 @@ pub struct PreviewCounts {
     pub not_imported: u32,
 }
 
-/// IMP-030 — a file read through a mapping, each row judged; nothing written (IMP-017).
+/// IMP-030 — a file read through a mapper, each row judged; nothing written (IMP-017).
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct ImportPreview {
     /// How the file was read.
@@ -168,6 +168,15 @@ impl CsvImportUseCase {
         Ok(shown)
     }
 
+    /// IMP-020D — the mapper the folder of the file at `path` remembers, when one is held.
+    pub async fn remembered_import_mapper(
+        &self,
+        path: &str,
+    ) -> Result<Option<String>, CsvImportError> {
+        let folder = self.folder_of(path).await?;
+        Ok(self.import_service.remembered_import_mapper(&folder).await)
+    }
+
     /// IMP-010 to IMP-016 — how the file at `path` reads for `account_id`, with what the user
     /// chose, the rest detected.
     pub async fn read_import_file(
@@ -181,17 +190,17 @@ impl CsvImportUseCase {
         Ok(read_file(&bytes, choices).map(|(_, read)| read)?)
     }
 
-    /// IMP-030 — the file at `path` read through `mapping` for `account_id`, every row
-    /// judged. `mapping_id` names the saved mapping it was picked from, when it was (IMP-020):
+    /// IMP-030 — the file at `path` read through `mapper` for `account_id`, every row
+    /// judged. `mapper_id` names the saved mapper it was picked from, when it was (IMP-020):
     /// its matches stand, any other is made now and must name an asset (IMP-033).
     pub async fn preview_import(
         &self,
         account_id: &str,
         path: &str,
-        mapping_id: Option<&str>,
-        mapping: &ColumnMappingDraft,
+        mapper_id: Option<&str>,
+        mapper: &ImportMapperDraft,
     ) -> Result<ImportPreview, CsvImportError> {
-        self.run(account_id, path, mapping_id, mapping, None).await
+        self.run(account_id, path, mapper_id, mapper, None).await
     }
 
     /// IMP-050 — the file read and judged again as `preview_import` does, against the account
@@ -203,30 +212,42 @@ impl CsvImportUseCase {
         &self,
         account_id: &str,
         path: &str,
-        mapping_id: Option<&str>,
-        mapping: &ColumnMappingDraft,
+        mapper_id: Option<&str>,
+        mapper: &ImportMapperDraft,
         add_deposits: bool,
     ) -> Result<ImportPreview, CsvImportError> {
-        self.run(account_id, path, mapping_id, mapping, Some(add_deposits))
-            .await
+        // Resolved first: once rows are recorded nothing refuses the import (IMP-020C).
+        let folder = match mapper_id {
+            Some(_) => Some(self.folder_of(path).await?),
+            None => None,
+        };
+        let preview = self
+            .run(account_id, path, mapper_id, mapper, Some(add_deposits))
+            .await?;
+        if let (Some(folder), Some(mapper_id)) = (folder, mapper_id) {
+            self.import_service
+                .remember_import_mapper(&folder, mapper_id)
+                .await;
+        }
+        Ok(preview)
     }
 
-    /// The file read through `mapping` and every row judged; with `record`, the rows taken
+    /// The file read through `mapper` and every row judged; with `record`, the rows taken
     /// recorded, `record` saying whether the deposits a purchase needs are added.
     async fn run(
         &self,
         account_id: &str,
         path: &str,
-        mapping_id: Option<&str>,
-        mapping: &ColumnMappingDraft,
+        mapper_id: Option<&str>,
+        mapper: &ImportMapperDraft,
         record: Option<bool>,
     ) -> Result<ImportPreview, CsvImportError> {
         let currency = self.account_currency(account_id).await?;
-        mapping.columns.check()?;
-        let saved: Vec<AssetMatch> = match mapping_id {
+        mapper.columns.check()?;
+        let saved: Vec<AssetMatch> = match mapper_id {
             Some(id) => {
                 self.import_service
-                    .get_column_mapping(id)
+                    .get_import_mapper(id)
                     .await?
                     .asset_matches
             }
@@ -241,7 +262,7 @@ impl CsvImportUseCase {
                 ImportError::DatabaseError
             })?;
         let known: HashSet<&str> = assets.iter().map(|asset| asset.id.as_str()).collect();
-        if let Some(made) = mapping
+        if let Some(made) = mapper
             .asset_matches
             .iter()
             .find(|matched| !saved.contains(matched) && !known.contains(matched.asset_id.as_str()))
@@ -252,23 +273,23 @@ impl CsvImportUseCase {
             .into());
         }
         let choices = ReadingChoices {
-            encoding: Some(mapping.encoding),
-            separator: Some(mapping.separator),
-            decimal_mark: Some(mapping.decimal_mark),
-            date_format: Some(mapping.date_format),
-            date_column: Some(mapping.columns.date.clone()),
+            encoding: Some(mapper.encoding),
+            separator: Some(mapper.separator),
+            decimal_mark: Some(mapper.decimal_mark),
+            date_format: Some(mapper.date_format),
+            date_column: Some(mapper.columns.date.clone()),
         };
         let bytes = self.read_bytes(path).await?;
         let (file, read) = read_file(&bytes, &choices)?;
         let format = RowFormat {
-            decimal_mark: mapping.decimal_mark,
-            date_format: mapping.date_format,
+            decimal_mark: mapper.decimal_mark,
+            date_format: mapper.date_format,
         };
-        let rows = read_rows(&file, &mapping.columns, &mapping.operation_types, format)?;
+        let rows = read_rows(&file, &mapper.columns, &mapper.operation_types, format)?;
         let pending: Vec<(u32, Pending)> = rows
             .into_iter()
             .map(|row| {
-                let pending = pend(row.read, &mapping.asset_matches, &assets, &currency);
+                let pending = pend(row.read, &mapper.asset_matches, &assets, &currency);
                 (row.line, pending)
             })
             .collect();
@@ -417,9 +438,8 @@ impl CsvImportUseCase {
             .collect()
     }
 
-    /// IMP-010 — the file's bytes, refused when the user did not pick it, when it is larger
-    /// than 10 MB or cannot be read.
-    async fn read_bytes(&self, path: &str) -> Result<Vec<u8>, CsvImportError> {
+    /// IMP-010 — `path` once it is known to be the file last picked.
+    async fn picked_file(&self, path: &str) -> Result<PathBuf, CsvImportError> {
         let canonical = tokio::fs::canonicalize(path).await.map_err(unreadable)?;
         let picked = self
             .picked
@@ -431,6 +451,23 @@ impl CsvImportUseCase {
             tracing::warn!(target: BACKEND, "import: a file the user did not pick");
             return Err(CsvImportTask::FileNotPicked.into());
         }
+        Ok(canonical)
+    }
+
+    /// IMP-020C — the folder a picked file sits in, as remembered.
+    async fn folder_of(&self, path: &str) -> Result<String, CsvImportError> {
+        let canonical = self.picked_file(path).await?;
+        Ok(canonical
+            .parent()
+            .unwrap_or(&canonical)
+            .to_string_lossy()
+            .into_owned())
+    }
+
+    /// IMP-010 — the file's bytes, refused when the user did not pick it, when it is larger
+    /// than 10 MB or cannot be read.
+    async fn read_bytes(&self, path: &str) -> Result<Vec<u8>, CsvImportError> {
+        let canonical = self.picked_file(path).await?;
         let metadata = tokio::fs::metadata(&canonical).await.map_err(unreadable)?;
         if metadata.len() > LARGEST_FILE {
             return Err(ImportError::FileTooLarge.into());
@@ -558,7 +595,7 @@ fn pend(read: RowRead, matches: &[AssetMatch], assets: &[Asset], currency: &str)
     }
 }
 
-/// IMP-032 / IMP-033 — the asset a row names: the mapping's matches first, then its ISIN,
+/// IMP-032 / IMP-033 / IMP-033A — the asset a row names: the mapper's matches first, then its ISIN,
 /// its reference and its name, the first matching exactly one asset.
 fn matched<'a>(read: &AssetRead, matches: &[AssetMatch], assets: &'a [Asset]) -> Option<&'a Asset> {
     let by_code = |code: &str| code.trim().to_lowercase();
