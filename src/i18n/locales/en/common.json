@@ -234,12 +234,27 @@
     "language_fr": "Français",
     "auto_record_price_label": "Automatically record transaction price as market price",
     "auto_record_price_description": "When enabled, new transaction forms will have the auto-record checkbox pre-checked.",
+    "price_provider_label": "Price source, on this computer",
+    "price_provider_off": "Off",
+    "price_provider_option": { "yahoo_finance": "Yahoo Finance — personal use" },
+    "price_provider_notice": {
+      "yahoo_finance": "Yahoo Finance is an unofficial source. Prices are fetched from this computer, under Yahoo's terms, for your personal use, and it may stop at any time."
+    },
+    "price_provider_note": {
+      "yahoo_finance": "An unofficial source, under Yahoo's terms, that may stop. A failed fetch keeps the last price, shown as outdated."
+    },
+    "price_provider_understood_label": "I understand",
+    "price_provider_understood_description": "Prices start being fetched once this is ticked. You can turn the source off at any time.",
+    "price_provider_saving": "Saving…",
+    "price_provider_loading": "Loading…",
+    "price_provider_load_failed": "The price source could not be read.",
     "auto_fetch_label": "Automatically fetch prices on launch",
-    "auto_fetch_description": "When enabled, the app fetches current prices from Yahoo Finance for all active holdings every time it starts.",
+    "auto_fetch_description": "Fetches current prices for all active holdings every time the app starts.",
     "scheduled_fetch_label": "Daily price download",
     "scheduled_fetch_description": "Downloads closing prices and exchange rates once per day at the chosen time — even when the app is closed.",
     "scheduled_fetch_time_label": "Download time",
     "scheduled_fetch": {
+      "saving": "Saving…",
       "loading": "Loading…",
       "status_none": "No download yet.",
       "status_succeeded": "Last download: {{executedAt}} — {{updatedCount}} updated, {{skippedCount}} skipped.",
@@ -1292,6 +1307,10 @@
     "InvalidDateFormat": "Invalid date format — expected YYYY-MM-DD.",
     "PriceNotFound": "The price record was not found.",
     "NoExternalProvider": "No price provider is chosen on this computer.",
+    "price_provider": {
+      "NotOffered": "This build does not offer that source.",
+      "NotSaved": "The choice could not be saved on this computer; nothing changed."
+    },
     "AccountNotFound": "Account not found.",
     "TransactionNotFound": "Transaction not found.",
     "AssetNotFound": "Asset not found.",

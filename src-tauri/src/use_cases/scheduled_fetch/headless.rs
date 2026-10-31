@@ -178,7 +178,8 @@ pub async fn run(build_providers: impl FnOnce() -> anyhow::Result<HeadlessProvid
 mod tests {
     use super::*;
 
-    // SPF-072 — a scheduled fetch that fires with no External provider chosen does nothing and answers success. The rate-history mock has no expectation, so
+    // SPF-072 — a scheduled fetch that fires with no External provider chosen does nothing and
+    // answers success. The rate-history mock has no expectation, so
     // any attempt to fetch rates on the way would fail the test.
     #[tokio::test]
     async fn a_leftover_with_no_external_provider_chosen_does_nothing() {

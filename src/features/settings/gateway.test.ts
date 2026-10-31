@@ -13,7 +13,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 const mockInvoke = vi.mocked(invoke);
 
 // Import after mock is registered so bindings.ts picks up the mock
-const { settingsGateway } = await import("./gateway");
+const { settingsGateway, ...providerGateway } = await import("./gateway");
 
 function makeSyncStatus(overrides: Partial<SyncStatusView> = {}): SyncStatusView {
   return {
@@ -481,5 +481,31 @@ describe("settingsGateway — the agent connection setting (AGT-022, AGT-023)", 
       status: "error",
       error: { code: "NoAgentChannel" },
     });
+  });
+});
+
+describe("price provider commands (MKT-214, MKT-215)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("reads and passes the choice through", async () => {
+    const choice = { chosen: null, offered: ["yahoo_finance"] };
+    vi.mocked(invoke).mockResolvedValue(choice);
+
+    await expect(providerGateway.getPriceProviderChoice()).resolves.toEqual(choice);
+    await expect(providerGateway.setPriceProviderChoice("yahoo_finance")).resolves.toEqual({
+      status: "ok",
+      data: choice,
+    });
+    expect(invoke).toHaveBeenCalledWith("set_price_provider_choice", { chosen: "yahoo_finance" });
+  });
+
+  it("starts the first fetch as the launch does, and passes a refusal through", async () => {
+    vi.mocked(invoke).mockRejectedValue({ code: "NoExternalProvider" });
+
+    await expect(providerGateway.fetchAllAssetPrices()).resolves.toEqual({
+      status: "error",
+      error: { code: "NoExternalProvider" },
+    });
+    expect(invoke).toHaveBeenCalledWith("fetch_all_asset_prices", { trigger: "Launch" });
   });
 });

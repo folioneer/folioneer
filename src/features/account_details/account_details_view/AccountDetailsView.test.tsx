@@ -104,6 +104,7 @@ const pinnedScrollbar = (overrides: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
+  useAppStore.setState({ hasExternalProvider: true });
   mockUsePinnedScrollbar.mockReturnValue(pinnedScrollbar());
 });
 
@@ -700,7 +701,7 @@ describe("AccountDetailsView — without an External provider (MKT-212)", () => 
     expect(closedRowProps.at(-1)?.onBackfillPriceHistory).toBeTypeOf("function");
   });
 
-  it("offers none of them in a build without one", () => {
+  it("offers none of them with none chosen", () => {
     useAppStore.setState({ hasExternalProvider: false });
     mockUseAccountDetailsView.mockReturnValue(withHoldings());
     render(<AccountDetailsView />);

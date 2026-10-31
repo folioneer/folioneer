@@ -4,7 +4,10 @@ import {
   type AgentConnectionState,
   type CurrencyError,
   commands,
+  type FetchAllAssetPricesError,
   type PortfolioSyncError,
+  type PriceProviderChoice,
+  type PriceProviderChoiceError,
   type RateHistoryBackfillError,
   type ReferenceCurrency,
   type Result,
@@ -19,9 +22,24 @@ import {
 /**
  * Gateway for the Settings feature's scheduled-fetch (SPF-010–061) and sync
  * (SYN) commands. Centralizes all Tauri command calls for the feature (the only
- * file allowed to touch `commands.*`, F3). Each function is a typed `Result`
- * pass-through (F27) matching the `bindings.ts` signature.
+ * file allowed to touch `commands.*`, F3). Each function is a pass-through
+ * (F27) matching the `bindings.ts` signature.
  */
+export async function getPriceProviderChoice(): Promise<PriceProviderChoice> {
+  return await commands.getPriceProviderChoice();
+}
+
+export async function setPriceProviderChoice(
+  chosen: string | null,
+): Promise<Result<PriceProviderChoice, PriceProviderChoiceError>> {
+  return await commands.setPriceProviderChoice(chosen);
+}
+
+/** MKT-218 — a provider just chosen starts one fetch, under the launch's trigger (MKT-121). */
+export async function fetchAllAssetPrices(): Promise<Result<null, FetchAllAssetPricesError>> {
+  return await commands.fetchAllAssetPrices("Launch");
+}
+
 export async function configureScheduledFetch(
   enabled: boolean,
   triggerTime: string,

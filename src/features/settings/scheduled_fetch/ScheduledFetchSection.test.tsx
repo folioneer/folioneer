@@ -162,6 +162,9 @@ describe("ScheduledFetchSection — configure in-flight and errors (SPF-013/060)
 
     expect(screen.getByLabelText(/settings.scheduled_fetch_label/)).toBeDisabled();
     expect(screen.getByTestId("scheduled-fetch-time")).toBeDisabled();
+    expect(document.getElementById("scheduled-fetch-pending")).toHaveTextContent(
+      "settings.scheduled_fetch.saving",
+    );
   });
 
   it("shows an inline error when a configure call is rejected, toggle already reverted (SPF-013)", () => {

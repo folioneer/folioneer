@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const setLanguage = vi.fn();
 const toggleAutoRecordPrice = vi.fn();
@@ -22,6 +22,9 @@ vi.mock("./useSettings", () => ({
 }));
 
 // Each of these reads its own state and has its own tests.
+vi.mock("./price_provider/PriceProviderSection", () => ({
+  PriceProviderSection: () => <div data-testid="price-provider-mounted" />,
+}));
 vi.mock("./scheduled_fetch/ScheduledFetchSection", () => ({
   ScheduledFetchSection: () => <div data-testid="scheduled-fetch-section-mounted" />,
 }));
@@ -44,9 +47,6 @@ const open = (id: string) => fireEvent.click(element(id) as HTMLElement);
 describe("SettingsDialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  afterEach(() => {
     useAppStore.setState({ hasExternalProvider: true });
   });
 
@@ -99,15 +99,16 @@ describe("SettingsDialog", () => {
     expect(element("settings-auto-fetch")).toBeNull();
   });
 
-  // MKT-212, SPF-071 — with no External provider there is nothing to show in Prices.
-  it("has no Prices section with no External provider, and keeps the others", () => {
+  // MKT-212, MKT-215, SPF-071 — with none chosen, Prices holds only the choice.
+  it("shows only the price source with no External provider chosen", () => {
     useAppStore.setState({ hasExternalProvider: false });
     render(<SettingsDialog isOpen onClose={vi.fn()} />);
 
-    expect(element("settings-section-prices")).toBeNull();
-    expect(element("settings-section-general")).toBeInTheDocument();
-    expect(element("settings-section-sync")).toBeInTheDocument();
-    expect(element("settings-section-agents")).toBeInTheDocument();
+    open("settings-section-prices");
+
+    expect(screen.getByTestId("price-provider-mounted")).toBeInTheDocument();
+    expect(element("settings-auto-fetch")).toBeNull();
+    expect(screen.queryByTestId("scheduled-fetch-section-mounted")).toBeNull();
   });
 
   it("holds the whole of sync in its Sync section", () => {

@@ -234,12 +234,27 @@
     "language_fr": "Français",
     "auto_record_price_label": "Enregistrer automatiquement le prix de transaction comme prix de marché",
     "auto_record_price_description": "Si activé, la case d'enregistrement automatique sera pré-cochée dans les nouveaux formulaires de transaction.",
+    "price_provider_label": "Source des prix, sur cet ordinateur",
+    "price_provider_off": "Désactivée",
+    "price_provider_option": { "yahoo_finance": "Yahoo Finance — usage personnel" },
+    "price_provider_notice": {
+      "yahoo_finance": "Yahoo Finance est une source non officielle. Les prix sont récupérés depuis cet ordinateur, selon les conditions de Yahoo, pour votre usage personnel, et cela peut s'arrêter à tout moment."
+    },
+    "price_provider_note": {
+      "yahoo_finance": "Une source non officielle, selon les conditions de Yahoo, qui peut s'arrêter. Une récupération échouée conserve le dernier prix, signalé comme ancien."
+    },
+    "price_provider_understood_label": "J'ai compris",
+    "price_provider_understood_description": "La récupération des prix commence dès que cette case est cochée. Vous pouvez désactiver la source à tout moment.",
+    "price_provider_saving": "Enregistrement…",
+    "price_provider_loading": "Chargement…",
+    "price_provider_load_failed": "La source des prix n'a pas pu être lue.",
     "auto_fetch_label": "Récupérer automatiquement les prix au démarrage",
-    "auto_fetch_description": "Si activé, l'application récupère les prix actuels depuis Yahoo Finance pour toutes les positions actives à chaque démarrage.",
+    "auto_fetch_description": "Récupère les prix actuels de toutes les positions actives à chaque démarrage.",
     "scheduled_fetch_label": "Téléchargement quotidien des prix",
     "scheduled_fetch_description": "Télécharge les cours de clôture et les taux de change une fois par jour à l'heure choisie — même application fermée.",
     "scheduled_fetch_time_label": "Heure du téléchargement",
     "scheduled_fetch": {
+      "saving": "Enregistrement…",
       "loading": "Chargement…",
       "status_none": "Aucun téléchargement pour l'instant.",
       "status_succeeded": "Dernier téléchargement : {{executedAt}} — {{updatedCount}} mis à jour, {{skippedCount}} ignorés.",
@@ -1292,6 +1307,10 @@
     "InvalidDateFormat": "Format de date invalide — attendu AAAA-MM-JJ.",
     "PriceNotFound": "L'enregistrement de prix est introuvable.",
     "NoExternalProvider": "Aucun fournisseur de prix n'est choisi sur cet ordinateur.",
+    "price_provider": {
+      "NotOffered": "Cette version ne propose pas cette source.",
+      "NotSaved": "Le choix n'a pas pu être enregistré sur cet ordinateur ; rien n'a changé."
+    },
     "AccountNotFound": "Compte introuvable.",
     "TransactionNotFound": "Transaction introuvable.",
     "AssetNotFound": "Actif introuvable.",

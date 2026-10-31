@@ -23,9 +23,9 @@ describe("maybeLaunchAutoFetch — MKT-121 launch dispatch", () => {
     useAppStore.setState({ hasExternalProvider: true });
   });
 
-  // MKT-212 — a build without an External provider starts no auto-fetch, whatever
+  // MKT-212 — a computer with no External provider chosen starts no auto-fetch, whatever
   // the setting says.
-  it("does not dispatch in a build without an External provider, even with auto-fetch on", async () => {
+  it("does not dispatch in a computer with no External provider chosen, even with auto-fetch on", async () => {
     setAutoFetch(true);
     useAppStore.setState({ hasExternalProvider: false });
 
@@ -71,9 +71,9 @@ describe("launchRateRefresh — FXR-075 launch rate refresh", () => {
     localStorage.clear();
   });
 
-  // FXR-075 — rates refresh at every launch, in a build without an External provider
+  // FXR-075 — rates refresh at every launch, in a computer with no External provider chosen
   // and with auto-fetch off alike.
-  it("refreshes rates in a build without an External provider, with auto-fetch off", async () => {
+  it("refreshes rates in a computer with no External provider chosen, with auto-fetch off", async () => {
     setAutoFetch(false);
     useAppStore.setState({ hasExternalProvider: false });
     vi.mocked(refreshCurrencyRates).mockResolvedValue({ status: "ok", data: null });

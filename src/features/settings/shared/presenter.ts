@@ -3,6 +3,7 @@ import type {
   CurrencyError,
   FolderProblem,
   PortfolioSyncError,
+  PriceProviderChoiceError,
   RateHistoryBackfillError,
   RosterEntry,
   ScheduledFetchError,
@@ -10,6 +11,19 @@ import type {
   SyncFailure,
 } from "@/bindings";
 import type { I18nMessage } from "@/ui/format/i18n";
+
+/** F27 — Maps a refused price source (MKT-214) to an i18n key. */
+export function priceProviderChoiceErrorToI18n(error: PriceProviderChoiceError): I18nMessage {
+  switch (error.code) {
+    case "NotOffered":
+    case "NotSaved":
+      return { key: `error.price_provider.${error.code}` };
+    default: {
+      const _exhaustive: never = error;
+      return _exhaustive;
+    }
+  }
+}
 
 /**
  * F27 — Maps a `ScheduledFetchError` to an i18n key. Pure: no React, no
