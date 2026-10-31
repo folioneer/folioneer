@@ -125,11 +125,11 @@ describe("SyncSection — enabled state (SYN-061/063/070/072/073/074/082/084)", 
     expect(screen.getByText("Laptop")).toBeInTheDocument();
   });
 
-  // SYN-063 — the page leads with the health the core states, whatever else the status
+  // SYN-063 — the section leads with the health the core states, whatever else the status
   // carries: it shows it, it does not decide it.
   it("leads with the health of sync: up to date, needing attention, or paused", () => {
     const word = () => document.getElementById("sync-status-state")?.textContent;
-    // A held-back change is carried, and the core says up to date: the page shows the word.
+    // A held-back change is carried, and the core says up to date: the section shows the word.
     mockUseSyncSection.mockReturnValue({ ...enabledState, heldBackCount: 2, health: "up_to_date" });
     const { unmount } = render(<SyncSection />);
     expect(word()).toBe("sync.health.up_to_date");

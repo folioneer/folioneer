@@ -20,7 +20,7 @@ const HEALTH_DOT = {
   paused: "bg-m3-outline",
 } as const;
 
-/** A titled group of the page: what it holds, and an optional line saying what it is for. */
+/** A titled group of the section: what it holds, and an optional line saying what it is for. */
 function Group({
   id,
   title,
@@ -68,7 +68,7 @@ function ActionRow({
 }
 
 /**
- * SYN-010/017/061/063/066/069–074/082/084 — the sync page: the honest positioning note
+ * SYN-010/017/061/063/066/069–074/082/084 — the Sync section: the honest positioning note
  * and "Enable sync" while disabled; while enabled, its health with the routine actions,
  * the computers, this computer's name and folder, and the actions that cannot be undone,
  * kept apart. Stable ids per F25.

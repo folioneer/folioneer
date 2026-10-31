@@ -41,7 +41,7 @@ export interface UseSyncSectionResult {
   notices: ConflictNotice[];
   inconsistentHoldings: InconsistentHolding[];
   failures: SyncFailure[];
-  /** True while a run started from this page is in flight (SYN-061). */
+  /** True while a run started from this section is in flight (SYN-061). */
   isSyncing: boolean;
   /** Set when the last action was rejected; cleared by the next action (F27). */
   actionError: I18nMessage | null;
@@ -96,7 +96,7 @@ const DISABLED_STATUS: SyncStatusView = {
 };
 
 /**
- * SYN-061/063/070–074/082 — the sync page's state: loads the sync status on
+ * SYN-061/063/070–074/082 — the Sync section's state: loads the sync status on
  * mount and exposes every device-side action. Each action's result carries the
  * fresh status (or the run report's status), which replaces the displayed one.
  */

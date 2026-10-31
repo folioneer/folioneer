@@ -231,7 +231,7 @@ describe("sync", () => {
     await modal.waitForExist({ timeout: 20000, reverse: true });
     const statusBlock = await $("#sync-status");
     await statusBlock.waitForExist({ timeout: 10000 });
-    await captureScreen("sync-page");
+    await captureScreen("sync-section");
 
     // -----------------------------------------------------------------
     // Step 5 — The one thing only a real run can prove: the backend wrote

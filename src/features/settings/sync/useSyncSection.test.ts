@@ -77,7 +77,7 @@ describe("useSyncSection — load status on mount (SYN-063)", () => {
     expect(result.current.isLoading).toBe(true);
   });
 
-  // SYN-063 — the page carries the health the core states with the status, as it is.
+  // SYN-063 — the section carries the health the core states with the status, as it is.
   it("carries the health the core states", async () => {
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({
       status: "ok",
