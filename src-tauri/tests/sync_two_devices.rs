@@ -969,6 +969,83 @@ async fn syn_021_the_reference_currency_chosen_on_one_device_is_the_others() {
     );
 }
 
+// IMP-051A — the deposit an import adds carries its mark to the other device.
+#[tokio::test]
+async fn imp_051a_an_added_deposits_mark_is_the_other_devices() {
+    use folioneer_lib::context::account::TransactionType;
+    use folioneer_lib::context::import::{
+        ColumnMappingDraft, DateFormat, DecimalMark, Encoding, MappedColumns, OperationLabel,
+        OperationType, Separator,
+    };
+    use folioneer_lib::shared::infrastructure::uow::SqliteTransactionManager;
+    use folioneer_lib::use_cases::csv_import::CsvImportUseCase;
+    use std::io::Write;
+
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop, account_id, _) = two_devices_sharing(dir.path()).await;
+    let import = CsvImportUseCase::new(
+        desktop.import_service.clone(),
+        desktop.account_service.clone(),
+        desktop.asset_service.clone(),
+        Arc::new(SqliteTransactionManager::new(desktop.pool.clone())),
+    );
+    // The account holds 1,000: a purchase of 3,000 needs a deposit of 2,000.
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    file.write_all(
+        b"Date,Type,Ticker,Quantity,Price,Amount\n2026-02-01,Buy,AAPL,30,100.00,3000.00\n",
+    )
+    .unwrap();
+    import.allow_file(file.path()).await.unwrap();
+    let mapping = ColumnMappingDraft {
+        name: "Broker".into(),
+        separator: Separator::Comma,
+        decimal_mark: DecimalMark::Dot,
+        date_format: DateFormat::YearMonthDay,
+        encoding: Encoding::Utf8,
+        columns: MappedColumns {
+            date: "Date".into(),
+            operation: "Type".into(),
+            isin: None,
+            reference: Some("Ticker".into()),
+            name: None,
+            quantity: Some("Quantity".into()),
+            unit_price: Some("Price".into()),
+            gross_amount: Some("Amount".into()),
+            fees: None,
+            net_amount: None,
+            currency: None,
+        },
+        operation_types: vec![OperationLabel {
+            label: "Buy".into(),
+            transaction_type: OperationType::Purchase,
+        }],
+        asset_matches: Vec::new(),
+    };
+    import
+        .confirm_import(
+            &account_id,
+            file.path().to_str().unwrap(),
+            None,
+            &mapping,
+            true,
+        )
+        .await
+        .unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+
+    let added: Vec<_> = laptop
+        .account_service
+        .get_all_transactions_for_account(&account_id)
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|t| t.transaction_type == TransactionType::Deposit && t.added_deposit)
+        .collect();
+    assert_eq!(added.len(), 1);
+    assert_eq!(added[0].date, "2026-02-01");
+}
+
 // IMP-023 — a column mapping saved before sync travels with the first publish; renamed on
 // the device that joined, it is renamed on the first, and deleted there, it is gone on both.
 #[tokio::test]

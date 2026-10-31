@@ -43,6 +43,7 @@ struct Ctx {
     account_service: Arc<AccountService>,
     asset_service: Arc<AssetService>,
     bus: Arc<SideEffectEventBus>,
+    pool: sqlx::SqlitePool,
 }
 
 async fn build_ctx() -> Ctx {
@@ -64,11 +65,14 @@ async fn build_ctx() -> Ctx {
         )
         .with_event_bus(Arc::clone(&bus)),
     );
-    let asset_service = Arc::new(AssetService::new(
-        Box::new(SqliteAssetRepository::new(pool.clone())),
-        Box::new(SqliteAssetCategoryRepository::new(pool.clone())),
-        Box::new(SqliteAssetPriceRepository::new(pool.clone())),
-    ));
+    let asset_service = Arc::new(
+        AssetService::new(
+            Box::new(SqliteAssetRepository::new(pool.clone())),
+            Box::new(SqliteAssetCategoryRepository::new(pool.clone())),
+            Box::new(SqliteAssetPriceRepository::new(pool.clone())),
+        )
+        .with_event_bus(Arc::clone(&bus)),
+    );
     let mappings = Arc::new(ImportService::new(Box::new(
         SqliteColumnMappingRepository::new(pool.clone()),
     )));
@@ -84,6 +88,7 @@ async fn build_ctx() -> Ctx {
         account_service,
         asset_service,
         bus,
+        pool,
     }
 }
 
@@ -635,14 +640,18 @@ async fn imp_050_a_confirmed_import_records_every_ready_row_at_once() {
     let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
     let mut events = ctx.bus.subscribe();
     let confirmed = confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
-    let updated = events
-        .drain()
-        .into_iter()
-        .filter(|event| *event == Event::TransactionUpdated)
+    let raised = events.drain();
+    let updated = raised
+        .iter()
+        .filter(|event| **event == Event::TransactionUpdated)
         .count();
     assert_eq!(
         updated, 1,
-        "IMP-050: one TransactionUpdated for the whole import"
+        "IMP-050A: one TransactionUpdated for the whole import"
+    );
+    assert!(
+        raised.contains(&Event::AssetUpdated),
+        "IMP-050A: the Cash Asset the deposit needs was created"
     );
     assert_eq!(confirmed.counts.ready, 3);
     assert!(matches!(status(&confirmed, 4), RowStatus::Rejected { .. }));
@@ -672,10 +681,319 @@ async fn imp_050_a_confirmed_import_records_every_ready_row_at_once() {
     );
 }
 
-// IMP-051 — left out by the user's choice, no deposit is added, and the purchase the cash
+const HEADER: &str = "Date,Type,ISIN,Ticker,Name,Quantity,Price,Amount,Commission,Currency\n";
+
+// IMP-035A / IMP-038 — within one day the inflows come first: a deposit written after the
+// purchase it funds funds it, so no deposit is added and the cash is not counted twice.
+#[tokio::test]
+async fn imp_035a_a_days_own_deposit_funds_its_purchases() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let rows = format!(
+        "{HEADER}2024-02-01,Buy,FR0000000010,ACM,Acme World,2,100.00,200.00,1.00,EUR\n\
+         2024-02-01,Deposit,,,,,,201.00,,EUR\n"
+    );
+    let file = picked(&ctx, &rows, false).await;
+    let previewed = preview(&ctx, &account_id, &file, &english_mapping()).await;
+    assert!(
+        matches!(
+            status(&previewed, 2),
+            RowStatus::Ready { funding: None, .. }
+        ),
+        "IMP-038: the day's own deposit funds the purchase"
+    );
+    confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    let recorded = transactions(&ctx, &account_id).await;
+    let kinds: Vec<(TransactionType, bool)> = recorded
+        .iter()
+        .map(|t| (t.transaction_type, t.added_deposit))
+        .collect();
+    assert_eq!(
+        kinds,
+        vec![
+            (TransactionType::Deposit, false),
+            (TransactionType::Purchase, false),
+        ],
+        "IMP-035A: the deposit recorded first, none added"
+    );
+}
+
+// IMP-036 / IMP-053 — a sale recorded before its asset was archived is already recorded when
+// the file comes again, not refused as a new sale of an archived asset (SEL-037).
+#[tokio::test]
+async fn imp_036_a_recorded_sale_of_an_asset_since_archived_is_already_recorded() {
+    let ctx = build_ctx().await;
+    let acme = asset(&ctx, "Acme World", "ACM", Some("FR0000000010"), "EUR").await;
+    let account_id = account(&ctx, micro(1000)).await;
+    let rows = format!(
+        "{HEADER}2024-02-01,Buy,FR0000000010,ACM,Acme World,2,100.00,200.00,0,EUR\n\
+         2024-02-02,Sell,FR0000000010,ACM,Acme World,2,110.00,220.00,0,EUR\n"
+    );
+    let file = picked(&ctx, &rows, false).await;
+    confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    ctx.asset_service
+        .archive_asset(&acme)
+        .await
+        .expect("archived");
+    let again = preview(&ctx, &account_id, &file, &english_mapping()).await;
+    assert!(matches!(
+        status(&again, 3),
+        RowStatus::AlreadyRecorded { .. }
+    ));
+    let new_sale =
+        format!("{HEADER}2024-02-03,Sell,FR0000000010,ACM,Acme World,1,110.00,110.00,0,EUR\n");
+    let later = picked(&ctx, &new_sale, false).await;
+    let refused = preview(&ctx, &account_id, &later, &english_mapping()).await;
+    assert!(
+        matches!(
+            status(&refused, 2),
+            RowStatus::Rejected {
+                reason: RowReason::ManualEntry {
+                    refusal: AccountError::ArchivedAssetSell
+                }
+            }
+        ),
+        "SEL-037: a new sale of an archived asset stays refused"
+    );
+}
+
+// IMP-036 — two such rows match two such transactions, not one; a withdrawal too.
+#[tokio::test]
+async fn imp_036_each_transaction_matches_one_row() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let rows = format!(
+        "{HEADER}2024-02-01,Deposit,,,,,,50.00,,EUR\n\
+         2024-02-02,Withdrawal,,,,,,10.00,,EUR\n"
+    );
+    let first = picked(&ctx, &rows, false).await;
+    confirm(&ctx, &account_id, &first, &english_mapping(), true).await;
+    let twice = format!(
+        "{HEADER}2024-02-01,Deposit,,,,,,50.00,,EUR\n\
+         2024-02-01,Deposit,,,,,,50.00,,EUR\n\
+         2024-02-02,Withdrawal,,,,,,10.00,,EUR\n"
+    );
+    let later = picked(&ctx, &twice, false).await;
+    let previewed = preview(&ctx, &account_id, &later, &english_mapping()).await;
+    assert!(matches!(
+        status(&previewed, 2),
+        RowStatus::AlreadyRecorded { .. }
+    ));
+    assert!(matches!(status(&previewed, 3), RowStatus::Ready { .. }));
+    assert!(matches!(
+        status(&previewed, 4),
+        RowStatus::AlreadyRecorded { .. }
+    ));
+}
+
+// IMP-035A — the order runs over dates whatever the file's, a sale is no inflow, and a
+// dividend on the day of a first purchase comes before it and is rejected (DIV-011).
+#[tokio::test]
+async fn imp_035a_the_order_of_a_days_rows() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let rows = format!(
+        "{HEADER}2024-02-03,Buy,FR0000000010,ACM,Acme World,1,100.00,100.00,0,EUR\n\
+         2024-02-03,Dividend,FR0000000002,,,,,3.00,,EUR\n\
+         2024-02-01,Deposit,,,,,,100.00,,EUR\n\
+         2024-02-02,Buy,FR0000000002,BTP,Beta Power,1,100.00,100.00,0,EUR\n\
+         2024-02-02,Sell,FR0000000002,BTP,Beta Power,1,100.00,100.00,0,EUR\n\
+         2024-02-04,Dividend,FR0000000010,,,,,1.00,,EUR\n\
+         2024-02-05,Buy,FR0000000002,BTP,Beta Power,1,100.00,100.00,0,EUR\n\
+         2024-02-05,Dividend,FR0000000002,,,,,1.00,,EUR\n"
+    );
+    let file = picked(&ctx, &rows, false).await;
+    let previewed = preview(&ctx, &account_id, &file, &english_mapping()).await;
+    assert!(
+        matches!(
+            status(&previewed, 2),
+            RowStatus::Ready { funding: None, .. }
+        ),
+        "the sale of the day before funds it, the file's order aside"
+    );
+    assert!(
+        matches!(
+            status(&previewed, 5),
+            RowStatus::Ready { funding: None, .. }
+        ),
+        "the day's first purchase, funded by the earlier deposit"
+    );
+    assert!(
+        matches!(
+            status(&previewed, 9),
+            RowStatus::Rejected {
+                reason: RowReason::AssetNotHeld
+            }
+        ),
+        "IMP-035A: the dividend comes before the day's first purchase"
+    );
+}
+
+// IMP-038 — the rows after a funded purchase are judged as if its deposit were added, and a
+// day's own deposit leaves only what it does not cover to add.
+#[tokio::test]
+async fn imp_038_each_funding_counts_what_came_before() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let rows = format!(
+        "{HEADER}2024-02-01,Buy,FR0000000010,ACM,Acme World,2,100.00,200.00,0,EUR\n\
+         2024-02-01,Deposit,,,,,,50.00,,EUR\n\
+         2024-02-02,Buy,FR0000000010,ACM,Acme World,1,100.00,100.00,0,EUR\n"
+    );
+    let file = picked(&ctx, &rows, false).await;
+    let previewed = preview(&ctx, &account_id, &file, &english_mapping()).await;
+    let funding = |line| match status(&previewed, line) {
+        RowStatus::Ready { funding, .. } => *funding,
+        other => panic!("line {line}: {other:?}"),
+    };
+    assert_eq!(
+        funding(2),
+        Some(micro(150)),
+        "what the day's deposit leaves"
+    );
+    assert_eq!(funding(4), Some(micro(100)), "nothing left of the first");
+    let confirmed = confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    assert_eq!(confirmed.counts.ready, 3);
+    let recorded = transactions(&ctx, &account_id).await;
+    assert_eq!(deposits(&recorded).len(), 3, "the file's and the two added");
+}
+
+// IMP-050A — the Cash Asset already there, no `AssetUpdated` is raised.
+#[tokio::test]
+async fn imp_050a_no_asset_event_when_the_cash_asset_exists() {
+    let ctx = build_ctx().await;
+    asset(&ctx, "Acme World", "ACM", Some("FR0000000010"), "EUR").await;
+    let account_id = account(&ctx, micro(1000)).await;
+    let rows =
+        format!("{HEADER}2024-02-01,Buy,FR0000000010,ACM,Acme World,2,100.00,200.00,0,EUR\n");
+    let file = picked(&ctx, &rows, false).await;
+    let mut events = ctx.bus.subscribe();
+    confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    assert!(!events.drain().contains(&Event::AssetUpdated));
+}
+
+// IMP-010 — only the file last picked is read.
+#[tokio::test]
+async fn imp_010_only_the_file_last_picked_is_read() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let earlier = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    let _last = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    let refused = ctx
+        .import
+        .preview_import(&account_id, path(&earlier), None, &english_mapping())
+        .await;
+    assert!(matches!(
+        refused,
+        Err(CsvImportError::UseCase(CsvImportTask::FileNotPicked))
+    ));
+}
+
+// IMP-035 / IMP-037 — a row is refused as manual entry would refuse it: a future date, a sale
+// of nothing held, a sale leaving a later transaction short; an asset in another currency.
+#[tokio::test]
+async fn imp_035_a_row_is_judged_as_if_typed() {
+    let ctx = build_ctx().await;
+    asset(&ctx, "Dollar Fund", "USF", Some("US0378331005"), "USD").await;
+    let account_id = english_portfolio(&ctx).await;
+    let first = format!(
+        "{HEADER}2024-03-01,Buy,FR0000000010,ACM,Acme World,2,100.00,200.00,0,EUR\n\
+         2024-03-02,Sell,FR0000000010,ACM,Acme World,2,100.00,200.00,0,EUR\n"
+    );
+    let file = picked(&ctx, &first, false).await;
+    confirm(&ctx, &account_id, &file, &english_mapping(), true).await;
+    let rows = format!(
+        "{HEADER}2099-01-01,Deposit,,,,,,10.00,,EUR\n\
+         2024-02-01,Sell,FR0000000002,BTP,Beta Power,1,100.00,100.00,0,EUR\n\
+         2024-03-01,Sell,FR0000000010,ACM,Acme World,1,100.00,100.00,0,EUR\n\
+         2024-02-02,Buy,US0378331005,USF,Dollar Fund,1,100.00,100.00,0,EUR\n"
+    );
+    let later = picked(&ctx, &rows, false).await;
+    let previewed = preview(&ctx, &account_id, &later, &english_mapping()).await;
+    for (line, what) in [
+        (2, "TRX-020: a future date"),
+        (3, "SEL-012: nothing held"),
+        (4, "SEL-032: a later sale left short"),
+    ] {
+        assert!(
+            matches!(
+                status(&previewed, line),
+                RowStatus::Rejected {
+                    reason: RowReason::ManualEntry { .. }
+                }
+            ),
+            "{what}: {:?}",
+            status(&previewed, line)
+        );
+    }
+    assert!(matches!(
+        status(&previewed, 5),
+        RowStatus::Rejected {
+            reason: RowReason::OtherCurrency
+        }
+    ));
+}
+
+// IMP-036A — a later file's deposit row of an added deposit's date and amount is already
+// recorded, so the cash is not counted twice; the added mark stays.
+#[tokio::test]
+async fn imp_036a_a_later_files_deposit_row_matches_an_added_deposit() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    let purchase =
+        format!("{HEADER}2024-02-01,Buy,FR0000000010,ACM,Acme World,2,100.00,200.00,1.00,EUR\n");
+    let first = picked(&ctx, &purchase, false).await;
+    confirm(&ctx, &account_id, &first, &english_mapping(), true).await;
+    let deposit = format!("{HEADER}2024-02-01,Deposit,,,,,,201.00,,EUR\n");
+    let later = picked(&ctx, &deposit, false).await;
+    let confirmed = confirm(&ctx, &account_id, &later, &english_mapping(), true).await;
+    assert!(matches!(
+        status(&confirmed, 2),
+        RowStatus::AlreadyRecorded { .. }
+    ));
+    let recorded = transactions(&ctx, &account_id).await;
+    let found = deposits(&recorded);
+    assert_eq!(found.len(), 1, "IMP-036A: the cash is not counted twice");
+    assert!(found[0].added_deposit, "IMP-036A: the added mark stays");
+}
+
+// IMP-050 — a write failing on the last row records none of them, and announces nothing.
+#[tokio::test]
+async fn imp_050_a_failed_write_records_nothing() {
+    let ctx = build_ctx().await;
+    let account_id = english_portfolio(&ctx).await;
+    sqlx::query(
+        "CREATE TRIGGER refuse_the_last_row BEFORE INSERT ON transactions \
+         WHEN NEW.date = '2024-02-02' BEGIN SELECT RAISE(ABORT, 'refused'); END",
+    )
+    .execute(&ctx.pool)
+    .await
+    .expect("trigger");
+    let rows = format!(
+        "{HEADER}2024-02-01,Deposit,,,,,,500.00,,EUR\n\
+         2024-02-02,Buy,FR0000000010,ACM,Acme World,2,100.00,200.00,1.00,EUR\n"
+    );
+    let file = picked(&ctx, &rows, false).await;
+    let mut events = ctx.bus.subscribe();
+    let failed = ctx
+        .import
+        .confirm_import(&account_id, path(&file), None, &english_mapping(), true)
+        .await;
+    assert!(failed.is_err(), "IMP-050: the failed write is told");
+    assert!(
+        transactions(&ctx, &account_id).await.is_empty(),
+        "IMP-050: all of them or none"
+    );
+    assert!(
+        events.drain().is_empty(),
+        "IMP-050A: nothing recorded, nothing announced"
+    );
+}
+
+// IMP-051B — left out by the user's choice, no deposit is added, and the purchase the cash
 // cannot fund is rejected as manual entry rejects it (CSH-041).
 #[tokio::test]
-async fn imp_051_the_added_deposits_can_be_left_out() {
+async fn imp_051b_the_added_deposits_can_be_left_out() {
     let ctx = build_ctx().await;
     let account_id = english_portfolio(&ctx).await;
     let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
@@ -743,9 +1061,9 @@ async fn imp_052_an_unknown_asset_created_from_its_row_is_recorded() {
         .any(|t| t.asset_id == created && t.transaction_type == TransactionType::Purchase));
 }
 
-// IMP-051 — a corrected added deposit stays marked as added.
+// IMP-051A — a corrected added deposit stays marked as added.
 #[tokio::test]
-async fn imp_051_a_corrected_added_deposit_stays_added() {
+async fn imp_051a_a_corrected_added_deposit_stays_added() {
     let ctx = build_ctx().await;
     let account_id = english_portfolio(&ctx).await;
     let file = picked(&ctx, &fixture("english_broker.csv"), false).await;

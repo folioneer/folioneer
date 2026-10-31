@@ -17,6 +17,7 @@ use uuid::Uuid;
     Type,
     PartialEq,
     Eq,
+    Hash,
     Default,
     strum_macros::Display,
     strum_macros::EnumString,

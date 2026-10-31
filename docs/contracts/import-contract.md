@@ -24,13 +24,14 @@
 
 > A file is read for one account (IMP-010), its format detected or chosen (IMP-011 to IMP-018),
 > then previewed through the mapping in use, every row judged and nothing written (IMP-017,
-> IMP-030). `path` is what `pick_import_file` returned: a file the user did not pick there is
+> IMP-030). `path` is what the last `pick_import_file` returned: any other file is
 > refused (IMP-010). The preview reads the file
 > with the mapping's own format, none detected (IMP-020); a choice the user makes is an edit of
 > that mapping (IMP-018). `mapping_id` names the saved mapping it was picked from: its asset
-> matches stand, any other was made now and must name an asset of the portfolio (IMP-033).
+> matches stand, any other was made now and must name an asset of the portfolio (IMP-033);
+> saving a mapping keeps its matches as they are, unchecked.
 
-The three commands return `CsvImportError`: the codes of `ImportError`, of `AccountError` (`AccountNotFound`, `DatabaseError`) and of the use case's own `CsvImportTask` (`FileUnreadable`, `FileNotPicked`, `MatchedAssetNotFound`, `UnknownError` — a broken invariant, logged), each on the wire as `{ "code": … }`.
+The four commands return `CsvImportError`: the codes of `ImportError`, of `AccountError` (`AccountNotFound`, `DatabaseError`) and of the use case's own `CsvImportTask` (`FileUnreadable`, `FileNotPicked`, `MatchedAssetNotFound`, `UnknownError` — a broken invariant, logged), each on the wire as `{ "code": … }`.
 
 **File errors** (`read_import_file`, `preview_import`): `AccountNotFound { account_id }`, `FileUnreadable`, `FileNotPicked`, `FileTooLarge`, `FileEmpty`, `FileHasNoRow` (IMP-010), `FileNotUtf8` (IMP-011), `SeparatorNotFound` (IMP-012), `HeaderNameRepeated { name }` (IMP-015), `DatabaseError`.
 
@@ -201,6 +202,8 @@ enum RowFigures {
 | Event                  | Payload | Rule                                                                                                                |
 | ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
 | `ColumnMappingUpdated` | —       | IMP-026 — a mapping saved, renamed or deleted on this computer; bare signal; a synced change raises `SyncCompleted` |
+| `TransactionUpdated`   | —       | IMP-050A — `confirm_import` recorded at least one row; bare signal, once per import                                 |
+| `AssetUpdated`         | —       | IMP-050A, CSH-010 — `confirm_import` created the Cash Asset of the account's currency; bare signal                  |
 
 ---
 
@@ -210,3 +213,4 @@ enum RowFigures {
 - 2026-10-25 — Amended by `csv-import` (#501): the reading errors of `ImportError` (IMP-010 to IMP-021), ahead of the preview command.
 - 2026-10-25 — Amended by `csv-import` (#501): `read_import_file`, `preview_import`, their types and errors (IMP-010 to IMP-038).
 - 2026-10-25 — Amended by `csv-import` (#502): `confirm_import` (IMP-050 to IMP-053).
+- 2026-10-31 — Amended by `csv-import` (#696): the events `confirm_import` publishes; saving keeps matches unchecked.

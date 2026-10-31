@@ -33,10 +33,10 @@ What reading a file through a mapping shows, nothing written (IMP-017).
 | Field    | Business meaning                                                                                                                                                                                  |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `file`   | How the file was read: its encoding, separator, decimal mark and date format, detected or chosen (IMP-011 to IMP-014, IMP-018), the date format possibly not detected (IMP-014), and its columns. |
-| `rows`   | Every import row, in the file's order; a label the mapping gives no type shows on its rows, rejected with it (IMP-022).                                                                           |
+| `rows`   | Every PreviewRow, in the file's order; a label the mapping gives no type shows on its rows, rejected with it (IMP-022).                                                                           |
 | `counts` | How many rows hold each status; a trade tax joined to its purchase counts with it (IMP-030, IMP-034).                                                                                             |
 
-### Import row (computed, never stored)
+### PreviewRow (computed, never stored)
 
 One line of the file that is not blank, once read through a mapping and judged.
 
@@ -54,7 +54,7 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 ### Reading the file (010–019)
 
-**IMP-010 — A file is read for one account (backend)**: An import reads one file for one account the user picks; only the file the user picked is read. It is rejected with a specific error when the account is unknown, and when the file cannot be read, is empty, holds a header and no row — blank lines (IMP-016) are no row —, or is larger than 10 MB.
+**IMP-010 — A file is read for one account (backend)**: An import reads one file for one account the user picks; only the file the user last picked is read. It is rejected with a specific error when the account is unknown, when the file is not the one last picked, and when the file cannot be read, is empty, holds a header and no row — blank lines (IMP-016) are no row —, or is larger than 10 MB.
 
 **IMP-011 — The encoding is detected (backend)**: A file whose bytes read as UTF-8 is read as UTF-8, its byte order mark dropped; any other file is read as Windows-1252, which reads every byte and reads an ISO-8859-1 file as written. A file read as UTF-8 by the user's choice or a saved mapping's (IMP-018, IMP-020) whose bytes are not UTF-8 is rejected with a specific error.
 
@@ -62,9 +62,9 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 **IMP-012A — How a field is read (backend)**: A field between double quotes holds the separator as text, and two double quotes inside it stand for one; a field is read trimmed. Empty fields at the end of the header, a trailing separator's among them, add no column; a line keeps every field, its empty last one included.
 
-**IMP-013 — The decimal mark is detected (backend)**: With `,` as separator the decimal mark is the dot. Otherwise it is the comma when a field of the file outside the header, trimmed, is a figure written with a comma: a sign or none, digits — their thousands separated by dots or spaces, or not separated —, a comma and one or more digits ("1.234,56", "-12,5"); the dot in any other case.
+**IMP-013 — The decimal mark is detected (backend)**: With `,` as separator the decimal mark is the dot. Otherwise it is the comma when a field of the file outside the header, trimmed, is a figure written with a comma: a sign or none, digits — their thousands separated by dots or spaces as IMP-013A groups them, or not separated —, a comma and one or more digits ("1.234,56", "-12,5"; ",5" tells nothing); the dot in any other case.
 
-**IMP-013A — How a figure is read (backend)**: A figure is read with its sign, which is then ignored (IMP-031), its decimals after the decimal mark, spaces between its thousands — a space, a no-break space or a narrow no-break space — and, with the decimal comma, dots between its thousands; any other character, a comma under the decimal dot among them ("1,234.56"), makes it a figure that does not read; it is held in micro-units, a seventh decimal rounded down (TRX-024). An empty field is no figure.
+**IMP-013A — How a figure is read (backend)**: A figure is read with its sign, which is then ignored (IMP-031), its decimals after the decimal mark — a mark with no decimals after it reads as none —, spaces between its thousands — a space, a no-break space or a narrow no-break space — and, with the decimal comma, dots between its thousands; any other character, a comma under the decimal dot among them ("1,234.56"), makes it a figure that does not read, and so does a separator that does not sit between groups of thousands — one to three digits, then groups of three, exactly one separator between two groups ("12 34" does not read, nor does a figure with two spaces in a row); a figure may have no whole part (".5"), but a sign, a mark or both alone and a figure too large for micro-units do not read; the thousands of one figure may mix those separators; it is held in micro-units, a seventh decimal rounded down (TRX-024). An empty field is no figure.
 
 **IMP-014 — The date format is detected once the date column is known (backend)**: The date format is the first of day/month/year, year-month-day and month/day/year under which every field of the date column (IMP-021) that is not empty, on the lines that are not blank, reads as a real day; the parts of a date are separated by `/`, `-` or `.`, the year has four digits, and a time after the date is ignored. When none reads all of them, or the column holds no date, it is day/month/year, said to be not detected, and the preview rejects each row whose date does not read (IMP-030).
 
@@ -72,7 +72,7 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 **IMP-016 — Blank and short lines (backend)**: A line whose fields are all empty once trimmed — a line of separators only among them — is blank and skipped. A line with fewer fields than the header is rejected in the preview, its reason naming the line; a line's fields beyond the header's are ignored.
 
-**IMP-017 — Reading and previewing write nothing (backend)**: Reading a file and previewing it write nothing: no transaction, asset, holding or mapping. The portfolio is unchanged until the user confirms (IMP-050); a mapping is written only when saved (IMP-020).
+**IMP-017 — Reading and previewing write nothing (backend)**: Reading a file and previewing it write nothing: no transaction, asset, holding or mapping. The portfolio is unchanged until the user confirms (IMP-050), but for an asset the user creates (IMP-052); a mapping is written only when saved (IMP-020).
 
 **IMP-018 — The user's choice replaces the detected one (backend)**: An encoding, separator, decimal mark or date format the user picks replaces the detected one, or the saved mapping's, and the file is read again with it; the choice is part of the mapping in use, kept when it is saved.
 
@@ -108,9 +108,13 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 **IMP-034 — A trade tax joins its purchase (backend)**: A trade-tax row is added to the fees of the purchase in the file with the same asset — the same ISIN, reference and name as read —, on the same date, of the same quantity when the tax row has one; its amount is its net amount, or its gross amount. The tax row keeps its own line in the preview, its status naming the purchase's line, and is counted and recorded with that purchase. When several purchases fit, the first in the file's order not yet holding one takes it: a purchase takes one trade tax at most, and a second tax row of the same asset, date and quantity takes the next such purchase. A trade-tax row with no such purchase is rejected — "no purchase of this asset, date and quantity in the file".
 
-**IMP-035 — Rows follow the rules of manual entry (backend)**: The ready rows are judged in date order, the file's order within one day, as each would be judged typed by hand into the account in that order, after the ready rows before it: every rule of manual entry for its type applies — among them the date (TRX-020), the asset's currency being the account's (IMP-037), a sale of nothing held on its date (SEL-012), above what is held then (SEL-021) or leaving a later transaction short (SEL-032), a sale of an archived asset (SEL-037), a dividend of an asset not held as DIV-011 states it — held today, the ready rows included, until #688 makes it held on the dividend's date —, a withdrawal above the cash (CSH-031). A row these rules refuse is rejected with the reason manual entry gives. A row already recorded (IMP-036) is not judged again: it stands among the rows before the next ones as the transaction it matches. The cash a purchase needs is the one exception (IMP-038).
+**IMP-035 — Rows follow the rules of manual entry (backend)**: The rows are judged in the order IMP-035A gives them, each as it would be typed by hand into the account in that order, after the ready rows before it: every rule of manual entry for its type applies — among them the date (TRX-020), the asset's currency being the account's (IMP-037), a sale of nothing held on its date (SEL-012), above what is held then (SEL-021) or leaving a later transaction short (SEL-032), a sale of an archived asset (SEL-037), a dividend of an asset not held as DIV-011 states it — held today, the ready rows included, until #688 makes it held on the dividend's date —, a withdrawal above the cash (CSH-031). A row these rules refuse is rejected with the reason manual entry gives. A row already recorded (IMP-036) is not judged again: it stands among the rows before the next ones as the transaction it matches. The cash a purchase needs is the one exception (IMP-038).
 
-**IMP-036 — A row already recorded is shown so (backend)**: A row is **already recorded** when the account holds a transaction of the same type, date and asset, with the same quantity and the same total amount as manual entry computes it (TRX-026 for a purchase, its trade tax included; SEL-023 for a sale) — or, for a deposit, a withdrawal and a dividend, the same amount. Two such rows in the file match two such transactions, not one. Importing the same file twice therefore shows already recorded, the second time, every row the first import recorded. Already recorded is judged before the rules of manual entry (IMP-035).
+**IMP-035A — The order of a day's rows (backend)**: The rows are judged in date order and, within one day, the inflows first — the deposits and the dividends —, then the other rows, each in the file's order. A day's own deposit therefore funds that day's purchases, and a deposit is added only for what it leaves uncovered (IMP-038). A sale is no inflow here: a purchase written before a same-day sale that would fund it still needs its deposit. A dividend on the day of a first purchase comes before it, and is rejected as DIV-011 states.
+
+**IMP-036 — A row already recorded is shown so (backend)**: A row is **already recorded** when the account holds a transaction of the same type, date and asset, with the same quantity and the same total amount as manual entry computes it (TRX-026 for a purchase, its trade tax included; SEL-023 for a sale) — or, for a deposit, a withdrawal and a dividend, the same amount. Two such rows in the file match two such transactions, not one. Importing the same file twice therefore shows already recorded, the second time, every row the first import recorded. Already recorded is judged after the currency (IMP-037), which tells two amounts apart, and before the other rules of manual entry (IMP-035).
+
+**IMP-036A — A later file's deposit row and an added deposit (backend)**: An added deposit (IMP-051) is a deposit like any other for IMP-036: a later file's deposit row of its date and amount is already recorded, so the cash is not counted twice, and the deposit stays marked as added.
 
 **IMP-037 — One currency in this version (backend)**: A row whose asset's currency, or whose own currency when the file has one, is not the account's is rejected — "another currency: record it by hand". The exchange rate is therefore always 1.
 
@@ -122,13 +126,23 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 ### Confirmation (050–059)
 
-**IMP-050 — The confirmed import records every ready row at once (backend)**: On confirmation the file is read and its rows judged again, as the preview judges them (IMP-030 to IMP-038), against the account as it is then. Every ready row is recorded, in the order IMP-035 judges them, in one write: all of them or, when the write fails, none. The import raises one `TransactionUpdated`, none when nothing is recorded. The rows rejected, of an unknown asset, already recorded or not imported are left out. The confirmation returns the rows as judged then; the ready ones are those recorded.
+**IMP-050 — The confirmed import records every ready row at once (backend)**: On confirmation the file is read and its rows judged again, as the preview judges them (IMP-030 to IMP-038), against the account as it is then. Every ready row is recorded, in the order IMP-035A gives them, in one write with the added deposits (IMP-051) and the Cash Asset (IMP-050A): all of them or, when the write fails, none. The rows rejected, of an unknown asset, already recorded or not imported are left out. The confirmation reports the rows as judged then; the ready ones are those recorded.
 
-**IMP-051 — An added deposit funds a purchase (backend)**: By default, each ready purchase the cash cannot fund (IMP-038) is recorded after a deposit of the amount the preview shows, on the purchase's date: an **Added deposit**, marked as added. The mark is part of the deposit: it is kept when the deposit is corrected and synced with it, so every device shows which deposits an import added. The user may leave the added deposits out for this import: such a purchase is then judged without one and rejected as manual entry rejects it (CSH-041).
+**IMP-050A — What a confirmation announces (backend)**: The import raises one `TransactionUpdated`, none when nothing is recorded, and `AssetUpdated` when it creates the Cash Asset of the account's currency, ensured whenever a row is recorded (CSH-010). A write that fails announces nothing.
 
-**IMP-052 — An unknown asset is settled before confirming (backend)**: The user creates the asset of an unknown-asset row from what the row read — its name, ISIN and reference, in the account's currency (IMP-037) — or matches it to an asset of the portfolio (IMP-033); the preview then judges its rows again (IMP-032). A row still of an unknown asset at the confirmation is left out (IMP-050).
+**IMP-051 — An added deposit funds a purchase (backend)**: Unless they are left out (IMP-051B), each ready purchase the cash cannot fund (IMP-038) is recorded after the deposit IMP-038 gives it as judged at the confirmation, on the purchase's date: an **Added deposit**, marked as added.
+
+**IMP-051A — The added-deposit mark stays with the deposit (backend)**: The added-deposit mark is part of the deposit: it is kept when the deposit is corrected and synced with it.
+
+**IMP-051B — The added deposits can be left out (frontend + backend)**: The added deposits are on by default; the user may leave them out for this import: such a purchase is then judged without one and rejected as manual entry rejects it (CSH-041).
+
+**IMP-052 — An unknown asset is created from its row (frontend)**: From an unknown-asset row the user opens the usual asset form, prefilled with what the row read — its name, ISIN and reference — and the account's currency; its kind, class and category are chosen there, every field stays editable, and the form's refusals hold (AST-001, AST-031, AST-032).
+
+**IMP-052A — The asset created takes its row (frontend + backend)**: The asset created from a row is matched (IMP-033) to the first the row read of its ISIN, its reference and its name, whatever was edited in the form, and the preview judges the rows again (IMP-032); created in another currency, they are rejected (IMP-037).
 
 **IMP-053 — The same file imported twice records nothing new (backend)**: Importing a file again shows already recorded every row the first import recorded (IMP-036), so nothing new is recorded and nothing is announced. An added deposit is no row of the file: its purchase being already recorded, none is added again.
+
+**IMP-054 — The journal shows an added deposit (frontend)**: On every device, an added deposit's row in the account journal shows an "Added deposit" chip in the Recorded by column, styled as the AI agent's chip, with the hover hint "Added by an import to fund a purchase" (TXL-061).
 
 ---
 
@@ -145,7 +159,7 @@ map the columns, the operation labels (IMP-021, IMP-022); the date format follow
         │                                                   ── save the mapping (IMP-020)
         ▼
 preview: each row ready / rejected / unknown asset / already recorded / not imported (IMP-030)
-        │  match an unknown asset (IMP-033) → judged again
+        │  match an unknown asset (IMP-033) or create it (IMP-052) → judged again
         ▼
 confirm: the ready rows recorded at once (IMP-050), the added deposits by default (IMP-051)
 ```
@@ -154,7 +168,7 @@ confirm: the ready rows recorded at once (IMP-050), the added deposits by defaul
 
 ## UX Draft
 
-The screens are #503 (picking the file, mapping the columns) and #504 (the preview); their mocks come with those issues. This spec's rules are the core's.
+The screens are #503 (picking the file, mapping the columns) and #504 (the preview); their mocks come with those issues. This spec's rules are the core's, but for leaving the added deposits out (IMP-051B), the prefilled asset form (IMP-052, IMP-052A) and the journal's chip (IMP-054).
 
 ---
 
@@ -167,6 +181,7 @@ The screens are #503 (picking the file, mapping the columns) and #504 (the previ
 - SYN-064 lists `ColumnMappingUpdated` among the events raised by this device's own writes (IMP-026).
 - CFR-060 does not report two column mappings left with the same name (IMP-027).
 - SYN-041 does not hold back a column mapping for an asset it matches that this device has not received (IMP-033).
+- TXL-060: a journal row carries the added-deposit mark (IMP-051). TXL-061: its Recorded by column shows the chip (IMP-054). AGT-045: that chip is not an AI agent's mark; an added deposit has no session.
 
 ---
 
@@ -175,4 +190,8 @@ The screens are #503 (picking the file, mapping the columns) and #504 (the previ
 - [x] Where does an asset come from when the file has no ISIN? — Its exact name, case and accents ignored; one matching none or two is an unknown asset, matched once and remembered by the mapping (owner, 2026-10-25).
 - [x] Is a saved mapping synced? — Yes, as accounts and assets are, the later change winning (owner, 2026-10-25).
 - [x] Where does a trade tax on its own row go? — Into the fees of the purchase of the same asset, date and quantity; one with no such purchase is rejected (owner, 2026-10-25).
-- [x] Which rules does an imported row follow? — Those of a operation typed by hand; a dividend needs the asset held on its date, which manual entry does not check yet (#688) (owner, 2026-10-25).
+- [x] Within one day, are inflows judged before purchases? — Yes: deposits and dividends first, so a day's own deposit funds its purchases (owner, 2026-10-26).
+- [x] Can a later file's deposit row match an added deposit? — Yes, by date and amount, and the mark stays (owner, 2026-10-26).
+- [x] How does the journal show an added deposit? — A chip with a hover hint in Recorded by, styled as the AI agent's chip (owner, validated with #504's mock).
+- [x] What is the asset created from a row matched to? — The strongest the row read, so a row of the same name and another ISIN does not take it; whatever was edited in the form, since the match is what the file wrote (agent, 2026-10-31; #504 builds it).
+- [x] Which rules does an imported row follow? — Those of an operation typed by hand; a dividend needs the asset held on its date, which manual entry does not check yet (#688) (owner, 2026-10-25).

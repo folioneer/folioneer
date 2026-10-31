@@ -329,25 +329,29 @@ fn read_line(
     }))
 }
 
+/// IMP-013A — digits with no separator, or one to three digits then groups of three, each
+/// after a separator of `thousands`.
+fn whole_digits(whole: &str, thousands: &[char]) -> Option<String> {
+    let groups: Vec<&str> = whole.split(thousands).collect();
+    let (first, rest) = groups.split_first()?;
+    let digits = |group: &str| group.chars().all(|c| c.is_ascii_digit());
+    let grouped = rest.is_empty()
+        || (1..=3).contains(&first.len()) && rest.iter().all(|group| group.len() == 3);
+    (grouped && groups.iter().all(|group| digits(group))).then(|| groups.concat())
+}
+
 /// IMP-013A — a figure in micro-units, its sign ignored, a seventh decimal rounded down;
 /// `None` when it does not read.
 pub fn read_figure(text: &str, decimal_mark: DecimalMark) -> Option<i64> {
     let unsigned = text.strip_prefix(['-', '+']).unwrap_or(text);
-    let (decimal, thousands) = match decimal_mark {
-        DecimalMark::Dot => ('.', None),
-        DecimalMark::Comma => (',', Some('.')),
+    let (decimal, thousands): (char, &[char]) = match decimal_mark {
+        DecimalMark::Dot => ('.', &[' ', '\u{a0}', '\u{202f}']),
+        DecimalMark::Comma => (',', &[' ', '\u{a0}', '\u{202f}', '.']),
     };
-    let digits: String = unsigned
-        .chars()
-        .filter(|c| !matches!(c, ' ' | '\u{a0}' | '\u{202f}') && Some(*c) != thousands)
-        .collect();
-    let (whole, decimals) = digits.split_once(decimal).unwrap_or((&digits, ""));
-    if whole.is_empty() && decimals.is_empty()
-        || !whole
-            .chars()
-            .chain(decimals.chars())
-            .all(|c| c.is_ascii_digit())
-    {
+    let (whole, decimals) = unsigned.split_once(decimal).unwrap_or((unsigned, ""));
+    let whole = whole_digits(whole, thousands)?;
+    let whole = whole.as_str();
+    if whole.is_empty() && decimals.is_empty() || !decimals.chars().all(|c| c.is_ascii_digit()) {
         return None;
     }
     let micro: String = decimals.chars().chain("000000".chars()).take(6).collect();
@@ -503,6 +507,30 @@ mod tests {
         assert_eq!(read_figure("1,234.56", DecimalMark::Dot), None);
         assert_eq!(read_figure("12 EUR", DecimalMark::Dot), None);
         assert_eq!(read_figure("-", DecimalMark::Dot), None);
+        assert_eq!(read_figure("12 34", DecimalMark::Dot), None);
+        assert_eq!(read_figure("12.34", DecimalMark::Comma), None);
+        assert_eq!(read_figure("1 2345,6", DecimalMark::Comma), None);
+        assert_eq!(read_figure("1234 567", DecimalMark::Dot), None);
+        assert_eq!(read_figure("1,23 4", DecimalMark::Comma), None);
+        assert_eq!(read_figure(" 123", DecimalMark::Dot), None);
+        assert_eq!(read_figure("1  234", DecimalMark::Dot), None);
+        assert_eq!(
+            read_figure("1.234 567,8", DecimalMark::Comma),
+            Some(1_234_567_800_000)
+        );
+        assert_eq!(
+            read_figure("1\u{a0}234", DecimalMark::Dot),
+            Some(1_234_000_000)
+        );
+        assert_eq!(read_figure("12,", DecimalMark::Comma), Some(12_000_000));
+        assert_eq!(
+            read_figure("1234,5", DecimalMark::Comma),
+            Some(1_234_500_000)
+        );
+        assert_eq!(
+            read_figure("1 234 567", DecimalMark::Dot),
+            Some(1_234_567_000_000)
+        );
     }
 
     // IMP-021 — a mapped column the file lacks is refused when used on that file; headers
