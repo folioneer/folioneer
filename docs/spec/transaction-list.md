@@ -12,7 +12,7 @@ The feature lives in `features/transactions/` and reads the account context. It 
 
 ## Entity Definition
 
-> This feature does not introduce a new persisted entity. It reads `Transaction` records defined in [Financial Asset Transaction](financial-asset-transaction.md). The account journal also reads the mark of a transaction an AI agent recorded, defined in [AI Agent Connection](agent-connection.md) (AGT-045).
+> This feature does not introduce a new persisted entity. It reads `Transaction` records defined in [Financial Asset Transaction](financial-asset-transaction.md). The account journal also reads the mark of a transaction an AI agent recorded, defined in [AI Agent Connection](agent-connection.md) (AGT-045). It reads the added-deposit mark, defined in [CSV Import](csv-import.md) (IMP-051).
 
 ---
 

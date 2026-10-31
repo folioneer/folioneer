@@ -138,7 +138,7 @@ One line of the file that is not blank, once read through a mapping and judged.
 
 **IMP-052 — An unknown asset is created from its row (frontend)**: From an unknown-asset row the user opens the usual asset form, prefilled with what the row read — its name, ISIN and reference — and the account's currency; its kind, class and category are chosen there, every field stays editable, and the form's refusals hold (AST-001, AST-031, AST-032).
 
-**IMP-052A — The asset created takes its row (frontend + backend)**: The asset created from a row is matched (IMP-033) to the first the row read of its ISIN, its reference and its name, whatever was edited in the form, and the preview judges the rows again (IMP-032); created in another currency, they are rejected (IMP-037).
+**IMP-052A — The asset created takes its row (frontend + backend)**: The window asks for the asset created from a row to be matched (IMP-033) to the first the row read of its ISIN, its reference and its name, whatever was edited in the form, and the preview judges the rows again (IMP-032); created in another currency, they are rejected (IMP-037).
 
 **IMP-053 — The same file imported twice records nothing new (backend)**: Importing a file again shows already recorded every row the first import recorded (IMP-036), so nothing new is recorded and nothing is announced. An added deposit is no row of the file: its purchase being already recorded, none is added again.
 
