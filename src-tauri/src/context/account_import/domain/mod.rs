@@ -6,7 +6,10 @@ pub mod import_mapper;
 pub mod row;
 
 pub use file::LARGEST_FILE;
-pub use file::{read_date, read_file, DateReading, FileLine, FileRead, ImportFile, ReadingChoices};
+pub use file::{
+    read_date, read_file, DateReading, FileLine, FileOperationLabel, FileRead, ImportFile,
+    ReadingChoices,
+};
 pub use import_mapper::{
     folded, names_a_file, new_mapper_id, AssetMatch, DateFormat, DecimalMark, Encoding,
     ImportMapper, ImportMapperDraft, ImportMapperStore, MappedColumns, MapperChoiceRepository,

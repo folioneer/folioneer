@@ -4,7 +4,7 @@
 
 Every transaction is typed by hand today, which stops anyone with years of history from starting (#369). Brokers export CSV files, and none agree on columns, separators, number and date formats or encoding. An **Account import** brings a file's rows into one account in two steps: the file is read through an **Import mapper** and previewed row by row, nothing written; then the user confirms, and the rows are recorded at once (IMP-050).
 
-This spec holds the reading, the import mapper and the preview (#501), the confirmation and the **Added deposit** (#502); the screens come with #503 and #504. The account import is a surface beside the window, the command line and the AI agent connection: any of them may start it, and its rows are judged and recorded through the same recorder as theirs, by the same rules — every transaction follows them, whatever records it (owner, 2026-10-25): the purchase (TRX), the sale (SEL), the dividend (DIV), the deposit and the withdrawal (CSH). This version starts it from the window (#503). Figures follow TRX-024. No mapper ships with the application: the user saves or adds the first. The reading rules were checked against a French broker's securities export: one file, ISO-8859-1 (read as Windows-1252, IMP-011), `;` with a trailing `;`, a decimal dot, no ISIN column, the trade tax on its own row (owner, 2026-10-25).
+This spec holds the reading, the import mapper and the preview (#501), the confirmation and the **Added deposit** (#502); the window (#503) and the preview it opens (#504). The account import is a surface beside the window, the command line and the AI agent connection: any of them may start it, and its rows are judged and recorded through the same recorder as theirs, by the same rules — every transaction follows them, whatever records it (owner, 2026-10-25): the purchase (TRX), the sale (SEL), the dividend (DIV), the deposit and the withdrawal (CSH). This version starts it from the window (#503). Figures follow TRX-024. No mapper ships with the application: the user saves or adds the first. The reading rules were checked against a French broker's securities export: one file, ISO-8859-1 (read as Windows-1252, IMP-011), `;` with a trailing `;`, a decimal dot, no ISIN column, the trade tax on its own row (owner, 2026-10-25).
 
 ---
 
@@ -30,11 +30,11 @@ How one provider's export is read, saved under that provider and reused for ever
 
 What reading a file through a mapper shows, nothing written (IMP-017).
 
-| Field    | Business meaning                                                                                                                                                                                  |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `file`   | How the file was read: its encoding, separator, decimal mark and date format, detected or chosen (IMP-011 to IMP-014, IMP-018), the date format possibly not detected (IMP-014), and its columns. |
-| `rows`   | Every PreviewRow, in the file's order; a label the mapper gives no type shows on its rows, rejected with it (IMP-022).                                                                            |
-| `counts` | How many rows hold each status; a trade tax joined to its purchase counts with it (IMP-030, IMP-034).                                                                                             |
+| Field    | Business meaning                                                                                                                                                                                                                  |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `file`   | How the file was read: its encoding, separator, decimal mark and date format, detected or chosen (IMP-011 to IMP-014, IMP-018), the date format possibly not detected (IMP-014), its columns and its operation labels (IMP-022A). |
+| `rows`   | Every PreviewRow, in the file's order; a label the mapper gives no type shows on its rows, rejected with it (IMP-022).                                                                                                            |
+| `counts` | How many rows hold each status; a trade tax joined to its purchase counts with it (IMP-030, IMP-034).                                                                                                                             |
 
 ### PreviewRow (computed, never stored)
 
@@ -90,9 +90,11 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 **IMP-020E — A saved mapper is reused (backend)**: A saved mapper picked for the next file reads it with its own separator, decimal mark, date format and encoding, none detected. The preview runs with the mapper in use, saved or not. Picking a mapper that is no longer held or no longer reads (IMP-020A) is rejected with a specific error.
 
-**IMP-021 — The columns a row needs (backend)**: A mapper names the column of each field a row reads, by its header, compared trimmed and case ignored: the date and the operation, always; the asset by one or more of its ISIN, its reference and its name, at least one; the quantity, the unit price, the gross amount, the fees, the net amount and the currency, each optional. One column may serve two fields. A mapper without the date or the operation column, or without any asset column, is rejected with a specific error when saved or used; one naming a column the file lacks is rejected with a specific error when used on that file.
+**IMP-021 — The columns a row needs (backend)**: A mapper names the column of each field a row reads, by its header, compared trimmed and case ignored: the date and the operation, always; the asset by one or more of its ISIN, its reference and its name, at least one; the quantity, the unit price, the gross amount, the fees, the net amount and the currency, each optional. One column may serve two fields. A mapper without the date or the operation column, or without any asset column, is rejected with a specific error when saved or used; one naming columns the file lacks is rejected when used on that file, with a specific error naming each of them.
 
-**IMP-022 — Each operation label has its operation type (backend)**: A mapper gives each operation label of the file, compared trimmed and case ignored, one operation type: purchase, sale, dividend, deposit, withdrawal, trade tax, or not imported — a corporate action this version leaves to record by hand. A row whose label the mapper in use gives no type is rejected with its label as reason, until the user gives it one; the type given is part of the mapper in use, kept when it is saved. A mapper's file giving one label two types reads with the first.
+**IMP-022 — Each operation label has its operation type (backend)**: A mapper gives each operation label of the file, compared trimmed and case ignored, one operation type: purchase, sale, dividend, deposit, withdrawal, trade tax, or not imported — a corporate action this version leaves to record by hand. A row whose label the mapper in use gives no type is rejected with its label as reason, until the user gives it one; a row whose operation field is empty is rejected the same way, with an empty label, and no type can be given to it. The type given is part of the mapper in use, kept when it is saved, and so are the types of labels the file in use does not hold. A mapper's file giving one label two types reads with the first.
+
+**IMP-022A — The labels a file holds (backend)**: Once the operation column is known, reading a file tells each label that column holds, compared trimmed and case ignored and written as first met, with how many rows hold it, in the order the file first holds them. An empty field is no label. A column the file lacks tells no label and refuses nothing at reading; IMP-021 refuses it when the mapper is used.
 
 **IMP-024 — A mapper's provider (backend)**: A provider empty once trimmed is rejected with a specific error, and so is a provider another mapper holds, case and accents ignored — a provider being set, not one the mapper already holds (IMP-027). A provider is stored trimmed.
 
@@ -154,6 +156,22 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 ---
 
+### The window (060–069)
+
+**IMP-060 — The window opens from the account (frontend)**: The live view of an account's details, even one holding nothing, has an Import action in its header, absent from a past date's view. Each opening starts from picking a file, nothing of the last opening kept; a dialog closed unpicked changes nothing.
+
+**IMP-061 — A new mapper is filled in the window (frontend)**: With no mapper preselected, the window shows the file's format as read, each to change (IMP-018); a select per field of IMP-021, listing the file's columns; each label of the file with its count and a select of operation types (IMP-022, IMP-022A); and the provider, to save the mapper with (IMP-024). A saved mapper says so; a refused one says why. A file that cannot be read shows why and only its format, so that it can be changed.
+
+**IMP-062 — A saved mapper is checked at once (frontend)**: A saved mapper in use, preselected (IMP-020D) or picked, is run on the file straight away. The preselected one names the folder it was remembered for. A file it reads says it matches, the form folded behind Edit the mapper; another refusal is shown, and Edit the mapper stays offered.
+
+**IMP-063 — A file a saved mapper does not match (frontend)**: A file lacking columns the mapper in use needs shows an alert naming them, each once (IMP-021), and Preview is disabled, until the user picks another mapper, starts a new one or chooses another file. That mapper's form is not opened over the file.
+
+**IMP-064 — A mapper file refused (frontend)**: A file that cannot be added as a mapper (IMP-020B) shows an alert with the reason and disables Preview until the next change in the window; the mapper in use stays as it was. A dialog closed unpicked changes nothing.
+
+**IMP-065 — Preview (frontend)**: Preview runs the preview with the mapper in use, saved or not (IMP-030), and says how many rows hold each status. A refusal is shown and disables it until the next change. While the window works, its action shows it.
+
+---
+
 ## Workflow
 
 ```
@@ -176,7 +194,7 @@ confirm: the ready rows recorded at once (IMP-050), the added deposits by defaul
 
 ## UX Draft
 
-The screens are #503 (picking the file, mapping the columns) and #504 (the preview); their mocks come with those issues. This spec's rules are the core's, but for leaving the added deposits out (IMP-051B), the preselected mapper (IMP-020D), the prefilled asset form (IMP-052, IMP-052A) and the journal's chip (IMP-054).
+**Entry point:** the Import action of the account details header (IMP-060). **Main component:** `AccountImportModal`. **States:** picking a file, new mapper, remembered mapper, file not matching, mapper file refused (IMP-060 to IMP-065). **Flow:** pick a file → the mapper → Preview. Mock: [folioneer-design/503](https://github.com/folioneer/folioneer-design/tree/main/503). The preview itself is #504, with its mock.
 
 ---
 

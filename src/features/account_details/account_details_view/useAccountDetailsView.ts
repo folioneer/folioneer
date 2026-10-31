@@ -86,6 +86,7 @@ export function useAccountDetailsView(accountId: string) {
   const [sellTarget, setSellTarget] = useState<SellTarget | null>(null);
   const [historyTarget, setHistoryTarget] = useState<HoldingDetail | null>(null);
   const [openBalanceOpen, setOpenBalanceOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const [withdrawalOpen, setWithdrawalOpen] = useState(false);
   const [dividendOpen, setDividendOpen] = useState(false);
@@ -157,6 +158,12 @@ export function useAccountDetailsView(accountId: string) {
     setOpenBalanceOpen(false);
     data.retry();
   }, [data]);
+
+  const handleImportOpen = useCallback(() => {
+    if (isAsOf) return;
+    setImportOpen(true);
+  }, [isAsOf]);
+  const handleImportClose = useCallback(() => setImportOpen(false), []);
 
   const handleDepositOpen = useCallback(() => {
     if (isAsOf) return;
@@ -467,6 +474,7 @@ export function useAccountDetailsView(accountId: string) {
     sellTarget,
     historyTarget,
     openBalanceOpen,
+    importOpen,
     depositOpen,
     withdrawalOpen,
     dividendOpen,
@@ -490,6 +498,8 @@ export function useAccountDetailsView(accountId: string) {
     handlePriceHistory,
     handleHistoryClose,
     handleOpenBalanceOpen,
+    handleImportOpen,
+    handleImportClose,
     handleOpenBalanceClose,
     handleOpenBalanceSuccess,
     handleDepositOpen,

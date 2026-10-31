@@ -3,6 +3,7 @@ use crate::context::account_import::error::AccountImportError;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use std::collections::HashMap;
 
 /// IMP-010 — the largest file an import reads, in bytes.
 pub const LARGEST_FILE: u64 = 10 * 1024 * 1024;
@@ -10,8 +11,9 @@ pub const LARGEST_FILE: u64 = 10 * 1024 * 1024;
 /// IMP-012 — how many lines after the header the separator is detected on.
 const DETECTION_LINES: usize = 20;
 
-/// IMP-018 — what the user picked instead of the detected format, and the date column the
-/// date format is detected on (IMP-014). Each left out is detected.
+/// IMP-018 — what the user picked instead of the detected format, each left out detected; the
+/// date column the date format is detected on (IMP-014); the operation column whose labels are
+/// told (IMP-022A), never detected: left out, or one the file lacks, it tells no label.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(deny_unknown_fields)]
 pub struct ReadingChoices {
@@ -25,6 +27,17 @@ pub struct ReadingChoices {
     pub date_format: Option<DateFormat>,
     /// The header of the date column, once mapped (IMP-021).
     pub date_column: Option<String>,
+    /// The header of the operation column, once mapped (IMP-022A).
+    pub operation_column: Option<String>,
+}
+
+/// IMP-022A — a label the operation column holds, and how many rows hold it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct FileOperationLabel {
+    /// The label, written as first met.
+    pub label: String,
+    /// How many rows hold it, case ignored.
+    pub rows: u32,
 }
 
 /// The date format a file is read with, and whether it was detected (IMP-014).
@@ -52,6 +65,8 @@ pub struct FileRead {
     pub columns: Vec<String>,
     /// How many lines after the header are not blank.
     pub rows: u32,
+    /// The labels of the operation column, once it is known; empty before (IMP-022A).
+    pub operation_labels: Vec<FileOperationLabel>,
 }
 
 /// One line of the file after its header that is not blank (IMP-016).
@@ -147,6 +162,11 @@ pub fn read_file(
         }),
         (None, None) => None,
     };
+    let operation_labels = choices
+        .operation_column
+        .as_deref()
+        .and_then(|column| file.column(column))
+        .map_or_else(Vec::new, |position| operation_labels(&file, position));
     let read = FileRead {
         encoding,
         separator,
@@ -154,8 +174,33 @@ pub fn read_file(
         date_reading,
         columns: named,
         rows: u32::try_from(file.lines.len()).unwrap_or(u32::MAX),
+        operation_labels,
     };
     Ok((file, read))
+}
+
+/// IMP-022A — the labels of the column at `position`, in the order the file first holds them.
+fn operation_labels(file: &ImportFile, position: usize) -> Vec<FileOperationLabel> {
+    let mut labels: Vec<FileOperationLabel> = Vec::new();
+    let mut seen: HashMap<String, usize> = HashMap::new();
+    let fields = file
+        .lines
+        .iter()
+        .filter_map(|line| line.fields.get(position))
+        .filter(|field| !field.is_empty());
+    for field in fields {
+        let index = *seen.entry(field.to_lowercase()).or_insert_with(|| {
+            labels.push(FileOperationLabel {
+                label: field.clone(),
+                rows: 0,
+            });
+            labels.len() - 1
+        });
+        if let Some(held) = labels.get_mut(index) {
+            held.rows = held.rows.saturating_add(1);
+        }
+    }
+    labels
 }
 
 /// IMP-011 — the file's text: UTF-8 when its bytes are, its byte order mark dropped,
@@ -548,5 +593,25 @@ mod tests {
         );
         assert_eq!(read.columns.len(), 10);
         assert_eq!(file.lines[0].fields[1], "Achat Comptant");
+    }
+
+    // IMP-022A — each label once, as first met, with its rows; no label before the column is
+    // known or from an empty field.
+    #[test]
+    fn imp_022a_the_file_tells_its_labels() {
+        let bytes = b"Date;Op\n01/02/2024;Buy\n02/02/2024;SELL\n03/02/2024; buy \n04/02/2024;\n";
+        let (_, unknown) = read_file(bytes, &ReadingChoices::default()).expect("read");
+        assert!(unknown.operation_labels.is_empty());
+        let choices = ReadingChoices {
+            operation_column: Some("op".to_string()),
+            ..ReadingChoices::default()
+        };
+        let (_, read) = read_file(bytes, &choices).expect("read");
+        let labels: Vec<(&str, u32)> = read
+            .operation_labels
+            .iter()
+            .map(|label| (label.label.as_str(), label.rows))
+            .collect();
+        assert_eq!(labels, [("Buy", 2), ("SELL", 1)]);
     }
 }

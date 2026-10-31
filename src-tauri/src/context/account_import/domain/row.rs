@@ -157,15 +157,39 @@ struct Located<'a> {
     currency: Option<usize>,
 }
 
-/// IMP-021 — the position of every mapped column, a column the file lacks refused.
+/// IMP-021 — the position of every mapped column; the columns the file lacks refused, all named.
 fn locate<'a>(
     columns: &'a MappedColumns,
     file: &ImportFile,
 ) -> Result<Located<'a>, AccountImportError> {
+    let mapped = [
+        Some(&columns.date),
+        Some(&columns.operation),
+        columns.isin.as_ref(),
+        columns.reference.as_ref(),
+        columns.name.as_ref(),
+        columns.quantity.as_ref(),
+        columns.unit_price.as_ref(),
+        columns.gross_amount.as_ref(),
+        columns.fees.as_ref(),
+        columns.net_amount.as_ref(),
+        columns.currency.as_ref(),
+    ];
+    let mut lacking: Vec<String> = Vec::new();
+    for name in mapped.into_iter().flatten() {
+        let name = name.trim();
+        if file.column(name).is_none()
+            && !lacking
+                .iter()
+                .any(|seen| seen.to_lowercase() == name.to_lowercase())
+        {
+            lacking.push(name.to_string());
+        }
+    }
     let find = |name: &str| {
         file.column(name)
-            .ok_or_else(|| AccountImportError::MappedColumnNotInFile {
-                column: name.trim().to_string(),
+            .ok_or_else(|| AccountImportError::MappedColumnsNotInFile {
+                columns: lacking.clone(),
             })
     };
     let optional = |name: &Option<String>| name.as_deref().map(find).transpose();
@@ -550,8 +574,18 @@ mod tests {
         let refused = read_rows(&file, &mapped, &labels(), DOT_DAY_FIRST);
         assert!(matches!(
             refused,
-            Err(AccountImportError::MappedColumnNotInFile { column }) if column == "libellé"
+            Err(AccountImportError::MappedColumnsNotInFile { columns }) if columns == ["libellé", "Qté", "Prix", "Brut", "Courtage", "Net", "Devise"]
         ));
+    }
+
+    // IMP-022 — an empty operation field is rejected the same way, with an empty label.
+    #[test]
+    fn imp_022_an_empty_operation_field_is_rejected() {
+        let read = rows("X;;03/01/2024;1;1;1;0;1;EUR;\n");
+        assert_eq!(
+            read[0],
+            RowRead::Rejected(RowRejection::OperationTypeMissing { label: "".into() })
+        );
     }
 
     // IMP-022 — a label without a type is rejected with it; a not-imported label is so.

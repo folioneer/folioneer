@@ -2,6 +2,7 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   ChevronDown,
   Coins,
+  FileUp,
   Gift,
   Percent,
   PlusCircle,
@@ -25,6 +26,7 @@ import { IconButton } from "@/ui/components/button/IconButton";
 import { WarningChip } from "@/ui/components/chip/WarningChip";
 import { FAB } from "@/ui/components/fab/FAB";
 import { DateField } from "@/ui/components/field/DateField";
+import { AccountImportModal } from "../account_import/AccountImportModal";
 import { BuyTransactionModal } from "../buy_transaction/BuyTransactionModal";
 import { DepositTransactionModal } from "../deposit_transaction/DepositTransactionModal";
 import { DividendTransactionModal } from "../dividend_transaction/DividendTransactionModal";
@@ -245,6 +247,17 @@ export function AccountDetailsView() {
                       onClick={view.handleOpenBalanceOpen}
                       aria-label={t("account_details.action_open_balance")}
                       title={t("account_details.action_open_balance")}
+                    />
+                    {/* IMP — Import a file into this account */}
+                    <IconButton
+                      id="add-menu-import"
+                      shape="square"
+                      size="lg"
+                      variant="tonal"
+                      icon={<FileUp size={20} />}
+                      onClick={view.handleImportOpen}
+                      aria-label={t("account_details.action_import")}
+                      title={t("account_details.action_import")}
                     />
                     {/* DIV-010 — Record dividend */}
                     <IconButton
@@ -584,6 +597,15 @@ export function AccountDetailsView() {
           holding={view.historyTarget}
           accountId={accountId}
           priceableAssets={view.priceableAssets}
+        />
+      )}
+
+      {/* IMP — Mounted only while open: each opening starts from picking a file. */}
+      {view.importOpen && (
+        <AccountImportModal
+          onClose={view.handleImportClose}
+          accountId={accountId}
+          accountName={view.summary?.accountName ?? ""}
         />
       )}
 

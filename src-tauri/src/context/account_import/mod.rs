@@ -16,8 +16,8 @@ pub mod infrastructure;
 pub use api::*;
 pub use application::AccountImportService;
 pub use domain::{
-    folded, read_file, read_rows, AssetRead, DateReading, FileRead, OperationRead, ReadingChoices,
-    RowFigures, RowFormat, RowRead, RowRejection, LARGEST_FILE,
+    folded, read_file, read_rows, AssetRead, DateReading, FileOperationLabel, FileRead,
+    OperationRead, ReadingChoices, RowFigures, RowFormat, RowRead, RowRejection, LARGEST_FILE,
 };
 pub use domain::{
     AssetMatch, DateFormat, DecimalMark, Encoding, ImportMapper, ImportMapperDraft,

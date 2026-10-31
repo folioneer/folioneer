@@ -590,6 +590,7 @@ describe("useAccountDetailsView — as-of read-only mode", () => {
     act(() => result.current.handleDepositOpen());
     act(() => result.current.handleWithdrawalOpen());
     act(() => result.current.handleOpenBalanceOpen());
+    act(() => result.current.handleImportOpen());
     act(() =>
       result.current.handleBuyOpen({
         accountName: "Main",
@@ -616,6 +617,7 @@ describe("useAccountDetailsView — as-of read-only mode", () => {
     expect(result.current.depositOpen).toBe(false);
     expect(result.current.withdrawalOpen).toBe(false);
     expect(result.current.openBalanceOpen).toBe(false);
+    expect(result.current.importOpen).toBe(false);
     expect(result.current.buyTarget).toBeNull();
     expect(result.current.sellTarget).toBeNull();
   });
