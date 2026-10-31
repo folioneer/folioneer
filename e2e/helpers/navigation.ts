@@ -75,6 +75,7 @@ export async function closeSettings(): Promise<void> {
  */
 export async function navigateToSync(): Promise<void> {
   await openSettingsSection("sync");
+  // Open sync closes the dialog on its way to the page.
   const openSync = await $("#settings-open-sync");
   await openSync.waitForExist({ timeout: 10000 });
   await openSync.click();
