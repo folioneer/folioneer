@@ -37,6 +37,13 @@ describe("scheduledFetchErrorToI18n", () => {
   });
 
   // SPF-013 — OS schedule removal failure
+  // SPF-073 — with no External provider chosen.
+  it("maps NoExternalProvider to the shared i18n key", () => {
+    expect(scheduledFetchErrorToI18n({ code: "NoExternalProvider" })).toEqual({
+      key: "error.NoExternalProvider",
+    });
+  });
+
   it("maps ScheduleRemovalFailed to its flat i18n key (SPF-013)", () => {
     const error: ScheduledFetchError = { code: "ScheduleRemovalFailed" };
     expect(scheduledFetchErrorToI18n(error)).toEqual({

@@ -1262,11 +1262,28 @@ async backfillHoldingPriceHistory(accountId: string, assetId: string) : Promise<
 }
 },
 /**
- * Reports what this build can do, so the interface renders only what it permits
- * (MKT-211). Infallible: the value is managed before any window exists.
+ * Reports what can run now, so the interface renders only what it permits (MKT-211).
+ * Infallible: both values are managed before any window exists.
  */
 async getCapabilities() : Promise<Capabilities> {
     return await TAURI_INVOKE("get_capabilities");
+},
+/**
+ * The External provider chosen on this computer, and what the build offers (MKT-214).
+ */
+async getPriceProviderChoice() : Promise<PriceProviderChoice> {
+    return await TAURI_INVOKE("get_price_provider_choice");
+},
+/**
+ * Chooses an External provider on this computer, or none (MKT-214).
+ */
+async setPriceProviderChoice(chosen: string | null) : Promise<Result<PriceProviderChoice, PriceProviderChoiceError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_price_provider_choice", { chosen }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 },
 /**
  * AGT-036 — the setting, who asks to connect and who is connected. Infallible: it reads
@@ -1377,8 +1394,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
+export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 
 /** user-defined types **/
 
@@ -2625,15 +2642,14 @@ account_id: string;
  */
 transaction_id: string }
 /**
- * What the interface is told about this build: what it can do and which distribution
- * channel it belongs to (MKT-211, UPD-030). Settled
- * at composition and constant for the run.
+ * What the interface is told: whether this computer has an External provider chosen, and
+ * which distribution channel the build belongs to (MKT-211, UPD-030).
  */
 export type Capabilities = { 
 /**
- * Whether this build has an External provider. Without one no fetch task, no
- * scheduled fetch and no price history backfill exists (MKT-210), and the
- * interface offers none of them (MKT-212).
+ * Whether an External provider is chosen on this computer. Without one no fetch task,
+ * no scheduled fetch and no price history backfill runs (MKT-210), and the interface
+ * offers none of them (MKT-212).
  */
 external_provider: boolean; 
 /**
@@ -3615,6 +3631,10 @@ export type FetchPriceTask =
  * No active holdings with a derivable provider symbol found in scope (MKT-111).
  */
 { code: "NoFetchableHoldings" } | 
+/**
+ * No External provider is chosen on this computer (MKT-210).
+ */
+{ code: "NoExternalProvider" } | 
 /**
  * Catch-all for unexpected runtime failures not attributable to a specific BC.
  */
@@ -5028,6 +5048,10 @@ export type PriceHistoryBackfillTask =
  */
 { code: "TickerNotResolved" } | 
 /**
+ * No External provider is chosen on this computer (MKT-210).
+ */
+{ code: "NoExternalProvider" } | 
+/**
  * A daily-close request failed; nothing was recorded (MKT-195).
  */
 { code: "ProviderUnreachable" }
@@ -5123,6 +5147,30 @@ movement_amount: number | null;
  * holdings (MKT-151) never set it.
  */
 incomplete: boolean }
+/**
+ * MKT-214 — the External provider chosen on this computer, and what the build offers.
+ */
+export type PriceProviderChoice = { 
+/**
+ * The id chosen; `None` is off.
+ */
+chosen: string | null; 
+/**
+ * The ids on offer.
+ */
+offered: string[] }
+/**
+ * Refusals of `set_price_provider_choice` (MKT-214).
+ */
+export type PriceProviderChoiceError = 
+/**
+ * This build does not offer that External provider.
+ */
+{ code: "NotOffered" } | 
+/**
+ * The choice could not be kept on this computer; nothing changed.
+ */
+{ code: "NotSaved" }
 /**
  * Flat wire-facing error enum for `backfill_currency_rate_history`
  * (FXR-110/114).
@@ -5544,6 +5592,10 @@ export type ScheduledFetchError =
  * The OS schedule could not be removed (SPF-013).
  */
 { code: "ScheduleRemovalFailed" } | 
+/**
+ * No External provider is chosen on this computer (SPF-073).
+ */
+{ code: "NoExternalProvider" } | 
 /**
  * An unexpected database error occurred.
  */

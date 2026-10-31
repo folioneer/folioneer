@@ -2,7 +2,7 @@
 
 ## Context
 
-The Market Price feature allows users to record the current market value of a financial asset manually. Automated prices slot into the same data model when the build has an External provider (MKT-210).
+The Market Price feature allows users to record the current market value of a financial asset manually. Automated prices slot into the same data model when an External provider is chosen on this computer (MKT-210, MKT-214).
 
 A price is recorded per asset (not per holding) and is timestamped: multiple entries can accumulate over time, one per date per asset. The Account Details view uses the most recently dated price to display the current value, unrealized gain/loss, and performance percentage for each active holding.
 
@@ -73,11 +73,11 @@ Why this device's last fetch could not price one asset (MKT-220, MKT-221). Devic
 
 ### Capabilities
 
-What the interface is told about this build: what it can do and which distribution channel it belongs to (MKT-211). A read model, settled when the application starts and constant for the run; never persisted.
+What the interface is told: whether an External provider is chosen on this computer, and which distribution channel the build belongs to (MKT-211). A read model, asked again after the choice changes; never persisted.
 
 | Field                  | Business meaning                                                                                                                                     |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `external_provider`    | Whether this build has an External provider; without one no fetch task, price history backfill or scheduled fetch exists (MKT-210).                  |
+| `external_provider`    | Whether an External provider is chosen on this computer; without one no fetch task, price history backfill or scheduled fetch runs (MKT-210).        |
 | `distribution_channel` | The distribution channel the build belongs to — its name, as the build reports it — named beside its version; absent for the public build (UPD-030). |
 
 ### HoldingDetail (extended)
@@ -280,7 +280,7 @@ This section extends the buy/sell transaction flow defined in `docs/spec/financi
 
 These rules apply to all paths that write `AssetPrice` (manual entry MKT-020+, transaction auto-record MKT-050+, auto-fetch — see "Auto-Fetch from External Provider" — the price history backfill MKT-190+, and an AI agent's recording MKT-103).
 
-**MKT-100 — `AssetPriceSource` enum (backend)**: `AssetPrice.source` is of type `AssetPriceSource`, with variants `Manual | YahooFinance | Agent`. Exposed on the frontend wire surface. (`YahooFinance` is written by a Yahoo Finance provider — the owner's private build; the public build has none, MKT-210. The former `Stooq` / `Finnhub` variants are removed.)
+**MKT-100 — `AssetPriceSource` enum (backend)**: `AssetPrice.source` is of type `AssetPriceSource`, with variants `Manual | YahooFinance | Agent`. Exposed on the frontend wire surface. (`YahooFinance` is written by the Yahoo Finance provider, once a computer chooses it, MKT-214. The former `Stooq` / `Finnhub` variants are removed.)
 
 **MKT-101 — `source: Manual` on user-driven paths (backend)**: Every user-driven write sets `source = Manual` — both `record_asset_price` (manual entry MKT-020+, transaction auto-record MKT-050+) and `update_asset_price` (price-history edit MKT-083, MKT-084). An auto-fetched row edited via the price-history flow therefore becomes `Manual`. The frontend never passes a source value.
 
@@ -292,7 +292,7 @@ These rules apply to all paths that write `AssetPrice` (manual entry MKT-020+, t
 
 ### Auto-Fetch from External Provider (110–149)
 
-This section adds an automated price-update mechanism that complements the existing manual entry paths (MKT-020+, MKT-050+). Auto-fetch retrieves current prices from an External provider on app launch and on user demand. Which External provider a build plugs in is decided by its extension file ([ADR-020](../adr/020-one-extension-file-per-build.md)): the public build has none (MKT-210); the owner's private build uses the keyless Yahoo Finance `/v8/finance/chart/` JSON endpoint, whose conventions the rules below follow.
+This section adds an automated price-update mechanism that complements the existing manual entry paths (MKT-020+, MKT-050+). Auto-fetch retrieves current prices from an External provider on app launch and on user demand. The External providers a build offers are decided by its extension file ([ADR-024](../adr/024-the-public-build-offers-a-list-of-price-providers.md)), and each computer chooses one or none (MKT-214). The public build offers the keyless Yahoo Finance `/v8/finance/chart/` JSON endpoint, whose conventions the rules below follow.
 
 #### Fetch task definitions
 
@@ -452,7 +452,7 @@ The header tells how recent the portfolio's prices are, and each holding whether
 
 **MKT-201 — Last fetch on this device (backend)**: The application keeps, as device-local data that is never synced (SYN-023), the moment this device last fetched prices: the end of an in-app fetch task (MKT-122, MKT-130, MKT-132) that priced at least one asset (MKT-119 `ok > 0`), or the execution of a scheduled download (SPF-050) that updated at least one asset, whichever is later. A task or a run that priced nothing — nothing in scope, provider unreachable, every asset skipped — leaves the moment unchanged. An in-app task records the moment before it announces its completion (MKT-119). A device that ran scheduled downloads before this record existed starts from its last successful one; a device that has never fetched has no such moment.
 
-**MKT-202 — Header display (frontend)**: The header shows, on every view and whether or not sync is enabled, "Prices as of" the newest price date (MKT-200) with its own icon; the item's tooltip tells when this device last fetched prices (MKT-201), or that it never did — except in a build with no External provider, where the item has no tooltip and says nothing about fetching (MKT-212). With no newest price date the item says that no price is recorded yet. The item is absent until its figures have been read, and stays absent when the read fails.
+**MKT-202 — Header display (frontend)**: The header shows, on every view and whether or not sync is enabled, "Prices as of" the newest price date (MKT-200) with its own icon; the item's tooltip tells when this device last fetched prices (MKT-201), or that it never did — except with no External provider chosen, where the item has no tooltip and says nothing about fetching (MKT-212). With no newest price date the item says that no price is recorded yet. The item is absent until its figures have been read, and stays absent when the read fails.
 
 **MKT-203 — Reactivity (frontend)**: The header item reads its two figures when the application starts, and again after a fetch task completes (`AssetPriceFetchCompleted`), after a price is recorded outside a fetch task (`AssetPriceUpdated`, ignored while a fetch task runs — MKT-181), after a transaction changes what is held (`TransactionUpdated`), and after a sync applied changes (`SyncCompleted`). A scheduled download runs outside the application and raises no event in it: when it runs while the application is open, the item shows its result at the next of these events or at the next start.
 
@@ -466,15 +466,17 @@ The header tells how recent the portfolio's prices are, and each holding whether
 
 ### Without an External provider (210–219)
 
-A build may be composed without an External provider ([ADR-020](../adr/020-one-extension-file-per-build.md)); the public build is composed without one since TODO-038, for the reasons recorded in [`external-dependencies.md`](../external-dependencies.md). Prices typed by hand, or recorded by an AI agent the owner allowed (MKT-103), are then the only prices, and the application must read as complete rather than as one with a broken half.
+A computer has no External provider until it chooses one ([ADR-024](../adr/024-the-public-build-offers-a-list-of-price-providers.md)), for the reasons recorded in [`external-dependencies.md`](../external-dependencies.md). Prices typed by hand, or recorded by an AI agent the owner allowed (MKT-103), are then the only prices, and the application must read as complete rather than as one with a broken half.
 
-**MKT-210 — A build may have no External provider (backend)**: The External provider is optional at composition. A build composed without one has no fetch task — no auto-fetch (MKT-121/122), no global refresh (MKT-130), no account refresh (MKT-131/132) — and no price history backfill (MKT-190). Starting any of them is refused before any work is done: nothing is fetched, nothing is written, and no moment of last fetch is recorded (MKT-201). The scheduled fetch follows the same rule (SPF-070).
+**MKT-210 — A computer may have no External provider (backend)**: With no External provider chosen (MKT-214) no fetch task runs — no auto-fetch (MKT-121/122), no global refresh (MKT-130), no account refresh (MKT-131/132) — and no price history backfill (MKT-190). Starting any of them is refused before any work is done: no request leaves the computer, nothing is written, and no moment of last fetch is recorded (MKT-201). The scheduled fetch follows the same rule (SPF-070).
 
-**MKT-211 — Answers about the build, settled at start (backend)**: The application reports to its interface whether this build has an External provider, together with its distribution channel (UPD-030). The External provider answer governs every fetch task, the price history backfill and the scheduled fetch alike. These answers are settled when the application starts and do not change while it runs.
+**MKT-211 — What the interface is told (backend)**: The application reports to its interface whether an External provider is chosen on this computer, together with the distribution channel of the build (UPD-030). The External provider answer governs every fetch task, the price history backfill and the scheduled fetch alike. It changes when the choice does (MKT-214), and the interface asks again then; the channel is settled when the application starts.
 
-**MKT-212 — The interface offers nothing that cannot run (frontend)**: In a build with no External provider (MKT-211) the interface renders no control that starts a fetch task, no price history backfill action on a holding or a closed position, and no typed-by-hand toggle (MKT-153), which only matters to a fetch; a price already typed by hand still says so (MKT-158). The Settings page shows no auto-fetch setting (MKT-120) and no scheduled fetch section (SPF-071), and the application starts no auto-fetch (MKT-121). Nothing is greyed out and nothing mentions a feature to come: the controls are absent. The header's price item (MKT-202) keeps "Prices as of" the newest price date — prices typed by hand are recorded prices — and has no tooltip: it says nothing about fetching.
+**MKT-212 — The interface offers nothing that cannot run (frontend)**: With no External provider chosen (MKT-211) the interface renders no control that starts a fetch task, no price history backfill action on a holding or a closed position, and no typed-by-hand toggle (MKT-153), which only matters to a fetch; a price already typed by hand still says so (MKT-158). The Settings page shows no auto-fetch setting (MKT-120) and no scheduled fetch section (SPF-071), and the application starts no auto-fetch (MKT-121). Nothing is greyed out and nothing mentions a feature to come: the controls are absent. The header's price item (MKT-202) keeps "Prices as of" the newest price date — prices typed by hand are recorded prices — and has no tooltip: it says nothing about fetching.
 
 **MKT-213 — What remains, and what cannot be reached (frontend + backend)**: Everything computed from prices already recorded is unchanged, and so is recording a price by hand (MKT-020) and editing its history (MKT-070). What answers a fetch task cannot be reached, since none runs: the manual fill of unpriced assets (MKT-172), the fetch progress in the shell (MKT-180), the fetch-outcome snackbar (MKT-145) and the price-movement report (PMV-010). Exchange rates are unaffected: they refresh on their own, at launch (FXR-075) and through "Update rates" (FXR-110).
+
+**MKT-214 — Each computer chooses its External provider (backend)**: A build offers a list of External providers, written in its code (the public build: Yahoo Finance; never a user's or a community's file). Each computer chooses one or none, and none is the default. The choice is kept on this computer and never synced; what it holds that the build no longer offers counts as none. A new choice holds at once, without a restart, and only the chosen provider is called. The stored auto-fetch and scheduled fetch settings are untouched by the choice (SPF-070). Refused: a provider the build does not offer, and a choice that could not be saved, which changes nothing.
 
 ---
 

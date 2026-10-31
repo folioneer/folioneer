@@ -19,6 +19,9 @@ pub enum FetchPriceTask {
     /// No active holdings with a derivable provider symbol found in scope (MKT-111).
     #[error("No fetchable holdings in scope")]
     NoFetchableHoldings,
+    /// No External provider is chosen on this computer (MKT-210).
+    #[error("No price provider is chosen on this computer")]
+    NoExternalProvider,
     /// Catch-all for unexpected runtime failures not attributable to a specific BC.
     #[error("Unexpected error")]
     UnknownError,

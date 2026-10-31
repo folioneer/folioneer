@@ -1,9 +1,8 @@
-//! What this build can do, decided at composition and read by the interface (MKT-211).
+//! What can run now, read by the interface (MKT-211).
 //!
-//! No orchestrator: there is nothing to coordinate. The answer is a property of how the
-//! application was composed (`extensions.rs`, ADR-020), settled before the first window
-//! opens and constant for the run, so `api.rs` returns the value the composition root
-//! managed rather than computing one.
+//! No orchestrator: there is nothing to coordinate. `api.rs` answers from the build's
+//! channel, which the composition root managed, and from the External provider chosen on
+//! this computer (MKT-214), which the interface reads again when it changes.
 
 /// Tauri commands of the capabilities use case.
 #[cfg(feature = "app")]

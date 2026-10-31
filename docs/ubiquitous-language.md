@@ -511,7 +511,7 @@ Recording every missed trading-day close since the last successful scheduled fet
 
 ### External provider
 
-A third-party HTTP service that returns current asset prices and their daily-close history, with no credential asked of the user. A build may have none, and then holds only prices typed by hand — the public build has none.
+A third-party HTTP service that returns current asset prices and their daily-close history, with no credential asked of the user. A build offers a list of them and each computer chooses one or none; with none it holds only prices typed by hand or recorded by an agent.
 
 > Status: confirmed
 

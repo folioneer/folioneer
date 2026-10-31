@@ -7,6 +7,7 @@ use crate::context::account::AccountServiceContract;
 use crate::context::asset::{AssetServiceContract, PriceProvider};
 use crate::context::currency::CurrencyService;
 use crate::shared::infrastructure::scheduler::DailyFetchScheduler;
+use crate::use_cases::price_provider_choice::FetchScheduleFollower;
 use crate::use_cases::shared::price_fetch_failures::{
     PriceFetchFailureReason, PriceFetchFailureRepository,
 };
@@ -518,10 +519,21 @@ pub fn backfill_window(
     (from, today)
 }
 
-/// SPF-070 — a build with no External provider owns no scheduled fetch: it registers
-/// none, and removes one a build that had a provider left with the operating system,
-/// so nothing wakes up to fetch what cannot be fetched. The stored configuration is
-/// untouched, so a build that regains a provider honours it again (SPF-015).
+#[async_trait::async_trait]
+impl FetchScheduleFollower for ScheduledFetchOrchestrator {
+    async fn follow(&self, on: bool) {
+        if on {
+            self.self_heal().await;
+        } else {
+            drop_schedule_without_provider(self.scheduler.as_ref()).await;
+        }
+    }
+}
+
+/// SPF-070 — with no External provider chosen, a computer owns no scheduled fetch: it
+/// registers none, and removes one left with the operating system, so nothing wakes up to
+/// fetch what cannot be fetched. The stored configuration is untouched, so choosing a
+/// provider again honours it (SPF-015).
 ///
 /// Failures are logged, never surfaced: this runs at start-up, and a schedule that
 /// could not be removed is retried at the next one.

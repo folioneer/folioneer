@@ -47,6 +47,8 @@ export function fetchPriceErrorToI18n(
       return { key: "mkt.fetch_already_running", severity: "info" };
     case "NoFetchableHoldings":
       return { key: "mkt.fetch_no_holdings", severity: "info" };
+    case "NoExternalProvider":
+      return { key: "error.NoExternalProvider", severity: "info" };
     case "AccountNotFound":
       return { key: "error.AccountNotFound", severity: "error" };
     case "NameAlreadyExists":

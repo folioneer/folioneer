@@ -166,7 +166,7 @@ This feature does not add fields to `HoldingDetail`; it changes the **conditions
 
 **FXR-074 — CurrencyRateUpdated on fetch success (backend)**: Every rate the launch rate refresh writes publishes `CurrencyRateUpdated` (FXR-026); "Update rates" publishes it once, when it wrote at least one rate.
 
-**FXR-075 — Launch rate refresh (frontend + backend)**: Every start of the interface, once the application is initialised, records the latest published rate of every persisted pair (FXR-071). The headless scheduled run is not a start of the interface; it records rates itself (SPF-035). The launch refresh runs in every build, whether or not it has an External provider (MKT-210), and whatever the auto-fetch setting (MKT-120), which governs prices only. It is silent: nothing is shown, and a failure leaves the stored rates as they were (FXR-070, FXR-073).
+**FXR-075 — Launch rate refresh (frontend + backend)**: Every start of the interface, once the application is initialised, records the latest published rate of every persisted pair (FXR-071). The headless scheduled run is not a start of the interface; it records rates itself (SPF-035). The launch refresh runs whether or not an External provider is chosen (MKT-210), and whatever the auto-fetch setting (MKT-120), which governs prices only. It is silent: nothing is shown, and a failure leaves the stored rates as they were (FXR-070, FXR-073).
 
 **FXR-077 — Price fetch tasks carry no rate (backend)**: The fetch tasks (MKT-122, MKT-130, MKT-132) fetch prices only; no rate is fetched, and no pair is followed, by any of them. Rates refresh through FXR-075, FXR-110 and the scheduled fetch (SPF-035).
 

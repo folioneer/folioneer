@@ -1291,6 +1291,7 @@
     "DateInFuture": "La date ne peut pas être dans le futur.",
     "InvalidDateFormat": "Format de date invalide — attendu AAAA-MM-JJ.",
     "PriceNotFound": "L'enregistrement de prix est introuvable.",
+    "NoExternalProvider": "Aucune source de prix n'est choisie sur cet ordinateur.",
     "AccountNotFound": "Compte introuvable.",
     "TransactionNotFound": "Transaction introuvable.",
     "AssetNotFound": "Actif introuvable.",

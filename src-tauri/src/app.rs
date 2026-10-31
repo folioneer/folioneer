@@ -45,9 +45,12 @@ use crate::use_cases::portfolio_sync::{
 use crate::use_cases::price_fetch_failures::PriceFetchFailuresUseCase;
 use crate::use_cases::price_freshness::PriceFreshnessUseCase;
 use crate::use_cases::price_history_backfill::PriceHistoryBackfillUseCase;
+use crate::use_cases::price_provider_choice::chosen::choice_file;
+use crate::use_cases::price_provider_choice::{
+    ChosenPriceProvider, FetchScheduleFollower, PriceProviderChoiceUseCase,
+};
 use crate::use_cases::rate_history_backfill::RateHistoryBackfillUseCase;
 use crate::use_cases::rate_refresh::RateRefreshUseCase;
-use crate::use_cases::scheduled_fetch::orchestrator::drop_schedule_without_provider;
 use crate::use_cases::scheduled_fetch::{
     ScheduledFetchOrchestrator, SqliteScheduledFetchRepository,
 };
@@ -152,6 +155,12 @@ pub fn run() {
             tauri::async_runtime::block_on(async move {
                 // UPD-018 / UPD-035 — tell the window, which stays open to show the error screen
                 let agent_data_dir = dirs.local_data_dir.clone();
+                // MKT-214 — read before the database opens; a failed open still has it.
+                let price_choice_file = choice_file(&dirs.local_data_dir);
+                let chosen_price_provider = Arc::new(ChosenPriceProvider::of(
+                    providers.price,
+                    Some(&dirs.local_data_dir),
+                ));
                 let mappers_folder = dirs.local_data_dir.join("import-mappers");
                 let db = match Database::new(dirs.local_data_dir).await {
                     Ok(db) => Arc::new(db),
@@ -193,7 +202,6 @@ pub fn run() {
                         .with_run(Arc::clone(&sync_run))
                         .with_event_bus(Arc::clone(&event_bus)),
                 );
-                let price_provider = providers.price;
                 let AppContainer {
                     account_service,
                     asset_service,
@@ -354,14 +362,15 @@ pub fn run() {
                 )));
 
                 // MKT-211, UPD-030 — what the interface is told about this build.
-                app_handle.manage(Capabilities::of_build(
-                    price_provider.is_some(),
+                app_handle.manage(Capabilities::of(
+                    chosen_price_provider.is_on(),
                     extensions::distribution_channel(),
                 ));
                 // MKT-210, SPF-070 — what fetches prices.
                 manage_price_fetching(
                     &app_handle,
-                    price_provider,
+                    chosen_price_provider,
+                    price_choice_file,
                     PriceFetchingParts {
                         pool: db.pool.clone(),
                         account_service: account_service.clone(),
@@ -440,20 +449,16 @@ struct PriceFetchingParts {
     price_fetch_failures: Arc<dyn PriceFetchFailureRepository>,
 }
 
-/// MKT-210, SPF-070 — the three paths that fetch prices exist only with an External
-/// provider. Without one no fetching use case is managed, so no command reaches a
-/// half-built one, and a scheduled fetch a build with a provider registered is taken away.
+/// MKT-210, SPF-070 — the three paths that fetch prices, all through the provider this
+/// computer chose. With none chosen their commands refuse, and a scheduled fetch left with
+/// the operating system is taken away; choosing one brings it back (MKT-214).
 fn manage_price_fetching<R: tauri::Runtime>(
     app_handle: &tauri::AppHandle<R>,
-    price_provider: Option<Arc<dyn PriceProvider>>,
+    chosen: Arc<ChosenPriceProvider>,
+    choice_file: PathBuf,
     parts: PriceFetchingParts,
 ) {
-    let Some(price_provider) = price_provider else {
-        tauri::async_runtime::spawn(async {
-            drop_schedule_without_provider(platform_scheduler().as_ref()).await;
-        });
-        return;
-    };
+    let price_provider: Arc<dyn PriceProvider> = Arc::clone(&chosen) as Arc<dyn PriceProvider>;
     let PriceFetchingParts {
         pool,
         account_service,
@@ -505,12 +510,20 @@ fn manage_price_fetching<R: tauri::Runtime>(
         .with_fetch_log(price_fetch_log)
         .with_fetch_failures(price_fetch_failures),
     );
-    // SPF-015 — verify/repair the OS schedule against the stored configuration on every
-    // app start; failures are logged, never surfaced.
-    let self_heal_orchestrator = Arc::clone(&scheduled_fetch_orchestrator);
+    // SPF-015, SPF-070 — verify/repair the OS schedule against the stored configuration on
+    // every app start, or take it away with no provider chosen; failures are logged, never
+    // surfaced.
+    let start_follower = Arc::clone(&scheduled_fetch_orchestrator);
+    let on = chosen.is_on();
     tauri::async_runtime::spawn(async move {
-        self_heal_orchestrator.self_heal().await;
+        start_follower.follow(on).await;
     });
+    app_handle.manage(Arc::new(PriceProviderChoiceUseCase::new(
+        Arc::clone(&chosen),
+        choice_file,
+        Arc::clone(&scheduled_fetch_orchestrator) as Arc<dyn FetchScheduleFollower>,
+    )));
+    app_handle.manage(chosen);
     app_handle.manage(scheduled_fetch_orchestrator);
 
     // MKT-190 — price history backfill of one holding.
@@ -581,6 +594,7 @@ fn create_app_dirs(app: &tauri::AppHandle) -> anyhow::Result<AppDirectories> {
 mod tests {
     use super::*;
     use crate::context::asset::MockPriceProvider;
+    use crate::use_cases::price_provider_choice::{OfferedPriceProvider, PriceProviders};
 
     async fn parts() -> PriceFetchingParts {
         let pool = sqlx::sqlite::SqlitePoolOptions::new()
@@ -610,36 +624,110 @@ mod tests {
         }
     }
 
-    // MKT-210 — without an External provider no fetching use case exists, so no command
-    // can reach one.
-    #[tokio::test]
-    async fn a_build_without_an_external_provider_manages_no_fetching_use_case() {
-        let app = tauri::test::mock_app();
-
-        manage_price_fetching(app.handle(), None, parts().await);
-
-        assert!(app.try_state::<Arc<AssetPriceFetchUseCase>>().is_none());
-        assert!(app.try_state::<Arc<ScheduledFetchOrchestrator>>().is_none());
-        assert!(app
-            .try_state::<Arc<PriceHistoryBackfillUseCase>>()
-            .is_none());
+    fn offering_one(default: Option<&'static str>) -> Arc<ChosenPriceProvider> {
+        // A mock with no expectation panics if a fetch reaches it.
+        Arc::new(ChosenPriceProvider::of(
+            PriceProviders {
+                offered: vec![OfferedPriceProvider {
+                    id: "first",
+                    provider: Arc::new(MockPriceProvider::new()),
+                }],
+                default,
+            },
+            None,
+        ))
     }
 
-    // MKT-210 — with one, the three fetching paths exist.
-    #[tokio::test]
-    async fn a_build_with_an_external_provider_manages_the_three_fetching_use_cases() {
+    async fn managed(chosen: Arc<ChosenPriceProvider>) -> tauri::App<tauri::test::MockRuntime> {
         let app = tauri::test::mock_app();
+        let file = tempfile::tempdir().expect("folder").keep().join("choice");
+        manage_price_fetching(app.handle(), chosen, file, parts().await);
+        app
+    }
 
-        manage_price_fetching(
-            app.handle(),
-            Some(Arc::new(MockPriceProvider::new())),
-            parts().await,
-        );
+    fn code_of(error: impl serde::Serialize) -> String {
+        serde_json::to_value(error).expect("serialized")["code"]
+            .as_str()
+            .expect("code")
+            .to_string()
+    }
 
-        assert!(app.try_state::<Arc<AssetPriceFetchUseCase>>().is_some());
-        assert!(app.try_state::<Arc<ScheduledFetchOrchestrator>>().is_some());
-        assert!(app
-            .try_state::<Arc<PriceHistoryBackfillUseCase>>()
-            .is_some());
+    // MKT-210, SPF-073 — with no provider chosen, every path that fetches is refused before
+    // any work: the mock would panic, and the account named does not even exist.
+    #[tokio::test]
+    async fn with_no_provider_chosen_every_fetching_command_is_refused() {
+        let app = managed(offering_one(None)).await;
+        const REFUSED: &str = "NoExternalProvider";
+
+        let error = crate::use_cases::asset_price_fetch::fetch_all_asset_prices(
+            app.state(),
+            app.state(),
+            crate::use_cases::asset_price_fetch::FetchTrigger::Manual,
+        )
+        .await
+        .expect_err("refused");
+        assert_eq!(code_of(error), REFUSED);
+        let error = crate::use_cases::asset_price_fetch::fetch_account_asset_prices(
+            app.state(),
+            app.state(),
+            "nobody".to_string(),
+        )
+        .await
+        .expect_err("refused");
+        assert_eq!(code_of(error), REFUSED);
+        let error = crate::use_cases::price_history_backfill::backfill_holding_price_history(
+            app.state(),
+            app.state(),
+            "nobody".to_string(),
+            "nothing".to_string(),
+        )
+        .await
+        .expect_err("refused");
+        assert_eq!(code_of(error), REFUSED);
+        let error = crate::use_cases::scheduled_fetch::configure_scheduled_fetch(
+            app.state(),
+            app.state(),
+            true,
+            "08:00".to_string(),
+        )
+        .await
+        .expect_err("refused");
+        assert_eq!(code_of(error), REFUSED);
+        let error =
+            crate::use_cases::scheduled_fetch::get_scheduled_fetch_status(app.state(), app.state())
+                .await
+                .expect_err("refused");
+        assert_eq!(code_of(error), REFUSED);
+    }
+
+    // MKT-211 — the answer the interface reads follows the choice, without a restart.
+    #[tokio::test]
+    async fn the_capabilities_follow_the_choice() {
+        let chosen = offering_one(None);
+        let app = managed(Arc::clone(&chosen)).await;
+        app.manage(Capabilities::of(false, None));
+
+        let answer = crate::use_cases::capabilities::get_capabilities(app.state(), app.state());
+        assert!(!answer.external_provider);
+        chosen.choose(Some("first"));
+        let answer = crate::use_cases::capabilities::get_capabilities(app.state(), app.state());
+        assert!(answer.external_provider);
+    }
+
+    // MKT-214 — the three fetching paths and the choice exist on or off, so choosing a
+    // provider needs no restart.
+    #[tokio::test]
+    async fn the_fetching_use_cases_exist_on_or_off() {
+        for default in [None, Some("first")] {
+            let app = managed(offering_one(default)).await;
+
+            assert!(app.try_state::<Arc<AssetPriceFetchUseCase>>().is_some());
+            assert!(app.try_state::<Arc<ScheduledFetchOrchestrator>>().is_some());
+            assert!(app
+                .try_state::<Arc<PriceHistoryBackfillUseCase>>()
+                .is_some());
+            assert!(app.try_state::<Arc<PriceProviderChoiceUseCase>>().is_some());
+            assert!(app.try_state::<Arc<ChosenPriceProvider>>().is_some());
+        }
     }
 }

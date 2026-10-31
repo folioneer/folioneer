@@ -16,6 +16,9 @@ pub enum PriceHistoryBackfillTask {
     /// or it serves no close over a held period of 7 days or more (MKT-196).
     #[error("No price history found for this asset's ticker")]
     TickerNotResolved,
+    /// No External provider is chosen on this computer (MKT-210).
+    #[error("No price provider is chosen on this computer")]
+    NoExternalProvider,
     /// A daily-close request failed; nothing was recorded (MKT-195).
     #[error("The price provider could not be reached")]
     ProviderUnreachable,

@@ -4,6 +4,8 @@
 use std::sync::Arc;
 use tauri::State;
 
+use crate::use_cases::price_provider_choice::ChosenPriceProvider;
+
 use super::error::ScheduledFetchError;
 use super::orchestrator::ScheduledFetchOrchestrator;
 use super::repository::ScheduledFetchStatus;
@@ -15,9 +17,13 @@ use super::repository::ScheduledFetchStatus;
 #[specta::specta]
 pub async fn configure_scheduled_fetch(
     uc: State<'_, Arc<ScheduledFetchOrchestrator>>,
+    chosen: State<'_, Arc<ChosenPriceProvider>>,
     enabled: bool,
     trigger_time: String,
 ) -> Result<(), ScheduledFetchError> {
+    if !chosen.is_on() {
+        return Err(ScheduledFetchError::NoExternalProvider);
+    }
     uc.configure(enabled, trigger_time).await
 }
 
@@ -27,6 +33,10 @@ pub async fn configure_scheduled_fetch(
 #[specta::specta]
 pub async fn get_scheduled_fetch_status(
     uc: State<'_, Arc<ScheduledFetchOrchestrator>>,
+    chosen: State<'_, Arc<ChosenPriceProvider>>,
 ) -> Result<ScheduledFetchStatus, ScheduledFetchError> {
+    if !chosen.is_on() {
+        return Err(ScheduledFetchError::NoExternalProvider);
+    }
     uc.status().await
 }

@@ -32,7 +32,7 @@ command_line/        the command line (CLI): an interface beside the shell, call
 agent_connection/    the agent connection (AGT, ADR-023): the `--mcp` bridge, which holds no data, the local channel,
                      the owner's consent and the tools the running application serves to an agent
 ../cli/main.rs       `folioneer-cli`, the command line as a console program (installed beside the main one on Windows)
-extensions.rs        the one file a build differs by: external data sources and update channel (ADR-020)
+extensions.rs        the one file a build differs by: external data sources, the price providers offered (ADR-024) and update channel (ADR-020)
 main.rs              entry point; `--scheduled-fetch` runs the daily download, `holding …` a command (CLI), `--mcp` the
                      agent bridge (AGT), all without a window
 ```

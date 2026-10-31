@@ -17,6 +17,9 @@ pub enum ScheduledFetchError {
     /// The OS schedule could not be removed (SPF-013).
     #[error("Failed to remove the daily schedule from the operating system")]
     ScheduleRemovalFailed,
+    /// No External provider is chosen on this computer (SPF-073).
+    #[error("No price provider is chosen on this computer")]
+    NoExternalProvider,
     /// An unexpected database error occurred.
     #[error("An unexpected database error occurred")]
     DatabaseError,

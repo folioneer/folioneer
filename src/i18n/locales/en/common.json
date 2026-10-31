@@ -1291,6 +1291,7 @@
     "DateInFuture": "Date cannot be in the future.",
     "InvalidDateFormat": "Invalid date format — expected YYYY-MM-DD.",
     "PriceNotFound": "The price record was not found.",
+    "NoExternalProvider": "No price source is chosen on this computer.",
     "AccountNotFound": "Account not found.",
     "TransactionNotFound": "Transaction not found.",
     "AssetNotFound": "Asset not found.",

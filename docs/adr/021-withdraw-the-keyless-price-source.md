@@ -1,7 +1,7 @@
 # ADR 021 — Withdraw the keyless price source decision
 
 **Date**: 2026-09-27
-**Status**: Accepted — supersedes ADR-017
+**Status**: Superseded by ADR-024
 
 ## Context
 
