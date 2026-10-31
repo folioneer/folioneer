@@ -62,7 +62,10 @@ impl ChosenPriceProvider {
             None => providers.default,
             Some(Err(error)) if error.kind() == std::io::ErrorKind::NotFound => providers.default,
             // A file that cannot be read is no choice to act on: off, not the default.
-            Some(Err(_)) => None,
+            Some(Err(error)) => {
+                tracing::warn!(target: BACKEND, err = %error, "price provider choice unreadable: off");
+                None
+            }
             Some(Ok(content)) => match content.trim() {
                 OFF => None,
                 id => providers

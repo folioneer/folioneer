@@ -53,7 +53,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-014 — Local time and DST (backend)**: The trigger time is a local wall-clock time in the machine's timezone. Daylight-saving shifts do not change the wall-clock trigger.
 
-**SPF-015 — Self-heal on app start (backend)**: On every app start — except with no External provider chosen (SPF-070) — when the configuration is enabled, the OS schedule is verified and silently repaired if missing or stale (e.g. the application moved after an update). When disabled, a leftover schedule is silently removed.
+**SPF-015 — Self-heal on app start and on choosing a provider (backend)**: On every app start — except with no External provider chosen (SPF-070) — and whenever a provider is chosen (MKT-214), when the configuration is enabled, the OS schedule is verified and silently repaired if missing or stale (e.g. the application moved after an update). When disabled, a leftover schedule is silently removed.
 
 **SPF-016 — No resident presence (backend)**: Outside its brief daily execution, nothing runs and nothing is visible — no tray icon, no background service, no window.
 

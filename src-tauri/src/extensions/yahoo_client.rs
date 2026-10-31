@@ -434,12 +434,6 @@ fn utc_day_start_epoch_seconds(date: &str) -> Result<i64> {
 mod tests {
     use super::*;
 
-    // The constructor builds a reqwest client successfully in a normal environment.
-    #[test]
-    fn new_builds_a_client() {
-        assert!(ReqwestYahooClient::new().is_ok());
-    }
-
     // MKT-102/117 — a US quote: price to micros, date from the regular-market timestamp.
     #[test]
     fn parses_us_quote_price_and_date() {

@@ -46,6 +46,10 @@ mod tests {
             json!({ "code": "ScheduleRemovalFailed" })
         );
         assert_eq!(
+            to_value(ScheduledFetchError::NoExternalProvider).unwrap(),
+            json!({ "code": "NoExternalProvider" })
+        );
+        assert_eq!(
             to_value(ScheduledFetchError::DatabaseError).unwrap(),
             json!({ "code": "DatabaseError" })
         );

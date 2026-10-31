@@ -76,6 +76,10 @@ mod tests {
                 PriceHistoryBackfillTask::ProviderUnreachable,
                 "ProviderUnreachable",
             ),
+            (
+                PriceHistoryBackfillTask::NoExternalProvider,
+                "NoExternalProvider",
+            ),
         ] {
             let composite: PriceHistoryBackfillError = task.into();
             assert_eq!(to_value(&composite).unwrap(), json!({ "code": code }));
