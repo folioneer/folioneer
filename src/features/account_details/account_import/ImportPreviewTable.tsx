@@ -27,16 +27,10 @@ interface ImportPreviewTableProps {
   currency: string;
   /** IMP-067 — an unknown asset's status opens its step; a row reading nothing does not. */
   onUnknown?: (line: number) => void;
-  fundingNote: (amount: string) => string;
 }
 
 /** The rows of the file as judged (IMP-066), in the file's order. */
-export function ImportPreviewTable({
-  rows,
-  currency,
-  onUnknown,
-  fundingNote,
-}: ImportPreviewTableProps) {
+export function ImportPreviewTable({ rows, currency, onUnknown }: ImportPreviewTableProps) {
   const { t, i18n } = useTranslation();
   const dash = "—";
   return (
@@ -57,7 +51,9 @@ export function ImportPreviewTable({
           const status = messageText(t, row.status) ?? "";
           const note =
             row.funding !== null
-              ? fundingNote(moneyOf(row.funding, currency, i18n.language))
+              ? t("account_import.note_funding", {
+                  amount: moneyOf(row.funding, currency, i18n.language),
+                })
               : messageText(t, row.note);
           return (
             <tbody key={row.line} id={`account-import-row-${row.line}`}>

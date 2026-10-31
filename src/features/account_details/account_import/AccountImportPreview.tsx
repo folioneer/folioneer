@@ -78,11 +78,7 @@ function UnknownAssetStep({
           {t("account_import.action_create_asset")}
         </Button>
       </div>
-      <ImportPreviewTable
-        rows={step.focusedRows}
-        currency={accountCurrency}
-        fundingNote={(amount) => t("account_import.note_funding", { amount })}
-      />
+      <ImportPreviewTable rows={step.focusedRows} currency={accountCurrency} />
     </div>
   );
 }
@@ -172,12 +168,7 @@ export function AccountImportPreview({
               {messageText(t, problem)}
             </p>
           )}
-          <ImportPreviewTable
-            rows={step.rows}
-            currency={accountCurrency}
-            onUnknown={step.focus}
-            fundingNote={(amount) => t("account_import.note_funding", { amount })}
-          />
+          <ImportPreviewTable rows={step.rows} currency={accountCurrency} onUnknown={step.focus} />
           {preview.deposits.count > 0 && (
             <label
               htmlFor="account-import-add-deposits"
