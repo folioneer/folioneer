@@ -489,7 +489,7 @@ A computer has no External provider until it chooses one ([ADR-024](../adr/024-t
 
 **MKT-215 — The interface offers the choice (frontend)**: The Prices section of Settings offers none and each External provider the build offers. A provider becomes the choice only once a checkbox acknowledges its notice: an unofficial source, used from this computer, under its terms, for personal use, that may stop at any time. None is saved at once, with no notice. A refused choice (MKT-214) is shown as an error and the choice stays as it was.
 
-**MKT-216 — A choice being saved (frontend)**: While a choice is being saved the section says so, and the list and the checkbox cannot change.
+**MKT-216 — The choice being read or saved (frontend)**: While the choice is being read or saved the section says so; while it is saved, the list and the checkbox cannot change. A read that fails is said in place of the list; the rest of Settings stays usable.
 
 **MKT-217 — With a provider chosen (frontend)**: Once a choice is saved the interface asks again what it was told (MKT-211). With a provider chosen the settings of MKT-120 and SPF-010 appear, and the section recalls what the source is and that a failed fetch keeps the last price, judged outdated (MKT-205).
 
