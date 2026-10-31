@@ -28,10 +28,8 @@ vi.mock("./scheduled_fetch/ScheduledFetchSection", () => ({
 vi.mock("./reference_currency/ReferenceCurrencySection", () => ({
   ReferenceCurrencySection: () => <div data-testid="reference-currency-section-mounted" />,
 }));
-vi.mock("./sync/SyncSummary", () => ({
-  SyncSummary: ({ onLeave }: { onLeave: () => void }) => (
-    <button type="button" data-testid="sync-summary-mounted" onClick={onLeave} />
-  ),
+vi.mock("./sync/SyncSection", () => ({
+  SyncSection: () => <div data-testid="sync-section-mounted" />,
 }));
 vi.mock("./agent_connection/AgentsAllowedSetting", () => ({
   AgentsAllowedSetting: () => <div data-testid="agents-allowed-mounted" />,
@@ -112,16 +110,20 @@ describe("SettingsDialog", () => {
     expect(element("settings-section-agents")).toBeInTheDocument();
   });
 
-  it("closes from its button, and when Sync leaves for its page", () => {
+  it("holds the whole of sync in its Sync section", () => {
+    render(<SettingsDialog isOpen onClose={vi.fn()} />);
+
+    open("settings-section-sync");
+
+    expect(screen.getByTestId("sync-section-mounted")).toBeInTheDocument();
+  });
+
+  it("closes from its button", () => {
     const onClose = vi.fn();
     render(<SettingsDialog isOpen onClose={onClose} />);
 
     open("settings-close");
     expect(onClose).toHaveBeenCalledTimes(1);
-
-    open("settings-section-sync");
-    fireEvent.click(screen.getByTestId("sync-summary-mounted"));
-    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   it("reopens on General", () => {

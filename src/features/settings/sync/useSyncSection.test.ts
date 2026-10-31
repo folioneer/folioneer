@@ -19,7 +19,7 @@ vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 
 // 2. Import mocked modules for typed access
 import * as gateway from "../gateway";
-import { useSyncPage } from "./useSyncPage";
+import { useSyncSection } from "./useSyncSection";
 
 function makeSyncStatus(overrides: Partial<SyncStatusView> = {}): SyncStatusView {
   return {
@@ -64,7 +64,7 @@ function makeSyncReport(overrides: Partial<SyncReportView> = {}): SyncReportView
   };
 }
 
-describe("useSyncPage — load status on mount (SYN-063)", () => {
+describe("useSyncSection — load status on mount (SYN-063)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -72,19 +72,19 @@ describe("useSyncPage — load status on mount (SYN-063)", () => {
   it("is loading before the status call resolves", () => {
     vi.mocked(gateway.getSyncStatus).mockReturnValue(new Promise(() => {}));
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
 
     expect(result.current.isLoading).toBe(true);
   });
 
-  // SYN-063 — the page carries the health the core states with the status, as it is.
+  // SYN-063 — the section carries the health the core states with the status, as it is.
   it("carries the health the core states", async () => {
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({
       status: "ok",
       data: makeSyncStatus({ health: "needs_attention" }),
     });
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.health).toBe("needs_attention");
@@ -103,7 +103,7 @@ describe("useSyncPage — load status on mount (SYN-063)", () => {
       }),
     });
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.enabled).toBe(false);
@@ -112,7 +112,7 @@ describe("useSyncPage — load status on mount (SYN-063)", () => {
   it("loads the enabled status with device name, folder and roster", async () => {
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.enabled).toBe(true);
@@ -129,14 +129,14 @@ describe("useSyncPage — load status on mount (SYN-063)", () => {
       error: { code: "DatabaseError" },
     });
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.loadError).toEqual({ key: "sync.errors.DatabaseError" });
   });
 });
 
-describe("useSyncPage — Sync now (SYN-061)", () => {
+describe("useSyncSection — Sync now (SYN-061)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
@@ -145,7 +145,7 @@ describe("useSyncPage — Sync now (SYN-061)", () => {
   it("calls syncNow and re-renders status from report.status on success", async () => {
     vi.mocked(gateway.syncNow).mockResolvedValue({ status: "ok", data: makeSyncReport() });
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
@@ -163,7 +163,7 @@ describe("useSyncPage — Sync now (SYN-061)", () => {
       data: makeSyncReport({ status: makeSyncStatus({ health: "needs_attention" }) }),
     });
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.health).toBe("up_to_date");
 
@@ -182,7 +182,7 @@ describe("useSyncPage — Sync now (SYN-061)", () => {
       }),
     );
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     act(() => {
@@ -200,7 +200,7 @@ describe("useSyncPage — Sync now (SYN-061)", () => {
       error: { code: "SyncPaused" },
     });
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
@@ -211,7 +211,7 @@ describe("useSyncPage — Sync now (SYN-061)", () => {
   });
 });
 
-describe("useSyncPage — pause / resume (SYN-070/073)", () => {
+describe("useSyncSection — pause / resume (SYN-070/073)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
@@ -223,7 +223,7 @@ describe("useSyncPage — pause / resume (SYN-070/073)", () => {
       data: makeSyncStatus({ paused: true }),
     });
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
@@ -244,7 +244,7 @@ describe("useSyncPage — pause / resume (SYN-070/073)", () => {
       data: makeSyncReport({ status: makeSyncStatus({ paused: false }) }),
     });
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.paused).toBe(true);
 
@@ -257,7 +257,7 @@ describe("useSyncPage — pause / resume (SYN-070/073)", () => {
   });
 });
 
-describe("useSyncPage — rename device / change folder (SYN-072/074)", () => {
+describe("useSyncSection — rename device / change folder (SYN-072/074)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
@@ -269,7 +269,7 @@ describe("useSyncPage — rename device / change folder (SYN-072/074)", () => {
       data: makeSyncStatus({ device_name: "Laptop" }),
     });
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
@@ -286,7 +286,7 @@ describe("useSyncPage — rename device / change folder (SYN-072/074)", () => {
       data: makeSyncStatus({ folder: "/home/user/new-sync" }),
     });
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
@@ -305,7 +305,7 @@ describe("useSyncPage — rename device / change folder (SYN-072/074)", () => {
       error: { code: "InstallationHoldsUserData" },
     } as never);
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     const before = result.current.folder;
 
@@ -318,7 +318,7 @@ describe("useSyncPage — rename device / change folder (SYN-072/074)", () => {
   });
 });
 
-describe("useSyncPage — moving to a folder that holds no portfolio (SYN-074)", () => {
+describe("useSyncSection — moving to a folder that holds no portfolio (SYN-074)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
@@ -334,7 +334,7 @@ describe("useSyncPage — moving to a folder that holds no portfolio (SYN-074)",
       status: "ok",
       data: { problem: null, holds_portfolio: false },
     } as never);
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     let accepted = true;
@@ -361,7 +361,7 @@ describe("useSyncPage — moving to a folder that holds no portfolio (SYN-074)",
       status: "ok",
       data: { problem: null, holds_portfolio: false },
     } as never);
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
@@ -375,7 +375,7 @@ describe("useSyncPage — moving to a folder that holds no portfolio (SYN-074)",
   // SYN-075 — a folder that could not be read goes to the change, which says why.
   it("changes to a folder that could not be read without asking", async () => {
     vi.mocked(gateway.inspectSyncFolder).mockRejectedValue(new Error("no core"));
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
@@ -391,7 +391,7 @@ describe("useSyncPage — moving to a folder that holds no portfolio (SYN-074)",
       status: "ok",
       data: { problem: null, holds_portfolio: true },
     } as never);
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
@@ -402,14 +402,14 @@ describe("useSyncPage — moving to a folder that holds no portfolio (SYN-074)",
   });
 });
 
-describe("useSyncPage — leave sync confirmation (SYN-071/082)", () => {
+describe("useSyncSection — leave sync confirmation (SYN-071/082)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(gateway.getSyncStatus).mockResolvedValue({ status: "ok", data: makeSyncStatus() });
   });
 
   it("does not call leaveSync until confirmed", async () => {
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     act(() => result.current.requestLeave());
@@ -421,7 +421,7 @@ describe("useSyncPage — leave sync confirmation (SYN-071/082)", () => {
   it("calls leaveSync only after confirmLeave", async () => {
     vi.mocked(gateway.leaveSync).mockResolvedValue({ status: "ok", data: null });
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     act(() => result.current.requestLeave());
@@ -434,7 +434,7 @@ describe("useSyncPage — leave sync confirmation (SYN-071/082)", () => {
   });
 
   it("cancelLeave dismisses the confirmation without calling leaveSync", async () => {
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     act(() => result.current.requestLeave());
@@ -446,7 +446,7 @@ describe("useSyncPage — leave sync confirmation (SYN-071/082)", () => {
   it("handleBrowseFolder returns the picked path (SYN-074)", async () => {
     vi.mocked(gateway.pickSyncFolder).mockResolvedValue("/media/phil/KEY/Folioneer");
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     let picked: string | null = null;
@@ -461,7 +461,7 @@ describe("useSyncPage — leave sync confirmation (SYN-071/082)", () => {
   it("handleBrowseFolder passes a cancelled picker through as null (SYN-074)", async () => {
     vi.mocked(gateway.pickSyncFolder).mockResolvedValue(null);
 
-    const { result } = renderHook(() => useSyncPage());
+    const { result } = renderHook(() => useSyncSection());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     let picked: string | null = "unchanged";

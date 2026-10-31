@@ -31,7 +31,7 @@
  *   precondition-guard error variant (`AlreadyEnabled`, `SyncPaused`, `NotPaused`, …) —
  *   see `PortfolioSyncOrchestrator`'s and `SyncService`'s inline `#[cfg(test)]` modules
  *   and the Tier-3 two-device integration test. This E2E scenario locks in the one thing
- *   only a real running app can prove: the sync page's enable → status → sync now
+ *   only a real running app can prove: the Sync section's enable → status → sync now
  *   → pause → resume → rename → leave chain genuinely reaches `enable_sync` /
  *   `sync_now` / `pause_sync` / `resume_sync` / `rename_sync_device` / `leave_sync` /
  *   `get_sync_status` on the real Rust backend, and that the backend actually writes the
@@ -47,13 +47,13 @@
  *     GTK dialog WebDriver cannot drive; the folder is always typed directly in this file.
  *   - `change_sync_folder` (SYN-074) and conflict notices (SYN-066) — no scenario in the
  *     single-device chain naturally produces a second folder or a conflict; both are
- *     fully covered by BE Tier 1/2 and the FE `useSyncPage.test.ts` /
+ *     fully covered by BE Tier 1/2 and the FE `useSyncSection.test.ts` /
  *     `NoticeList.test.tsx` mocked-gateway tests.
  *   - SYN-017 (honest-positioning copy) and the no-recovery/metadata-exposure notes
- *     (SYN-053/054) — the paragraphs carrying this copy in `SyncPage.tsx` and
+ *     (SYN-053/054) — the paragraphs carrying this copy in `SyncSection.tsx` and
  *     `EnableSyncModal.tsx` have no stable `id` (they are plain `<p>{t(...)}</p>` nodes).
  *     E1-E4 forbid a text/aria-label selector, so this rule has no locale-invariant E2E
- *     surface; it is exercised by `SyncPage.test.tsx` / `EnableSyncModal.test.tsx`,
+ *     surface; it is exercised by `SyncSection.test.tsx` / `EnableSyncModal.test.tsx`,
  *     which can assert translated text directly. Not a missing-helper gap — adding an
  *     `id` to those paragraphs is a frontend source change, out of this writer's scope.
  *   - `SyncFailure` rendering (SYN-034/035/069/084), inconsistent holdings (SYN-040),
@@ -61,7 +61,7 @@
  *     enabled device with an always-available folder and no other device publishing
  *     concurrently; these require the join/two-device setup this file cannot drive.
  *   - The shell `SyncIndicator` (`#sync-indicator`) — it reads the same `SyncStatus`
- *     already exercised through `SyncPage`; asserting it too would duplicate
+ *     already exercised through `SyncSection`; asserting it too would duplicate
  *     coverage without proving anything new about the IPC round trip.
  *
  * Seed strategy:
@@ -89,7 +89,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $, browser } from "@wdio/globals";
 import { dismissLeftoverModal } from "../helpers/modal";
-import { navigateToSync } from "../helpers/navigation";
+import { closeSettings, navigateToSync } from "../helpers/navigation";
 import { setReactInputValue } from "../helpers/react";
 import { captureScreen } from "../helpers/screenshot";
 import { seedAccount } from "../helpers/seed";
@@ -231,7 +231,7 @@ describe("sync", () => {
     await modal.waitForExist({ timeout: 20000, reverse: true });
     const statusBlock = await $("#sync-status");
     await statusBlock.waitForExist({ timeout: 10000 });
-    await captureScreen("sync-page");
+    await captureScreen("sync-section");
 
     // -----------------------------------------------------------------
     // Step 5 — The one thing only a real run can prove: the backend wrote
@@ -353,6 +353,7 @@ describe("sync", () => {
       FIRST_DEVICE_NAME,
       "SYN-072 — the rename prompt must pre-fill the device's current name",
     );
+    await captureScreen("sync-rename-over-settings");
 
     await setReactInputValue("sync-rename-value", RENAMED_DEVICE_NAME);
     const promptSubmit = await $("#sync-rename-submit");
@@ -462,5 +463,7 @@ describe("sync", () => {
       segmentFilesAfterLeave.some((name) => name.startsWith("seg-")),
       "SYN-037/082 — leave_sync must keep the device's segment file; its area stays in the folder",
     );
+
+    await closeSettings();
   });
 });

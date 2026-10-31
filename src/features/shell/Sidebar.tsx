@@ -1,6 +1,7 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { Info, Menu, Settings, TrendingUp, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { AboutModal } from "@/features/about";
 import { SettingsDialog } from "@/features/settings";
@@ -111,8 +112,14 @@ export function Sidebar({ isOpen, toggleDrawer }: SidebarProps) {
         isOpen={isOpen}
       />
 
-      <AboutModal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />
-      <SettingsDialog isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      {/* On the body: the header stacks over anything inside the drawer. */}
+      {createPortal(
+        <>
+          <AboutModal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />
+          <SettingsDialog isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        </>,
+        document.body,
+      )}
     </aside>
   );
 }

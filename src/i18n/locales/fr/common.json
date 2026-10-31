@@ -344,7 +344,6 @@
     "notice_added": "{{agent}} a ajouté un actif : {{name}} ({{reference}})"
   },
   "sync": {
-    "title": "Synchronisation multi-appareils",
     "local_copy_note": "La copie publiée dans le dossier partagé est chiffrée avec votre phrase secrète de synchronisation. La copie conservée sur cet ordinateur n'est pas chiffrée.",
     "no_recovery_note": "Si vous oubliez la phrase secrète, la copie publiée ne peut plus être déchiffrée et il n'existe aucun moyen de la récupérer. Vous pouvez toujours repartir de zéro depuis un ordinateur qui détient le portefeuille.",
     "metadata_exposure_note": "L'hébergeur du dossier voit les noms, tailles et dates des fichiers — donc quand et à quel rythme le portefeuille est utilisé, et combien d'ordinateurs le partagent — mais pas vos comptes, positions ni montants.",
@@ -358,10 +357,6 @@
     "leave": "Quitter la synchronisation",
     "start_over": "Repartir de zéro",
     "loading": "Chargement de l'état de synchronisation…",
-    "status_enabled": "Activée",
-    "status_paused": "En pause",
-    "status_disabled": "Non activée sur cet ordinateur",
-    "open_page": "Ouvrir la synchronisation",
     "health": {
       "up_to_date": "À jour",
       "needs_attention": "Attention requise",

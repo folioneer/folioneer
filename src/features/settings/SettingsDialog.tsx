@@ -10,7 +10,7 @@ import { ModalContainer } from "@/ui/components/modal/ModalContainer";
 import { AgentsAllowedSetting } from "./agent_connection/AgentsAllowedSetting";
 import { ReferenceCurrencySection } from "./reference_currency/ReferenceCurrencySection";
 import { ScheduledFetchSection } from "./scheduled_fetch/ScheduledFetchSection";
-import { SyncSummary } from "./sync/SyncSummary";
+import { SyncSection } from "./sync/SyncSection";
 import { type LanguageChoice, useSettings } from "./useSettings";
 
 type SettingsSection = "general" | "prices" | "sync" | "agents";
@@ -120,7 +120,7 @@ function SettingsContent({ titleId, onClose }: { titleId: string; onClose: () =>
         <div className="flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto p-6">
           {section === "general" && <GeneralSection />}
           {section === "prices" && <PricesSection />}
-          {section === "sync" && <SyncSummary onLeave={onClose} />}
+          {section === "sync" && <SyncSection />}
           {section === "agents" && <AgentsAllowedSetting />}
         </div>
       </div>

@@ -70,20 +70,16 @@ export async function closeSettings(): Promise<void> {
 }
 
 /**
- * Opens the sync page the way a user does: Settings, then its "Open sync" link (TODO-010).
- * Waits for the page's own content — "Enable sync" while disabled, the status otherwise.
+ * Opens Settings on its Sync section, the way a user does. Waits for the section's own
+ * content — "Enable sync" while disabled, the status otherwise.
  */
 export async function navigateToSync(): Promise<void> {
   await openSettingsSection("sync");
-  // Open sync closes the dialog on its way to the page.
-  const openSync = await $("#settings-open-sync");
-  await openSync.waitForExist({ timeout: 10000 });
-  await openSync.click();
   await browser.waitUntil(
     async () =>
       (await (await $("#sync-enable")).isExisting()) ||
       (await (await $("#sync-status")).isExisting()),
-    { timeout: 10000, timeoutMsg: "the sync page did not show Enable sync nor its status" },
+    { timeout: 10000, timeoutMsg: "the Sync section did not show Enable sync nor its status" },
   );
 }
 
