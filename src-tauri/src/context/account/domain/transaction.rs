@@ -1,4 +1,6 @@
 use crate::context::account::error::AccountError;
+use crate::core::cash::is_cash_asset;
+use crate::core::quantity::{from_surface, to_surface, QUANTITY_UNIT};
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDate;
@@ -381,9 +383,7 @@ impl Transaction {
         note: Option<String>,
     ) -> StdResult<Self, AccountError> {
         Self::validate_date(&date)?;
-        if quantity <= 0 {
-            return Err(AccountError::QuantityNotPositive);
-        }
+        Self::ensure_quantity(quantity)?;
         Ok(Self {
             id: Uuid::new_v4().to_string(),
             account_id,
@@ -592,9 +592,7 @@ impl Transaction {
         note: Option<String>,
     ) -> StdResult<Self, AccountError> {
         Self::validate_date(&date)?;
-        if quantity <= 0 {
-            return Err(AccountError::QuantityNotPositive);
-        }
+        Self::ensure_quantity(quantity)?;
         Ok(Self {
             id: Uuid::new_v4().to_string(),
             account_id,
@@ -650,9 +648,7 @@ impl Transaction {
         note: Option<String>,
     ) -> StdResult<Self, AccountError> {
         Self::validate_date(&date)?;
-        if quantity <= 0 {
-            return Err(AccountError::QuantityNotPositive);
-        }
+        Self::ensure_quantity(quantity)?;
         Ok(Self {
             id: Uuid::new_v4().to_string(),
             account_id,
@@ -695,9 +691,7 @@ impl Transaction {
         transfer_id: String,
     ) -> StdResult<Self, AccountError> {
         Self::validate_date(&date)?;
-        if quantity <= 0 {
-            return Err(AccountError::QuantityNotPositive);
-        }
+        Self::ensure_quantity(quantity)?;
         if exchange_rate <= 0 {
             return Err(AccountError::ExchangeRateNotPositive);
         }
@@ -761,7 +755,7 @@ impl Transaction {
         if quantity <= 0 {
             return 0;
         }
-        ((total_amount as i128 * 1_000_000) / quantity as i128) as i64
+        ((total_amount as i128 * QUANTITY_UNIT) / quantity as i128) as i64
     }
 
     /// AGT-088 / AGT-091 — whether this transaction still stands in full as `shown` stood
@@ -866,12 +860,25 @@ impl Transaction {
     }
 
     /// TRX-024A — what a surface gives as this transaction's quantity: a split's
-    /// factor, a dividend's amount, otherwise its quantity.
+    /// factor, a dividend's amount, the cash line's money, otherwise its quantity in millionths.
     pub fn shown_quantity(&self) -> i64 {
         match self.transaction_type {
             TransactionType::Split => self.factor(),
             TransactionType::Dividend => self.dividend_amount.unwrap_or(self.quantity),
-            _ => self.quantity,
+            _ if is_cash_asset(&self.asset_id) => self.quantity,
+            _ => to_surface(self.quantity),
+        }
+    }
+
+    /// TRX-024 — a quantity a surface sent to correct this transaction, as stored: money on
+    /// the cash line, a split's factor and a dividend's amount keep their own scale.
+    pub fn stored_correction_quantity(&self, surface_quantity: i64) -> i64 {
+        match self.transaction_type {
+            TransactionType::Split | TransactionType::Dividend => surface_quantity,
+            _ if is_cash_asset(&self.asset_id) => surface_quantity,
+            // TRX-024D — sent back as it was read, the quantity keeps its last two decimals.
+            _ if to_surface(self.quantity) == surface_quantity => self.quantity,
+            _ => from_surface(surface_quantity),
         }
     }
 
@@ -936,10 +943,7 @@ impl Transaction {
     ) -> StdResult<(), AccountError> {
         Self::validate_date(date)?;
 
-        // TRX-020 — quantity must be strictly positive
-        if quantity <= 0 {
-            return Err(AccountError::QuantityNotPositive);
-        }
+        Self::ensure_quantity(quantity)?;
 
         // TRX-020 — unit_price must be >= 0
         if unit_price < 0 {
@@ -967,6 +971,18 @@ impl Transaction {
             return Err(AccountError::TotalAmountNotPositive);
         }
 
+        Ok(())
+    }
+
+    /// TRX-020, TRX-024C — a quantity is strictly positive and fits in storage: a surface's
+    /// quantity past what storage holds saturates to the largest integer.
+    pub fn ensure_quantity(quantity: i64) -> StdResult<(), AccountError> {
+        if quantity <= 0 {
+            return Err(AccountError::QuantityNotPositive);
+        }
+        if quantity == i64::MAX {
+            return Err(AccountError::QuantityOutOfRange);
+        }
         Ok(())
     }
 
@@ -1082,6 +1098,7 @@ pub enum EnteredAmount {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::quantity::from_surface;
 
     fn make_transaction(
         quantity: i64,
@@ -1095,7 +1112,7 @@ mod tests {
             "asset-1".to_string(),
             TransactionType::Purchase,
             "2020-01-01".to_string(),
-            quantity,
+            from_surface(quantity),
             unit_price,
             exchange_rate,
             fees,
@@ -1133,11 +1150,11 @@ mod tests {
             "asset-1".to_string(),
             TransactionType::OpeningBalance,
             "2020-01-01".to_string(),
-            micro, // quantity
-            0,     // unit_price
-            micro, // exchange_rate
-            0,     // fees
-            0,     // total_amount = 0 (zero-cost)
+            from_surface(micro), // quantity
+            0,                   // unit_price
+            micro,               // exchange_rate
+            0,                   // fees
+            0,                   // total_amount = 0 (zero-cost)
             None,
             None,
         );
@@ -1153,7 +1170,7 @@ mod tests {
             "asset-1".to_string(),
             TransactionType::OpeningBalance,
             "2020-01-01".to_string(),
-            micro,
+            from_surface(micro),
             0,
             micro,
             0,
@@ -1183,7 +1200,7 @@ mod tests {
             "b".to_string(),
             TransactionType::Purchase,
             "1899-12-31".to_string(),
-            micro,
+            from_surface(micro),
             micro,
             micro,
             0,
@@ -1203,7 +1220,7 @@ mod tests {
             "b".to_string(),
             TransactionType::Purchase,
             "2099-01-01".to_string(),
-            micro,
+            from_surface(micro),
             micro,
             micro,
             0,
@@ -1504,7 +1521,7 @@ mod tests {
             "acc-1".to_string(),
             "asset-xyz".to_string(),
             "2024-06-15".to_string(),
-            5_000_000, // 5 shares in micros
+            from_surface(5_000_000), // 5 shares in micros
             None,
         )
         .unwrap();
@@ -1518,7 +1535,7 @@ mod tests {
             tx.asset_id, "asset-xyz",
             "asset_id must be the distributing asset"
         );
-        assert_eq!(tx.quantity, 5_000_000);
+        assert_eq!(tx.quantity, crate::core::quantity::from_surface(5_000_000));
         // FSD-023 — zero-cost convention: no money moves
         assert_eq!(
             tx.unit_price, 0,
@@ -1546,7 +1563,7 @@ mod tests {
             "acc-1".to_string(),
             "asset-xyz".to_string(),
             "2024-06-15".to_string(),
-            1_000_000,
+            from_surface(1_000_000),
             Some("Bonus issue 1:10".to_string()),
         )
         .unwrap();
@@ -1635,7 +1652,7 @@ mod tests {
             "acc-1".to_string(),
             "asset-xyz".to_string(),
             "2099-01-01".to_string(),
-            1_000_000,
+            from_surface(1_000_000),
             None,
         )
         .unwrap_err();
@@ -1653,7 +1670,7 @@ mod tests {
             "acc-1".to_string(),
             "asset-xyz".to_string(),
             "1899-12-31".to_string(),
-            1_000_000,
+            from_surface(1_000_000),
             None,
         )
         .unwrap_err();
@@ -1671,7 +1688,7 @@ mod tests {
             "acc-1".to_string(),
             "asset-xyz".to_string(),
             "not-a-date".to_string(),
-            1_000_000,
+            from_surface(1_000_000),
             None,
         )
         .unwrap_err();
@@ -1682,6 +1699,112 @@ mod tests {
     }
 
     // -------------------------------------------------------------------------
+    // TRX-024 — a surface's quantity past what storage holds saturates, and is refused.
+    #[test]
+    fn trx_024c_a_saturated_quantity_is_refused() {
+        let refused = Transaction::new(
+            "account".to_string(),
+            "asset".to_string(),
+            TransactionType::Purchase,
+            "2024-01-01".to_string(),
+            crate::core::quantity::from_surface(i64::MAX),
+            1_000_000,
+            1_000_000,
+            0,
+            1_000_000,
+            None,
+            None,
+        );
+        assert!(matches!(
+            refused.expect_err("refused"),
+            AccountError::QuantityOutOfRange
+        ));
+
+        // Every recording that carries a quantity refuses it the same way.
+        let saturated = crate::core::quantity::from_surface(i64::MAX);
+        let side = |transaction_type| {
+            Transaction::new_transfer_side(
+                "account".to_string(),
+                "asset".to_string(),
+                transaction_type,
+                "2024-01-01".to_string(),
+                saturated,
+                1_000_000,
+                1_000_000,
+                None,
+                "transfer".to_string(),
+            )
+        };
+        for refused in [
+            Transaction::free_shares(
+                "account".to_string(),
+                "asset".to_string(),
+                "2024-01-01".to_string(),
+                saturated,
+                None,
+            ),
+            Transaction::interest(
+                "account".to_string(),
+                "asset".to_string(),
+                "2024-01-01".to_string(),
+                saturated,
+                None,
+            ),
+            Transaction::write_off(
+                "account".to_string(),
+                "asset".to_string(),
+                "2024-01-01".to_string(),
+                saturated,
+                WriteOffReason::Other,
+                None,
+            ),
+            side(TransactionType::TransferOut),
+        ] {
+            assert!(matches!(
+                refused.expect_err("refused"),
+                AccountError::QuantityOutOfRange
+            ));
+        }
+    }
+
+    // TRX-024 — a surface reads a non-cash quantity in millionths, the rest in its own scale.
+    #[test]
+    fn trx_024b_what_a_surface_reads_as_a_quantity() {
+        let on = |asset: &str, kind: TransactionType, quantity: i64| {
+            Transaction::new(
+                "account".to_string(),
+                asset.to_string(),
+                kind,
+                "2024-01-01".to_string(),
+                quantity,
+                1_000_000,
+                1_000_000,
+                0,
+                1_000_000,
+                None,
+                None,
+            )
+            .expect("valid")
+        };
+        let purchase = on("asset", TransactionType::Purchase, 123_456_700);
+        assert_eq!(purchase.shown_quantity(), 1_234_567);
+        assert_eq!(purchase.as_shown().quantity, 1_234_567);
+        assert_eq!(purchase.stored_correction_quantity(1_234_567), 123_456_700);
+        let mut fine = purchase.clone();
+        fine.quantity = 16_666_666;
+        assert_eq!(fine.stored_correction_quantity(166_666), 16_666_666);
+        assert_eq!(fine.stored_correction_quantity(166_667), 16_666_700);
+
+        let deposit = on("system-cash-eur", TransactionType::Deposit, 500_000_000);
+        assert_eq!(deposit.shown_quantity(), 500_000_000);
+        assert_eq!(deposit.stored_correction_quantity(500_000_000), 500_000_000);
+
+        // A correction's figure on a split is its factor, on a dividend its amount.
+        let mut split = purchase.clone();
+        split.transaction_type = TransactionType::Split;
+        assert_eq!(split.stored_correction_quantity(2_000_000), 2_000_000);
+    }
+
     // INT-021/024 — Transaction::interest factory
     // -------------------------------------------------------------------------
 
@@ -1694,7 +1817,7 @@ mod tests {
             "acc-1".to_string(),
             "asset-xyz".to_string(),
             "2024-06-15".to_string(),
-            5_000_000, // 5 units in micros
+            from_surface(5_000_000), // 5 units in micros
             None,
         )
         .unwrap();
@@ -1708,7 +1831,7 @@ mod tests {
             tx.asset_id, "asset-xyz",
             "asset_id must be the credited asset"
         );
-        assert_eq!(tx.quantity, 5_000_000);
+        assert_eq!(tx.quantity, crate::core::quantity::from_surface(5_000_000));
         // INT-024 — zero-cost convention: no money moves
         assert_eq!(
             tx.unit_price, 0,
@@ -1753,7 +1876,7 @@ mod tests {
             "acc-1".to_string(),
             "asset-xyz".to_string(),
             "2099-01-01".to_string(),
-            1_000_000,
+            from_surface(1_000_000),
             None,
         )
         .unwrap_err();
@@ -1772,7 +1895,7 @@ mod tests {
             "acc-1".to_string(),
             "asset-xyz".to_string(),
             "2024-06-15".to_string(),
-            2_000_000,
+            from_surface(2_000_000),
             Some("2024 rate".to_string()),
             "2024-06-15T00:00:00.000001Z".to_string(),
         )

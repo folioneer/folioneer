@@ -115,6 +115,43 @@ pub struct SegmentChange {
     pub content: Option<String>,
 }
 
+/// The data format version from which a non-cash quantity is in hundred-millionths (SYN-038).
+const HUNDRED_MILLIONTHS_SINCE: u32 = 14;
+
+impl SegmentChange {
+    /// SYN-038 — the change as the current data format writes it: a transaction written
+    /// before version 14 has its non-cash quantity multiplied by 100. Its split's factor, its
+    /// dividend's amount and what moves on the cash line stay in millionths. Content that is
+    /// not a transaction's JSON is left for validation (SYN-034); a quantity that would not
+    /// fit stays as it came and is refused by the same validation.
+    pub fn in_current_format(mut self, written_in: u32) -> Self {
+        if written_in >= HUNDRED_MILLIONTHS_SINCE || self.record_kind != RecordKind::Transaction {
+            return self;
+        }
+        let Some(mut content) = self
+            .content
+            .as_deref()
+            .and_then(|content| serde_json::from_str::<serde_json::Value>(content).ok())
+        else {
+            return self;
+        };
+        let text = |field: &str| content.get(field).and_then(|value| value.as_str());
+        let keeps_its_scale = matches!(text("transaction_type"), Some("Split" | "Dividend"))
+            || text("asset_id").is_some_and(crate::core::cash::is_cash_asset);
+        let scaled = content
+            .get("quantity")
+            .and_then(|quantity| quantity.as_i64())
+            .map(|quantity| quantity.saturating_mul(100));
+        if let (false, Some(scaled)) = (keeps_its_scale, scaled) {
+            if let Some(quantity) = content.get_mut("quantity") {
+                *quantity = scaled.into();
+            }
+            self.content = Some(content.to_string());
+        }
+        self
+    }
+}
+
 /// A published file carrying a consecutive batch of one device's changes (SYN-031).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct Segment {
@@ -220,4 +257,83 @@ pub trait FolderStore: Send + Sync {
     /// Removes the folder header — rolling back a failed first publish (SYN-013) or clearing
     /// the folder for a start-over (SYN-071).
     async fn remove_header(&self) -> Result<(), SyncError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn transaction(asset_id: &str, kind: &str, quantity: i64) -> SegmentChange {
+        SegmentChange {
+            sequence: 1,
+            logical_timestamp: "00000000000000000001".to_string(),
+            based_on: None,
+            record_kind: RecordKind::Transaction,
+            record_identity: "tx-1".to_string(),
+            operation: Operation::Created,
+            origin: Origin::User,
+            content: Some(format!(
+                r#"{{"id":"tx-1","asset_id":"{asset_id}","transaction_type":"{kind}","quantity":{quantity},"note":"kept"}}"#
+            )),
+        }
+    }
+
+    fn quantity(change: &SegmentChange) -> i64 {
+        let content = change.content.as_deref().expect("content");
+        let value: serde_json::Value = serde_json::from_str(content).expect("json");
+        assert_eq!(value["note"], "kept");
+        value["quantity"].as_i64().expect("quantity")
+    }
+
+    // SYN-038 — a transaction from an older format reads in hundred-millionths.
+    #[test]
+    fn syn_038_an_older_quantity_is_multiplied_on_read() {
+        let read = transaction("asset-1", "Purchase", 1_234_567).in_current_format(13);
+        assert_eq!(quantity(&read), 123_456_700);
+    }
+
+    // SYN-038 — version 14 and later already hold the new form.
+    #[test]
+    fn syn_038_a_current_quantity_is_left_as_written() {
+        let read = transaction("asset-1", "Purchase", 7).in_current_format(14);
+        assert_eq!(quantity(&read), 7);
+    }
+
+    // TRX-024 — what is not a non-cash quantity stays in its own scale.
+    #[test]
+    fn syn_038_cash_a_split_and_a_dividend_stay_as_written() {
+        for (asset_id, kind) in [
+            ("system-cash-eur", "Deposit"),
+            ("asset-1", "Split"),
+            ("asset-1", "Dividend"),
+        ] {
+            let read = transaction(asset_id, kind, 7).in_current_format(13);
+            assert_eq!(quantity(&read), 7, "{kind}");
+        }
+    }
+
+    // SYN-034 — a quantity past what fits saturates, past the bound validation refuses.
+    #[test]
+    fn syn_034_an_older_quantity_that_would_not_fit_is_refused_by_validation() {
+        let read = transaction("asset-1", "Purchase", i64::MAX / 2).in_current_format(13);
+        assert_eq!(quantity(&read), i64::MAX);
+        assert!(matches!(
+            crate::context::sync::domain::resolution::Change::from_segment_change("device", read),
+            Err(crate::context::sync::domain::MalformedChange::AmountOutOfBounds { .. })
+        ));
+    }
+
+    // SYN-034 — other kinds of record, and content that does not parse, are left for
+    // validation.
+    #[test]
+    fn syn_038_what_is_not_a_transaction_is_left_as_written() {
+        let mut asset = transaction("asset-1", "Purchase", 7);
+        asset.record_kind = RecordKind::Asset;
+        assert_eq!(quantity(&asset.in_current_format(13)), 7);
+
+        let mut broken = transaction("asset-1", "Purchase", 7);
+        broken.content = Some("not json".to_string());
+        let read = broken.in_current_format(13);
+        assert_eq!(read.content.as_deref(), Some("not json"));
+    }
 }

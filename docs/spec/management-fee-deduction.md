@@ -20,7 +20,7 @@ A quantity-only event removing shares of a held asset to pay a management fee �
 | `account_id`       | The account whose holding the fee is taken from.                                                               |
 | `asset_id`         | The charged asset — the holding shares are removed from. **Not** the Cash Asset.                               |
 | `date`             | Business date the fee was applied.                                                                             |
-| `quantity`         | Number of shares removed (strictly positive, micro-units, fractional allowed as for a Buy).                    |
+| `quantity`         | Number of shares removed (strictly positive, on the scale of TRX-024, fractional allowed as for a Buy).        |
 | `id`               | A freshly generated identity for a one-off deduction; a deterministic one for a generated deduction (FEE-048). |
 | `note`             | Optional free-text note.                                                                                       |
 
@@ -91,7 +91,7 @@ A recurring rule that generates fee deductions for one (account, asset) holding 
 
 **FEE-040 — Lazy catch-up on app open (backend)**: On application startup, for every `active` schedule, the system generates a FeeDeduction for each **completed** due period whose boundary date is on or after `start_date` and strictly after `last_applied_period`, up to the most recently completed period as of today, in chronological order. The in-progress current period is **not** charged until its boundary has passed, so no deduction is ever future-dated (FEE-021, TRX-020). A schedule whose `start_date` is in the past therefore **backfills** every elapsed completed period on first open. No always-on scheduler is involved. When the installation shares its portfolio with other devices, the catch-up runs after the launch sync (SYN-060), so it sees the merged ledger. <!-- AI-Decision: lazy materialization on app open — ADR-018 -->
 
-**FEE-041 — Per-period removal amount (backend)**: Each generated deduction removes `floor(holding_quantity × annual_rate ÷ periods_per_year)` shares, computed against the holding quantity **as of that period** — deductions are applied sequentially, so each one reduces the base for the next. The division is made once and floored once: the annual rate is never rounded to a per-period rate first. A rate of 0.20 % a year on a monthly schedule removes 0.166666 of a share from 1000 shares, not the 0.166660 a monthly rate rounded first would give. A later run never recomputes a deduction already generated.
+**FEE-041 — Per-period removal amount (backend)**: Each generated deduction removes `floor(holding_quantity × annual_rate ÷ periods_per_year)` shares, computed against the holding quantity **as of that period** — deductions are applied sequentially, so each one reduces the base for the next. The division is made once and floored once: the annual rate is never rounded to a per-period rate first. A rate of 0.20 % a year on a monthly schedule removes 0.16666666 of a share from 1000 shares, not the 0.16666000 a monthly rate rounded first would give. A later run never recomputes a deduction already generated.
 
 **FEE-042 — Period date convention (backend)**: Each generated deduction is dated at its period boundary (e.g. the last calendar day of the month for a monthly cadence).
 

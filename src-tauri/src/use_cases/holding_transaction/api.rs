@@ -7,6 +7,8 @@ use super::{
     StockSplitPreview, TransactionDraft, TransactionDraftError, TransactionPreview,
 };
 use crate::context::account::{AccountError, ManagementFeeRemoval, Transaction, WriteOffReason};
+use crate::core::cash::is_cash_asset;
+use crate::core::quantity::from_surface;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;
@@ -135,10 +137,11 @@ pub async fn open_holding(
         &dto.account_id,
         dto.asset_id,
         dto.date,
-        dto.quantity,
+        from_surface(dto.quantity),
         dto.total_cost,
     )
     .await
+    .map(|transaction| transaction.as_shown())
 }
 
 /// Records a purchase of an asset into an account (TRX-027).
@@ -152,7 +155,7 @@ pub async fn buy_holding(
         &dto.account_id,
         dto.asset_id,
         dto.date,
-        dto.quantity,
+        from_surface(dto.quantity),
         dto.unit_price,
         dto.exchange_rate,
         dto.fees,
@@ -160,6 +163,7 @@ pub async fn buy_holding(
         dto.note,
     )
     .await
+    .map(|transaction| transaction.as_shown())
 }
 
 /// Records a sale of an asset from an account (SEL-012, SEL-021, SEL-023, SEL-024).
@@ -173,7 +177,7 @@ pub async fn sell_holding(
         &dto.account_id,
         dto.asset_id,
         dto.date,
-        dto.quantity,
+        from_surface(dto.quantity),
         dto.unit_price,
         dto.exchange_rate,
         dto.fees,
@@ -181,6 +185,7 @@ pub async fn sell_holding(
         dto.note,
     )
     .await
+    .map(|transaction| transaction.as_shown())
 }
 
 /// Corrects an existing transaction and recalculates the affected holding
@@ -191,11 +196,14 @@ pub async fn correct_transaction(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: CorrectTransactionDTO,
 ) -> Result<Transaction, AccountError> {
+    let quantity = uc
+        .stored_correction_quantity(&dto.transaction_id, dto.quantity)
+        .await?;
     uc.correct_transaction(
         &dto.account_id,
         &dto.transaction_id,
         dto.date,
-        dto.quantity,
+        quantity,
         dto.unit_price,
         dto.exchange_rate,
         dto.fees,
@@ -203,6 +211,7 @@ pub async fn correct_transaction(
         dto.note,
     )
     .await
+    .map(|transaction| transaction.as_shown())
 }
 
 /// Cancels a transaction and recalculates (or removes) the associated holding (TRX-034).
@@ -255,6 +264,7 @@ pub async fn record_deposit(
 ) -> Result<Transaction, AccountError> {
     uc.record_deposit(&dto.account_id, dto.date, dto.amount_micros, dto.note)
         .await
+        .map(|transaction| transaction.as_shown())
 }
 
 /// Records a cash withdrawal from an account (CSH-032).
@@ -266,6 +276,7 @@ pub async fn record_withdrawal(
 ) -> Result<Transaction, AccountError> {
     uc.record_withdrawal(&dto.account_id, dto.date, dto.amount_micros, dto.note)
         .await
+        .map(|transaction| transaction.as_shown())
 }
 
 // =============================================================================
@@ -305,6 +316,7 @@ pub async fn record_dividend(
         dto.note,
     )
     .await
+    .map(|transaction| transaction.as_shown())
 }
 
 // =============================================================================
@@ -339,10 +351,11 @@ pub async fn record_free_shares(
         &dto.account_id,
         dto.asset_id,
         dto.date,
-        dto.quantity,
+        from_surface(dto.quantity),
         dto.note,
     )
     .await
+    .map(|transaction| transaction.as_shown())
 }
 
 // =============================================================================
@@ -378,11 +391,12 @@ pub async fn record_write_off(
         &dto.account_id,
         dto.asset_id,
         dto.date,
-        dto.quantity,
+        from_surface(dto.quantity),
         dto.reason,
         dto.note,
     )
     .await
+    .map(|transaction| transaction.as_shown())
 }
 
 /// Parameters for correcting a write-off (WOF-030, WOF-058); the asset is fixed.
@@ -413,11 +427,12 @@ pub async fn correct_write_off(
         &dto.account_id,
         &dto.transaction_id,
         dto.date,
-        dto.quantity,
+        from_surface(dto.quantity),
         dto.reason,
         dto.note,
     )
     .await
+    .map(|transaction| transaction.as_shown())
 }
 
 // =============================================================================
@@ -454,6 +469,7 @@ pub async fn record_split(
         dto.note,
     )
     .await
+    .map(|transaction| transaction.as_shown())
 }
 
 // =============================================================================
@@ -495,10 +511,11 @@ pub async fn record_management_fee(
         dto.asset_id,
         dto.date,
         dto.percent_micros,
-        dto.resulting_quantity_micros,
+        dto.resulting_quantity_micros.map(from_surface),
         dto.note,
     )
     .await
+    .map(|transaction| transaction.as_shown())
 }
 
 /// What a one-off management fee entered by its resulting quantity would remove
@@ -512,8 +529,14 @@ pub async fn preview_management_fee(
     date: String,
     resulting_quantity_micros: i64,
 ) -> Result<ManagementFeeRemoval, super::error::ManagementFeeError> {
-    uc.preview_management_fee(&account_id, asset_id, date, resulting_quantity_micros)
-        .await
+    uc.preview_management_fee(
+        &account_id,
+        asset_id,
+        date,
+        from_surface(resulting_quantity_micros),
+    )
+    .await
+    .map(|removal| removal.as_shown())
 }
 
 // =============================================================================
@@ -548,15 +571,24 @@ pub async fn record_interest(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: RecordInterestDTO,
 ) -> Result<Transaction, super::error::InterestError> {
+    // INT-023 — on the account's cash line the credit is money, already in its own scale.
+    let credited = dto.quantity_micros.map(|quantity| {
+        if is_cash_asset(&dto.asset_id) {
+            quantity
+        } else {
+            from_surface(quantity)
+        }
+    });
     uc.record_interest(
         &dto.account_id,
         dto.asset_id,
         dto.date,
         dto.percent_micros,
-        dto.quantity_micros,
+        credited,
         dto.note,
     )
     .await
+    .map(|transaction| transaction.as_shown())
 }
 
 /// Checks a transaction draft without writing anything (TRX-062): the unit price and total
@@ -567,7 +599,15 @@ pub async fn validate_transaction_draft(
     uc: State<'_, HoldingTransactionUseCase>,
     draft: TransactionDraft,
 ) -> Result<TransactionPreview, TransactionDraftError> {
-    uc.validate_draft(draft).await
+    uc.validate_draft(TransactionDraft {
+        quantity: match draft.kind {
+            // TRX-062 — a dividend's draft carries its amount, which is money.
+            super::DraftKind::Dividend => draft.quantity,
+            super::DraftKind::Purchase | super::DraftKind::Sell => from_surface(draft.quantity),
+        },
+        ..draft
+    })
+    .await
 }
 
 /// Checks a split draft without writing anything (SPL-062): the factor recording would
@@ -579,7 +619,12 @@ pub async fn validate_stock_split_draft(
     uc: State<'_, HoldingTransactionUseCase>,
     draft: StockSplitDraft,
 ) -> Result<StockSplitPreview, TransactionDraftError> {
-    uc.validate_stock_split_draft(draft).await
+    uc.validate_stock_split_draft(draft)
+        .await
+        .map(|preview| StockSplitPreview {
+            position: preview.position.map(|position| position.as_shown()),
+            ..preview
+        })
 }
 
 /// Checks an opening balance draft without writing anything (TRX-066): whether its total
@@ -590,5 +635,8 @@ pub async fn validate_opening_balance_draft(
     uc: State<'_, HoldingTransactionUseCase>,
     draft: OpeningBalanceDraft,
 ) -> Result<OpeningBalancePreview, TransactionDraftError> {
-    uc.validate_opening_balance_draft(&draft)
+    uc.validate_opening_balance_draft(&OpeningBalanceDraft {
+        quantity: from_surface(draft.quantity),
+        ..draft
+    })
 }

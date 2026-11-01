@@ -6,7 +6,7 @@ A Free Share Distribution records additional shares of a held asset received **a
 
 The feature adds a new free-shares variant to `TransactionType` (joining `Purchase | Sell | OpeningBalance | Deposit | Withdrawal | Dividend`). A free-share distribution is attributed to the distributing asset (its `asset_id` is that asset, so it surfaces under that asset in the transaction list) and its sole effect is `Holding.quantity += quantity` — the total cost basis is unchanged, so the average price (VWAP) dilutes. It touches the `account` bounded context (Transaction, Holding, the Account aggregate root) and reuses the chronological-replay machinery defined in TRX (TRX-031/036).
 
-Quantities are `i64` micro-units ([ADR-001](../adr/001-use-i64-for-monetary-amounts.md), TRX-024); the holding mutation and the transaction insert commit atomically within the existing Unit of Work ([ADR-006](../adr/006-unit-of-work.md)).
+Quantities are `i64` hundred-millionths ([ADR-001](../adr/001-use-i64-for-monetary-amounts.md), TRX-024); the holding mutation and the transaction insert commit atomically within the existing Unit of Work ([ADR-006](../adr/006-unit-of-work.md)).
 
 This v1 covers **zero-cost distributions only** (the user-confirmed model: no invested capital is added; the position's value is conserved and the market feed reflects any ex-distribution price adjustment). Stock splits and reverse splits (ratio-based quantity changes), a user-declared fiscal attribution value (cost-basis-increasing), distributions on closed positions, and a per-holding-row shortcut are each deferred (see Open Questions / Deferred).
 
@@ -24,7 +24,7 @@ A quantity-only corporate event: shares of a held asset received for free, recor
 | `account_id`       | The account whose holding receives the shares.                                                                                    |
 | `asset_id`         | The **distributing asset** — the holding the free shares are added to. **Not** the Cash Asset.                                    |
 | `date`             | Business date the shares were received (must not be in the future, must not be older than the existing TRX lower bound, TRX-020). |
-| `quantity`         | Number of free shares received (strictly positive, micro-units per TRX-024 — fractional quantities allowed, as for a Purchase).   |
+| `quantity`         | Number of free shares received (strictly positive, on the scale of TRX-024 — fractional quantities allowed, as for a Purchase).   |
 | `note`             | Optional free-text note.                                                                                                          |
 
 > A free-share distribution carries **no monetary amount, no unit price, no exchange rate, and no fees** — no money changes hands. Fields that exist on `Transaction` but carry no business meaning for a distribution follow a fixed convention rather than user input; their exact packing is a contract/plan concern, not a business rule.

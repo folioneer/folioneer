@@ -10,6 +10,7 @@ pub use db::{Database, MigrationFailure};
 
 /// Cross-context cash constants (CSH-014, CSH-017).
 pub mod cash;
+pub mod quantity;
 
 /// Logging infrastructure and frontend log bridge.
 pub mod logger;

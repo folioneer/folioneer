@@ -1350,6 +1350,7 @@
     "TotalAmountNotPositive": "Total amount must be strictly positive.",
     "TotalAmountBelowFees": "Total amount cannot be lower than the fees it includes.",
     "UnitPriceOutOfRange": "The derived unit price is out of range — check quantity and total.",
+    "QuantityOutOfRange": "This quantity is too large.",
     "ArchivedAsset": "Cannot open a balance for an archived asset.",
     "InvalidTotalCost": "Total cost must not be negative.",
     "AmountNotPositive": "Amount must be greater than 0.",

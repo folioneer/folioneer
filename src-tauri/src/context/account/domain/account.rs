@@ -7,6 +7,8 @@ use super::transaction::{
 };
 use super::wrapper::{country_well_formed, wrapper_known, PORTFOLIO_COUNTRY};
 use crate::context::account::error::AccountError;
+use crate::core::quantity::to_surface;
+use crate::core::quantity::QUANTITY_UNIT;
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
 use crate::shared::infrastructure::uow::UnitOfWork;
 use anyhow::{anyhow, Result};
@@ -69,7 +71,7 @@ enum Invariants {
 }
 
 /// What a one-off management fee entered by its resulting quantity removes (FEE-028/029).
-/// Quantities are i64 micro-units (ADR-001); the percentage is in micro-percent
+/// Quantities are in hundred-millionths (TRX-024); the percentage is in micro-percent
 /// (1% = 1_000_000), floored.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
 pub struct ManagementFeeRemoval {
@@ -79,6 +81,17 @@ pub struct ManagementFeeRemoval {
     pub removed_quantity: i64,
     /// Share of the holding the removal represents.
     pub percent_micros: i64,
+}
+
+impl ManagementFeeRemoval {
+    /// The removal as a surface gives it (TRX-024).
+    pub fn as_shown(&self) -> Self {
+        Self {
+            held_quantity: to_surface(self.held_quantity),
+            removed_quantity: to_surface(self.removed_quantity),
+            ..self.clone()
+        }
+    }
 }
 
 /// Where an account stood before new transactions were tried on it (`Account::attempt`).
@@ -822,7 +835,7 @@ impl Account {
     /// Seeds a holding directly from a quantity and total cost, without full transaction history
     /// (TRX-042, TRX-047, TRX-048).
     ///
-    /// `total_amount = total_cost` (direct). `unit_price = floor(total_cost * MICRO / quantity)`.
+    /// `total_amount = total_cost` (direct). `unit_price = floor(total_cost * QUANTITY_UNIT / quantity)`.
     /// `fees = 0`, `exchange_rate = 1_000_000`. TRX-026 formula does not apply.
     /// OpeningBalance rows participate in VWAP identically to Purchase (TRX-048).
     /// The cash line cannot be seeded via an opening balance (CSH-061); initial
@@ -1054,8 +1067,8 @@ impl Account {
         }
         if quantity > held {
             return Err(AccountError::Oversell {
-                available: held,
-                requested: quantity,
+                available: to_surface(held),
+                requested: to_surface(quantity),
             }
             .into());
         }
@@ -1823,7 +1836,7 @@ impl Account {
                 | TransactionType::TransferIn => {
                     let qty = t.quantity as i128;
                     total_quantity += qty;
-                    vwap_numerator += t.total_amount as i128 * MICRO;
+                    vwap_numerator += t.total_amount as i128 * QUANTITY_UNIT;
                 }
                 // TRF-020/023/024 — a transfer out leaves at the average price at its place,
                 // the cost it moves, kept in the map under its id; it realizes nothing and,
@@ -1932,7 +1945,12 @@ impl Account {
         } else {
             last_vwap
         };
-        let quantity = total_quantity as i64;
+        // TRX-024C — a holding past what storage holds is refused; a synced ledger's stands at it.
+        let quantity = match i64::try_from(total_quantity) {
+            Ok(quantity) => quantity,
+            Err(_) if enforced => return Err(AccountError::QuantityOutOfRange.into()),
+            Err(_) => total_quantity.clamp(i64::MIN as i128, i64::MAX as i128) as i64,
+        };
 
         let existing_id = self
             .holdings
@@ -1995,7 +2013,9 @@ impl Account {
         }
         let held_quantity = self.holding_quantity_as_of(asset_id, date);
         if resulting_quantity >= held_quantity {
-            return Err(AccountError::ResultingQuantityNotBelowHeld { held_quantity });
+            return Err(AccountError::ResultingQuantityNotBelowHeld {
+                held_quantity: to_surface(held_quantity),
+            });
         }
         let removed_quantity = held_quantity - resulting_quantity;
         let percent_micros =
@@ -2071,7 +2091,7 @@ impl Account {
                 | TransactionType::OpeningBalance
                 | TransactionType::TransferIn => {
                     total_quantity += t.quantity as i128;
-                    vwap_numerator += t.total_amount as i128 * MICRO;
+                    vwap_numerator += t.total_amount as i128 * QUANTITY_UNIT;
                 }
                 // TRF-020/023 — a transfer out leaves at its average cost, realizing nothing.
                 TransactionType::TransferOut => {
@@ -2139,7 +2159,7 @@ impl Account {
             // A read-only replay over already-validated history never goes negative;
             // clamp defensively so internally-inconsistent stored data can never
             // surface a negative quantity (the field contract is "0 when not held").
-            quantity: total_quantity.max(0) as i64,
+            quantity: total_quantity.clamp(0, i64::MAX as i128) as i64,
             average_price,
             total_realized_pnl,
             last_sold_date,
@@ -2210,9 +2230,7 @@ impl Account {
         if crate::core::cash::is_cash_asset(asset_id) {
             return Err(AccountError::OpeningBalanceOnCashAsset);
         }
-        if quantity <= 0 {
-            return Err(AccountError::QuantityNotPositive);
-        }
+        Transaction::ensure_quantity(quantity)?;
         // TRX-045 — a zero-cost position is valid (e.g. a mined / gifted /
         // airdropped asset seeded as a starting position); only a negative
         // total cost is rejected.
@@ -2322,7 +2340,7 @@ impl Account {
     }
 
     /// Computes total_amount for a Purchase (TRX-026).
-    /// Formula: floor(floor(qty × price / MICRO) × rate / MICRO) + fees
+    /// Formula: floor(floor(qty × price / QUANTITY_UNIT) × rate / MICRO) + fees
     pub fn compute_purchase_total(
         quantity: i64,
         unit_price: i64,
@@ -2333,11 +2351,11 @@ impl Account {
         let qty = quantity as i128;
         let price = unit_price as i128;
         let rate = exchange_rate as i128;
-        ((qty * price / MICRO) * rate / MICRO) as i64 + fees
+        ((qty * price / QUANTITY_UNIT) * rate / MICRO) as i64 + fees
     }
 
     /// Computes total_amount for a Sell (SEL-023).
-    /// Formula: floor(floor(qty × price / MICRO) × rate / MICRO) - fees
+    /// Formula: floor(floor(qty × price / QUANTITY_UNIT) × rate / MICRO) - fees
     pub fn compute_sell_total(
         quantity: i64,
         unit_price: i64,
@@ -2348,11 +2366,11 @@ impl Account {
         let qty = quantity as i128;
         let price = unit_price as i128;
         let rate = exchange_rate as i128;
-        ((qty * price / MICRO) * rate / MICRO) as i64 - fees
+        ((qty * price / QUANTITY_UNIT) * rate / MICRO) as i64 - fees
     }
 
     /// Derives the unit price implied by a user-entered all-in total (TRX-060, SEL-050).
-    /// Formula: round((securities_amount × MICRO × MICRO) / (quantity × exchange_rate)),
+    /// Formula: round((securities_amount × MICRO × QUANTITY_UNIT) / (quantity × exchange_rate)),
     /// rounding half up. `securities_amount` is the account-currency micro-amount
     /// attributable to the securities themselves — `total − fees` for a purchase,
     /// `total + fees` for a sell — and is never negative in a transaction that is
@@ -2369,7 +2387,7 @@ impl Account {
             return Err(AccountError::ExchangeRateNotPositive);
         }
         const MICRO: i128 = 1_000_000;
-        let numerator = securities_amount * MICRO * MICRO;
+        let numerator = securities_amount * MICRO * QUANTITY_UNIT;
         let denominator = quantity as i128 * exchange_rate as i128;
         let rounded = (numerator + denominator / 2) / denominator;
         i64::try_from(rounded).map_err(|_| AccountError::UnitPriceOutOfRange)
@@ -2419,7 +2437,7 @@ impl Account {
     }
 
     /// TRX-047 — an opening balance's unit price from its total cost:
-    /// `floor(total_cost × MICRO / quantity)`; a negative total cost (TRX-045) and a
+    /// `floor(total_cost × QUANTITY_UNIT / quantity)`; a negative total cost (TRX-045) and a
     /// non-positive quantity (TRX-044) are rejected.
     /// Returns `(unit_price, total_cost)`.
     fn derive_opening_balance_from_total(
@@ -2432,18 +2450,16 @@ impl Account {
         if total_cost < 0 {
             return Err(AccountError::InvalidTotalCost);
         }
-        const MICRO: i128 = 1_000_000;
         Ok((
-            (total_cost as i128 * MICRO / quantity as i128) as i64,
+            (total_cost as i128 * QUANTITY_UNIT / quantity as i128) as i64,
             total_cost,
         ))
     }
 
     /// Computes total_amount for an OpeningBalance correction (TRX-051).
-    /// Formula: floor(qty × unit_price / MICRO) — no exchange_rate factor.
+    /// Formula: floor(qty × unit_price / QUANTITY_UNIT) — no exchange_rate factor.
     fn compute_opening_balance_total(quantity: i64, unit_price: i64) -> i64 {
-        const MICRO: i128 = 1_000_000;
-        (quantity as i128 * unit_price as i128 / MICRO) as i64
+        (quantity as i128 * unit_price as i128 / QUANTITY_UNIT) as i64
     }
 
     /// SPL-062 — what a split of `factor` on `date` would make of an asset's position:
@@ -2481,14 +2497,13 @@ impl Account {
     }
 
     /// Computes realized P&L for a sell (SEL-024).
-    /// realized_pnl = total_sell_amount - floor(vwap_before_sell × sold_quantity / MICRO)
+    /// realized_pnl = total_sell_amount - floor(vwap_before_sell × sold_quantity / QUANTITY_UNIT)
     fn compute_realized_pnl(
         total_sell_amount: i64,
         vwap_before_sell: i64,
         sold_quantity: i64,
     ) -> i64 {
-        const MICRO: i128 = 1_000_000;
-        let cost_basis = (vwap_before_sell as i128 * sold_quantity as i128 / MICRO) as i64;
+        let cost_basis = (vwap_before_sell as i128 * sold_quantity as i128 / QUANTITY_UNIT) as i64;
         total_sell_amount - cost_basis
     }
 
@@ -2705,6 +2720,7 @@ impl Account {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::quantity::from_surface;
 
     // SYN-038 / ACC-041 — an account change written before data format version 4 carries no
     // country and no wrapper: it is read with neither.
@@ -2892,7 +2908,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             micro(100),
             micro(1),
             0,
@@ -2904,7 +2920,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-02-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             micro(200),
             micro(1),
             0,
@@ -2918,7 +2934,7 @@ mod tests {
             .iter()
             .find(|h| h.asset_id == "asset-1")
             .unwrap();
-        assert_eq!(h.quantity, micro(4));
+        assert_eq!(h.quantity, crate::core::quantity::from_surface(micro(4)));
         assert_eq!(h.average_price, micro(150));
     }
 
@@ -2977,7 +2993,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-01-02".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -2988,7 +3004,7 @@ mod tests {
         acc.sell_holding(
             "asset-1".to_string(),
             "2024-01-03".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(300),
             micro(1),
             0,
@@ -3066,7 +3082,7 @@ mod tests {
             .sell_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(100),
                 micro(1),
                 0,
@@ -3089,7 +3105,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(1),
+            from_surface(micro(1)),
             micro(100),
             micro(1),
             0,
@@ -3101,7 +3117,7 @@ mod tests {
             .sell_holding(
                 "asset-1".to_string(),
                 "2024-06-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(100),
                 micro(1),
                 0,
@@ -3124,7 +3140,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(1),
+            from_surface(micro(1)),
             micro(100),
             micro(1),
             0,
@@ -3136,7 +3152,7 @@ mod tests {
             .sell_holding(
                 "asset-1".to_string(),
                 "2024-06-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(150),
                 micro(1),
                 0,
@@ -3157,7 +3173,7 @@ mod tests {
             .buy_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(3),
+                from_surface(micro(3)),
                 0,
                 micro(1),
                 0,
@@ -3179,7 +3195,7 @@ mod tests {
             .buy_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 0,
                 micro(1),
                 micro(10),
@@ -3204,7 +3220,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             micro(100),
             micro(1),
             0,
@@ -3216,7 +3232,7 @@ mod tests {
             .sell_holding(
                 "asset-1".to_string(),
                 "2024-06-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 0,
                 micro(1),
                 micro(10),
@@ -3233,7 +3249,8 @@ mod tests {
     // TRX-060 / SEL-050 — an exact .5 fraction rounds up
     #[test]
     fn derive_unit_price_from_total_rounds_half_up() {
-        let derived = Account::derive_unit_price_from_total(3, micro(2), micro(1)).unwrap();
+        let derived =
+            Account::derive_unit_price_from_total(3, from_surface(micro(2)), micro(1)).unwrap();
         assert_eq!(derived, 2);
     }
 
@@ -3245,7 +3262,7 @@ mod tests {
             .buy_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 0,
                 micro(1),
                 0,
@@ -3269,7 +3286,7 @@ mod tests {
             .buy_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 0,
                 micro(1),
                 micro(10),
@@ -3292,7 +3309,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(1),
+            from_surface(micro(1)),
             micro(100),
             micro(1),
             0,
@@ -3304,7 +3321,7 @@ mod tests {
             .sell_holding(
                 "asset-1".to_string(),
                 "2024-06-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 0,
                 micro(1),
                 0,
@@ -3328,7 +3345,7 @@ mod tests {
             .buy_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                1, // 0.000001 units
+                from_surface(1), // 0.000001 units
                 0,
                 1, // exchange rate 0.000001
                 0,
@@ -3377,7 +3394,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(1),
+            from_surface(micro(1)),
             micro(100),
             micro(1),
             0,
@@ -3389,7 +3406,7 @@ mod tests {
             .sell_holding(
                 "asset-1".to_string(),
                 "2024-06-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 0,
                 0,
                 0,
@@ -3413,7 +3430,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             0,
             micro(1),
             micro(10),
@@ -3425,7 +3442,7 @@ mod tests {
             .sell_holding(
                 "asset-1".to_string(),
                 "2024-06-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(150),
                 micro(1),
                 0,
@@ -3445,7 +3462,7 @@ mod tests {
             .buy_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(100),
                 micro(1),
                 0,
@@ -3459,7 +3476,7 @@ mod tests {
         acc.correct_transaction(
             &tx.id,
             "2024-01-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             micro(200),
             micro(1),
             0,
@@ -3485,7 +3502,7 @@ mod tests {
             .buy_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(100),
                 micro(1),
                 0,
@@ -3500,7 +3517,7 @@ mod tests {
             .correct_transaction(
                 &tx.id,
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(999),
                 micro(1),
                 0,
@@ -3522,7 +3539,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             micro(100),
             micro(1),
             0,
@@ -3534,7 +3551,7 @@ mod tests {
             .sell_holding(
                 "asset-1".to_string(),
                 "2024-02-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(150),
                 micro(1),
                 micro(10),
@@ -3549,7 +3566,7 @@ mod tests {
             .correct_transaction(
                 &sell.id,
                 "2024-02-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(999),
                 micro(1),
                 micro(10),
@@ -3572,7 +3589,7 @@ mod tests {
             .buy_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(100),
                 micro(1),
                 0,
@@ -3585,7 +3602,7 @@ mod tests {
             .correct_transaction(
                 &tx.id,
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(100),
                 micro(1),
                 0,
@@ -3609,7 +3626,7 @@ mod tests {
             .buy_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(100),
                 micro(1),
                 0,
@@ -3622,7 +3639,7 @@ mod tests {
             .correct_transaction(
                 &tx.id,
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(100),
                 micro(1),
                 micro(50),
@@ -3645,7 +3662,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             micro(100),
             micro(1),
             0,
@@ -3657,7 +3674,7 @@ mod tests {
             .sell_holding(
                 "asset-1".to_string(),
                 "2024-02-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(150),
                 micro(1),
                 0,
@@ -3670,7 +3687,7 @@ mod tests {
             .correct_transaction(
                 &sell.id,
                 "2024-02-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(150),
                 micro(1),
                 0,
@@ -3699,7 +3716,7 @@ mod tests {
             "asset-1".to_string(),
             TransactionType::Purchase,
             "2024-06-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             micro(100),
             micro(1),
             0,
@@ -3714,7 +3731,7 @@ mod tests {
             "asset-1".to_string(),
             TransactionType::Sell,
             "2024-07-01".to_string(),
-            micro(1),
+            from_surface(micro(1)),
             micro(150),
             micro(1),
             0,
@@ -3728,7 +3745,10 @@ mod tests {
         let (holding, _pnl) = acc
             .recalculate_holding("asset-1", &[&sell, &buy])
             .expect("chronologically valid history must not oversell regardless of storage order");
-        assert_eq!(holding.quantity, micro(1));
+        assert_eq!(
+            holding.quantity,
+            crate::core::quantity::from_surface(micro(1))
+        );
     }
 
     // TDI-010 — holding_snapshot_as_of: as-of-date quantity + VWAP reconstruction.
@@ -3746,7 +3766,7 @@ mod tests {
             asset.to_string(),
             tx_type,
             date.to_string(),
-            micro(qty_units),
+            from_surface(micro(qty_units)),
             0,
             micro(1),
             0,
@@ -3779,11 +3799,11 @@ mod tests {
         ];
         // As of 2024-07-01 — only the first buy is in scope.
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-01");
-        assert_eq!(snap.quantity, micro(2));
+        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(2)));
         assert_eq!(snap.average_price, micro(100));
         // As of 2024-08-01 — both buys: VWAP = 600 / 4 = 150.
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-08-01");
-        assert_eq!(snap.quantity, micro(4));
+        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(4)));
         assert_eq!(snap.average_price, micro(150));
     }
 
@@ -3815,7 +3835,7 @@ mod tests {
             ),
         ];
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-15");
-        assert_eq!(snap.quantity, micro(1)); // 1 unit remains
+        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(1))); // 1 unit remains
         assert_eq!(snap.average_price, micro(100)); // VWAP preserved across the sell (SEL-026)
     }
 
@@ -3831,7 +3851,7 @@ mod tests {
         )];
         // TDI-011 — inclusive cut-off.
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-06-01");
-        assert_eq!(snap.quantity, micro(2));
+        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(2)));
     }
 
     #[test]
@@ -3855,7 +3875,8 @@ mod tests {
             ),
         ];
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-01");
-        assert_eq!(snap.quantity, micro(2)); // only asset-1's transactions
+        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(2)));
+        // only asset-1's transactions
     }
 
     #[test]
@@ -3880,7 +3901,7 @@ mod tests {
             ),
         ];
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-01");
-        assert_eq!(snap.quantity, micro(4));
+        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(4)));
         assert_eq!(snap.average_price, micro(50)); // FSD-023 — VWAP dilutes to 200/4
     }
 
@@ -3906,7 +3927,7 @@ mod tests {
             ),
         ];
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-01");
-        assert_eq!(snap.quantity, micro(4));
+        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(4)));
         assert_eq!(snap.average_price, micro(50)); // INT-024 — VWAP dilutes to 200/4
     }
 
@@ -3971,7 +3992,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-06-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             micro(100),
             micro(1),
             0,
@@ -3983,7 +4004,7 @@ mod tests {
             .sell_holding(
                 "asset-1".to_string(),
                 "2024-07-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(150),
                 micro(1),
                 0,
@@ -3997,7 +4018,7 @@ mod tests {
             .correct_transaction(
                 &sell.id,
                 "2024-05-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(150),
                 micro(1),
                 0,
@@ -4023,7 +4044,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-06-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             micro(100),
             micro(1),
             0,
@@ -4035,7 +4056,7 @@ mod tests {
             .sell_holding(
                 "asset-1".to_string(),
                 "2024-07-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(150),
                 micro(1),
                 0,
@@ -4049,7 +4070,7 @@ mod tests {
         acc.correct_transaction(
             &sell.id,
             "2024-05-01".to_string(),
-            micro(1),
+            from_surface(micro(1)),
             micro(150),
             micro(1),
             0,
@@ -4080,7 +4101,7 @@ mod tests {
             .buy_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(100),
                 micro(1),
                 0,
@@ -4136,7 +4157,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                -micro(1),
+                from_surface(-micro(1)),
                 micro(100),
             )
             .unwrap_err();
@@ -4152,7 +4173,12 @@ mod tests {
     fn open_holding_allows_zero_total_cost() {
         let mut acc = cash_seeded_account();
         let tx = acc
-            .open_holding("asset-1".to_string(), "2024-01-01".to_string(), micro(1), 0)
+            .open_holding(
+                "asset-1".to_string(),
+                "2024-01-01".to_string(),
+                from_surface(micro(1)),
+                0,
+            )
             .expect("zero-cost opening balance is valid");
         assert_eq!(tx.total_amount, 0, "zero-cost position has total_amount 0");
         assert_eq!(tx.unit_price, 0, "zero-cost position has unit_price 0");
@@ -4166,7 +4192,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 -micro(1),
             )
             .unwrap_err();
@@ -4208,7 +4234,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2099-12-31".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(100),
             )
             .unwrap_err();
@@ -4227,7 +4253,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "1899-12-31".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(100),
             )
             .unwrap_err();
@@ -4247,7 +4273,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 total_cost,
             )
             .unwrap();
@@ -4265,7 +4291,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(500),
             )
             .unwrap();
@@ -4280,7 +4306,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(500),
             )
             .unwrap();
@@ -4302,14 +4328,14 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                quantity,
+                from_surface(quantity),
                 total_cost,
             )
             .unwrap();
         let expected_unit_price = (total_cost as i128 * 1_000_000 / quantity as i128) as i64;
         assert_eq!(
             tx.unit_price, expected_unit_price,
-            "unit_price must be floor(total_cost*MICRO/qty)"
+            "unit_price must be floor(total_cost*QUANTITY_UNIT/qty)"
         );
     }
 
@@ -4321,7 +4347,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(100),
             )
             .unwrap();
@@ -4338,7 +4364,7 @@ mod tests {
         acc.open_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             micro(200),
         )
         .unwrap();
@@ -4346,7 +4372,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-02-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             micro(100),
             micro(1),
             0,
@@ -4361,7 +4387,11 @@ mod tests {
             .find(|h| h.asset_id == "asset-1")
             .unwrap();
         // VWAP = (200 + 200) / (2 + 2) = 100
-        assert_eq!(h.quantity, micro(4), "total quantity must accumulate");
+        assert_eq!(
+            h.quantity,
+            crate::core::quantity::from_surface(micro(4)),
+            "total quantity must accumulate"
+        );
         assert_eq!(
             h.average_price,
             micro(100),
@@ -4377,7 +4407,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2023-01-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(100),
             )
             .cloned();
@@ -4385,7 +4415,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2023-06-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(200),
             )
             .cloned();
@@ -4398,13 +4428,13 @@ mod tests {
             .unwrap();
         assert_eq!(
             h.quantity,
-            micro(3),
+            crate::core::quantity::from_surface(micro(3)),
             "quantities must accumulate across multiple openings"
         );
     }
 
     // TRX-051 (backend) — correct_transaction on an OpeningBalance row recomputes
-    // total_amount = quantity * unit_price / MICRO (not TRX-026 purchase formula)
+    // total_amount = quantity * unit_price / QUANTITY_UNIT (not TRX-026 purchase formula)
     // TRX-051 / DEBT-033 — an opening balance corrected with its typed total cost stores
     // that total verbatim and derives the unit price by the TRX-047 rule.
     #[test]
@@ -4414,7 +4444,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(200),
             )
             .unwrap()
@@ -4424,7 +4454,7 @@ mod tests {
             .correct_transaction(
                 &tx.id,
                 "2024-01-01".to_string(),
-                micro(3),
+                from_surface(micro(3)),
                 0,
                 1_000_000,
                 0,
@@ -4445,7 +4475,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(200),
             )
             .unwrap()
@@ -4454,7 +4484,7 @@ mod tests {
         let negative = acc.correct_transaction(
             &tx.id,
             "2024-01-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             0,
             1_000_000,
             0,
@@ -4487,7 +4517,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(200),
             )
             .unwrap()
@@ -4501,20 +4531,20 @@ mod tests {
             .correct_transaction(
                 &tx.id,
                 "2024-01-01".to_string(),
-                micro(3),      // new quantity
-                tx.unit_price, // keep same unit_price
-                1_000_000,     // exchange_rate (must be 1 for OpeningBalance)
-                0,             // fees (must be 0 for OpeningBalance)
-                None,          // total_amount (typed-total mode unused here)
+                from_surface(micro(3)), // new quantity
+                tx.unit_price,          // keep same unit_price
+                1_000_000,              // exchange_rate (must be 1 for OpeningBalance)
+                0,                      // fees (must be 0 for OpeningBalance)
+                None,                   // total_amount (typed-total mode unused here)
                 None,
             )
             .unwrap();
 
-        // total_amount should be floor(qty * unit_price / MICRO) — not using exchange_rate
+        // total_amount should be floor(qty * unit_price / QUANTITY_UNIT) — not using exchange_rate
         let expected = (micro(3) as i128 * tx.unit_price as i128 / 1_000_000) as i64;
         assert_eq!(
             corrected.total_amount, expected,
-            "corrected OpeningBalance total_amount must use qty*unit_price/MICRO formula"
+            "corrected OpeningBalance total_amount must use qty*unit_price/QUANTITY_UNIT formula"
         );
     }
 
@@ -4528,7 +4558,7 @@ mod tests {
             .open_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(1),
             )
             .unwrap();
@@ -4545,7 +4575,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             micro(100),
             micro(1),
             0,
@@ -4557,7 +4587,7 @@ mod tests {
             .sell_holding(
                 "asset-1".to_string(),
                 "2024-06-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(150),
                 micro(1),
                 0,
@@ -4575,7 +4605,7 @@ mod tests {
             .iter()
             .find(|h| h.asset_id == "asset-1")
             .unwrap();
-        assert_eq!(h.quantity, micro(2));
+        assert_eq!(h.quantity, crate::core::quantity::from_surface(micro(2)));
         assert_eq!(h.average_price, micro(100));
     }
 
@@ -4662,7 +4692,7 @@ mod tests {
                 .buy_holding(
                     "asset-1".to_string(),
                     "2024-01-02".to_string(),
-                    1_000_000,
+                    from_surface(1_000_000),
                     1_000_000,
                     1_000_000,
                     0,
@@ -4781,7 +4811,7 @@ mod tests {
         acc.correct_transaction(
             &dep.id,
             "2020-01-01".to_string(),
-            900_000_000,
+            from_surface(900_000_000),
             1_000_000,
             1_000_000,
             0,
@@ -4792,7 +4822,7 @@ mod tests {
 
         assert_eq!(
             acc.cash_holding_quantity(),
-            900_000_000,
+            crate::core::quantity::from_surface(900_000_000),
             "edited deposit must drive the new cash balance"
         );
     }
@@ -4896,7 +4926,7 @@ mod tests {
         acc.buy_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             micro(100),
             micro(1),
             0,
@@ -4920,7 +4950,7 @@ mod tests {
             .buy_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(100),
                 micro(1),
                 0,
@@ -4949,7 +4979,7 @@ mod tests {
             .buy_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(100),
                 micro(1),
                 0,
@@ -4963,7 +4993,7 @@ mod tests {
             .correct_transaction(
                 &buy_tx.id,
                 "2024-01-01".to_string(),
-                micro(5),
+                from_surface(micro(5)),
                 micro(100),
                 micro(1),
                 0,
@@ -4989,7 +5019,7 @@ mod tests {
             .buy_holding(
                 "asset-1".to_string(),
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(100),
                 micro(1),
                 0,
@@ -5017,7 +5047,7 @@ mod tests {
         acc.open_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(1_000),
         )
         .unwrap();
@@ -5026,7 +5056,7 @@ mod tests {
         acc.sell_holding(
             "asset-1".to_string(),
             "2024-06-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             micro(150),
             micro(1),
             0,
@@ -5075,7 +5105,7 @@ mod tests {
         acc.open_holding(
             "asset-1".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(1_000),
         )
         .unwrap();
@@ -5083,7 +5113,7 @@ mod tests {
             .sell_holding(
                 "asset-1".to_string(),
                 "2024-06-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(150),
                 micro(1),
                 0,
@@ -5193,7 +5223,7 @@ mod tests {
         acc.open_holding(
             "asset-aapl".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(1_000),
         )
         .unwrap();
@@ -5229,7 +5259,7 @@ mod tests {
         acc.open_holding(
             "asset-aapl".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(1_000),
         )
         .unwrap();
@@ -5278,7 +5308,7 @@ mod tests {
         acc.open_holding(
             "asset-aapl".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(1_000),
         )
         .unwrap();
@@ -5328,7 +5358,7 @@ mod tests {
         acc.open_holding(
             "asset-aapl".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(1_000),
         )
         .unwrap();
@@ -5369,7 +5399,7 @@ mod tests {
         acc.open_holding(
             "asset-aapl".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(1_000),
         )
         .unwrap();
@@ -5410,7 +5440,7 @@ mod tests {
         acc.open_holding(
             "asset-aapl".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(1_000),
         )
         .unwrap();
@@ -5474,7 +5504,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -5489,14 +5519,14 @@ mod tests {
             .unwrap()
             .clone();
         let cost_basis_before =
-            holding_before.quantity as i128 * holding_before.average_price as i128 / 1_000_000;
+            holding_before.quantity as i128 * holding_before.average_price as i128 / 100_000_000;
 
         // Record 5 free shares at zero cost (FSD-022a, FSD-023)
         let tx = Transaction::free_shares(
             acc.id.clone(),
             "asset-xyz".to_string(),
             "2024-06-15".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             None,
         )
         .unwrap();
@@ -5511,7 +5541,7 @@ mod tests {
         // FSD-022a — quantity must increase by the distributed amount
         assert_eq!(
             holding_after.quantity,
-            micro(15),
+            crate::core::quantity::from_surface(micro(15)),
             "quantity must increase from 10 to 15 after free-share distribution"
         );
 
@@ -5519,7 +5549,7 @@ mod tests {
         // value (TRX-026 floor convention; the derived display cost may round down
         // by < 1 micro-unit per share).
         let expected_diluted_vwap =
-            (cost_basis_before * 1_000_000 / holding_after.quantity as i128) as i64;
+            (cost_basis_before * 100_000_000 / holding_after.quantity as i128) as i64;
         assert_eq!(
             holding_after.average_price, expected_diluted_vwap,
             "average price must equal floor(cost_basis / new_quantity) after free-share distribution"
@@ -5539,7 +5569,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -5553,7 +5583,7 @@ mod tests {
             acc.id.clone(),
             "asset-xyz".to_string(),
             "2024-06-15".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             None,
         )
         .unwrap();
@@ -5576,7 +5606,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -5590,7 +5620,7 @@ mod tests {
             acc.id.clone(),
             "asset-xyz".to_string(),
             "2024-06-15".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             None,
         )
         .unwrap();
@@ -5629,7 +5659,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -5654,10 +5684,10 @@ mod tests {
             .iter()
             .find(|h| h.asset_id == "asset-xyz")
             .unwrap();
-        assert_eq!(h.quantity, micro(200));
+        assert_eq!(h.quantity, crate::core::quantity::from_surface(micro(200)));
         assert_eq!(h.average_price, micro(5));
         assert_eq!(
-            h.quantity as i128 * h.average_price as i128 / 1_000_000,
+            h.quantity as i128 * h.average_price as i128 / 100_000_000,
             1_000_000_000
         );
     }
@@ -5669,7 +5699,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -5694,7 +5724,7 @@ mod tests {
             .iter()
             .find(|h| h.asset_id == "asset-xyz")
             .unwrap();
-        assert_eq!(h.quantity, micro(1));
+        assert_eq!(h.quantity, crate::core::quantity::from_surface(micro(1)));
         assert_eq!(h.average_price, micro(1000));
     }
 
@@ -5705,7 +5735,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -5728,7 +5758,7 @@ mod tests {
             .sell_holding(
                 "asset-xyz".to_string(),
                 "2024-03-01".to_string(),
-                micro(10),
+                from_surface(micro(10)),
                 micro(60),
                 micro(1),
                 0,
@@ -5747,7 +5777,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             micro(100),
             micro(1),
             0,
@@ -5758,7 +5788,7 @@ mod tests {
         acc.sell_holding(
             "asset-xyz".to_string(),
             "2024-02-01".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             micro(110),
             micro(1),
             0,
@@ -5809,7 +5839,7 @@ mod tests {
     #[test]
     fn spl_021_collapsing_reverse_split_is_rejected() {
         let mut acc = cash_seeded_account();
-        // Hold 0.5 units; a ×0.000001 reverse split would floor to 0.
+        // Hold 0.005 units; a ×0.000001 reverse split would floor to 0.
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
@@ -5846,7 +5876,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(7),
+            from_surface(micro(7)),
             33_333_333,
             micro(1),
             micro(1),
@@ -5890,7 +5920,10 @@ mod tests {
             .map(|h| (h.quantity, h.average_price))
             .unwrap();
         assert_eq!((preview.new_quantity, preview.new_average_price), after);
-        assert_eq!(preview.new_quantity, 10_500_000);
+        assert_eq!(
+            preview.new_quantity,
+            crate::core::quantity::from_surface(10_500_000)
+        );
     }
 
     // SPL-062 — a split is previewed on the position of its date: one dated before a later
@@ -5902,7 +5935,7 @@ mod tests {
             acc.buy_holding(
                 "asset-xyz".to_string(),
                 date.to_string(),
-                micro(quantity),
+                from_surface(micro(quantity)),
                 micro(10),
                 micro(1),
                 0,
@@ -5916,7 +5949,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             (preview.old_quantity, preview.new_quantity),
-            (micro(4), micro(8))
+            (from_surface(micro(4)), from_surface(micro(8)))
         );
         assert_eq!(
             (preview.old_average_price, preview.new_average_price),
@@ -5983,7 +6016,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(10),
             micro(1),
             0,
@@ -5994,7 +6027,7 @@ mod tests {
         acc.sell_holding(
             "asset-xyz".to_string(),
             "2024-09-01".to_string(),
-            micro(6),
+            from_surface(micro(6)),
             micro(10),
             micro(1),
             0,
@@ -6030,7 +6063,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -6065,7 +6098,7 @@ mod tests {
             .iter()
             .find(|h| h.asset_id == "asset-xyz")
             .unwrap();
-        assert_eq!(h.quantity, micro(40));
+        assert_eq!(h.quantity, crate::core::quantity::from_surface(micro(40)));
         assert_eq!(h.average_price, micro(25));
     }
 
@@ -6077,7 +6110,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -6099,7 +6132,7 @@ mod tests {
             .sell_holding(
                 "asset-xyz".to_string(),
                 "2024-03-01".to_string(),
-                micro(15),
+                from_surface(micro(15)),
                 micro(60),
                 micro(1),
                 0,
@@ -6113,7 +6146,7 @@ mod tests {
             .correct_transaction(
                 &sell.id,
                 "2024-01-15".to_string(),
-                micro(15),
+                from_surface(micro(15)),
                 micro(60),
                 micro(1),
                 0,
@@ -6147,7 +6180,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -6161,7 +6194,7 @@ mod tests {
             acc.id.clone(),
             "asset-xyz".to_string(),
             "2024-06-01".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             None,
         )
         .unwrap();
@@ -6183,7 +6216,7 @@ mod tests {
             .sell_holding(
                 "asset-xyz".to_string(),
                 "2024-09-01".to_string(),
-                micro(5),
+                from_surface(micro(5)),
                 micro(80),
                 micro(1),
                 0,
@@ -6213,7 +6246,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -6226,7 +6259,7 @@ mod tests {
             .sell_holding(
                 "asset-xyz".to_string(),
                 "2024-03-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(120),
                 micro(1),
                 0,
@@ -6243,7 +6276,7 @@ mod tests {
             acc.id.clone(),
             "asset-xyz".to_string(),
             "2024-06-01".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             None,
         )
         .unwrap();
@@ -6272,7 +6305,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -6293,7 +6326,7 @@ mod tests {
             acc.id.clone(),
             "asset-xyz".to_string(),
             "2024-06-15".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             None,
         )
         .unwrap();
@@ -6308,7 +6341,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             holding_mid.quantity,
-            micro(15),
+            crate::core::quantity::from_surface(micro(15)),
             "sanity: distribution applied"
         );
 
@@ -6330,11 +6363,11 @@ mod tests {
             holding_after.average_price, holding_before.average_price,
             "average_price must be restored to pre-distribution value (FSD-028)"
         );
-        // cost_basis = quantity × average_price / MICRO
+        // cost_basis = quantity × average_price / QUANTITY_UNIT
         let cost_after =
-            holding_after.quantity as i128 * holding_after.average_price as i128 / 1_000_000;
+            holding_after.quantity as i128 * holding_after.average_price as i128 / 100_000_000;
         let cost_before =
-            holding_before.quantity as i128 * holding_before.average_price as i128 / 1_000_000;
+            holding_before.quantity as i128 * holding_before.average_price as i128 / 100_000_000;
         assert_eq!(
             cost_after, cost_before,
             "cost basis must be restored exactly (FSD-028)"
@@ -6353,7 +6386,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             micro(100),
             micro(1),
             0,
@@ -6366,7 +6399,7 @@ mod tests {
             acc.id.clone(),
             "asset-xyz".to_string(),
             "2024-06-01".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             None,
         )
         .unwrap();
@@ -6377,7 +6410,7 @@ mod tests {
         acc.sell_holding(
             "asset-xyz".to_string(),
             "2024-09-01".to_string(),
-            micro(8),
+            from_surface(micro(8)),
             micro(80),
             micro(1),
             0,
@@ -6407,7 +6440,7 @@ mod tests {
             .buy_holding(
                 "asset-xyz".to_string(),
                 "2024-01-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(1),
                 micro(1),
                 0,
@@ -6421,7 +6454,7 @@ mod tests {
             acc.id.clone(),
             "asset-xyz".to_string(),
             "2024-06-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             None,
         )
         .unwrap();
@@ -6480,7 +6513,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -6493,7 +6526,7 @@ mod tests {
             acc.id.clone(),
             "asset-xyz".to_string(),
             "2024-06-01".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             None,
         )
         .unwrap();
@@ -6506,11 +6539,11 @@ mod tests {
             .correct_transaction(
                 &fs_id,
                 "2024-06-01".to_string(),
-                micro(3),  // new quantity
-                0,         // unit_price = 0 (free shares, no acquisition cost)
-                1_000_000, // exchange_rate = 1.0 (no FX leg)
-                0,         // fees = 0
-                None,      // total_amount (typed-total mode unused here)
+                from_surface(micro(3)), // new quantity
+                0,                      // unit_price = 0 (free shares, no acquisition cost)
+                1_000_000,              // exchange_rate = 1.0 (no FX leg)
+                0,                      // fees = 0
+                None,                   // total_amount (typed-total mode unused here)
                 Some("Corrected note".to_string()),
             )
             .unwrap();
@@ -6528,7 +6561,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             holding.quantity,
-            micro(13),
+            crate::core::quantity::from_surface(micro(13)),
             "holding quantity must reflect corrected free-shares count (FSD-040)"
         );
     }
@@ -6542,7 +6575,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -6555,7 +6588,7 @@ mod tests {
             acc.id.clone(),
             "asset-xyz".to_string(),
             "2024-06-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             None,
         )
         .unwrap();
@@ -6568,11 +6601,11 @@ mod tests {
             .correct_transaction(
                 &fee_id,
                 "2024-06-01".to_string(),
-                micro(3),  // new removed quantity
-                0,         // unit_price = 0 (no acquisition cost)
-                1_000_000, // exchange_rate = 1.0 (no FX leg)
-                0,         // fees = 0
-                None,      // total_amount (typed-total mode unused here)
+                from_surface(micro(3)), // new removed quantity
+                0,                      // unit_price = 0 (no acquisition cost)
+                1_000_000,              // exchange_rate = 1.0 (no FX leg)
+                0,                      // fees = 0
+                None,                   // total_amount (typed-total mode unused here)
                 Some("Corrected fee".to_string()),
             )
             .unwrap();
@@ -6588,7 +6621,7 @@ mod tests {
             .expect("asset-xyz holding must exist after fee correction");
         assert_eq!(
             holding.quantity,
-            micro(7),
+            crate::core::quantity::from_surface(micro(7)),
             "holding quantity must reflect the corrected fee deduction (FEE-023)"
         );
     }
@@ -6607,7 +6640,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -6622,13 +6655,13 @@ mod tests {
             .unwrap()
             .clone();
         let cost_basis_before =
-            holding_before.quantity as i128 * holding_before.average_price as i128 / 1_000_000;
+            holding_before.quantity as i128 * holding_before.average_price as i128 / 100_000_000;
 
         let tx = Transaction::interest(
             acc.id.clone(),
             "asset-xyz".to_string(),
             "2024-06-15".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             None,
         )
         .unwrap();
@@ -6641,11 +6674,11 @@ mod tests {
             .unwrap();
         assert_eq!(
             holding_after.quantity,
-            micro(15),
+            crate::core::quantity::from_surface(micro(15)),
             "quantity must increase from 10 to 15 after the interest credit"
         );
         let expected_diluted_vwap =
-            (cost_basis_before * 1_000_000 / holding_after.quantity as i128) as i64;
+            (cost_basis_before * 100_000_000 / holding_after.quantity as i128) as i64;
         assert_eq!(
             holding_after.average_price, expected_diluted_vwap,
             "average price must equal floor(cost_basis / new_quantity) after the interest credit"
@@ -6695,7 +6728,7 @@ mod tests {
         acc.buy_holding(
             "asset-xyz".to_string(),
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(100),
             micro(1),
             0,
@@ -6708,7 +6741,7 @@ mod tests {
             acc.id.clone(),
             "asset-xyz".to_string(),
             "2024-06-01".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             None,
         )
         .unwrap();
@@ -6721,11 +6754,11 @@ mod tests {
             .correct_transaction(
                 &int_id,
                 "2024-06-01".to_string(),
-                micro(3),  // new credited quantity
-                0,         // unit_price = 0 (no acquisition cost)
-                1_000_000, // exchange_rate = 1.0 (no FX leg)
-                0,         // fees = 0
-                None,      // total_amount (typed-total mode unused here)
+                from_surface(micro(3)), // new credited quantity
+                0,                      // unit_price = 0 (no acquisition cost)
+                1_000_000,              // exchange_rate = 1.0 (no FX leg)
+                0,                      // fees = 0
+                None,                   // total_amount (typed-total mode unused here)
                 Some("Corrected interest".to_string()),
             )
             .unwrap();
@@ -6741,7 +6774,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             holding.quantity,
-            micro(13),
+            crate::core::quantity::from_surface(micro(13)),
             "holding quantity must reflect the corrected interest credit (INT-040)"
         );
     }
@@ -6801,6 +6834,7 @@ mod tests {
 #[cfg(test)]
 mod two_asset_and_synced_ledger_tests {
     use super::*;
+    use crate::core::quantity::from_surface;
 
     const A: &str = "asset-a";
     const B: &str = "asset-b";
@@ -6832,7 +6866,7 @@ mod two_asset_and_synced_ledger_tests {
         acc.buy_holding(
             asset.to_string(),
             date.to_string(),
-            micro(quantity),
+            from_surface(micro(quantity)),
             micro(price),
             micro(1),
             0,
@@ -6848,7 +6882,7 @@ mod two_asset_and_synced_ledger_tests {
         acc.sell_holding(
             asset.to_string(),
             date.to_string(),
-            micro(quantity),
+            from_surface(micro(quantity)),
             micro(price),
             micro(1),
             0,
@@ -6873,7 +6907,7 @@ mod two_asset_and_synced_ledger_tests {
             asset.to_string(),
             kind,
             date.to_string(),
-            micro(quantity),
+            from_surface(micro(quantity)),
             micro(price),
             micro(1),
             0,
@@ -6929,7 +6963,7 @@ mod two_asset_and_synced_ledger_tests {
         acc.correct_transaction(
             &first,
             "2024-01-01".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(60),
             micro(1),
             0,
@@ -6939,10 +6973,16 @@ mod two_asset_and_synced_ledger_tests {
         .unwrap();
 
         let a = holding(&acc, A).unwrap();
-        assert_eq!((a.quantity, a.average_price), (micro(15), micro(100)));
+        assert_eq!(
+            (a.quantity, a.average_price),
+            (from_surface(micro(15)), micro(100))
+        );
         assert_eq!(realized_pnl(&acc, &sale_a), Some(micro(250)));
         let b = holding(&acc, B).unwrap();
-        assert_eq!((b.quantity, b.average_price), (micro(5), micro(200)));
+        assert_eq!(
+            (b.quantity, b.average_price),
+            (from_surface(micro(5)), micro(200))
+        );
         assert_eq!(realized_pnl(&acc, &sale_b), Some(micro(500)));
         assert_eq!(updated(&acc), vec![sale_a, first]);
     }
@@ -6965,7 +7005,7 @@ mod two_asset_and_synced_ledger_tests {
             .correct_transaction(
                 &first,
                 "2024-01-01".to_string(),
-                micro(10),
+                from_surface(micro(10)),
                 micro(1_000_000),
                 micro(1),
                 0,
@@ -7003,7 +7043,7 @@ mod two_asset_and_synced_ledger_tests {
             .correct_transaction(
                 &purchase,
                 "2024-01-01".to_string(),
-                micro(5),
+                from_surface(micro(5)),
                 micro(100),
                 micro(1),
                 0,
@@ -7032,7 +7072,10 @@ mod two_asset_and_synced_ledger_tests {
         acc.cancel_transaction(&only).unwrap();
 
         assert!(holding(&acc, A).is_none());
-        assert_eq!(holding(&acc, B).map(|h| h.quantity), Some(micro(10)));
+        assert_eq!(
+            holding(&acc, B).map(|h| h.quantity),
+            Some(crate::core::quantity::from_surface(micro(10)))
+        );
         assert!(holding(&acc, &acc.cash_asset_id()).is_some());
     }
 
@@ -7057,7 +7100,7 @@ mod two_asset_and_synced_ledger_tests {
             Holding::new(
                 "acc-1".to_string(),
                 A.to_string(),
-                micro(1),
+                crate::core::quantity::from_surface(micro(1)),
                 micro(1),
                 0,
                 None,
@@ -7103,7 +7146,7 @@ mod two_asset_and_synced_ledger_tests {
             "acc-1".to_string(),
             A.to_string(),
             "2024-03-01".to_string(),
-            micro(2),
+            from_surface(micro(2)),
             None,
         )
         .unwrap();
@@ -7134,7 +7177,7 @@ mod two_asset_and_synced_ledger_tests {
                 .map(|t| t.id.clone())
                 .unwrap(),
             "2024-01-03".to_string(),
-            micro(6),
+            from_surface(micro(6)),
             micro(155),
             micro(1),
             micro(2),
@@ -7185,14 +7228,17 @@ mod two_asset_and_synced_ledger_tests {
             "acc-1".to_string(),
             A.to_string(),
             "2024-06-15".to_string(),
-            micro(5),
+            from_surface(micro(5)),
             None,
         )
         .unwrap();
         acc.apply_interest(interest).unwrap();
 
         assert_eq!(acc.holding_quantity(&cash), before);
-        assert_eq!(acc.holding_quantity(A), micro(15));
+        assert_eq!(
+            acc.holding_quantity(A),
+            crate::core::quantity::from_surface(micro(15))
+        );
     }
 
     // CFR-017 — a synced transaction moved to another asset leaves the first asset's
@@ -7202,14 +7248,17 @@ mod two_asset_and_synced_ledger_tests {
         let mut acc = account();
         let purchase = synced(A, TransactionType::Purchase, "2024-01-01", 10, 100);
         acc.apply_synced_transaction(purchase.clone());
-        assert_eq!(acc.holding_quantity(A), micro(10));
+        assert_eq!(
+            acc.holding_quantity(A),
+            crate::core::quantity::from_surface(micro(10))
+        );
 
         let mut moved = purchase;
         moved.asset_id = B.to_string();
         acc.apply_synced_transaction(moved);
 
         assert!(holding(&acc, A).is_none());
-        assert_eq!(acc.holding_quantity(B), micro(10));
+        assert_eq!(acc.holding_quantity(B), from_surface(micro(10)));
     }
 
     // CFR-017/030 — removing a synced transaction removes that one, replays its holding and
@@ -7229,7 +7278,10 @@ mod two_asset_and_synced_ledger_tests {
 
         let left: Vec<&str> = acc.transactions.iter().map(|t| t.id.as_str()).collect();
         assert_eq!(left, vec![second.id.as_str()]);
-        assert_eq!(acc.holding_quantity(A), micro(5));
+        assert_eq!(
+            acc.holding_quantity(A),
+            crate::core::quantity::from_surface(micro(5))
+        );
         assert_eq!(acc.holding_quantity(&cash), -micro(500));
         assert!(acc
             .pending_changes
@@ -7250,7 +7302,10 @@ mod two_asset_and_synced_ledger_tests {
         acc.remove_synced_transaction(&only.id);
 
         assert!(holding(&acc, A).is_none());
-        assert_eq!(acc.holding_quantity(B), micro(10));
+        assert_eq!(
+            acc.holding_quantity(B),
+            crate::core::quantity::from_surface(micro(10))
+        );
         assert!(acc.pending_changes.iter().any(|c| matches!(
             c,
             AccountChange::HoldingDeleted { asset_id, .. } if asset_id == A
@@ -7374,13 +7429,96 @@ mod preview_trade_tests {
         }
     }
 
+    // TRX-024 — one hundred-millionth of a unit, a satoshi, is recorded, replayed and sold
+    // without being lost to the old scale; the money it moves stays in millionths.
+    #[test]
+    fn trx_024c_a_holding_past_the_largest_quantity_is_refused() {
+        let mut account =
+            Account::new("Account".into(), String::new(), "EUR".into(), false).expect("account");
+        const SIXTY_BILLION: i64 = 6_000_000_000_000_000_000;
+        account
+            .open_holding("asset".into(), "2026-01-02".into(), SIXTY_BILLION, 60 * M)
+            .expect("sixty billion units fit");
+        let refused = account
+            .open_holding("asset".into(), "2026-01-03".into(), SIXTY_BILLION, 60 * M)
+            .expect_err("a hundred and twenty billion do not");
+        assert!(matches!(
+            refused.downcast_ref::<AccountError>(),
+            Some(AccountError::QuantityOutOfRange)
+        ));
+        assert_eq!(account.holding_quantity("asset"), SIXTY_BILLION);
+    }
+
+    #[test]
+    fn trx_024_a_satoshi_survives_recording_replay_and_sale() {
+        let mut account =
+            Account::new("Account".into(), String::new(), "EUR".into(), false).expect("account");
+        // Fifty thousand euros a unit: one satoshi is worth half a millionth of a thousand.
+        account
+            .open_holding("btc".into(), "2026-01-02".into(), 300, 150_000)
+            .expect("three satoshis");
+        assert_eq!(account.holding_quantity("btc"), 300);
+
+        let synced = serde_json::to_string(account.transactions.first().expect("recorded"))
+            .expect("written");
+        let read: Transaction = serde_json::from_str(&synced).expect("read");
+        assert_eq!(read.quantity, 300);
+
+        account
+            .sell_holding(
+                "btc".into(),
+                "2026-01-03".into(),
+                1,
+                50_000 * M,
+                M,
+                0,
+                None,
+                None,
+            )
+            .expect("one satoshi sold");
+        assert_eq!(account.holding_quantity("btc"), 299);
+        let sale = account.transactions.last().expect("recorded");
+        assert_eq!(sale.total_amount, 500);
+    }
+
+    // TRX-024 — a fee's removal reaches a surface in millionths.
+    #[test]
+    fn trx_024_a_removal_is_shown_in_millionths() {
+        let removal = ManagementFeeRemoval {
+            held_quantity: 2_500_000_000,
+            removed_quantity: 50_000_000,
+            percent_micros: 2_000_000,
+        };
+        assert_eq!(
+            removal.as_shown(),
+            ManagementFeeRemoval {
+                held_quantity: 25_000_000,
+                removed_quantity: 500_000,
+                percent_micros: 2_000_000,
+            }
+        );
+    }
+
+    // TRX-024 — a refusal states what a surface reads: its figures, not the stored scale.
+    #[test]
+    fn trx_024_an_oversell_names_the_figures_of_a_surface() {
+        let refusal = Account::ensure_held(100_000_000, 150_000_000).expect_err("refused");
+        assert!(matches!(
+            refusal.downcast_ref::<AccountError>(),
+            Some(AccountError::Oversell {
+                available: 1_000_000,
+                requested: 1_500_000,
+            })
+        ));
+    }
+
     // TRX-062 / TRX-026 — a purchase by unit price: total = qty × price × rate + fees.
     #[test]
     fn trx_062_a_purchase_by_unit_price_previews_its_total() {
         let preview = Account::preview_trade(
             TransactionType::Purchase,
             "2026-01-02",
-            2 * M,
+            crate::core::quantity::from_surface(2 * M),
             by_price(50 * M, M, 3 * M),
         );
         assert_eq!(preview.expect("valid"), (50 * M, 103 * M));
@@ -7392,7 +7530,7 @@ mod preview_trade_tests {
         let preview = Account::preview_trade(
             TransactionType::Sell,
             "2026-01-02",
-            2 * M,
+            crate::core::quantity::from_surface(2 * M),
             by_price(50 * M, M, 3 * M),
         );
         assert_eq!(preview.expect("valid"), (50 * M, 97 * M));
@@ -7404,7 +7542,7 @@ mod preview_trade_tests {
         let preview = Account::preview_trade(
             TransactionType::Purchase,
             "2026-01-02",
-            2 * M,
+            crate::core::quantity::from_surface(2 * M),
             by_total(103 * M, M, 3 * M),
         );
         assert_eq!(preview.expect("valid"), (50 * M, 103 * M));
@@ -7413,8 +7551,14 @@ mod preview_trade_tests {
     // TRX-062 — the rejections recording would meet, before anything is written.
     #[test]
     fn trx_062_the_recording_rejections_apply_to_a_draft() {
-        let preview =
-            |kind, date, quantity, entered| Account::preview_trade(kind, date, quantity, entered);
+        let preview = |kind, date, quantity, entered| {
+            Account::preview_trade(
+                kind,
+                date,
+                crate::core::quantity::from_surface(quantity),
+                entered,
+            )
+        };
         assert!(matches!(
             preview(
                 TransactionType::Purchase,
@@ -7489,7 +7633,7 @@ mod preview_trade_tests {
             Account::preview_trade(
                 TransactionType::Purchase,
                 date,
-                quantity,
+                crate::core::quantity::from_surface(quantity),
                 by_price(M, rate, fees),
             )
         };
@@ -7515,6 +7659,7 @@ mod preview_trade_tests {
 #[cfg(test)]
 mod write_off_tests {
     use super::*;
+    use crate::core::quantity::from_surface;
 
     const COIN: &str = "asset-coin";
 
@@ -7541,7 +7686,7 @@ mod write_off_tests {
         acc.buy_holding(
             COIN.to_string(),
             date.to_string(),
-            micro(quantity),
+            from_surface(micro(quantity)),
             micro(price),
             micro(1),
             0,
@@ -7561,7 +7706,7 @@ mod write_off_tests {
             acc.id.clone(),
             COIN.to_string(),
             date.to_string(),
-            quantity,
+            from_surface(quantity),
             reason,
             Some("to a hardware wallet".to_string()),
         )?;
@@ -7598,7 +7743,7 @@ mod write_off_tests {
         assert_eq!((tx.total_amount, tx.unit_price, tx.fees), (0, 0, 0));
         assert_eq!(tx.realized_pnl, Some(-micro(200)));
         let coin = holding(&acc);
-        assert_eq!(coin.quantity, micro(8));
+        assert_eq!(coin.quantity, crate::core::quantity::from_surface(micro(8)));
         assert_eq!(coin.average_price, micro(100));
         assert_eq!(coin.total_realized_pnl, -micro(200));
         assert_eq!(acc.holding_quantity(&acc.cash_asset_id()), cash_before);
@@ -7613,7 +7758,7 @@ mod write_off_tests {
                 acc.id.clone(),
                 COIN.into(),
                 "2024-01-02".into(),
-                micro(5),
+                from_surface(micro(5)),
                 None,
             )
             .unwrap(),
@@ -7664,7 +7809,7 @@ mod write_off_tests {
         ));
         assert_eq!(
             holding(&acc).quantity,
-            micro(10),
+            crate::core::quantity::from_surface(micro(10)),
             "a refusal changes nothing"
         );
     }
@@ -7677,7 +7822,7 @@ mod write_off_tests {
         acc.sell_holding(
             COIN.into(),
             "2024-06-01".into(),
-            micro(8),
+            from_surface(micro(8)),
             micro(120),
             micro(1),
             0,
@@ -7694,7 +7839,10 @@ mod write_off_tests {
             )),
             AccountError::CascadingOversell
         ));
-        assert_eq!(holding(&acc).quantity, micro(2));
+        assert_eq!(
+            holding(&acc).quantity,
+            crate::core::quantity::from_surface(micro(2))
+        );
     }
 
     // WOF-032 — correcting or removing the purchase a later write-off draws on is refused
@@ -7714,7 +7862,7 @@ mod write_off_tests {
         let corrected = acc.correct_transaction(
             &purchase,
             "2024-01-02".into(),
-            micro(5),
+            from_surface(micro(5)),
             micro(100),
             micro(1),
             0,
@@ -7726,7 +7874,10 @@ mod write_off_tests {
             Some(AccountError::CascadingOversell)
         ));
         assert!(acc.cancel_transaction(&purchase).is_err());
-        assert_eq!(holding(&acc).quantity, micro(2));
+        assert_eq!(
+            holding(&acc).quantity,
+            crate::core::quantity::from_surface(micro(2))
+        );
     }
 
     // WOF-040 — removing a write-off restores the holding exactly.
@@ -7762,14 +7913,17 @@ mod write_off_tests {
             .correct_write_off(
                 &tx.id,
                 "2024-03-01".into(),
-                micro(3),
+                from_surface(micro(3)),
                 WriteOffReason::Dust,
                 None,
             )
             .unwrap();
         assert_eq!(corrected.write_off_reason, Some(WriteOffReason::Dust));
         assert_eq!(corrected.realized_pnl, Some(-micro(300)));
-        assert_eq!(holding(&acc).quantity, micro(7));
+        assert_eq!(
+            holding(&acc).quantity,
+            crate::core::quantity::from_surface(micro(7))
+        );
         let recorded = acc
             .pending_changes
             .iter()
@@ -7793,7 +7947,7 @@ mod write_off_tests {
             .correct_transaction(
                 &tx.id,
                 "2024-03-01".into(),
-                micro(3),
+                from_surface(micro(3)),
                 0,
                 micro(1),
                 0,
@@ -7807,7 +7961,7 @@ mod write_off_tests {
         ));
         let kept = acc.transactions.iter().find(|t| t.id == tx.id).unwrap();
         assert_eq!(kept.write_off_reason, None);
-        assert_eq!(kept.quantity, micro(2));
+        assert_eq!(kept.quantity, crate::core::quantity::from_surface(micro(2)));
     }
 
     // WOF-033 — a write-off without a reason takes the one its correction names, and can be
@@ -7830,7 +7984,7 @@ mod write_off_tests {
             .correct_write_off(
                 &named,
                 "2024-03-01".into(),
-                micro(1),
+                from_surface(micro(1)),
                 WriteOffReason::Dust,
                 None,
             )
@@ -7853,7 +8007,7 @@ mod write_off_tests {
             error_of(acc.correct_write_off(
                 &tx.id,
                 date.into(),
-                quantity,
+                from_surface(quantity),
                 WriteOffReason::Dust,
                 None,
             ))
@@ -7872,7 +8026,7 @@ mod write_off_tests {
         acc.sell_holding(
             COIN.into(),
             "2024-06-01".into(),
-            micro(7),
+            from_surface(micro(7)),
             micro(120),
             micro(1),
             0,
@@ -7886,7 +8040,7 @@ mod write_off_tests {
         ));
         let kept = acc.transactions.iter().find(|t| t.id == tx.id).unwrap();
         assert_eq!(kept.write_off_reason, Some(WriteOffReason::Lost));
-        assert_eq!(kept.quantity, micro(2));
+        assert_eq!(kept.quantity, crate::core::quantity::from_surface(micro(2)));
     }
 
     // SEL-030 / #607 — a sale's correction is refused against what was held just before it,
@@ -7901,7 +8055,7 @@ mod write_off_tests {
             .sell_holding(
                 COIN.into(),
                 "2024-03-01".into(),
-                micro(4),
+                from_surface(micro(4)),
                 micro(120),
                 micro(1),
                 0,
@@ -7913,7 +8067,7 @@ mod write_off_tests {
         let corrected = acc.correct_transaction(
             &sale.id,
             "2024-03-01".into(),
-            micro(12),
+            from_surface(micro(12)),
             micro(120),
             micro(1),
             0,
@@ -7931,7 +8085,7 @@ mod write_off_tests {
         let backdated = acc.sell_holding(
             COIN.into(),
             "2024-04-01".into(),
-            micro(11),
+            from_surface(micro(11)),
             micro(120),
             micro(1),
             0,

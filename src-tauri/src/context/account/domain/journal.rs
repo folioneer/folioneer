@@ -156,6 +156,7 @@ impl JournalFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::quantity::from_surface;
 
     const M: i64 = 1_000_000;
 
@@ -174,7 +175,11 @@ mod tests {
             asset_id.to_string(),
             kind,
             date.to_string(),
-            quantity,
+            if crate::core::cash::is_cash_asset(asset_id) {
+                quantity
+            } else {
+                from_surface(quantity)
+            },
             0,
             M,
             0,

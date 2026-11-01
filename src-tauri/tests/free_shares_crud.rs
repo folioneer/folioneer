@@ -127,7 +127,7 @@ async fn record_free_shares_end_to_end_persists_correct_fields() {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            folioneer_lib::core::quantity::from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -145,7 +145,7 @@ async fn record_free_shares_end_to_end_persists_correct_fields() {
     let cost_basis_before = holdings_before
         .iter()
         .find(|h| h.asset_id == asset.id)
-        .map(|h| h.quantity as i128 * h.average_price as i128 / 1_000_000)
+        .map(|h| h.quantity as i128 * h.average_price as i128 / 100_000_000)
         .unwrap();
 
     // FSD-022 — record 5 free shares
@@ -155,7 +155,7 @@ async fn record_free_shares_end_to_end_persists_correct_fields() {
             &account.id,
             asset.id.clone(),
             "2024-06-15".to_string(),
-            micro(5),
+            folioneer_lib::core::quantity::from_surface(micro(5)),
             Some("Bonus issue".to_string()),
         )
         .await
@@ -168,7 +168,10 @@ async fn record_free_shares_end_to_end_persists_correct_fields() {
         "asset_id must be the distributing asset"
     );
     assert_eq!(tx.account_id, account.id);
-    assert_eq!(tx.quantity, micro(5));
+    assert_eq!(
+        tx.quantity,
+        folioneer_lib::core::quantity::from_surface(micro(5))
+    );
     assert_eq!(tx.unit_price, 0, "unit_price must be 0 (FSD-023)");
     assert_eq!(
         tx.exchange_rate, 1_000_000,
@@ -195,14 +198,14 @@ async fn record_free_shares_end_to_end_persists_correct_fields() {
     // FSD-022a — quantity increased
     assert_eq!(
         holding_after.quantity,
-        micro(15),
+        folioneer_lib::core::quantity::from_surface(micro(15)),
         "quantity must be 10 + 5 = 15 after free-share distribution"
     );
     // FSD-023 — underlying cost unchanged → VWAP dilutes to the exact floored
     // value (TRX-026 floor convention; the derived display cost may round down
     // by < 1 micro-unit per share).
     let expected_diluted_vwap =
-        (cost_basis_before * 1_000_000 / holding_after.quantity as i128) as i64;
+        (cost_basis_before * 100_000_000 / holding_after.quantity as i128) as i64;
     assert_eq!(
         holding_after.average_price, expected_diluted_vwap,
         "average price must equal floor(cost_basis / new_quantity) after free-share distribution (FSD-023)"
@@ -240,7 +243,7 @@ async fn record_free_shares_does_not_create_asset_price_row() {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            folioneer_lib::core::quantity::from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -255,7 +258,7 @@ async fn record_free_shares_does_not_create_asset_price_row() {
             &account.id,
             asset.id.clone(),
             "2024-06-15".to_string(),
-            micro(5),
+            folioneer_lib::core::quantity::from_surface(micro(5)),
             None,
         )
         .await
@@ -289,7 +292,7 @@ async fn record_free_shares_account_not_found_propagates() {
             "nonexistent-account",
             asset.id.clone(),
             "2024-06-15".to_string(),
-            micro(5),
+            folioneer_lib::core::quantity::from_surface(micro(5)),
             None,
         )
         .await
@@ -332,7 +335,7 @@ async fn record_free_shares_asset_not_held_propagates() {
             &account.id,
             asset.id.clone(),
             "2024-06-15".to_string(),
-            micro(5),
+            folioneer_lib::core::quantity::from_surface(micro(5)),
             None,
         )
         .await
@@ -404,7 +407,7 @@ async fn record_free_shares_publishes_transaction_updated_event() {
         &account.id,
         asset.id.clone(),
         "2024-01-15".to_string(),
-        micro(10),
+        folioneer_lib::core::quantity::from_surface(micro(10)),
         micro(50),
         micro(1),
         0,
@@ -420,7 +423,7 @@ async fn record_free_shares_publishes_transaction_updated_event() {
         &account.id,
         asset.id.clone(),
         "2024-06-15".to_string(),
-        micro(5),
+        folioneer_lib::core::quantity::from_surface(micro(5)),
         None,
     )
     .await
@@ -475,7 +478,7 @@ async fn record_free_shares_then_cancel_restores_holding_exactly() {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            folioneer_lib::core::quantity::from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -503,7 +506,7 @@ async fn record_free_shares_then_cancel_restores_holding_exactly() {
             &account.id,
             asset.id.clone(),
             "2024-06-15".to_string(),
-            micro(5),
+            folioneer_lib::core::quantity::from_surface(micro(5)),
             None,
         )
         .await
@@ -521,7 +524,7 @@ async fn record_free_shares_then_cancel_restores_holding_exactly() {
         .unwrap();
     assert_eq!(
         holding_mid.quantity,
-        micro(15),
+        folioneer_lib::core::quantity::from_surface(micro(15)),
         "sanity: distribution applied"
     );
 
@@ -551,9 +554,9 @@ async fn record_free_shares_then_cancel_restores_holding_exactly() {
         "average_price must be restored to pre-distribution value (FSD-028)"
     );
     let cost_after =
-        holding_after.quantity as i128 * holding_after.average_price as i128 / 1_000_000;
+        holding_after.quantity as i128 * holding_after.average_price as i128 / 100_000_000;
     let cost_before =
-        holding_before.quantity as i128 * holding_before.average_price as i128 / 1_000_000;
+        holding_before.quantity as i128 * holding_before.average_price as i128 / 100_000_000;
     assert_eq!(
         cost_after, cost_before,
         "cost basis must be restored exactly (FSD-028)"
@@ -617,7 +620,7 @@ async fn record_free_shares_performance_neutrality() {
         &account.id,
         asset.id.clone(),
         "2024-01-15".to_string(),
-        micro(10),
+        folioneer_lib::core::quantity::from_surface(micro(10)),
         micro(50),
         micro(1),
         0,
@@ -630,7 +633,7 @@ async fn record_free_shares_performance_neutrality() {
         &account.id,
         asset.id.clone(),
         "2024-06-01".to_string(),
-        micro(5),
+        folioneer_lib::core::quantity::from_surface(micro(5)),
         None,
     )
     .await

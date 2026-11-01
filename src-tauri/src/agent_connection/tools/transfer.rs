@@ -1,6 +1,8 @@
 //! AGT-065A — a transfer an agent records: a holding moved from one account to another at
 //! its cost (TRF), through the window's transfer and marked part by part.
 
+use crate::context::account::Transaction;
+use crate::core::quantity::from_surface;
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -87,7 +89,7 @@ impl AgentTools {
         tracing::info!(target: BACKEND, session = granted.session_id, parts = parts.len(), "agent recorded a transfer");
         as_json(&serde_json::json!({
             "status": "recorded",
-            "transactions": parts,
+            "transactions": parts.iter().map(Transaction::as_shown).collect::<Vec<_>>(),
             "from": sending.account_name,
             "from_currency": sending.currency,
             "to": receiving.account_name,
@@ -158,8 +160,8 @@ impl AgentTools {
             })?;
         let figures = TransferFigures {
             date: typed.date.unwrap_or_else(today),
-            quantity_sent: typed.quantity,
-            quantity_received: typed.received.unwrap_or(typed.quantity),
+            quantity_sent: from_surface(typed.quantity),
+            quantity_received: from_surface(typed.received.unwrap_or(typed.quantity)),
             exchange_rate: typed.rate,
             note: typed.note,
         };

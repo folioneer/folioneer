@@ -97,7 +97,7 @@ async fn freshness_read_on_completion(provider: Arc<dyn PriceProvider>) -> Price
             &account.id,
             asset.id.clone(),
             "2024-01-01".to_string(),
-            1_000_000,
+            folioneer_lib::core::quantity::from_surface(1_000_000),
             100_000_000,
         )
         .await

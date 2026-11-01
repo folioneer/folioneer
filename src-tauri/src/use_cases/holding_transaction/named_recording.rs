@@ -4,6 +4,7 @@
 //! it, so the two never differ. A price at a date is recorded here too (CLI-029, AGT-062): it
 //! is no holding transaction, and it shares the lookup by name and the refusals.
 
+use crate::core::quantity::{from_surface, to_surface};
 use serde::Serialize;
 
 use crate::context::account::{
@@ -578,7 +579,10 @@ fn change_fields(
                 })
             }
         },
-        _ => c.quantity.unwrap_or(stored.quantity),
+        _ => c
+            .quantity
+            .map(|quantity| stored.stored_correction_quantity(quantity))
+            .unwrap_or(stored.quantity),
     };
     let (unit_price, total) = match kind {
         TransactionType::Purchase | TransactionType::Sell | TransactionType::OpeningBalance => {
@@ -1062,7 +1066,7 @@ impl HoldingTransactionUseCase {
                             &found.account_id,
                             found.asset_id.clone(),
                             date,
-                            target.quantity,
+                            from_surface(target.quantity),
                             total_cost,
                         )
                         .await
@@ -1172,7 +1176,7 @@ impl HoldingTransactionUseCase {
                             &found.account_id,
                             found.asset_id.clone(),
                             date,
-                            free_shares.quantity,
+                            from_surface(free_shares.quantity),
                             free_shares.note,
                         )
                         .await
@@ -1193,7 +1197,7 @@ impl HoldingTransactionUseCase {
                             &found.account_id,
                             found.asset_id.clone(),
                             date,
-                            write_off.quantity,
+                            from_surface(write_off.quantity),
                             write_off.reason,
                             write_off.note,
                         )
@@ -1343,7 +1347,7 @@ impl HoldingTransactionUseCase {
             holdings.push(HeldAsOf {
                 asset: reference,
                 name,
-                quantity: snapshot.quantity,
+                quantity: to_surface(snapshot.quantity),
                 average_price: snapshot.average_price,
             });
         }
@@ -1403,7 +1407,7 @@ impl HoldingTransactionUseCase {
             &found.account_id,
             found.asset_id.clone(),
             date,
-            free_shares.quantity,
+            from_surface(free_shares.quantity),
             free_shares.note,
         )
         .await
@@ -1453,12 +1457,20 @@ impl HoldingTransactionUseCase {
             }
         };
         let date = interest.date.unwrap_or_else(|| today.to_string());
+        // INT-023 — on the account's cash line the credit is money, in its own scale.
+        let credited = interest.quantity.map(|quantity| {
+            if crate::core::cash::is_cash_asset(&asset_id) {
+                quantity
+            } else {
+                from_surface(quantity)
+            }
+        });
         self.record_interest(
             &account_id,
             asset_id,
             date,
             interest.percent,
-            interest.quantity,
+            credited,
             interest.note,
         )
         .await
@@ -1501,7 +1513,7 @@ impl HoldingTransactionUseCase {
             found.asset_id.clone(),
             date,
             fee.percent,
-            fee.resulting_quantity,
+            fee.resulting_quantity.map(from_surface),
             fee.note,
         )
         .await
@@ -1531,7 +1543,7 @@ impl HoldingTransactionUseCase {
             &found.account_id,
             found.asset_id.clone(),
             date,
-            write_off.quantity,
+            from_surface(write_off.quantity),
             write_off.reason,
             write_off.note,
         )
@@ -1632,7 +1644,7 @@ impl HoldingTransactionUseCase {
                     account_id: found.account_id.clone(),
                     asset_id: found.asset_id.clone(),
                     date: date.clone(),
-                    quantity: target.quantity,
+                    quantity: from_surface(target.quantity),
                     total_cost: Some(*total_cost),
                 })
                 .is_ok_and(|preview| preview.zero_cost),
@@ -1644,7 +1656,7 @@ impl HoldingTransactionUseCase {
                     &found.account_id,
                     found.asset_id.clone(),
                     date,
-                    target.quantity,
+                    from_surface(target.quantity),
                     total_cost,
                 )
                 .await
@@ -1655,7 +1667,7 @@ impl HoldingTransactionUseCase {
                     &found.account_id,
                     found.asset_id.clone(),
                     date,
-                    trade.target.quantity,
+                    from_surface(trade.target.quantity),
                     unit_price,
                     trade.rate,
                     trade.fees,
@@ -1671,7 +1683,7 @@ impl HoldingTransactionUseCase {
                     &found.account_id,
                     found.asset_id.clone(),
                     date,
-                    trade.target.quantity,
+                    from_surface(trade.target.quantity),
                     unit_price,
                     trade.rate,
                     trade.fees,
@@ -1847,7 +1859,7 @@ fn trade_op(trade: &Trade, asset_id: String, date: String) -> TradeOp {
     TradeOp {
         asset_id,
         date,
-        quantity: trade.target.quantity,
+        quantity: from_surface(trade.target.quantity),
         unit_price,
         exchange_rate: trade.rate,
         fees: trade.fees,
@@ -2071,6 +2083,7 @@ pub fn refusal_from_account(error: &AccountError) -> Refusal {
         AccountError::DateTooOld => "the date is before 1900".to_string(),
         AccountError::QuantityNotPositive => "the quantity must be above zero".to_string(),
         AccountError::UnitPriceNegative => "the price cannot be negative".to_string(),
+        AccountError::QuantityOutOfRange => "the quantity is too large".to_string(),
         AccountError::UnitPriceOutOfRange => {
             "the price this total gives cannot be stored".to_string()
         }
@@ -2192,6 +2205,11 @@ mod tests {
                 AccountError::UnitPriceNegative,
                 "UnitPriceNegative",
                 "the price cannot be negative",
+            ),
+            (
+                AccountError::QuantityOutOfRange,
+                "QuantityOutOfRange",
+                "the quantity is too large",
             ),
             (
                 AccountError::UnitPriceOutOfRange,

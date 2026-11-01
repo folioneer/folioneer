@@ -249,7 +249,7 @@ async fn fetch_for_account_passes_exchange_qualified_symbol_to_provider() {
             &account.id,
             asset.id.clone(),
             "2024-01-01".to_string(),
-            1_000_000,
+            folioneer_lib::core::quantity::from_surface(1_000_000),
             100_000_000,
         )
         .await
@@ -372,7 +372,7 @@ async fn fetch_for_account_skips_locked_asset() {
             &account.id,
             asset.id.clone(),
             "2024-01-01".to_string(),
-            1_000_000,
+            folioneer_lib::core::quantity::from_surface(1_000_000),
             100_000_000,
         )
         .await
@@ -482,7 +482,7 @@ async fn fetch_for_account_includes_unblocked_asset() {
             &account.id,
             asset.id.clone(),
             "2024-01-01".to_string(),
-            1_000_000,
+            folioneer_lib::core::quantity::from_surface(1_000_000),
             100_000_000,
         )
         .await
@@ -577,7 +577,7 @@ async fn fetch_publishes_completion_event_with_counts() {
             &account.id,
             asset.id.clone(),
             "2024-01-01".to_string(),
-            1_000_000,
+            folioneer_lib::core::quantity::from_surface(1_000_000),
             100_000_000,
         )
         .await
@@ -716,7 +716,7 @@ async fn fetch_completion_event_unpriced_list_contains_skipped_asset_with_last_p
             &account.id,
             asset.id.clone(),
             "2024-01-01".to_string(),
-            1_000_000,
+            folioneer_lib::core::quantity::from_surface(1_000_000),
             100_000_000,
         )
         .await
@@ -871,7 +871,7 @@ async fn fetch_completion_unpriced_entry_has_none_last_price_when_never_priced()
             &account.id,
             asset.id.clone(),
             "2024-01-01".to_string(),
-            1_000_000,
+            folioneer_lib::core::quantity::from_surface(1_000_000),
             100_000_000,
         )
         .await
@@ -994,7 +994,7 @@ async fn fetch_completion_unpriced_list_excludes_successfully_fetched_asset() {
             &account.id,
             asset.id.clone(),
             "2024-01-01".to_string(),
-            1_000_000,
+            folioneer_lib::core::quantity::from_surface(1_000_000),
             100_000_000,
         )
         .await
@@ -1139,7 +1139,7 @@ async fn fetch_completion_unpriced_len_equals_skipped_count_in_mixed_outcome() {
                 &account.id,
                 asset.id.clone(),
                 "2024-01-01".to_string(),
-                1_000_000,
+                folioneer_lib::core::quantity::from_surface(1_000_000),
                 100_000_000,
             )
             .await
@@ -1283,7 +1283,7 @@ async fn fetch_completion_locked_asset_absent_from_unpriced_list() {
             &account.id,
             asset.id.clone(),
             "2024-01-01".to_string(),
-            1_000_000,
+            folioneer_lib::core::quantity::from_surface(1_000_000),
             100_000_000,
         )
         .await
@@ -1384,7 +1384,7 @@ async fn a_price_fetch_leaves_exchange_rates_alone() {
             &account.id,
             asset.id.clone(),
             "2024-01-01".to_string(),
-            1_000_000,
+            folioneer_lib::core::quantity::from_surface(1_000_000),
             100_000_000,
         )
         .await

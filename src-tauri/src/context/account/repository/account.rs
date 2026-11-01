@@ -1485,6 +1485,7 @@ mod tests {
     use super::*;
     use crate::context::account::domain::{Account, AccountChange};
     use crate::context::sync::SqliteChangeRecorder;
+    use crate::core::quantity::from_surface;
     use sqlx::sqlite::SqlitePoolOptions;
     use std::sync::Arc;
 
@@ -1552,7 +1553,7 @@ mod tests {
             asset_id.to_string(),
             TransactionType::Purchase,
             "2026-08-01".to_string(),
-            10,
+            from_surface(10),
             100_000_000,
             1_000_000,
             0,

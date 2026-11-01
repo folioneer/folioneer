@@ -17,8 +17,8 @@
         "has_inconsistent_holding": false,
         "name": "Growth USD",
         "outdated_price_count": 0,
-        "total_global_value": 7898737960,
-        "total_unrealized_pnl": -45838882,
+        "total_global_value": 7898737868,
+        "total_unrealized_pnl": -45838954,
         "wrapper": null
       }
     ],
@@ -26,8 +26,8 @@
       "currency": "EUR",
       "incomplete": false,
       "outdated_price_count": 0,
-      "total_global_value": 31482526302,
-      "total_unrealized_pnl": 3731569880
+      "total_global_value": 31482526217,
+      "total_unrealized_pnl": 3731569813
     }
   },
   "details_growth_usd_as_of_2025-12-31": {
@@ -38,23 +38,23 @@
         "asset_currency": "USD",
         "asset_name": "Beta Corp",
         "asset_reference": "BETA",
-        "average_price": 141084629,
-        "cost_basis": 2096576842,
+        "average_price": 141084634,
+        "cost_basis": 2096576823,
         "current_price": 138000000,
         "current_price_date": "2025-12-31",
         "current_price_source": "Manual",
-        "current_value": 2050737960,
+        "current_value": 2050737868,
         "dividends_received": 0,
         "fee_rate_percent_micros": null,
         "fx_rate_date": null,
         "inconsistency": null,
-        "management_fees": 20309170,
-        "market_value": 2050737960,
+        "management_fees": 20309262,
+        "market_value": 2050737868,
         "note_alarm_triggered": false,
         "note_text": null,
         "note_threshold_direction": null,
         "note_threshold_price": null,
-        "performance_pct": -2186367,
+        "performance_pct": -2186371,
         "period_performance": {
           "five_years": null,
           "one_year": null,
@@ -63,11 +63,11 @@
           "ytd": null
         },
         "price_outdated": false,
-        "quantity": 14860420,
+        "quantity": 14860419,
         "realized_lost": 0,
-        "realized_pnl": -55423145,
-        "total_return_pct": -2186367,
-        "unrealized_pnl": -45838882,
+        "realized_pnl": -55423170,
+        "total_return_pct": -2186371,
+        "unrealized_pnl": -45838954,
         "unrecorded_splits": [],
         "weight_pct": 25962855
       },
@@ -111,14 +111,14 @@
     ],
     "outdated_price_count": 0,
     "total_capital_brought_in": 8000000000,
-    "total_cost_basis": 2096576842,
+    "total_cost_basis": 2096576823,
     "total_dividends_received": 0,
-    "total_global_value": 7898737960,
+    "total_global_value": 7898737868,
     "total_holding_count": 2,
-    "total_management_fees": 20309170,
+    "total_management_fees": 20309262,
     "total_net_cash_input": 8000000000,
-    "total_realized_pnl": -55423145,
-    "total_unrealized_pnl": -45838882
+    "total_realized_pnl": -55423170,
+    "total_unrealized_pnl": -45838954
   },
   "details_main_eur_as_of_2025-12-31": {
     "account_name": "Main EUR",
@@ -294,21 +294,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 31482526302,
+        "end_value": 31482526217,
         "month": 12,
         "period_over_period": {
-          "gain": 103264904,
+          "gain": 103264905,
           "pct": 329086
         },
-        "pnl": 103264904,
-        "previous_value": 31379261398,
+        "pnl": 103264905,
+        "previous_value": 31379261312,
         "since_inception": {
-          "gain": 4282526302,
+          "gain": 4282526217,
           "pct": 16089268
         },
         "year": 2025,
         "year_to_date": {
-          "gain": 2400957861,
+          "gain": 2400957864,
           "pct": 8255943
         }
       },
@@ -317,21 +317,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 31379261398,
+        "end_value": 31379261312,
         "month": 11,
         "period_over_period": {
           "gain": 103264905,
           "pct": 330173
         },
         "pnl": 103264905,
-        "previous_value": 31275996493,
+        "previous_value": 31275996407,
         "since_inception": {
-          "gain": 4179261398,
+          "gain": 4179261312,
           "pct": 15716587
         },
         "year": 2025,
         "year_to_date": {
-          "gain": 2297692957,
+          "gain": 2297692959,
           "pct": 7900856
         }
       },
@@ -340,21 +340,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 31275996493,
+        "end_value": 31275996407,
         "month": 10,
         "period_over_period": {
           "gain": 151264905,
           "pct": 485995
         },
         "pnl": 151264905,
-        "previous_value": 31124731588,
+        "previous_value": 31124731502,
         "since_inception": {
-          "gain": 4075996493,
+          "gain": 4075996407,
           "pct": 15344019
         },
         "year": 2025,
         "year_to_date": {
-          "gain": 2194428052,
+          "gain": 2194428054,
           "pct": 7545769
         }
       },
@@ -363,21 +363,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 31124731588,
+        "end_value": 31124731502,
         "month": 9,
         "period_over_period": {
-          "gain": 55264904,
+          "gain": 55264905,
           "pct": 177875
         },
-        "pnl": 55264904,
-        "previous_value": 31069466684,
+        "pnl": 55264905,
+        "previous_value": 31069466597,
         "since_inception": {
-          "gain": 3924731588,
+          "gain": 3924731502,
           "pct": 14791818
         },
         "year": 2025,
         "year_to_date": {
-          "gain": 2043163147,
+          "gain": 2043163149,
           "pct": 7025629
         }
       },
@@ -386,21 +386,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 31069466684,
+        "end_value": 31069466597,
         "month": 8,
         "period_over_period": {
           "gain": -185560095,
           "pct": -593696
         },
         "pnl": -185560095,
-        "previous_value": 31255026779,
+        "previous_value": 31255026692,
         "since_inception": {
-          "gain": 3869466684,
-          "pct": 14601670
+          "gain": 3869466597,
+          "pct": 14601669
         },
         "year": 2025,
         "year_to_date": {
-          "gain": 1987898243,
+          "gain": 1987898244,
           "pct": 6835595
         }
       },
@@ -409,21 +409,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 31255026779,
+        "end_value": 31255026692,
         "month": 7,
         "period_over_period": {
-          "gain": -87226480,
+          "gain": -87226477,
           "pct": -278303
         },
-        "pnl": -87226480,
-        "previous_value": 31342253259,
+        "pnl": -87226477,
+        "previous_value": 31342253169,
         "since_inception": {
-          "gain": 4055026779,
-          "pct": 15323672
+          "gain": 4055026692,
+          "pct": 15323671
         },
         "year": 2025,
         "year_to_date": {
-          "gain": 2173458338,
+          "gain": 2173458339,
           "pct": 7473662
         }
       },
@@ -432,21 +432,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 31342253259,
+        "end_value": 31342253169,
         "month": 6,
         "period_over_period": {
-          "gain": 44166301,
+          "gain": 44166300,
           "pct": 141115
         },
-        "pnl": 44166301,
-        "previous_value": 31298086958,
+        "pnl": 44166300,
+        "previous_value": 31298086869,
         "since_inception": {
-          "gain": 4142253259,
+          "gain": 4142253169,
           "pct": 15678148
         },
         "year": 2025,
         "year_to_date": {
-          "gain": 2260684818,
+          "gain": 2260684816,
           "pct": 7773600
         }
       },
@@ -455,21 +455,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 31298086958,
+        "end_value": 31298086869,
         "month": 5,
         "period_over_period": {
-          "gain": 101316300,
+          "gain": 101316301,
           "pct": 324765
         },
-        "pnl": 101316300,
-        "previous_value": 31196770658,
+        "pnl": 101316301,
+        "previous_value": 31196770568,
         "since_inception": {
-          "gain": 4098086958,
+          "gain": 4098086869,
           "pct": 15537684
         },
         "year": 2025,
         "year_to_date": {
-          "gain": 2216518517,
+          "gain": 2216518516,
           "pct": 7621729
         }
       },
@@ -478,21 +478,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 31196770658,
+        "end_value": 31196770568,
         "month": 4,
         "period_over_period": {
           "gain": 101316301,
           "pct": 325823
         },
         "pnl": 101316301,
-        "previous_value": 31095454357,
+        "previous_value": 31095454267,
         "since_inception": {
-          "gain": 3996770658,
+          "gain": 3996770568,
           "pct": 15183963
         },
         "year": 2025,
         "year_to_date": {
-          "gain": 2115202217,
+          "gain": 2115202215,
           "pct": 7273342
         }
       },
@@ -501,21 +501,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 31095454357,
+        "end_value": 31095454267,
         "month": 3,
         "period_over_period": {
-          "gain": -103683700,
+          "gain": -103683699,
           "pct": -332328
         },
-        "pnl": -103683700,
-        "previous_value": 31199138057,
+        "pnl": -103683699,
+        "previous_value": 31199137966,
         "since_inception": {
-          "gain": 3895454357,
+          "gain": 3895454267,
           "pct": 14831736
         },
         "year": 2025,
         "year_to_date": {
-          "gain": 2013885916,
+          "gain": 2013885914,
           "pct": 6924956
         }
       },
@@ -524,21 +524,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 31199138057,
+        "end_value": 31199137966,
         "month": 2,
         "period_over_period": {
-          "gain": 1740316301,
+          "gain": 1740316300,
           "pct": 5907623
         },
-        "pnl": 1740316301,
-        "previous_value": 29458821756,
+        "pnl": 1740316300,
+        "previous_value": 29458821666,
         "since_inception": {
-          "gain": 3999138057,
-          "pct": 15266365
+          "gain": 3999137966,
+          "pct": 15266364
         },
         "year": 2025,
         "year_to_date": {
-          "gain": 2117569616,
+          "gain": 2117569613,
           "pct": 7281483
         }
       },
@@ -547,21 +547,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 29458821756,
+        "end_value": 29458821666,
         "month": 1,
         "period_over_period": {
-          "gain": 377253315,
+          "gain": 377253313,
           "pct": 1297224
         },
-        "pnl": 377253315,
-        "previous_value": 29081568441,
+        "pnl": 377253313,
+        "previous_value": 29081568353,
         "since_inception": {
-          "gain": 2258821756,
-          "pct": 8646354
+          "gain": 2258821666,
+          "pct": 8646353
         },
         "year": 2025,
         "year_to_date": {
-          "gain": 377253315,
+          "gain": 377253313,
           "pct": 1297224
         }
       },
@@ -570,21 +570,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 29081568441,
+        "end_value": 29081568353,
         "month": 12,
         "period_over_period": {
-          "gain": 90121359,
+          "gain": 90121321,
           "pct": 310854
         },
-        "pnl": 90121359,
-        "previous_value": 28991447082,
+        "pnl": 90121321,
+        "previous_value": 28991447032,
         "since_inception": {
-          "gain": 1881568441,
-          "pct": 7227637
+          "gain": 1881568353,
+          "pct": 7227636
         },
         "year": 2024,
         "year_to_date": {
-          "gain": 1881568441,
+          "gain": 1881568353,
           "pct": 7247493
         }
       },
@@ -593,21 +593,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 28991447082,
+        "end_value": 28991447032,
         "month": 11,
         "period_over_period": {
-          "gain": 90100402,
+          "gain": 90100377,
           "pct": 311751
         },
-        "pnl": 90100402,
-        "previous_value": 28901346680,
+        "pnl": 90100377,
+        "previous_value": 28901346655,
         "since_inception": {
-          "gain": 1791447082,
+          "gain": 1791447032,
           "pct": 6910294
         },
         "year": 2024,
         "year_to_date": {
-          "gain": 1791447082,
+          "gain": 1791447032,
           "pct": 6931045
         }
       },
@@ -616,21 +616,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 28901346680,
+        "end_value": 28901346655,
         "month": 10,
         "period_over_period": {
-          "gain": -29920583,
+          "gain": -29920598,
           "pct": -103419
         },
-        "pnl": -29920583,
-        "previous_value": 28931267263,
+        "pnl": -29920598,
+        "previous_value": 28931267253,
         "since_inception": {
-          "gain": 1701346680,
+          "gain": 1701346655,
           "pct": 6594873
         },
         "year": 2024,
         "year_to_date": {
-          "gain": 1701346680,
+          "gain": 1701346655,
           "pct": 6616638
         }
       },
@@ -639,21 +639,21 @@
         "asset_flow": 560000000,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 28931267263,
+        "end_value": 28931267253,
         "month": 9,
         "period_over_period": {
-          "gain": 650058404,
+          "gain": 650058397,
           "pct": 2298552
         },
-        "pnl": 90058404,
-        "previous_value": 28281208859,
+        "pnl": 90058397,
+        "previous_value": 28281208856,
         "since_inception": {
-          "gain": 1731267263,
+          "gain": 1731267253,
           "pct": 6752677
         },
         "year": 2024,
         "year_to_date": {
-          "gain": 1731267263,
+          "gain": 1731267253,
           "pct": 6777503
         }
       },
@@ -662,21 +662,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 28281208859,
+        "end_value": 28281208856,
         "month": 8,
         "period_over_period": {
-          "gain": 106537364,
+          "gain": 106537361,
           "pct": 378131
         },
-        "pnl": 106537364,
+        "pnl": 106537361,
         "previous_value": 28174671495,
         "since_inception": {
-          "gain": 1081208859,
+          "gain": 1081208856,
           "pct": 4249261
         },
         "year": 2024,
         "year_to_date": {
-          "gain": 1081208859,
+          "gain": 1081208856,
           "pct": 4266820
         }
       },
@@ -842,22 +842,22 @@
     "yearly": [
       {
         "annualized_yield": {
-          "gain": 4282526302,
+          "gain": 4282526217,
           "pct": 7761268
         },
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 31482526302,
+        "end_value": 31482526217,
         "month": null,
         "period_over_period": {
-          "gain": 2400957861,
+          "gain": 2400957864,
           "pct": 8255943
         },
-        "pnl": 2400957861,
-        "previous_value": 29081568441,
+        "pnl": 2400957864,
+        "previous_value": 29081568353,
         "since_inception": {
-          "gain": 4282526302,
+          "gain": 4282526217,
           "pct": 16089268
         },
         "year": 2025,
@@ -865,20 +865,20 @@
       },
       {
         "annualized_yield": {
-          "gain": 1881568441,
-          "pct": 7227637
+          "gain": 1881568353,
+          "pct": 7227636
         },
         "asset_flow": 560000000,
         "cash_flow": 27200000000,
         "dividends": 75500000,
-        "end_value": 29081568441,
+        "end_value": 29081568353,
         "month": null,
         "period_over_period": null,
-        "pnl": 1246068441,
+        "pnl": 1246068353,
         "previous_value": 0,
         "since_inception": {
-          "gain": 1881568441,
-          "pct": 7227637
+          "gain": 1881568353,
+          "pct": 7227636
         },
         "year": 2024,
         "year_to_date": null
@@ -895,21 +895,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 7898737960,
+        "end_value": 7898737868,
         "month": 12,
         "period_over_period": {
           "gain": -7430210,
           "pct": -93979
         },
         "pnl": -7430210,
-        "previous_value": 7906168170,
+        "previous_value": 7906168078,
         "since_inception": {
-          "gain": -101262040,
-          "pct": -1265775
+          "gain": -101262132,
+          "pct": -1265776
         },
         "year": 2025,
         "year_to_date": {
-          "gain": -159162520,
+          "gain": -159162516,
           "pct": -1975235
         }
       },
@@ -918,21 +918,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 7906168170,
+        "end_value": 7906168078,
         "month": 11,
         "period_over_period": {
           "gain": -7430210,
           "pct": -93891
         },
         "pnl": -7430210,
-        "previous_value": 7913598380,
+        "previous_value": 7913598288,
         "since_inception": {
-          "gain": -93831830,
-          "pct": -1172897
+          "gain": -93831922,
+          "pct": -1172899
         },
         "year": 2025,
         "year_to_date": {
-          "gain": -151732310,
+          "gain": -151732306,
           "pct": -1883025
         }
       },
@@ -941,21 +941,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 7913598380,
+        "end_value": 7913598288,
         "month": 10,
         "period_over_period": {
-          "gain": -7430210,
+          "gain": -7430209,
           "pct": -93803
         },
-        "pnl": -7430210,
-        "previous_value": 7921028590,
+        "pnl": -7430209,
+        "previous_value": 7921028497,
         "since_inception": {
-          "gain": -86401620,
-          "pct": -1080020
+          "gain": -86401712,
+          "pct": -1080021
         },
         "year": 2025,
         "year_to_date": {
-          "gain": -144302100,
+          "gain": -144302096,
           "pct": -1790815
         }
       },
@@ -964,21 +964,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 7921028590,
+        "end_value": 7921028497,
         "month": 9,
         "period_over_period": {
           "gain": -7430210,
           "pct": -93715
         },
         "pnl": -7430210,
-        "previous_value": 7928458800,
+        "previous_value": 7928458707,
         "since_inception": {
-          "gain": -78971410,
-          "pct": -987142
+          "gain": -78971503,
+          "pct": -987143
         },
         "year": 2025,
         "year_to_date": {
-          "gain": -136871890,
+          "gain": -136871887,
           "pct": -1698604
         }
       },
@@ -987,21 +987,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 7928458800,
+        "end_value": 7928458707,
         "month": 8,
         "period_over_period": {
           "gain": -59930210,
           "pct": -750216
         },
         "pnl": -59930210,
-        "previous_value": 7988389010,
+        "previous_value": 7988388917,
         "since_inception": {
-          "gain": -71541200,
-          "pct": -894265
+          "gain": -71541293,
+          "pct": -894266
         },
         "year": 2025,
         "year_to_date": {
-          "gain": -129441680,
+          "gain": -129441677,
           "pct": -1606394
         }
       },
@@ -1010,21 +1010,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 7988389010,
+        "end_value": 7988388917,
         "month": 7,
         "period_over_period": {
-          "gain": -9930210,
+          "gain": -9930209,
           "pct": -124153
         },
-        "pnl": -9930210,
-        "previous_value": 7998319220,
+        "pnl": -9930209,
+        "previous_value": 7998319126,
         "since_inception": {
-          "gain": -11610990,
-          "pct": -145137
+          "gain": -11611083,
+          "pct": -145138
         },
         "year": 2025,
         "year_to_date": {
-          "gain": -69511470,
+          "gain": -69511467,
           "pct": -862649
         }
       },
@@ -1033,21 +1033,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 7998319220,
+        "end_value": 7998319126,
         "month": 6,
         "period_over_period": {
           "gain": -9930210,
           "pct": -123999
         },
         "pnl": -9930210,
-        "previous_value": 8008249430,
+        "previous_value": 8008249336,
         "since_inception": {
-          "gain": -1680780,
-          "pct": -21009
+          "gain": -1680874,
+          "pct": -21010
         },
         "year": 2025,
         "year_to_date": {
-          "gain": -59581260,
+          "gain": -59581258,
           "pct": -739414
         }
       },
@@ -1056,21 +1056,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 8008249430,
+        "end_value": 8008249336,
         "month": 5,
         "period_over_period": {
           "gain": -9930210,
           "pct": -123846
         },
         "pnl": -9930210,
-        "previous_value": 8018179640,
+        "previous_value": 8018179546,
         "since_inception": {
-          "gain": 8249430,
-          "pct": 103117
+          "gain": 8249336,
+          "pct": 103116
         },
         "year": 2025,
         "year_to_date": {
-          "gain": -49651050,
+          "gain": -49651048,
           "pct": -616178
         }
       },
@@ -1079,21 +1079,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 8018179640,
+        "end_value": 8018179546,
         "month": 4,
         "period_over_period": {
-          "gain": -9930210,
-          "pct": -123693
+          "gain": -9930209,
+          "pct": -123692
         },
-        "pnl": -9930210,
-        "previous_value": 8028109850,
+        "pnl": -9930209,
+        "previous_value": 8028109755,
         "since_inception": {
-          "gain": 18179640,
-          "pct": 227245
+          "gain": 18179546,
+          "pct": 227244
         },
         "year": 2025,
         "year_to_date": {
-          "gain": -39720840,
+          "gain": -39720838,
           "pct": -492942
         }
       },
@@ -1102,21 +1102,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 8028109850,
+        "end_value": 8028109755,
         "month": 3,
         "period_over_period": {
           "gain": -9930210,
           "pct": -123540
         },
         "pnl": -9930210,
-        "previous_value": 8038040060,
+        "previous_value": 8038039965,
         "since_inception": {
-          "gain": 28109850,
-          "pct": 351373
+          "gain": 28109755,
+          "pct": 351371
         },
         "year": 2025,
         "year_to_date": {
-          "gain": -29790630,
+          "gain": -29790629,
           "pct": -369707
         }
       },
@@ -1125,21 +1125,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 8038040060,
+        "end_value": 8038039965,
         "month": 2,
         "period_over_period": {
           "gain": -9930210,
           "pct": -123387
         },
         "pnl": -9930210,
-        "previous_value": 8047970270,
+        "previous_value": 8047970175,
         "since_inception": {
-          "gain": 38040060,
-          "pct": 475500
+          "gain": 38039965,
+          "pct": 475499
         },
         "year": 2025,
         "year_to_date": {
-          "gain": -19860420,
+          "gain": -19860419,
           "pct": -246471
         }
       },
@@ -1148,21 +1148,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 8047970270,
+        "end_value": 8047970175,
         "month": 1,
         "period_over_period": {
-          "gain": -9930210,
+          "gain": -9930209,
           "pct": -123235
         },
-        "pnl": -9930210,
-        "previous_value": 8057900480,
+        "pnl": -9930209,
+        "previous_value": 8057900384,
         "since_inception": {
-          "gain": 47970270,
-          "pct": 599628
+          "gain": 47970175,
+          "pct": 599627
         },
         "year": 2025,
         "year_to_date": {
-          "gain": -9930210,
+          "gain": -9930209,
           "pct": -123235
         }
       },
@@ -1171,22 +1171,22 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 8057900480,
+        "end_value": 8057900384,
         "month": 12,
         "period_over_period": {
-          "gain": -12802870,
-          "pct": -158633
+          "gain": -12802912,
+          "pct": -158634
         },
-        "pnl": -12802870,
-        "previous_value": 8070703350,
+        "pnl": -12802912,
+        "previous_value": 8070703296,
         "since_inception": {
-          "gain": 57900480,
-          "pct": 723756
+          "gain": 57900384,
+          "pct": 723754
         },
         "year": 2024,
         "year_to_date": {
-          "gain": 57900480,
-          "pct": 866134
+          "gain": 57900384,
+          "pct": 866132
         }
       },
       {
@@ -1194,21 +1194,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 8070703350,
+        "end_value": 8070703296,
         "month": 11,
         "period_over_period": {
-          "gain": -12825650,
-          "pct": -158663
+          "gain": -12825677,
+          "pct": -158664
         },
-        "pnl": -12825650,
-        "previous_value": 8083529000,
+        "pnl": -12825677,
+        "previous_value": 8083528973,
         "since_inception": {
-          "gain": 70703350,
+          "gain": 70703296,
           "pct": 883791
         },
         "year": 2024,
         "year_to_date": {
-          "gain": 70703350,
+          "gain": 70703296,
           "pct": 1077322
         }
       },
@@ -1217,21 +1217,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 8083529000,
+        "end_value": 8083528973,
         "month": 10,
         "period_over_period": {
-          "gain": -12848460,
-          "pct": -158693
+          "gain": -12848476,
+          "pct": -158694
         },
-        "pnl": -12848460,
-        "previous_value": 8096377460,
+        "pnl": -12848476,
+        "previous_value": 8096377449,
         "since_inception": {
-          "gain": 83529000,
+          "gain": 83528973,
           "pct": 1044112
         },
         "year": 2024,
         "year_to_date": {
-          "gain": 83529000,
+          "gain": 83528973,
           "pct": 1300861
         }
       },
@@ -1240,21 +1240,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 8096377460,
+        "end_value": 8096377449,
         "month": 9,
         "period_over_period": {
-          "gain": -12871300,
+          "gain": -12871308,
           "pct": -158723
         },
-        "pnl": -12871300,
-        "previous_value": 8109248760,
+        "pnl": -12871308,
+        "previous_value": 8109248757,
         "since_inception": {
-          "gain": 96377460,
+          "gain": 96377449,
           "pct": 1204718
         },
         "year": 2024,
         "year_to_date": {
-          "gain": 96377460,
+          "gain": 96377449,
           "pct": 1544075
         }
       },
@@ -1263,21 +1263,21 @@
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 8109248760,
+        "end_value": 8109248757,
         "month": 8,
         "period_over_period": {
-          "gain": -12894170,
+          "gain": -12894173,
           "pct": -158753
         },
-        "pnl": -12894170,
+        "pnl": -12894173,
         "previous_value": 8122142930,
         "since_inception": {
-          "gain": 109248760,
+          "gain": 109248757,
           "pct": 1365609
         },
         "year": 2024,
         "year_to_date": {
-          "gain": 109248760,
+          "gain": 109248757,
           "pct": 1813350
         }
       },
@@ -1397,43 +1397,43 @@
     "yearly": [
       {
         "annualized_yield": {
-          "gain": -101262040,
-          "pct": -692035
+          "gain": -101262132,
+          "pct": -692036
         },
         "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
-        "end_value": 7898737960,
+        "end_value": 7898737868,
         "month": null,
         "period_over_period": {
-          "gain": -159162520,
+          "gain": -159162516,
           "pct": -1975235
         },
-        "pnl": -159162520,
-        "previous_value": 8057900480,
+        "pnl": -159162516,
+        "previous_value": 8057900384,
         "since_inception": {
-          "gain": -101262040,
-          "pct": -1265775
+          "gain": -101262132,
+          "pct": -1265776
         },
         "year": 2025,
         "year_to_date": null
       },
       {
         "annualized_yield": {
-          "gain": 57900480,
-          "pct": 723756
+          "gain": 57900384,
+          "pct": 723754
         },
         "asset_flow": 0,
         "cash_flow": 8000000000,
         "dividends": 0,
-        "end_value": 8057900480,
+        "end_value": 8057900384,
         "month": null,
         "period_over_period": null,
-        "pnl": 57900480,
+        "pnl": 57900384,
         "previous_value": 0,
         "since_inception": {
-          "gain": 57900480,
-          "pct": 723756
+          "gain": 57900384,
+          "pct": 723754
         },
         "year": 2024,
         "year_to_date": null
@@ -2047,11 +2047,11 @@
     "observed_to": "2026-01-05",
     "rows": [
       {
-        "after": 7750133760,
-        "before": 7898737960,
+        "after": 7750133675,
+        "before": 7898737868,
         "currency": "USD",
         "incomplete": false,
-        "movement_amount": -148604200,
+        "movement_amount": -148604193,
         "movement_pct": -1881366,
         "name": "Growth USD"
       },
@@ -2065,10 +2065,10 @@
         "name": "Main EUR"
       }
     ],
-    "total_after": 31477524396,
-    "total_before": 31482526302,
+    "total_after": 31477524317,
+    "total_before": 31482526217,
     "total_currency": "EUR",
-    "total_movement_amount": -5001906,
+    "total_movement_amount": -5001900,
     "total_movement_pct": -15887
   }
 }

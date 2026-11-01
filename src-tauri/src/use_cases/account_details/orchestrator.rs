@@ -7,11 +7,12 @@ use crate::context::currency::CurrencyService;
 use crate::context::sync::HoldingInconsistency;
 use crate::core::cash::{is_cash_asset, system_cash_asset_id};
 use crate::core::logger::BACKEND;
+use crate::core::quantity::QUANTITY_UNIT;
 use crate::use_cases::shared::inconsistency::holding_inconsistency;
 use crate::use_cases::shared::unrecorded_split::{unrecorded_splits, UnrecordedSplit};
 use crate::use_cases::shared::valuation::{
     at_rate, convert_at_rate, holding_metric_for_span, load_priced_assets, load_rate_map_for_dates,
-    market_valued_flow_dates, PricedAsset, RateMap, MICRO,
+    market_valued_flow_dates, PricedAsset, RateMap,
 };
 use chrono::{Datelike, Local, NaiveDate};
 use serde::Serialize;
@@ -196,7 +197,7 @@ pub struct AccountDetailsResponse {
 
 /// MKT-143 — current price × quantity in the asset's own currency; None without a price.
 fn current_value_of(quantity: i64, current_price: Option<i64>) -> Option<i64> {
-    current_price.map(|price| (quantity as i128 * price as i128 / 1_000_000) as i64)
+    current_price.map(|price| (quantity as i128 * price as i128 / QUANTITY_UNIT) as i64)
 }
 
 /// ACD-052 — each holding's share of the Global Value in micro-percent; None when the
@@ -401,8 +402,8 @@ impl AccountDetailsUseCase {
             let cost_basis = if is_cash {
                 0
             } else {
-                let computed =
-                    (holding.quantity as i128 * holding.average_price as i128 / 1_000_000) as i64;
+                let computed = (holding.quantity as i128 * holding.average_price as i128
+                    / QUANTITY_UNIT) as i64;
                 total_cost_basis = total_cost_basis.saturating_add(computed);
                 computed
             };
@@ -460,7 +461,7 @@ impl AccountDetailsUseCase {
                     Some(converted) => {
                         let unrealized_pnl = ((converted as i128 - holding.average_price as i128)
                             * holding.quantity as i128
-                            / 1_000_000) as i64;
+                            / QUANTITY_UNIT) as i64;
                         let performance_pct = if cost_basis != 0 {
                             Some((unrealized_pnl as i128 * 100_000_000 / cost_basis as i128) as i64)
                         } else {
@@ -490,7 +491,7 @@ impl AccountDetailsUseCase {
                 Some(holding.quantity)
             } else {
                 converted_price.map(|converted| {
-                    (holding.quantity as i128 * converted as i128 / 1_000_000) as i64
+                    (holding.quantity as i128 * converted as i128 / QUANTITY_UNIT) as i64
                 })
             };
             if let Some(value) = market_value {
@@ -555,7 +556,11 @@ impl AccountDetailsUseCase {
                 asset_id: holding.asset_id,
                 asset_name: asset.name,
                 asset_reference: asset.reference,
-                quantity: holding.quantity,
+                quantity: if is_cash {
+                    holding.quantity
+                } else {
+                    crate::core::quantity::to_surface(holding.quantity)
+                },
                 average_price: holding.average_price,
                 cost_basis,
                 realized_pnl: holding.total_realized_pnl,
@@ -694,7 +699,7 @@ impl AccountDetailsUseCase {
             let Some(price) = prices.iter().find(|p| p.date.as_str() <= t.date.as_str()) else {
                 continue; // FEE-054 — no recorded price → contributes 0
             };
-            let value_asset_ccy = (t.quantity as i128 * price.price as i128 / 1_000_000) as i64;
+            let value_asset_ccy = (t.quantity as i128 * price.price as i128 / QUANTITY_UNIT) as i64;
             let fee_value = if asset.currency == account_currency {
                 value_asset_ccy
             } else {
@@ -841,7 +846,7 @@ impl AccountDetailsUseCase {
             // Active-as-of: enrich with the carry-forward price + FX as of the date.
             let cost_basis = (reconstruction.quantity as i128
                 * reconstruction.average_price as i128
-                / 1_000_000) as i64;
+                / QUANTITY_UNIT) as i64;
             total_cost_basis = total_cost_basis.saturating_add(cost_basis);
 
             // FXR-035 — resolve the rate to value this holding in the account
@@ -893,7 +898,7 @@ impl AccountDetailsUseCase {
                         let unrealized_pnl = ((converted as i128
                             - reconstruction.average_price as i128)
                             * reconstruction.quantity as i128
-                            / 1_000_000) as i64;
+                            / QUANTITY_UNIT) as i64;
                         let performance_pct = if cost_basis != 0 {
                             Some((unrealized_pnl as i128 * 100_000_000 / cost_basis as i128) as i64)
                         } else {
@@ -918,7 +923,7 @@ impl AccountDetailsUseCase {
             // the date; a priced holding contributes it to the Global Value, a
             // holding with no price or no usable rate carries None.
             let market_value: Option<i64> = converted_price.map(|converted| {
-                (reconstruction.quantity as i128 * converted as i128 / 1_000_000) as i64
+                (reconstruction.quantity as i128 * converted as i128 / QUANTITY_UNIT) as i64
             });
             if let Some(value) = market_value {
                 total_global_value = total_global_value.saturating_add(value);
@@ -937,7 +942,7 @@ impl AccountDetailsUseCase {
                 asset_id: asset_id.to_string(),
                 asset_name: asset.name,
                 asset_reference: asset.reference,
-                quantity: reconstruction.quantity,
+                quantity: crate::core::quantity::to_surface(reconstruction.quantity),
                 average_price: reconstruction.average_price,
                 cost_basis,
                 realized_pnl,
@@ -1197,7 +1202,7 @@ fn window_position_pct(
                 .get(&(priced.currency.clone(), window_start))?,
         )
     };
-    let value = quantity_at_start as i128 * converted_price / MICRO;
+    let value = quantity_at_start as i128 * converted_price / QUANTITY_UNIT;
     debug_assert!(
         value <= i64::MAX as i128 && value >= i64::MIN as i128,
         "window_position_pct start_value i64 overflow: {value}"
@@ -1244,6 +1249,7 @@ mod tests {
         AssetClass, CreateAssetDTO, SqliteAssetCategoryRepository, SqliteAssetRepository,
         SYSTEM_CATEGORY_ID,
     };
+    use crate::core::quantity::from_surface;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn setup(pool: &sqlx::Pool<sqlx::Sqlite>) -> (Arc<AccountService>, Arc<AssetService>) {
@@ -1401,8 +1407,8 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    2_000_000,   // 2.0 units
-                    100_000_000, // 100.00
+                    crate::core::quantity::from_surface(2_000_000), // 2.0 units
+                    100_000_000,                                    // 100.00
                     0,
                     None,
                 )
@@ -1464,7 +1470,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    1_000_000,
+                    crate::core::quantity::from_surface(1_000_000),
                     50_000_000,
                     0,
                     None,
@@ -1963,7 +1969,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset1.id,
-                    1_000_000,
+                    crate::core::quantity::from_surface(1_000_000),
                     50_000_000,
                     10_000_000,
                     Some("2025-06-01".to_string()),
@@ -2078,7 +2084,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id,
-                    1_000_000,
+                    crate::core::quantity::from_surface(1_000_000),
                     100_000_000,
                     0,
                     None,
@@ -2128,7 +2134,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    2_000_000,
+                    crate::core::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -2182,7 +2188,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    1_000_000,
+                    crate::core::quantity::from_surface(1_000_000),
                     100_000_000,
                     0,
                     None,
@@ -2238,7 +2244,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    2_000_000,
+                    crate::core::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -2292,7 +2298,7 @@ mod tests {
                 Holding::new(
                     account_id.to_string(),
                     asset.id.clone(),
-                    1_000_000,
+                    crate::core::quantity::from_surface(1_000_000),
                     100_000_000,
                     0,
                     None,
@@ -2322,7 +2328,7 @@ mod tests {
                 &account.id,
                 asset_id.clone(),
                 "2024-01-02".into(),
-                10_000_000,
+                from_surface(10_000_000),
                 1_000_000_000,
             )
             .await
@@ -2332,7 +2338,7 @@ mod tests {
                 &account.id,
                 asset_id.clone(),
                 "2024-03-01".into(),
-                2_000_000,
+                from_surface(2_000_000),
                 crate::context::account::WriteOffReason::Lost,
                 None,
             )
@@ -2343,7 +2349,7 @@ mod tests {
                 &account.id,
                 asset_id.clone(),
                 "2024-03-02".into(),
-                1_000_000,
+                from_surface(1_000_000),
                 crate::context::account::WriteOffReason::NetworkFee,
                 None,
             )
@@ -2377,7 +2383,7 @@ mod tests {
                 &account.id,
                 &lost.id,
                 "2024-03-01".into(),
-                2_000_000,
+                from_surface(2_000_000),
                 crate::context::account::WriteOffReason::Dust,
                 None,
             )
@@ -2400,7 +2406,7 @@ mod tests {
                 &account.id,
                 asset_id.clone(),
                 "2020-01-02".into(),
-                10_000_000,
+                from_surface(10_000_000),
                 1_000_000_000,
             )
             .await
@@ -2526,7 +2532,7 @@ mod tests {
                 Holding::new(
                     account_id.to_string(),
                     asset.id.clone(),
-                    quantity,
+                    crate::core::quantity::from_surface(quantity),
                     100_000_000,
                     0,
                     None,
@@ -2679,7 +2685,7 @@ mod tests {
                     Holding::new(
                         account.id.clone(),
                         asset_id,
-                        1_000_000,
+                        crate::core::quantity::from_surface(1_000_000),
                         100_000_000,
                         0,
                         None,
@@ -2770,7 +2776,7 @@ mod tests {
                     Holding::new(
                         account.id.clone(),
                         asset.id.clone(),
-                        1_000_000,
+                        crate::core::quantity::from_surface(1_000_000),
                         100_000_000,
                         0,
                         None,
@@ -3017,7 +3023,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 iso(today - chrono::Duration::days(30)),
-                100_000_000,
+                from_surface(100_000_000),
                 50_000_000_000,
             )
             .await
@@ -3155,7 +3161,15 @@ mod tests {
         // average_price = 0 → cost_basis = 0
         SqliteHoldingRepository::new(pool.clone())
             .upsert(
-                Holding::new(account.id.clone(), asset.id.clone(), 1_000_000, 0, 0, None).unwrap(),
+                Holding::new(
+                    account.id.clone(),
+                    asset.id.clone(),
+                    crate::core::quantity::from_surface(1_000_000),
+                    0,
+                    0,
+                    None,
+                )
+                .unwrap(),
             )
             .await
             .unwrap();
@@ -3203,7 +3217,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    2_000_000,
+                    crate::core::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -3257,7 +3271,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    2_000_000,
+                    crate::core::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -3311,7 +3325,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    1_000_000,
+                    crate::core::quantity::from_surface(1_000_000),
                     100_000_000,
                     0,
                     None,
@@ -3386,7 +3400,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset1.id.clone(),
-                    2_000_000,
+                    crate::core::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -3421,7 +3435,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset2.id.clone(),
-                    1_000_000,
+                    crate::core::quantity::from_surface(1_000_000),
                     50_000_000,
                     0,
                     None,
@@ -3479,8 +3493,15 @@ mod tests {
             let holding_repo = SqliteHoldingRepository::new(pool.clone());
             holding_repo
                 .upsert(
-                    Holding::new(account.id.clone(), asset.id, 1_000_000, 50_000_000, 0, None)
-                        .unwrap(),
+                    Holding::new(
+                        account.id.clone(),
+                        asset.id,
+                        crate::core::quantity::from_surface(1_000_000),
+                        50_000_000,
+                        0,
+                        None,
+                    )
+                    .unwrap(),
                 )
                 .await
                 .unwrap();
@@ -3549,7 +3570,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    2_000_000,
+                    crate::core::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -3697,7 +3718,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    1_000_000,
+                    crate::core::quantity::from_surface(1_000_000),
                     100_000_000,
                     0,
                     None,
@@ -3953,7 +3974,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    2_000_000,
+                    crate::core::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -4062,7 +4083,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    2_000_000,
+                    crate::core::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -4152,7 +4173,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    2_000_000,
+                    crate::core::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -4278,7 +4299,7 @@ mod tests {
                 &account.id,
                 early.clone(),
                 "2024-02-01".to_string(),
-                2_000_000,
+                from_surface(2_000_000),
                 100_000_000,
                 1_000_000,
                 0,
@@ -4293,7 +4314,7 @@ mod tests {
                 &account.id,
                 late.clone(),
                 "2024-08-01".to_string(),
-                5_000_000,
+                from_surface(5_000_000),
                 50_000_000,
                 1_000_000,
                 0,
@@ -4371,7 +4392,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 "2024-02-01".to_string(),
-                2_000_000,
+                from_surface(2_000_000),
                 100_000_000,
                 1_000_000,
                 0,
@@ -4446,7 +4467,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 "2024-02-01".to_string(),
-                4_000_000,
+                from_surface(4_000_000),
                 100_000_000,
                 1_000_000,
                 0,
@@ -4461,7 +4482,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 "2024-03-01".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 150_000_000,
                 1_000_000,
                 0,
@@ -4515,7 +4536,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 "2024-02-01".to_string(),
-                2_000_000,
+                from_surface(2_000_000),
                 100_000_000,
                 1_000_000,
                 0,
@@ -4572,7 +4593,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 "2024-02-01".to_string(),
-                2_000_000,
+                from_surface(2_000_000),
                 100_000_000,
                 1_000_000,
                 0,
@@ -4587,7 +4608,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 "2024-03-01".to_string(),
-                2_000_000,
+                from_surface(2_000_000),
                 130_000_000,
                 1_000_000,
                 0,
@@ -4641,7 +4662,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 "2024-02-01".to_string(),
-                3_000_000,
+                from_surface(3_000_000),
                 100_000_000,
                 1_000_000,
                 0,
@@ -4656,7 +4677,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 "2024-09-01".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 150_000_000,
                 1_000_000,
                 0,
@@ -4713,7 +4734,7 @@ mod tests {
                         &account.id,
                         sold.clone(),
                         date.to_string(),
-                        1_000_000,
+                        from_surface(1_000_000),
                         12_000_000,
                         1_000_000,
                         0,
@@ -4727,7 +4748,7 @@ mod tests {
                         &account.id,
                         sold.clone(),
                         date.to_string(),
-                        1_000_000,
+                        from_surface(1_000_000),
                         10_000_000,
                         1_000_000,
                         0,
@@ -4745,7 +4766,7 @@ mod tests {
                 &account.id,
                 bought.clone(),
                 day.to_string(),
-                2_000_000,
+                from_surface(2_000_000),
                 100_000_000,
                 1_000_000,
                 0,
@@ -4828,7 +4849,7 @@ mod tests {
                 &account.id,
                 gift.clone(),
                 "2024-01-01".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 0,
             )
             .await
@@ -4906,7 +4927,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 "2024-02-01".to_string(),
-                2_000_000,
+                from_surface(2_000_000),
                 100_000_000,
                 1_000_000,
                 0,
@@ -4991,7 +5012,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    1_000_000,
+                    crate::core::quantity::from_surface(1_000_000),
                     50_000_000,
                     0,
                     None,
@@ -5093,8 +5114,8 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2024-01-01".to_string(),
-                100_000_000, // 100 units
-                10_000_000,  // 10.00
+                from_surface(100_000_000), // 100 units
+                10_000_000,                // 10.00
                 1_000_000,
                 0,
                 None,
@@ -5189,8 +5210,8 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2024-01-01".to_string(),
-                100_000_000, // 100 units
-                10_000_000,  // 10.00
+                from_surface(100_000_000), // 100 units
+                10_000_000,                // 10.00
                 1_000_000,
                 0,
                 None,
@@ -5280,8 +5301,8 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2024-01-01".to_string(),
-                100_000_000, // 100 units
-                10_000_000,  // 10.00
+                from_surface(100_000_000), // 100 units
+                10_000_000,                // 10.00
                 1_000_000,
                 0,
                 None,
@@ -5372,8 +5393,8 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2024-01-01".to_string(),
-                100_000_000, // 100 units
-                10_000_000,  // 10.00
+                from_surface(100_000_000), // 100 units
+                10_000_000,                // 10.00
                 1_000_000,
                 0,
                 None,
@@ -5488,7 +5509,7 @@ mod tests {
                 account_id,
                 asset_id.to_string(),
                 date.to_string(),
-                quantity,
+                from_surface(quantity),
                 unit_price,
                 1_000_000,
                 0,
@@ -5653,7 +5674,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 iso(first_flow_day),
-                1_000_000,
+                from_surface(1_000_000),
                 110_000_000,
                 1_000_000,
                 0,

@@ -110,7 +110,7 @@ async fn seed_held_position(ctx: &Ctx) -> (String, String) {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            folioneer_lib::core::quantity::from_surface(micro(10)),
             micro(50),
             micro(1),
             0,

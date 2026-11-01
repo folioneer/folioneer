@@ -115,7 +115,7 @@ async fn seed_held_position(ctx: &Ctx) -> (String, String) {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            folioneer_lib::core::quantity::from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -186,7 +186,7 @@ async fn record_split_rescales_quantity_and_preserves_cost_basis() {
         .expect("holding must survive the split");
     assert_eq!(
         holding.quantity,
-        micro(200),
+        folioneer_lib::core::quantity::from_surface(micro(200)),
         "quantity must rescale by the factor (SPL-020)"
     );
     assert_eq!(
@@ -194,7 +194,7 @@ async fn record_split_rescales_quantity_and_preserves_cost_basis() {
         "average price must rescale to 2.50 (SPL-020)"
     );
     assert_eq!(
-        holding.quantity as i128 * holding.average_price as i128 / 1_000_000,
+        holding.quantity as i128 * holding.average_price as i128 / 100_000_000,
         micro(500) as i128,
         "cost basis must be preserved across the rescale (SPL-020)"
     );
@@ -337,7 +337,10 @@ async fn spl_062_the_split_draft_check_previews_what_recording_leaves() {
     assert_eq!(preview.factor, 1_500_000);
     assert_eq!(
         (position.old_quantity, position.old_average_price),
-        (micro(10), micro(50))
+        (
+            folioneer_lib::core::quantity::from_surface(micro(10)),
+            micro(50)
+        )
     );
 
     let untouched = ctx
@@ -346,7 +349,11 @@ async fn spl_062_the_split_draft_check_previews_what_recording_leaves() {
         .await
         .unwrap()
         .expect("holding");
-    assert_eq!(untouched.quantity, micro(10), "the check writes nothing");
+    assert_eq!(
+        untouched.quantity,
+        folioneer_lib::core::quantity::from_surface(micro(10)),
+        "the check writes nothing"
+    );
 
     ctx.use_case
         .record_split(

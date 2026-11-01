@@ -1290,7 +1290,7 @@ async fn agt_051_a_session_changes_what_another_session_recorded_and_the_mark_st
         .iter()
         .find(|row| row.transaction.id == of_the_first)
         .expect("still there");
-    assert_eq!(corrected.transaction.quantity, M);
+    assert_eq!(corrected.transaction.quantity, 100 * M);
     assert_eq!(
         corrected.recorded_by.as_ref().expect("marked").session,
         first.key,
@@ -2087,7 +2087,7 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
         .await
         .expect("read")
         .expect("stored");
-    assert_eq!(unchanged.quantity, 500_000);
+    assert_eq!(unchanged.quantity, 50_000_000);
     // An argument the tool does not know is ignored (AGT-040): a percent changes nothing.
     for (recorded, arguments, code) in [
         (&by_percent, json!({ "percent": 1 }), "MissingArgument"),
@@ -4179,7 +4179,7 @@ async fn agt_063_the_edges_of_a_split_and_free_shares() {
     assert_eq!(
         call(
             "record_split",
-            json!({ "account": "PEA", "asset": "TINY", "new": 1, "old": 2, "date": "2026-03-01" }),
+            json!({ "account": "PEA", "asset": "TINY", "new": 1, "old": 1000, "date": "2026-03-01" }),
         )
         .await
         .expect_err("refused")
@@ -4796,7 +4796,7 @@ async fn agt_087_a_change_is_refused_before_asking() {
         .await
         .expect("read")
         .expect("kept");
-    assert_eq!(stored.quantity, 10 * M, "nothing was written");
+    assert_eq!(stored.quantity, 1_000 * M, "nothing was written");
 }
 
 // AGT-087 — a split is changed by its ratio, a purchase's total follows its unit price when
@@ -6547,8 +6547,8 @@ async fn replaced_stands_as_recorded(received: i64) {
             sale.asset_id.clone(),
             TransferFigures {
                 date: "2019-06-01".to_string(),
-                quantity_sent: 4 * M,
-                quantity_received: received * M,
+                quantity_sent: 400 * M,
+                quantity_received: 100 * received * M,
                 exchange_rate: None,
                 note: None,
             },
@@ -6928,8 +6928,8 @@ async fn agt_080_a_part_of_a_transfer_is_refused_before_asking() {
             bought.asset_id.clone(),
             TransferFigures {
                 date: "2019-06-01".to_string(),
-                quantity_sent: 4 * M,
-                quantity_received: 3 * M,
+                quantity_sent: 400 * M,
+                quantity_received: 300 * M,
                 exchange_rate: None,
                 note: None,
             },

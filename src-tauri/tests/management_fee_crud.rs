@@ -139,7 +139,7 @@ async fn record_management_fee_does_not_create_asset_price_row() {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            folioneer_lib::core::quantity::from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -225,7 +225,7 @@ async fn record_management_fee_performance_neutrality() {
         &account.id,
         asset.id.clone(),
         "2024-01-15".to_string(),
-        micro(10),
+        folioneer_lib::core::quantity::from_surface(micro(10)),
         micro(50),
         micro(1),
         0,
@@ -306,7 +306,7 @@ async fn account_holding(ctx: &Ctx, quantity: i64) -> (Account, String) {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            quantity,
+            folioneer_lib::core::quantity::from_surface(quantity),
             micro(50),
             micro(1),
             0,
@@ -332,13 +332,14 @@ async fn fee_028_resulting_quantity_records_the_exact_removal() {
             asset_id.clone(),
             "2024-06-15".to_string(),
             None,
-            Some(24_500_000),
+            Some(folioneer_lib::core::quantity::from_surface(24_500_000)),
             None,
         )
         .await
         .expect("FEE-028: a resulting quantity below the held one must be recorded");
     assert_eq!(
-        fee.quantity, 500_000,
+        fee.quantity,
+        folioneer_lib::core::quantity::from_surface(500_000),
         "25.000000 → 24.500000 removes 0.500000"
     );
 
@@ -349,13 +350,14 @@ async fn fee_028_resulting_quantity_records_the_exact_removal() {
             asset_id.clone(),
             "2024-06-16".to_string(),
             None,
-            Some(24_499_999),
+            Some(folioneer_lib::core::quantity::from_surface(24_499_999)),
             None,
         )
         .await
         .expect("FEE-028: a one-micro-unit removal must be recorded");
     assert_eq!(
-        one_micro.quantity, 1,
+        one_micro.quantity,
+        folioneer_lib::core::quantity::from_surface(1),
         "no rounding: 24.500000 → 24.499999 removes 0.000001"
     );
 
@@ -365,7 +367,10 @@ async fn fee_028_resulting_quantity_records_the_exact_removal() {
         .await
         .unwrap()
         .expect("the holding stays open");
-    assert_eq!(holding.quantity, 24_499_999);
+    assert_eq!(
+        holding.quantity,
+        folioneer_lib::core::quantity::from_surface(24_499_999)
+    );
 }
 
 /// FEE-028 — a resulting quantity of zero removes the whole holding as of that date.
@@ -381,12 +386,15 @@ async fn fee_028_resulting_quantity_zero_removes_the_whole_holding() {
             asset_id,
             "2024-06-15".to_string(),
             None,
-            Some(0),
+            Some(folioneer_lib::core::quantity::from_surface(0)),
             None,
         )
         .await
         .expect("FEE-028: zero is a valid resulting quantity");
-    assert_eq!(fee.quantity, micro(25));
+    assert_eq!(
+        fee.quantity,
+        folioneer_lib::core::quantity::from_surface(micro(25))
+    );
 }
 
 /// FEE-021/028 — a resulting quantity below zero, or not strictly below the quantity held
@@ -404,7 +412,7 @@ async fn fee_028_resulting_quantity_out_of_bounds_is_rejected() {
                 asset_id.clone(),
                 "2024-06-15".to_string(),
                 None,
-                Some(resulting),
+                Some(folioneer_lib::core::quantity::from_surface(resulting)),
                 None,
             )
             .await
@@ -422,7 +430,7 @@ async fn fee_028_resulting_quantity_out_of_bounds_is_rejected() {
             asset_id.clone(),
             "2024-06-15".to_string(),
             None,
-            Some(-1),
+            Some(folioneer_lib::core::quantity::from_surface(-1)),
             None,
         )
         .await
@@ -447,7 +455,7 @@ async fn fee_021_both_or_neither_amount_is_rejected() {
                 asset_id.clone(),
                 "2024-06-15".to_string(),
                 percent,
-                resulting,
+                resulting.map(folioneer_lib::core::quantity::from_surface),
                 None,
             )
             .await
@@ -472,12 +480,18 @@ async fn fee_029_preview_reports_held_removed_and_percentage_without_writing() {
             &account.id,
             asset_id.clone(),
             "2024-06-15".to_string(),
-            24_500_000,
+            folioneer_lib::core::quantity::from_surface(24_500_000),
         )
         .await
         .expect("FEE-029: a valid resulting quantity previews");
-    assert_eq!(preview.held_quantity, micro(25));
-    assert_eq!(preview.removed_quantity, 500_000);
+    assert_eq!(
+        preview.held_quantity,
+        folioneer_lib::core::quantity::from_surface(micro(25))
+    );
+    assert_eq!(
+        preview.removed_quantity,
+        folioneer_lib::core::quantity::from_surface(500_000)
+    );
     assert_eq!(preview.percent_micros, 2_000_000, "0.5 of 25 is 2 %");
 
     // FEE-021 — the date bounds are checked before the holding is replayed.
@@ -515,7 +529,7 @@ async fn fee_029_preview_reports_held_removed_and_percentage_without_writing() {
         .expect("the holding exists");
     assert_eq!(
         holding.quantity,
-        micro(25),
+        folioneer_lib::core::quantity::from_surface(micro(25)),
         "FEE-029: a preview writes nothing"
     );
 }
@@ -599,7 +613,7 @@ async fn fee_021_a_date_outside_its_bounds_is_refused() {
 #[tokio::test]
 async fn fee_022_a_percentage_that_removes_nothing_is_refused() {
     let ctx = build_ctx().await;
-    // 25 micro-units: 1 % of them floors to zero.
+    // 25 millionths of a unit: 0.01 % of them floors to zero.
     let (account, asset_id) = account_holding(&ctx, 25).await;
 
     let error = ctx
@@ -608,7 +622,7 @@ async fn fee_022_a_percentage_that_removes_nothing_is_refused() {
             &account.id,
             asset_id.clone(),
             "2024-06-15".to_string(),
-            micro(1),
+            10_000,
             None,
         )
         .await
@@ -621,7 +635,10 @@ async fn fee_022_a_percentage_that_removes_nothing_is_refused() {
         .await
         .unwrap()
         .expect("the holding exists");
-    assert_eq!(holding.quantity, 25);
+    assert_eq!(
+        holding.quantity,
+        folioneer_lib::core::quantity::from_surface(25)
+    );
 }
 
 /// FEE-029 — the preview refuses what the recording refuses: an unknown account or
@@ -703,7 +720,7 @@ async fn fee_063_a_deduction_is_edited_and_deleted_through_the_replay() {
             &account.id,
             asset_id.clone(),
             "2024-09-01".to_string(),
-            22_500_000,
+            folioneer_lib::core::quantity::from_surface(22_500_000),
             micro(60),
             micro(1),
             0,
@@ -730,7 +747,10 @@ async fn fee_063_a_deduction_is_edited_and_deleted_through_the_replay() {
         .expect("a date and a note are edited");
     assert_eq!(edited.date, "2024-07-01");
     assert_eq!(edited.note.as_deref(), Some("TER"));
-    assert_eq!(edited.quantity, 2_500_000);
+    assert_eq!(
+        edited.quantity,
+        folioneer_lib::core::quantity::from_surface(2_500_000)
+    );
     assert_eq!(edited.asset_id, asset_id);
 
     let refused = ctx
@@ -739,7 +759,7 @@ async fn fee_063_a_deduction_is_edited_and_deleted_through_the_replay() {
             &account.id,
             &fee.id,
             "2024-07-01".to_string(),
-            micro(3),
+            folioneer_lib::core::quantity::from_surface(micro(3)),
             0,
             micro(1),
             0,
@@ -760,7 +780,11 @@ async fn fee_063_a_deduction_is_edited_and_deleted_through_the_replay() {
         .await
         .unwrap()
         .expect("the holding exists");
-    assert_eq!(holding.quantity, 2_500_000, "the removed shares are back");
+    assert_eq!(
+        holding.quantity,
+        folioneer_lib::core::quantity::from_surface(2_500_000),
+        "the removed shares are back"
+    );
 }
 
 /// FEE-075 — an account that existed before the parameter keeps its fees: what is checked

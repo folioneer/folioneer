@@ -102,10 +102,14 @@ async fn read_device_history(
             tracing::warn!(target: BACKEND, device_id, name = %name, err = %error, "join: segment unreadable");
             unreadable(error)
         })?;
+        let written_in = segment.data_format_version;
         for segment_change in segment.changes {
             let sequence = segment_change.sequence;
-            let change =
-                Change::from_segment_change(device_id, segment_change).map_err(|problem| {
+            let change = Change::from_segment_change(
+                device_id,
+                segment_change.in_current_format(written_in),
+            )
+            .map_err(|problem| {
                     tracing::warn!(target: BACKEND, device_id, name = %name, err = %problem, "join: segment malformed");
                     JoinError::HistoryIncomplete
                 })?;
@@ -325,10 +329,11 @@ async fn rebuild(
 mod tests {
     use super::*;
     use crate::context::sync::domain::{
-        segment_file_name, DerivationParameters, MockFolderStore, Segment,
+        segment_file_name, DerivationParameters, MockFolderStore, Segment, SegmentChange,
     };
     use crate::context::sync::infrastructure::codec::encode_segment;
     use crate::context::sync::infrastructure::crypto::{derive_key, Key};
+    use crate::shared::domain::{Operation, Origin, RecordKind};
 
     const DEVICE: &str = "desktop-device";
 
@@ -444,6 +449,57 @@ mod tests {
             read(damaged).await,
             Err(JoinError::HistoryIncomplete)
         ));
+    }
+
+    // SYN-038 — a history written in an older format joins in the current form: a device
+    // joining reads the same quantity as one that applied the change when it came.
+    #[tokio::test]
+    async fn syn_038_a_history_in_an_older_format_joins_in_the_current_form() {
+        let mut folder = MockFolderStore::new();
+        folder
+            .expect_read_manifest_bytes()
+            .returning(|_| Ok(Some(manifest_written_in(13))));
+        folder
+            .expect_list_segment_names()
+            .returning(|_| Ok(vec![segment_file_name(1, 1)]));
+        folder.expect_read_segment_bytes().returning(|_, _| {
+            let segment = Segment {
+                device_id: DEVICE.into(),
+                first_sequence: 1,
+                last_sequence: 1,
+                data_format_version: 13,
+                changes: vec![SegmentChange {
+                    sequence: 1,
+                    logical_timestamp: "00000000000000000001".into(),
+                    based_on: None,
+                    record_kind: RecordKind::Transaction,
+                    record_identity: "tx-1".into(),
+                    operation: Operation::Created,
+                    origin: Origin::User,
+                    content: Some(
+                        r#"{"id":"tx-1","asset_id":"asset-1","transaction_type":"Purchase","quantity":7}"#
+                            .into(),
+                    ),
+                }],
+            };
+            Ok(Some(encode_segment(&key(), &segment).expect("sealed")))
+        });
+        let mut history = History {
+            changes: vec![],
+            cursors: vec![],
+        };
+
+        read_device_history(&folder, &key(), DEVICE, &mut history)
+            .await
+            .expect("read");
+
+        let content = history.changes[0]
+            .change
+            .content
+            .as_deref()
+            .expect("content");
+        let read: serde_json::Value = serde_json::from_str(content).expect("json");
+        assert_eq!(read["quantity"], 700);
     }
 
     // SYN-035 — a folder with both a file in a newer format and a gap reports the first

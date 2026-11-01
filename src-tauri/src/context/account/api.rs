@@ -6,8 +6,9 @@ use super::domain::{
     HoldingNote, ThresholdDirection, Wrapper, PORTFOLIO_COUNTRY, WRAPPERS,
 };
 use crate::context::account::{
-    AccountError, AccountJournal, HoldingSnapshot, JournalFilter, Transaction,
+    AccountError, AccountJournal, HoldingSnapshot, JournalFilter, JournalRow, Transaction,
 };
+use crate::core::cash::is_cash_asset;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -142,6 +143,7 @@ pub async fn get_transactions(
         .account_service
         .get_transactions(&account_id, &asset_id)
         .await
+        .map(|transactions| transactions.iter().map(Transaction::as_shown).collect())
 }
 
 /// TDI-010 — Returns the (account, asset) holding's quantity and VWAP average
@@ -158,6 +160,13 @@ pub async fn get_holding_snapshot_as_of(
         .account_service
         .holding_snapshot_as_of(&account_id, &asset_id, &date)
         .await
+        .map(|snapshot| {
+            if is_cash_asset(&asset_id) {
+                snapshot
+            } else {
+                snapshot.as_shown()
+            }
+        })
 }
 
 /// The account journal of an account: its transactions in date order, each with the cash
@@ -173,6 +182,17 @@ pub async fn get_account_journal(
         .account_service
         .get_account_journal(&account_id, &filter)
         .await
+        .map(|journal| AccountJournal {
+            rows: journal
+                .rows
+                .into_iter()
+                .map(|row| JournalRow {
+                    transaction: row.transaction.as_shown(),
+                    ..row
+                })
+                .collect(),
+            ..journal
+        })
 }
 
 // =============================================================================

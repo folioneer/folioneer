@@ -54,6 +54,7 @@ mod tests {
         AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
         SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
     };
+    use crate::core::quantity::from_surface;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn setup_pool() -> sqlx::Pool<sqlx::Sqlite> {
@@ -155,7 +156,7 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2026-01-01".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 10_000_000,
                 1_000_000,
                 0,
@@ -206,7 +207,7 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2026-01-01".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 10_000_000,
                 1_000_000,
                 0,
@@ -220,7 +221,7 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2026-01-02".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 12_000_000,
                 1_000_000,
                 0,

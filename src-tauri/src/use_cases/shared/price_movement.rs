@@ -190,7 +190,11 @@ mod tests {
             "holding-1".to_string(),
             "acc-1".to_string(),
             asset_id.to_string(),
-            quantity,
+            if crate::core::cash::is_cash_asset(asset_id) {
+                quantity
+            } else {
+                crate::core::quantity::from_surface(quantity)
+            },
             0,
             0,
             None,

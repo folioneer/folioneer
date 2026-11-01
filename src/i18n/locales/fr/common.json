@@ -1350,6 +1350,7 @@
     "TotalAmountNotPositive": "Le montant total doit être strictement positif.",
     "TotalAmountBelowFees": "Le montant total ne peut pas être inférieur aux frais qu'il inclut.",
     "UnitPriceOutOfRange": "Le prix unitaire dérivé est hors limites — vérifiez la quantité et le total.",
+    "QuantityOutOfRange": "Cette quantité est trop grande.",
     "ArchivedAsset": "Impossible d'ouvrir un solde pour un actif archivé.",
     "InvalidTotalCost": "Le coût total ne doit pas être négatif.",
     "AmountNotPositive": "Le montant doit être supérieur à 0.",

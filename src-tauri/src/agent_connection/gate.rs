@@ -141,6 +141,7 @@ pub async fn answer_replacement(
                 Some(transfer_id) => transfers
                     .get_transfer(&transfer_id)
                     .await
+                    .map(|view| view.as_shown())
                     .inspect_err(|err| tracing::error!(target: BACKEND, session, err = ?err, "answer_replacement_request: the transfer recorded could not be read"))
                     .ok(),
                 None => {

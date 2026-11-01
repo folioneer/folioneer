@@ -13,9 +13,9 @@ use std::sync::Arc;
 pub struct TransferFigures {
     /// Business date (YYYY-MM-DD).
     pub date: String,
-    /// Quantity leaving the sending account (micro-units).
+    /// Quantity leaving the sending account (hundred-millionths).
     pub quantity_sent: i64,
-    /// Quantity reaching the receiving account (micro-units), not above the quantity sent.
+    /// Quantity reaching the receiving account (hundred-millionths), not above the quantity sent.
     pub quantity_received: i64,
     /// Rate from the sending account's currency to the receiving one's (micros); `None`
     /// takes the stored rate of the date (TRF-022).

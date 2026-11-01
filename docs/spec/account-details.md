@@ -23,7 +23,7 @@ Represents the current state of a financial position within the account. Persist
 | Field                | Business meaning                                                                                                                    |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `asset_id`           | The financial asset held.                                                                                                           |
-| `quantity`           | Current number of units held (i64 micros). Zero when the position is closed.                                                        |
+| `quantity`           | Current number of units held (i64, on the scale of TRX-024). Zero when the position is closed.                                      |
 | `average_price`      | Volume-weighted average purchase price in account currency (i64 micros). Preserved at closure (TRX-040).                            |
 | `last_sold_date`     | ISO date of the most recent Sell transaction for this holding. NULL if no sell has ever occurred.                                   |
 | `total_realized_pnl` | Cumulative realized profit or loss across all Sell and write-off transactions for this holding (i64 micros, WOF-021). Zero if none. |

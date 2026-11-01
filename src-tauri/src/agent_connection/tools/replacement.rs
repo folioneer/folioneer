@@ -2,6 +2,7 @@
 //! transfer recorded the four-step way — with the transfer they stand for. AGT-093 — four
 //! that agents recorded it replaces without asking.
 
+use crate::core::quantity::to_surface;
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -122,7 +123,11 @@ impl AgentTools {
                 return Ok(None);
             };
             let view = match parts.first().and_then(|part| part.transfer_id.clone()) {
-                Some(transfer_id) => transfer.get_transfer(&transfer_id).await.ok(),
+                Some(transfer_id) => transfer
+                    .get_transfer(&transfer_id)
+                    .await
+                    .ok()
+                    .map(|view| view.as_shown()),
                 None => None,
             };
             Ok(Some((parts.len(), view)))
@@ -242,9 +247,9 @@ fn shown_of(
         date: steps.sale.date.clone(),
         asset_name: asset.name.clone(),
         asset_reference: asset.reference.clone(),
-        quantity_sent: steps.sale.quantity,
-        quantity_received: steps.purchase.quantity,
-        quantity_not_received: Some(steps.sale.quantity - steps.purchase.quantity)
+        quantity_sent: to_surface(steps.sale.quantity),
+        quantity_received: to_surface(steps.purchase.quantity),
+        quantity_not_received: Some(to_surface(steps.sale.quantity - steps.purchase.quantity))
             .filter(|not_received| *not_received > 0),
         cost: asked.cost(),
         from_currency: sale.currency.clone(),
