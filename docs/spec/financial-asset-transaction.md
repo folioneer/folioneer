@@ -72,7 +72,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-024B — A surface exchanges a quantity in micro-units (backend)**: The window, the AI agent connection and the command line read and send a quantity of a non-cash asset in micro-units, converted at the backend's boundary, so that what they read stops at the sixth decimal.
 
-**TRX-024C — The largest quantity (backend)**: A transaction's quantity of a non-cash asset cannot pass 1,000,000,000 units, the same limit every device reads (SYN-034); a holding cannot pass 92,233,720,368.54775807 units, what storage holds. A recording or a correction past either, its replay included, is refused with a specific error; a merged ledger past what storage holds stands at it (CFR-042).
+**TRX-024C — The largest quantity (backend)**: A transaction's quantity cannot pass 1,000,000,000 units of a non-cash asset, or 100,000,000,000 units of money on a deposit, a withdrawal or a dividend, the same limits every device reads (SYN-034); a holding cannot pass 92,233,720,368.54775807 units, what storage holds. A recording or a correction past either, its replay included, is refused with a specific error; a merged ledger past what storage holds stands at it (CFR-042).
 
 **TRX-024D — A correction sent back unchanged (backend)**: A correction whose quantity is the one its surface read leaves the stored quantity as it is, its last two decimals included, even one that reads as zero.
 
@@ -242,3 +242,9 @@ _`transaction_type` is not shown in the form. It is hardcoded to `Purchase` unti
 ## Cross-amendments
 
 - **CFR-041** — when the portfolio is shared between devices, `created_at` is carried verbatim with the transaction and never re-derived, and the TRX-036 order gains a third key — transaction identity — for same-date, same-`created_at` entries from different devices (see `sync-conflict-resolution.md`).
+
+---
+
+## Open Questions
+
+- [ ] TRX-024B: no surface can send the eight decimals storage now holds, nor sell a residue below one micro-unit. #385 and #579 move the surfaces to eight decimals.

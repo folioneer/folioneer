@@ -1726,6 +1726,37 @@ mod tests {
             Err(AccountError::QuantityOutOfRange)
         ));
 
+        // Money on a deposit, a withdrawal or a dividend reaches the same check.
+        for refused in [
+            Transaction::new_deposit(
+                "account".to_string(),
+                "cash".to_string(),
+                "2024-01-01".to_string(),
+                crate::core::quantity::LARGEST_QUANTITY + 1,
+                None,
+            ),
+            Transaction::new_withdrawal(
+                "account".to_string(),
+                "cash".to_string(),
+                "2024-01-01".to_string(),
+                crate::core::quantity::LARGEST_QUANTITY + 1,
+                None,
+            ),
+            Transaction::new_dividend(
+                "account".to_string(),
+                "asset".to_string(),
+                "2024-01-01".to_string(),
+                crate::core::quantity::LARGEST_QUANTITY + 1,
+                1_000_000,
+                None,
+            ),
+        ] {
+            assert!(matches!(
+                refused.expect_err("refused"),
+                AccountError::QuantityOutOfRange
+            ));
+        }
+
         // Every recording that carries a quantity refuses it the same way.
         let saturated = crate::core::quantity::from_surface(i64::MAX);
         let side = |transaction_type| {
