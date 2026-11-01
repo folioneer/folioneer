@@ -1945,7 +1945,7 @@ impl Account {
         } else {
             last_vwap
         };
-        // TRX-024C — a holding past what storage holds is refused; a synced ledger's stands at it.
+        // TRX-024C — a holding past what storage holds is refused; a merged ledger stands at it.
         let quantity = match i64::try_from(total_quantity) {
             Ok(quantity) => quantity,
             Err(_) if enforced => return Err(AccountError::QuantityOutOfRange.into()),
@@ -7432,21 +7432,23 @@ mod preview_trade_tests {
     // TRX-024 — one hundred-millionth of a unit, a satoshi, is recorded, replayed and sold
     // without being lost to the old scale; the money it moves stays in millionths.
     #[test]
-    fn trx_024c_a_holding_past_the_largest_quantity_is_refused() {
+    fn trx_024c_a_holding_past_what_storage_holds_is_refused() {
         let mut account =
             Account::new("Account".into(), String::new(), "EUR".into(), false).expect("account");
-        const SIXTY_BILLION: i64 = 6_000_000_000_000_000_000;
-        account
-            .open_holding("asset".into(), "2026-01-02".into(), SIXTY_BILLION, 60 * M)
-            .expect("sixty billion units fit");
+        const A_BILLION: i64 = crate::core::quantity::LARGEST_QUANTITY;
+        for _ in 0..92 {
+            account
+                .open_holding("asset".into(), "2026-01-02".into(), A_BILLION, M)
+                .expect("ninety-two billion units fit");
+        }
         let refused = account
-            .open_holding("asset".into(), "2026-01-03".into(), SIXTY_BILLION, 60 * M)
-            .expect_err("a hundred and twenty billion do not");
+            .open_holding("asset".into(), "2026-01-02".into(), A_BILLION, M)
+            .expect_err("ninety-three billion do not");
         assert!(matches!(
             refused.downcast_ref::<AccountError>(),
             Some(AccountError::QuantityOutOfRange)
         ));
-        assert_eq!(account.holding_quantity("asset"), SIXTY_BILLION);
+        assert_eq!(account.holding_quantity("asset"), 92 * A_BILLION);
     }
 
     #[test]

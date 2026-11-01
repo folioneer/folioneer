@@ -974,13 +974,12 @@ impl Transaction {
         Ok(())
     }
 
-    /// TRX-020, TRX-024C — a quantity is strictly positive and fits in storage: a surface's
-    /// quantity past what storage holds saturates to the largest integer.
+    /// TRX-020, TRX-024C — a quantity is strictly positive and no larger than every device reads.
     pub fn ensure_quantity(quantity: i64) -> StdResult<(), AccountError> {
         if quantity <= 0 {
             return Err(AccountError::QuantityNotPositive);
         }
-        if quantity == i64::MAX {
+        if quantity > crate::core::quantity::LARGEST_QUANTITY {
             return Err(AccountError::QuantityOutOfRange);
         }
         Ok(())
@@ -1718,6 +1717,13 @@ mod tests {
         assert!(matches!(
             refused.expect_err("refused"),
             AccountError::QuantityOutOfRange
+        ));
+
+        // The limit itself is fine, one step past it is not.
+        assert!(Transaction::ensure_quantity(crate::core::quantity::LARGEST_QUANTITY).is_ok());
+        assert!(matches!(
+            Transaction::ensure_quantity(crate::core::quantity::LARGEST_QUANTITY + 1),
+            Err(AccountError::QuantityOutOfRange)
         ));
 
         // Every recording that carries a quantity refuses it the same way.

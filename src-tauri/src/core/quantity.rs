@@ -7,6 +7,10 @@
 /// One unit of a non-cash asset, as a stored quantity.
 pub const QUANTITY_UNIT: i128 = 100_000_000;
 
+/// The largest quantity one transaction carries, here and on every other device (TRX-024C,
+/// SYN-034): a billion units of a non-cash asset.
+pub const LARGEST_QUANTITY: i64 = 100_000_000_000_000_000;
+
 /// How many stored steps make one millionth of a unit.
 const SURFACE_STEP: i64 = 100;
 

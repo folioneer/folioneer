@@ -15,7 +15,7 @@
 >
 > **One condition, two wire shapes.** `UpdateRequired` and `FolderUnavailable` exist both as error codes (on calls that cannot start) and as `SyncFailure` variants (on runs that completed partially). They describe the same user-facing condition; the frontend presenter maps both shapes to one message.
 >
-> **Wire conventions**: identifiers and logical timestamps are strings; instants are ISO-8601 strings; the folder is an absolute path string; money and quantities are `i64` micros (ADR-001).
+> **Wire conventions**: identifiers and logical timestamps are strings; instants are ISO-8601 strings; the folder is an absolute path string; money and quantities are `i64`, on the scales of TRX-024 (ADR-001).
 
 ---
 

@@ -1287,6 +1287,7 @@ describe("writeOffErrorToI18n", () => {
   it.each([
     ["CascadingOversell", "transaction.error_later_left_short"],
     ["QuantityNotPositive", "error.QuantityNotPositive"],
+    ["QuantityOutOfRange", "error.QuantityOutOfRange"],
   ] as const)("%s shows under the quantity", (code, key) => {
     expect(refuse({ code })).toEqual({ message: { key }, onQuantity: true });
   });

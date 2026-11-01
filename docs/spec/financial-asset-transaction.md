@@ -72,11 +72,11 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-024B — A surface exchanges a quantity in micro-units (backend)**: The window, the AI agent connection and the command line read and send a quantity of a non-cash asset in micro-units, converted at the backend's boundary, so that what they read stops at the sixth decimal.
 
-**TRX-024C — The largest quantity (backend)**: A quantity of a non-cash asset cannot pass 92,233,720,368.54775807 units: a recording or a correction that sends one, or whose replay would take a holding past it, is refused with a specific error; a merged ledger past it (CFR-042) stands at the limit.
+**TRX-024C — The largest quantity (backend)**: A transaction's quantity of a non-cash asset cannot pass 1,000,000,000 units, the same limit every device reads (SYN-034); a holding cannot pass 92,233,720,368.54775807 units, what storage holds. A recording or a correction past either, its replay included, is refused with a specific error; a merged ledger past what storage holds (CFR-042) stands at it.
 
 **TRX-024D — A correction sent back unchanged (backend)**: A correction whose quantity is the one its surface read leaves the stored quantity as it is, its last two decimals included, even one that reads as zero.
 
-**TRX-024E — A portfolio already past the largest quantity (backend)**: A portfolio that holds a quantity past TRX-024C when this representation arrives is left as it was: the migration fails, and UPD-034 and UPD-035 apply.
+**TRX-024E — A portfolio already past the largest quantity (backend)**: A portfolio that holds a quantity past what storage holds (TRX-024C) when this representation arrives is left as it was: the migration fails, and UPD-034 and UPD-035 apply.
 
 **TRX-024F — A computed quantity (backend)**: A quantity a rule computes is floored at the scale of TRX-024.
 
