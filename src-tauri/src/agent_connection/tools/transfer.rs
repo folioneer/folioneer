@@ -114,8 +114,8 @@ impl AgentTools {
             )
             .await
             .map_err(|error| refusal_from_transfer(&error))?;
-        let mut parts =
-            serde_json::to_value(&previewed.parts).map_err(|_| portfolio_unreadable())?;
+        let shown: Vec<_> = previewed.parts.iter().map(Transaction::as_shown).collect();
+        let mut parts = serde_json::to_value(&shown).map_err(|_| portfolio_unreadable())?;
         if let Some(parts) = parts.as_array_mut() {
             for part in parts {
                 if let Some(id) = part.get_mut("id") {

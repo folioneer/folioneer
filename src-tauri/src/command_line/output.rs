@@ -3,7 +3,7 @@
 use serde_json::json;
 
 use crate::context::account::{Transaction, TransactionType};
-use crate::use_cases::holding_transaction::{decimal, Refusal};
+use crate::use_cases::holding_transaction::{decimal, figures_as_text, Refusal};
 
 use super::orchestrator::{verb, AssetRow, Listing, Outcome};
 
@@ -70,9 +70,9 @@ pub fn render(outcome: &Outcome, json: bool) -> Printed {
             true,
         ) => Printed {
             stdout: Some(if *zero_cost {
-                json!({ "status": "recorded", "transaction": transaction.as_shown(), "warning": "ZeroCostOpeningBalance" })
+                json!({ "status": "recorded", "transaction": figures_as_text(json!(transaction.as_shown())), "warning": "ZeroCostOpeningBalance" })
             } else {
-                json!({ "status": "recorded", "transaction": transaction.as_shown() })
+                json!({ "status": "recorded", "transaction": figures_as_text(json!(transaction.as_shown())) })
             }
             .to_string()),
             stderr: None,
@@ -127,7 +127,7 @@ pub fn render(outcome: &Outcome, json: bool) -> Printed {
             json,
         ) => Printed {
             stdout: Some(if json {
-                json!({ "status": "recorded", "price": price }).to_string()
+                json!({ "status": "recorded", "price": figures_as_text(json!(price)) }).to_string()
             } else {
                 format!(
                     "Recorded: price of {} on {} — {} {}",
@@ -373,7 +373,7 @@ mod tests {
             serde_json::from_str(&printed.stdout.expect("json")).expect("valid json");
         assert_eq!(value["status"], "recorded");
         assert_eq!(value["transaction"]["id"], "tx-1");
-        assert_eq!(value["transaction"]["total_amount"], 992_190_000);
+        assert_eq!(value["transaction"]["total_amount"], "992.19");
 
         let refusal = Refusal {
             code: "Oversell".to_string(),

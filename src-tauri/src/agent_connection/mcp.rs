@@ -9,6 +9,9 @@ use super::wire::shown_name;
 
 /// The protocol version answered when the client asks for none.
 const PROTOCOL_VERSION: &str = "2025-06-18";
+
+/// AGT-010, AGT-014 — the one convention on figures, said once.
+const FIGURES: &str = "Every figure you read and every figure you write is exact decimal text with a dot and up to six decimals: \"12.5\" is twelve and a half, and a percentage \"1.5\" is 1.5 %. Send a figure back as you read it. Only what counts things and the ratio of a split are whole numbers.";
 const METHOD_NOT_FOUND: i64 = -32601;
 const INVALID_PARAMS: i64 = -32602;
 const INVALID_REQUEST: i64 = -32600;
@@ -74,6 +77,7 @@ impl Conversation {
                             .unwrap_or(PROTOCOL_VERSION),
                         "capabilities": { "tools": {} },
                         "serverInfo": { "name": "folioneer", "version": env!("CARGO_PKG_VERSION") },
+                        "instructions": FIGURES,
                     }),
                 )
             }
@@ -187,6 +191,7 @@ mod tests {
         assert_eq!(hello["result"]["protocolVersion"], "2025-03-26");
         assert_eq!(hello["result"]["serverInfo"]["name"], "folioneer");
         assert_eq!(hello["result"]["capabilities"], json!({ "tools": {} }));
+        assert_eq!(hello["result"]["instructions"], FIGURES);
 
         let initialized = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
         assert_eq!(conversation.answer(&initialized, &mut host).await, None);

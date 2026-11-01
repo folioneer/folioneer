@@ -20,9 +20,10 @@ use crate::use_cases::account_creation::AccountCreationUseCase;
 use crate::use_cases::account_details::AccountDetailsUseCase;
 use crate::use_cases::account_summary::AccountSummaryUseCase;
 use crate::use_cases::holding_transaction::{
-    code_of, decimal_to_micro, CashAmount, Change, Correction, DividendAmount, FreeShares,
-    HoldingTransactionUseCase, InterestCredit, ManagementFee, PriceAt, RecordedBy, Recording,
-    StockSplit, Target, Trade, TradeAmount, TransactionsAsked, TypedTransaction, WriteOff,
+    code_of, decimal_to_micro, figures_as_text, CashAmount, Change, Correction, DividendAmount,
+    FreeShares, HoldingTransactionUseCase, InterestCredit, ManagementFee, PriceAt, RecordedBy,
+    Recording, StockSplit, Target, Trade, TradeAmount, TransactionsAsked, TypedTransaction,
+    WriteOff,
 };
 use crate::use_cases::transfer::TransferUseCase;
 
@@ -159,7 +160,10 @@ impl AgentTools {
         tool: &str,
         arguments: &Value,
     ) -> Result<Value, Refusal> {
-        let result = self.run(granted, tool, arguments).await;
+        let result = self
+            .run(granted, tool, arguments)
+            .await
+            .map(figures_as_text);
         // AGT-052 — a read that was answered counts as one.
         if result.is_ok() && definitions::only_reads(tool) {
             granted.count_read();
