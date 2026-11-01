@@ -231,7 +231,7 @@ describe("toTransactionRow — Dividend (DIV-023)", () => {
       split_factor: null,
       dividend_amount: 2_500_000,
     };
-    expect(toTransactionRow(dividend, "Asset", "Account").quantity).toMatch(/^2[.,]500$/);
+    expect(toTransactionRow(dividend, "Asset", "Account").quantity).toBe("2,500");
   });
 });
 

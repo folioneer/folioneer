@@ -553,7 +553,7 @@ impl Account {
                 created_at,
             )?
         } else if tx_type == TransactionType::Split {
-            // SPL-030 — the corrected factor rides in `quantity`; money fields are
+            // SPL-030 — a correction sends the factor as its `quantity`; money fields are
             // ignored. Rebuild via the identity-preserving split factory (SPL-011).
             Transaction::split_with_id(
                 tx_id.to_string(),
