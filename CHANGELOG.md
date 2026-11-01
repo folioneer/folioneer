@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-11-01
+
+### Added
+
+- [price] choose a price source for this computer, Yahoo Finance once you accept its notice
+- [sync] Sync's settings now live in the Settings dialog, in its Sync section
+- [settings] Settings opens as a dialog over your screen, its settings in named sections
+- [import] the import preview lists every row, and you record only what you confirm
+- [import] an account's Import window reads your broker's CSV and saves how to read it as a mapper
+- [import] an import mapper is a JSON file, added from a file and chosen again for its folder
+
+### Fixed
+
+- [import] a day's own deposit funds its purchases, so an import no longer counts the cash twice
+
 ## [0.16.0] - 2026-10-26
 
 ### Added
