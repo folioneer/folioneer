@@ -125,7 +125,7 @@ describe("buy_sell", () => {
 
     const holdingQty = await $(`#holding-quantity-${astId}`);
     await holdingQty.waitForExist({ timeout: 8000 });
-    await browser.waitUntil(async () => /^1[.,]00000001$/.test(await holdingQty.getText()), {
+    await browser.waitUntil(async () => (await holdingQty.getText()) === "1.00000001", {
       timeout: 8000,
       timeoutMsg: "The holding must read 1.00000001 after buying a satoshi (TRX-024B)",
     });

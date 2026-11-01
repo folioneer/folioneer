@@ -35,7 +35,7 @@ pub struct Target {
     pub asset: String,
     /// The date, or `None` for today.
     pub date: Option<String>,
-    /// Quantity in micro-units.
+    /// Quantity on the stored scale of a non-cash asset (TRX-024).
     pub quantity: i64,
 }
 
@@ -121,7 +121,7 @@ pub struct FreeShares {
     pub asset: String,
     /// The date, or `None` for today.
     pub date: Option<String>,
-    /// How many shares were received (micro-units).
+    /// How many shares were received, on the stored scale of a non-cash asset (TRX-024).
     pub quantity: i64,
     /// Optional note.
     pub note: Option<String>,
@@ -136,7 +136,7 @@ pub struct WriteOff {
     pub asset: String,
     /// The date, or `None` for today.
     pub date: Option<String>,
-    /// The quantity that left (micro-units).
+    /// The quantity that left, on the stored scale of a non-cash asset (TRX-024).
     pub quantity: i64,
     /// Why it left.
     pub reason: WriteOffReason,

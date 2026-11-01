@@ -97,7 +97,7 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 
 **ACD-022 — Asset metadata enrichment (backend)**: For each holding, the use case fetches the corresponding asset's name and reference (ticker) from `AssetService`. These fields populate `HoldingDetail.asset_name` and `HoldingDetail.asset_reference`.
 
-**ACD-023 — Cost basis calculation (backend)**: The cost basis for a holding is computed as `Holding.quantity × Holding.average_price`, each on its scale (TRX-024), in micro-units. This is the only financial computation performed by this feature.
+**ACD-023 — Cost basis calculation (backend)**: The cost basis for a holding is computed as `Holding.quantity` on its scale (TRX-024) × `Holding.average_price` in micro-units, the result brought back to micro-units (ACD-024). This is the only financial computation performed by this feature.
 
 **ACD-024 — Calculation precision (backend)**: Cost basis calculations use `i128` intermediates to prevent overflow before scaling back to `i64` micro-units, per ADR-001.
 
