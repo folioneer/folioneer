@@ -107,9 +107,9 @@ export function SplitEditModalMount() {
         lockedAssetId: assetId,
         lockedAssetName: assetName,
         initialDate: transaction.date,
-        // The micro-scaled factor rides in `quantity` (SPL-010) — prefill it
+        // The micro-scaled factor is `split_factor` (SPL-010) — prefill it
         // back as the decimal multiplier the edit field expects.
-        initialFactor: microToFieldDecimal(transaction.quantity),
+        initialFactor: microToFieldDecimal(transaction.split_factor ?? transaction.quantity),
         initialNote: transaction.note ?? "",
       }}
     />

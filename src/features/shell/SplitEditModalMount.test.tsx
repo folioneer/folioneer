@@ -37,14 +37,15 @@ vi.mock("@/features/account_details/split_transaction/SplitModal", () => ({
   ),
 }));
 
-// The micro-scaled factor rides in `quantity` (SPL-010) — ×2 split.
+// The micro-scaled factor is `split_factor` (SPL-010) — ×2 split.
 const splitTx = {
   id: "tx-spl-1",
   account_id: "acc-1",
   asset_id: "asset-equity-1",
   transaction_type: "Split",
   date: "2024-06-15",
-  quantity: 2_000_000,
+  quantity: 0,
+  split_factor: 2_000_000,
   note: null,
 };
 
@@ -91,7 +92,7 @@ describe("SplitEditModalMount (SPL-030)", () => {
     });
     mockGetTransactions.mockResolvedValue({
       status: "ok",
-      data: [{ ...splitTx, quantity: 1_333_333 }],
+      data: [{ ...splitTx, split_factor: 1_333_333 }],
     });
 
     render(<SplitEditModalMount />);

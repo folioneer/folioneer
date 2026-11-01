@@ -2584,7 +2584,8 @@ impl AccountService {
         content: &str,
         rank: Rank,
     ) -> StdResult<(), AccountError> {
-        let transaction: Transaction = synced_content(content)?;
+        // SYN-038 — a change written before data format 13 carries its figure in `quantity`.
+        let transaction = synced_content::<Transaction>(content)?.with_figure_in_its_field();
         let mut account = self.load_applied(conn, &transaction.account_id).await?;
         let transaction_id = transaction.id.clone();
         account.apply_synced_transaction(transaction);
@@ -8105,6 +8106,117 @@ mod tests {
         assert_eq!(
             stamped.0, "laptop",
             "CFR-014: the incoming rank must be stamped"
+        );
+    }
+
+    // SYN-038 (#577) — a change written before data format 13 carries a split's factor and a
+    // dividend's amount in `quantity`: applied, each is in its field.
+    #[tokio::test]
+    async fn syn_038_a_change_of_an_older_format_has_its_figure_moved_on_apply() {
+        let pool = make_pool().await;
+        let (svc, asset_id) = setup(&pool).await;
+        seed_cash_asset_row(&pool, "EUR").await;
+        let account = svc
+            .create("Older".into(), String::new(), "EUR".into(), false)
+            .await
+            .unwrap();
+        for (id, kind, total) in [
+            ("tx-split", "Split", 0),
+            ("tx-dividend", "Dividend", 7_000_000),
+        ] {
+            let content = format!(
+                r#"{{"id":"{id}","account_id":"{}","asset_id":"{asset_id}",
+                    "transaction_type":"{kind}","date":"2026-08-20","quantity":7000000,
+                    "unit_price":1000000,"exchange_rate":1000000,"fees":0,
+                    "total_amount":{total},"note":null,"realized_pnl":null,
+                    "created_at":"2026-08-20T10:00:00Z"}}"#,
+                account.id
+            );
+            let mut conn = pool.acquire().await.unwrap();
+            svc.apply_transaction(&mut conn, &content, incoming_rank("laptop", 200))
+                .await
+                .unwrap();
+        }
+
+        let split = svc
+            .get_transaction_by_id("tx-split")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (split.quantity, split.split_factor, split.dividend_amount),
+            (0, Some(7_000_000), None)
+        );
+        let dividend = svc
+            .get_transaction_by_id("tx-dividend")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (
+                dividend.quantity,
+                dividend.split_factor,
+                dividend.dividend_amount
+            ),
+            (0, None, Some(7_000_000))
+        );
+    }
+
+    // SYN-038 (#577) — a change of data format 13 already has its figures in their fields:
+    // applied, they are stored as they came, with `quantity` left at 0.
+    #[tokio::test]
+    async fn syn_038_a_change_of_format_13_is_applied_as_it_came() {
+        let pool = make_pool().await;
+        let (svc, asset_id) = setup(&pool).await;
+        seed_cash_asset_row(&pool, "EUR").await;
+        let account = svc
+            .create("Current".into(), String::new(), "EUR".into(), false)
+            .await
+            .unwrap();
+        for (id, kind, total, figures) in [
+            ("tx-split", "Split", 0, r#""split_factor":2000000"#),
+            (
+                "tx-dividend",
+                "Dividend",
+                7_000_000,
+                r#""dividend_amount":7000000"#,
+            ),
+        ] {
+            let content = format!(
+                r#"{{"id":"{id}","account_id":"{}","asset_id":"{asset_id}",
+                    "transaction_type":"{kind}","date":"2026-08-20","quantity":0,{figures},
+                    "unit_price":0,"exchange_rate":1000000,"fees":0,
+                    "total_amount":{total},"note":null,"realized_pnl":null,
+                    "created_at":"2026-08-20T10:00:00Z"}}"#,
+                account.id
+            );
+            let mut conn = pool.acquire().await.unwrap();
+            svc.apply_transaction(&mut conn, &content, incoming_rank("laptop", 200))
+                .await
+                .unwrap();
+        }
+
+        let split = svc
+            .get_transaction_by_id("tx-split")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (split.quantity, split.split_factor, split.dividend_amount),
+            (0, Some(2_000_000), None)
+        );
+        let dividend = svc
+            .get_transaction_by_id("tx-dividend")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (
+                dividend.quantity,
+                dividend.split_factor,
+                dividend.dividend_amount
+            ),
+            (0, None, Some(7_000_000))
         );
     }
 

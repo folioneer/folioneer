@@ -70,9 +70,9 @@ pub fn render(outcome: &Outcome, json: bool) -> Printed {
             true,
         ) => Printed {
             stdout: Some(if *zero_cost {
-                json!({ "status": "recorded", "transaction": transaction, "warning": "ZeroCostOpeningBalance" })
+                json!({ "status": "recorded", "transaction": transaction.as_shown(), "warning": "ZeroCostOpeningBalance" })
             } else {
-                json!({ "status": "recorded", "transaction": transaction })
+                json!({ "status": "recorded", "transaction": transaction.as_shown() })
             }
             .to_string()),
             stderr: None,
@@ -180,7 +180,7 @@ fn recorded_line(
         (kind, asset) => format!(
             "Recorded: {} {} {} in {account_name} on {date} — {total} {currency}",
             verb(kind),
-            decimal(transaction.quantity),
+            decimal(transaction.shown_quantity()),
             asset.unwrap_or_default(),
         ),
     }

@@ -133,7 +133,7 @@ async fn seed_held_position(ctx: &Ctx) -> (String, String) {
 // -------------------------------------------------------------------------
 
 /// SPL-010/020 — record_split end-to-end: persists a Split transaction packing
-/// the micro-scaled factor in `quantity` with the no-money convention
+/// the micro-scaled factor in `split_factor` with the no-money convention
 /// (unit_price=0, exchange_rate=1_000_000, fees=0, total_amount=0,
 /// realized_pnl=None); the holding quantity rescales by the factor and the
 /// cost basis (vwap numerator) is preserved.
@@ -160,9 +160,9 @@ async fn record_split_rescales_quantity_and_preserves_cost_basis() {
     assert_eq!(tx.account_id, account_id);
     assert_eq!(tx.asset_id, asset_id);
     assert_eq!(
-        tx.quantity,
-        micro(20),
-        "the micro-scaled factor must ride in quantity (SPL-010)"
+        (tx.quantity, tx.split_factor),
+        (0, Some(micro(20))),
+        "the micro-scaled factor is in its own field (SPL-010)"
     );
     assert_eq!(tx.unit_price, 0, "unit_price must be 0 (SPL-010)");
     assert_eq!(

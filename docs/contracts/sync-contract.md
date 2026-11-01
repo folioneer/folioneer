@@ -201,6 +201,7 @@ Record identity per kind follows CFR-012: accounts, categories, assets, transact
 
 ## Changelog
 
+- 2026-11-01 — #577 (SYN-038, SPL-010, DIV-023): a split's factor and a dividend's amount leave a transaction's `quantity` for `split_factor` and `dividend_amount`; data format version 13. No command changed.
 - 2026-10-31 — #714 (SYN-014, SYN-021, SYN-038): `RecordKind` loses `ColumnMapping`, an import mapper being a file; data format version 12. No command changed.
 - 2026-10-25 — #502 (SYN-038, IMP-051): a transaction carries `added_deposit`; data format version 11. No command changed.
 - 2026-10-25 — #501 (SYN-014, SYN-021, SYN-038, IMP-023): `RecordKind` gains `ColumnMapping`; a saved mapping is user data for `inspect_sync_folder`; data format version 10. No command changed.

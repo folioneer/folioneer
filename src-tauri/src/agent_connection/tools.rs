@@ -313,7 +313,7 @@ impl AgentTools {
         tracing::info!(target: BACKEND, session = granted.session_id, transaction = %recorded.transaction.id, kind = %recorded.transaction.transaction_type, "agent recording");
         as_json(&serde_json::json!({
             "status": "recorded",
-            "transaction": recorded.transaction,
+            "transaction": recorded.transaction.as_shown(),
             "account": recorded.account_name,
             "currency": recorded.currency,
             "asset": recorded.asset_reference,
@@ -404,7 +404,7 @@ impl AgentTools {
                     "date": transaction.date,
                     "transaction_type": transaction.transaction_type,
                     "asset": row.asset_reference,
-                    "quantity": transaction.quantity,
+                    "quantity": transaction.shown_quantity(),
                     "unit_price": transaction.unit_price,
                     "total_amount": transaction.total_amount,
                     "fees": transaction.fees,
@@ -722,9 +722,9 @@ impl AgentTools {
             .ask_change(granted, as_it_is, becomes, asked.fields)
             .await
         {
-            ChangeAnswer::Changed(changed) => {
-                as_json(&serde_json::json!({ "status": "changed", "transaction": changed }))
-            }
+            ChangeAnswer::Changed(changed) => as_json(
+                &serde_json::json!({ "status": "changed", "transaction": changed.as_shown() }),
+            ),
             ChangeAnswer::Refused => Err(Refusal {
                 code: "ChangeRefused".to_string(),
                 message: "the owner did not change this transaction".to_string(),
@@ -787,8 +787,8 @@ impl AgentTools {
                 .map_err(refused)?;
             (previewed, false)
         };
-        let mut transaction =
-            serde_json::to_value(&previewed.transaction).map_err(|_| portfolio_unreadable())?;
+        let mut transaction = serde_json::to_value(previewed.transaction.as_shown())
+            .map_err(|_| portfolio_unreadable())?;
         if !keeps_its_id {
             if let Some(id) = transaction.get_mut("id") {
                 *id = Value::Null;
@@ -825,7 +825,7 @@ impl AgentTools {
         })?;
         self.tell_recordings(granted).await;
         tracing::info!(target: BACKEND, session = granted.session_id, transaction = %corrected.id, "agent corrected its recording");
-        as_json(&serde_json::json!({ "status": "corrected", "transaction": corrected }))
+        as_json(&serde_json::json!({ "status": "corrected", "transaction": corrected.as_shown() }))
     }
 
     /// AGT-043 — the one account with this name, case ignored; the refusal names only what
@@ -1130,7 +1130,7 @@ fn shown(typed: &TypedTransaction, transaction: &Transaction) -> TransactionShow
         kind: transaction.transaction_type,
         asset_name,
         asset_reference,
-        quantity: transaction.quantity,
+        quantity: transaction.shown_quantity(),
         amount: transaction.total_amount,
         unit_price: transaction.unit_price,
         fees: transaction.fees,
