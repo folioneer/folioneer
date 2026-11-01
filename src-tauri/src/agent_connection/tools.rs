@@ -178,10 +178,11 @@ impl AgentTools {
             "cancel_recording" => self.cancel(granted, arguments).await,
             "request_removal" => self.request_removal(granted, arguments).await,
             "request_change" => self.request_change(granted, arguments).await,
+            "replace_with_transfer" => self.replace_with_transfer(granted, arguments).await,
             "request_transfer_replacement" => {
                 self.request_transfer_replacement(granted, arguments).await
             }
-            "preview_recording" => self.preview(granted, arguments).await,
+            "preview_recording" => self.preview(arguments).await,
             "record_opening_balance"
             | "record_purchase"
             | "record_sale"
@@ -642,15 +643,14 @@ impl AgentTools {
         }
     }
 
-    /// AGT-050 — the session cancels a transaction it recorded itself.
+    /// AGT-050 — the session cancels a transaction an agent recorded.
     async fn cancel(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
         let transaction_id = text(arguments, "transaction")?.to_string();
         let recorder = Arc::clone(&self.recorder);
-        let session = granted.key.clone();
         // As a recording (AGT-049): once started, the cancelling runs to its end.
         let cancelled = tokio::spawn(async move {
             recorder
-                .cancel_recorded_by_agent(&transaction_id, &session)
+                .cancel_recorded_by_agent(&transaction_id)
                 .await
         })
         .await
@@ -736,7 +736,7 @@ impl AgentTools {
     /// AGT-072 — what a recording would do, nothing written: the recording tool's arguments
     /// read as that tool reads them, then the refusal the real call would give, or the
     /// transaction with no id and the account without it and with it.
-    async fn preview(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
+    async fn preview(&self, arguments: &Value) -> Result<Value, Refusal> {
         let tool = text(arguments, "tool")?;
         let not_previewed = || Refusal {
             code: "InvalidArguments".to_string(),
@@ -774,7 +774,7 @@ impl AgentTools {
             let (transaction_id, change, reason) = correction_of(inner)?;
             let previewed = self
                 .recorder
-                .preview_correction_by_agent(&transaction_id, &granted.key, change, reason)
+                .preview_correction_by_agent(&transaction_id, change, reason)
                 .await
                 .map_err(refused)?;
             (previewed, true)
@@ -805,14 +805,13 @@ impl AgentTools {
         }))
     }
 
-    /// AGT-050 — the session corrects a transaction it recorded itself.
+    /// AGT-050 — the session corrects a transaction an agent recorded.
     async fn correct(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
         let (transaction_id, change, reason) = correction_of(arguments)?;
         let recorder = Arc::clone(&self.recorder);
-        let session = granted.key.clone();
         let corrected = tokio::spawn(async move {
             recorder
-                .correct_recorded_by_agent(&transaction_id, &session, change, reason)
+                .correct_recorded_by_agent(&transaction_id, change, reason)
                 .await
         })
         .await

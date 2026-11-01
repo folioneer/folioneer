@@ -1653,9 +1653,10 @@ impl AccountService {
         Ok(staged.into_preview())
     }
 
-    /// AGT-091 — replaces the transactions `shown` with a transfer in one write, as
+    /// AGT-091 / AGT-093 — replaces the transactions `shown` with a transfer in one write, as
     /// `stage_replacement` stages it, only while each stands as it was shown and the
-    /// transfer moves `cost_shown`; `None` when not, nothing written.
+    /// transfer moves `cost_shown`; `None` when not, nothing written. With `mark`, the
+    /// transfer's parts are an agent's, marked in the same write (AGT-045).
     #[allow(clippy::too_many_arguments)]
     pub async fn replace_with_transfer(
         &self,
@@ -1668,6 +1669,7 @@ impl AccountService {
         quantity_received: i64,
         exchange_rate: i64,
         cost_shown: i64,
+        mark: Option<&AgentRecording>,
     ) -> Result<Option<Vec<Transaction>>, AccountError> {
         info!(target: BACKEND, from = %from_account_id, to = %to_account_id, asset_id = %asset_id, "replace_with_transfer");
         let replaced: Vec<String> = shown.iter().map(|t| t.id.clone()).collect();
@@ -1698,8 +1700,14 @@ impl AccountService {
         if !stands || cost != cost_shown {
             return Ok(None);
         }
+        let ids: Vec<String> = staged.parts.iter().map(|part| part.id.clone()).collect();
         let mut written = vec![&mut staged.sending, &mut staged.receiving];
-        save_accounts(&*self.account_repo, &mut written).await?;
+        save_accounts_marked(
+            &*self.account_repo,
+            &mut written,
+            mark.map(|mark| (ids.as_slice(), mark)),
+        )
+        .await?;
         self.emit_transaction_updated();
         Ok(Some(staged.parts))
     }
@@ -3089,6 +3097,7 @@ pub trait AccountServiceContract: Send + Sync {
         quantity_received: i64,
         exchange_rate: i64,
         cost_shown: i64,
+        mark: Option<AgentRecording>,
     ) -> StdResult<Option<Vec<Transaction>>, AccountError>;
     /// A transfer read as one from its parts (TRF-060).
     async fn transfer_view(&self, transfer_id: &str) -> StdResult<TransferView, AccountError>;
@@ -3743,6 +3752,7 @@ impl AccountServiceContract for AccountService {
         quantity_received: i64,
         exchange_rate: i64,
         cost_shown: i64,
+        mark: Option<AgentRecording>,
     ) -> StdResult<Option<Vec<Transaction>>, AccountError> {
         AccountService::replace_with_transfer(
             self,
@@ -3755,6 +3765,7 @@ impl AccountServiceContract for AccountService {
             quantity_received,
             exchange_rate,
             cost_shown,
+            mark.as_ref(),
         )
         .await
     }

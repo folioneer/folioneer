@@ -5,7 +5,7 @@
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName" }` object; a variant with fields carries them beside `code`, as `TransactionNotRemoved { reason }` does. The FE matches on `code`.
 >
-> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–063, AGT-065A, AGT-070, AGT-071, AGT-075, AGT-080, AGT-087, AGT-090) and the tools of AGT-064 and AGT-068 are not Tauri commands — what the window shows of an added asset is `AgentSession.assets_added` and `last_asset` here, of a created account `accounts_added` and `last_account`; what an AI agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
+> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–063, AGT-065A, AGT-070, AGT-071, AGT-075, AGT-080, AGT-087, AGT-090, AGT-093) and the tools of AGT-064 and AGT-068 are not Tauri commands — what the window shows of an added asset is `AgentSession.assets_added` and `last_asset` here, of a created account `accounts_added` and `last_account`; what an AI agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
 
 ---
 
@@ -208,3 +208,4 @@ The mark of a transaction an AI agent recorded (AGT-045) reaches the window in t
 - 2026-10-24 — #513: `answer_replacement_request` (AGT-091); `AgentConnectionState` gains `replacements`, with `ReplacementRequest` and `TransferShown`; `AgentConnectionError` gains `ReplacementRequestGone` and `TransactionsNotReplaced { reason }`. The tool `request_transfer_replacement` (AGT-090) is no Tauri command.
 - 2026-10-24 — #513: `TransferShown` gains `quantity_not_received`, and `ReplacementRequest.transactions` are `ReplacedShown`, each with what it moved, signed (AGT-091, AGT-092). No command or error changes.
 - 2026-10-25 — #339: the tool `list_prices` (AGT-075) is no Tauri command. No command, type or error changes.
+- 2026-11-01 — #675: a session corrects and cancels what any session recorded (AGT-050, AGT-051), and the tool `replace_with_transfer` (AGT-093) is no Tauri command; its parts reach the window as `AgentSession.recordings` and `transactions_recorded` count them. No command, type or error changes.

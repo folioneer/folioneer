@@ -167,7 +167,7 @@ An AI agent — Claude Code, Claude Desktop — can read the portfolio, an accou
 
 3. At the AI agent's first call, Folioneer asks you to allow or refuse the connection. A yes lasts until you click **Disconnect** in the header or close Folioneer.
 
-What an AI agent recorded is marked in the account journal ("Recorded by"). An AI agent can correct or cancel what it recorded in its own session; for a transaction you typed it can only ask you, one at a time — Folioneer shows it in full and you remove it or refuse. It reads no file.
+What an AI agent recorded is marked in the account journal ("Recorded by"). An AI agent can correct or cancel what an AI agent recorded, in this session or an earlier one; for a transaction you typed it can only ask you, one at a time — Folioneer shows it in full and you remove it or refuse. It reads no file.
 
 ## Documentation
 

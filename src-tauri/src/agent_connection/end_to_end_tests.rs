@@ -1248,10 +1248,10 @@ async fn agt_062_a_session_records_a_price() {
     );
 }
 
-// AGT-051 — a transaction the owner typed, one another session recorded and one that does
-// not exist are refused alike, in the same words: nothing is said of what exists.
+// AGT-051 (#675) — a session corrects and cancels what an earlier session recorded, and the
+// mark stays the one of the session that recorded it.
 #[tokio::test]
-async fn agt_051_a_session_touches_nothing_it_did_not_record() {
+async fn agt_051_a_session_changes_what_another_session_recorded_and_the_mark_stays() {
     use crate::context::account::JournalFilter;
 
     let data_dir = tempfile::tempdir().expect("tempdir");
@@ -1270,6 +1270,60 @@ async fn agt_051_a_session_touches_nothing_it_did_not_record() {
             .expect("recorded"),
     );
     let account = bench.accounts.get_all().await.expect("accounts").remove(0);
+
+    bench
+        .tools
+        .call(
+            &second,
+            "correct_recording",
+            &json!({ "transaction": of_the_first, "quantity": 1 }),
+        )
+        .await
+        .expect("corrected");
+    let journal = bench
+        .accounts
+        .get_account_journal(&account.id, &JournalFilter::default())
+        .await
+        .expect("journal");
+    let corrected = journal
+        .rows
+        .iter()
+        .find(|row| row.transaction.id == of_the_first)
+        .expect("still there");
+    assert_eq!(corrected.transaction.quantity, M);
+    assert_eq!(
+        corrected.recorded_by.as_ref().expect("marked").session,
+        first.key,
+        "the mark stays the first session's"
+    );
+
+    bench
+        .tools
+        .call(
+            &second,
+            "cancel_recording",
+            &json!({ "transaction": of_the_first }),
+        )
+        .await
+        .expect("cancelled");
+    let after = bench
+        .accounts
+        .get_account_journal(&account.id, &JournalFilter::default())
+        .await
+        .expect("journal");
+    assert_eq!(after.rows.len(), journal.rows.len() - 1);
+}
+
+// AGT-051 — a transaction the owner typed and one that does not exist are refused in one
+// sentence, which says nothing of what exists and names the tools that ask the owner.
+#[tokio::test]
+async fn agt_051_a_session_touches_nothing_no_agent_recorded() {
+    use crate::context::account::JournalFilter;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let account = bench.accounts.get_all().await.expect("accounts").remove(0);
     let journal = bench
         .accounts
         .get_account_journal(&account.id, &JournalFilter::default())
@@ -1285,11 +1339,7 @@ async fn agt_051_a_session_touches_nothing_it_did_not_record() {
         .clone();
 
     let mut said = std::collections::HashSet::new();
-    for transaction in [
-        typed_by_the_owner.as_str(),
-        of_the_first.as_str(),
-        "no-such-transaction",
-    ] {
+    for transaction in [typed_by_the_owner.as_str(), "no-such-transaction"] {
         for (tool, arguments) in [
             ("cancel_recording", json!({ "transaction": transaction })),
             (
@@ -1299,10 +1349,17 @@ async fn agt_051_a_session_touches_nothing_it_did_not_record() {
         ] {
             let refused = bench
                 .tools
-                .call(&second, tool, &arguments)
+                .call(&granted, tool, &arguments)
                 .await
                 .expect_err("refused");
             assert_eq!(refused.code, "NotYourRecording", "{tool} {transaction}");
+            for asking in [
+                "request_removal",
+                "request_change",
+                "request_transfer_replacement",
+            ] {
+                assert!(refused.message.contains(asking), "{}", refused.message);
+            }
             said.insert(refused.message);
         }
     }
@@ -1313,7 +1370,6 @@ async fn agt_051_a_session_touches_nothing_it_did_not_record() {
         .await
         .expect("journal");
     assert_eq!(after.rows.len(), journal.rows.len(), "nothing was touched");
-    assert_eq!(bench.connections.sessions()[0].recordings, 1);
 }
 
 // AGT-053 — the owner removes everything a session recorded, in an order its own
@@ -3535,7 +3591,7 @@ async fn agt_080_an_agent_asks_and_the_owner_answers_each_removal() {
         .expect("read")
         .is_none());
 
-    // A transaction an agent recorded is not asked about: the session cancels its own.
+    // A transaction an agent recorded is not asked about: a session cancels or corrects it.
     let of_the_agent = recorded_id(
         &bench
             .tools
@@ -6902,4 +6958,273 @@ async fn agt_080_a_part_of_a_transfer_is_refused_before_asking() {
         );
     }
     assert!(bench.connections.removals().is_empty(), "nothing was asked");
+}
+
+/// A1 and A2, 10 CW8 typed in A1, then the four-step way of 4 CW8 from A1 to A2 recorded by
+/// `recording`: the ids of the sale, the withdrawal, the deposit and the purchase.
+async fn four_steps_recorded_by_an_agent(
+    bench: &Workbench,
+    recording: &super::connections::Granted,
+) -> (String, String, [String; 4]) {
+    let (a1, a2) = (
+        euro_account(bench, "A1").await,
+        euro_account(bench, "A2").await,
+    );
+    typed(bench, owner::deposit("A1", "2019-01-15", 2000)).await;
+    typed(bench, owner::buy("A1", "2019-03-01", 10, 100)).await;
+    let mut ids = Vec::new();
+    for (tool, arguments) in [
+        (
+            "record_sale",
+            json!({ "account": "A1", "asset": "CW8", "quantity": 4, "price": 150, "date": "2019-06-01" }),
+        ),
+        (
+            "record_withdrawal",
+            json!({ "account": "A1", "amount": 600, "date": "2019-06-02" }),
+        ),
+        (
+            "record_deposit",
+            json!({ "account": "A2", "amount": 600, "date": "2019-06-03" }),
+        ),
+        (
+            "record_purchase",
+            json!({ "account": "A2", "asset": "CW8", "quantity": 4, "price": 150, "date": "2019-06-04" }),
+        ),
+    ] {
+        let recorded = bench
+            .tools
+            .call(recording, tool, &arguments)
+            .await
+            .expect("recorded");
+        ids.push(recorded_id(&recorded));
+    }
+    (a1, a2, ids.try_into().expect("four"))
+}
+
+// AGT-093 (#675) — four transactions an earlier session recorded become one transfer in one
+// call, nobody asked, its parts marked with the session that replaced them.
+#[tokio::test]
+async fn agt_093_a_session_replaces_four_agent_recordings_with_a_transfer_without_asking() {
+    use crate::context::account::{JournalFilter, TransactionType};
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let first = session(&bench.connections).await;
+    let second = session(&bench.connections).await;
+    let (a1, a2, four) = four_steps_recorded_by_an_agent(&bench, &first).await;
+
+    let answer = bench
+        .tools
+        .call(
+            &second,
+            "replace_with_transfer",
+            &json!({ "transactions": four }),
+        )
+        .await
+        .expect("replaced");
+
+    assert_eq!(answer["status"], "replaced");
+    assert_eq!(answer["transfer"]["from_account_id"], json!(a1));
+    assert_eq!(answer["transfer"]["to_account_id"], json!(a2));
+    assert_eq!(answer["transfer"]["quantity_sent"], 4 * M);
+    assert!(bench.connections.replacements().is_empty(), "nobody asked");
+    let told = bench
+        .connections
+        .sessions()
+        .into_iter()
+        .find(|told| told.recordings == 2)
+        .expect("the replacing session, its two parts");
+    assert_eq!(told.transactions_recorded, 2, "each part is counted");
+    assert_eq!(
+        told.last_recording.expect("a last recording").kind,
+        TransactionType::TransferIn
+    );
+    for account in [&a1, &a2] {
+        let journal = bench
+            .accounts
+            .get_account_journal(account, &JournalFilter::default())
+            .await
+            .expect("journal");
+        assert!(journal
+            .rows
+            .iter()
+            .all(|row| !four.contains(&row.transaction.id)));
+        let part = journal
+            .rows
+            .iter()
+            .find(|row| {
+                matches!(
+                    row.transaction.transaction_type,
+                    TransactionType::TransferIn | TransactionType::TransferOut
+                )
+            })
+            .expect("the transfer's part");
+        assert_eq!(part.transaction.date, "2019-06-01", "the sale's date");
+        assert_eq!(
+            part.recorded_by.as_ref().expect("marked").session,
+            second.key
+        );
+    }
+}
+
+// AGT-093 — one of the four with no mark is refused with AGT-051's sentence, four that are
+// not a transfer with AGT-090's code, and nothing is written.
+#[tokio::test]
+async fn agt_093_what_no_agent_recorded_or_no_transfer_is_refused() {
+    use crate::context::account::JournalFilter;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let (a1, _, [sale, withdrawal, deposit, purchase]) =
+        four_steps_recorded_by_an_agent(&bench, &granted).await;
+    let journal = bench
+        .accounts
+        .get_account_journal(&a1, &JournalFilter::default())
+        .await
+        .expect("journal");
+    let typed_by_the_owner = journal
+        .rows
+        .iter()
+        .find(|row| row.recorded_by.is_none())
+        .expect("the owner's")
+        .transaction
+        .id
+        .clone();
+
+    for (transactions, code) in [
+        (
+            json!([sale, typed_by_the_owner, deposit, purchase]),
+            "NotYourRecording",
+        ),
+        (json!([sale, withdrawal, deposit]), "InvalidArguments"),
+        (
+            json!([withdrawal, sale, sale, purchase]),
+            "InvalidArguments",
+        ),
+        (
+            json!(["no-such-transaction", withdrawal, deposit, purchase]),
+            "NotYourRecording",
+        ),
+    ] {
+        let refused = bench
+            .tools
+            .call(
+                &granted,
+                "replace_with_transfer",
+                &json!({ "transactions": transactions }),
+            )
+            .await
+            .expect_err("refused");
+        assert_eq!(refused.code, code, "{transactions}");
+    }
+    let other = recorded_id(
+        &bench
+            .tools
+            .call(
+                &granted,
+                "record_deposit",
+                &json!({ "account": "A1", "amount": 1, "date": "2019-06-05" }),
+            )
+            .await
+            .expect("recorded"),
+    );
+    let refused = bench
+        .tools
+        .call(
+            &granted,
+            "replace_with_transfer",
+            &json!({ "transactions": [other, withdrawal, deposit, purchase] }),
+        )
+        .await
+        .expect_err("refused");
+    assert_eq!(refused.code, "NotATransfer");
+    let after = bench
+        .accounts
+        .get_account_journal(&a1, &JournalFilter::default())
+        .await
+        .expect("journal");
+    assert_eq!(
+        after.rows.len(),
+        journal.rows.len() + 1,
+        "only the deposit recorded here"
+    );
+}
+
+// AGT-093 / AGT-047 — a full session replaces nothing, and a transfer whose parts do not fit
+// is refused before anything is written.
+#[tokio::test]
+async fn agt_093_a_replacement_takes_places_of_the_limit() {
+    use super::connections::MAX_RECORDINGS;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let recording = session(&bench.connections).await;
+    let (_, _, four) = four_steps_recorded_by_an_agent(&bench, &recording).await;
+    let replacing = session(&bench.connections).await;
+    let replace = json!({ "transactions": four });
+
+    for _ in 0..MAX_RECORDINGS - 1 {
+        replacing.count_recording();
+    }
+    assert_eq!(
+        bench
+            .tools
+            .call(&replacing, "replace_with_transfer", &replace)
+            .await
+            .expect_err("two parts do not fit in one place")
+            .code,
+        "SessionLimitReached"
+    );
+    replacing.count_recording();
+    assert_eq!(
+        bench
+            .tools
+            .call(&replacing, "replace_with_transfer", &replace)
+            .await
+            .expect_err("no place left")
+            .code,
+        "SessionLimitReached"
+    );
+    for id in &four {
+        assert!(bench
+            .accounts
+            .get_transaction_by_id(id)
+            .await
+            .expect("read")
+            .is_some());
+    }
+}
+
+// AGT-072 / AGT-093 — `preview_recording` does not take a replacement, and AGT-080's pointer
+// names the two tools that change what an agent recorded.
+#[tokio::test]
+async fn agt_093_a_replacement_is_not_previewed_and_a_request_points_to_the_tools() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let (_, _, four) = four_steps_recorded_by_an_agent(&bench, &granted).await;
+
+    assert!(bench
+        .tools
+        .call(
+            &granted,
+            "preview_recording",
+            &json!({ "tool": "replace_with_transfer", "arguments": { "transactions": four } }),
+        )
+        .await
+        .is_err());
+    let refused = bench
+        .tools
+        .call(
+            &granted,
+            "request_removal",
+            &json!({ "transaction": four[0] }),
+        )
+        .await
+        .expect_err("an agent recorded it");
+    assert_eq!(refused.code, "NotTypedByOwner");
+    for tool in ["cancel_recording", "correct_recording"] {
+        assert!(refused.message.contains(tool), "{}", refused.message);
+    }
 }

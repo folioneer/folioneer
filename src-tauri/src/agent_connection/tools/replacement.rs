@@ -1,15 +1,21 @@
 //! AGT-090 — an agent asks the owner to replace four transactions the owner typed — a
-//! transfer recorded the four-step way — with the transfer they stand for.
+//! transfer recorded the four-step way — with the transfer they stand for. AGT-093 — four
+//! that agents recorded it replaces without asking.
+
+use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::context::account::TransactionType;
+use crate::context::account::{AgentRecording, TransactionType};
 use crate::core::BACKEND;
 use crate::use_cases::holding_transaction::TypedTransaction;
 use crate::use_cases::transfer::{Replacement, ReplacementError};
 
 use super::transfer::refusal_from_transfer;
-use super::{as_json, figure, shown, AgentTools, Granted, Refusal};
+use super::{
+    as_json, figure, portfolio_unreadable, session_limit_reached, shown, AgentTools, Granted,
+    Refusal,
+};
 use crate::agent_connection::connections::{ReplacedShown, ReplacementAnswer, TransferShown};
 
 /// AGT-090 — how many transactions a replacement takes.
@@ -44,13 +50,7 @@ impl AgentTools {
             .ask_replacement(four, rate)
             .await
             .map_err(|error| {
-                let refusal = match error {
-                    ReplacementError::NotATransfer(reason) => Refusal {
-                        code: "NotATransfer".to_string(),
-                        message: format!("{reason}: a transfer recorded the four-step way is a sale and a withdrawal in one account, a deposit and a purchase in another"),
-                    },
-                    ReplacementError::Refused(error) => refusal_from_transfer(&error),
-                };
+                let refusal = refusal_from_replacement(error);
                 tracing::info!(target: BACKEND, session = granted.session_id, code = %refusal.code, "agent's replacement refused before asking the owner");
                 refusal
             })?;
@@ -73,6 +73,98 @@ impl AgentTools {
             }),
             ReplacementAnswer::NotReplaced { code, message } => Err(Refusal { code, message }),
         }
+    }
+
+    /// AGT-093 — the session replaces four transactions agents recorded with the transfer
+    /// they stand for, asking nobody, the transfer's parts marked with this session.
+    pub(super) async fn replace_with_transfer(
+        &self,
+        granted: &Granted,
+        arguments: &Value,
+    ) -> Result<Value, Refusal> {
+        if !granted.may_record_one_more() {
+            return Err(session_limit_reached());
+        }
+        let ids = ids_of(arguments)?;
+        let rate = figure(arguments, "rate")?;
+        let mut four = Vec::with_capacity(FOUR);
+        for id in &ids {
+            four.push(
+                self.recorder
+                    .recorded_by_an_agent(id)
+                    .await
+                    .map_err(|refusal| Refusal {
+                        code: refusal.code,
+                        message: refusal.message,
+                    })?,
+            );
+        }
+        let asked = self
+            .transfer
+            .ask_replacement(four, rate)
+            .await
+            .map_err(refusal_from_replacement)?;
+        // AGT-047 — each part takes a place of the limit, as `record_transfer`'s do.
+        if !granted.may_record(asked.preview.parts.len() as u32) {
+            return Err(session_limit_reached());
+        }
+        let mark = AgentRecording {
+            agent: granted.client.clone(),
+            session: granted.key.clone(),
+            session_started_at: granted.started_at.clone(),
+        };
+        let transfer = Arc::clone(&self.transfer);
+        // AGT-049 — once started, the replacement runs to its end, whatever becomes of the
+        // connection that asked.
+        let parts = tokio::spawn(async move {
+            let parts = transfer.replace(&asked, Some(&mark)).await?;
+            let Some(parts) = parts else {
+                return Ok(None);
+            };
+            let view = match parts.first().and_then(|part| part.transfer_id.clone()) {
+                Some(transfer_id) => transfer.get_transfer(&transfer_id).await.ok(),
+                None => None,
+            };
+            Ok(Some((parts.len(), view)))
+        })
+        .await
+        .map_err(|error| {
+            tracing::error!(target: BACKEND, err = ?error, "agent replacement: the task ended early");
+            portfolio_unreadable()
+        })?
+        .map_err(|error| refusal_from_transfer(&error))?;
+        let Some((parts, view)) = parts else {
+            return Err(Refusal {
+                code: "TransactionChanged".to_string(),
+                message: "the four transactions or the transfer changed since they were read: read them again".to_string(),
+            });
+        };
+        for _ in 0..parts {
+            granted.count_marked_transaction();
+        }
+        self.tell_recordings(granted).await;
+        tracing::info!(target: BACKEND, session = granted.session_id, "agent replaced four recordings with a transfer");
+        let Some(view) = view else {
+            tracing::error!(target: BACKEND, "replace_with_transfer: the transfer recorded could not be read");
+            return Err(Refusal {
+                code: "DatabaseError".to_string(),
+                message:
+                    "the transfer was recorded, but could not be read: list_transactions shows it"
+                        .to_string(),
+            });
+        };
+        as_json(&serde_json::json!({ "status": "replaced", "transfer": view }))
+    }
+}
+
+/// AGT-090 — what the checks of a replacement refuse, with its code.
+fn refusal_from_replacement(error: ReplacementError) -> Refusal {
+    match error {
+        ReplacementError::NotATransfer(reason) => Refusal {
+            code: "NotATransfer".to_string(),
+            message: format!("{reason}: a transfer recorded the four-step way is a sale and a withdrawal in one account, a deposit and a purchase in another"),
+        },
+        ReplacementError::Refused(error) => refusal_from_transfer(&error),
     }
 }
 

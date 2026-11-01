@@ -278,7 +278,7 @@
     "connection_covers": "If you allow, until you disconnect or close Folioneer, it may:",
     "connection_covers_read": "read your accounts, assets, holdings, transactions, prices and totals;",
     "connection_covers_add": "add what your portfolio does not have yet — counted in the same 500;",
-    "connection_never": "Your answer covers the whole session. It can correct or cancel only what it recorded in this session; for a transaction you typed it can only ask you, one at a time — and it never reads a file, a setting or your sync folder.",
+    "connection_never": "Your answer covers the whole session. It can correct or cancel what an AI agent recorded, in this session or an earlier one; for a transaction you typed it can only ask you, one at a time — and it never reads a file, a setting or your sync folder.",
     "connection_allow": "Allow for this session",
     "connection_refuse": "Refuse",
     "connected": "{{client}} is connected",

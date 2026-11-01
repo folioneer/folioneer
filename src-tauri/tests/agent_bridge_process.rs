@@ -93,6 +93,7 @@ fn agt_010_the_program_started_with_mcp_lists_its_tools() {
             "request_removal",
             "request_change",
             "request_transfer_replacement",
+            "replace_with_transfer",
         ]
     );
     for tool in tools {
@@ -138,6 +139,7 @@ fn agt_013_every_tool_listed_says_whether_it_only_reads() {
             || name == "request_removal"
             || name == "request_change"
             || name == "request_transfer_replacement"
+            || name == "replace_with_transfer"
             || name == "add_asset"
             || name == "add_account";
         assert_eq!(only_reads, !records, "{name}");

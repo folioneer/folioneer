@@ -345,6 +345,7 @@ mod tests {
                 "request_removal",
                 "request_change",
                 "request_transfer_replacement",
+                "replace_with_transfer",
             ]
         );
         assert_eq!(

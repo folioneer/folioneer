@@ -133,7 +133,7 @@ pub async fn answer_replacement(
         answered.tell(ReplacementAnswer::Refused);
         return Ok(());
     }
-    let refusal = match transfers.replace(&answered.held).await {
+    let refusal = match transfers.replace(&answered.held, None).await {
         Ok(Some(parts)) => {
             tracing::info!(target: BACKEND, session, "the owner replaced four transactions with a transfer");
             let transfer_id = parts.first().and_then(|part| part.transfer_id.clone());
