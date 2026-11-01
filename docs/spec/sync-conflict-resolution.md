@@ -102,7 +102,7 @@ Out of scope here: how anything is shown (SYN-063/066 own the status surface), h
 
 > _Scenario._ Desktop and Laptop each record a buy dated 2026-08-20 while unsynced. Laptop's carries the earlier creation time. Both devices replay Laptop's buy first — including Desktop, which received it second.
 
-**CFR-042 — A merge that breaks a holding invariant keeps every transaction (backend)**: When transactions that were each valid where they were recorded together oversell a position or overdraw the cash holding (CSH-080), all of them are kept and the holding — cash holding included — is **inconsistent**, with the reason, until the replayed ledger is valid again (SYN-040). Inconsistency is derived from the ledger on every recomputation, never stored or synced. Merge never silently drops or alters a transaction to restore an invariant.
+**CFR-042 — A merge that breaks a holding invariant keeps every transaction (backend)**: When transactions that were each valid where they were recorded together oversell a position or overdraw the cash holding (CSH-080), all of them are kept and the holding — cash holding included — is **inconsistent**, with the reason, until the replayed ledger is valid again (SYN-040). Inconsistency is derived from the ledger on every recomputation, never stored or synced. Merge never silently drops or alters a transaction to restore an invariant. A merged holding past what storage holds (TRX-024C) stands at that limit, every transaction kept.
 
 > _Scenario._ 15 TotalEnergies held. Desktop sells 10; Laptop, unsynced, sells 10. Result: both sales exist; the TotalEnergies holding shows −5 and is marked inconsistent on both devices until the user corrects one sale.
 
