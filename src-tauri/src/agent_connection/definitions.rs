@@ -27,7 +27,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "portfolio_summary",
             title: "Portfolio summary",
             only_reads: true,
-            description: "The value of the portfolio: each account with its total value, its unrealized gain, its performance this year and how many of its holdings have an outdated price (outdated_price_count), and the total over the accounts. Amounts and quantities are whole numbers of millionths: 1500000 is 1.5.",
+            description: "The value of the portfolio: each account with its total value, its unrealized gain, its performance this year and how many of its holdings have an outdated price (outdated_price_count), and the total over the accounts.",
             input_schema: nothing(),
         },
         ToolDefinition {
@@ -54,7 +54,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "list_holdings",
             title: "List an account's holdings",
             only_reads: true,
-            description: "The holdings of one account, with their quantities, costs, latest prices and gains, and the account's totals — total_capital_brought_in is what the owner brought in, cash and opening balances at cost; price_outdated says a holding's latest price is too old to trust for its kind (5 business days, 10 for a fund, never for a custom asset), and outdated_price_count how many are; unrecorded_splits lists the splits the price provider reports that this account held through without recording one on that date, each with its date and its factor as new for old — record it with record_split, nothing is recorded automatically; as they stood on a past date when `as_of` is given. Amounts and quantities are whole numbers of millionths: 1500000 is 1.5.",
+            description: "The holdings of one account, with their quantities, costs, latest prices and gains, and the account's totals — total_capital_brought_in is what the owner brought in, cash and opening balances at cost; price_outdated says a holding's latest price is too old to trust for its kind (5 business days, 10 for a fund, never for a custom asset), and outdated_price_count how many are; unrecorded_splits lists the splits the price provider reports that this account held through without recording one on that date, each with its date and its factor as new for old — record it with record_split, nothing is recorded automatically; as they stood on a past date when `as_of` is given.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -69,7 +69,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "list_transactions",
             title: "List an account's transactions",
             only_reads: true,
-            description: "The transactions of one account, oldest first, 100 to a page: each with its id — the one correct_recording and cancel_recording take — its date, transaction_type, asset, quantity, unit price, total, fees, exchange rate and note, and who recorded it (recorded_by.by): owner, agent — with the agent's name — or session, this session. owner means no agent recorded it on this computer. Read it before recording from a statement, so that nothing is recorded twice. Amounts and quantities are whole numbers of millionths: 1500000 is 1.5; a figure a transaction does not have is 0, and the quantity of a Split is its factor.",
+            description: "The transactions of one account, oldest first, 100 to a page: each with its id — the one correct_recording and cancel_recording take — its date, transaction_type, asset, quantity, unit price, total, fees, exchange rate and note, and who recorded it (recorded_by.by): owner, agent — with the agent's name — or session, this session. owner means no agent recorded it on this computer. Read it before recording from a statement, so that nothing is recorded twice. A figure a transaction does not have is 0, and the quantity of a Split is its factor.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -89,7 +89,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "get_price",
             title: "Read an asset's price at a date",
             only_reads: true,
-            description: "The price the application holds for one unit of an asset at a date, in the asset's currency: the price of that date or, when it has none, the closest earlier one — its own date says which. With it, its source: Manual (typed by the owner), Agent (recorded by an agent), or the name of the provider it was fetched from. status is no_price when the asset has no price up to that date. reported_splits lists every split the price provider reports for the asset, oldest first, each with its date and its factor as new for old (20 for 1 is a 20-for-1 split); compare them with the splits recorded in the account. Use it to check a valuation against a statement. The price is a whole number of millionths: 1500000 is 1.5.",
+            description: "The price the application holds for one unit of an asset at a date, in the asset's currency: the price of that date or, when it has none, the closest earlier one — its own date says which. With it, its source: Manual (typed by the owner), Agent (recorded by an agent), or the name of the provider it was fetched from. status is no_price when the asset has no price up to that date. reported_splits lists every split the price provider reports for the asset, oldest first, each with its date and its factor as new for old (20 for 1 is a 20-for-1 split); compare them with the splits recorded in the account. Use it to check a valuation against a statement.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -104,7 +104,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "list_prices",
             title: "List an asset's prices over a period",
             only_reads: true,
-            description: "The prices the application holds for one asset, oldest first, 100 to a page, between two dates, both included, or over its whole history: each with its date, the price of one unit in the asset's currency, and its source: Manual (typed by the owner), Agent (recorded by an agent), or the name of the provider it was fetched from. total says how many prices the dates keep. Use it to check a price history against a statement or a known event, such as a split, and to say which dates are wrong. The price is a whole number of millionths: 1500000 is 1.5.",
+            description: "The prices the application holds for one asset, oldest first, 100 to a page, between two dates, both included, or over its whole history: each with its date, the price of one unit in the asset's currency, and its source: Manual (typed by the owner), Agent (recorded by an agent), or the name of the provider it was fetched from. total says how many prices the dates keep. Use it to check a price history against a statement or a known event, such as a split, and to say which dates are wrong.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -121,7 +121,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "record_opening_balance",
             title: "Record an opening balance",
             only_reads: false,
-            description: "Record what an account already held of an asset on a date: the quantity and its total cost. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+            description: "Record what an account already held of an asset on a date: the quantity and its total cost. The recording follows the application's rules and is marked as recorded by this agent.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -138,28 +138,28 @@ pub fn definitions() -> Vec<ToolDefinition> {
         trade_definition(
             "record_purchase",
             "Record a purchase",
-            "Record a purchase of an asset in an account. Give either the unit price, in the asset's currency, or the broker's all-in total, in the account's currency. The cash of the account pays for it. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+            "Record a purchase of an asset in an account. Give either the unit price, in the asset's currency, or the broker's all-in total, in the account's currency. The cash of the account pays for it. The recording follows the application's rules and is marked as recorded by this agent.",
         ),
         trade_definition(
             "record_sale",
             "Record a sale",
-            "Record a sale of an asset held in an account. Give either the unit price, in the asset's currency, or the broker's all-in total, in the account's currency. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+            "Record a sale of an asset held in an account. Give either the unit price, in the asset's currency, or the broker's all-in total, in the account's currency. The recording follows the application's rules and is marked as recorded by this agent.",
         ),
         cash_definition(
             "record_deposit",
             "Record a deposit",
-            "Record cash paid into an account from outside. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+            "Record cash paid into an account from outside. The recording follows the application's rules and is marked as recorded by this agent.",
         ),
         cash_definition(
             "record_withdrawal",
             "Record a withdrawal",
-            "Record cash taken out of an account. The account must hold that cash on the date. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+            "Record cash taken out of an account. The account must hold that cash on the date. The recording follows the application's rules and is marked as recorded by this agent.",
         ),
         ToolDefinition {
             name: "record_dividend",
             title: "Record a dividend",
             only_reads: false,
-            description: "Record a dividend an asset held in an account paid: the cash of the account receives it, the holding is unchanged. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+            description: "Record a dividend an asset held in an account paid: the cash of the account receives it, the holding is unchanged. The recording follows the application's rules and is marked as recorded by this agent.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -197,7 +197,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "record_free_shares",
             title: "Record free shares",
             only_reads: false,
-            description: "Record shares of an asset held in an account received at no cost — a bonus issue, a dividend paid in shares: the quantity held rises, its cost is unchanged and no cash moves. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+            description: "Record shares of an asset held in an account received at no cost — a bonus issue, a dividend paid in shares: the quantity held rises, its cost is unchanged and no cash moves. The recording follows the application's rules and is marked as recorded by this agent.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -215,7 +215,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "record_write_off",
             title: "Record a write-off",
             only_reads: false,
-            description: "Record a quantity of an asset held in an account that left without proceeds — a network fee paid in the asset, dust, coins sent away or lost: the quantity held falls at its average cost, the cost taken out is a realized loss and no cash moves. The recording follows the application's rules and is marked as recorded by this agent. Figures are decimals with a dot (12.5), not millionths.",
+            description: "Record a quantity of an asset held in an account that left without proceeds — a network fee paid in the asset, dust, coins sent away or lost: the quantity held falls at its average cost, the cost taken out is a realized loss and no cash moves. The recording follows the application's rules and is marked as recorded by this agent.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -234,7 +234,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "record_transfer",
             title: "Record a transfer",
             only_reads: false,
-            description: "Record an asset moved from one account of the portfolio to another — shares moved between brokers, coins sent from an exchange to a wallet: the quantity leaves the sending account at its average cost and enters the receiving one at that cost, converted at the rate between the two accounts' currencies; no cash moves and no gain is realized. When less arrives than was sent, the difference is a fee in kind, written off in the sending account. The transfer's parts follow the application's rules and are marked as recorded by this agent; cancel_recording on any of them removes the whole transfer, and a part is not corrected: cancel it and record the transfer again. Figures are decimals with a dot (12.5), not millionths.",
+            description: "Record an asset moved from one account of the portfolio to another — shares moved between brokers, coins sent from an exchange to a wallet: the quantity leaves the sending account at its average cost and enters the receiving one at that cost, converted at the rate between the two accounts' currencies; no cash moves and no gain is realized. When less arrives than was sent, the difference is a fee in kind, written off in the sending account. The transfer's parts follow the application's rules and are marked as recorded by this agent; cancel_recording on any of them removes the whole transfer, and a part is not corrected: cancel it and record the transfer again.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -255,7 +255,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "record_interest",
             title: "Record interest",
             only_reads: false,
-            description: "Record interest credited in an account: in units to an interest-bearing asset held there, or, with no asset, to the account's cash in its currency. Give exactly one of percent, the share of what is held on the date that is credited, and quantity, what is credited. The recording follows the application's rules and is marked as recorded by this agent; it is not previewed. Figures are decimals with a dot (2.5 for 2.5 %), not millionths.",
+            description: "Record interest credited in an account: in units to an interest-bearing asset held there, or, with no asset, to the account's cash in its currency. Give exactly one of percent, the share of what is held on the date that is credited, and quantity, what is credited. The recording follows the application's rules and is marked as recorded by this agent; it is not previewed.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -274,7 +274,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "record_management_fee",
             title: "Record a management fee",
             only_reads: false,
-            description: "Record a management fee taken in units of an asset held in an account, as an insurance contract takes it: the quantity held falls, its cost stays and no cash moves. Give exactly one of percent, the share of what is held on the date that is removed, and resulting_quantity, what the holding holds after the fee. A fee the holding's fee schedule already generated for that period is refused: ask to change that one with request_change instead. The recording follows the application's rules and is marked as recorded by this agent; it is not previewed. Figures are decimals with a dot (0.5 for 0.5 %), not millionths.",
+            description: "Record a management fee taken in units of an asset held in an account, as an insurance contract takes it: the quantity held falls, its cost stays and no cash moves. Give exactly one of percent, the share of what is held on the date that is removed, and resulting_quantity, what the holding holds after the fee. A fee the holding's fee schedule already generated for that period is refused: ask to change that one with request_change instead. The recording follows the application's rules and is marked as recorded by this agent; it is not previewed.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -293,12 +293,12 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "record_price",
             title: "Record a price",
             only_reads: false,
-            description: "Record the price of one unit of an asset on a date, in the asset's currency — a year-end price from a statement, for instance. It is stored as recorded by an agent and replaces the price the asset already has on that date, if any. Figures are decimals with a dot (12.5), not millionths.",
+            description: "Record the price of one unit of an asset on a date, in the asset's currency — a year-end price from a statement, for instance. It is stored as recorded by an agent and replaces the price the asset already has on that date, if any.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "asset": { "type": "string", "description": "The asset's name, reference or ISIN, or REFERENCE@EXCHANGE when a reference is shared." },
-                    "price": { "type": ["string", "number"], "description": "The price of one unit, in the asset's currency, with at most six decimals." },
+                    "price": { "type": ["string", "number"], "description": "The price of one unit, in the asset's currency." },
                     "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." }
                 },
                 "required": ["asset", "price"],
@@ -347,7 +347,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "correct_recording",
             title: "Correct a recording",
             only_reads: false,
-            description: "Correct a transaction an agent recorded, in this session or an earlier one, of any type, as the window corrects it: give its id, as the recording returned it or list_transactions gives it, and only what changes; the rest stays. Every type takes date and note; a purchase or a sale quantity, price or total (not both), fees and rate; an opening balance quantity and total (its total cost); a deposit or a withdrawal amount; a dividend amount (in the asset's currency) and rate; a split new and old, its ratio; free shares, interest or a management fee quantity; a write-off quantity and reason. A transaction the owner typed is refused. Figures are decimals with a dot (12.5), not millionths.",
+            description: "Correct a transaction an agent recorded, in this session or an earlier one, of any type, as the window corrects it: give its id, as the recording returned it or list_transactions gives it, and only what changes; the rest stays. Every type takes date and note; a purchase or a sale quantity, price or total (not both), fees and rate; an opening balance quantity and total (its total cost); a deposit or a withdrawal amount; a dividend amount (in the asset's currency) and rate; a split new and old, its ratio; free shares, interest or a management fee quantity; a write-off quantity and reason. A transaction the owner typed is refused.",
             input_schema: json!({
                 "type": "object",
                 "properties": {

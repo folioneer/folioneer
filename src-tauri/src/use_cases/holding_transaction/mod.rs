@@ -10,6 +10,8 @@
 mod api;
 /// Use-case-owned typed errors (composite + application leaf).
 mod error;
+/// What an agent and the command line's JSON read: figures as decimal text.
+mod figures_as_text;
 /// Listing by what a person named (AGT-070).
 mod named_listing;
 /// Recording by what a person named (CLI-011, AGT-044).
@@ -27,6 +29,7 @@ pub use error::{
     SplitError, SplitTask, TransactionDraftError, TransactionDraftTask, WriteOffError,
     WriteOffTask,
 };
+pub use figures_as_text::{figures_as_text, WHOLE_NUMBERS};
 pub use named_listing::{
     ListedPrices, ListedTransaction, ListedTransactions, PriceRead, RecordedBy, TransactionsAsked,
     PRICES_PER_PAGE, TRANSACTIONS_PER_PAGE,
