@@ -19,7 +19,7 @@ const target = {
   assetId: "asset-btc",
   assetName: "Bitcoin",
   assetReference: "BTC",
-  quantityMicro: 500_000,
+  heldQuantity: "0.5",
   averagePriceMicro: 20_000_000_000,
 };
 
@@ -28,7 +28,7 @@ const hookReturn = (over: Record<string, unknown> = {}) => ({
   refusal: null,
   isSubmitting: false,
   isFormValid: true,
-  heldMicro: 500_000,
+  heldQuantity: "0.5",
   overHolding: false,
   estimatedCostMicro: 2_000_000_000,
   handleChange: vi.fn(),

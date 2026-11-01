@@ -4,9 +4,11 @@ import type { OpeningBalanceDraft, Transaction } from "@/bindings";
 import { logger } from "@/lib/logger";
 import {
   decimalToMicro,
+  decimalToQuantity,
   microToExactDecimal,
   microToFieldDecimal,
   microToFormatted,
+  quantityToFieldDecimal,
 } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
@@ -49,7 +51,7 @@ export function useEditTransactionModal({
     assetId: transaction.asset_id,
     date: transaction.date,
     // TRX-051: for OpeningBalance, unitPrice field is repurposed to hold the total cost
-    quantity: microToFieldDecimal(transaction.quantity),
+    quantity: quantityToFieldDecimal(transaction.quantity),
     unitPrice: isOpeningBalance
       ? microToFieldDecimal(transaction.total_amount)
       : microToFieldDecimal(transaction.unit_price),
@@ -100,7 +102,7 @@ export function useEditTransactionModal({
             account_id: formData.accountId,
             asset_id: formData.assetId,
             date: formData.date,
-            quantity: decimalToMicro(formData.quantity),
+            quantity: decimalToQuantity(formData.quantity),
             total_cost:
               formData.unitPrice.trim() === "" ? null : decimalToMicro(formData.unitPrice),
           }
@@ -140,7 +142,7 @@ export function useEditTransactionModal({
 
   const entered = useMemo(
     () => ({
-      qtyMicro: decimalToMicro(formData.quantity),
+      quantity: decimalToQuantity(formData.quantity),
       priceMicro: decimalToMicro(formData.unitPrice),
       rateMicro: isOpeningBalance ? 1_000_000 : decimalToMicro(formData.exchangeRate),
       feesMicro: isOpeningBalance ? 0 : decimalToMicro(formData.fees),
@@ -211,7 +213,7 @@ export function useEditTransactionModal({
     try {
       const result = await correctTransaction(transaction.id, transaction.account_id, {
         date: formData.date,
-        quantity: entered.qtyMicro,
+        quantity: entered.quantity,
         unit_price: isOpeningBalance ? 0 : (preview?.unit_price ?? entered.priceMicro),
         exchange_rate: entered.rateMicro,
         fees: entered.feesMicro,

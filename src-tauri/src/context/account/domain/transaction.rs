@@ -1,6 +1,8 @@
 use crate::context::account::error::AccountError;
-use crate::core::cash::is_cash_asset;
-use crate::shared::domain::quantity::{from_surface, shown_for, to_surface, QUANTITY_UNIT};
+use crate::shared::domain::quantity::{
+    quantity_text, read_scaled, scaled_text, stored_quantity, FigureTextError, MONEY_DECIMALS,
+    QUANTITY_UNIT,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDate;
@@ -100,7 +102,7 @@ impl TransactionType {
 
 /// A single financial event affecting an asset's quantity and cost basis within an account.
 /// All financial fields are stored as i64 micro-units (ADR-001, TRX-024).
-#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Transaction {
     /// Unique identifier.
     pub id: String,
@@ -151,6 +153,74 @@ pub struct Transaction {
     /// `quantity` (SYN-038).
     #[serde(default)]
     pub dividend_amount: Option<i64>,
+}
+
+/// A transaction as a surface reads it: its fields, with `quantity` as decimal text
+/// (TRX-024A, TRX-024B). `Transaction` itself is what storage and a sync change hold.
+#[derive(Debug, Serialize, Clone, Type)]
+#[specta(rename = "Transaction")]
+pub struct TransactionView {
+    /// Unique identifier.
+    pub id: String,
+    /// The account where the transaction occurred.
+    pub account_id: String,
+    /// The financial asset involved.
+    pub asset_id: String,
+    /// Type of transaction.
+    pub transaction_type: TransactionType,
+    /// Date when the transaction was executed (ISO 8601, "YYYY-MM-DD").
+    pub date: String,
+    /// What is given as its quantity (TRX-024A), as decimal text.
+    pub quantity: String,
+    /// Price per unit in asset's native currency (micro-units).
+    pub unit_price: i64,
+    /// Conversion rate from asset currency to account currency (micro-units).
+    pub exchange_rate: i64,
+    /// Transaction fees in account currency (micro-units).
+    pub fees: i64,
+    /// Total cost or proceeds in account currency (micro-units).
+    pub total_amount: i64,
+    /// Optional user comment.
+    pub note: Option<String>,
+    /// Realized P&L for Sell transactions (micro-units, SEL-024).
+    pub realized_pnl: Option<i64>,
+    /// ISO 8601 timestamp of record creation.
+    pub created_at: String,
+    /// Why a write-off's quantity left (WOF entity).
+    pub write_off_reason: Option<WriteOffReason>,
+    /// The transfer this transaction is a part of (TRF entity).
+    pub transfer_id: Option<String>,
+    /// IMP-051 — a deposit the import added before a purchase the file left unfunded.
+    pub added_deposit: bool,
+    /// SPL-010 — a split's factor (micro-units).
+    pub split_factor: Option<i64>,
+    /// DIV-023 — a dividend's net amount (micro-units).
+    pub dividend_amount: Option<i64>,
+}
+
+impl From<&Transaction> for TransactionView {
+    fn from(transaction: &Transaction) -> Self {
+        Self {
+            id: transaction.id.clone(),
+            account_id: transaction.account_id.clone(),
+            asset_id: transaction.asset_id.clone(),
+            transaction_type: transaction.transaction_type,
+            date: transaction.date.clone(),
+            quantity: transaction.shown_quantity(),
+            unit_price: transaction.unit_price,
+            exchange_rate: transaction.exchange_rate,
+            fees: transaction.fees,
+            total_amount: transaction.total_amount,
+            note: transaction.note.clone(),
+            realized_pnl: transaction.realized_pnl,
+            created_at: transaction.created_at.clone(),
+            write_off_reason: transaction.write_off_reason,
+            transfer_id: transaction.transfer_id.clone(),
+            added_deposit: transaction.added_deposit,
+            split_factor: transaction.split_factor,
+            dividend_amount: transaction.dividend_amount,
+        }
+    }
 }
 
 impl Transaction {
@@ -859,34 +929,34 @@ impl Transaction {
         self.split_factor.unwrap_or(self.quantity)
     }
 
-    /// TRX-024A — what a surface gives as this transaction's quantity: a split's
-    /// factor, a dividend's amount, the cash line's money, otherwise its quantity in millionths.
-    pub fn shown_quantity(&self) -> i64 {
+    /// TRX-024A — what a surface gives as this transaction's quantity, as decimal text: a
+    /// split's factor, a dividend's amount, otherwise its quantity on its own scale.
+    pub fn shown_quantity(&self) -> String {
+        match self.transaction_type {
+            TransactionType::Split | TransactionType::Dividend => {
+                scaled_text(self.quantity_figure(), MONEY_DECIMALS)
+            }
+            _ => quantity_text(&self.asset_id, self.quantity),
+        }
+    }
+
+    /// What a correction leaves as this transaction's quantity figure when none is given: a
+    /// split's factor, a dividend's amount, otherwise its quantity, each on its own scale.
+    pub fn quantity_figure(&self) -> i64 {
         match self.transaction_type {
             TransactionType::Split => self.factor(),
             TransactionType::Dividend => self.dividend_amount.unwrap_or(self.quantity),
-            _ => shown_for(&self.asset_id, self.quantity),
+            _ => self.quantity,
         }
     }
 
-    /// TRX-024 — a quantity a surface sent to correct this transaction, as stored: money on
-    /// the cash line, a split's factor and a dividend's amount keep their own scale.
-    pub fn stored_correction_quantity(&self, surface_quantity: i64) -> i64 {
+    /// TRX-024B — a quantity a surface sent as decimal text to correct this transaction, as
+    /// stored: a split's factor and a dividend's amount are money's six decimals.
+    pub fn stored_correction_quantity(&self, text: &str) -> Result<i64, FigureTextError> {
         match self.transaction_type {
-            TransactionType::Split | TransactionType::Dividend => surface_quantity,
-            _ if is_cash_asset(&self.asset_id) => surface_quantity,
-            // TRX-024D — sent back as it was read, the quantity keeps its last two decimals.
-            _ if to_surface(self.quantity) == surface_quantity => self.quantity,
-            _ => from_surface(surface_quantity),
+            TransactionType::Split | TransactionType::Dividend => read_scaled(text, MONEY_DECIMALS),
+            _ => stored_quantity(&self.asset_id, text),
         }
-    }
-
-    /// The transaction as the agent connection and the command line give it: its fields, its
-    /// `quantity` being `shown_quantity`.
-    pub fn as_shown(&self) -> Self {
-        let mut shown = self.clone();
-        shown.quantity = self.shown_quantity();
-        shown
     }
 
     /// Reconstructs a Transaction from storage without validation.
@@ -1096,6 +1166,7 @@ pub enum EnteredAmount {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::shared::domain::quantity::from_surface;
 
     fn make_transaction(
         quantity: i64,
@@ -1826,23 +1897,29 @@ mod tests {
             )
             .expect("valid")
         };
-        let purchase = on("asset", TransactionType::Purchase, 123_456_700);
-        assert_eq!(purchase.shown_quantity(), 1_234_567);
-        assert_eq!(purchase.as_shown().quantity, 1_234_567);
-        assert_eq!(purchase.stored_correction_quantity(1_234_567), 123_456_700);
-        let mut fine = purchase.clone();
-        fine.quantity = 16_666_666;
-        assert_eq!(fine.stored_correction_quantity(166_666), 16_666_666);
-        assert_eq!(fine.stored_correction_quantity(166_667), 16_666_700);
+        let purchase = on("asset", TransactionType::Purchase, 123_456_789);
+        assert_eq!(purchase.shown_quantity(), "1.23456789");
+        assert_eq!(TransactionView::from(&purchase).quantity, "1.23456789");
+        assert_eq!(
+            purchase.stored_correction_quantity("1.23456789"),
+            Ok(123_456_789)
+        );
 
         let deposit = on("system-cash-eur", TransactionType::Deposit, 500_000_000);
-        assert_eq!(deposit.shown_quantity(), 500_000_000);
-        assert_eq!(deposit.stored_correction_quantity(500_000_000), 500_000_000);
+        assert_eq!(deposit.shown_quantity(), "500");
+        assert_eq!(deposit.stored_correction_quantity("500"), Ok(500_000_000));
+        assert_eq!(
+            deposit.stored_correction_quantity("0.0000001"),
+            Err(FigureTextError::NotAFigure)
+        );
 
         // A correction's figure on a split is its factor, on a dividend its amount.
         let mut split = purchase.clone();
         split.transaction_type = TransactionType::Split;
-        assert_eq!(split.stored_correction_quantity(2_000_000), 2_000_000);
+        assert_eq!(split.stored_correction_quantity("2"), Ok(2_000_000));
+        let mut dividend = purchase.clone();
+        dividend.transaction_type = TransactionType::Dividend;
+        assert_eq!(dividend.stored_correction_quantity("2.5"), Ok(2_500_000));
     }
 
     // INT-021/024 — Transaction::interest factory
@@ -2006,7 +2083,7 @@ mod tests {
             (split.quantity, split.split_factor, split.factor()),
             (0, Some(20_000_000), 20_000_000)
         );
-        assert_eq!(split.as_shown().quantity, 20_000_000);
+        assert_eq!(TransactionView::from(&split).quantity, "20");
 
         let dividend = Transaction::new_dividend(
             "a".to_string(),
@@ -2021,6 +2098,6 @@ mod tests {
             (dividend.quantity, dividend.dividend_amount),
             (0, Some(5_000_000))
         );
-        assert_eq!(dividend.as_shown().quantity, 5_000_000);
+        assert_eq!(TransactionView::from(&dividend).quantity, "5");
     }
 }

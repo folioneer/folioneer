@@ -583,7 +583,7 @@ export function AccountDetailsView() {
           assetName={view.sellTarget.assetName}
           assetReference={view.sellTarget.assetReference}
           assetCurrency={view.sellTarget.assetCurrency}
-          holdingQuantityMicro={view.sellTarget.holdingQuantityMicro}
+          holdingQuantity={view.sellTarget.holdingQuantity}
           showExchangeRate={view.sellTarget.showExchangeRate}
           onSubmitSuccess={view.handleSellSuccess}
         />

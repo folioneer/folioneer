@@ -979,9 +979,9 @@ async recordManagementFee(dto: ManagementFeeDTO) : Promise<Result<Transaction, M
  * What a one-off management fee entered by its resulting quantity would remove
  * (FEE-029): the quantity held as of `date`, the removal and the percentage it represents.
  */
-async previewManagementFee(accountId: string, assetId: string, date: string, resultingQuantityMicros: number) : Promise<Result<ManagementFeeRemoval, ManagementFeeError>> {
+async previewManagementFee(accountId: string, assetId: string, date: string, resultingQuantity: string) : Promise<Result<ManagementFeeRemoval, ManagementFeeError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("preview_management_fee", { accountId, assetId, date, resultingQuantityMicros }) };
+    return { status: "ok", data: await TAURI_INVOKE("preview_management_fee", { accountId, assetId, date, resultingQuantity }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1394,8 +1394,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
+export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 
 /** user-defined types **/
 
@@ -1576,7 +1576,7 @@ export type AccountError =
 /**
  * Sell quantity exceeds the currently held units.
  */
-{ code: "Oversell"; available: number; requested: number } | 
+{ code: "Oversell"; available: string; requested: string } | 
 /**
  * Correcting a transaction would leave a later sell with insufficient units.
  */
@@ -1708,7 +1708,7 @@ export type AccountError =
  * The resulting quantity of a one-off management fee is not strictly below the
  * quantity held as of the fee's date (FEE-028).
  */
-{ code: "ResultingQuantityNotBelowHeld"; held_quantity: number } | 
+{ code: "ResultingQuantityNotBelowHeld"; held_quantity: string } | 
 /**
  * Exactly one of percent / quantity must be provided when recording interest (INT-021).
  */
@@ -2608,9 +2608,9 @@ asset_id: string;
  */
 date: string; 
 /**
- * Quantity in micro-units.
+ * Quantity as decimal text.
  */
-quantity: number; 
+quantity: string; 
 /**
  * Unit price in asset currency (micro-units).
  */
@@ -2800,9 +2800,9 @@ transaction_id: string;
  */
 date: string; 
 /**
- * Corrected quantity in micro-units.
+ * Corrected quantity, as decimal text (TRX-024B).
  */
-quantity: number; 
+quantity: string; 
 /**
  * Corrected unit price in asset currency (micro-units).
  */
@@ -2839,13 +2839,13 @@ transfer_id: string;
  */
 date: string; 
 /**
- * Corrected quantity sent (micro-units).
+ * Corrected quantity sent (decimal text).
  */
-quantity_sent: number; 
+quantity_sent: string; 
 /**
- * Corrected quantity received (micro-units).
+ * Corrected quantity received (decimal text).
  */
-quantity_received: number; 
+quantity_received: string; 
 /**
  * Corrected rate (micros); `null` takes the stored rate of the date again (TRF-030).
  */
@@ -2871,9 +2871,9 @@ transaction_id: string;
  */
 date: string; 
 /**
- * Corrected quantity (micro-units, strictly positive, WOF-011).
+ * Corrected quantity (decimal text, strictly positive, WOF-011).
  */
-quantity: number; 
+quantity: string; 
 /**
  * Corrected reason (WOF entity).
  */
@@ -3752,9 +3752,9 @@ asset_id: string;
  */
 date: string; 
 /**
- * Number of free shares received (micro-units, strictly positive, FSD-021).
+ * Number of free shares received (decimal text, strictly positive, FSD-021).
  */
-quantity: number; 
+quantity: string; 
 /**
  * Optional user note.
  */
@@ -3800,7 +3800,7 @@ export type FreeSharesTask =
 { code: "FreeSharesOnCashAsset" }
 /**
  * Current state of a financial position: an asset held within an account (ADR-002).
- * All financial fields are stored as i64 micro-units (ADR-001).
+ * All figures are stored as i64 fixed-point (ADR-001, TRX-024).
  */
 export type Holding = { 
 /**
@@ -3816,7 +3816,8 @@ account_id: string;
  */
 asset_id: string; 
 /**
- * Current number of units held (micro-units: value × 10^6).
+ * Current number of units held: hundred-millionths, the Cash Holding's balance in
+ * micro-units (TRX-024).
  */
 quantity: number; 
 /**
@@ -3848,9 +3849,9 @@ asset_name: string;
  */
 asset_reference: string; 
 /**
- * Current units held (i64 micro-units, ADR-001).
+ * Current units held, as decimal text (TRX-024B).
  */
-quantity: number; 
+quantity: string; 
 /**
  * VWAP purchase price in account currency (i64 micro-units, ADR-001).
  */
@@ -3997,9 +3998,9 @@ export type HoldingInconsistency =
  */
 { Oversold: { 
 /**
- * The oversold quantity, in micros, negative by construction.
+ * The oversold quantity, as decimal text, negative by construction.
  */
-quantity: number } } | 
+quantity: string } } | 
 /**
  * The replayed cash balance is negative, in the account's currency.
  */
@@ -4065,15 +4066,13 @@ five_years: number | null;
  */
 ten_years: number | null }
 /**
- * Point-in-time reconstruction of a single holding's quantity and VWAP cost
- * basis as of a date — the read-only "as of" valuation behind the trade-dialog
- * insights (TDI-010). All financial fields are i64 micro-units (ADR-001).
+ * `HoldingSnapshot` as the window reads it: its quantity as decimal text (TRX-024B).
  */
 export type HoldingSnapshot = { 
 /**
- * Units held as of the queried date (micro-units), 0 when nothing is held.
+ * Units held as of the queried date, 0 when nothing is held.
  */
-quantity: number; 
+quantity: string; 
 /**
  * VWAP cost basis per unit, account currency (micro-units), 0 when never held.
  */
@@ -4411,15 +4410,15 @@ date: string;
 /**
  * Percentage of the holding to remove, in micro-percent (1% = 1_000_000),
  * strictly positive and at most 100_000_000; mutually exclusive with
- * `resulting_quantity_micros` (FEE-021).
+ * `resulting_quantity` (FEE-021).
  */
 percent_micros: number | null; 
 /**
- * Quantity the holding should hold after the fee, as of `date` (micro-units, zero
+ * Quantity the holding should hold after the fee, as of `date` (decimal text, zero
  * or more and below the held quantity); mutually exclusive with `percent_micros`
  * (FEE-021/028).
  */
-resulting_quantity_micros: number | null; 
+resulting_quantity: string | null; 
 /**
  * Optional user note.
  */
@@ -4443,18 +4442,18 @@ AccountError |
 ManagementFeeTask
 /**
  * What a one-off management fee entered by its resulting quantity removes (FEE-028/029).
- * Quantities are i64 micro-units (ADR-001); the percentage is in micro-percent
+ * Quantities read as decimal text (TRX-024B); the percentage is in micro-percent
  * (1% = 1_000_000), floored.
  */
 export type ManagementFeeRemoval = { 
 /**
  * Quantity held as of the fee's date.
  */
-held_quantity: number; 
+held_quantity: string; 
 /**
  * Quantity the fee removes: held minus resulting, exactly.
  */
-removed_quantity: number; 
+removed_quantity: string; 
 /**
  * Share of the holding the removal represents.
  */
@@ -4579,9 +4578,9 @@ asset_id: string;
  */
 date: string; 
 /**
- * Quantity in micro-units; strictly positive (TRX-044).
+ * Quantity as decimal text; strictly positive (TRX-044).
  */
-quantity: number; 
+quantity: string; 
 /**
  * Total cost paid in account currency (micro-units); strictly positive (TRX-045).
  */
@@ -4631,8 +4630,7 @@ export type OpenHoldingTask =
  */
 { code: "OpeningBalanceOnCashAsset" }
 /**
- * An opening balance as the user is still entering it (TRX-066). Empty strings are fields
- * not filled yet, and so is a total cost of `None`: a typed 0 is a figure (TRX-045).
+ * An opening balance draft as the window sends it: the quantity as decimal text (TRX-024B).
  */
 export type OpeningBalanceDraft = { 
 /**
@@ -4648,9 +4646,9 @@ asset_id: string;
  */
 date: string; 
 /**
- * Quantity, in micros.
+ * Quantity, as decimal text; `0` until entered.
  */
-quantity: number; 
+quantity: string; 
 /**
  * Total cost in account currency, in micros; `None` until entered.
  */
@@ -5247,14 +5245,14 @@ asset_id: string;
 date: string; 
 /**
  * Interest rate in micro-percent (1% = 1_000_000), strictly positive and at
- * most 100_000_000; mutually exclusive with `quantity_micros` (INT-021/022).
+ * most 100_000_000; mutually exclusive with `quantity` (INT-021/022).
  */
 percent_micros: number | null; 
 /**
- * Credited quantity (micro-units, strictly positive); mutually exclusive
+ * Credited quantity (decimal text, strictly positive); mutually exclusive
  * with `percent_micros` (INT-021).
  */
-quantity_micros: number | null; 
+quantity: string | null; 
 /**
  * Optional user note.
  */
@@ -5382,10 +5380,10 @@ export type ReplacedShown = {
  */
 transaction: TransactionShown; 
 /**
- * The quantity it moved into the holding, negative out of it, in micro-units; `None`
+ * The quantity it moved into the holding, negative out of it, as decimal text; `None`
  * for a transaction on the account's cash.
  */
-holding_moved: number | null; 
+holding_moved: string | null; 
 /**
  * The cash it moved into the account, negative out of it, in micro-units.
  */
@@ -5677,9 +5675,9 @@ asset_id: string;
  */
 date: string; 
 /**
- * Quantity in micro-units.
+ * Quantity as decimal text.
  */
-quantity: number; 
+quantity: string; 
 /**
  * Unit price in asset currency (micro-units).
  */
@@ -5835,13 +5833,14 @@ size: SplitSize;
 correcting: string | null }
 /**
  * What a split would make of a position (SPL-020): the holding on the split's date,
- * before and after the rescale. All fields are i64 micro-units (ADR-001).
+ * before and after the rescale: quantities read as decimal text (TRX-024B), prices in
+ * micro-units.
  */
 export type StockSplitPosition = { 
 /**
  * Units held on the split's date, before it.
  */
-old_quantity: number; 
+old_quantity: string; 
 /**
  * Average cost per unit before the split, account currency.
  */
@@ -5849,7 +5848,7 @@ old_average_price: number;
 /**
  * Units held once the split is applied.
  */
-new_quantity: number; 
+new_quantity: string; 
 /**
  * Average cost per unit once the split is applied, account currency.
  */
@@ -6231,8 +6230,8 @@ export type ThresholdDirection =
  */
 "Above"
 /**
- * A single financial event affecting an asset's quantity and cost basis within an account.
- * All financial fields are stored as i64 micro-units (ADR-001, TRX-024).
+ * A transaction as a surface reads it: its fields, with `quantity` as decimal text
+ * (TRX-024A, TRX-024B). `Transaction` itself is what storage and a sync change hold.
  */
 export type Transaction = { 
 /**
@@ -6248,7 +6247,7 @@ account_id: string;
  */
 asset_id: string; 
 /**
- * Type of transaction: Purchase, Sell, or OpeningBalance.
+ * Type of transaction.
  */
 transaction_type: TransactionType; 
 /**
@@ -6256,12 +6255,11 @@ transaction_type: TransactionType;
  */
 date: string; 
 /**
- * Number of units traded (micro-units: value × 10^6). Must be > 0, except on a split and
- * a dividend, which hold their figure in a field of its own and leave this 0.
+ * What is given as its quantity (TRX-024A), as decimal text.
  */
-quantity: number; 
+quantity: string; 
 /**
- * Price per unit in asset's native currency (micro-units). Can be 0 (gifted assets).
+ * Price per unit in asset's native currency (micro-units).
  */
 unit_price: number; 
 /**
@@ -6273,8 +6271,7 @@ exchange_rate: number;
  */
 fees: number; 
 /**
- * Total cost (Purchase) or proceeds (Sell) in account currency (micro-units).
- * Must be > 0, except an OpeningBalance position may be 0 (zero-cost, TRX-045).
+ * Total cost or proceeds in account currency (micro-units).
  */
 total_amount: number; 
 /**
@@ -6282,46 +6279,40 @@ total_amount: number;
  */
 note: string | null; 
 /**
- * Realized P&L for Sell transactions (micro-units, SEL-024). NULL for Purchase.
+ * Realized P&L for Sell transactions (micro-units, SEL-024).
  */
 realized_pnl: number | null; 
 /**
- * ISO 8601 timestamp of record creation — used for same-date tie-breaking (SEL-024).
+ * ISO 8601 timestamp of record creation.
  */
 created_at: string; 
 /**
- * Why a write-off's quantity left (WOF entity); `None` on every other type. Absent
- * from a change written before data format 7, read as `None` (SYN-038).
+ * Why a write-off's quantity left (WOF entity).
  */
-write_off_reason?: WriteOffReason | null; 
+write_off_reason: WriteOffReason | null; 
 /**
- * The transfer this transaction is a part of (TRF entity): its two sides and its fee in
- * kind share it; `None` on every other transaction, and on a change written before it.
+ * The transfer this transaction is a part of (TRF entity).
  */
-transfer_id?: string | null; 
+transfer_id: string | null; 
 /**
- * IMP-051 — a deposit the import added before a purchase the file left unfunded;
- * `false` on every other transaction, and on a change written before data format 11.
+ * IMP-051 — a deposit the import added before a purchase the file left unfunded.
  */
-added_deposit?: boolean; 
+added_deposit: boolean; 
 /**
- * SPL-010 — a split's factor (micro-units); `None` on every other type. Absent from a
- * change written before data format 13, which carries it in `quantity` (SYN-038).
+ * SPL-010 — a split's factor (micro-units).
  */
-split_factor?: number | null; 
+split_factor: number | null; 
 /**
- * DIV-023 — a dividend's net amount, in the currency it was entered in (micro-units); `None` on every
- * other type. Absent from a change written before data format 13, which carries it in
- * `quantity` (SYN-038).
+ * DIV-023 — a dividend's net amount (micro-units).
  */
-dividend_amount?: number | null }
+dividend_amount: number | null }
 /**
- * A transaction draft: a purchase or sale as the user is still entering it (TRX-062).
- * Empty strings are fields not filled yet; amounts are in micros.
+ * A transaction draft as the window sends it: the quantity as decimal text (TRX-024B); a
+ * dividend's draft carries its amount there, which is money (TRX-062).
  */
 export type TransactionDraft = { 
 /**
- * Purchase or sale.
+ * Purchase, sale or dividend.
  */
 kind: DraftKind; 
 /**
@@ -6337,16 +6328,15 @@ asset_id: string;
  */
 date: string; 
 /**
- * Quantity.
+ * Quantity, as decimal text; `0` until entered.
  */
-quantity: number; 
+quantity: string; 
 /**
  * What the user entered: a unit price or a typed total, with rate and fees.
  */
 entered: EnteredAmount; 
 /**
- * The transaction being corrected, if any — a correction is not checked for
- * oversell here: recording it replays the ledger (SEL-030).
+ * The transaction being corrected, if any.
  */
 correcting: string | null }
 /**
@@ -6436,9 +6426,9 @@ asset_name: string | null;
  */
 asset_reference: string | null; 
 /**
- * Its quantity, in micro-units.
+ * Its quantity, as decimal text (TRX-024A).
  */
-quantity: number; 
+quantity: string; 
 /**
  * Its amount in the account's currency, in micro-units.
  */
@@ -6541,14 +6531,14 @@ asset_id: string;
  */
 date: string; 
 /**
- * Quantity leaving the sending account (micro-units, strictly positive).
+ * Quantity leaving the sending account (decimal text, strictly positive).
  */
-quantity_sent: number; 
+quantity_sent: string; 
 /**
- * Quantity reaching the receiving account (micro-units, strictly positive, not above
+ * Quantity reaching the receiving account (decimal text, strictly positive, not above
  * the quantity sent); the difference is the fee in kind (TRF-021).
  */
-quantity_received: number; 
+quantity_received: string; 
 /**
  * Rate from the sending account's currency to the receiving one's (micros); `null`
  * takes the stored rate of the date (TRF-022).
@@ -6599,18 +6589,18 @@ asset_name: string;
  */
 asset_reference: string; 
 /**
- * The quantity sent, the sale's, in micro-units.
+ * The quantity sent, the sale's.
  */
-quantity_sent: number; 
+quantity_sent: string; 
 /**
- * The quantity received, the purchase's, in micro-units.
+ * The quantity received, the purchase's.
  */
-quantity_received: number; 
+quantity_received: string; 
 /**
- * The quantity not received, the fee in kind (TRF-021), in micro-units; `None` when all
+ * The quantity not received, the fee in kind (TRF-021); `None` when all
  * that is sent is received.
  */
-quantity_not_received: number | null; 
+quantity_not_received: string | null; 
 /**
  * The cost it moves, in the sending account's currency, in micro-units.
  */
@@ -6675,13 +6665,13 @@ asset_id: string;
 date: string; 
 /**
  * What left the sending account: the transfer out's quantity plus its fee in kind's
- * (micro-units).
+ * (TRX-024).
  */
-quantity_sent: number; 
+quantity_sent: string; 
 /**
- * What reached the receiving account: the transfer in's quantity (micro-units).
+ * What reached the receiving account: the transfer in's quantity (TRX-024).
  */
-quantity_received: number; 
+quantity_received: string; 
 /**
  * The cost the transfer out moved, in the sending account's currency (micro-units).
  */
@@ -7034,9 +7024,9 @@ asset_id: string;
  */
 date: string; 
 /**
- * Quantity written off (micro-units, strictly positive, WOF-011).
+ * Quantity written off (decimal text, strictly positive, WOF-011).
  */
-quantity: number; 
+quantity: string; 
 /**
  * Why it left (WOF entity).
  */

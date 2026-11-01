@@ -6,7 +6,7 @@ A Free Share Distribution records additional shares of a held asset received **a
 
 The feature adds a new free-shares variant to `TransactionType` (joining `Purchase | Sell | OpeningBalance | Deposit | Withdrawal | Dividend`). A free-share distribution is attributed to the distributing asset (its `asset_id` is that asset, so it surfaces under that asset in the transaction list) and its sole effect is `Holding.quantity += quantity` — the total cost basis is unchanged, so the average price (VWAP) dilutes. It touches the `account` bounded context (Transaction, Holding, the Account aggregate root) and reuses the chronological-replay machinery defined in TRX (TRX-031/036).
 
-Quantities are `i64` hundred-millionths ([ADR-001](../adr/001-use-i64-for-monetary-amounts.md), TRX-024); the holding mutation and the transaction insert commit atomically within the existing Unit of Work ([ADR-006](../adr/006-unit-of-work.md)).
+Quantities are on the scale of TRX-024 ([ADR-001](../adr/001-use-i64-for-monetary-amounts.md)); the holding mutation and the transaction insert commit atomically within the existing Unit of Work ([ADR-006](../adr/006-unit-of-work.md)).
 
 This v1 covers **zero-cost distributions only** (the user-confirmed model: no invested capital is added; the position's value is conserved and the market feed reflects any ex-distribution price adjustment). Stock splits and reverse splits (ratio-based quantity changes), a user-declared fiscal attribution value (cost-basis-increasing), distributions on closed positions, and a per-holding-row shortcut are each deferred (see Open Questions / Deferred).
 

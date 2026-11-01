@@ -20,7 +20,7 @@ replaying only the transactions dated on or before a cut-off date.
 
 | Field           | Type | Notes                                                                                                                                        |
 | --------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `quantity`      | i64  | Units held as of the date, stored on the scale of TRX-024 and read in micro-units (TRX-024B), 0 when nothing is held.                        |
+| `quantity`      | text | Units held as of the date, as decimal text (TRX-024B), 0 when nothing is held.                                                               |
 | `average_price` | i64  | VWAP cost basis per unit in **account** currency (micro-units; fees + FX included, identical to `Holding.average_price`), 0 when never held. |
 
 ## Business Rules

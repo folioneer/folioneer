@@ -5,10 +5,12 @@ import type {
   TransactionDraftError,
   WriteOffReason,
 } from "@/bindings";
+import { isCashAsset } from "@/lib/cashAsset";
 import {
+  decimalToMicro,
+  formatQuantity,
   microToFormatted,
   microToFormattedFactor,
-  microToFormattedQuantity,
 } from "@/lib/microUnits";
 import { formatIsoDateNumeric } from "@/ui/format/date";
 import type { I18nMessage } from "@/ui/format/i18n";
@@ -37,8 +39,8 @@ export function transactionMutationErrorToI18n(err: AccountError | OpenHoldingEr
       return {
         key: "error.Oversell",
         vars: {
-          available: microToFormatted(err.available, 6),
-          requested: microToFormatted(err.requested, 6),
+          available: formatQuantity(err.available, 6),
+          requested: formatQuantity(err.requested, 6),
         },
       };
     case "ClosedPosition":
@@ -165,6 +167,17 @@ function formatSplitFactorLabel(factorMicros: number): string {
 }
 
 /**
+ * TRX-024I — a journal row's quantity: three decimals for money, a dividend's amount and a
+ * Cash Asset's, at least three and up to eight for a quantity of an asset.
+ */
+function journalQuantity(tx: Transaction): string {
+  if (tx.transaction_type === "Dividend" || isCashAsset(tx.asset_id)) {
+    return microToFormatted(tx.dividend_amount ?? decimalToMicro(tx.quantity));
+  }
+  return formatQuantity(tx.quantity, 3);
+}
+
+/**
  * Maps a raw Transaction + contextual names to a display-ready ViewModel (TRX-024).
  */
 export function toTransactionRow(
@@ -185,8 +198,8 @@ export function toTransactionRow(
     date: tx.date,
     quantity:
       tx.transaction_type === "Split"
-        ? formatSplitFactorLabel(tx.split_factor ?? tx.quantity)
-        : microToFormatted(tx.dividend_amount ?? tx.quantity),
+        ? formatSplitFactorLabel(tx.split_factor ?? decimalToMicro(tx.quantity))
+        : journalQuantity(tx),
     unitPrice: microToFormatted(tx.unit_price),
     exchangeRate: microToFormatted(tx.exchange_rate),
     fees: microToFormatted(tx.fees),
@@ -222,7 +235,7 @@ export function toCashStatementCells(input: {
  * units out has its own copy (DEBT-008); a change here is made there too.
  */
 export function takeOutRefusal(
-  error: { code: string; available?: number },
+  error: { code: string; available?: string },
   reference: string,
   isoDate: string,
   locale: string,
@@ -233,7 +246,7 @@ export function takeOutRefusal(
       if (error.available === undefined) return null;
       return {
         key: "transaction.error_over_held_on",
-        vars: { held: microToFormattedQuantity(error.available), reference, date },
+        vars: { held: formatQuantity(error.available), reference, date },
       };
     case "ClosedPosition":
       return { key: "transaction.error_none_held_on", vars: { reference, date } };

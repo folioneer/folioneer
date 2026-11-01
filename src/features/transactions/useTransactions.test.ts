@@ -48,7 +48,7 @@ const makeTx = (): Transaction => ({
   asset_id: "asset-1",
   transaction_type: "Purchase",
   date: "2024-01-15",
-  quantity: 1_000_000,
+  quantity: "1",
   unit_price: 100_000_000,
   exchange_rate: 1_000_000,
   fees: 0,
@@ -56,13 +56,18 @@ const makeTx = (): Transaction => ({
   note: null,
   realized_pnl: null,
   created_at: "2024-01-15T10:00:00Z",
+  write_off_reason: null,
+  transfer_id: null,
+  added_deposit: false,
+  split_factor: null,
+  dividend_amount: null,
 });
 
 const buyDto: BuyHoldingDTO = {
   account_id: "acc-1",
   asset_id: "asset-1",
   date: "2024-01-15",
-  quantity: 1_000_000,
+  quantity: "1",
   unit_price: 100_000_000,
   exchange_rate: 1_000_000,
   fees: 0,
@@ -147,7 +152,7 @@ describe("useTransactions", () => {
       account_id: "acc-1",
       asset_id: "asset-1",
       date: "2024-02-01",
-      quantity: 500_000,
+      quantity: "0.5",
       unit_price: 110_000_000,
       exchange_rate: 1_000_000,
       fees: 0,
@@ -168,7 +173,7 @@ describe("useTransactions", () => {
   it("sellHolding returns Oversell error code on failure", async () => {
     mockSellHolding.mockResolvedValue({
       status: "error",
-      error: { code: "Oversell", available: 500_000, requested: 999_000_000 },
+      error: { code: "Oversell", available: "0.5", requested: "999" },
     });
     const { result } = renderHook(() => useTransactions());
     let ret: { data: Transaction | null; error: I18nMessage | null } = {
@@ -180,7 +185,7 @@ describe("useTransactions", () => {
         account_id: "acc-1",
         asset_id: "asset-1",
         date: "2024-02-01",
-        quantity: 999_000_000,
+        quantity: "999",
         unit_price: 100_000_000,
         exchange_rate: 1_000_000,
         fees: 0,
@@ -202,7 +207,7 @@ describe("useTransactions", () => {
     const { result } = renderHook(() => useTransactions());
     const dto: Omit<CorrectTransactionDTO, "account_id" | "transaction_id"> = {
       date: "2024-01-20",
-      quantity: 2_000_000,
+      quantity: "2",
       unit_price: 90_000_000,
       exchange_rate: 1_000_000,
       fees: 0,
@@ -229,7 +234,7 @@ describe("useTransactions", () => {
     const { result } = renderHook(() => useTransactions());
     const dto: Omit<CorrectTransactionDTO, "account_id" | "transaction_id"> = {
       date: "2024-01-20",
-      quantity: 2_000_000,
+      quantity: "2",
       unit_price: 90_000_000,
       exchange_rate: 1_000_000,
       fees: 0,

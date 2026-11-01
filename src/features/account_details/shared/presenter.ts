@@ -24,9 +24,12 @@ import type {
 } from "@/bindings";
 import { isCashAsset } from "@/lib/cashAsset";
 import {
+  decimalToMicro,
+  formatQuantity,
+  isPositiveQuantity,
+  microPerUnit,
   microToFormatted,
   microToFormattedPrice,
-  microToFormattedQuantity,
 } from "@/lib/microUnits";
 import type { StoredPerfPeriod } from "@/lib/perfPeriodStorage";
 import { formatIsoDateNumeric } from "@/ui/format/date";
@@ -174,8 +177,8 @@ export function transactionDraftErrorToI18n(err: TransactionDraftError): I18nMes
       return {
         key: "error.Oversell",
         vars: {
-          available: microToFormatted(err.available, 6),
-          requested: microToFormatted(err.requested, 6),
+          available: formatQuantity(err.available, 6),
+          requested: formatQuantity(err.requested, 6),
         },
       };
     default:
@@ -225,7 +228,7 @@ export function managementFeeErrorToI18n(err: ManagementFeeError | AccountError)
   if (err.code === "ResultingQuantityNotBelowHeld") {
     return {
       key: "error.ResultingQuantityNotBelowHeld",
-      vars: { held: microToFormattedQuantity(err.held_quantity) },
+      vars: { held: formatQuantity(err.held_quantity) },
     };
   }
   return { key: `error.${err.code}` };
@@ -254,8 +257,8 @@ export interface HoldingRowViewModel {
   /** ISO 4217 currency code of the asset (MKT-023). */
   assetCurrency: string;
   quantity: string;
-  /** Holding quantity in raw micro-units — used to pass to SellTransactionModal (SEL-010). */
-  quantityMicro: number;
+  /** Holding quantity as decimal text — used to pass to SellTransactionModal (SEL-010). */
+  heldQuantity: string;
   averagePrice: string;
   /** Market value = current_price × quantity, asset currency; "—" when no price (MKT-143). */
   currentValue: string;
@@ -542,8 +545,8 @@ export function toHoldingRow(detail: HoldingDetail): HoldingRowViewModel {
       assetName: detail.asset_name,
       assetReference: detail.asset_reference,
       assetCurrency: detail.asset_currency,
-      quantity: microToFormatted(detail.quantity, 2),
-      quantityMicro: detail.quantity,
+      quantity: microToFormatted(decimalToMicro(detail.quantity), 2),
+      heldQuantity: detail.quantity,
       averagePrice: "",
       averagePriceMicro: 0,
       currentValue: "",
@@ -584,8 +587,8 @@ export function toHoldingRow(detail: HoldingDetail): HoldingRowViewModel {
     assetName: detail.asset_name,
     assetReference: detail.asset_reference,
     assetCurrency: detail.asset_currency,
-    quantity: microToFormattedQuantity(detail.quantity),
-    quantityMicro: detail.quantity,
+    quantity: formatQuantity(detail.quantity),
+    heldQuantity: detail.quantity,
     averagePrice: microToFormattedPrice(detail.average_price),
     averagePriceMicro: detail.average_price,
     // MKT-143 — the backend's current price × quantity, asset currency.
@@ -657,7 +660,9 @@ export function toAccountSummary(response: AccountDetailsResponse): AccountSumma
   // gating, otherwise an account with only a cash holding would never trigger the
   // "no positions yet" empty state nor the closed-only message.
   const nonCashActive = response.holdings.filter((h) => !isCashAsset(h.asset_id));
-  const hasCashHolding = response.holdings.some((h) => isCashAsset(h.asset_id) && h.quantity > 0);
+  const hasCashHolding = response.holdings.some(
+    (h) => isCashAsset(h.asset_id) && isPositiveQuantity(h.quantity),
+  );
   return {
     accountName: response.account_name,
     holdingCount: response.total_holding_count,
@@ -782,8 +787,7 @@ export function transferErrorToI18n(
  * the cost it moved over the quantity it took, the quantity received.
  */
 export function transferAveragePriceMicro(transfer: TransferView): number {
-  if (transfer.quantity_received <= 0) return 0;
-  return Number((BigInt(transfer.cost) * 1_000_000n) / BigInt(transfer.quantity_received));
+  return microPerUnit(transfer.cost, transfer.quantity_received);
 }
 
 /**
@@ -791,9 +795,7 @@ export function transferAveragePriceMicro(transfer: TransferView): number {
  * quantity, micro-units, rounded down; 0 for no quantity.
  */
 export function writeOffAveragePriceMicro(tx: Transaction): number {
-  if (tx.quantity <= 0) return 0;
-  const costMicro = -(tx.realized_pnl ?? 0);
-  return Number((BigInt(costMicro) * 1_000_000n) / BigInt(tx.quantity));
+  return microPerUnit(-(tx.realized_pnl ?? 0), tx.quantity);
 }
 
 /**
@@ -803,7 +805,7 @@ export function writeOffAveragePriceMicro(tx: Transaction): number {
  * units out has its own copy (DEBT-008); a change here is made there too.
  */
 export function takeOutRefusal(
-  error: { code: string; available?: number },
+  error: { code: string; available?: string },
   reference: string,
   isoDate: string,
   locale: string,
@@ -814,7 +816,7 @@ export function takeOutRefusal(
       if (error.available === undefined) return null;
       return {
         key: "transaction.error_over_held_on",
-        vars: { held: microToFormattedQuantity(error.available), reference, date },
+        vars: { held: formatQuantity(error.available), reference, date },
       };
     case "ClosedPosition":
       return { key: "transaction.error_none_held_on", vars: { reference, date } };

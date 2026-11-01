@@ -3,14 +3,24 @@
 
 use super::error::{DividendError, OpenHoldingError};
 use super::{
-    HoldingTransactionUseCase, OpeningBalanceDraft, OpeningBalancePreview, StockSplitDraft,
-    StockSplitPreview, TransactionDraft, TransactionDraftError, TransactionPreview,
+    DraftKind, HoldingTransactionUseCase, OpeningBalanceDraft, OpeningBalancePreview,
+    StockSplitDraft, StockSplitPreview, TransactionDraft, TransactionDraftError,
+    TransactionPreview,
 };
-use crate::context::account::{AccountError, ManagementFeeRemoval, Transaction, WriteOffReason};
-use crate::shared::domain::quantity::from_surface;
+use crate::context::account::{
+    AccountError, EnteredAmount, ManagementFeeRemoval, TransactionView, WriteOffReason,
+};
+use crate::shared::domain::quantity::{
+    read_scaled, stored_non_cash_quantity, stored_quantity, MONEY_DECIMALS,
+};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;
+
+/// TRX-024B — a quantity the window sent as decimal text, as stored.
+fn read_quantity(asset_id: &str, text: &str) -> Result<i64, AccountError> {
+    Ok(stored_quantity(asset_id, text)?)
+}
 
 // =============================================================================
 // Opening Balance — DTO + dedicated error
@@ -25,8 +35,8 @@ pub struct OpenHoldingDTO {
     pub asset_id: String,
     /// Date of the opening balance (YYYY-MM-DD).
     pub date: String,
-    /// Quantity in micro-units; strictly positive (TRX-044).
-    pub quantity: i64,
+    /// Quantity as decimal text; strictly positive (TRX-044).
+    pub quantity: String,
     /// Total cost paid in account currency (micro-units); strictly positive (TRX-045).
     pub total_cost: i64,
 }
@@ -44,8 +54,8 @@ pub struct BuyHoldingDTO {
     pub asset_id: String,
     /// Transaction date (YYYY-MM-DD).
     pub date: String,
-    /// Quantity in micro-units.
-    pub quantity: i64,
+    /// Quantity as decimal text.
+    pub quantity: String,
     /// Unit price in asset currency (micro-units).
     pub unit_price: i64,
     /// Exchange rate asset→account currency (micro-units).
@@ -69,8 +79,8 @@ pub struct SellHoldingDTO {
     pub asset_id: String,
     /// Transaction date (YYYY-MM-DD).
     pub date: String,
-    /// Quantity in micro-units.
-    pub quantity: i64,
+    /// Quantity as decimal text.
+    pub quantity: String,
     /// Unit price in asset currency (micro-units).
     pub unit_price: i64,
     /// Exchange rate asset→account currency (micro-units).
@@ -95,8 +105,8 @@ pub struct CorrectTransactionDTO {
     pub transaction_id: String,
     /// Corrected transaction date (YYYY-MM-DD).
     pub date: String,
-    /// Corrected quantity in micro-units.
-    pub quantity: i64,
+    /// Corrected quantity, as decimal text (TRX-024B).
+    pub quantity: String,
     /// Corrected unit price in asset currency (micro-units).
     pub unit_price: i64,
     /// Corrected exchange rate asset→account currency (micro-units).
@@ -131,16 +141,17 @@ pub struct CancelTransactionDTO {
 pub async fn open_holding(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: OpenHoldingDTO,
-) -> Result<Transaction, OpenHoldingError> {
+) -> Result<TransactionView, OpenHoldingError> {
+    let quantity = read_quantity(&dto.asset_id, &dto.quantity)?;
     uc.open_holding(
         &dto.account_id,
         dto.asset_id,
         dto.date,
-        from_surface(dto.quantity),
+        quantity,
         dto.total_cost,
     )
     .await
-    .map(|transaction| transaction.as_shown())
+    .map(|transaction| TransactionView::from(&transaction))
 }
 
 /// Records a purchase of an asset into an account (TRX-027).
@@ -149,12 +160,13 @@ pub async fn open_holding(
 pub async fn buy_holding(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: BuyHoldingDTO,
-) -> Result<Transaction, AccountError> {
+) -> Result<TransactionView, AccountError> {
+    let quantity = read_quantity(&dto.asset_id, &dto.quantity)?;
     uc.buy_holding(
         &dto.account_id,
         dto.asset_id,
         dto.date,
-        from_surface(dto.quantity),
+        quantity,
         dto.unit_price,
         dto.exchange_rate,
         dto.fees,
@@ -162,7 +174,7 @@ pub async fn buy_holding(
         dto.note,
     )
     .await
-    .map(|transaction| transaction.as_shown())
+    .map(|transaction| TransactionView::from(&transaction))
 }
 
 /// Records a sale of an asset from an account (SEL-012, SEL-021, SEL-023, SEL-024).
@@ -171,12 +183,13 @@ pub async fn buy_holding(
 pub async fn sell_holding(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: SellHoldingDTO,
-) -> Result<Transaction, AccountError> {
+) -> Result<TransactionView, AccountError> {
+    let quantity = read_quantity(&dto.asset_id, &dto.quantity)?;
     uc.sell_holding(
         &dto.account_id,
         dto.asset_id,
         dto.date,
-        from_surface(dto.quantity),
+        quantity,
         dto.unit_price,
         dto.exchange_rate,
         dto.fees,
@@ -184,7 +197,7 @@ pub async fn sell_holding(
         dto.note,
     )
     .await
-    .map(|transaction| transaction.as_shown())
+    .map(|transaction| TransactionView::from(&transaction))
 }
 
 /// Corrects an existing transaction and recalculates the affected holding
@@ -194,9 +207,9 @@ pub async fn sell_holding(
 pub async fn correct_transaction(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: CorrectTransactionDTO,
-) -> Result<Transaction, AccountError> {
+) -> Result<TransactionView, AccountError> {
     let quantity = uc
-        .stored_correction_quantity(&dto.transaction_id, dto.quantity)
+        .stored_correction_quantity(&dto.transaction_id, &dto.quantity)
         .await?;
     uc.correct_transaction(
         &dto.account_id,
@@ -210,7 +223,7 @@ pub async fn correct_transaction(
         dto.note,
     )
     .await
-    .map(|transaction| transaction.as_shown())
+    .map(|transaction| TransactionView::from(&transaction))
 }
 
 /// Cancels a transaction and recalculates (or removes) the associated holding (TRX-034).
@@ -260,10 +273,10 @@ pub struct WithdrawalDTO {
 pub async fn record_deposit(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: DepositDTO,
-) -> Result<Transaction, AccountError> {
+) -> Result<TransactionView, AccountError> {
     uc.record_deposit(&dto.account_id, dto.date, dto.amount_micros, dto.note)
         .await
-        .map(|transaction| transaction.as_shown())
+        .map(|transaction| TransactionView::from(&transaction))
 }
 
 /// Records a cash withdrawal from an account (CSH-032).
@@ -272,10 +285,10 @@ pub async fn record_deposit(
 pub async fn record_withdrawal(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: WithdrawalDTO,
-) -> Result<Transaction, AccountError> {
+) -> Result<TransactionView, AccountError> {
     uc.record_withdrawal(&dto.account_id, dto.date, dto.amount_micros, dto.note)
         .await
-        .map(|transaction| transaction.as_shown())
+        .map(|transaction| TransactionView::from(&transaction))
 }
 
 // =============================================================================
@@ -305,7 +318,7 @@ pub struct DividendDTO {
 pub async fn record_dividend(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: DividendDTO,
-) -> Result<Transaction, DividendError> {
+) -> Result<TransactionView, DividendError> {
     uc.record_dividend(
         &dto.account_id,
         dto.asset_id,
@@ -315,7 +328,7 @@ pub async fn record_dividend(
         dto.note,
     )
     .await
-    .map(|transaction| transaction.as_shown())
+    .map(|transaction| TransactionView::from(&transaction))
 }
 
 // =============================================================================
@@ -333,8 +346,8 @@ pub struct FreeSharesDTO {
     pub asset_id: String,
     /// Business date the shares were received (YYYY-MM-DD, FSD-021).
     pub date: String,
-    /// Number of free shares received (micro-units, strictly positive, FSD-021).
-    pub quantity: i64,
+    /// Number of free shares received (decimal text, strictly positive, FSD-021).
+    pub quantity: String,
     /// Optional user note.
     pub note: Option<String>,
 }
@@ -345,16 +358,11 @@ pub struct FreeSharesDTO {
 pub async fn record_free_shares(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: FreeSharesDTO,
-) -> Result<Transaction, super::error::FreeSharesError> {
-    uc.record_free_shares(
-        &dto.account_id,
-        dto.asset_id,
-        dto.date,
-        from_surface(dto.quantity),
-        dto.note,
-    )
-    .await
-    .map(|transaction| transaction.as_shown())
+) -> Result<TransactionView, super::error::FreeSharesError> {
+    let quantity = read_quantity(&dto.asset_id, &dto.quantity)?;
+    uc.record_free_shares(&dto.account_id, dto.asset_id, dto.date, quantity, dto.note)
+        .await
+        .map(|transaction| TransactionView::from(&transaction))
 }
 
 // =============================================================================
@@ -371,8 +379,8 @@ pub struct WriteOffDTO {
     pub asset_id: String,
     /// Business date the quantity left (YYYY-MM-DD, WOF-011).
     pub date: String,
-    /// Quantity written off (micro-units, strictly positive, WOF-011).
-    pub quantity: i64,
+    /// Quantity written off (decimal text, strictly positive, WOF-011).
+    pub quantity: String,
     /// Why it left (WOF entity).
     pub reason: WriteOffReason,
     /// Optional user note.
@@ -385,17 +393,18 @@ pub struct WriteOffDTO {
 pub async fn record_write_off(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: WriteOffDTO,
-) -> Result<Transaction, super::error::WriteOffError> {
+) -> Result<TransactionView, super::error::WriteOffError> {
+    let quantity = read_quantity(&dto.asset_id, &dto.quantity)?;
     uc.record_write_off(
         &dto.account_id,
         dto.asset_id,
         dto.date,
-        from_surface(dto.quantity),
+        quantity,
         dto.reason,
         dto.note,
     )
     .await
-    .map(|transaction| transaction.as_shown())
+    .map(|transaction| TransactionView::from(&transaction))
 }
 
 /// Parameters for correcting a write-off (WOF-030, WOF-058); the asset is fixed.
@@ -407,8 +416,8 @@ pub struct CorrectWriteOffDTO {
     pub transaction_id: String,
     /// Corrected business date (YYYY-MM-DD, WOF-011).
     pub date: String,
-    /// Corrected quantity (micro-units, strictly positive, WOF-011).
-    pub quantity: i64,
+    /// Corrected quantity (decimal text, strictly positive, WOF-011).
+    pub quantity: String,
     /// Corrected reason (WOF entity).
     pub reason: WriteOffReason,
     /// Corrected note.
@@ -421,17 +430,17 @@ pub struct CorrectWriteOffDTO {
 pub async fn correct_write_off(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: CorrectWriteOffDTO,
-) -> Result<Transaction, AccountError> {
+) -> Result<TransactionView, AccountError> {
     uc.correct_write_off(
         &dto.account_id,
         &dto.transaction_id,
         dto.date,
-        from_surface(dto.quantity),
+        stored_non_cash_quantity(&dto.quantity).map_err(AccountError::from)?,
         dto.reason,
         dto.note,
     )
     .await
-    .map(|transaction| transaction.as_shown())
+    .map(|transaction| TransactionView::from(&transaction))
 }
 
 // =============================================================================
@@ -459,7 +468,7 @@ pub struct RecordSplitDTO {
 pub async fn record_split(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: RecordSplitDTO,
-) -> Result<Transaction, super::error::SplitError> {
+) -> Result<TransactionView, super::error::SplitError> {
     uc.record_split(
         &dto.account_id,
         dto.asset_id,
@@ -468,7 +477,7 @@ pub async fn record_split(
         dto.note,
     )
     .await
-    .map(|transaction| transaction.as_shown())
+    .map(|transaction| TransactionView::from(&transaction))
 }
 
 // =============================================================================
@@ -488,12 +497,12 @@ pub struct ManagementFeeDTO {
     pub date: String,
     /// Percentage of the holding to remove, in micro-percent (1% = 1_000_000),
     /// strictly positive and at most 100_000_000; mutually exclusive with
-    /// `resulting_quantity_micros` (FEE-021).
+    /// `resulting_quantity` (FEE-021).
     pub percent_micros: Option<i64>,
-    /// Quantity the holding should hold after the fee, as of `date` (micro-units, zero
+    /// Quantity the holding should hold after the fee, as of `date` (decimal text, zero
     /// or more and below the held quantity); mutually exclusive with `percent_micros`
     /// (FEE-021/028).
-    pub resulting_quantity_micros: Option<i64>,
+    pub resulting_quantity: Option<String>,
     /// Optional user note.
     pub note: Option<String>,
 }
@@ -504,17 +513,22 @@ pub struct ManagementFeeDTO {
 pub async fn record_management_fee(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: ManagementFeeDTO,
-) -> Result<Transaction, super::error::ManagementFeeError> {
+) -> Result<TransactionView, super::error::ManagementFeeError> {
+    let resulting = dto
+        .resulting_quantity
+        .as_deref()
+        .map(|text| read_quantity(&dto.asset_id, text))
+        .transpose()?;
     uc.record_management_fee_entry(
         &dto.account_id,
         dto.asset_id,
         dto.date,
         dto.percent_micros,
-        dto.resulting_quantity_micros.map(from_surface),
+        resulting,
         dto.note,
     )
     .await
-    .map(|transaction| transaction.as_shown())
+    .map(|transaction| TransactionView::from(&transaction))
 }
 
 /// What a one-off management fee entered by its resulting quantity would remove
@@ -526,16 +540,11 @@ pub async fn preview_management_fee(
     account_id: String,
     asset_id: String,
     date: String,
-    resulting_quantity_micros: i64,
+    resulting_quantity: String,
 ) -> Result<ManagementFeeRemoval, super::error::ManagementFeeError> {
-    uc.preview_management_fee(
-        &account_id,
-        asset_id,
-        date,
-        from_surface(resulting_quantity_micros),
-    )
-    .await
-    .map(|removal| removal.as_shown())
+    let resulting = read_quantity(&asset_id, &resulting_quantity)?;
+    uc.preview_management_fee(&account_id, asset_id, date, resulting)
+        .await
 }
 
 // =============================================================================
@@ -554,11 +563,11 @@ pub struct RecordInterestDTO {
     /// Business date the interest was credited (YYYY-MM-DD, INT-021).
     pub date: String,
     /// Interest rate in micro-percent (1% = 1_000_000), strictly positive and at
-    /// most 100_000_000; mutually exclusive with `quantity_micros` (INT-021/022).
+    /// most 100_000_000; mutually exclusive with `quantity` (INT-021/022).
     pub percent_micros: Option<i64>,
-    /// Credited quantity (micro-units, strictly positive); mutually exclusive
+    /// Credited quantity (decimal text, strictly positive); mutually exclusive
     /// with `percent_micros` (INT-021).
-    pub quantity_micros: Option<i64>,
+    pub quantity: Option<String>,
     /// Optional user note.
     pub note: Option<String>,
 }
@@ -569,11 +578,13 @@ pub struct RecordInterestDTO {
 pub async fn record_interest(
     uc: State<'_, HoldingTransactionUseCase>,
     dto: RecordInterestDTO,
-) -> Result<Transaction, super::error::InterestError> {
-    // INT-023 — on the account's cash line the credit is money, already in its own scale.
+) -> Result<TransactionView, super::error::InterestError> {
+    // INT-023 — on the account's cash line the credit is money, on its own scale.
     let credited = dto
-        .quantity_micros
-        .map(|quantity| crate::shared::domain::quantity::stored_for(&dto.asset_id, quantity));
+        .quantity
+        .as_deref()
+        .map(|text| read_quantity(&dto.asset_id, text))
+        .transpose()?;
     uc.record_interest(
         &dto.account_id,
         dto.asset_id,
@@ -583,7 +594,64 @@ pub async fn record_interest(
         dto.note,
     )
     .await
-    .map(|transaction| transaction.as_shown())
+    .map(|transaction| TransactionView::from(&transaction))
+}
+
+/// A transaction draft as the window sends it: the quantity as decimal text (TRX-024B); a
+/// dividend's draft carries its amount there, which is money (TRX-062).
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(deny_unknown_fields)]
+#[specta(rename = "TransactionDraft")]
+pub struct TransactionDraftDTO {
+    /// Purchase, sale or dividend.
+    pub kind: DraftKind,
+    /// The account, empty until chosen.
+    pub account_id: String,
+    /// The asset, empty until chosen.
+    pub asset_id: String,
+    /// ISO date, empty until entered.
+    pub date: String,
+    /// Quantity, as decimal text; `0` until entered.
+    pub quantity: String,
+    /// What the user entered: a unit price or a typed total, with rate and fees.
+    pub entered: EnteredAmount,
+    /// The transaction being corrected, if any.
+    pub correcting: Option<String>,
+}
+
+impl TransactionDraftDTO {
+    fn into_draft(self) -> Result<TransactionDraft, AccountError> {
+        let quantity = match self.kind {
+            DraftKind::Dividend => read_scaled(&self.quantity, MONEY_DECIMALS)?,
+            DraftKind::Purchase | DraftKind::Sell => stored_non_cash_quantity(&self.quantity)?,
+        };
+        Ok(TransactionDraft {
+            kind: self.kind,
+            account_id: self.account_id,
+            asset_id: self.asset_id,
+            date: self.date,
+            quantity,
+            entered: self.entered,
+            correcting: self.correcting,
+        })
+    }
+}
+
+/// An opening balance draft as the window sends it: the quantity as decimal text (TRX-024B).
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(deny_unknown_fields)]
+#[specta(rename = "OpeningBalanceDraft")]
+pub struct OpeningBalanceDraftDTO {
+    /// The account, empty until chosen.
+    pub account_id: String,
+    /// The asset, empty until chosen.
+    pub asset_id: String,
+    /// ISO date, empty until entered.
+    pub date: String,
+    /// Quantity, as decimal text; `0` until entered.
+    pub quantity: String,
+    /// Total cost in account currency, in micros; `None` until entered.
+    pub total_cost: Option<i64>,
 }
 
 /// Checks a transaction draft without writing anything (TRX-062): the unit price and total
@@ -592,9 +660,9 @@ pub async fn record_interest(
 #[specta::specta]
 pub async fn validate_transaction_draft(
     uc: State<'_, HoldingTransactionUseCase>,
-    draft: TransactionDraft,
+    draft: TransactionDraftDTO,
 ) -> Result<TransactionPreview, TransactionDraftError> {
-    uc.validate_draft(draft.as_stored()).await
+    uc.validate_draft(draft.into_draft()?).await
 }
 
 /// Checks a split draft without writing anything (SPL-062): the factor recording would
@@ -606,12 +674,7 @@ pub async fn validate_stock_split_draft(
     uc: State<'_, HoldingTransactionUseCase>,
     draft: StockSplitDraft,
 ) -> Result<StockSplitPreview, TransactionDraftError> {
-    uc.validate_stock_split_draft(draft)
-        .await
-        .map(|preview| StockSplitPreview {
-            position: preview.position.map(|position| position.as_shown()),
-            ..preview
-        })
+    uc.validate_stock_split_draft(draft).await
 }
 
 /// Checks an opening balance draft without writing anything (TRX-066): whether its total
@@ -620,10 +683,14 @@ pub async fn validate_stock_split_draft(
 #[specta::specta]
 pub async fn validate_opening_balance_draft(
     uc: State<'_, HoldingTransactionUseCase>,
-    draft: OpeningBalanceDraft,
+    draft: OpeningBalanceDraftDTO,
 ) -> Result<OpeningBalancePreview, TransactionDraftError> {
+    let quantity = read_quantity(&draft.asset_id, &draft.quantity)?;
     uc.validate_opening_balance_draft(&OpeningBalanceDraft {
-        quantity: from_surface(draft.quantity),
-        ..draft
+        account_id: draft.account_id,
+        asset_id: draft.asset_id,
+        date: draft.date,
+        quantity,
+        total_cost: draft.total_cost,
     })
 }

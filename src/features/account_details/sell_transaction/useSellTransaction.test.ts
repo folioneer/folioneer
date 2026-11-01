@@ -55,7 +55,7 @@ const answers = (unit_price: number, total_amount: number) => ({
 });
 const oversell = {
   status: "error",
-  error: { code: "Oversell", available: 1_000_000, requested: 2_000_000 },
+  error: { code: "Oversell", available: "1", requested: "2" },
 };
 
 const fakeSubmit = { preventDefault: vi.fn() } as unknown as React.FormEvent;
@@ -64,7 +64,7 @@ const BASE_PROPS = {
   accountId: "account-1",
   assetId: "asset-1",
   assetReference: "AAPL",
-  holdingQuantityMicro: 3_000_000, // 3 units
+  holdingQuantity: "3", // 3 units
 };
 
 describe("useSellTransaction", () => {
@@ -74,7 +74,7 @@ describe("useSellTransaction", () => {
     mockRecordAssetPrice.mockReset();
     mockGetSnapshot.mockReset();
     mockValidateDraft.mockReset().mockImplementation(fakeDraftCheck);
-    mockGetSnapshot.mockResolvedValue({ status: "ok", data: { quantity: 0, average_price: 0 } });
+    mockGetSnapshot.mockResolvedValue({ status: "ok", data: { quantity: "0", average_price: 0 } });
   });
 
   // TDI-030 — the gain shown is the one the draft check returns; the form computes none.
@@ -152,7 +152,7 @@ describe("useSellTransaction", () => {
   it("shows no gain when the draft check returns none", async () => {
     mockGetSnapshot.mockResolvedValue({
       status: "ok",
-      data: { quantity: 2_000_000, average_price: 100_000_000 },
+      data: { quantity: "2", average_price: 100_000_000 },
     });
     mockValidateDraft.mockResolvedValue({
       status: "ok",
@@ -184,16 +184,16 @@ describe("useSellTransaction", () => {
     });
 
     expect(mockValidateDraft).toHaveBeenLastCalledWith(
-      expect.objectContaining({ kind: "Sell", quantity: 2_000_000, correcting: null }),
+      expect.objectContaining({ kind: "Sell", quantity: "2", correcting: null }),
     );
     expect(result.current.totalAmountDisplay).toBe("95,000");
   });
 
-  // SEL-022 — oversell guard: quantity > holdingQuantityMicro → form invalid
+  // SEL-022 — oversell guard: quantity > holdingQuantity → form invalid
   it("marks form invalid when quantity exceeds holding (SEL-022)", async () => {
     mockValidateDraft.mockResolvedValue(oversell);
     const { result } = renderHook(() =>
-      useSellTransaction({ ...BASE_PROPS, holdingQuantityMicro: 1_000_000 }),
+      useSellTransaction({ ...BASE_PROPS, holdingQuantity: "1" }),
     );
 
     await act(async () => {
@@ -214,7 +214,7 @@ describe("useSellTransaction", () => {
     const { result } = renderHook(() =>
       useSellTransaction({
         ...BASE_PROPS,
-        holdingQuantityMicro: 1_000_000,
+        holdingQuantity: "1",
         onSubmitSuccess,
       }),
     );
@@ -299,7 +299,7 @@ describe("useSellTransaction", () => {
       expect.objectContaining({
         account_id: "account-1",
         asset_id: "asset-1",
-        quantity: 1_000_000,
+        quantity: "1",
         unit_price: 100_000_000,
       }),
     );
@@ -348,7 +348,7 @@ describe("useSellTransaction", () => {
       expect.objectContaining({
         total_amount: 140_000_000,
         unit_price: 150_000_000,
-        quantity: 1_000_000,
+        quantity: "1",
         fees: 10_000_000,
       }),
     );
@@ -415,7 +415,7 @@ describe("useSellTransaction", () => {
   it("keeps the oversell guard in total mode", async () => {
     mockValidateDraft.mockResolvedValue(oversell);
     const { result } = renderHook(() =>
-      useSellTransaction({ ...BASE_PROPS, holdingQuantityMicro: 1_000_000 }),
+      useSellTransaction({ ...BASE_PROPS, holdingQuantity: "1" }),
     );
 
     await act(async () => {

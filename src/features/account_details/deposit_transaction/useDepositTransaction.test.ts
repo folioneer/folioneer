@@ -136,7 +136,7 @@ const editDeposit = {
   asset_id: "system-cash-eur",
   transaction_type: "Deposit",
   date: "2026-05-01",
-  quantity: 500_000_000,
+  quantity: "500",
   unit_price: 1_000_000,
   exchange_rate: 1_000_000,
   fees: 0,
@@ -144,6 +144,11 @@ const editDeposit = {
   note: "rent",
   realized_pnl: null,
   created_at: "2026-05-01T00:00:00Z",
+  write_off_reason: null,
+  transfer_id: null,
+  added_deposit: false,
+  split_factor: null,
+  dividend_amount: null,
 } as const;
 
 describe("useDepositTransaction — edit mode (CSH-111)", () => {
@@ -158,7 +163,7 @@ describe("useDepositTransaction — edit mode (CSH-111)", () => {
     const { result } = renderHook(() =>
       useDepositTransaction({
         accountId: "account-1",
-        editTransaction: { ...editDeposit, quantity: 500_123_456, total_amount: 500_123_456 },
+        editTransaction: { ...editDeposit, quantity: "500.123456", total_amount: 500_123_456 },
       }),
     );
     expect(result.current.formData.amount).toBe("500.123456");
@@ -188,7 +193,7 @@ describe("useDepositTransaction — edit mode (CSH-111)", () => {
     expect(mockCorrectTransaction).toHaveBeenCalledWith(
       "tx-dep-1",
       "account-1",
-      expect.objectContaining({ date: "2026-05-01", quantity: 650_000_000, note: "rent" }),
+      expect.objectContaining({ date: "2026-05-01", quantity: "650", note: "rent" }),
     );
     expect(mockShowSnackbar).toHaveBeenCalledWith("cash.deposit_updated", "success");
   });

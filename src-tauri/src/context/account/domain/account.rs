@@ -7,7 +7,6 @@ use super::transaction::{
 };
 use super::wrapper::{country_well_formed, wrapper_known, PORTFOLIO_COUNTRY};
 use crate::context::account::error::AccountError;
-use crate::shared::domain::quantity::to_surface;
 use crate::shared::domain::quantity::QUANTITY_UNIT;
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
 use crate::shared::infrastructure::uow::UnitOfWork;
@@ -71,27 +70,20 @@ enum Invariants {
 }
 
 /// What a one-off management fee entered by its resulting quantity removes (FEE-028/029).
-/// Quantities are in hundred-millionths (TRX-024); the percentage is in micro-percent
+/// Quantities read as decimal text (TRX-024B); the percentage is in micro-percent
 /// (1% = 1_000_000), floored.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
+#[derive(Debug, Serialize, Clone, PartialEq, Eq, Type)]
 pub struct ManagementFeeRemoval {
     /// Quantity held as of the fee's date.
+    #[serde(serialize_with = "crate::shared::domain::quantity::as_text")]
+    #[specta(type = String)]
     pub held_quantity: i64,
     /// Quantity the fee removes: held minus resulting, exactly.
+    #[serde(serialize_with = "crate::shared::domain::quantity::as_text")]
+    #[specta(type = String)]
     pub removed_quantity: i64,
     /// Share of the holding the removal represents.
     pub percent_micros: i64,
-}
-
-impl ManagementFeeRemoval {
-    /// The removal as a surface gives it (TRX-024).
-    pub fn as_shown(&self) -> Self {
-        Self {
-            held_quantity: to_surface(self.held_quantity),
-            removed_quantity: to_surface(self.removed_quantity),
-            ..self.clone()
-        }
-    }
 }
 
 /// Where an account stood before new transactions were tried on it (`Account::attempt`).
@@ -1067,8 +1059,8 @@ impl Account {
         }
         if quantity > held {
             return Err(AccountError::Oversell {
-                available: to_surface(held),
-                requested: to_surface(quantity),
+                available: held,
+                requested: quantity,
             }
             .into());
         }
@@ -2013,9 +2005,7 @@ impl Account {
         }
         let held_quantity = self.holding_quantity_as_of(asset_id, date);
         if resulting_quantity >= held_quantity {
-            return Err(AccountError::ResultingQuantityNotBelowHeld {
-                held_quantity: to_surface(held_quantity),
-            });
+            return Err(AccountError::ResultingQuantityNotBelowHeld { held_quantity });
         }
         let removed_quantity = held_quantity - resulting_quantity;
         let percent_micros =
@@ -6195,8 +6185,8 @@ mod tests {
                 .map(|e| matches!(
                     e,
                     AccountError::Oversell {
-                        available: 10_000_000,
-                        requested: 15_000_000
+                        available: 1_000_000_000,
+                        requested: 1_500_000_000
                     }
                 ))
                 .unwrap_or(false),
@@ -7521,33 +7511,28 @@ mod preview_trade_tests {
 
     // TRX-024 — a fee's removal reaches a surface in millionths.
     #[test]
-    fn trx_024_a_removal_is_shown_in_millionths() {
-        let removal = ManagementFeeRemoval {
-            held_quantity: 2_500_000_000,
+    fn trx_024b_a_removal_reads_as_decimal_text() {
+        let read = serde_json::to_value(ManagementFeeRemoval {
+            held_quantity: 2_500_000_001,
             removed_quantity: 50_000_000,
             percent_micros: 2_000_000,
-        };
-        assert_eq!(
-            removal.as_shown(),
-            ManagementFeeRemoval {
-                held_quantity: 25_000_000,
-                removed_quantity: 500_000,
-                percent_micros: 2_000_000,
-            }
-        );
+        })
+        .unwrap();
+        assert_eq!(read["held_quantity"], "25.00000001");
+        assert_eq!(read["removed_quantity"], "0.5");
+        assert_eq!(read["percent_micros"], 2_000_000);
     }
 
-    // TRX-024 — a refusal states what a surface reads: its figures, not the stored scale.
+    // TRX-024B — a refusal states every decimal of what is held, even below a millionth.
     #[test]
-    fn trx_024_an_oversell_names_the_figures_of_a_surface() {
-        let refusal = Account::ensure_held(100_000_000, 150_000_000).expect_err("refused");
-        assert!(matches!(
-            refusal.downcast_ref::<AccountError>(),
-            Some(AccountError::Oversell {
-                available: 1_000_000,
-                requested: 1_500_000,
-            })
-        ));
+    fn trx_024b_an_oversell_reads_as_decimal_text() {
+        let refusal = Account::ensure_held(1, 150_000_000).expect_err("oversell");
+        let error = refusal
+            .downcast_ref::<AccountError>()
+            .expect("account error");
+        let read = serde_json::to_value(error).unwrap();
+        assert_eq!(read["available"], "0.00000001");
+        assert_eq!(read["requested"], "1.5");
     }
 
     // TRX-062 / TRX-026 — a purchase by unit price: total = qty × price × rate + fees.
@@ -8059,8 +8044,8 @@ mod write_off_tests {
         assert!(matches!(
             correct(&mut acc, "2024-03-01", micro(11)),
             AccountError::Oversell {
-                available: 10_000_000,
-                requested: 11_000_000
+                available: 1_000_000_000,
+                requested: 1_100_000_000
             }
         ));
         assert!(matches!(
@@ -8124,8 +8109,8 @@ mod write_off_tests {
         assert!(matches!(
             error_of(corrected.cloned()),
             AccountError::Oversell {
-                available: 10_000_000,
-                requested: 12_000_000
+                available: 1_000_000_000,
+                requested: 1_200_000_000
             }
         ));
         // Sixteen held today, six on 2024-04-01: a backdated sale names the six.
@@ -8142,8 +8127,8 @@ mod write_off_tests {
         assert!(matches!(
             error_of(backdated.cloned()),
             AccountError::Oversell {
-                available: 6_000_000,
-                requested: 11_000_000
+                available: 600_000_000,
+                requested: 1_100_000_000
             }
         ));
     }

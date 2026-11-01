@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use chrono::NaiveDate;
 
-use crate::context::account::{AgentRecording, JournalFilter, Transaction, TransactionType};
+use crate::context::account::{AgentRecording, JournalFilter, TransactionType, TransactionView};
 use crate::context::asset::{Asset, AssetPrice};
 use crate::core::BACKEND;
 
@@ -54,8 +54,8 @@ pub struct TransactionsAsked {
 /// One transaction of a listing.
 #[derive(Debug, Clone)]
 pub struct ListedTransaction {
-    /// The transaction as stored.
-    pub transaction: Transaction,
+    /// The transaction as a surface reads it.
+    pub transaction: TransactionView,
     /// The reference of its asset; `None` for a transaction on the account's cash.
     pub asset_reference: Option<String>,
     /// The agent session that recorded it; `None` for one the owner typed (AGT-045).

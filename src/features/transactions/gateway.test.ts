@@ -30,7 +30,7 @@ const makeTx = (): Transaction => ({
   asset_id: "asset-1",
   transaction_type: "Purchase",
   date: "2024-01-15",
-  quantity: 1_000_000,
+  quantity: "1",
   unit_price: 100_000_000,
   exchange_rate: 1_000_000,
   fees: 0,
@@ -38,13 +38,18 @@ const makeTx = (): Transaction => ({
   note: null,
   realized_pnl: null,
   created_at: "2024-01-15T10:00:00Z",
+  write_off_reason: null,
+  transfer_id: null,
+  added_deposit: false,
+  split_factor: null,
+  dividend_amount: null,
 });
 
 const buyDto: BuyHoldingDTO = {
   account_id: "acc-1",
   asset_id: "asset-1",
   date: "2024-01-15",
-  quantity: 1_000_000,
+  quantity: "1",
   unit_price: 100_000_000,
   exchange_rate: 1_000_000,
   fees: 0,
@@ -91,7 +96,7 @@ describe("transactionGateway", () => {
       account_id: "acc-1",
       asset_id: "ast-1",
       date: "2026-01-02",
-      quantity: 2_000_000,
+      quantity: "2",
       entered: { mode: "Total", total: 95_000_000, exchange_rate: 1_000_000, fees: 5_000_000 },
       correcting: null,
     };
@@ -103,10 +108,14 @@ describe("transactionGateway", () => {
     });
     expect(mockInvoke).toHaveBeenCalledWith("validate_transaction_draft", { draft });
 
-    mockInvoke.mockRejectedValue({ code: "Oversell", available: 1, requested: 2 });
+    mockInvoke.mockRejectedValue({
+      code: "Oversell",
+      available: "0.000001",
+      requested: "0.000002",
+    });
     expect(await transactionGateway.validateTransactionDraft(draft)).toEqual({
       status: "error",
-      error: { code: "Oversell", available: 1, requested: 2 },
+      error: { code: "Oversell", available: "0.000001", requested: "0.000002" },
     });
   });
 
@@ -117,7 +126,7 @@ describe("transactionGateway", () => {
       account_id: "acc-1",
       asset_id: "ast-1",
       date: "2026-01-02",
-      quantity: 2_000_000,
+      quantity: "2",
       total_cost: null,
     };
     mockInvoke.mockResolvedValue({ zero_cost: false });
@@ -161,7 +170,7 @@ describe("transactionGateway", () => {
       account_id: "acc-1",
       asset_id: "asset-1",
       date: "2024-02-01",
-      quantity: 500_000,
+      quantity: "0.5",
       unit_price: 110_000_000,
       exchange_rate: 1_000_000,
       fees: 0,
@@ -180,7 +189,7 @@ describe("transactionGateway", () => {
       account_id: "acc-1",
       asset_id: "asset-1",
       date: "2024-02-01",
-      quantity: 999_000_000,
+      quantity: "999",
       unit_price: 100_000_000,
       exchange_rate: 1_000_000,
       fees: 0,
@@ -189,8 +198,8 @@ describe("transactionGateway", () => {
     };
     const err: AccountError = {
       code: "Oversell",
-      available: 500_000,
-      requested: 999_000_000,
+      available: "0.5",
+      requested: "999",
     };
     mockInvoke.mockRejectedValue(err);
     const result = await transactionGateway.sellHolding(sellDto);
@@ -202,7 +211,7 @@ describe("transactionGateway", () => {
   it("correctTransaction returns updated Transaction on success", async () => {
     const dto: Omit<CorrectTransactionDTO, "account_id" | "transaction_id"> = {
       date: "2024-01-20",
-      quantity: 2_000_000,
+      quantity: "2",
       unit_price: 90_000_000,
       exchange_rate: 1_000_000,
       fees: 0,
@@ -223,7 +232,7 @@ describe("transactionGateway", () => {
     mockInvoke.mockRejectedValue(err);
     const dto: Omit<CorrectTransactionDTO, "account_id" | "transaction_id"> = {
       date: "2024-01-20",
-      quantity: 2_000_000,
+      quantity: "2",
       unit_price: 90_000_000,
       exchange_rate: 1_000_000,
       fees: 0,

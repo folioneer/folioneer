@@ -2,6 +2,7 @@
 //! micro-units (TRX-024). Anything wrong is a usage error (CLI-022).
 
 use crate::context::asset::{AssetClass, AssetCreationDefaults, AssetKind, NamedAsset};
+use crate::shared::domain::quantity::{stored_non_cash_quantity, FigureTextError};
 
 use crate::use_cases::holding_transaction::{
     decimal_to_micro, CashAmount, DividendAmount, PriceAt, Recording, Target, Trade, TradeAmount,
@@ -247,7 +248,7 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
         account: options.text("--account")?,
         asset: options.text("--asset")?,
         date: options.date()?,
-        quantity: options.amount("--quantity")?,
+        quantity: options.quantity("--quantity")?,
     };
     let command = match verb {
         "open" => Recording::Open {
@@ -332,6 +333,24 @@ impl Options {
             let hint = comma_hint(value).unwrap_or_default();
             Reason(format!("{name} is not a decimal number: \"{value}\"{hint}"))
         })
+    }
+
+    /// CLI-015 — a quantity of a non-cash asset, up to eight decimals, as stored. One past
+    /// what storage holds reaches the core at its limit, which refuses it (TRX-024C).
+    fn quantity(&self, name: &str) -> Result<i64, Reason> {
+        let value = self
+            .get(name)
+            .ok_or_else(|| Reason(format!("{name} is missing")))?;
+        match stored_non_cash_quantity(value) {
+            Ok(read) => Ok(read),
+            Err(FigureTextError::TooLarge) => Ok(i64::MAX),
+            Err(FigureTextError::NotAFigure) => {
+                let hint = quantity_comma_hint(value).unwrap_or_default();
+                Err(Reason(format!(
+                    "{name} is not a decimal number: \"{value}\"{hint}"
+                )))
+            }
+        }
     }
 
     fn amount_or(&self, name: &str, default: i64) -> Result<i64, Reason> {
@@ -424,6 +443,13 @@ fn comma_hint(value: &str) -> Option<String> {
         .then(|| format!(" — write the decimals after a dot: {dotted}"))
 }
 
+/// CLI-015 — the same for a quantity, which carries eight decimals (TRX-024).
+fn quantity_comma_hint(value: &str) -> Option<String> {
+    let dotted = value.replace(',', ".");
+    (value.contains(',') && stored_non_cash_quantity(&dotted).is_ok())
+        .then(|| format!(" — write the decimals after a dot: {dotted}"))
+}
+
 fn is_iso_date(text: &str) -> bool {
     chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d").is_ok() && text.len() == 10
 }
@@ -456,7 +482,7 @@ mod tests {
                     account: "PEA".to_string(),
                     asset: "CW8".to_string(),
                     date: None,
-                    quantity: 10 * MICRO,
+                    quantity: 10 * crate::shared::domain::quantity::QUANTITY_UNIT as i64,
                 },
                 total_cost: 4_950_500_000,
             }
@@ -800,9 +826,13 @@ mod tests {
             reason("holding buy --account A --asset B --quantity 1,5 --price 1"),
             "--quantity is not a decimal number: \"1,5\" — write the decimals after a dot: 1.5"
         );
+        assert_eq!(
+            reason("holding buy --account A --asset B --quantity 0,00000001 --price 1"),
+            "--quantity is not a decimal number: \"0,00000001\" — write the decimals after a dot: 0.00000001"
+        );
         // CLI-015 — the hint shows a figure only when it is one: not for a comma used
         // between thousands, several commas, or no comma at all.
-        for typed in ["abc", "1,234.5", "1,2,3"] {
+        for typed in ["abc", "1,234.5", "1,2,3", "0.000000001"] {
             assert_eq!(
                 reason(&format!(
                     "holding buy --account A --asset B --quantity {typed} --price 1"

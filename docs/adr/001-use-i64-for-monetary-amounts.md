@@ -9,7 +9,7 @@ Existing financial values in the database (e.g., `average_price`, `quantity` in 
 
 ## Decision
 
-All new financial amounts within the `Transaction` entity, and any future financial entities or fields, will be stored as `i64` (64-bit integers). A consistent micro-unit scale (e.g., multiplying by 1,000,000 for 6 decimal places of precision) will be applied consistently at the application boundary (e.g., frontend-to-backend and vice-versa) to convert between human-readable decimal values and the `i64` micro-unit representation. A non-cash quantity is on a finer scale (TRX-024), because a millionth cannot hold a satoshi. This approach ensures exact precision for all monetary calculations.
+All new financial amounts within the `Transaction` entity, and any future financial entities or fields, will be stored as `i64` (64-bit integers). A fixed scale converts between human-readable decimal values and the `i64` representation: micro-units (×1,000,000) by default, a finer one for a quantity of a non-cash asset (TRX-024). This approach ensures exact precision for all monetary calculations.
 
 ## Consequences
 

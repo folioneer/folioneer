@@ -25,7 +25,7 @@ const coreCheck = async (draft: OpeningBalanceDraft) => {
   const problem = (code: string) => ({ status: "error" as const, error: { code } });
   if (!draft.date) return problem("DateMissing");
   if (draft.total_cost === null) return problem("TotalCostMissing");
-  if (draft.quantity <= 0) return problem("QuantityNotPositive");
+  if (Number(draft.quantity) <= 0) return problem("QuantityNotPositive");
   if (draft.total_cost < 0) return problem("InvalidTotalCost");
   return { status: "ok" as const, data: { zero_cost: draft.total_cost === 0 } };
 };
@@ -63,7 +63,7 @@ const makeTransaction = () => ({
   asset_id: "asset-1",
   transaction_type: "OpeningBalance" as const,
   date: "2024-01-15",
-  quantity: 5_000_000,
+  quantity: "5",
   unit_price: 100_000_000,
   exchange_rate: 1_000_000,
   fees: 0,
@@ -118,7 +118,7 @@ describe("useOpenBalance", () => {
       account_id: "account-1",
       asset_id: "asset-1",
       date: "2024-01-15",
-      quantity: 5_000_000,
+      quantity: "5",
       total_cost: null,
     });
     expect(result.current.isFormValid).toBe(false);
@@ -275,7 +275,7 @@ describe("useOpenBalance", () => {
         account_id: "account-1",
         asset_id: "asset-1",
         date: "2024-01-15",
-        quantity: 5_000_000,
+        quantity: "5",
         total_cost: 500_000_000,
       }),
     );

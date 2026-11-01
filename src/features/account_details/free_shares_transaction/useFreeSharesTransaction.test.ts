@@ -93,6 +93,16 @@ describe("useFreeSharesTransaction (FSD-020/021/025)", () => {
   });
 
   // FSD-021 — form invalid when quantity is negative
+  // TRX-024J — a quantity what the form keeps leaves at zero.
+  it("isFormValid false when a ninth decimal is all the quantity has", () => {
+    const { result } = renderHook(() => useFreeSharesTransaction(BASE_PROPS));
+    act(() => {
+      result.current.handleChange("assetId", "asset-1");
+      result.current.handleChange("quantity", "0.000000001");
+    });
+    expect(result.current.isFormValid).toBe(false);
+  });
+
   it("isFormValid false when quantity is negative", () => {
     const { result } = renderHook(() => useFreeSharesTransaction(BASE_PROPS));
     act(() => {
@@ -138,7 +148,7 @@ describe("useFreeSharesTransaction (FSD-020/021/025)", () => {
       expect.objectContaining({
         account_id: "account-1",
         asset_id: "asset-equity-1",
-        quantity: 5_500_000,
+        quantity: "5.5",
         note: null,
       }),
     );
@@ -304,7 +314,7 @@ describe("useFreeSharesTransaction (FSD-020/021/025)", () => {
     expect(mockCorrectTransaction).toHaveBeenCalledWith(
       "tx-fsd-existing",
       "account-1",
-      expect.objectContaining({ quantity: 3_000_000, unit_price: 0, fees: 0 }),
+      expect.objectContaining({ quantity: "3", unit_price: 0, fees: 0 }),
     );
     // The create path must NOT be used in edit mode.
     expect(mockRecordFreeShares).not.toHaveBeenCalled();

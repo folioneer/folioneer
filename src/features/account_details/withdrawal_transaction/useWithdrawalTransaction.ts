@@ -4,7 +4,7 @@ import type { Transaction } from "@/bindings";
 import { transactionMutationErrorToI18n } from "@/features/transactions/shared/presenter";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { decimalToMicro, microToFieldDecimal } from "@/lib/microUnits";
+import { decimalToMicro, microToExactDecimal, microToFieldDecimal } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -74,7 +74,7 @@ export function useWithdrawalTransaction({
         const result = editTransaction
           ? await accountDetailsGateway.correctTransaction(editTransaction.id, accountId, {
               date: formData.date,
-              quantity: amountMicros,
+              quantity: microToExactDecimal(amountMicros),
               unit_price: editTransaction.unit_price,
               exchange_rate: editTransaction.exchange_rate,
               fees: editTransaction.fees,

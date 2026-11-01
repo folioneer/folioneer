@@ -6,9 +6,10 @@ import { logger } from "@/lib/logger";
 import {
   decimalToMicro,
   decimalToNumber,
+  formatQuantity,
+  microToExactDecimal,
   microToFieldDecimal,
   microToFormattedPrice,
-  microToFormattedQuantity,
 } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
@@ -149,9 +150,9 @@ export function useSplitTransaction({
       position === null
         ? null
         : {
-            oldQuantity: microToFormattedQuantity(position.old_quantity),
+            oldQuantity: formatQuantity(position.old_quantity),
             oldAveragePrice: microToFormattedPrice(position.old_average_price),
-            newQuantity: microToFormattedQuantity(position.new_quantity),
+            newQuantity: formatQuantity(position.new_quantity),
             newAveragePrice: microToFormattedPrice(position.new_average_price),
           },
     [position],
@@ -191,7 +192,7 @@ export function useSplitTransaction({
             // convention (unit_price 0, exchange_rate 1.0, fees 0, no total).
             await accountDetailsGateway.correctTransaction(editMode.transactionId, accountId, {
               date: formData.date,
-              quantity: factorMicro,
+              quantity: microToExactDecimal(factorMicro),
               unit_price: 0,
               exchange_rate: 1_000_000,
               fees: 0,

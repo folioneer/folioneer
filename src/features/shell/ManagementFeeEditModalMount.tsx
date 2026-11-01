@@ -6,7 +6,7 @@ import { ManagementFeeEditModal } from "@/features/account_details/management_fe
 import { transactionGateway } from "@/features/transactions/gateway";
 import { transactionLoadErrorToI18n } from "@/features/transactions/shared/presenter";
 import { logger } from "@/lib/logger";
-import { microToFieldDecimal } from "@/lib/microUnits";
+import { quantityToFieldDecimal } from "@/lib/microUnits";
 import { patchModalSearch } from "@/lib/modalSearch";
 import { useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
@@ -99,7 +99,7 @@ export function ManagementFeeEditModalMount() {
         transactionId: transaction.id,
         lockedAssetName: assetName,
         initialDate: transaction.date,
-        initialQuantity: microToFieldDecimal(transaction.quantity),
+        initialQuantity: quantityToFieldDecimal(transaction.quantity),
         initialNote: transaction.note ?? "",
       }}
     />

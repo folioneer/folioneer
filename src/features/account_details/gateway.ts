@@ -165,9 +165,9 @@ export const accountDetailsGateway = {
     accountId: string,
     assetId: string,
     date: string,
-    resultingQuantityMicros: number,
+    resultingQuantity: string,
   ): Promise<Result<ManagementFeeRemoval, ManagementFeeError>> {
-    return commands.previewManagementFee(accountId, assetId, date, resultingQuantityMicros);
+    return commands.previewManagementFee(accountId, assetId, date, resultingQuantity);
   },
 
   // FEE-030 — create the recurring fee schedule for an (account, asset) pair.

@@ -143,15 +143,15 @@ describe("useManagementFee (FEE-020/021/022)", () => {
       await result.current.handleSubmit(fakeSubmit);
     });
     expect(mockRecordManagementFee).toHaveBeenCalledWith(
-      expect.objectContaining({ percent_micros: 2_000_000, resulting_quantity_micros: null }),
+      expect.objectContaining({ percent_micros: 2_000_000, resulting_quantity: null }),
     );
   });
 
   // FEE-029 — in quantity mode the backend computes the preview; the form is valid once it has one
   it("asks the backend for the removal preview in quantity mode and exposes it", async () => {
     const preview = {
-      held_quantity: 25_000_000,
-      removed_quantity: 500_000,
+      held_quantity: "25",
+      removed_quantity: "0.5",
       percent_micros: 2_000_000,
     };
     mockPreviewManagementFee.mockResolvedValue({ status: "ok", data: preview });
@@ -169,7 +169,7 @@ describe("useManagementFee (FEE-020/021/022)", () => {
       "account-1",
       "asset-equity-1",
       TODAY,
-      24_500_000,
+      "24.5",
     );
     expect(result.current.previewError).toBeNull();
     expect(result.current.isFormValid).toBe(true);
@@ -179,7 +179,7 @@ describe("useManagementFee (FEE-020/021/022)", () => {
   it("exposes a rejected preview as an inline error and keeps the form invalid", async () => {
     mockPreviewManagementFee.mockResolvedValue({
       status: "error",
-      error: { code: "ResultingQuantityNotBelowHeld", held_quantity: 25_000_000 },
+      error: { code: "ResultingQuantityNotBelowHeld", held_quantity: "25" },
     });
     const { result } = renderHook(() => useManagementFee(BASE_PROPS));
     act(() => {
@@ -201,13 +201,13 @@ describe("useManagementFee (FEE-020/021/022)", () => {
   // FEE-029 — an answer to an earlier entry arriving late never replaces the current one
   it("ignores a preview that answers an entry the user has already changed", async () => {
     const late = {
-      held_quantity: 25_000_000,
-      removed_quantity: 1_000_000,
+      held_quantity: "25",
+      removed_quantity: "1",
       percent_micros: 4_000_000,
     };
     const current = {
-      held_quantity: 25_000_000,
-      removed_quantity: 500_000,
+      held_quantity: "25",
+      removed_quantity: "0.5",
       percent_micros: 2_000_000,
     };
     let resolveLate: (value: unknown) => void = () => {};
@@ -255,7 +255,7 @@ describe("useManagementFee (FEE-020/021/022)", () => {
   it("submits the resulting quantity and a null percentage in quantity mode", async () => {
     mockPreviewManagementFee.mockResolvedValue({
       status: "ok",
-      data: { held_quantity: 25_000_000, removed_quantity: 500_000, percent_micros: 2_000_000 },
+      data: { held_quantity: "25", removed_quantity: "0.5", percent_micros: 2_000_000 },
     });
     mockRecordManagementFee.mockResolvedValue({ status: "ok", data: { id: "tx-fee-1" } });
     const { result } = renderHook(() => useManagementFee(BASE_PROPS));
@@ -271,7 +271,7 @@ describe("useManagementFee (FEE-020/021/022)", () => {
     });
 
     expect(mockRecordManagementFee).toHaveBeenCalledWith(
-      expect.objectContaining({ percent_micros: null, resulting_quantity_micros: 24_500_000 }),
+      expect.objectContaining({ percent_micros: null, resulting_quantity: "24.5" }),
     );
   });
 

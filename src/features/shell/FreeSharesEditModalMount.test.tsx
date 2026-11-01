@@ -47,7 +47,7 @@ const freeSharesTx = {
   asset_id: "asset-equity-1",
   transaction_type: "FreeShares",
   date: "2024-06-15",
-  quantity: 5_000_000,
+  quantity: "5",
   note: null,
 };
 
@@ -94,7 +94,7 @@ describe("FreeSharesEditModalMount (FSD-040)", () => {
     });
     mockGetTransactions.mockResolvedValue({
       status: "ok",
-      data: [{ ...freeSharesTx, quantity: 5_123_456 }],
+      data: [{ ...freeSharesTx, quantity: "5.123456" }],
     });
 
     render(<FreeSharesEditModalMount />);

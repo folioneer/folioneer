@@ -133,7 +133,7 @@ const makeHolding = (overrides: Partial<HoldingDetail> = {}): HoldingDetail => (
   asset_id: "asset-1",
   asset_name: "Apple",
   asset_reference: "AAPL",
-  quantity: 2_000_000,
+  quantity: "2",
   average_price: 100_000_000,
   cost_basis: 200_000_000,
   realized_pnl: 0,
@@ -174,7 +174,7 @@ const makeCashHolding = (overrides: Partial<HoldingDetail> = {}): HoldingDetail 
     asset_id: "system-cash-eur",
     asset_name: "Cash EUR",
     asset_reference: "EUR",
-    quantity: 500_000_000,
+    quantity: "500",
     average_price: 1_000_000,
     cost_basis: 500_000_000,
     realized_pnl: 0,
@@ -279,7 +279,7 @@ describe("useAccountDetails — cash row (CSH-092 / CSH-095)", () => {
     mockGetAccountDetails.mockResolvedValue({
       status: "ok",
       data: makeResponse({
-        holdings: [makeCashHolding({ quantity: 0 })],
+        holdings: [makeCashHolding({ quantity: "0" })],
         total_holding_count: 1,
       }),
     });

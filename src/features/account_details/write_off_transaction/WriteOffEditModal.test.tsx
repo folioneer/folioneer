@@ -28,12 +28,12 @@ vi.mock("./WriteOffModal", () => ({
     target,
     editMode,
   }: {
-    target: { quantityMicro: number; averagePriceMicro: number };
-    editMode: { initialReason: string; initialQuantityMicro: number };
+    target: { heldQuantity: string; averagePriceMicro: number };
+    editMode: { initialReason: string; initialReadQuantity: number };
   }) => (
     <div data-testid="write-off-form">
-      {target.quantityMicro}:{target.averagePriceMicro}:{editMode.initialReason}:
-      {editMode.initialQuantityMicro}
+      {target.heldQuantity}:{target.averagePriceMicro}:{editMode.initialReason}:
+      {editMode.initialReadQuantity}
     </div>
   ),
 }));
@@ -45,7 +45,7 @@ const transaction = {
   asset_id: "asset-btc",
   transaction_type: "WriteOff",
   date: "2024-06-15",
-  quantity: 100_000,
+  quantity: "0.1",
   realized_pnl: -2_000_000_000,
   write_off_reason: "Lost",
   note: null,
@@ -70,11 +70,11 @@ describe("WriteOffEditModal (WOF-058)", () => {
   it("fills the form with what is held today and the write-off's own average price", async () => {
     mockGetAccountDetails.mockResolvedValue({
       status: "ok",
-      data: { holdings: [{ asset_id: "asset-btc", quantity: 400_000 }] },
+      data: { holdings: [{ asset_id: "asset-btc", quantity: "0.4" }] },
     });
     render(<WriteOffEditModal {...props} />);
     expect(await screen.findByTestId("write-off-form")).toHaveTextContent(
-      "400000:20000000000:Lost:100000",
+      "0.4:20000000000:Lost:0.1",
     );
   });
 

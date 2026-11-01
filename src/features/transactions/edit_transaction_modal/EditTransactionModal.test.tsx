@@ -63,7 +63,7 @@ const FAKE_TX: Transaction = {
   asset_id: "asset-stock-1",
   transaction_type: "Purchase",
   date: "2024-01-01",
-  quantity: 1_000_000,
+  quantity: "1",
   unit_price: 100_000_000,
   exchange_rate: 1_000_000,
   fees: 0,
@@ -71,6 +71,11 @@ const FAKE_TX: Transaction = {
   note: null,
   realized_pnl: null,
   created_at: "2024-01-01T00:00:00Z",
+  write_off_reason: null,
+  transfer_id: null,
+  added_deposit: false,
+  split_factor: null,
+  dividend_amount: null,
 };
 
 describe("EditTransactionModal", () => {

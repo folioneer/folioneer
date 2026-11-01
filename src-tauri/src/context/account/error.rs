@@ -64,8 +64,12 @@ pub enum AccountError {
     #[error("Oversell: requested {requested} exceeds available {available}")]
     Oversell {
         /// Units currently held before the sale.
+        #[serde(serialize_with = "crate::shared::domain::quantity::as_text")]
+        #[specta(type = String)]
         available: i64,
         /// Units the operation attempts to sell.
+        #[serde(serialize_with = "crate::shared::domain::quantity::as_text")]
+        #[specta(type = String)]
         requested: i64,
     },
     /// Correcting a transaction would leave a later sell with insufficient units.
@@ -185,7 +189,9 @@ pub enum AccountError {
     /// quantity held as of the fee's date (FEE-028).
     #[error("Resulting quantity must be below the held quantity {held_quantity}")]
     ResultingQuantityNotBelowHeld {
-        /// Quantity held as of the fee's date, in micro-units.
+        /// Quantity held as of the fee's date.
+        #[serde(serialize_with = "crate::shared::domain::quantity::as_text")]
+        #[specta(type = String)]
         held_quantity: i64,
     },
 
@@ -257,6 +263,17 @@ pub enum AccountError {
     DatabaseError,
 }
 
+impl From<crate::shared::domain::quantity::FigureTextError> for AccountError {
+    /// TRX-024G — a text that is no quantity is refused by a window command.
+    fn from(error: crate::shared::domain::quantity::FigureTextError) -> Self {
+        use crate::shared::domain::quantity::FigureTextError;
+        match error {
+            FigureTextError::NotAFigure => Self::QuantityNotPositive,
+            FigureTextError::TooLarge => Self::QuantityOutOfRange,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266,6 +283,18 @@ mod tests {
     /// flat `{ "code": "VariantName", ...payload }` object on the wire. A missing
     /// or mis-tagged variant collapses to `null` under an untagged composite —
     /// this test catches that regression for `AccountError` itself.
+    // TRX-024G — what the window gets for a text the core does not read.
+    #[test]
+    fn trx_024g_a_text_is_refused_with_a_code() {
+        use crate::shared::domain::quantity::stored_quantity;
+        let refusal = |text: &str| AccountError::from(stored_quantity("BTC", text).unwrap_err());
+        assert!(matches!(refusal("abc"), AccountError::QuantityNotPositive));
+        assert!(matches!(
+            refusal("99999999999999"),
+            AccountError::QuantityOutOfRange
+        ));
+    }
+
     #[test]
     fn each_variant_emits_a_code() {
         assert_eq!(
@@ -313,7 +342,7 @@ mod tests {
                 requested: 2
             })
             .unwrap(),
-            json!({ "code": "Oversell", "available": 1, "requested": 2 })
+            json!({ "code": "Oversell", "available": "0.00000001", "requested": "0.00000002" })
         );
         assert_eq!(
             to_value(AccountError::CascadingOversell).unwrap(),
@@ -425,7 +454,7 @@ mod tests {
                 held_quantity: 25_000_000
             })
             .unwrap(),
-            json!({ "code": "ResultingQuantityNotBelowHeld", "held_quantity": 25_000_000 })
+            json!({ "code": "ResultingQuantityNotBelowHeld", "held_quantity": "0.25" })
         );
         // INT variant
         assert_eq!(

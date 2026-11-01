@@ -1,8 +1,7 @@
 //! AGT-065A — a transfer an agent records: a holding moved from one account to another at
 //! its cost (TRF), through the window's transfer and marked part by part.
 
-use crate::context::account::Transaction;
-use crate::shared::domain::quantity::from_surface;
+use crate::context::account::TransactionView;
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -15,8 +14,8 @@ use crate::use_cases::transfer::{
 };
 
 use super::{
-    amount, as_json, figure, note, optional_text, portfolio_unreadable, session_limit_reached,
-    text, today, AgentTools, Granted, Refusal,
+    as_json, figure, note, optional_text, portfolio_unreadable, quantity, required_quantity,
+    session_limit_reached, text, today, AgentTools, Granted, Refusal,
 };
 
 /// A transfer as the agent sent it.
@@ -89,7 +88,7 @@ impl AgentTools {
         tracing::info!(target: BACKEND, session = granted.session_id, parts = parts.len(), "agent recorded a transfer");
         as_json(&serde_json::json!({
             "status": "recorded",
-            "transactions": parts.iter().map(Transaction::as_shown).collect::<Vec<_>>(),
+            "transactions": parts.iter().map(TransactionView::from).collect::<Vec<_>>(),
             "from": sending.account_name,
             "from_currency": sending.currency,
             "to": receiving.account_name,
@@ -114,7 +113,7 @@ impl AgentTools {
             )
             .await
             .map_err(|error| refusal_from_transfer(&error))?;
-        let shown: Vec<_> = previewed.parts.iter().map(Transaction::as_shown).collect();
+        let shown: Vec<_> = previewed.parts.iter().map(TransactionView::from).collect();
         let mut parts = serde_json::to_value(&shown).map_err(|_| portfolio_unreadable())?;
         if let Some(parts) = parts.as_array_mut() {
             for part in parts {
@@ -160,8 +159,8 @@ impl AgentTools {
             })?;
         let figures = TransferFigures {
             date: typed.date.unwrap_or_else(today),
-            quantity_sent: from_surface(typed.quantity),
-            quantity_received: from_surface(typed.received.unwrap_or(typed.quantity)),
+            quantity_sent: typed.quantity,
+            quantity_received: typed.received.unwrap_or(typed.quantity),
             exchange_rate: typed.rate,
             note: typed.note,
         };
@@ -176,8 +175,8 @@ fn transfer_of(arguments: &Value) -> Result<TypedTransfer, Refusal> {
         to: text(arguments, "to")?.to_string(),
         asset: text(arguments, "asset")?.to_string(),
         date: optional_text(arguments, "date")?,
-        quantity: amount(arguments, "quantity")?,
-        received: figure(arguments, "received")?,
+        quantity: required_quantity(arguments, "quantity")?,
+        received: quantity(arguments, "received")?,
         rate: figure(arguments, "rate")?,
         note: note(arguments)?,
     })

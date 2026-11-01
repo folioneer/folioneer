@@ -1,7 +1,11 @@
+import { isCashAsset } from "./cashAsset";
+
 /**
  * Micro-unit conversion utilities (ADR-001, TRX-024).
  *
  * All financial values are stored and transmitted as i64 micro-units (value × 1_000_000).
+ * A quantity is the exception: it crosses as decimal text (TRX-024B), and sums and comparisons
+ * of quantities go through the helpers below, never through a number.
  * Decimal ↔ micro conversion occurs ONLY at the UI boundary:
  *   - User input:  decimal string → number (micro-units) via decimalToMicro
  *   - A form field: number (micro-units) → decimal string via microToFieldDecimal
@@ -133,4 +137,105 @@ export function microToFormattedQuantity(micros: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 6,
   }).format(micros / MICRO);
+}
+
+/** TRX-024B — the decimals a quantity of a non-cash asset carries. */
+const QUANTITY_DECIMALS = 8;
+
+/** TRX-024B — the decimals of a quantity of a Cash Asset, a split's factor, a dividend's amount. */
+export const MONEY_DECIMALS = 6;
+
+/** TRX-024B — the decimals a quantity of `assetId` carries. */
+export function decimalsOf(assetId: string): number {
+  return isCashAsset(assetId) ? MONEY_DECIMALS : QUANTITY_DECIMALS;
+}
+
+/**
+ * TRX-024H — what a form sends as a quantity: `value`, written with a dot, kept to `decimals`
+ * decimals as `decimalToMicro` keeps six, without trailing zeros; "0" for what is not a number.
+ * e.g. "1.50" → "1.5", "0.123456789" → "0.12345678"
+ */
+export function decimalToQuantity(value: string, decimals = QUANTITY_DECIMALS): string {
+  const trimmed = value.trim();
+  if (!/^[+-]?(\d+\.?\d*|\.\d+)$/.test(trimmed)) return "0";
+  const negative = trimmed.startsWith("-");
+  const [whole = "", fraction = ""] = trimmed.replace(/^[+-]/, "").split(".");
+  const kept = fraction.slice(0, decimals).replace(/0+$/, "");
+  const digits = (whole.replace(/^0+(?=\d)/, "") || "0") + (kept ? `.${kept}` : "");
+  return negative && digits !== "0" ? `-${digits}` : digits;
+}
+
+/** A quantity's decimal text as a whole number of hundred-millionths, for exact sums and comparisons. */
+function quantitySteps(quantity: string): bigint {
+  const normal = decimalToQuantity(quantity);
+  const negative = normal.startsWith("-");
+  const [whole = "0", fraction = ""] = normal.replace("-", "").split(".");
+  const steps = BigInt(whole + fraction.padEnd(QUANTITY_DECIMALS, "0"));
+  return negative ? -steps : steps;
+}
+
+/** A whole number of hundred-millionths as a quantity's decimal text. */
+function stepsToQuantity(steps: bigint): string {
+  const negative = steps < 0n;
+  const digits = (negative ? -steps : steps).toString().padStart(QUANTITY_DECIMALS + 1, "0");
+  const whole = digits.slice(0, -QUANTITY_DECIMALS);
+  const fraction = digits.slice(-QUANTITY_DECIMALS).replace(/0+$/, "");
+  return `${negative ? "-" : ""}${whole}${fraction ? `.${fraction}` : ""}`;
+}
+
+/** Negative, zero or positive as `a` is below, equal to or above `b`, exactly. */
+export function compareQuantities(a: string, b: string): number {
+  const difference = quantitySteps(a) - quantitySteps(b);
+  if (difference === 0n) return 0;
+  return difference < 0n ? -1 : 1;
+}
+
+/** The sum of two quantities, exactly. */
+export function addQuantities(a: string, b: string): string {
+  return stepsToQuantity(quantitySteps(a) + quantitySteps(b));
+}
+
+/** `a − b`, exactly. */
+export function subtractQuantities(a: string, b: string): string {
+  return stepsToQuantity(quantitySteps(a) - quantitySteps(b));
+}
+
+/** What `quantity` costs at `priceMicros` a unit, in micro-units, rounded toward zero. */
+export function quantityCost(quantity: string, priceMicros: number): number {
+  return Number((quantitySteps(quantity) * BigInt(priceMicros)) / 10n ** BigInt(QUANTITY_DECIMALS));
+}
+
+/** Whether a quantity is above zero. */
+export function isPositiveQuantity(quantity: string): boolean {
+  return quantitySteps(quantity) > 0n;
+}
+
+/**
+ * TRX-024B — the unit cost of `totalMicros` over `quantity`, in micro-units, rounded toward zero;
+ * 0 for no quantity.
+ */
+export function microPerUnit(totalMicros: number, quantity: string): number {
+  const steps = quantitySteps(quantity);
+  if (steps <= 0n) return 0;
+  return Number((BigInt(totalMicros) * 10n ** BigInt(QUANTITY_DECIMALS)) / steps);
+}
+
+/**
+ * TRX-024B — a quantity in a form field: every decimal it carries and at least three, as
+ * `microToFieldDecimal` writes a figure (100 → "100.000", 0.00000001 → "0.00000001").
+ */
+export function quantityToFieldDecimal(quantity: string): string {
+  const [whole = "0", decimals = ""] = quantity.split(".");
+  return `${whole}.${decimals.padEnd(3, "0")}`;
+}
+
+/**
+ * TRX-024I — a quantity to read, in the display language: trimmed, up to eight decimals by
+ * default ("2" → "2", "1.5" → "1.5"), or with at least `minimumDecimals` in a journal row.
+ */
+export function formatQuantity(quantity: string, minimumDecimals = 0): string {
+  return new Intl.NumberFormat(_displayLocale, {
+    minimumFractionDigits: minimumDecimals,
+    maximumFractionDigits: QUANTITY_DECIMALS,
+  }).format(quantity as Intl.StringNumericLiteral);
 }

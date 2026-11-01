@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { HoldingDetail } from "@/bindings";
 import { isCashAsset } from "@/lib/cashAsset";
 import { logger } from "@/lib/logger";
+import { isPositiveQuantity } from "@/lib/microUnits";
 import { patchModalSearch } from "@/lib/modalSearch";
 import {
   getPerfPeriod,
@@ -406,7 +407,7 @@ export function useAccountDetailsView(accountId: string) {
   const activeNonCashHoldings = useMemo(
     () =>
       data.holdingDetails
-        .filter((h) => !isCashAsset(h.asset_id) && h.quantity > 0)
+        .filter((h) => !isCashAsset(h.asset_id) && isPositiveQuantity(h.quantity))
         .map((h) => ({
           assetId: h.asset_id,
           assetName: h.asset_name,
@@ -428,7 +429,7 @@ export function useAccountDetailsView(accountId: string) {
       .filter(
         (h) =>
           isCashAsset(h.asset_id) ||
-          (h.quantity > 0 && interestBearingByAssetId.get(h.asset_id) === true),
+          (isPositiveQuantity(h.quantity) && interestBearingByAssetId.get(h.asset_id) === true),
       )
       .map((h) => ({
         assetId: h.asset_id,

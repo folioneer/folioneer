@@ -39,7 +39,7 @@ direct **quantity** field (exactly one of the two must be filled, INT-021), and
 an optional note.
 
 **INT-021 — Amount validation (backend)**: exactly one of `percent_micros` /
-`quantity_micros` must be provided; both or neither → `InterestAmountInvalid`.
+`quantity` must be provided; both or neither → `InterestAmountInvalid`.
 Percent mode: strictly positive (`PercentageNotPositive`) and at most 100%
 micro-percent (`PercentageAboveHundred`). Quantity mode: strictly positive
 (`QuantityNotPositive`). Date follows the TRX-020 bounds.

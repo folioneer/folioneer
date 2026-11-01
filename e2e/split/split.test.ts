@@ -115,7 +115,7 @@ describe("split", () => {
 
     // -------------------------------------------------------------------
     // Step 5 — Holding rescaled (SPL-020): quantity 10 → 20, average 100 → 50.
-    //   microToFormattedQuantity renders integers without a separator, so
+    //   formatQuantity renders integers without a separator, so
     //   "20" is locale-invariant; the average renders with 2 decimals in the
     //   forced en-US locale → "50.00".
     // -------------------------------------------------------------------

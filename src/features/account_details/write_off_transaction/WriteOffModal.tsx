@@ -1,11 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
-import {
-  microToFormatted,
-  microToFormattedPrice,
-  microToFormattedQuantity,
-} from "@/lib/microUnits";
+import { formatQuantity, microToFormatted, microToFormattedPrice } from "@/lib/microUnits";
 import { Button } from "@/ui/components/button/Button";
 import { CalcField } from "@/ui/components/field/CalcField";
 import { DateField } from "@/ui/components/field/DateField";
@@ -45,7 +41,7 @@ export function WriteOffModal({
     refusal,
     isSubmitting,
     isFormValid,
-    heldMicro,
+    heldQuantity,
     overHolding,
     estimatedCostMicro,
     handleChange,
@@ -57,7 +53,7 @@ export function WriteOffModal({
     [t],
   );
 
-  const held = microToFormattedQuantity(heldMicro);
+  const held = formatQuantity(heldQuantity);
   // WOF-053 — over the quantity held, refused under the field; WOF-055 — a refusal on the
   // quantity shows there too.
   const quantityError = overHolding

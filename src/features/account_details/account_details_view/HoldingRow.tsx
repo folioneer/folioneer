@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { type KeyboardEvent, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import { isPositiveQuantity } from "@/lib/microUnits";
 import { patchModalSearch } from "@/lib/modalSearch";
 import type { StoredPerfPeriod } from "@/lib/perfPeriodStorage";
 import { otherAccounts } from "@/lib/store";
@@ -121,16 +122,16 @@ export function HoldingRow({
     onSell({
       ...buildTarget(),
       assetReference: row.assetReference,
-      holdingQuantityMicro: row.quantityMicro,
+      holdingQuantity: row.heldQuantity,
     });
-  }, [onSell, buildTarget, row.assetReference, row.quantityMicro]);
+  }, [onSell, buildTarget, row.assetReference, row.heldQuantity]);
 
   const handleWriteOff = useCallback(() => {
     onWriteOff?.({
       assetId: row.assetId,
       assetName: row.assetName,
       assetReference: row.assetReference,
-      quantityMicro: row.quantityMicro,
+      heldQuantity: row.heldQuantity,
       averagePriceMicro: row.averagePriceMicro,
     });
   }, [onWriteOff, row]);
@@ -143,7 +144,7 @@ export function HoldingRow({
       assetId: row.assetId,
       assetName: row.assetName,
       assetReference: row.assetReference,
-      quantityMicro: row.quantityMicro,
+      heldQuantity: row.heldQuantity,
       averagePriceMicro: row.averagePriceMicro,
       accountName: sendingAccount?.name ?? "",
       accountCurrency: sendingAccount?.currency ?? "",
@@ -251,7 +252,7 @@ export function HoldingRow({
                   id={`action-record-withdrawal-${row.assetId}`}
                   aria-label={t("cash.action_record_withdrawal")}
                   onClick={onWithdraw}
-                  disabled={row.quantityMicro <= 0}
+                  disabled={!isPositiveQuantity(row.heldQuantity)}
                 />
               </>
             )}

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { ManagementFeeRemoval } from "@/bindings";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { decimalToMicro } from "@/lib/microUnits";
+import { decimalToMicro, decimalToQuantity } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -73,7 +73,7 @@ export function useManagementFee({ accountId, onSubmitSuccess }: UseManagementFe
     }
     let isCurrent = true;
     accountDetailsGateway
-      .previewManagementFee(accountId, assetId, date, decimalToMicro(resultingQuantity))
+      .previewManagementFee(accountId, assetId, date, decimalToQuantity(resultingQuantity))
       .then((result) => {
         if (!isCurrent) return;
         if (result.status === "ok") {
@@ -133,8 +133,8 @@ export function useManagementFee({ accountId, onSubmitSuccess }: UseManagementFe
           asset_id: formData.assetId,
           date: formData.date,
           percent_micros: formData.mode === "percent" ? decimalToMicro(formData.percent) : null,
-          resulting_quantity_micros:
-            formData.mode === "quantity" ? decimalToMicro(formData.resultingQuantity) : null,
+          resulting_quantity:
+            formData.mode === "quantity" ? decimalToQuantity(formData.resultingQuantity) : null,
           note: formData.note || null,
         });
 

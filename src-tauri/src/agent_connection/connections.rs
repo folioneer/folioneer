@@ -91,8 +91,8 @@ pub struct TransactionShown {
     pub asset_name: Option<String>,
     /// Its asset's reference; `None` for a transaction on the account's cash.
     pub asset_reference: Option<String>,
-    /// Its quantity, in micro-units.
-    pub quantity: i64,
+    /// Its quantity, as decimal text (TRX-024A).
+    pub quantity: String,
     /// Its amount in the account's currency, in micro-units.
     pub amount: i64,
     /// Its unit price, in micro-units.
@@ -239,9 +239,9 @@ pub struct ReplacementRequest {
 pub struct ReplacedShown {
     /// The transaction as it stood when the agent asked.
     pub transaction: TransactionShown,
-    /// The quantity it moved into the holding, negative out of it, in micro-units; `None`
+    /// The quantity it moved into the holding, negative out of it, as decimal text; `None`
     /// for a transaction on the account's cash.
-    pub holding_moved: Option<i64>,
+    pub holding_moved: Option<String>,
     /// The cash it moved into the account, negative out of it, in micro-units.
     pub cash_moved: i64,
 }
@@ -259,12 +259,18 @@ pub struct TransferShown {
     pub asset_name: String,
     /// The asset's reference.
     pub asset_reference: String,
-    /// The quantity sent, the sale's, in micro-units.
+    /// The quantity sent, the sale's.
+    #[serde(serialize_with = "crate::shared::domain::quantity::as_text")]
+    #[specta(type = String)]
     pub quantity_sent: i64,
-    /// The quantity received, the purchase's, in micro-units.
+    /// The quantity received, the purchase's.
+    #[serde(serialize_with = "crate::shared::domain::quantity::as_text")]
+    #[specta(type = String)]
     pub quantity_received: i64,
-    /// The quantity not received, the fee in kind (TRF-021), in micro-units; `None` when all
+    /// The quantity not received, the fee in kind (TRF-021); `None` when all
     /// that is sent is received.
+    #[serde(serialize_with = "crate::shared::domain::quantity::as_optional_text")]
+    #[specta(type = Option<String>)]
     pub quantity_not_received: Option<i64>,
     /// The cost it moves, in the sending account's currency, in micro-units.
     pub cost: i64,
@@ -1183,7 +1189,7 @@ mod tests {
             kind: TransactionType::Deposit,
             asset_name: None,
             asset_reference: None,
-            quantity: 5_000_000_000,
+            quantity: "5000".to_string(),
             amount: 5_000_000_000,
             unit_price: 1_000_000,
             fees: 0,

@@ -32,7 +32,7 @@ describe("toTransactionDraft", () => {
       account_id: "account-1",
       asset_id: "asset-1",
       date: "2026-01-02",
-      quantity: 2_000_000,
+      quantity: "2",
       entered: {
         mode: "UnitPrice",
         unit_price: 100_000_000,
@@ -122,5 +122,13 @@ describe("useTransactionDraftCheck", () => {
     await act(async () => {});
     expect(mockValidateDraft).not.toHaveBeenCalled();
     expect(result.current.isClean).toBe(false);
+  });
+});
+
+describe("toTransactionDraft — a quantity's decimals (TRX-024B)", () => {
+  it("sends a satoshi as it was typed", () => {
+    expect(
+      toTransactionDraft("Purchase", { ...FORM, quantity: "0.00000001" }, "price", "").quantity,
+    ).toBe("0.00000001");
   });
 });

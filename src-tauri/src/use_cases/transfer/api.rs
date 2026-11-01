@@ -3,8 +3,8 @@
 
 use super::error::TransferError;
 use super::orchestrator::{TransferFigures, TransferUseCase};
-use crate::context::account::{Transaction, TransferView};
-use crate::shared::domain::quantity::from_surface;
+use crate::context::account::{AccountError, TransactionView, TransferView};
+use crate::shared::domain::quantity::stored_non_cash_quantity;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;
@@ -20,11 +20,11 @@ pub struct TransferDTO {
     pub asset_id: String,
     /// Business date (YYYY-MM-DD, TRF-011).
     pub date: String,
-    /// Quantity leaving the sending account (micro-units, strictly positive).
-    pub quantity_sent: i64,
-    /// Quantity reaching the receiving account (micro-units, strictly positive, not above
+    /// Quantity leaving the sending account (decimal text, strictly positive).
+    pub quantity_sent: String,
+    /// Quantity reaching the receiving account (decimal text, strictly positive, not above
     /// the quantity sent); the difference is the fee in kind (TRF-021).
-    pub quantity_received: i64,
+    pub quantity_received: String,
     /// Rate from the sending account's currency to the receiving one's (micros); `null`
     /// takes the stored rate of the date (TRF-022).
     pub exchange_rate: Option<i64>,
@@ -39,14 +39,19 @@ pub struct CorrectTransferDTO {
     pub transfer_id: String,
     /// Corrected business date (YYYY-MM-DD).
     pub date: String,
-    /// Corrected quantity sent (micro-units).
-    pub quantity_sent: i64,
-    /// Corrected quantity received (micro-units).
-    pub quantity_received: i64,
+    /// Corrected quantity sent (decimal text).
+    pub quantity_sent: String,
+    /// Corrected quantity received (decimal text).
+    pub quantity_received: String,
     /// Corrected rate (micros); `null` takes the stored rate of the date again (TRF-030).
     pub exchange_rate: Option<i64>,
     /// Corrected note.
     pub note: Option<String>,
+}
+
+/// TRX-024B — a quantity the window sent as decimal text, as stored; a transfer moves no cash.
+fn read_quantity(text: &str) -> Result<i64, TransferError> {
+    stored_non_cash_quantity(text).map_err(|error| AccountError::from(error).into())
 }
 
 /// Records a transfer between two accounts at its cost (TRF-020); returns its parts.
@@ -55,21 +60,21 @@ pub struct CorrectTransferDTO {
 pub async fn record_transfer(
     uc: State<'_, TransferUseCase>,
     dto: TransferDTO,
-) -> Result<Vec<Transaction>, TransferError> {
+) -> Result<Vec<TransactionView>, TransferError> {
     uc.record_transfer(
         &dto.from_account_id,
         &dto.to_account_id,
         dto.asset_id,
         TransferFigures {
             date: dto.date,
-            quantity_sent: from_surface(dto.quantity_sent),
-            quantity_received: from_surface(dto.quantity_received),
+            quantity_sent: read_quantity(&dto.quantity_sent)?,
+            quantity_received: read_quantity(&dto.quantity_received)?,
             exchange_rate: dto.exchange_rate,
             note: dto.note,
         },
     )
     .await
-    .map(|parts| parts.iter().map(Transaction::as_shown).collect())
+    .map(|parts| parts.iter().map(TransactionView::from).collect())
 }
 
 /// Corrects a transfer as one operation (TRF-030); returns its parts.
@@ -78,19 +83,19 @@ pub async fn record_transfer(
 pub async fn correct_transfer(
     uc: State<'_, TransferUseCase>,
     dto: CorrectTransferDTO,
-) -> Result<Vec<Transaction>, TransferError> {
+) -> Result<Vec<TransactionView>, TransferError> {
     uc.correct_transfer(
         &dto.transfer_id,
         TransferFigures {
             date: dto.date,
-            quantity_sent: from_surface(dto.quantity_sent),
-            quantity_received: from_surface(dto.quantity_received),
+            quantity_sent: read_quantity(&dto.quantity_sent)?,
+            quantity_received: read_quantity(&dto.quantity_received)?,
             exchange_rate: dto.exchange_rate,
             note: dto.note,
         },
     )
     .await
-    .map(|parts| parts.iter().map(Transaction::as_shown).collect())
+    .map(|parts| parts.iter().map(TransactionView::from).collect())
 }
 
 /// Removes every part of a transfer together (TRF-040).
@@ -110,9 +115,7 @@ pub async fn get_transfer(
     uc: State<'_, TransferUseCase>,
     transfer_id: String,
 ) -> Result<TransferView, TransferError> {
-    uc.get_transfer(&transfer_id)
-        .await
-        .map(TransferView::as_shown)
+    uc.get_transfer(&transfer_id).await
 }
 
 /// The rate a transfer between two accounts on a date takes when none is given (TRF-061);

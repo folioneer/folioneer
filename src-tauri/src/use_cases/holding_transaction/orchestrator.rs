@@ -12,6 +12,7 @@ use crate::context::account::{
 };
 use crate::context::asset::{Asset, AssetClass, AssetServiceContract};
 use crate::core::logger::BACKEND;
+use crate::shared::domain::quantity::stored_non_cash_quantity;
 use std::sync::Arc;
 
 /// What a transaction draft is (TRX-062): a purchase, a sale, or a dividend being corrected.
@@ -28,8 +29,7 @@ pub enum DraftKind {
 
 /// A transaction draft: a purchase or sale as the user is still entering it (TRX-062).
 /// Empty strings are fields not filled yet; amounts are in micros.
-#[derive(Debug, Clone, serde::Deserialize, specta::Type)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone)]
 pub struct TransactionDraft {
     /// Purchase or sale.
     pub kind: DraftKind,
@@ -48,26 +48,9 @@ pub struct TransactionDraft {
     pub correcting: Option<String>,
 }
 
-impl TransactionDraft {
-    /// The draft as stored (TRX-024): a dividend's draft carries its amount, which is money
-    /// (TRX-062).
-    pub fn as_stored(self) -> Self {
-        Self {
-            quantity: match self.kind {
-                DraftKind::Dividend => self.quantity,
-                DraftKind::Purchase | DraftKind::Sell => {
-                    crate::shared::domain::quantity::from_surface(self.quantity)
-                }
-            },
-            ..self
-        }
-    }
-}
-
 /// An opening balance as the user is still entering it (TRX-066). Empty strings are fields
 /// not filled yet, and so is a total cost of `None`: a typed 0 is a figure (TRX-045).
-#[derive(Debug, Clone, serde::Deserialize, specta::Type)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone)]
 pub struct OpeningBalanceDraft {
     /// The account, empty until chosen.
     pub account_id: String,
@@ -728,19 +711,21 @@ impl HoldingTransactionUseCase {
             .await
     }
 
-    /// TRX-024 — a quantity a surface sent to correct `transaction_id`, as stored.
+    /// TRX-024B — a quantity a surface sent as decimal text to correct `transaction_id`, as
+    /// stored; a transaction that does not exist is refused by the correction, as it was.
     pub async fn stored_correction_quantity(
         &self,
         transaction_id: &str,
-        surface_quantity: i64,
+        text: &str,
     ) -> Result<i64, AccountError> {
-        Ok(self
+        match self
             .account_service
             .get_transaction_by_id(transaction_id)
             .await?
-            .map_or(surface_quantity, |stored| {
-                stored.stored_correction_quantity(surface_quantity)
-            }))
+        {
+            Some(stored) => Ok(stored.stored_correction_quantity(text)?),
+            None => Ok(stored_non_cash_quantity(text)?),
+        }
     }
 
     /// Corrects an existing transaction and recalculates the affected holding (TRX-031).
@@ -1650,17 +1635,17 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            uc.stored_correction_quantity(&opening.id, micro(3))
+            uc.stored_correction_quantity(&opening.id, "3")
                 .await
                 .unwrap(),
             from_surface(micro(3))
         );
         // Nothing to read the scale from: the transaction's absence is refused further on.
         assert_eq!(
-            uc.stored_correction_quantity("no-such-transaction", micro(3))
+            uc.stored_correction_quantity("no-such-transaction", "3")
                 .await
                 .unwrap(),
-            micro(3)
+            from_surface(micro(3))
         );
     }
 
@@ -2544,8 +2529,8 @@ mod tests {
             matches!(
                 refused,
                 AccountError::Oversell {
-                    available: 10_000_000,
-                    requested: 11_000_000
+                    available: 1_000_000_000,
+                    requested: 1_100_000_000
                 }
             ),
             "expected Oversell of the 10 held, got: {refused:?}"
@@ -4026,7 +4011,7 @@ mod draft_tests {
             Err(TransactionDraftError::Account(AccountError::Oversell {
                 available,
                 requested,
-            })) => assert_eq!((available, requested), (M + M / 2, 2 * M)),
+            })) => assert_eq!((available, requested), (150_000_000, 200_000_000)),
             other => panic!("expected an oversell, got {other:?}"),
         }
         assert_eq!(

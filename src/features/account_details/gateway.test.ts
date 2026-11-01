@@ -39,7 +39,7 @@ describe("accountDetailsGateway — openHolding", () => {
       account_id: "account-1",
       asset_id: "asset-1",
       date: "2024-01-15",
-      quantity: 5_000_000,
+      quantity: "5",
       total_cost: 500_000_000,
     };
     const mockTransaction: Transaction = {
@@ -48,7 +48,7 @@ describe("accountDetailsGateway — openHolding", () => {
       asset_id: "asset-1",
       transaction_type: "OpeningBalance",
       date: "2024-01-15",
-      quantity: 5_000_000,
+      quantity: "5",
       unit_price: 100_000_000,
       exchange_rate: 1_000_000,
       fees: 0,
@@ -56,6 +56,11 @@ describe("accountDetailsGateway — openHolding", () => {
       note: null,
       realized_pnl: null,
       created_at: "2024-01-15T10:00:00Z",
+      write_off_reason: null,
+      transfer_id: null,
+      added_deposit: false,
+      split_factor: null,
+      dividend_amount: null,
     };
     // bindings.ts wraps the TAURI_INVOKE result in { status: "ok", data: ... }
     mockInvoke.mockResolvedValue(mockTransaction);
@@ -72,7 +77,7 @@ describe("accountDetailsGateway — openHolding", () => {
       account_id: "no-such-account",
       asset_id: "asset-1",
       date: "2024-01-15",
-      quantity: 1_000_000,
+      quantity: "1",
       total_cost: 100_000_000,
     };
     const err: OpenHoldingError = {
@@ -94,7 +99,7 @@ describe("accountDetailsGateway — openHolding", () => {
       account_id: "account-1",
       asset_id: "no-such-asset",
       date: "2024-01-15",
-      quantity: 1_000_000,
+      quantity: "1",
       total_cost: 100_000_000,
     };
     const err: OpenHoldingError = { code: "AssetNotFound" };
@@ -112,7 +117,7 @@ describe("accountDetailsGateway — openHolding", () => {
       account_id: "account-1",
       asset_id: "archived-asset",
       date: "2024-01-15",
-      quantity: 1_000_000,
+      quantity: "1",
       total_cost: 100_000_000,
     };
     const err: OpenHoldingError = { code: "ArchivedAsset" };
@@ -129,7 +134,7 @@ describe("accountDetailsGateway — openHolding", () => {
       account_id: "account-1",
       asset_id: "system-cash-eur",
       date: "2024-01-15",
-      quantity: 1_000_000,
+      quantity: "1",
       total_cost: 100_000_000,
     };
     const err: OpenHoldingError = { code: "OpeningBalanceOnCashAsset" };
@@ -145,7 +150,7 @@ describe("accountDetailsGateway — openHolding", () => {
       account_id: "account-1",
       asset_id: "asset-1",
       date: "2024-01-15",
-      quantity: 1_000_000,
+      quantity: "1",
       total_cost: 100_000_000,
     };
     const err: OpenHoldingError = { code: "DatabaseError" };
@@ -162,7 +167,7 @@ describe("accountDetailsGateway — openHolding", () => {
       account_id: "account-1",
       asset_id: "asset-1",
       date: "2024-01-15",
-      quantity: 0,
+      quantity: "0",
       total_cost: 100_000_000,
     };
     const err: OpenHoldingError = { code: "QuantityNotPositive" };
@@ -179,7 +184,7 @@ describe("accountDetailsGateway — openHolding", () => {
       account_id: "account-1",
       asset_id: "asset-1",
       date: "2024-01-15",
-      quantity: 1_000_000,
+      quantity: "1",
       total_cost: -1,
     };
     const err: OpenHoldingError = { code: "InvalidTotalCost" };
@@ -196,7 +201,7 @@ describe("accountDetailsGateway — openHolding", () => {
       account_id: "account-1",
       asset_id: "asset-1",
       date: "2099-12-31",
-      quantity: 1_000_000,
+      quantity: "1",
       total_cost: 100_000_000,
     };
     const err: OpenHoldingError = { code: "DateInFuture" };
@@ -213,7 +218,7 @@ describe("accountDetailsGateway — openHolding", () => {
       account_id: "account-1",
       asset_id: "asset-1",
       date: "1899-12-31",
-      quantity: 1_000_000,
+      quantity: "1",
       total_cost: 100_000_000,
     };
     const err: OpenHoldingError = { code: "DateTooOld" };
@@ -230,7 +235,7 @@ describe("accountDetailsGateway — openHolding", () => {
       account_id: "account-1",
       asset_id: "asset-1",
       date: "not-a-date",
-      quantity: 1_000_000,
+      quantity: "1",
       total_cost: 100_000_000,
     };
     const err: OpenHoldingError = { code: "InvalidDate" };
@@ -260,7 +265,7 @@ describe("accountDetailsGateway — recordDeposit (CSH-022)", () => {
       asset_id: "system-cash-eur",
       transaction_type: "Deposit",
       date: "2025-06-15",
-      quantity: 250_000_000,
+      quantity: "250",
       unit_price: 1_000_000,
       exchange_rate: 1_000_000,
       fees: 0,
@@ -268,6 +273,11 @@ describe("accountDetailsGateway — recordDeposit (CSH-022)", () => {
       note: null,
       realized_pnl: null,
       created_at: "2025-06-15T10:00:00Z",
+      write_off_reason: null,
+      transfer_id: null,
+      added_deposit: false,
+      split_factor: null,
+      dividend_amount: null,
     };
     mockInvoke.mockResolvedValue(mockTransaction);
 
@@ -385,7 +395,7 @@ describe("accountDetailsGateway — recordWithdrawal (CSH-032)", () => {
       asset_id: "system-cash-eur",
       transaction_type: "Withdrawal",
       date: "2025-06-15",
-      quantity: 100_000_000,
+      quantity: "100",
       unit_price: 1_000_000,
       exchange_rate: 1_000_000,
       fees: 0,
@@ -393,6 +403,11 @@ describe("accountDetailsGateway — recordWithdrawal (CSH-032)", () => {
       note: null,
       realized_pnl: null,
       created_at: "2025-06-15T10:00:00Z",
+      write_off_reason: null,
+      transfer_id: null,
+      added_deposit: false,
+      split_factor: null,
+      dividend_amount: null,
     };
     mockInvoke.mockResolvedValue(mockTransaction);
 
@@ -473,8 +488,8 @@ describe("accountDetailsGateway — previewManagementFee (FEE-029)", () => {
 
   it("invokes preview_management_fee with positional args and returns the removal", async () => {
     const removal = {
-      held_quantity: 25_000_000,
-      removed_quantity: 500_000,
+      held_quantity: "25",
+      removed_quantity: "0.5",
       percent_micros: 2_000_000,
     };
     mockInvoke.mockResolvedValue(removal);
@@ -482,13 +497,13 @@ describe("accountDetailsGateway — previewManagementFee (FEE-029)", () => {
       "account-1",
       "asset-1",
       "2026-09-19",
-      24_500_000,
+      "24.5",
     );
     expect(mockInvoke).toHaveBeenCalledWith("preview_management_fee", {
       accountId: "account-1",
       assetId: "asset-1",
       date: "2026-09-19",
-      resultingQuantityMicros: 24_500_000,
+      resultingQuantity: "24.5",
     });
     expect(result).toEqual({ status: "ok", data: removal });
   });
@@ -496,17 +511,17 @@ describe("accountDetailsGateway — previewManagementFee (FEE-029)", () => {
   it("surfaces the typed rejection with the held quantity", async () => {
     mockInvoke.mockRejectedValue({
       code: "ResultingQuantityNotBelowHeld",
-      held_quantity: 25_000_000,
+      held_quantity: "25",
     });
     const result = await accountDetailsGateway.previewManagementFee(
       "account-1",
       "asset-1",
       "2026-09-19",
-      26_000_000,
+      "26",
     );
     expect(result).toEqual({
       status: "error",
-      error: { code: "ResultingQuantityNotBelowHeld", held_quantity: 25_000_000 },
+      error: { code: "ResultingQuantityNotBelowHeld", held_quantity: "25" },
     });
   });
 });
@@ -522,7 +537,7 @@ describe("accountDetailsGateway — recordFreeShares (FSD-022)", () => {
       account_id: "account-1",
       asset_id: "asset-equity-1",
       date: "2026-06-12",
-      quantity: 5_000_000,
+      quantity: "5",
       note: null,
     };
     const mockTransaction: Transaction = {
@@ -531,7 +546,7 @@ describe("accountDetailsGateway — recordFreeShares (FSD-022)", () => {
       asset_id: "asset-equity-1",
       transaction_type: "FreeShares",
       date: "2026-06-12",
-      quantity: 5_000_000,
+      quantity: "5",
       unit_price: 0,
       exchange_rate: 1_000_000,
       fees: 0,
@@ -539,6 +554,11 @@ describe("accountDetailsGateway — recordFreeShares (FSD-022)", () => {
       note: null,
       realized_pnl: null,
       created_at: "2026-06-12T10:00:00Z",
+      write_off_reason: null,
+      transfer_id: null,
+      added_deposit: false,
+      split_factor: null,
+      dividend_amount: null,
     };
     mockInvoke.mockResolvedValue(mockTransaction);
 
@@ -554,7 +574,7 @@ describe("accountDetailsGateway — recordFreeShares (FSD-022)", () => {
       account_id: "no-such",
       asset_id: "asset-equity-1",
       date: "2026-06-12",
-      quantity: 5_000_000,
+      quantity: "5",
       note: null,
     };
     const err = { code: "AccountNotFound", account_id: "no-such" };
@@ -572,7 +592,7 @@ describe("accountDetailsGateway — recordFreeShares (FSD-022)", () => {
       account_id: "account-1",
       asset_id: "no-such-asset",
       date: "2026-06-12",
-      quantity: 5_000_000,
+      quantity: "5",
       note: null,
     };
     const err = { code: "AssetNotFound" };
@@ -589,7 +609,7 @@ describe("accountDetailsGateway — recordFreeShares (FSD-022)", () => {
       account_id: "account-1",
       asset_id: "asset-not-held",
       date: "2026-06-12",
-      quantity: 5_000_000,
+      quantity: "5",
       note: null,
     };
     const err = { code: "AssetNotHeld" };
@@ -606,7 +626,7 @@ describe("accountDetailsGateway — recordFreeShares (FSD-022)", () => {
       account_id: "account-1",
       asset_id: "system-cash-eur",
       date: "2026-06-12",
-      quantity: 5_000_000,
+      quantity: "5",
       note: null,
     };
     const err = { code: "FreeSharesOnCashAsset" };
@@ -623,7 +643,7 @@ describe("accountDetailsGateway — recordFreeShares (FSD-022)", () => {
       account_id: "account-1",
       asset_id: "asset-equity-1",
       date: "2026-06-12",
-      quantity: 0,
+      quantity: "0",
       note: null,
     };
     const err = { code: "QuantityNotPositive" };
@@ -640,7 +660,7 @@ describe("accountDetailsGateway — recordFreeShares (FSD-022)", () => {
       account_id: "account-1",
       asset_id: "asset-equity-1",
       date: "not-a-date",
-      quantity: 5_000_000,
+      quantity: "5",
       note: null,
     };
     const err = { code: "InvalidDate" };
@@ -657,7 +677,7 @@ describe("accountDetailsGateway — recordFreeShares (FSD-022)", () => {
       account_id: "account-1",
       asset_id: "asset-equity-1",
       date: "2099-12-31",
-      quantity: 5_000_000,
+      quantity: "5",
       note: null,
     };
     const err = { code: "DateInFuture" };
@@ -674,7 +694,7 @@ describe("accountDetailsGateway — recordFreeShares (FSD-022)", () => {
       account_id: "account-1",
       asset_id: "asset-equity-1",
       date: "1899-12-31",
-      quantity: 5_000_000,
+      quantity: "5",
       note: null,
     };
     const err = { code: "DateTooOld" };
@@ -691,7 +711,7 @@ describe("accountDetailsGateway — recordFreeShares (FSD-022)", () => {
       account_id: "account-1",
       asset_id: "asset-equity-1",
       date: "2026-06-12",
-      quantity: 5_000_000,
+      quantity: "5",
       note: null,
     };
     const err = { code: "DatabaseError" };
@@ -724,7 +744,7 @@ describe("accountDetailsGateway — recordDividend (DIV-023)", () => {
       asset_id: "asset-equity-1",
       transaction_type: "Dividend",
       date: "2026-05-31",
-      quantity: 1_000_000,
+      quantity: "1",
       unit_price: 1_000_000,
       exchange_rate: 1_000_000,
       fees: 0,
@@ -732,6 +752,11 @@ describe("accountDetailsGateway — recordDividend (DIV-023)", () => {
       note: null,
       realized_pnl: null,
       created_at: "2026-05-31T10:00:00Z",
+      write_off_reason: null,
+      transfer_id: null,
+      added_deposit: false,
+      split_factor: null,
+      dividend_amount: null,
     };
     mockInvoke.mockResolvedValue(mockTransaction);
 
@@ -933,7 +958,7 @@ describe("accountDetailsGateway — validateTransactionDraft (TRX-062)", () => {
       account_id: "acc-1",
       asset_id: "ast-1",
       date: "2026-01-02",
-      quantity: 1_000_000,
+      quantity: "1",
       entered: {
         mode: "UnitPrice" as const,
         unit_price: 10_000_000,

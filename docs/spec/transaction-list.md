@@ -46,7 +46,7 @@ The feature lives in `features/transactions/` and reads the account context. It 
 
 **TXL-024 — Default sort order (frontend)**: Transactions are displayed with the most recent date first (descending). The user can toggle the sort direction by clicking the Date column header. The rows come in that order from the account journal of the account filtered to the asset (TXL-060); the page does not reorder them (F32).
 
-**TXL-025 — Financial value formatting (frontend)**: All financial fields (unit price, exchange rate, fees, total amount, quantity) are formatted as decimal strings with three decimal places, per TRX-024 (micro-unit → decimal conversion at the display boundary, ADR-001).
+**TXL-025 — Financial value formatting (frontend)**: All financial fields (unit price, exchange rate, fees, total amount) are formatted as decimal strings with three decimal places, per TRX-024 (micro-unit → decimal conversion at the display boundary, ADR-001); a quantity shows as TRX-024I says.
 
 **TXL-026 — Reactivity to transaction mutations (frontend)**: After any successful edit or delete operation within this view, the transaction list is re-fetched for the current `(accountId, assetId)` pair to reflect the updated state. The current sort direction is preserved across this re-fetch.
 

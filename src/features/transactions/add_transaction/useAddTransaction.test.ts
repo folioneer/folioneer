@@ -83,7 +83,7 @@ describe("useAddTransaction", () => {
     expect(mockValidateDraft).toHaveBeenLastCalledWith(
       expect.objectContaining({
         kind: "Purchase",
-        quantity: 2_000_000,
+        quantity: "2",
         entered: { mode: "UnitPrice", unit_price: 100_000_000, exchange_rate: 1_000_000, fees: 0 },
         correcting: null,
       }),

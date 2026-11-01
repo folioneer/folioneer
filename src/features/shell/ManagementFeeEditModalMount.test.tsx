@@ -47,7 +47,7 @@ const managementFeeTx = {
   asset_id: "asset-equity-1",
   transaction_type: "ManagementFee",
   date: "2024-06-15",
-  quantity: 1_000_000,
+  quantity: "1",
   note: null,
 };
 
@@ -94,7 +94,7 @@ describe("ManagementFeeEditModalMount (FEE-063)", () => {
     });
     mockGetTransactions.mockResolvedValue({
       status: "ok",
-      data: [{ ...managementFeeTx, quantity: 1_123_456 }],
+      data: [{ ...managementFeeTx, quantity: "1.123456" }],
     });
 
     render(<ManagementFeeEditModalMount />);

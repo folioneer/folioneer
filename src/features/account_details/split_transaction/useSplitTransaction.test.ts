@@ -71,9 +71,9 @@ const answer = (overrides: Record<string, unknown> = {}) => ({
   data: {
     factor: 2_000_000,
     position: {
-      old_quantity: 10_000_000,
+      old_quantity: "10",
       old_average_price: 150_000_000,
-      new_quantity: 20_000_000,
+      new_quantity: "20",
       new_average_price: 75_000_000,
     },
     price_after_split: 75_000_000,
@@ -127,9 +127,9 @@ describe("useSplitTransaction — create mode (SPL-061/062/040)", () => {
       answer({
         factor: 1_500_000,
         position: {
-          old_quantity: 7_000_000,
+          old_quantity: "7",
           old_average_price: 33_476_190,
-          new_quantity: 10_500_000,
+          new_quantity: "10.5",
           new_average_price: 22_317_460,
         },
         price_after_split: 66_666_667,
@@ -367,7 +367,7 @@ describe("useSplitTransaction — edit mode (SPL-030)", () => {
 
     expect(mockCorrectTransaction).toHaveBeenCalledWith("tx-split-1", "account-1", {
       date: "2024-06-15",
-      quantity: 3_000_000,
+      quantity: "3",
       unit_price: 0,
       exchange_rate: 1_000_000,
       fees: 0,

@@ -110,12 +110,15 @@ describe("useInterestTransaction (INT-020/021/025)", () => {
     expect(mockRecordInterest).not.toHaveBeenCalled();
   });
 
-  // INT-021 — zero quantity surfaces as an inline error on submit.
-  it("surfaces a zero-quantity error on submit instead of disabling the gate", async () => {
+  // INT-021, TRX-024J — a zero quantity, or one left at zero, surfaces as an inline error on submit.
+  it.each([
+    "0",
+    "0.000000001",
+  ])("surfaces an error on submit for %s, the gate open", async (typed) => {
     const { result } = renderHook(() => useInterestTransaction(BASE_PROPS));
     act(() => {
       result.current.handleChange("assetId", "asset-fund-1");
-      result.current.handleChange("quantity", "0");
+      result.current.handleChange("quantity", typed);
     });
     expect(result.current.isFormValid).toBe(true);
     await act(async () => {
@@ -153,8 +156,8 @@ describe("useInterestTransaction (INT-020/021/025)", () => {
     expect("fees" in result.current.formData).toBe(false);
   });
 
-  // INT-021/022 — percent mode submits percent_micros and a null quantity_micros
-  it("submits percent mode with percent in micro-percent and quantity_micros null", async () => {
+  // INT-021/022 — percent mode submits percent_micros and a null quantity
+  it("submits percent mode with percent in micro-percent and quantity null", async () => {
     mockRecordInterest.mockResolvedValue({ status: "ok", data: { id: "tx-int-1" } });
     const { result } = renderHook(() => useInterestTransaction(BASE_PROPS));
 
@@ -172,12 +175,12 @@ describe("useInterestTransaction (INT-020/021/025)", () => {
       asset_id: "asset-fund-1",
       date: TODAY,
       percent_micros: 2_500_000,
-      quantity_micros: null,
+      quantity: null,
       note: null,
     });
   });
 
-  // INT-021 — quantity mode submits quantity_micros and a null percent_micros
+  // INT-021 — quantity mode submits quantity and a null percent_micros
   it("submits quantity mode with quantity in micros and percent_micros null", async () => {
     mockRecordInterest.mockResolvedValue({ status: "ok", data: { id: "tx-int-1" } });
     const { result } = renderHook(() => useInterestTransaction(BASE_PROPS));
@@ -196,7 +199,7 @@ describe("useInterestTransaction (INT-020/021/025)", () => {
         account_id: "account-1",
         asset_id: "asset-fund-1",
         percent_micros: null,
-        quantity_micros: 5_500_000,
+        quantity: "5.5",
         note: null,
       }),
     );
@@ -370,7 +373,7 @@ describe("useInterestTransaction (INT-020/021/025)", () => {
     // the zero-cost convention on the money fields, and the original transaction id.
     expect(mockCorrectTransaction).toHaveBeenCalledWith("tx-int-existing", "account-1", {
       date: TODAY,
-      quantity: 3_000_000,
+      quantity: "3",
       unit_price: 0,
       exchange_rate: 1_000_000,
       fees: 0,

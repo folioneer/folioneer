@@ -47,7 +47,7 @@ const interestTx = {
   asset_id: "asset-fund-1",
   transaction_type: "Interest",
   date: "2024-06-15",
-  quantity: 5_000_000,
+  quantity: "5",
   note: null,
 };
 
@@ -94,7 +94,7 @@ describe("InterestEditModalMount (INT-040)", () => {
     });
     mockGetTransactions.mockResolvedValue({
       status: "ok",
-      data: [{ ...interestTx, quantity: 5_123_456 }],
+      data: [{ ...interestTx, quantity: "5.123456" }],
     });
 
     render(<InterestEditModalMount />);

@@ -2,7 +2,7 @@
 
 use serde_json::json;
 
-use crate::context::account::{Transaction, TransactionType};
+use crate::context::account::{Transaction, TransactionType, TransactionView};
 use crate::use_cases::holding_transaction::{decimal, figures_as_text, Refusal};
 
 use super::orchestrator::{verb, AssetRow, Listing, Outcome};
@@ -70,9 +70,9 @@ pub fn render(outcome: &Outcome, json: bool) -> Printed {
             true,
         ) => Printed {
             stdout: Some(if *zero_cost {
-                json!({ "status": "recorded", "transaction": figures_as_text(json!(transaction.as_shown())), "warning": "ZeroCostOpeningBalance" })
+                json!({ "status": "recorded", "transaction": figures_as_text(json!(TransactionView::from(&**transaction))), "warning": "ZeroCostOpeningBalance" })
             } else {
-                json!({ "status": "recorded", "transaction": figures_as_text(json!(transaction.as_shown())) })
+                json!({ "status": "recorded", "transaction": figures_as_text(json!(TransactionView::from(&**transaction))) })
             }
             .to_string()),
             stderr: None,
@@ -180,7 +180,7 @@ fn recorded_line(
         (kind, asset) => format!(
             "Recorded: {} {} {} in {account_name} on {date} — {total} {currency}",
             verb(kind),
-            decimal(transaction.shown_quantity()),
+            transaction.shown_quantity(),
             asset.unwrap_or_default(),
         ),
     }

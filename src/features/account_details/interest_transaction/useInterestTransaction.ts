@@ -2,7 +2,12 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { decimalToMicro } from "@/lib/microUnits";
+import {
+  decimalsOf,
+  decimalToMicro,
+  decimalToQuantity,
+  isPositiveQuantity,
+} from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -46,10 +51,21 @@ interface InterestFormData {
  * INT-021 — exactly one of percent / quantity must be filled; both or neither
  * fails, otherwise the filled field's own numeric validation applies.
  */
-function validateInterestAmount(percent: string, quantity: string): I18nMessage | null {
+function validateInterestAmount(
+  percent: string,
+  quantity: string,
+  assetId: string,
+): I18nMessage | null {
   const exactlyOne = (percent !== "") !== (quantity !== "");
   if (!exactlyOne) return { key: "error.InterestAmountInvalid" };
-  return percent !== "" ? validatePercentage(percent) : validateAmount(quantity);
+  if (percent !== "") return validatePercentage(percent);
+  // TRX-024J — a quantity what the form keeps leaves at zero is refused like a zero.
+  return (
+    validateAmount(quantity) ??
+    (isPositiveQuantity(decimalToQuantity(quantity, decimalsOf(assetId)))
+      ? null
+      : { key: "validation.amount_not_positive" })
+  );
 }
 
 export function useInterestTransaction({
@@ -97,7 +113,11 @@ export function useInterestTransaction({
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      const amountErr = validateInterestAmount(formData.percent, formData.quantity);
+      const amountErr = validateInterestAmount(
+        formData.percent,
+        formData.quantity,
+        formData.assetId,
+      );
       const dateErr = validateDate(formData.date);
       const validationError =
         formData.assetId === "" ? { key: "error.AssetNotHeld" } : (amountErr ?? dateErr);
@@ -117,7 +137,7 @@ export function useInterestTransaction({
             // are inert (unit_price 0, exchange_rate 1.0, fees 0).
             await accountDetailsGateway.correctTransaction(editMode.transactionId, accountId, {
               date: formData.date,
-              quantity: decimalToMicro(formData.quantity),
+              quantity: decimalToQuantity(formData.quantity, decimalsOf(formData.assetId)),
               unit_price: 0,
               exchange_rate: 1_000_000,
               fees: 0,
@@ -130,7 +150,10 @@ export function useInterestTransaction({
               asset_id: formData.assetId,
               date: formData.date,
               percent_micros: formData.percent !== "" ? decimalToMicro(formData.percent) : null,
-              quantity_micros: formData.quantity !== "" ? decimalToMicro(formData.quantity) : null,
+              quantity:
+                formData.quantity !== ""
+                  ? decimalToQuantity(formData.quantity, decimalsOf(formData.assetId))
+                  : null,
               note,
             });
 

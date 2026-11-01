@@ -6,7 +6,7 @@ import { formatHoldingInconsistency } from "./holdingInconsistency";
 // fields are formatted, not raw.
 describe("formatHoldingInconsistency", () => {
   it("maps Oversold with the formatted oversold quantity", () => {
-    const reason: HoldingInconsistency = { Oversold: { quantity: -5_000_000 } };
+    const reason: HoldingInconsistency = { Oversold: { quantity: "-5" } };
     expect(formatHoldingInconsistency(reason)).toEqual({
       key: "sync.inconsistency.oversold",
       vars: { quantity: "-5" },

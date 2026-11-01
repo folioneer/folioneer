@@ -11,7 +11,7 @@ export type ModalTarget = {
 export type SellTarget = ModalTarget & {
   /** The asset's reference, named by a refusal for lack of units (SEL-021). */
   assetReference: string;
-  holdingQuantityMicro: number;
+  holdingQuantity: string;
 };
 
 /** The holding a stock split rescales (SPL-061). */
@@ -51,8 +51,8 @@ export type WriteOffTarget = {
   assetId: string;
   assetName: string;
   assetReference: string;
-  /** Quantity held today, micro-units — the form's line and its pre-check (WOF-053). */
-  quantityMicro: number;
+  /** Quantity held today, decimal text — the form's line and its pre-check (WOF-053). */
+  heldQuantity: string;
   /** Average price in account currency, micro-units — the form's estimate (WOF-052). */
   averagePriceMicro: number;
 };

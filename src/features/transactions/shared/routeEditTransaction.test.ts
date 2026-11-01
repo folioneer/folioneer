@@ -14,7 +14,7 @@ const tx = (type: Transaction["transaction_type"]): Transaction =>
     asset_id: "asset-1",
     transaction_type: type,
     date: "2024-01-01",
-    quantity: 0,
+    quantity: "0",
     unit_price: 0,
     exchange_rate: 0,
     fees: 0,

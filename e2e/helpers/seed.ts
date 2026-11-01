@@ -172,7 +172,7 @@ export async function seedBuy(
             account_id: accId,
             asset_id: astId,
             date: d,
-            quantity: qty,
+            quantity: String(qty / 1_000_000),
             unit_price: 100_000_000,
             exchange_rate: 1_000_000,
             fees: 0,

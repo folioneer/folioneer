@@ -1,5 +1,5 @@
 import type { HoldingInconsistency } from "@/bindings";
-import { microToFormatted, microToFormattedQuantity } from "@/lib/microUnits";
+import { formatQuantity, microToFormatted } from "@/lib/microUnits";
 import type { I18nMessage } from "./i18n";
 
 /**
@@ -10,7 +10,7 @@ export function formatHoldingInconsistency(reason: HoldingInconsistency): I18nMe
   if ("Oversold" in reason) {
     return {
       key: "sync.inconsistency.oversold",
-      vars: { quantity: microToFormattedQuantity(reason.Oversold.quantity) },
+      vars: { quantity: formatQuantity(reason.Oversold.quantity) },
     };
   }
   return {

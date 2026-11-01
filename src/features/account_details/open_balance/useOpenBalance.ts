@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { OpeningBalanceDraft } from "@/bindings";
 import { transactionMutationErrorToI18n } from "@/features/transactions/shared/presenter";
 import { logger } from "@/lib/logger";
-import { decimalToMicro } from "@/lib/microUnits";
+import { decimalToMicro, decimalToQuantity } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import { todayIso } from "@/ui/format/date";
 import type { I18nMessage } from "@/ui/format/i18n";
@@ -49,7 +49,7 @@ export function useOpenBalance({ accountId, assetId, onSubmitSuccess }: UseOpenB
       account_id: formData.accountId,
       asset_id: formData.assetId,
       date: formData.date,
-      quantity: decimalToMicro(formData.quantity),
+      quantity: decimalToQuantity(formData.quantity),
       total_cost: formData.totalCost.trim() === "" ? null : decimalToMicro(formData.totalCost),
     }),
     [formData],

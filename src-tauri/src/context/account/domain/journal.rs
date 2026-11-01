@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::{Account, AgentRecording, Transaction, TransactionType};
+use super::{Account, AgentRecording, Transaction, TransactionType, TransactionView};
 
 /// The cash a transaction moves on the account's cash line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,7 +50,7 @@ pub struct JournalFilter {
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct JournalRow {
     /// The transaction.
-    pub transaction: Transaction,
+    pub transaction: TransactionView,
     /// Cash it took out (micro-units), or none.
     pub cash_out: Option<i64>,
     /// Cash it brought in (micro-units), or none.
@@ -112,7 +112,7 @@ impl AccountJournal {
                 CashEffect::None => (None, None),
             };
             rows.push(JournalRow {
-                transaction,
+                transaction: TransactionView::from(&transaction),
                 cash_out,
                 cash_in,
                 cash_balance: i64::try_from(balance).unwrap_or(if balance < 0 {

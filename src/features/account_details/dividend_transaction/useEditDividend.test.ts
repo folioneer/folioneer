@@ -57,7 +57,7 @@ describe("useEditDividend (DIV-040)", () => {
       account_id: "account-1",
       asset_id: "asset-1",
       date: "2026-09-15",
-      quantity: 18_600_000,
+      quantity: "18.6",
       entered: { mode: "UnitPrice", unit_price: 1_000_000, exchange_rate: 921_400, fees: 0 },
       correcting: "tx-div-1",
     });
@@ -78,7 +78,7 @@ describe("useEditDividend (DIV-040)", () => {
 
     expect(mockCorrectTransaction).toHaveBeenCalledWith("tx-div-1", "account-1", {
       date: "2026-09-15",
-      quantity: 20_000_000,
+      quantity: "20",
       unit_price: 1_000_000,
       exchange_rate: 921_400,
       fees: 0,
@@ -102,7 +102,7 @@ describe("useEditDividend (DIV-040)", () => {
 
     expect(mockCorrectTransaction).toHaveBeenCalledWith("tx-div-1", "account-1", {
       date: "2026-09-15",
-      quantity: 12_500_000,
+      quantity: "12.5",
       unit_price: 1_000_000,
       exchange_rate: 1_000_000,
       fees: 0,

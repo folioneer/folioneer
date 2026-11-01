@@ -23,7 +23,7 @@ Represents the current state of a financial position within the account. Persist
 | Field                | Business meaning                                                                                                                    |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `asset_id`           | The financial asset held.                                                                                                           |
-| `quantity`           | Current number of units held (i64, on the scale of TRX-024). Zero when the position is closed.                                      |
+| `quantity`           | Current number of units held (on the scale of TRX-024; decimal text in the view, TRX-024B). Zero when the position is closed.       |
 | `average_price`      | Volume-weighted average purchase price in account currency (i64 micros). Preserved at closure (TRX-040).                            |
 | `last_sold_date`     | ISO date of the most recent Sell transaction for this holding. NULL if no sell has ever occurred.                                   |
 | `total_realized_pnl` | Cumulative realized profit or loss across all Sell and write-off transactions for this holding (i64 micros, WOF-021). Zero if none. |
@@ -37,7 +37,7 @@ Read projection for **open** positions (`quantity > 0`). Enriched by `AccountDet
 | `asset_id`        | `Holding`                    | ID of the held asset.                                                                                                                         |
 | `asset_name`      | `AssetService`               | Display name of the asset.                                                                                                                    |
 | `asset_reference` | `AssetService`               | Ticker or user-defined reference.                                                                                                             |
-| `quantity`        | `Holding`                    | Current number of units held, read in micro-units (TRX-024B). Always > 0.                                                                     |
+| `quantity`        | `Holding`                    | Current number of units held, as decimal text (TRX-024B). Always > 0.                                                                         |
 | `average_price`   | `Holding`                    | VWAP purchase price in account currency (i64 micros).                                                                                         |
 | `cost_basis`      | computed                     | `quantity × average_price` (i128 intermediate, per ACD-023/ACD-024). Not stored in DB.                                                        |
 | `realized_pnl`    | `Holding.total_realized_pnl` | Cumulative realized P&L from partial sells and write-offs (i64 micros, WOF-021). Zero if none. See SEL-042.                                   |
@@ -97,7 +97,7 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 
 **ACD-022 — Asset metadata enrichment (backend)**: For each holding, the use case fetches the corresponding asset's name and reference (ticker) from `AssetService`. These fields populate `HoldingDetail.asset_name` and `HoldingDetail.asset_reference`.
 
-**ACD-023 — Cost basis calculation (backend)**: The cost basis for a holding is computed as `Holding.quantity × Holding.average_price`. This is the only financial computation performed by this feature.
+**ACD-023 — Cost basis calculation (backend)**: The cost basis for a holding is computed as `Holding.quantity` on its scale (TRX-024) × `Holding.average_price` in micro-units, the result brought back to micro-units (ACD-024). This is the only financial computation performed by this feature.
 
 **ACD-024 — Calculation precision (backend)**: Cost basis calculations use `i128` intermediates to prevent overflow before scaling back to `i64` micro-units, per ADR-001.
 
@@ -145,7 +145,7 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 
 **ACD-040 — Reactivity to asset updates (frontend)**: When an `AssetUpdated` event is received, the Account Details view re-fetches the full `AccountDetailsResponse` to reflect any changes to asset metadata (name or reference). The event is published by the `asset` context; ACD-040 only governs the frontend reaction.
 
-**ACD-041 — Precision handling (backend)**: All financial values in `HoldingDetail` and `AccountDetailsResponse` are serialised as `i64` micro-unit values per ADR-001. The frontend presenter is responsible for converting them to display-ready strings.
+**ACD-041 — Precision handling (backend)**: All financial values in `HoldingDetail` and `AccountDetailsResponse` are serialised as `i64` micro-unit values per ADR-001, except a quantity, which is decimal text (TRX-024B). The frontend presenter is responsible for converting them to display-ready strings.
 
 **ACD-042 — Holding row inspect action (frontend)**: Each holding row in the Account Details view exposes an inspect action (e.g. a magnifier icon). Clicking it navigates to the Transaction List view for that holding (`/accounts/:accountId/transactions/:assetId`), per TXL-010. Navigation goes through the router; the Account Details view does not import from the `transactions` feature.
 
