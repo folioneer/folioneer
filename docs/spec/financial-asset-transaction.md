@@ -70,7 +70,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-024A — What is given as a quantity (frontend + backend)**: The tools of the AI agent connection (AGT-070, AGT-072, AGT-081, AGT-083, AGT-087, AGT-088) and the window's journal (SPL-060, DIV-050) give a split's factor (SPL-010) and a dividend's net amount (DIV-023) as the transaction's quantity; the command line, which records no split, does so for a dividend (CLI-021). An answer that returns a whole transaction, a recording's or a correction's, also carries `split_factor` and `dividend_amount` as such.
 
-**TRX-024B — A surface exchanges a quantity in micro-units (frontend + backend)**: The window, the AI agent connection and the command line read and send a quantity of a non-cash asset in micro-units, converted at the backend's boundary, so that what they read stops at the sixth decimal.
+**TRX-024B — A surface reads a quantity to the sixth decimal (frontend + backend)**: The window reads and sends a quantity of a non-cash asset in micro-units, and the AI agent connection and the command line as decimal text (AGT-014, CLI-021), converted at the backend's boundary, so that what they read stops at the sixth decimal.
 
 **TRX-024C — The largest quantity (backend)**: A transaction's quantity cannot pass 1,000,000,000 units of a non-cash asset, or 100,000,000,000 units of a Cash Asset, the same limits every device reads (SYN-034); a dividend's amount meets the Cash Asset's limit when recorded, and what a device reads of it is SYN-034's limit on other figures; a holding of a non-cash asset cannot pass 92,233,720,368.54775807 units, what storage holds. A recording or a correction past either, its replay included, is refused with a specific error; a merged ledger past what storage holds stands at it (CFR-042).
 
@@ -247,4 +247,4 @@ _`transaction_type` is not shown in the form. It is hardcoded to `Purchase` unti
 
 ## Open Questions
 
-- [ ] TRX-024B: no surface can send the eight decimals storage now holds, nor sell a residue below one micro-unit. #385 and #579 move the surfaces to eight decimals.
+- [ ] TRX-024B: no surface can send the eight decimals storage now holds, nor sell a residue below one micro-unit. #579 moves the surfaces to eight decimals.

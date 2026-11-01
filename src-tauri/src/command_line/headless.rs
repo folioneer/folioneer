@@ -253,7 +253,7 @@ mod tests {
             serde_json::from_str(sold.stdout.as_deref().expect("json")).expect("valid json");
         assert_eq!(value["status"], "recorded");
         assert_eq!(value["transaction"]["transaction_type"], "Sell");
-        assert_eq!(value["transaction"]["total_amount"], 990 * M);
+        assert_eq!(value["transaction"]["total_amount"], "990");
     }
 
     // CLI-029 — a price is recorded as the owner's own, through the rules of a price: it
@@ -281,7 +281,7 @@ mod tests {
         let value: serde_json::Value =
             serde_json::from_str(again.stdout.as_deref().expect("json")).expect("valid json");
         assert_eq!(value["status"], "recorded");
-        assert_eq!(value["price"]["price"], 512_300_000);
+        assert_eq!(value["price"]["price"], "512.3");
         assert_eq!(value["price"]["source"], "Manual");
 
         for (line, code) in [
@@ -374,7 +374,7 @@ mod tests {
         let value: serde_json::Value =
             serde_json::from_str(json.stdout.as_deref().expect("json")).expect("valid json");
         assert_eq!(value["price"]["date"], "2025-12-30");
-        assert_eq!(value["price"]["price"], 4_500);
+        assert_eq!(value["price"]["price"], "0.0045");
         let database = Database::new(dir.clone()).await.expect("database");
         let container = AppContainer::for_headless_writes(database.pool);
         let cw8 = container

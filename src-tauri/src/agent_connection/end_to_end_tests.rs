@@ -298,14 +298,14 @@ async fn agt_040_the_read_tools_answer_from_the_running_application() {
     );
     let summary = result(&answered[3]);
     assert_eq!(summary["summaries"][0]["name"], "PEA");
-    assert_eq!(summary["summaries"][0]["total_global_value"], 5_000 * M);
+    assert_eq!(summary["summaries"][0]["total_global_value"], "5000");
     // MKT-206 — the judgement of an outdated price reaches the agent with the figures; the
     // seeded asset is custom, never outdated (MKT-205).
     assert_eq!(summary["summaries"][0]["outdated_price_count"], 0);
     assert_eq!(summary["total"]["outdated_price_count"], 0);
     let holdings = result(&answered[4]);
     assert_eq!(holdings["account_name"], "PEA");
-    assert_eq!(holdings["total_global_value"], 5_000 * M);
+    assert_eq!(holdings["total_global_value"], "5000");
     assert_eq!(holdings["outdated_price_count"], 0);
     assert!(holdings["holdings"]
         .as_array()
@@ -313,7 +313,7 @@ async fn agt_040_the_read_tools_answer_from_the_running_application() {
         .iter()
         .all(|holding| holding["price_outdated"] == false));
     let before_the_deposit = result(&answered[5]);
-    assert_eq!(before_the_deposit["total_global_value"], 0);
+    assert_eq!(before_the_deposit["total_global_value"], "0");
 }
 
 // AGT-044 / AGT-045 — the three recordings go through the window's rules, and each is
@@ -357,11 +357,11 @@ async fn agt_044_an_agent_records_through_the_rules_and_its_recordings_are_marke
     let opened = result(&answered[1]);
     assert_eq!(opened["status"], "recorded");
     assert_eq!(opened["transaction"]["transaction_type"], "OpeningBalance");
-    assert_eq!(opened["transaction"]["quantity"], 10 * M);
-    assert_eq!(opened["transaction"]["total_amount"], 4_000 * M);
+    assert_eq!(opened["transaction"]["quantity"], "10");
+    assert_eq!(opened["transaction"]["total_amount"], "4000");
     assert_eq!(opened["account"], "PEA");
     let bought = result(&answered[2]);
-    assert_eq!(bought["transaction"]["unit_price"], 100_500_000);
+    assert_eq!(bought["transaction"]["unit_price"], "100.5");
     assert_eq!(bought["transaction"]["note"], "from a statement");
     let sold = result(&answered[3]);
     assert_eq!(sold["transaction"]["transaction_type"], "Sell");
@@ -810,8 +810,8 @@ async fn agt_050_a_session_corrects_and_cancels_what_it_recorded() {
     .await
     .expect("corrected");
     assert_eq!(more["status"], "corrected");
-    assert_eq!(more["transaction"]["quantity"], 3 * M);
-    assert_eq!(more["transaction"]["total_amount"], 300 * M);
+    assert_eq!(more["transaction"]["quantity"], "3");
+    assert_eq!(more["transaction"]["total_amount"], "300");
     // A new date alone keeps everything else.
     let moved = call(
         "correct_recording",
@@ -820,8 +820,8 @@ async fn agt_050_a_session_corrects_and_cancels_what_it_recorded() {
     .await
     .expect("corrected");
     assert_eq!(moved["transaction"]["date"], "2026-02-03");
-    assert_eq!(moved["transaction"]["quantity"], 3 * M);
-    assert_eq!(moved["transaction"]["total_amount"], 300 * M);
+    assert_eq!(moved["transaction"]["quantity"], "3");
+    assert_eq!(moved["transaction"]["total_amount"], "300");
     assert_eq!(moved["transaction"]["note"], "the right day");
     // AGT-052 — the last recording is told as it stands after the correction.
     let told = bench.connections.sessions().remove(0);
@@ -834,8 +834,8 @@ async fn agt_050_a_session_corrects_and_cancels_what_it_recorded() {
     )
     .await
     .expect("corrected");
-    assert_eq!(priced["transaction"]["total_amount"], 330 * M);
-    assert_eq!(priced["transaction"]["unit_price"], 110 * M);
+    assert_eq!(priced["transaction"]["total_amount"], "330");
+    assert_eq!(priced["transaction"]["unit_price"], "110");
 
     for (arguments, code) in [
         (json!({ "transaction": id }), "MissingArgument"),
@@ -878,8 +878,8 @@ async fn agt_050_a_session_corrects_and_cancels_what_it_recorded() {
     )
     .await
     .expect("corrected");
-    assert_eq!(fewer["transaction"]["quantity"], 8 * M);
-    assert_eq!(fewer["transaction"]["total_amount"], 1000 * M);
+    assert_eq!(fewer["transaction"]["quantity"], "8");
+    assert_eq!(fewer["transaction"]["total_amount"], "1000");
     call("cancel_recording", json!({ "transaction": opening }))
         .await
         .expect("cancelled");
@@ -922,7 +922,7 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
     .expect("deposited");
     assert_eq!(deposit["status"], "recorded");
     assert_eq!(deposit["transaction"]["transaction_type"], "Deposit");
-    assert_eq!(deposit["transaction"]["total_amount"], 1_500_500_000_i64);
+    assert_eq!(deposit["transaction"]["total_amount"], "1500.5");
     assert_eq!(deposit["transaction"]["note"], "statement 2019");
     assert_eq!(deposit["account"], "PEA");
     assert_eq!(deposit["asset"], Value::Null);
@@ -965,7 +965,7 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
     .await
     .expect("paid");
     assert_eq!(dividend["transaction"]["transaction_type"], "Dividend");
-    assert_eq!(dividend["transaction"]["total_amount"], 5 * M);
+    assert_eq!(dividend["transaction"]["total_amount"], "5");
     assert_eq!(dividend["asset"], "CW8");
 
     // What is missing or misread is refused as for any recording (AGT-048).
@@ -1046,7 +1046,7 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
     .await
     .expect("corrected");
     assert_eq!(more["status"], "corrected");
-    assert_eq!(more["transaction"]["total_amount"], 1600 * M);
+    assert_eq!(more["transaction"]["total_amount"], "1600");
     assert_eq!(more["transaction"]["note"], "statement 2019");
     let paid_more = call(
         "correct_recording",
@@ -1054,7 +1054,7 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
     )
     .await
     .expect("corrected");
-    assert_eq!(paid_more["transaction"]["total_amount"], 6 * M);
+    assert_eq!(paid_more["transaction"]["total_amount"], "6");
     // DIV-040 — the rate changes what the amount comes to in the account's currency.
     let at_par = call(
         "correct_recording",
@@ -1062,7 +1062,7 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
     )
     .await
     .expect("corrected");
-    assert_eq!(at_par["transaction"]["total_amount"], 12 * M);
+    assert_eq!(at_par["transaction"]["total_amount"], "12");
     for (recorded, arguments, code) in [
         (&withdrawal, json!({ "amount": 2000 }), "InsufficientCash"),
         (&withdrawal, json!({ "quantity": 1 }), "InvalidArguments"),
@@ -1138,7 +1138,7 @@ async fn agt_062_a_session_records_a_price() {
     .await
     .expect("recorded");
     assert_eq!(recorded["status"], "recorded");
-    assert_eq!(recorded["price"]["price"], 512_300_000);
+    assert_eq!(recorded["price"]["price"], "512.3");
     assert_eq!(recorded["price"]["source"], "Agent");
     assert_eq!(recorded["price"]["date"], "2019-12-31");
     assert_eq!(recorded["asset"], "CW8");
@@ -1529,8 +1529,8 @@ async fn agt_065_a_session_records_a_write_off() {
     .expect("previewed");
     assert_eq!(previewed["status"], "previewed");
     assert_eq!(previewed["transaction"]["transaction_type"], "WriteOff");
-    assert_eq!(previewed["after"]["holdings"][0]["quantity"], 9_500_000_i64);
-    assert_eq!(previewed["after"]["holdings"][0]["average_price"], 100 * M);
+    assert_eq!(previewed["after"]["holdings"][0]["quantity"], "9.5");
+    assert_eq!(previewed["after"]["holdings"][0]["average_price"], "100");
     assert_eq!(previewed["after"]["cash"], previewed["before"]["cash"]);
 
     let written_off = call(
@@ -1541,10 +1541,10 @@ async fn agt_065_a_session_records_a_write_off() {
     .expect("written off");
     assert_eq!(written_off["status"], "recorded");
     assert_eq!(written_off["transaction"]["transaction_type"], "WriteOff");
-    assert_eq!(written_off["transaction"]["quantity"], 500_000_i64);
-    assert_eq!(written_off["transaction"]["total_amount"], 0);
+    assert_eq!(written_off["transaction"]["quantity"], "0.5");
+    assert_eq!(written_off["transaction"]["total_amount"], "0");
     assert_eq!(written_off["transaction"]["write_off_reason"], "NetworkFee");
-    assert_eq!(written_off["transaction"]["realized_pnl"], -50 * M);
+    assert_eq!(written_off["transaction"]["realized_pnl"], "-50");
     assert_eq!(written_off["transaction"]["note"], "transfer fee");
     assert_eq!(written_off["account"], "PEA");
     assert_eq!(written_off["asset"], "CW8");
@@ -1626,7 +1626,7 @@ async fn agt_065_a_session_records_a_write_off() {
     .await
     .expect("corrected");
     assert_eq!(corrected["status"], "corrected");
-    assert_eq!(corrected["transaction"]["quantity"], M);
+    assert_eq!(corrected["transaction"]["quantity"], "1");
     assert_eq!(corrected["transaction"]["write_off_reason"], "Dust");
     assert_eq!(corrected["transaction"]["note"], "transfer fee");
     let kept = call(
@@ -1644,7 +1644,7 @@ async fn agt_065_a_session_records_a_write_off() {
     .await
     .expect("previewed");
     assert_eq!(previewed_reason["transaction"]["write_off_reason"], "Lost");
-    assert_eq!(previewed_reason["after"]["holdings"][0]["quantity"], 9 * M);
+    assert_eq!(previewed_reason["after"]["holdings"][0]["quantity"], "9");
     let stored = bench
         .accounts
         .get_transaction_by_id(&recorded_id(&written_off))
@@ -1820,8 +1820,8 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
     .expect("credited");
     assert_eq!(by_percent["status"], "recorded");
     assert_eq!(by_percent["transaction"]["transaction_type"], "Interest");
-    assert_eq!(by_percent["transaction"]["quantity"], 250_000_i64);
-    assert_eq!(by_percent["transaction"]["total_amount"], 0);
+    assert_eq!(by_percent["transaction"]["quantity"], "0.25");
+    assert_eq!(by_percent["transaction"]["total_amount"], "0");
     assert_eq!(by_percent["asset"], "FEUR");
     call(
         "record_interest",
@@ -1836,7 +1836,7 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
     )
     .await
     .expect("credited");
-    assert_eq!(on_cash["transaction"]["quantity"], 12_500_000_i64);
+    assert_eq!(on_cash["transaction"]["quantity"], "12.5");
     assert_eq!(on_cash["asset"], Value::Null);
     assert_eq!(on_cash["transaction"]["asset_id"], "system-cash-eur");
 
@@ -1926,7 +1926,7 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
         .expect("charged");
     assert_eq!(charged["status"], "recorded");
     assert_eq!(charged["transaction"]["transaction_type"], "ManagementFee");
-    assert_eq!(charged["transaction"]["quantity"], 112_500_i64);
+    assert_eq!(charged["transaction"]["quantity"], "0.1125");
     call(
         "record_management_fee",
         json!({ "account": "PEA", "asset": "FEUR", "resulting_quantity": 11, "date": "2026-03-25" }),
@@ -2061,7 +2061,7 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
     .await
     .expect("corrected");
     assert_eq!(less["status"], "corrected");
-    assert_eq!(less["transaction"]["quantity"], 500_000_i64);
+    assert_eq!(less["transaction"]["quantity"], "0.5");
     assert_eq!(less["transaction"]["note"], "2025 statement");
     let fee_corrected = call(
         "correct_recording",
@@ -2069,7 +2069,7 @@ async fn agt_066_a_session_records_interest_and_a_management_fee() {
     )
     .await
     .expect("corrected");
-    assert_eq!(fee_corrected["transaction"]["quantity"], 200_000_i64);
+    assert_eq!(fee_corrected["transaction"]["quantity"], "0.2");
     assert_eq!(fee_corrected["transaction"]["note"], "again");
     // AGT-073 — their correction is previewed, nothing written.
     for (recorded, quantity) in [(&by_percent, "0.4"), (&charged, "0.3")] {
@@ -2186,8 +2186,8 @@ async fn agt_063_a_session_records_a_split_and_free_shares() {
     .expect("split");
     assert_eq!(split["status"], "recorded");
     assert_eq!(split["transaction"]["transaction_type"], "Split");
-    assert_eq!(split["transaction"]["quantity"], 2 * M);
-    assert_eq!(split["transaction"]["total_amount"], 0);
+    assert_eq!(split["transaction"]["quantity"], "2");
+    assert_eq!(split["transaction"]["total_amount"], "0");
     assert_eq!(split["transaction"]["note"], "statement 2019");
     assert_eq!(split["account"], "PEA");
     assert_eq!(split["asset"], "CW8");
@@ -2206,8 +2206,8 @@ async fn agt_063_a_session_records_a_split_and_free_shares() {
     .await
     .expect("free shares");
     assert_eq!(free_shares["transaction"]["transaction_type"], "FreeShares");
-    assert_eq!(free_shares["transaction"]["quantity"], 1_500_000_i64);
-    assert_eq!(free_shares["transaction"]["total_amount"], 0);
+    assert_eq!(free_shares["transaction"]["quantity"], "1.5");
+    assert_eq!(free_shares["transaction"]["total_amount"], "0");
     assert_eq!(free_shares["asset"], "CW8");
 
     // What is missing or misread is refused as for any recording (AGT-048); the rest is
@@ -2329,7 +2329,7 @@ async fn agt_063_a_session_records_a_split_and_free_shares() {
     .await
     .expect("corrected");
     assert_eq!(three_for_one["status"], "corrected");
-    assert_eq!(three_for_one["transaction"]["quantity"], 3 * M);
+    assert_eq!(three_for_one["transaction"]["quantity"], "3");
     assert_eq!(three_for_one["transaction"]["note"], "statement 2019");
     let two = call(
         "correct_recording",
@@ -2337,7 +2337,7 @@ async fn agt_063_a_session_records_a_split_and_free_shares() {
     )
     .await
     .expect("corrected");
-    assert_eq!(two["transaction"]["quantity"], 2 * M);
+    assert_eq!(two["transaction"]["quantity"], "2");
     for (recorded, arguments, code) in [
         (&split, json!({ "new": 4 }), "InvalidArguments"),
         (&split, json!({ "quantity": 4 }), "InvalidArguments"),
@@ -2917,11 +2917,11 @@ async fn agt_070_a_session_lists_the_transactions_of_an_account() {
     let bought = &rows[1];
     assert_eq!(bought["id"], purchase["transaction"]["id"]);
     assert_eq!(bought["asset"], "CW8");
-    assert_eq!(bought["quantity"], 10 * M);
-    assert_eq!(bought["unit_price"], 100 * M);
-    assert_eq!(bought["total_amount"], 1_000 * M);
-    assert_eq!(bought["fees"], 0);
-    assert_eq!(bought["exchange_rate"], M);
+    assert_eq!(bought["quantity"], "10");
+    assert_eq!(bought["unit_price"], "100");
+    assert_eq!(bought["total_amount"], "1000");
+    assert_eq!(bought["fees"], "0");
+    assert_eq!(bought["exchange_rate"], "1");
     assert_eq!(bought["note"], "statement 2019");
     assert_eq!(bought["recorded_by"]["agent"], "claude-code");
     assert_eq!(rows[0]["asset"], Value::Null);
@@ -3181,11 +3181,11 @@ async fn agt_071_a_session_reads_the_price_of_an_asset_at_a_date() {
     .expect("recorded by the agent");
 
     for (asked, found) in [
-        (Some("2019-12-31"), Some(("2019-12-31", 500 * M, "Manual"))),
-        (Some("2020-03-15"), Some(("2019-12-31", 500 * M, "Manual"))),
-        (Some("2020-06-30"), Some(("2020-06-30", 600 * M, "Agent"))),
-        (Some("2020-12-31"), Some(("2020-06-30", 600 * M, "Agent"))),
-        (None, Some(("2020-06-30", 600 * M, "Agent"))),
+        (Some("2019-12-31"), Some(("2019-12-31", "500", "Manual"))),
+        (Some("2020-03-15"), Some(("2019-12-31", "500", "Manual"))),
+        (Some("2020-06-30"), Some(("2020-06-30", "600", "Agent"))),
+        (Some("2020-12-31"), Some(("2020-06-30", "600", "Agent"))),
+        (None, Some(("2020-06-30", "600", "Agent"))),
         (Some("2019-12-30"), None),
     ] {
         let arguments = match asked {
@@ -3329,7 +3329,7 @@ async fn agt_075_an_agent_lists_an_assets_prices_over_a_period() {
     assert_eq!(page.len(), PRICES_PER_PAGE);
     assert_eq!(
         page[0],
-        json!({ "date": "2020-01-01", "price": M, "source": "Manual" })
+        json!({ "date": "2020-01-01", "price": "1", "source": "Manual" })
     );
     assert!(page
         .windows(2)
@@ -3339,7 +3339,7 @@ async fn agt_075_an_agent_lists_an_assets_prices_over_a_period() {
         .expect("answered");
     assert_eq!(
         second["prices"],
-        json!([{ "date": last_day, "price": 900 * M, "source": "Agent" }])
+        json!([{ "date": last_day, "price": "900", "source": "Agent" }])
     );
     let past = call("list_prices", json!({ "asset": "CW8", "page": 3 }))
         .await
@@ -3865,7 +3865,7 @@ async fn agt_070_the_edges_of_a_listing() {
         .map(|row| row["transaction_type"].as_str().expect("a kind"))
         .collect();
     assert_eq!(kinds, ["Deposit", "Purchase", "Split"]);
-    assert_eq!(rows[2]["quantity"], 3 * M);
+    assert_eq!(rows[2]["quantity"], "3");
     assert_eq!(
         rows[0]["recorded_by"]["session_started_at"],
         json!(granted.started_at)
@@ -3945,7 +3945,7 @@ async fn agt_071_the_edges_of_a_price_read() {
     );
     assert_eq!(
         read["price"],
-        json!({ "date": "2020-01-02", "price": 300 * M, "source": "YahooFinance" })
+        json!({ "date": "2020-01-02", "price": "300", "source": "YahooFinance" })
     );
 
     call("add_asset", paris_listing()).await.expect("added");
@@ -4194,7 +4194,7 @@ async fn agt_063_the_edges_of_a_split_and_free_shares() {
     )
     .await
     .expect("split");
-    assert_eq!(split["transaction"]["quantity"], 2 * M);
+    assert_eq!(split["transaction"]["quantity"], "2");
     for asset in bench.assets.get_non_cash_assets().await.expect("assets") {
         assert!(bench
             .assets
@@ -5508,17 +5508,17 @@ async fn agt_072_a_preview_changes_nothing_and_shows_the_account_before_and_afte
     .expect("previewed");
     assert_eq!(bought["status"], "previewed");
     assert_eq!(bought["transaction"]["transaction_type"], "Purchase");
-    assert_eq!(bought["transaction"]["total_amount"], 200 * M);
+    assert_eq!(bought["transaction"]["total_amount"], "200");
     assert_eq!(bought["transaction"]["id"], Value::Null);
     assert_eq!(bought["account"], "PEA");
     assert_eq!(bought["currency"], "EUR");
     assert_eq!(bought["date"], "2026-02-01");
-    assert_eq!(bought["before"]["cash"], 5_000 * M);
+    assert_eq!(bought["before"]["cash"], "5000");
     assert_eq!(bought["before"]["holdings"], json!([]));
-    assert_eq!(bought["after"]["cash"], 4_800 * M);
+    assert_eq!(bought["after"]["cash"], "4800");
     assert_eq!(
         bought["after"]["holdings"],
-        json!([{ "asset": "CW8", "name": "Amundi MSCI World", "quantity": 2 * M, "average_price": 100 * M }])
+        json!([{ "asset": "CW8", "name": "Amundi MSCI World", "quantity": "2", "average_price": "100" }])
     );
 
     let opened = preview(
@@ -5530,7 +5530,7 @@ async fn agt_072_a_preview_changes_nothing_and_shows_the_account_before_and_afte
     assert_eq!(opened["transaction"]["transaction_type"], "OpeningBalance");
     assert_eq!(
         opened["after"]["holdings"],
-        json!([{ "asset": "CW8", "name": "Amundi MSCI World", "quantity": 10 * M, "average_price": 400 * M }])
+        json!([{ "asset": "CW8", "name": "Amundi MSCI World", "quantity": "10", "average_price": "400" }])
     );
     assert_eq!(written_rows(&bench).await, written, "nothing was written");
 
@@ -5561,9 +5561,9 @@ async fn agt_072_a_preview_changes_nothing_and_shows_the_account_before_and_afte
     )
     .await
     .expect("previewed");
-    assert_eq!(sold["before"]["holdings"][0]["quantity"], 4 * M);
-    assert_eq!(sold["after"]["holdings"][0]["quantity"], 3 * M);
-    assert_eq!(sold["after"]["cash"], 4_750 * M);
+    assert_eq!(sold["before"]["holdings"][0]["quantity"], "4");
+    assert_eq!(sold["after"]["holdings"][0]["quantity"], "3");
+    assert_eq!(sold["after"]["cash"], "4750");
     let split = preview(
         "record_split",
         json!({ "account": "PEA", "asset": "CW8", "new": 2, "old": 1, "date": "2026-03-01" }),
@@ -5571,7 +5571,7 @@ async fn agt_072_a_preview_changes_nothing_and_shows_the_account_before_and_afte
     .await
     .expect("previewed");
     assert_eq!(split["transaction"]["transaction_type"], "Split");
-    assert_eq!(split["after"]["holdings"][0]["quantity"], 8 * M);
+    assert_eq!(split["after"]["holdings"][0]["quantity"], "8");
     assert_eq!(written_rows(&bench).await, written, "nothing was written");
 }
 
@@ -5617,8 +5617,8 @@ async fn agt_072_the_cash_of_an_account_built_from_opening_balances_is_previewed
         .await
         .expect("previewed");
 
-    assert_eq!(sold["before"]["cash"], 0);
-    assert_eq!(sold["after"]["cash"], 150 * M);
+    assert_eq!(sold["before"]["cash"], "0");
+    assert_eq!(sold["after"]["cash"], "150");
     assert_eq!(sold["after"]["holdings"], json!([]));
 }
 
@@ -5797,15 +5797,15 @@ async fn agt_072_cash_a_dividend_and_free_shares_are_previewed() {
     )
     .await;
     assert_eq!(deposit["transaction"]["transaction_type"], "Deposit");
-    assert_eq!(deposit["before"]["cash"], 4_600 * M);
-    assert_eq!(deposit["after"]["cash"], 4_700 * M);
+    assert_eq!(deposit["before"]["cash"], "4600");
+    assert_eq!(deposit["after"]["cash"], "4700");
 
     let withdrawal = preview(
         "record_withdrawal",
         json!({ "account": "PEA", "amount": 600, "date": "2026-03-01" }),
     )
     .await;
-    assert_eq!(withdrawal["after"]["cash"], 4_000 * M);
+    assert_eq!(withdrawal["after"]["cash"], "4000");
 
     let dividend = preview(
         "record_dividend",
@@ -5813,8 +5813,8 @@ async fn agt_072_cash_a_dividend_and_free_shares_are_previewed() {
     )
     .await;
     assert_eq!(dividend["transaction"]["transaction_type"], "Dividend");
-    assert_eq!(dividend["after"]["cash"], 4_612 * M);
-    assert_eq!(dividend["after"]["holdings"][0]["quantity"], 4 * M);
+    assert_eq!(dividend["after"]["cash"], "4612");
+    assert_eq!(dividend["after"]["holdings"][0]["quantity"], "4");
 
     let free_shares = preview(
         "record_free_shares",
@@ -5822,7 +5822,7 @@ async fn agt_072_cash_a_dividend_and_free_shares_are_previewed() {
     )
     .await;
     assert_eq!(free_shares["transaction"]["transaction_type"], "FreeShares");
-    assert_eq!(free_shares["after"]["holdings"][0]["quantity"], 5 * M);
+    assert_eq!(free_shares["after"]["holdings"][0]["quantity"], "5");
     assert_eq!(written_rows(&bench).await, written, "nothing was written");
 }
 
@@ -5849,7 +5849,7 @@ async fn agt_072_a_price_is_previewed_with_the_price_it_would_replace() {
 
     let first = preview("2026-03-02").await;
     assert_eq!(first["status"], "previewed");
-    assert_eq!(first["price"]["price"], 512_500_000);
+    assert_eq!(first["price"]["price"], "512.5");
     assert_eq!(first["asset"], "CW8");
     assert_eq!(first["replaces"], Value::Null);
 
@@ -5879,7 +5879,7 @@ async fn agt_072_a_price_is_previewed_with_the_price_it_would_replace() {
         .expect("prices")
         .len();
     let second = preview("2026-03-02").await;
-    assert_eq!(second["replaces"]["price"], 500 * M);
+    assert_eq!(second["replaces"]["price"], "500");
     let after = bench
         .assets
         .get_asset_prices(
@@ -5929,10 +5929,10 @@ async fn agt_072_a_correction_is_previewed() {
         .await
         .expect("previewed");
     assert_eq!(corrected["transaction"]["id"], json!(bought));
-    assert_eq!(corrected["transaction"]["quantity"], 3 * M);
-    assert_eq!(corrected["before"]["holdings"][0]["quantity"], 2 * M);
-    assert_eq!(corrected["after"]["holdings"][0]["quantity"], 3 * M);
-    assert_eq!(corrected["after"]["cash"], 4_700 * M);
+    assert_eq!(corrected["transaction"]["quantity"], "3");
+    assert_eq!(corrected["before"]["holdings"][0]["quantity"], "2");
+    assert_eq!(corrected["after"]["holdings"][0]["quantity"], "3");
+    assert_eq!(corrected["after"]["cash"], "4700");
     assert_eq!(written_rows(&bench).await, written, "nothing was written");
 }
 
@@ -6094,20 +6094,17 @@ async fn agt_065a_a_session_records_a_transfer() {
         .collect();
     assert_eq!(kinds, ["WriteOff", "TransferOut", "TransferIn"]);
     assert_eq!(previewed["from"]["account"], "PEA");
-    assert_eq!(previewed["from"]["after"]["holdings"][0]["quantity"], 6 * M);
+    assert_eq!(previewed["from"]["after"]["holdings"][0]["quantity"], "6");
     assert_eq!(
         previewed["from"]["after"]["cash"],
         previewed["from"]["before"]["cash"]
     );
     assert_eq!(previewed["to"]["account"], "Wallet");
     assert_eq!(previewed["to"]["before"]["holdings"], json!([]));
-    assert_eq!(
-        previewed["to"]["after"]["holdings"][0]["quantity"],
-        3_500_000_i64
-    );
+    assert_eq!(previewed["to"]["after"]["holdings"][0]["quantity"], "3.5");
     assert_eq!(
         previewed["to"]["after"]["holdings"][0]["average_price"],
-        100 * M
+        "100"
     );
     assert_eq!(
         bench.connections.sessions()[0].recordings,
@@ -6242,7 +6239,7 @@ async fn agt_065a_a_session_records_a_transfer() {
     .await
     .expect("recorded");
     assert_eq!(converted["to_currency"], "USD");
-    assert_eq!(converted["transactions"][1]["exchange_rate"], 1_100_000);
+    assert_eq!(converted["transactions"][1]["exchange_rate"], "1.1");
 }
 
 // AGT-047 / AGT-065A — every part of a transfer takes a place of the session's limit, checked
@@ -6633,7 +6630,7 @@ async fn replaced_stands_as_recorded(received: i64) {
         .expect("replaced");
     let answered = asking.await.expect("asked").expect("replaced");
     assert_eq!(answered["status"], "replaced");
-    assert_eq!(answered["transfer"]["quantity_sent"], 4 * M);
+    assert_eq!(answered["transfer"]["quantity_sent"], "4");
     assert!(
         bench.connections.replacements().is_empty(),
         "the request is gone"
@@ -7026,7 +7023,7 @@ async fn agt_093_a_session_replaces_four_agent_recordings_with_a_transfer_withou
     assert_eq!(answer["status"], "replaced");
     assert_eq!(answer["transfer"]["from_account_id"], json!(a1));
     assert_eq!(answer["transfer"]["to_account_id"], json!(a2));
-    assert_eq!(answer["transfer"]["quantity_sent"], 4 * M);
+    assert_eq!(answer["transfer"]["quantity_sent"], "4");
     assert!(bench.connections.replacements().is_empty(), "nobody asked");
     let told = bench
         .connections
@@ -7226,5 +7223,110 @@ async fn agt_093_a_replacement_is_not_previewed_and_a_request_points_to_the_tool
     assert_eq!(refused.code, "NotTypedByOwner");
     for tool in ["cancel_recording", "correct_recording"] {
         assert!(refused.message.contains(tool), "{}", refused.message);
+    }
+}
+
+/// AGT-014 — fails on a number that is not on the list of what counts things.
+fn assert_no_figure_is_a_number(value: &Value, tool: &str) {
+    match value {
+        Value::Array(items) => items
+            .iter()
+            .for_each(|item| assert_no_figure_is_a_number(item, tool)),
+        Value::Object(fields) => {
+            for (name, field) in fields {
+                assert!(
+                    !field.is_number()
+                        || crate::use_cases::holding_transaction::WHOLE_NUMBERS
+                            .contains(&name.as_str()),
+                    "{tool} answers {name} as a number: {field}"
+                );
+                assert_no_figure_is_a_number(field, tool);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[tokio::test]
+async fn agt_014_an_agent_records_back_what_it_read_unchanged() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+    call(
+        "record_deposit",
+        json!({ "account": "PEA", "amount": 2000, "date": "2019-01-15" }),
+    )
+    .await
+    .expect("deposited");
+    call(
+        "record_purchase",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": "12.5", "price": "100.25", "date": "2019-03-01" }),
+    )
+    .await
+    .expect("bought");
+
+    let details = call("list_holdings", json!({ "account": "PEA" }))
+        .await
+        .expect("listed");
+    let held = details["holdings"]
+        .as_array()
+        .expect("holdings")
+        .iter()
+        .find(|holding| holding["asset_reference"] == "CW8")
+        .expect("CW8 held")
+        .clone();
+    assert_eq!(held["quantity"], "12.5");
+    assert_eq!(held["average_price"], "100.25");
+
+    let sold = call(
+        "record_sale",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": held["quantity"],
+            "price": held["average_price"], "date": "2019-04-01" }),
+    )
+    .await
+    .expect("what was read is recorded back");
+    assert_eq!(sold["transaction"]["quantity"], "12.5");
+    assert_eq!(sold["transaction"]["unit_price"], "100.25");
+}
+
+#[tokio::test]
+async fn agt_014_no_answer_carries_a_figure_as_a_number() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let sale = json!({ "account": "PEA", "asset": "CW8", "quantity": "1", "price": "110", "date": "2019-04-01" });
+    let purchase = json!({ "account": "PEA", "asset": "CW8", "quantity": "4", "price": "100.5", "date": "2019-03-01" });
+
+    for (tool, arguments) in [
+        (
+            "record_deposit",
+            json!({ "account": "PEA", "amount": 2000, "date": "2019-01-15" }),
+        ),
+        ("record_purchase", purchase),
+        (
+            "preview_recording",
+            json!({ "tool": "record_sale", "arguments": sale }),
+        ),
+        ("record_sale", sale),
+        (
+            "record_price",
+            json!({ "asset": "CW8", "price": "120.5", "date": "2019-05-01" }),
+        ),
+        ("portfolio_summary", json!({})),
+        ("list_holdings", json!({ "account": "PEA" })),
+        ("list_transactions", json!({ "account": "PEA" })),
+        ("get_price", json!({ "asset": "CW8", "date": "2019-05-01" })),
+        ("list_prices", json!({ "asset": "CW8" })),
+    ] {
+        let answer = bench
+            .tools
+            .call(&granted, tool, &arguments)
+            .await
+            .unwrap_or_else(|refusal| panic!("{tool} refused: {}", refusal.message));
+        assert_no_figure_is_a_number(&answer, tool);
     }
 }
