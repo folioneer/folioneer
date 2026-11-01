@@ -1,6 +1,6 @@
 use crate::context::account::error::AccountError;
 use crate::core::cash::is_cash_asset;
-use crate::core::quantity::{from_surface, to_surface, QUANTITY_UNIT};
+use crate::shared::domain::quantity::{from_surface, to_surface, QUANTITY_UNIT};
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDate;
@@ -979,7 +979,7 @@ impl Transaction {
         if quantity <= 0 {
             return Err(AccountError::QuantityNotPositive);
         }
-        if quantity > crate::core::quantity::LARGEST_QUANTITY {
+        if quantity > crate::shared::domain::quantity::LARGEST_QUANTITY {
             return Err(AccountError::QuantityOutOfRange);
         }
         Ok(())
@@ -1097,7 +1097,6 @@ pub enum EnteredAmount {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::quantity::from_surface;
 
     fn make_transaction(
         quantity: i64,
@@ -1534,7 +1533,10 @@ mod tests {
             tx.asset_id, "asset-xyz",
             "asset_id must be the distributing asset"
         );
-        assert_eq!(tx.quantity, crate::core::quantity::from_surface(5_000_000));
+        assert_eq!(
+            tx.quantity,
+            crate::shared::domain::quantity::from_surface(5_000_000)
+        );
         // FSD-023 — zero-cost convention: no money moves
         assert_eq!(
             tx.unit_price, 0,
@@ -1706,7 +1708,7 @@ mod tests {
             "asset".to_string(),
             TransactionType::Purchase,
             "2024-01-01".to_string(),
-            crate::core::quantity::from_surface(i64::MAX),
+            crate::shared::domain::quantity::from_surface(i64::MAX),
             1_000_000,
             1_000_000,
             0,
@@ -1720,9 +1722,11 @@ mod tests {
         ));
 
         // The limit itself is fine, one step past it is not.
-        assert!(Transaction::ensure_quantity(crate::core::quantity::LARGEST_QUANTITY).is_ok());
+        assert!(
+            Transaction::ensure_quantity(crate::shared::domain::quantity::LARGEST_QUANTITY).is_ok()
+        );
         assert!(matches!(
-            Transaction::ensure_quantity(crate::core::quantity::LARGEST_QUANTITY + 1),
+            Transaction::ensure_quantity(crate::shared::domain::quantity::LARGEST_QUANTITY + 1),
             Err(AccountError::QuantityOutOfRange)
         ));
 
@@ -1732,21 +1736,21 @@ mod tests {
                 "account".to_string(),
                 "cash".to_string(),
                 "2024-01-01".to_string(),
-                crate::core::quantity::LARGEST_QUANTITY + 1,
+                crate::shared::domain::quantity::LARGEST_QUANTITY + 1,
                 None,
             ),
             Transaction::new_withdrawal(
                 "account".to_string(),
                 "cash".to_string(),
                 "2024-01-01".to_string(),
-                crate::core::quantity::LARGEST_QUANTITY + 1,
+                crate::shared::domain::quantity::LARGEST_QUANTITY + 1,
                 None,
             ),
             Transaction::new_dividend(
                 "account".to_string(),
                 "asset".to_string(),
                 "2024-01-01".to_string(),
-                crate::core::quantity::LARGEST_QUANTITY + 1,
+                crate::shared::domain::quantity::LARGEST_QUANTITY + 1,
                 1_000_000,
                 None,
             ),
@@ -1758,7 +1762,7 @@ mod tests {
         }
 
         // Every recording that carries a quantity refuses it the same way.
-        let saturated = crate::core::quantity::from_surface(i64::MAX);
+        let saturated = crate::shared::domain::quantity::from_surface(i64::MAX);
         let side = |transaction_type| {
             Transaction::new_transfer_side(
                 "account".to_string(),
@@ -1868,7 +1872,10 @@ mod tests {
             tx.asset_id, "asset-xyz",
             "asset_id must be the credited asset"
         );
-        assert_eq!(tx.quantity, crate::core::quantity::from_surface(5_000_000));
+        assert_eq!(
+            tx.quantity,
+            crate::shared::domain::quantity::from_surface(5_000_000)
+        );
         // INT-024 — zero-cost convention: no money moves
         assert_eq!(
             tx.unit_price, 0,

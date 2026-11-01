@@ -6,7 +6,7 @@ use crate::context::account::{Account, AccountError, Transaction, TransactionTyp
 use crate::context::asset::{AssetClass, AssetPrice, AssetServiceContract};
 use crate::context::currency::CurrencyService;
 use crate::core::logger::BACKEND;
-use crate::core::quantity::QUANTITY_UNIT;
+use crate::shared::domain::quantity::QUANTITY_UNIT;
 use chrono::{Datelike, NaiveDate};
 use serde::Serialize;
 use specta::Type;
@@ -1069,7 +1069,7 @@ pub(crate) fn holding_close_date_as_of(
 mod tests {
     use super::test_fixtures::{day, transaction_on};
     use super::*;
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
 
     // FXR-035/042 — period_end_dates must pre-resolve a rate for every date the
     // build_* methods actually value (end_value_as_of), or a foreign holding
@@ -1790,7 +1790,7 @@ pub(crate) mod test_fixtures {
             {
                 amount
             } else {
-                crate::core::quantity::from_surface(amount)
+                crate::shared::domain::quantity::from_surface(amount)
             },
             1_000_000,
             1_000_000,

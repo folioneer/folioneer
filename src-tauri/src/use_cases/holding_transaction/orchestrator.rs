@@ -1383,7 +1383,7 @@ mod tests {
         AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
         SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
     };
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn setup_pool() -> sqlx::Pool<sqlx::Sqlite> {
@@ -1538,7 +1538,7 @@ mod tests {
             .expect("a purchase on an archived asset is saved");
         assert_eq!(
             bought.quantity,
-            crate::core::quantity::from_surface(micro(10))
+            crate::shared::domain::quantity::from_surface(micro(10))
         );
         let still = asset_svc.get_asset_by_id(&asset.id).await.unwrap().unwrap();
         assert!(still.is_archived, "the purchase unarchives nothing");
@@ -1685,7 +1685,7 @@ mod tests {
         assert_eq!(holdings.len(), 1);
         assert_eq!(
             holdings[0].quantity,
-            crate::core::quantity::from_surface(micro(2))
+            crate::shared::domain::quantity::from_surface(micro(2))
         );
         assert_eq!(holdings[0].average_price, micro(100));
     }
@@ -1862,7 +1862,7 @@ mod tests {
             .expect("paying asset holding must still exist");
         assert_eq!(
             paying_holding.quantity,
-            crate::core::quantity::from_surface(micro(10)),
+            crate::shared::domain::quantity::from_surface(micro(10)),
             "quantity must be unchanged"
         );
     }
@@ -2258,7 +2258,10 @@ mod tests {
             "transaction_type must be FreeShares"
         );
         assert_eq!(tx.asset_id, asset.id);
-        assert_eq!(tx.quantity, crate::core::quantity::from_surface(micro(5)));
+        assert_eq!(
+            tx.quantity,
+            crate::shared::domain::quantity::from_surface(micro(5))
+        );
         // FSD-023 — zero-cost convention
         assert_eq!(tx.unit_price, 0);
         assert_eq!(tx.exchange_rate, 1_000_000);
@@ -2278,7 +2281,7 @@ mod tests {
         // FSD-022a — quantity increased by distributed amount
         assert_eq!(
             holding_after.quantity,
-            crate::core::quantity::from_surface(micro(15)),
+            crate::shared::domain::quantity::from_surface(micro(15)),
             "quantity must be 15"
         );
         // FSD-023 — underlying cost unchanged → VWAP dilutes to the exact floored
@@ -2505,7 +2508,7 @@ mod tests {
         assert_eq!(corrected.id, written_off.id);
         assert_eq!(
             corrected.quantity,
-            crate::core::quantity::from_surface(micro(2))
+            crate::shared::domain::quantity::from_surface(micro(2))
         );
         assert_eq!(corrected.write_off_reason, Some(WriteOffReason::Lost));
         assert_eq!(corrected.realized_pnl, Some(-micro(200)));
@@ -2823,7 +2826,7 @@ mod tests {
         assert_eq!(tx.asset_id, asset.id);
         assert_eq!(
             tx.quantity,
-            crate::core::quantity::from_surface(micro(1)),
+            crate::shared::domain::quantity::from_surface(micro(1)),
             "credited qty must be 10% of 10"
         );
         // INT-024 — zero-cost packing
@@ -2840,7 +2843,7 @@ mod tests {
         let holding = holdings.iter().find(|h| h.asset_id == asset.id).unwrap();
         assert_eq!(
             holding.quantity,
-            crate::core::quantity::from_surface(micro(11)),
+            crate::shared::domain::quantity::from_surface(micro(11)),
             "quantity must be 10 + 1"
         );
     }
@@ -3292,7 +3295,7 @@ mod draft_tests {
     use super::*;
     use crate::context::account::{Holding, MockAccountServiceContract, RecordingPreview};
     use crate::context::asset::MockAssetServiceContract;
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
 
     const M: i64 = 1_000_000;
 
@@ -3302,7 +3305,7 @@ mod draft_tests {
             account_id: "acc-1".into(),
             asset_id: "asset-1".into(),
             date: "2026-01-02".into(),
-            quantity: crate::core::quantity::from_surface(2 * M),
+            quantity: crate::shared::domain::quantity::from_surface(2 * M),
             entered: EnteredAmount::UnitPrice {
                 unit_price: 50 * M,
                 exchange_rate: M,
@@ -3444,7 +3447,7 @@ mod draft_tests {
                     Holding::new(
                         account_id.into(),
                         asset_id.into(),
-                        crate::core::quantity::from_surface(quantity),
+                        crate::shared::domain::quantity::from_surface(quantity),
                         M,
                         0,
                         None,
@@ -3602,7 +3605,7 @@ mod draft_tests {
                     Holding::new(
                         account_id.into(),
                         asset_id.into(),
-                        crate::core::quantity::from_surface(4 * M),
+                        crate::shared::domain::quantity::from_surface(4 * M),
                         M,
                         0,
                         None,

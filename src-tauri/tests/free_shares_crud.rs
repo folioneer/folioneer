@@ -127,7 +127,7 @@ async fn record_free_shares_end_to_end_persists_correct_fields() {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            folioneer_lib::core::quantity::from_surface(micro(10)),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -155,7 +155,7 @@ async fn record_free_shares_end_to_end_persists_correct_fields() {
             &account.id,
             asset.id.clone(),
             "2024-06-15".to_string(),
-            folioneer_lib::core::quantity::from_surface(micro(5)),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(5)),
             Some("Bonus issue".to_string()),
         )
         .await
@@ -170,7 +170,7 @@ async fn record_free_shares_end_to_end_persists_correct_fields() {
     assert_eq!(tx.account_id, account.id);
     assert_eq!(
         tx.quantity,
-        folioneer_lib::core::quantity::from_surface(micro(5))
+        folioneer_lib::shared::domain::quantity::from_surface(micro(5))
     );
     assert_eq!(tx.unit_price, 0, "unit_price must be 0 (FSD-023)");
     assert_eq!(
@@ -198,7 +198,7 @@ async fn record_free_shares_end_to_end_persists_correct_fields() {
     // FSD-022a — quantity increased
     assert_eq!(
         holding_after.quantity,
-        folioneer_lib::core::quantity::from_surface(micro(15)),
+        folioneer_lib::shared::domain::quantity::from_surface(micro(15)),
         "quantity must be 10 + 5 = 15 after free-share distribution"
     );
     // FSD-023 — underlying cost unchanged → VWAP dilutes to the exact floored
@@ -243,7 +243,7 @@ async fn record_free_shares_does_not_create_asset_price_row() {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            folioneer_lib::core::quantity::from_surface(micro(10)),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -258,7 +258,7 @@ async fn record_free_shares_does_not_create_asset_price_row() {
             &account.id,
             asset.id.clone(),
             "2024-06-15".to_string(),
-            folioneer_lib::core::quantity::from_surface(micro(5)),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(5)),
             None,
         )
         .await
@@ -292,7 +292,7 @@ async fn record_free_shares_account_not_found_propagates() {
             "nonexistent-account",
             asset.id.clone(),
             "2024-06-15".to_string(),
-            folioneer_lib::core::quantity::from_surface(micro(5)),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(5)),
             None,
         )
         .await
@@ -335,7 +335,7 @@ async fn record_free_shares_asset_not_held_propagates() {
             &account.id,
             asset.id.clone(),
             "2024-06-15".to_string(),
-            folioneer_lib::core::quantity::from_surface(micro(5)),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(5)),
             None,
         )
         .await
@@ -407,7 +407,7 @@ async fn record_free_shares_publishes_transaction_updated_event() {
         &account.id,
         asset.id.clone(),
         "2024-01-15".to_string(),
-        folioneer_lib::core::quantity::from_surface(micro(10)),
+        folioneer_lib::shared::domain::quantity::from_surface(micro(10)),
         micro(50),
         micro(1),
         0,
@@ -423,7 +423,7 @@ async fn record_free_shares_publishes_transaction_updated_event() {
         &account.id,
         asset.id.clone(),
         "2024-06-15".to_string(),
-        folioneer_lib::core::quantity::from_surface(micro(5)),
+        folioneer_lib::shared::domain::quantity::from_surface(micro(5)),
         None,
     )
     .await
@@ -478,7 +478,7 @@ async fn record_free_shares_then_cancel_restores_holding_exactly() {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            folioneer_lib::core::quantity::from_surface(micro(10)),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -506,7 +506,7 @@ async fn record_free_shares_then_cancel_restores_holding_exactly() {
             &account.id,
             asset.id.clone(),
             "2024-06-15".to_string(),
-            folioneer_lib::core::quantity::from_surface(micro(5)),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(5)),
             None,
         )
         .await
@@ -524,7 +524,7 @@ async fn record_free_shares_then_cancel_restores_holding_exactly() {
         .unwrap();
     assert_eq!(
         holding_mid.quantity,
-        folioneer_lib::core::quantity::from_surface(micro(15)),
+        folioneer_lib::shared::domain::quantity::from_surface(micro(15)),
         "sanity: distribution applied"
     );
 
@@ -620,7 +620,7 @@ async fn record_free_shares_performance_neutrality() {
         &account.id,
         asset.id.clone(),
         "2024-01-15".to_string(),
-        folioneer_lib::core::quantity::from_surface(micro(10)),
+        folioneer_lib::shared::domain::quantity::from_surface(micro(10)),
         micro(50),
         micro(1),
         0,
@@ -633,7 +633,7 @@ async fn record_free_shares_performance_neutrality() {
         &account.id,
         asset.id.clone(),
         "2024-06-01".to_string(),
-        folioneer_lib::core::quantity::from_surface(micro(5)),
+        folioneer_lib::shared::domain::quantity::from_surface(micro(5)),
         None,
     )
     .await

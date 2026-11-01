@@ -12,7 +12,7 @@ use crate::shared::domain::{Operation, RecordIdentity, RecordKind};
 /// The widest amount, price, or rate a record may carry, in micros (±10⁹ units).
 pub const AMOUNT_BOUND: i64 = 1_000_000_000_000_000;
 /// The widest `quantity` a record may carry: what a device can record (TRX-024C).
-pub const QUANTITY_BOUND: i64 = crate::core::quantity::LARGEST_QUANTITY;
+pub const QUANTITY_BOUND: i64 = crate::shared::domain::quantity::LARGEST_QUANTITY;
 /// The longest text a record may carry, in characters (the holding note's own cap, HNO-011).
 pub const TEXT_BOUND: usize = 500;
 

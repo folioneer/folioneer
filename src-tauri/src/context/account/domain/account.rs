@@ -7,8 +7,8 @@ use super::transaction::{
 };
 use super::wrapper::{country_well_formed, wrapper_known, PORTFOLIO_COUNTRY};
 use crate::context::account::error::AccountError;
-use crate::core::quantity::to_surface;
-use crate::core::quantity::QUANTITY_UNIT;
+use crate::shared::domain::quantity::to_surface;
+use crate::shared::domain::quantity::QUANTITY_UNIT;
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
 use crate::shared::infrastructure::uow::UnitOfWork;
 use anyhow::{anyhow, Result};
@@ -2720,7 +2720,7 @@ impl Account {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
 
     // SYN-038 / ACC-041 — an account change written before data format version 4 carries no
     // country and no wrapper: it is read with neither.
@@ -2934,7 +2934,10 @@ mod tests {
             .iter()
             .find(|h| h.asset_id == "asset-1")
             .unwrap();
-        assert_eq!(h.quantity, crate::core::quantity::from_surface(micro(4)));
+        assert_eq!(
+            h.quantity,
+            crate::shared::domain::quantity::from_surface(micro(4))
+        );
         assert_eq!(h.average_price, micro(150));
     }
 
@@ -3747,7 +3750,7 @@ mod tests {
             .expect("chronologically valid history must not oversell regardless of storage order");
         assert_eq!(
             holding.quantity,
-            crate::core::quantity::from_surface(micro(1))
+            crate::shared::domain::quantity::from_surface(micro(1))
         );
     }
 
@@ -3799,11 +3802,17 @@ mod tests {
         ];
         // As of 2024-07-01 — only the first buy is in scope.
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-01");
-        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(2)));
+        assert_eq!(
+            snap.quantity,
+            crate::shared::domain::quantity::from_surface(micro(2))
+        );
         assert_eq!(snap.average_price, micro(100));
         // As of 2024-08-01 — both buys: VWAP = 600 / 4 = 150.
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-08-01");
-        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(4)));
+        assert_eq!(
+            snap.quantity,
+            crate::shared::domain::quantity::from_surface(micro(4))
+        );
         assert_eq!(snap.average_price, micro(150));
     }
 
@@ -3835,7 +3844,10 @@ mod tests {
             ),
         ];
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-15");
-        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(1))); // 1 unit remains
+        assert_eq!(
+            snap.quantity,
+            crate::shared::domain::quantity::from_surface(micro(1))
+        ); // 1 unit remains
         assert_eq!(snap.average_price, micro(100)); // VWAP preserved across the sell (SEL-026)
     }
 
@@ -3851,7 +3863,10 @@ mod tests {
         )];
         // TDI-011 — inclusive cut-off.
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-06-01");
-        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(2)));
+        assert_eq!(
+            snap.quantity,
+            crate::shared::domain::quantity::from_surface(micro(2))
+        );
     }
 
     #[test]
@@ -3875,7 +3890,10 @@ mod tests {
             ),
         ];
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-01");
-        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(2)));
+        assert_eq!(
+            snap.quantity,
+            crate::shared::domain::quantity::from_surface(micro(2))
+        );
         // only asset-1's transactions
     }
 
@@ -3901,7 +3919,10 @@ mod tests {
             ),
         ];
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-01");
-        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(4)));
+        assert_eq!(
+            snap.quantity,
+            crate::shared::domain::quantity::from_surface(micro(4))
+        );
         assert_eq!(snap.average_price, micro(50)); // FSD-023 — VWAP dilutes to 200/4
     }
 
@@ -3927,7 +3948,10 @@ mod tests {
             ),
         ];
         let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-01");
-        assert_eq!(snap.quantity, crate::core::quantity::from_surface(micro(4)));
+        assert_eq!(
+            snap.quantity,
+            crate::shared::domain::quantity::from_surface(micro(4))
+        );
         assert_eq!(snap.average_price, micro(50)); // INT-024 — VWAP dilutes to 200/4
     }
 
@@ -4389,7 +4413,7 @@ mod tests {
         // VWAP = (200 + 200) / (2 + 2) = 100
         assert_eq!(
             h.quantity,
-            crate::core::quantity::from_surface(micro(4)),
+            crate::shared::domain::quantity::from_surface(micro(4)),
             "total quantity must accumulate"
         );
         assert_eq!(
@@ -4428,7 +4452,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             h.quantity,
-            crate::core::quantity::from_surface(micro(3)),
+            crate::shared::domain::quantity::from_surface(micro(3)),
             "quantities must accumulate across multiple openings"
         );
     }
@@ -4605,7 +4629,10 @@ mod tests {
             .iter()
             .find(|h| h.asset_id == "asset-1")
             .unwrap();
-        assert_eq!(h.quantity, crate::core::quantity::from_surface(micro(2)));
+        assert_eq!(
+            h.quantity,
+            crate::shared::domain::quantity::from_surface(micro(2))
+        );
         assert_eq!(h.average_price, micro(100));
     }
 
@@ -4822,7 +4849,7 @@ mod tests {
 
         assert_eq!(
             acc.cash_holding_quantity(),
-            crate::core::quantity::from_surface(900_000_000),
+            crate::shared::domain::quantity::from_surface(900_000_000),
             "edited deposit must drive the new cash balance"
         );
     }
@@ -5541,7 +5568,7 @@ mod tests {
         // FSD-022a — quantity must increase by the distributed amount
         assert_eq!(
             holding_after.quantity,
-            crate::core::quantity::from_surface(micro(15)),
+            crate::shared::domain::quantity::from_surface(micro(15)),
             "quantity must increase from 10 to 15 after free-share distribution"
         );
 
@@ -5684,7 +5711,10 @@ mod tests {
             .iter()
             .find(|h| h.asset_id == "asset-xyz")
             .unwrap();
-        assert_eq!(h.quantity, crate::core::quantity::from_surface(micro(200)));
+        assert_eq!(
+            h.quantity,
+            crate::shared::domain::quantity::from_surface(micro(200))
+        );
         assert_eq!(h.average_price, micro(5));
         assert_eq!(
             h.quantity as i128 * h.average_price as i128 / 100_000_000,
@@ -5724,7 +5754,10 @@ mod tests {
             .iter()
             .find(|h| h.asset_id == "asset-xyz")
             .unwrap();
-        assert_eq!(h.quantity, crate::core::quantity::from_surface(micro(1)));
+        assert_eq!(
+            h.quantity,
+            crate::shared::domain::quantity::from_surface(micro(1))
+        );
         assert_eq!(h.average_price, micro(1000));
     }
 
@@ -5922,7 +5955,7 @@ mod tests {
         assert_eq!((preview.new_quantity, preview.new_average_price), after);
         assert_eq!(
             preview.new_quantity,
-            crate::core::quantity::from_surface(10_500_000)
+            crate::shared::domain::quantity::from_surface(10_500_000)
         );
     }
 
@@ -6098,7 +6131,10 @@ mod tests {
             .iter()
             .find(|h| h.asset_id == "asset-xyz")
             .unwrap();
-        assert_eq!(h.quantity, crate::core::quantity::from_surface(micro(40)));
+        assert_eq!(
+            h.quantity,
+            crate::shared::domain::quantity::from_surface(micro(40))
+        );
         assert_eq!(h.average_price, micro(25));
     }
 
@@ -6341,7 +6377,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             holding_mid.quantity,
-            crate::core::quantity::from_surface(micro(15)),
+            crate::shared::domain::quantity::from_surface(micro(15)),
             "sanity: distribution applied"
         );
 
@@ -6561,7 +6597,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             holding.quantity,
-            crate::core::quantity::from_surface(micro(13)),
+            crate::shared::domain::quantity::from_surface(micro(13)),
             "holding quantity must reflect corrected free-shares count (FSD-040)"
         );
     }
@@ -6621,7 +6657,7 @@ mod tests {
             .expect("asset-xyz holding must exist after fee correction");
         assert_eq!(
             holding.quantity,
-            crate::core::quantity::from_surface(micro(7)),
+            crate::shared::domain::quantity::from_surface(micro(7)),
             "holding quantity must reflect the corrected fee deduction (FEE-023)"
         );
     }
@@ -6674,7 +6710,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             holding_after.quantity,
-            crate::core::quantity::from_surface(micro(15)),
+            crate::shared::domain::quantity::from_surface(micro(15)),
             "quantity must increase from 10 to 15 after the interest credit"
         );
         let expected_diluted_vwap =
@@ -6774,7 +6810,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             holding.quantity,
-            crate::core::quantity::from_surface(micro(13)),
+            crate::shared::domain::quantity::from_surface(micro(13)),
             "holding quantity must reflect the corrected interest credit (INT-040)"
         );
     }
@@ -6834,7 +6870,7 @@ mod tests {
 #[cfg(test)]
 mod two_asset_and_synced_ledger_tests {
     use super::*;
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
 
     const A: &str = "asset-a";
     const B: &str = "asset-b";
@@ -7074,7 +7110,7 @@ mod two_asset_and_synced_ledger_tests {
         assert!(holding(&acc, A).is_none());
         assert_eq!(
             holding(&acc, B).map(|h| h.quantity),
-            Some(crate::core::quantity::from_surface(micro(10)))
+            Some(crate::shared::domain::quantity::from_surface(micro(10)))
         );
         assert!(holding(&acc, &acc.cash_asset_id()).is_some());
     }
@@ -7100,7 +7136,7 @@ mod two_asset_and_synced_ledger_tests {
             Holding::new(
                 "acc-1".to_string(),
                 A.to_string(),
-                crate::core::quantity::from_surface(micro(1)),
+                crate::shared::domain::quantity::from_surface(micro(1)),
                 micro(1),
                 0,
                 None,
@@ -7237,7 +7273,7 @@ mod two_asset_and_synced_ledger_tests {
         assert_eq!(acc.holding_quantity(&cash), before);
         assert_eq!(
             acc.holding_quantity(A),
-            crate::core::quantity::from_surface(micro(15))
+            crate::shared::domain::quantity::from_surface(micro(15))
         );
     }
 
@@ -7250,7 +7286,7 @@ mod two_asset_and_synced_ledger_tests {
         acc.apply_synced_transaction(purchase.clone());
         assert_eq!(
             acc.holding_quantity(A),
-            crate::core::quantity::from_surface(micro(10))
+            crate::shared::domain::quantity::from_surface(micro(10))
         );
 
         let mut moved = purchase;
@@ -7280,7 +7316,7 @@ mod two_asset_and_synced_ledger_tests {
         assert_eq!(left, vec![second.id.as_str()]);
         assert_eq!(
             acc.holding_quantity(A),
-            crate::core::quantity::from_surface(micro(5))
+            crate::shared::domain::quantity::from_surface(micro(5))
         );
         assert_eq!(acc.holding_quantity(&cash), -micro(500));
         assert!(acc
@@ -7304,7 +7340,7 @@ mod two_asset_and_synced_ledger_tests {
         assert!(holding(&acc, A).is_none());
         assert_eq!(
             acc.holding_quantity(B),
-            crate::core::quantity::from_surface(micro(10))
+            crate::shared::domain::quantity::from_surface(micro(10))
         );
         assert!(acc.pending_changes.iter().any(|c| matches!(
             c,
@@ -7435,7 +7471,7 @@ mod preview_trade_tests {
     fn trx_024c_a_holding_past_what_storage_holds_is_refused() {
         let mut account =
             Account::new("Account".into(), String::new(), "EUR".into(), false).expect("account");
-        const A_BILLION: i64 = crate::core::quantity::LARGEST_QUANTITY;
+        const A_BILLION: i64 = crate::shared::domain::quantity::LARGEST_QUANTITY;
         for _ in 0..92 {
             account
                 .open_holding("asset".into(), "2026-01-02".into(), A_BILLION, M)
@@ -7520,7 +7556,7 @@ mod preview_trade_tests {
         let preview = Account::preview_trade(
             TransactionType::Purchase,
             "2026-01-02",
-            crate::core::quantity::from_surface(2 * M),
+            crate::shared::domain::quantity::from_surface(2 * M),
             by_price(50 * M, M, 3 * M),
         );
         assert_eq!(preview.expect("valid"), (50 * M, 103 * M));
@@ -7532,7 +7568,7 @@ mod preview_trade_tests {
         let preview = Account::preview_trade(
             TransactionType::Sell,
             "2026-01-02",
-            crate::core::quantity::from_surface(2 * M),
+            crate::shared::domain::quantity::from_surface(2 * M),
             by_price(50 * M, M, 3 * M),
         );
         assert_eq!(preview.expect("valid"), (50 * M, 97 * M));
@@ -7544,7 +7580,7 @@ mod preview_trade_tests {
         let preview = Account::preview_trade(
             TransactionType::Purchase,
             "2026-01-02",
-            crate::core::quantity::from_surface(2 * M),
+            crate::shared::domain::quantity::from_surface(2 * M),
             by_total(103 * M, M, 3 * M),
         );
         assert_eq!(preview.expect("valid"), (50 * M, 103 * M));
@@ -7557,7 +7593,7 @@ mod preview_trade_tests {
             Account::preview_trade(
                 kind,
                 date,
-                crate::core::quantity::from_surface(quantity),
+                crate::shared::domain::quantity::from_surface(quantity),
                 entered,
             )
         };
@@ -7635,7 +7671,7 @@ mod preview_trade_tests {
             Account::preview_trade(
                 TransactionType::Purchase,
                 date,
-                crate::core::quantity::from_surface(quantity),
+                crate::shared::domain::quantity::from_surface(quantity),
                 by_price(M, rate, fees),
             )
         };
@@ -7661,7 +7697,7 @@ mod preview_trade_tests {
 #[cfg(test)]
 mod write_off_tests {
     use super::*;
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
 
     const COIN: &str = "asset-coin";
 
@@ -7745,7 +7781,10 @@ mod write_off_tests {
         assert_eq!((tx.total_amount, tx.unit_price, tx.fees), (0, 0, 0));
         assert_eq!(tx.realized_pnl, Some(-micro(200)));
         let coin = holding(&acc);
-        assert_eq!(coin.quantity, crate::core::quantity::from_surface(micro(8)));
+        assert_eq!(
+            coin.quantity,
+            crate::shared::domain::quantity::from_surface(micro(8))
+        );
         assert_eq!(coin.average_price, micro(100));
         assert_eq!(coin.total_realized_pnl, -micro(200));
         assert_eq!(acc.holding_quantity(&acc.cash_asset_id()), cash_before);
@@ -7811,7 +7850,7 @@ mod write_off_tests {
         ));
         assert_eq!(
             holding(&acc).quantity,
-            crate::core::quantity::from_surface(micro(10)),
+            crate::shared::domain::quantity::from_surface(micro(10)),
             "a refusal changes nothing"
         );
     }
@@ -7843,7 +7882,7 @@ mod write_off_tests {
         ));
         assert_eq!(
             holding(&acc).quantity,
-            crate::core::quantity::from_surface(micro(2))
+            crate::shared::domain::quantity::from_surface(micro(2))
         );
     }
 
@@ -7878,7 +7917,7 @@ mod write_off_tests {
         assert!(acc.cancel_transaction(&purchase).is_err());
         assert_eq!(
             holding(&acc).quantity,
-            crate::core::quantity::from_surface(micro(2))
+            crate::shared::domain::quantity::from_surface(micro(2))
         );
     }
 
@@ -7924,7 +7963,7 @@ mod write_off_tests {
         assert_eq!(corrected.realized_pnl, Some(-micro(300)));
         assert_eq!(
             holding(&acc).quantity,
-            crate::core::quantity::from_surface(micro(7))
+            crate::shared::domain::quantity::from_surface(micro(7))
         );
         let recorded = acc
             .pending_changes
@@ -7963,7 +8002,10 @@ mod write_off_tests {
         ));
         let kept = acc.transactions.iter().find(|t| t.id == tx.id).unwrap();
         assert_eq!(kept.write_off_reason, None);
-        assert_eq!(kept.quantity, crate::core::quantity::from_surface(micro(2)));
+        assert_eq!(
+            kept.quantity,
+            crate::shared::domain::quantity::from_surface(micro(2))
+        );
     }
 
     // WOF-033 — a write-off without a reason takes the one its correction names, and can be
@@ -8042,7 +8084,10 @@ mod write_off_tests {
         ));
         let kept = acc.transactions.iter().find(|t| t.id == tx.id).unwrap();
         assert_eq!(kept.write_off_reason, Some(WriteOffReason::Lost));
-        assert_eq!(kept.quantity, crate::core::quantity::from_surface(micro(2)));
+        assert_eq!(
+            kept.quantity,
+            crate::shared::domain::quantity::from_surface(micro(2))
+        );
     }
 
     // SEL-030 / #607 — a sale's correction is refused against what was held just before it,

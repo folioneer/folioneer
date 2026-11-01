@@ -193,7 +193,7 @@ mod tests {
             if crate::core::cash::is_cash_asset(asset_id) {
                 quantity
             } else {
-                crate::core::quantity::from_surface(quantity)
+                crate::shared::domain::quantity::from_surface(quantity)
             },
             0,
             0,

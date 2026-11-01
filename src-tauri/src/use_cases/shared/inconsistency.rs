@@ -6,7 +6,7 @@
 use crate::context::account::Holding;
 use crate::context::sync::HoldingInconsistency;
 use crate::core::cash::is_cash_asset;
-use crate::core::quantity::to_surface;
+use crate::shared::domain::quantity::to_surface;
 
 /// The inconsistency `holding` carries, if any: a negative quantity is `Oversold` for a
 /// position and `CashOverdrawn` for the Cash Holding (CSH-080).
@@ -37,7 +37,7 @@ mod tests {
             if crate::core::cash::is_cash_asset(asset_id) {
                 quantity
             } else {
-                crate::core::quantity::from_surface(quantity)
+                crate::shared::domain::quantity::from_surface(quantity)
             },
             1_000_000,
             0,

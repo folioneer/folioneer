@@ -141,7 +141,7 @@ where
             &account.id,
             asset.id.clone(),
             "2024-01-01".to_string(),
-            folioneer_lib::core::quantity::from_surface(1_000_000),
+            folioneer_lib::shared::domain::quantity::from_surface(1_000_000),
             100_000_000,
         )
         .await

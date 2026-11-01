@@ -156,7 +156,7 @@ impl JournalFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
 
     const M: i64 = 1_000_000;
 

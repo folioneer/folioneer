@@ -8,7 +8,7 @@ use super::{
 };
 use crate::context::account::{AccountError, ManagementFeeRemoval, Transaction, WriteOffReason};
 use crate::core::cash::is_cash_asset;
-use crate::core::quantity::from_surface;
+use crate::shared::domain::quantity::from_surface;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;

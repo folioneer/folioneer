@@ -317,4 +317,3 @@ Enable-sync modal in two steps: folder picker (validated, SYN-019), then passphr
 ## Open Questions
 
 - [ ] SYN-034: a figure other than a quantity can be recorded past what other devices read: #748.
-      None — all questions have been resolved.

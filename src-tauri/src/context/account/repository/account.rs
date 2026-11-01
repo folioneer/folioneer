@@ -1485,7 +1485,7 @@ mod tests {
     use super::*;
     use crate::context::account::domain::{Account, AccountChange};
     use crate::context::sync::SqliteChangeRecorder;
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
     use sqlx::sqlite::SqlitePoolOptions;
     use std::sync::Arc;
 

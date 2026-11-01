@@ -10,7 +10,7 @@ use crate::context::account_import::{
 };
 use crate::context::asset::{Asset, AssetClass, AssetServiceContract};
 use crate::core::logger::BACKEND;
-use crate::core::quantity::from_surface;
+use crate::shared::domain::quantity::from_surface;
 use crate::shared::infrastructure::uow::TransactionManager;
 use serde::Serialize;
 use specta::Type;

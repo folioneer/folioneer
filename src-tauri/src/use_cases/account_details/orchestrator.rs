@@ -7,7 +7,7 @@ use crate::context::currency::CurrencyService;
 use crate::context::sync::HoldingInconsistency;
 use crate::core::cash::{is_cash_asset, system_cash_asset_id};
 use crate::core::logger::BACKEND;
-use crate::core::quantity::QUANTITY_UNIT;
+use crate::shared::domain::quantity::QUANTITY_UNIT;
 use crate::use_cases::shared::inconsistency::holding_inconsistency;
 use crate::use_cases::shared::unrecorded_split::{unrecorded_splits, UnrecordedSplit};
 use crate::use_cases::shared::valuation::{
@@ -559,7 +559,7 @@ impl AccountDetailsUseCase {
                 quantity: if is_cash {
                     holding.quantity
                 } else {
-                    crate::core::quantity::to_surface(holding.quantity)
+                    crate::shared::domain::quantity::to_surface(holding.quantity)
                 },
                 average_price: holding.average_price,
                 cost_basis,
@@ -942,7 +942,7 @@ impl AccountDetailsUseCase {
                 asset_id: asset_id.to_string(),
                 asset_name: asset.name,
                 asset_reference: asset.reference,
-                quantity: crate::core::quantity::to_surface(reconstruction.quantity),
+                quantity: crate::shared::domain::quantity::to_surface(reconstruction.quantity),
                 average_price: reconstruction.average_price,
                 cost_basis,
                 realized_pnl,
@@ -1249,7 +1249,7 @@ mod tests {
         AssetClass, CreateAssetDTO, SqliteAssetCategoryRepository, SqliteAssetRepository,
         SYSTEM_CATEGORY_ID,
     };
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn setup(pool: &sqlx::Pool<sqlx::Sqlite>) -> (Arc<AccountService>, Arc<AssetService>) {
@@ -1407,8 +1407,8 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000), // 2.0 units
-                    100_000_000,                                    // 100.00
+                    crate::shared::domain::quantity::from_surface(2_000_000), // 2.0 units
+                    100_000_000,                                              // 100.00
                     0,
                     None,
                 )
@@ -1470,7 +1470,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     50_000_000,
                     0,
                     None,
@@ -1969,7 +1969,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset1.id,
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     50_000_000,
                     10_000_000,
                     Some("2025-06-01".to_string()),
@@ -2084,7 +2084,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id,
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     100_000_000,
                     0,
                     None,
@@ -2134,7 +2134,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000),
+                    crate::shared::domain::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -2188,7 +2188,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     100_000_000,
                     0,
                     None,
@@ -2244,7 +2244,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000),
+                    crate::shared::domain::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -2298,7 +2298,7 @@ mod tests {
                 Holding::new(
                     account_id.to_string(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     100_000_000,
                     0,
                     None,
@@ -2532,7 +2532,7 @@ mod tests {
                 Holding::new(
                     account_id.to_string(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(quantity),
+                    crate::shared::domain::quantity::from_surface(quantity),
                     100_000_000,
                     0,
                     None,
@@ -2685,7 +2685,7 @@ mod tests {
                     Holding::new(
                         account.id.clone(),
                         asset_id,
-                        crate::core::quantity::from_surface(1_000_000),
+                        crate::shared::domain::quantity::from_surface(1_000_000),
                         100_000_000,
                         0,
                         None,
@@ -2776,7 +2776,7 @@ mod tests {
                     Holding::new(
                         account.id.clone(),
                         asset.id.clone(),
-                        crate::core::quantity::from_surface(1_000_000),
+                        crate::shared::domain::quantity::from_surface(1_000_000),
                         100_000_000,
                         0,
                         None,
@@ -3164,7 +3164,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     0,
                     0,
                     None,
@@ -3217,7 +3217,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000),
+                    crate::shared::domain::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -3271,7 +3271,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000),
+                    crate::shared::domain::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -3325,7 +3325,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     100_000_000,
                     0,
                     None,
@@ -3400,7 +3400,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset1.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000),
+                    crate::shared::domain::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -3435,7 +3435,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset2.id.clone(),
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     50_000_000,
                     0,
                     None,
@@ -3496,7 +3496,7 @@ mod tests {
                     Holding::new(
                         account.id.clone(),
                         asset.id,
-                        crate::core::quantity::from_surface(1_000_000),
+                        crate::shared::domain::quantity::from_surface(1_000_000),
                         50_000_000,
                         0,
                         None,
@@ -3570,7 +3570,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000),
+                    crate::shared::domain::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -3718,7 +3718,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     100_000_000,
                     0,
                     None,
@@ -3974,7 +3974,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000),
+                    crate::shared::domain::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -4083,7 +4083,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000),
+                    crate::shared::domain::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -4173,7 +4173,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000),
+                    crate::shared::domain::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -5012,7 +5012,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     50_000_000,
                     0,
                     None,

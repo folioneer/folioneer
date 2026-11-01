@@ -2,7 +2,7 @@
 //! transfer recorded the four-step way — with the transfer they stand for. AGT-093 — four
 //! that agents recorded it replaces without asking.
 
-use crate::core::quantity::to_surface;
+use crate::shared::domain::quantity::to_surface;
 use std::sync::Arc;
 
 use serde_json::Value;

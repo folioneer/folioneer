@@ -1,5 +1,5 @@
 use crate::context::account::error::AccountError;
-use crate::core::quantity::to_surface;
+use crate::shared::domain::quantity::to_surface;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -237,7 +237,7 @@ mod tests {
             Holding::new(
                 "acc".into(),
                 "asset".into(),
-                crate::core::quantity::from_surface(quantity),
+                crate::shared::domain::quantity::from_surface(quantity),
                 1_000_000,
                 0,
                 None,

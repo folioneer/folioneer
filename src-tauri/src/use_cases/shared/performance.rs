@@ -6,7 +6,7 @@
 use crate::context::account::{AccountError, AccountServiceContract, Transaction, TransactionType};
 use crate::context::asset::{AssetClass, AssetServiceContract};
 use crate::context::currency::CurrencyService;
-use crate::core::quantity::QUANTITY_UNIT;
+use crate::shared::domain::quantity::QUANTITY_UNIT;
 use crate::use_cases::shared::valuation::{
     at_rate, end_value_as_of, holding_close_date_as_of, holding_end_value_as_of,
     holding_performance_for_span, holding_performance_for_span_windowed, load_priced_assets,
@@ -924,7 +924,7 @@ pub(crate) fn annualized_yield_metric(
 #[cfg(test)]
 mod lifetime_unavailable_tests {
     use super::*;
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
 
     fn row(since_pct: Option<i64>) -> PerformancePeriod {
         PerformancePeriod {

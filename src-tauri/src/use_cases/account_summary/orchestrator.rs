@@ -2,7 +2,7 @@ use crate::context::account::{Account, AccountError, AccountServiceContract, Age
 use crate::context::asset::{is_price_outdated, AssetClass, AssetServiceContract};
 use crate::context::currency::CurrencyService;
 use crate::core::logger::BACKEND;
-use crate::core::quantity::QUANTITY_UNIT;
+use crate::shared::domain::quantity::QUANTITY_UNIT;
 use chrono::NaiveDate;
 use std::collections::HashMap;
 
@@ -562,7 +562,7 @@ mod tests {
                 Holding::new(
                     acc_a.id.clone(),
                     bond.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000),
+                    crate::shared::domain::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -633,7 +633,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     50_000_000,
                     0,
                     None,
@@ -685,7 +685,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000),
+                    crate::shared::domain::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -778,7 +778,7 @@ mod tests {
                     Holding::new(
                         account.id.clone(),
                         asset.id.clone(),
-                        crate::core::quantity::from_surface(1_000_000),
+                        crate::shared::domain::quantity::from_surface(1_000_000),
                         100_000_000,
                         0,
                         None,
@@ -893,7 +893,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     100_000_000,
                     0,
                     None,
@@ -959,7 +959,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     bond.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000),
+                    crate::shared::domain::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,
@@ -1030,7 +1030,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     asset.id.clone(),
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     100_000_000,
                     0,
                     None,
@@ -1156,8 +1156,8 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     stock.id.clone(),
-                    crate::core::quantity::from_surface(1_000_000), // quantity: 1 unit
-                    100_000_000,                                    // average_price: 100 EUR
+                    crate::shared::domain::quantity::from_surface(1_000_000), // quantity: 1 unit
+                    100_000_000, // average_price: 100 EUR
                     0,
                     None,
                 )
@@ -1251,7 +1251,7 @@ mod tests {
                 Holding::new(
                     account.id.clone(),
                     stock.id.clone(),
-                    crate::core::quantity::from_surface(2_000_000),
+                    crate::shared::domain::quantity::from_surface(2_000_000),
                     100_000_000,
                     0,
                     None,

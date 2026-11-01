@@ -28,7 +28,6 @@ pub fn from_surface(quantity: i64) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::quantity::from_surface;
 
     #[test]
     fn trx_024_a_surface_quantity_round_trips() {

@@ -4543,7 +4543,7 @@ fn to_open_holding_error(e: anyhow::Error) -> OpenHoldingError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
     // This module contains both SQLite-backed integration tests (real in-memory DB,
     // catch constraint violations) and mock-based unit tests (fast delegation checks).
     // SQLite tests are grouped first; mock-based unit tests follow after the section header.
@@ -5096,7 +5096,7 @@ mod tests {
             .expect("asset holding present");
         assert_eq!(
             asset_holding.quantity,
-            crate::core::quantity::from_surface(micro(2))
+            crate::shared::domain::quantity::from_surface(micro(2))
         );
         assert_eq!(asset_holding.average_price, micro(100));
     }
@@ -5678,7 +5678,7 @@ mod tests {
         assert_eq!(holdings.len(), 1);
         assert_eq!(
             holdings[0].quantity,
-            crate::core::quantity::from_surface(micro(2))
+            crate::shared::domain::quantity::from_surface(micro(2))
         );
         assert_eq!(holdings[0].average_price, micro(100));
     }
@@ -5726,7 +5726,10 @@ mod tests {
             .find(|h| h.asset_id == asset_id)
             .expect("holding must exist after VWAP test operations");
         // VWAP = (200 + 200) / 4 = 100
-        assert_eq!(h.quantity, crate::core::quantity::from_surface(micro(4)));
+        assert_eq!(
+            h.quantity,
+            crate::shared::domain::quantity::from_surface(micro(4))
+        );
         assert_eq!(
             h.average_price,
             micro(100),
@@ -5769,7 +5772,7 @@ mod tests {
         let holdings = svc.get_holdings_for_account(&account.id).await.unwrap();
         assert_eq!(
             holdings[0].quantity,
-            crate::core::quantity::from_surface(micro(3)),
+            crate::shared::domain::quantity::from_surface(micro(3)),
             "quantities must accumulate"
         );
     }
@@ -6277,7 +6280,10 @@ mod tests {
             crate::context::account::TransactionType::FreeShares
         );
         assert_eq!(tx.asset_id, asset_id);
-        assert_eq!(tx.quantity, crate::core::quantity::from_surface(micro(5)));
+        assert_eq!(
+            tx.quantity,
+            crate::shared::domain::quantity::from_surface(micro(5))
+        );
         assert_eq!(tx.unit_price, 0, "unit_price must be 0 (FSD-023)");
         assert_eq!(
             tx.exchange_rate, 1_000_000,
@@ -6296,7 +6302,7 @@ mod tests {
         // FSD-022a — quantity increased
         assert_eq!(
             holding_after.quantity,
-            crate::core::quantity::from_surface(micro(15)),
+            crate::shared::domain::quantity::from_surface(micro(15)),
             "quantity must be 15 after 10 + 5 free"
         );
         // FSD-023 — underlying cost unchanged → VWAP dilutes to the exact floored
@@ -6658,7 +6664,8 @@ mod tests {
         );
         // The cost basis is preserved up to the per-share floor error (< 1 micro-unit
         // per remaining share); it can only round DOWN, never up.
-        let shares_after = holding_after.quantity / crate::core::quantity::QUANTITY_UNIT as i64;
+        let shares_after =
+            holding_after.quantity / crate::shared::domain::quantity::QUANTITY_UNIT as i64;
         assert!(
             cost_basis_after <= cost_basis_before
                 && cost_basis_after > cost_basis_before - (shares_after as i128 + 1),
@@ -7075,7 +7082,7 @@ mod tests {
         assert_eq!(tx.asset_id, asset_id);
         assert_eq!(
             tx.quantity,
-            crate::core::quantity::from_surface(micro(10)),
+            crate::shared::domain::quantity::from_surface(micro(10)),
             "credited qty must be 10% of 100"
         );
         assert_eq!(tx.unit_price, 0, "unit_price must be 0 (INT-024)");
@@ -7094,7 +7101,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             holding_after.quantity,
-            crate::core::quantity::from_surface(micro(110)),
+            crate::shared::domain::quantity::from_surface(micro(110)),
             "quantity must be 110 after 100 + 10 interest"
         );
         // INT-024 — cost basis unchanged → VWAP dilutes to floor(cost_basis / new_quantity).
@@ -7146,7 +7153,10 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(tx.quantity, crate::core::quantity::from_surface(micro(5)));
+        assert_eq!(
+            tx.quantity,
+            crate::shared::domain::quantity::from_surface(micro(5))
+        );
 
         let holdings_after = svc.get_holdings_for_account(&account.id).await.unwrap();
         let holding_after = holdings_after
@@ -7155,7 +7165,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             holding_after.quantity,
-            crate::core::quantity::from_surface(micro(105)),
+            crate::shared::domain::quantity::from_surface(micro(105)),
             "quantity must be 105 after 100 + 5 interest"
         );
     }

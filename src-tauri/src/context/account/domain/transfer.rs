@@ -33,8 +33,8 @@ impl TransferView {
     /// The transfer as a surface gives it (TRX-024).
     pub fn as_shown(self) -> Self {
         Self {
-            quantity_sent: crate::core::quantity::to_surface(self.quantity_sent),
-            quantity_received: crate::core::quantity::to_surface(self.quantity_received),
+            quantity_sent: crate::shared::domain::quantity::to_surface(self.quantity_sent),
+            quantity_received: crate::shared::domain::quantity::to_surface(self.quantity_received),
             ..self
         }
     }

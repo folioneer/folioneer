@@ -4,7 +4,7 @@
 //! it, so the two never differ. A price at a date is recorded here too (CLI-029, AGT-062): it
 //! is no holding transaction, and it shares the lookup by name and the refusals.
 
-use crate::core::quantity::{from_surface, to_surface};
+use crate::shared::domain::quantity::{from_surface, to_surface};
 use serde::Serialize;
 
 use crate::context::account::{

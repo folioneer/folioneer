@@ -115,7 +115,7 @@ async fn seed_held_position(ctx: &Ctx) -> (String, String) {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            folioneer_lib::core::quantity::from_surface(micro(10)),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -186,7 +186,7 @@ async fn record_split_rescales_quantity_and_preserves_cost_basis() {
         .expect("holding must survive the split");
     assert_eq!(
         holding.quantity,
-        folioneer_lib::core::quantity::from_surface(micro(200)),
+        folioneer_lib::shared::domain::quantity::from_surface(micro(200)),
         "quantity must rescale by the factor (SPL-020)"
     );
     assert_eq!(
@@ -338,7 +338,7 @@ async fn spl_062_the_split_draft_check_previews_what_recording_leaves() {
     assert_eq!(
         (position.old_quantity, position.old_average_price),
         (
-            folioneer_lib::core::quantity::from_surface(micro(10)),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(10)),
             micro(50)
         )
     );
@@ -351,7 +351,7 @@ async fn spl_062_the_split_draft_check_previews_what_recording_leaves() {
         .expect("holding");
     assert_eq!(
         untouched.quantity,
-        folioneer_lib::core::quantity::from_surface(micro(10)),
+        folioneer_lib::shared::domain::quantity::from_surface(micro(10)),
         "the check writes nothing"
     );
 

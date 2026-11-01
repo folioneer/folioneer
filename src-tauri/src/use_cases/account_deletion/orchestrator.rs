@@ -54,7 +54,7 @@ mod tests {
         AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
         SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
     };
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn setup_pool() -> sqlx::Pool<sqlx::Sqlite> {

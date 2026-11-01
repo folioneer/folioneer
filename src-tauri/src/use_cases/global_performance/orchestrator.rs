@@ -871,7 +871,7 @@ mod tests {
     use crate::context::currency::domain::{
         CurrencyRate, CurrencyRateSource, MockCurrencyPairRepository, MockCurrencyRateRepository,
     };
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
     use crate::use_cases::account_performance::AccountPerformanceUseCase;
     use sqlx::sqlite::SqlitePoolOptions;
 

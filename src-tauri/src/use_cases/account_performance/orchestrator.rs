@@ -59,7 +59,7 @@ mod tests {
         AssetService, CreateAssetDTO, SqliteAssetCategoryRepository, SqliteAssetPriceRepository,
         SqliteAssetRepository, SYSTEM_CATEGORY_ID,
     };
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
     use chrono::Datelike;
     use sqlx::sqlite::SqlitePoolOptions;
 

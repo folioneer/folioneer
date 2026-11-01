@@ -2,7 +2,7 @@
 //! its cost (TRF), through the window's transfer and marked part by part.
 
 use crate::context::account::Transaction;
-use crate::core::quantity::from_surface;
+use crate::shared::domain::quantity::from_surface;
 use std::sync::Arc;
 
 use serde_json::Value;

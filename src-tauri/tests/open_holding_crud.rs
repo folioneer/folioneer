@@ -67,7 +67,7 @@ async fn open_holding_end_to_end_persists_correct_fields() {
             &account.id,
             asset_id.clone(),
             "2024-01-01".to_string(),
-            folioneer_lib::core::quantity::from_surface(micro(2)),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(2)),
             micro(200),
         )
         .await
@@ -94,7 +94,7 @@ async fn open_holding_end_to_end_persists_correct_fields() {
     assert_eq!(holdings.len(), 1);
     assert_eq!(
         holdings[0].quantity,
-        folioneer_lib::core::quantity::from_surface(micro(2))
+        folioneer_lib::shared::domain::quantity::from_surface(micro(2))
     );
     assert_eq!(holdings[0].average_price, micro(100));
 }
@@ -109,7 +109,7 @@ async fn open_holding_account_not_found_propagates() {
             "nonexistent-account-id",
             asset_id,
             "2024-01-01".to_string(),
-            folioneer_lib::core::quantity::from_surface(micro(1)),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(1)),
             micro(100),
         )
         .await

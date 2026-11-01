@@ -111,7 +111,7 @@ mod tests {
         MockCurrencyPairRepository, MockCurrencyRateRepository,
     };
     use crate::context::currency::RateHistoryProvider;
-    use crate::core::quantity::from_surface;
+    use crate::shared::domain::quantity::from_surface;
 
     fn make_account(id: &str) -> Account {
         Account::restore(
@@ -256,7 +256,7 @@ mod tests {
                     "holding-1".to_string(),
                     account_id.to_string(),
                     "asset-usd".to_string(),
-                    crate::core::quantity::from_surface(1_000_000),
+                    crate::shared::domain::quantity::from_surface(1_000_000),
                     100_000_000,
                     0,
                     None,

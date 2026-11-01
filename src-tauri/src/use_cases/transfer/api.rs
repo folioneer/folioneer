@@ -4,7 +4,7 @@
 use super::error::TransferError;
 use super::orchestrator::{TransferFigures, TransferUseCase};
 use crate::context::account::{Transaction, TransferView};
-use crate::core::quantity::from_surface;
+use crate::shared::domain::quantity::from_surface;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;
