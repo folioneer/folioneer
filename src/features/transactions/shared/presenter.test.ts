@@ -183,24 +183,24 @@ describe("toTransactionRow — WriteOff (WOF-057)", () => {
 
 // SPL-060 — a split row shows its micro-scaled factor
 // as a trimmed "×N" ratio label.
-describe("toTransactionRow — Split (SPL-060)", () => {
-  const splitTx = (factorMicros: number) => ({
-    id: "tx-spl-1",
-    account_id: "account-1",
-    asset_id: "asset-equity-1",
-    transaction_type: "Split" as const,
-    date: "2026-07-01",
-    quantity: 0,
-    split_factor: factorMicros,
-    unit_price: 0,
-    exchange_rate: 1_000_000,
-    fees: 0,
-    total_amount: 0,
-    note: null,
-    realized_pnl: null,
-    created_at: "2026-07-01T10:00:00Z",
-  });
+const splitTx = (factorMicros: number) => ({
+  id: "tx-spl-1",
+  account_id: "account-1",
+  asset_id: "asset-equity-1",
+  transaction_type: "Split" as const,
+  date: "2026-07-01",
+  quantity: 0,
+  split_factor: factorMicros,
+  unit_price: 0,
+  exchange_rate: 1_000_000,
+  fees: 0,
+  total_amount: 0,
+  note: null,
+  realized_pnl: null,
+  created_at: "2026-07-01T10:00:00Z",
+});
 
+describe("toTransactionRow — Split (SPL-060)", () => {
   it("SPL-060: a whole factor renders without decimals (20_000_000 → '×20')", () => {
     const row = toTransactionRow(splitTx(20_000_000), "Alphabet Inc", "My Account");
     expect(row.quantity).toBe("×20");
@@ -216,6 +216,13 @@ describe("toTransactionRow — Split (SPL-060)", () => {
     expect(row.quantity).toBe("×0,1");
   });
 
+  it("SPL-060: type is 'Split' for i18n key construction", () => {
+    const row = toTransactionRow(splitTx(2_000_000), "Alphabet Inc", "My Account");
+    expect(row.type).toBe("Split");
+  });
+});
+
+describe("toTransactionRow — Dividend (DIV-023)", () => {
   // DIV-023 — a dividend row shows its amount, as when the amount was its quantity.
   it("DIV-023: a dividend shows its amount in the quantity column", () => {
     const dividend = {
@@ -225,11 +232,6 @@ describe("toTransactionRow — Split (SPL-060)", () => {
       dividend_amount: 2_500_000,
     };
     expect(toTransactionRow(dividend, "Asset", "Account").quantity).toMatch(/^2[.,]500$/);
-  });
-
-  it("SPL-060: type is 'Split' for i18n key construction", () => {
-    const row = toTransactionRow(splitTx(2_000_000), "Alphabet Inc", "My Account");
-    expect(row.type).toBe("Split");
   });
 });
 

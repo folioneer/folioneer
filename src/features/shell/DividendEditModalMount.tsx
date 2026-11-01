@@ -112,7 +112,7 @@ export function DividendEditModalMount() {
         assetId,
         date: transaction.date,
         // Exact, so saving without typing changes neither figure.
-        amount: microToExactDecimal(transaction.dividend_amount ?? 0),
+        amount: microToExactDecimal(transaction.dividend_amount ?? transaction.quantity),
         exchangeRate: microToExactDecimal(transaction.exchange_rate),
         note: transaction.note ?? "",
         unitPriceMicro: transaction.unit_price,

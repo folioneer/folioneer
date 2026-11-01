@@ -184,7 +184,7 @@ export function toTransactionRow(
     date: tx.date,
     quantity:
       tx.transaction_type === "Split"
-        ? formatSplitFactorLabel(tx.split_factor ?? 0)
+        ? formatSplitFactorLabel(tx.split_factor ?? tx.quantity)
         : microToFormatted(tx.dividend_amount ?? tx.quantity),
     unitPrice: microToFormatted(tx.unit_price),
     exchangeRate: microToFormatted(tx.exchange_rate),

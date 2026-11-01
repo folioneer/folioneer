@@ -96,7 +96,7 @@ The `AccountDetailsResponse` DTO (owned by ACD) gains one field.
 
 ### Display (050–059)
 
-**DIV-050 — Transaction list inclusion (frontend)**: Dividend transactions appear in the transaction list (TXL) when the user filters by the **paying asset** for that account. The Type column displays "Dividend" (cross-amends TXL-023). The Realized P&L column renders the neutral placeholder `—`. The amount/total columns render the stored values. When filtering by a different asset, the dividend does not appear.
+**DIV-050 — Transaction list inclusion (frontend)**: Dividend transactions appear in the transaction list (TXL) when the user filters by the **paying asset** for that account. The Type column displays "Dividend" (cross-amends TXL-023). The Quantity column shows its net amount (DIV-023). The Realized P&L column renders the neutral placeholder `—`. The amount/total columns render the stored values. When filtering by a different asset, the dividend does not appear.
 
 **DIV-051 — Reflected in Global Value (backend)**: Because a Dividend credits the Cash Holding, its amount is already included in `total_global_value` (CSH-094) through the cash term — independently of the per-asset dividend aggregation in DIV-070–073 (which sums the dividend transactions themselves, not the cash holding).
 

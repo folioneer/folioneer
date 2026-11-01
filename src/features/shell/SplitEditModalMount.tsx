@@ -109,7 +109,7 @@ export function SplitEditModalMount() {
         initialDate: transaction.date,
         // The micro-scaled factor is `split_factor` (SPL-010) — prefill it
         // back as the decimal multiplier the edit field expects.
-        initialFactor: microToFieldDecimal(transaction.split_factor ?? 0),
+        initialFactor: microToFieldDecimal(transaction.split_factor ?? transaction.quantity),
         initialNote: transaction.note ?? "",
       }}
     />
