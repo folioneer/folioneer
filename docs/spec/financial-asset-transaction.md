@@ -70,9 +70,9 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-024A — What is given as a quantity (frontend + backend)**: The tools of the AI agent connection (AGT-070, AGT-072, AGT-081, AGT-083, AGT-087, AGT-088) and the window's journal (SPL-060, DIV-050) give a split's factor (SPL-010) and a dividend's net amount (DIV-023) as the transaction's quantity; the command line, which records no split, does so for a dividend (CLI-021). An answer that returns a whole transaction, a recording's or a correction's, also carries `split_factor` and `dividend_amount` as such.
 
-**TRX-024B — A surface exchanges a quantity in micro-units (backend)**: The window, the AI agent connection and the command line read and send a quantity of a non-cash asset in micro-units, converted at the backend's boundary, so that what they read stops at the sixth decimal.
+**TRX-024B — A surface exchanges a quantity in micro-units (frontend + backend)**: The window, the AI agent connection and the command line read and send a quantity of a non-cash asset in micro-units, converted at the backend's boundary, so that what they read stops at the sixth decimal.
 
-**TRX-024C — The largest quantity (backend)**: A transaction's quantity cannot pass 1,000,000,000 units of a non-cash asset, or 100,000,000,000 units of money on a deposit, a withdrawal or a dividend, the same limits every device reads (SYN-034); a holding cannot pass 92,233,720,368.54775807 units, what storage holds. A recording or a correction past either, its replay included, is refused with a specific error; a merged ledger past what storage holds stands at it (CFR-042).
+**TRX-024C — The largest quantity (backend)**: A transaction's quantity cannot pass 1,000,000,000 units of a non-cash asset, or 100,000,000,000 units of a Cash Asset or a dividend's money, the same limits every device reads (SYN-034); a holding of a non-cash asset cannot pass 92,233,720,368.54775807 units, what storage holds. A recording or a correction past either, its replay included, is refused with a specific error; a merged ledger past what storage holds stands at it (CFR-042).
 
 **TRX-024D — A correction sent back unchanged (backend)**: A correction whose quantity is the one its surface read leaves the stored quantity as it is, its last two decimals included, even one that reads as zero.
 
@@ -190,7 +190,7 @@ Represents the current state of a position (asset held within an account). Compu
           │
           └─ [Save] → Backend validates (TRX-020, TRX-033)
                      → Backend computes total_amount (TRX-026)
-                     → Persists Transaction in micro-units (TRX-024)
+                     → Persists Transaction on the scales of TRX-024
                      → Updates Holding atomically (TRX-022, TRX-025, TRX-027)
                        using VWAP in chronological order (TRX-030, TRX-036)
                      → Publishes TransactionUpdated (TRX-037)

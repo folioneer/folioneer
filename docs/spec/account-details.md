@@ -37,7 +37,7 @@ Read projection for **open** positions (`quantity > 0`). Enriched by `AccountDet
 | `asset_id`        | `Holding`                    | ID of the held asset.                                                                                                                         |
 | `asset_name`      | `AssetService`               | Display name of the asset.                                                                                                                    |
 | `asset_reference` | `AssetService`               | Ticker or user-defined reference.                                                                                                             |
-| `quantity`        | `Holding`                    | Current number of units held (i64 micros). Always > 0.                                                                                        |
+| `quantity`        | `Holding`                    | Current number of units held, read in micro-units (TRX-024B). Always > 0.                                                                     |
 | `average_price`   | `Holding`                    | VWAP purchase price in account currency (i64 micros).                                                                                         |
 | `cost_basis`      | computed                     | `quantity × average_price` (i128 intermediate, per ACD-023/ACD-024). Not stored in DB.                                                        |
 | `realized_pnl`    | `Holding.total_realized_pnl` | Cumulative realized P&L from partial sells and write-offs (i64 micros, WOF-021). Zero if none. See SEL-042.                                   |
