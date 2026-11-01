@@ -8,7 +8,13 @@ import { useTransactions } from "@/features/transactions/useTransactions";
 import { getAutoRecordPrice } from "@/lib/autoRecordPriceStorage";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { microToExactDecimal, microToFieldDecimal, microToFormatted } from "@/lib/microUnits";
+import {
+  formatQuantity,
+  isPositiveQuantity,
+  microToExactDecimal,
+  microToFieldDecimal,
+  microToFormatted,
+} from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -22,8 +28,8 @@ interface UseSellTransactionProps {
   assetId: string;
   /** The asset's reference, named by a refusal for lack of units (SEL-021). */
   assetReference: string;
-  /** Holding quantity in micro-units — shown as the maximum sellable quantity (SEL-022). */
-  holdingQuantityMicro: number;
+  /** Holding quantity as decimal text — shown as the maximum sellable quantity (SEL-022). */
+  holdingQuantity: string;
   onSubmitSuccess?: () => void;
 }
 
@@ -31,7 +37,7 @@ export function useSellTransaction({
   accountId,
   assetId,
   assetReference,
-  holdingQuantityMicro,
+  holdingQuantity,
   onSubmitSuccess,
 }: UseSellTransactionProps) {
   const { t, i18n } = useTranslation();
@@ -83,7 +89,10 @@ export function useSellTransaction({
   // nothing is held as of that date (TDI-021).
   const { snapshot } = useHoldingSnapshotAsOf(accountId, assetId, formData.date);
   const averageCostAsOfDate = useMemo(
-    () => (snapshot && snapshot.quantity > 0 ? microToFormatted(snapshot.average_price) : null),
+    () =>
+      snapshot && isPositiveQuantity(snapshot.quantity)
+        ? microToFormatted(snapshot.average_price)
+        : null,
     [snapshot],
   );
 
@@ -215,7 +224,7 @@ export function useSellTransaction({
     /** Sell total proceeds in micro-units formatted for display (SEL-023, read-only). */
     totalAmountDisplay: microToFormatted(preview?.total_amount ?? 0),
     /** Maximum sellable quantity formatted for display (SEL-022). */
-    maxQuantityDisplay: microToFormatted(holdingQuantityMicro, 6),
+    maxQuantityDisplay: formatQuantity(holdingQuantity, 6),
     /** SEL-050 — how the money side is entered; resets with the modal (not persisted). */
     entryMode,
     setEntryMode: handleEntryModeChange,

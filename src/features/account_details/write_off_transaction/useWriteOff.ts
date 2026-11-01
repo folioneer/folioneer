@@ -3,7 +3,13 @@ import { useTranslation } from "react-i18next";
 import type { WriteOffReason } from "@/bindings";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { decimalToMicro } from "@/lib/microUnits";
+import {
+  addQuantities,
+  compareQuantities,
+  decimalToQuantity,
+  isPositiveQuantity,
+  quantityCost,
+} from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import { accountDetailsGateway } from "../gateway";
 import { type WriteOffRefusal, writeOffErrorToI18n } from "../shared/presenter";
@@ -27,8 +33,8 @@ export interface WriteOffEditMode {
   initialDate: string;
   /** The quantity as a field decimal. */
   initialQuantity: string;
-  /** The quantity in micro-units, counted back into what is held (WOF-058). */
-  initialQuantityMicro: number;
+  /** The quantity as decimal text, counted back into what is held (WOF-058). */
+  initialReadQuantity: string;
   initialReason: WriteOffReason;
   initialNote: string;
 }
@@ -47,11 +53,6 @@ interface WriteOffFormData {
   note: string;
 }
 
-/** The cost a quantity takes out at an average price, rounded down (WOF-021). */
-function costOf(quantityMicro: number, averagePriceMicro: number): number {
-  return Number((BigInt(quantityMicro) * BigInt(averagePriceMicro)) / 1_000_000n);
-}
-
 export function useWriteOff({ accountId, target, onSubmitSuccess, editMode }: UseWriteOffProps) {
   const { t, i18n } = useTranslation();
   const showSnackbar = useSnackbar();
@@ -66,24 +67,23 @@ export function useWriteOff({ accountId, target, onSubmitSuccess, editMode }: Us
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // WOF-058 — when correcting, the write-off being edited counts back into what is held.
-  const heldMicro = target.quantityMicro + (editMode?.initialQuantityMicro ?? 0);
+  const heldQuantity = addQuantities(target.heldQuantity, editMode?.initialReadQuantity ?? "0");
 
-  // WOF-053 — a figure that rounds to no micro-unit is no quantity.
-  const quantityMicro = useMemo(() => {
+  // WOF-053 — a figure left at zero by what the form keeps is no quantity (TRX-024J).
+  const quantity = useMemo(() => {
     if (validateAmount(formData.quantity) !== null) return null;
-    const micro = decimalToMicro(formData.quantity);
-    return micro > 0 ? micro : null;
+    const read = decimalToQuantity(formData.quantity);
+    return isPositiveQuantity(read) ? read : null;
   }, [formData.quantity]);
 
   // WOF-053 — a quantity above the quantity held is refused under the field, without recording.
-  const overHolding = quantityMicro !== null && quantityMicro > heldMicro;
+  const overHolding = quantity !== null && compareQuantities(quantity, heldQuantity) > 0;
 
   // WOF-052 — the form's estimate at the average price shown; the core takes the cost at the date.
   const estimatedCostMicro =
-    quantityMicro !== null && !overHolding ? costOf(quantityMicro, target.averagePriceMicro) : null;
+    quantity !== null && !overHolding ? quantityCost(quantity, target.averagePriceMicro) : null;
 
-  const isFormValid =
-    quantityMicro !== null && !overHolding && validateDate(formData.date) === null;
+  const isFormValid = quantity !== null && !overHolding && validateDate(formData.date) === null;
 
   const handleChange = useCallback((field: keyof WriteOffFormData, value: string) => {
     // WOF-055 — a refusal holds until the date, the quantity or the reason changes.
@@ -94,7 +94,7 @@ export function useWriteOff({ accountId, target, onSubmitSuccess, editMode }: Us
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (quantityMicro === null || overHolding) return;
+      if (quantity === null || overHolding) return;
       const dateErr = validateDate(formData.date);
       if (dateErr) {
         setRefusal({ message: dateErr, onQuantity: false });
@@ -110,7 +110,7 @@ export function useWriteOff({ accountId, target, onSubmitSuccess, editMode }: Us
               account_id: accountId,
               transaction_id: editMode.transactionId,
               date: formData.date,
-              quantity: quantityMicro,
+              quantity,
               reason: formData.reason,
               note,
             })
@@ -118,7 +118,7 @@ export function useWriteOff({ accountId, target, onSubmitSuccess, editMode }: Us
               account_id: accountId,
               asset_id: target.assetId,
               date: formData.date,
-              quantity: quantityMicro,
+              quantity,
               reason: formData.reason,
               note,
             });
@@ -141,7 +141,7 @@ export function useWriteOff({ accountId, target, onSubmitSuccess, editMode }: Us
       accountId,
       target,
       formData,
-      quantityMicro,
+      quantity,
       overHolding,
       editMode,
       t,
@@ -156,7 +156,7 @@ export function useWriteOff({ accountId, target, onSubmitSuccess, editMode }: Us
     refusal,
     isSubmitting,
     isFormValid,
-    heldMicro,
+    heldQuantity,
     overHolding,
     estimatedCostMicro,
     handleChange,

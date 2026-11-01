@@ -4,7 +4,6 @@
 //! it, so the two never differ. A price at a date is recorded here too (CLI-029, AGT-062): it
 //! is no holding transaction, and it shares the lookup by name and the refusals.
 
-use crate::shared::domain::quantity::{from_surface, to_surface};
 use serde::Serialize;
 
 use crate::context::account::{
@@ -13,6 +12,7 @@ use crate::context::account::{
 };
 use crate::context::asset::{Asset, AssetClass, AssetError, AssetPrice};
 use crate::core::BACKEND;
+use crate::shared::domain::quantity::non_cash_quantity_text;
 
 use super::error::{
     DividendError, DividendTask, FreeSharesError, FreeSharesTask, InterestError, InterestTask,
@@ -156,8 +156,8 @@ pub struct InterestCredit {
     pub date: Option<String>,
     /// The share of what is held credited (micro-percent, INT-022).
     pub percent: Option<i64>,
-    /// The quantity credited (micro-units).
-    pub quantity: Option<i64>,
+    /// The quantity credited, as decimal text (TRX-024B).
+    pub quantity: Option<String>,
     /// Optional note.
     pub note: Option<String>,
 }
@@ -173,7 +173,7 @@ pub struct ManagementFee {
     pub date: Option<String>,
     /// The share of what is held removed (micro-percent, FEE-022).
     pub percent: Option<i64>,
-    /// What the holding holds after the fee (micro-units, FEE-028).
+    /// What the holding holds after the fee, on the stored scale (TRX-024, FEE-028).
     pub resulting_quantity: Option<i64>,
     /// Optional note.
     pub note: Option<String>,
@@ -273,8 +273,8 @@ pub struct AsShown {
     pub date: String,
     /// What kind of transaction.
     pub kind: TransactionType,
-    /// Its quantity, in micro-units.
-    pub quantity: i64,
+    /// Its quantity, as decimal text (TRX-024A).
+    pub quantity: String,
     /// Its amount in the account's currency, in micro-units.
     pub amount: i64,
     /// Its unit price, in micro-units.
@@ -294,9 +294,9 @@ impl AsShown {
         (
             &transaction.date,
             transaction.transaction_type,
-            transaction.shown_quantity(),
+            &transaction.shown_quantity(),
             transaction.total_amount,
-        ) == (&self.date, self.kind, self.quantity, self.amount)
+        ) == (&self.date, self.kind, &self.quantity, self.amount)
     }
 
     /// Whether `transaction` still stands in full as the owner was shown it before a change:
@@ -355,8 +355,8 @@ pub struct Recorded {
 pub struct Correction {
     /// The new date.
     pub date: Option<String>,
-    /// The new quantity (micro-units).
-    pub quantity: Option<i64>,
+    /// The new quantity, as decimal text (TRX-024B).
+    pub quantity: Option<String>,
     /// The new unit price in the asset's currency (micro-units); never with `total`.
     pub price: Option<i64>,
     /// The new all-in total in the account's currency — for an opening balance, its total
@@ -454,7 +454,7 @@ fn price_and_total(stored: &Transaction, correction: &Correction) -> (i64, Optio
 }
 
 /// AGT-087 — what a change can move of a transaction: equal before and after, nothing changes.
-fn comparable(t: &Transaction) -> (&str, i64, i64, i64, i64, i64, Option<&str>) {
+fn comparable(t: &Transaction) -> (&str, String, i64, i64, i64, i64, Option<&str>) {
     (
         &t.date,
         t.shown_quantity(),
@@ -473,8 +473,8 @@ pub struct HeldAsOf {
     pub asset: String,
     /// The asset's name, which tells apart two assets sharing a reference (CLI-041).
     pub name: String,
-    /// The quantity held (micro-units).
-    pub quantity: i64,
+    /// The quantity held, as decimal text.
+    pub quantity: String,
     /// The average price, in the account's currency (micro-units).
     pub average_price: i64,
 }
@@ -562,10 +562,10 @@ fn change_fields(
     }
     let quantity = match kind {
         TransactionType::Deposit | TransactionType::Withdrawal | TransactionType::Dividend => {
-            change.amount.unwrap_or(stored.shown_quantity())
+            change.amount.unwrap_or(stored.quantity_figure())
         }
         TransactionType::Split => match (change.new, change.old) {
-            (None, None) => stored.shown_quantity(),
+            (None, None) => stored.quantity_figure(),
             (Some(new), Some(old)) => SplitSize::Ratio {
                 new: Some(new),
                 old: Some(old),
@@ -581,7 +581,13 @@ fn change_fields(
         },
         _ => c
             .quantity
-            .map(|quantity| stored.stored_correction_quantity(quantity))
+            .as_deref()
+            .map(|text| {
+                stored
+                    .stored_correction_quantity(text)
+                    .map_err(|error| refusal_from_account(&error.into()))
+            })
+            .transpose()?
             .unwrap_or(stored.quantity),
     };
     let (unit_price, total) = match kind {
@@ -1066,7 +1072,7 @@ impl HoldingTransactionUseCase {
                             &found.account_id,
                             found.asset_id.clone(),
                             date,
-                            from_surface(target.quantity),
+                            target.quantity,
                             total_cost,
                         )
                         .await
@@ -1176,7 +1182,7 @@ impl HoldingTransactionUseCase {
                             &found.account_id,
                             found.asset_id.clone(),
                             date,
-                            from_surface(free_shares.quantity),
+                            free_shares.quantity,
                             free_shares.note,
                         )
                         .await
@@ -1197,7 +1203,7 @@ impl HoldingTransactionUseCase {
                             &found.account_id,
                             found.asset_id.clone(),
                             date,
-                            from_surface(write_off.quantity),
+                            write_off.quantity,
                             write_off.reason,
                             write_off.note,
                         )
@@ -1347,7 +1353,7 @@ impl HoldingTransactionUseCase {
             holdings.push(HeldAsOf {
                 asset: reference,
                 name,
-                quantity: to_surface(snapshot.quantity),
+                quantity: non_cash_quantity_text(snapshot.quantity),
                 average_price: snapshot.average_price,
             });
         }
@@ -1407,7 +1413,7 @@ impl HoldingTransactionUseCase {
             &found.account_id,
             found.asset_id.clone(),
             date,
-            from_surface(free_shares.quantity),
+            free_shares.quantity,
             free_shares.note,
         )
         .await
@@ -1460,7 +1466,10 @@ impl HoldingTransactionUseCase {
         // INT-023 — on the account's cash line the credit is money, in its own scale.
         let credited = interest
             .quantity
-            .map(|quantity| crate::shared::domain::quantity::stored_for(&asset_id, quantity));
+            .as_deref()
+            .map(|text| crate::shared::domain::quantity::stored_quantity(&asset_id, text))
+            .transpose()
+            .map_err(|error| refusal_from_account(&error.into()))?;
         self.record_interest(
             &account_id,
             asset_id,
@@ -1509,7 +1518,7 @@ impl HoldingTransactionUseCase {
             found.asset_id.clone(),
             date,
             fee.percent,
-            fee.resulting_quantity.map(from_surface),
+            fee.resulting_quantity,
             fee.note,
         )
         .await
@@ -1539,7 +1548,7 @@ impl HoldingTransactionUseCase {
             &found.account_id,
             found.asset_id.clone(),
             date,
-            from_surface(write_off.quantity),
+            write_off.quantity,
             write_off.reason,
             write_off.note,
         )
@@ -1640,7 +1649,7 @@ impl HoldingTransactionUseCase {
                     account_id: found.account_id.clone(),
                     asset_id: found.asset_id.clone(),
                     date: date.clone(),
-                    quantity: from_surface(target.quantity),
+                    quantity: target.quantity,
                     total_cost: Some(*total_cost),
                 })
                 .is_ok_and(|preview| preview.zero_cost),
@@ -1652,7 +1661,7 @@ impl HoldingTransactionUseCase {
                     &found.account_id,
                     found.asset_id.clone(),
                     date,
-                    from_surface(target.quantity),
+                    target.quantity,
                     total_cost,
                 )
                 .await
@@ -1663,7 +1672,7 @@ impl HoldingTransactionUseCase {
                     &found.account_id,
                     found.asset_id.clone(),
                     date,
-                    from_surface(trade.target.quantity),
+                    trade.target.quantity,
                     unit_price,
                     trade.rate,
                     trade.fees,
@@ -1679,7 +1688,7 @@ impl HoldingTransactionUseCase {
                     &found.account_id,
                     found.asset_id.clone(),
                     date,
-                    from_surface(trade.target.quantity),
+                    trade.target.quantity,
                     unit_price,
                     trade.rate,
                     trade.fees,
@@ -1855,7 +1864,7 @@ fn trade_op(trade: &Trade, asset_id: String, date: String) -> TradeOp {
     TradeOp {
         asset_id,
         date,
-        quantity: from_surface(trade.target.quantity),
+        quantity: trade.target.quantity,
         unit_price,
         exchange_rate: trade.rate,
         fees: trade.fees,
@@ -2041,8 +2050,8 @@ pub fn refusal_from_account(error: &AccountError) -> Refusal {
             requested,
         } => format!(
             "only {} held on that date, not {}",
-            decimal(*available),
-            decimal(*requested)
+            non_cash_quantity_text(*available),
+            non_cash_quantity_text(*requested)
         ),
         AccountError::InsufficientCash { .. } => "not enough cash in the account".to_string(),
         AccountError::ClosedPosition => "nothing of this asset is held on that date".to_string(),
@@ -2105,7 +2114,7 @@ pub fn refusal_from_account(error: &AccountError) -> Refusal {
         }
         AccountError::ResultingQuantityNotBelowHeld { held_quantity } => format!(
             "the resulting quantity must be below the {} held on that date",
-            decimal(*held_quantity)
+            non_cash_quantity_text(*held_quantity)
         ),
         AccountError::InterestAmountInvalid => "give either percent or quantity".to_string(),
         AccountError::ManagementFeeAmountInvalid => {
@@ -2156,8 +2165,8 @@ mod tests {
         let cases = [
             (
                 AccountError::Oversell {
-                    available: 1_000_000,
-                    requested: 2_500_000,
+                    available: 100_000_000,
+                    requested: 250_000_000,
                 },
                 "Oversell",
                 "only 1 held on that date, not 2.5",

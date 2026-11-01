@@ -1,5 +1,5 @@
 import type { Transaction } from "@/bindings";
-import { microToFieldDecimal } from "@/lib/microUnits";
+import { quantityToFieldDecimal } from "@/lib/microUnits";
 import { writeOffAveragePriceMicro } from "../shared/presenter";
 import type { WriteOffTarget } from "../shared/types";
 import { useWriteOffEdit } from "./useWriteOffEdit";
@@ -28,15 +28,15 @@ export function WriteOffEditModal({
   onClose,
   onSubmitSuccess,
 }: WriteOffEditModalProps) {
-  const heldMicro = useWriteOffEdit(accountId, transaction, assetReference, onClose);
+  const heldQuantity = useWriteOffEdit(accountId, transaction, assetReference, onClose);
 
-  if (heldMicro === null) return null;
+  if (heldQuantity === null) return null;
 
   const target: WriteOffTarget = {
     assetId: transaction.asset_id,
     assetName,
     assetReference,
-    quantityMicro: heldMicro,
+    heldQuantity,
     averagePriceMicro: writeOffAveragePriceMicro(transaction),
   };
 
@@ -50,8 +50,8 @@ export function WriteOffEditModal({
       editMode={{
         transactionId: transaction.id,
         initialDate: transaction.date,
-        initialQuantity: microToFieldDecimal(transaction.quantity),
-        initialQuantityMicro: transaction.quantity,
+        initialQuantity: quantityToFieldDecimal(transaction.quantity),
+        initialReadQuantity: transaction.quantity,
         initialReason: transaction.write_off_reason ?? "Other",
         initialNote: transaction.note ?? "",
       }}

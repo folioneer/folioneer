@@ -2,9 +2,10 @@ import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
 import {
+  formatQuantity,
+  isPositiveQuantity,
   microToFormatted,
   microToFormattedPrice,
-  microToFormattedQuantity,
 } from "@/lib/microUnits";
 import { Button } from "@/ui/components/button/Button";
 import { CalcField } from "@/ui/components/field/CalcField";
@@ -53,7 +54,7 @@ export function TransferModal({
     refusal,
     isSubmitting,
     isFormValid,
-    heldMicro,
+    heldQuantity,
     overHolding,
     receivedAboveSent,
     summary,
@@ -73,7 +74,7 @@ export function TransferModal({
     [destinations, formData.toAccountId, t],
   );
 
-  const held = microToFormattedQuantity(heldMicro);
+  const held = formatQuantity(heldQuantity);
   // TRF-054 — over the quantity held, refused under the field; TRF-055 — a refusal for lack
   // of units shows there too.
   const sentError = overHolding
@@ -214,10 +215,10 @@ export function TransferModal({
                 account: destination.name,
               })}
             </p>
-            {summary.feeMicro > 0 && (
+            {isPositiveQuantity(summary.fee) && (
               <p id="transfer-summary-fee" className="text-m3-on-surface-variant">
                 {t("transfer.summary_fee", {
-                  fee: microToFormattedQuantity(summary.feeMicro),
+                  fee: formatQuantity(summary.fee),
                   reference: target.assetReference,
                   cost: microToFormatted(summary.feeCostMicro, 2),
                   currency: target.accountCurrency,

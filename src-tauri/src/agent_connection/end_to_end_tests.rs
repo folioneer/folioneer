@@ -371,7 +371,7 @@ async fn agt_044_an_agent_records_through_the_rules_and_its_recordings_are_marke
         (6, "give either price or total, not both"),
         (
             7,
-            "quantity is not a decimal with a dot and at most six decimals: \"1,5\"",
+            "quantity is not a decimal with a dot and at most eight decimals: \"1,5\"",
         ),
         (8, "total_cost is missing"),
     ] {
@@ -415,7 +415,13 @@ async fn agt_044_an_agent_records_through_the_rules_and_its_recordings_are_marke
         .find(|row| row.transaction.transaction_type == TransactionType::Sell)
         .expect("the sale")
         .transaction
+        .id
         .clone();
+    let sale = accounts
+        .get_transaction_by_id(&sale)
+        .await
+        .expect("read")
+        .expect("the sale");
     accounts
         .correct_transaction(
             &account.id,
@@ -1290,7 +1296,7 @@ async fn agt_051_a_session_changes_what_another_session_recorded_and_the_mark_st
         .iter()
         .find(|row| row.transaction.id == of_the_first)
         .expect("still there");
-    assert_eq!(corrected.transaction.quantity, 100 * M);
+    assert_eq!(corrected.transaction.quantity, "1");
     assert_eq!(
         corrected.recorded_by.as_ref().expect("marked").session,
         first.key,
@@ -3651,7 +3657,7 @@ async fn agt_080_a_removal_is_refused_before_asking_or_by_the_deletion() {
         account: "PEA".to_string(),
         asset: "CW8".to_string(),
         date: Some(date.to_string()),
-        quantity,
+        quantity: quantity * 100,
     };
     let opened = bench
         .recorder
@@ -3697,7 +3703,7 @@ async fn agt_080_a_removal_is_refused_before_asking_or_by_the_deletion() {
         Some("Amundi MSCI World")
     );
     assert_eq!(request.transaction.asset_reference.as_deref(), Some("CW8"));
-    assert_eq!(request.transaction.quantity, 10 * M);
+    assert_eq!(request.transaction.quantity, "10");
     let answered = answer_removal(&bench.connections, &bench.recorder, request.id, true).await;
     let Err(AnswerRefused::NotDone { reason }) = answered else {
         panic!("the deletion refused: {answered:?}");
@@ -4271,7 +4277,7 @@ async fn agt_063_a_split_that_cannot_be_marked_is_undone() {
                 account: "PEA".to_string(),
                 asset: "CW8".to_string(),
                 date: Some("2026-01-05".to_string()),
-                quantity: 10 * M,
+                quantity: 10 * 100 * M,
             },
             total_cost: 4_000 * M,
         },
@@ -4575,7 +4581,7 @@ async fn change_waiting(connections: &AgentConnections) -> super::connections::C
 /// The deposit the workbench seeds, as the owner typed it.
 async fn typed_deposit(bench: &Workbench) -> crate::context::account::Transaction {
     let account = bench.accounts.get_all().await.expect("accounts").remove(0);
-    bench
+    let id = bench
         .accounts
         .get_account_journal(
             &account.id,
@@ -4586,6 +4592,13 @@ async fn typed_deposit(bench: &Workbench) -> crate::context::account::Transactio
         .rows
         .remove(0)
         .transaction
+        .id;
+    bench
+        .accounts
+        .get_transaction_by_id(&id)
+        .await
+        .expect("read")
+        .expect("the deposit")
 }
 
 // AGT-087 / AGT-088 / AGT-082 — an agent asks to change a transaction the owner typed: the
@@ -4711,7 +4724,7 @@ async fn agt_087_a_change_is_refused_before_asking() {
         account: "PEA".to_string(),
         asset: "CW8".to_string(),
         date: Some(date.to_string()),
-        quantity,
+        quantity: quantity * 100,
     };
     let opened = bench
         .recorder
@@ -4813,7 +4826,7 @@ async fn agt_087_each_type_takes_what_its_correction_takes() {
         account: "PEA".to_string(),
         asset: "CW8".to_string(),
         date: Some(date.to_string()),
-        quantity,
+        quantity: quantity * 100,
     };
     let bought = bench
         .recorder
@@ -4853,8 +4866,8 @@ async fn agt_087_each_type_takes_what_its_correction_takes() {
 
     let asked = ask(json!({ "transaction": split.id, "new": 3, "old": 1 }));
     let request = change_waiting(&bench.connections).await;
-    assert_eq!(request.transaction.quantity, 2 * M);
-    assert_eq!(request.becomes.quantity, 3 * M);
+    assert_eq!(request.transaction.quantity, "2");
+    assert_eq!(request.becomes.quantity, "3");
     answer_change(&bench.connections, &bench.recorder, request.id, false)
         .await
         .expect("answered");
@@ -4874,7 +4887,7 @@ async fn agt_087_each_type_takes_what_its_correction_takes() {
     let asked = ask(json!({ "transaction": bought.transaction.id, "quantity": 5 }));
     let request = change_waiting(&bench.connections).await;
     assert_eq!(request.transaction.amount, 400 * M);
-    assert_eq!(request.becomes.quantity, 5 * M);
+    assert_eq!(request.becomes.quantity, "5");
     assert_eq!(request.becomes.amount, 500 * M);
     answer_change(&bench.connections, &bench.recorder, request.id, true)
         .await
@@ -5085,7 +5098,7 @@ async fn agt_080_two_sessions_ask_for_one_transaction_outside_the_limit() {
                     account: "PEA".to_string(),
                     asset: "CW8".to_string(),
                     date: Some("2026-01-05".to_string()),
-                    quantity: 10 * M,
+                    quantity: 10 * 100 * M,
                 },
                 total_cost: 4_000 * M,
             },
@@ -5125,7 +5138,7 @@ async fn agt_080_two_sessions_ask_for_one_transaction_outside_the_limit() {
     let requests = bench.connections.removals();
     assert_eq!(requests.len(), 2);
     assert_eq!(requests[0].session, first.session_id);
-    assert_eq!(requests[0].transaction.quantity, 3 * M, "a split's factor");
+    assert_eq!(requests[0].transaction.quantity, "3", "a split's factor");
 
     answer_removal(&bench.connections, &bench.recorder, requests[0].id, true)
         .await
@@ -5543,7 +5556,7 @@ async fn agt_072_a_preview_changes_nothing_and_shows_the_account_before_and_afte
                     account: "PEA".to_string(),
                     asset: "CW8".to_string(),
                     date: Some("2026-02-01".to_string()),
-                    quantity: 4 * M,
+                    quantity: 4 * 100 * M,
                 },
                 amount: TradeAmount::Price(100 * M),
                 fees: 0,
@@ -5597,7 +5610,7 @@ async fn agt_072_the_cash_of_an_account_built_from_opening_balances_is_previewed
                     account: "CTO".to_string(),
                     asset: "CW8".to_string(),
                     date: Some("2026-01-05".to_string()),
-                    quantity: 10 * M,
+                    quantity: 10 * 100 * M,
                 },
                 total_cost: 100 * M,
             },
@@ -5765,7 +5778,7 @@ async fn agt_072_cash_a_dividend_and_free_shares_are_previewed() {
                     account: "PEA".to_string(),
                     asset: "CW8".to_string(),
                     date: Some("2026-02-01".to_string()),
-                    quantity: 4 * M,
+                    quantity: 4 * 100 * M,
                 },
                 amount: TradeAmount::Price(100 * M),
                 fees: 0,
@@ -6411,7 +6424,7 @@ mod owner {
                 account: account.to_string(),
                 asset: "CW8".to_string(),
                 date: Some(date.to_string()),
-                quantity: quantity * M,
+                quantity: quantity * 100 * M,
             },
             amount: TradeAmount::Price(price * M),
             fees: 0,
@@ -6588,15 +6601,15 @@ async fn replaced_stands_as_recorded(received: i64) {
     let moved: Vec<_> = request
         .transactions
         .iter()
-        .map(|t| (t.holding_moved, t.cash_moved))
+        .map(|t| (t.holding_moved.clone(), t.cash_moved))
         .collect();
     assert_eq!(
         moved,
         [
-            (Some(-4 * M), 600 * M),
+            (Some("-4".to_string()), 600 * M),
             (None, -600 * M),
             (None, 600 * M),
-            (Some(received * M), -600 * M)
+            (Some(received.to_string()), -600 * M)
         ],
         "each step's quantity and cash, signed by the core"
     );
@@ -6613,11 +6626,11 @@ async fn replaced_stands_as_recorded(received: i64) {
     assert_eq!(request.transfer.from_account, "A1");
     assert_eq!(request.transfer.to_account, "A2");
     assert_eq!(request.transfer.date, "2019-06-01", "the sale's date");
-    assert_eq!(request.transfer.quantity_sent, 4 * M);
-    assert_eq!(request.transfer.quantity_received, received * M);
+    assert_eq!(request.transfer.quantity_sent, 400 * M);
+    assert_eq!(request.transfer.quantity_received, 100 * received * M);
     assert_eq!(
         request.transfer.quantity_not_received,
-        (received < 4).then_some((4 - received) * M),
+        (received < 4).then_some(100 * (4 - received) * M),
         "the fee in kind, when less is received"
     );
     assert_eq!(
@@ -7342,8 +7355,54 @@ async fn agt_014_no_answer_carries_a_figure_as_a_number() {
     }
 }
 
-/// TRX-024D, AGT-014 — a quantity holding more than the six decimals an agent reads, sent
-/// back as it was read, keeps its last decimals.
+/// TRX-024B — a satoshi through an agent: recorded, read back, sold, a ninth decimal refused.
+#[tokio::test]
+async fn trx_024b_a_satoshi_is_recorded_read_back_and_sold_by_an_agent() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+    call(
+        "record_deposit",
+        json!({ "account": "PEA", "amount": 2000, "date": "2019-01-15" }),
+    )
+    .await
+    .expect("deposited");
+    let bought = call(
+        "record_purchase",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": "0.00000002", "total": "1", "date": "2019-03-01" }),
+    )
+    .await
+    .expect("bought");
+    assert_eq!(bought["transaction"]["quantity"], "0.00000002");
+    let sold = call(
+        "record_sale",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": "0.00000001", "total": "1", "date": "2019-03-02" }),
+    )
+    .await
+    .expect("sold, though below a millionth");
+    assert_eq!(sold["transaction"]["quantity"], "0.00000001");
+
+    let refused = call(
+        "record_sale",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": "0.000000001", "total": "1", "date": "2019-03-03" }),
+    )
+    .await
+    .expect_err("a ninth decimal");
+    assert_eq!(refused.code, "InvalidFigure");
+    let oversold = call(
+        "record_sale",
+        json!({ "account": "PEA", "asset": "CW8", "quantity": "1", "total": "1", "date": "2019-03-03" }),
+    )
+    .await
+    .expect_err("more than held");
+    assert_eq!(oversold.message, "only 0.00000001 held on that date, not 1");
+}
+
+/// TRX-024D, AGT-014 — a quantity sent back as it was read keeps every decimal.
 #[tokio::test]
 async fn agt_014_a_quantity_corrected_as_it_was_read_keeps_its_stored_decimals() {
     let data_dir = tempfile::tempdir().expect("tempdir");
@@ -7382,7 +7441,7 @@ async fn agt_014_a_quantity_corrected_as_it_was_read_keeps_its_stored_decimals()
         .find(|row| row["id"] == id)
         .expect("the purchase")["quantity"]
         .clone();
-    assert_eq!(read, "1.234567");
+    assert_eq!(read, "1.23456789");
 
     call(
         "correct_recording",

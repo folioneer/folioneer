@@ -61,7 +61,10 @@ describe("previewPresenter", () => {
     const view = rowViewOf(
       row({
         status: "Rejected",
-        reason: { code: "ManualEntry", refusal: { code: "Oversell", available: 1, requested: 2 } },
+        reason: {
+          code: "ManualEntry",
+          refusal: { code: "Oversell", available: "0.000001", requested: "0.000002" },
+        },
         operation: purchase,
       }),
     );
@@ -173,7 +176,7 @@ describe("previewPresenter", () => {
     expect(
       rowReasonToI18n({
         code: "ManualEntry",
-        refusal: { code: "Oversell", available: 10_000_000, requested: 15_000_000 },
+        refusal: { code: "Oversell", available: "10", requested: "15" },
       }),
     ).toEqual({ key: "account_import.reason_over_held", vars: { held: "10" } });
   });

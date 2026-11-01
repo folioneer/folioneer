@@ -78,7 +78,7 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 
 **WOF-052 — Its estimate (frontend)**: While the quantity is a positive figure within what is held, a line gives what it takes out at the average price shown and says that no cash moves and, for `Lost`, that the result is shown apart as lost. It is the form's estimate; the core takes the cost at the date (WOF-021).
 
-**WOF-053 — Its quantity (frontend)**: While the quantity is empty, zero, below one micro-unit or not a positive figure, the record action is inactive. As it is typed, a quantity above the quantity held shown in the form is refused under the field, naming what is held, and the record action stays inactive; what was held on the chosen date is the core's check, its refusal worded as WOF-055 says.
+**WOF-053 — Its quantity (frontend)**: While the quantity is empty, zero, left at zero by the decimals it keeps (TRX-024J) or not a positive figure, the record action is inactive. As it is typed, a quantity above the quantity held shown in the form is refused under the field, naming what is held, and the record action stays inactive; what was held on the chosen date is the core's check, its refusal worded as WOF-055 says.
 
 **WOF-054 — Saving (frontend)**: While it saves, the record action is inactive; on success the form closes, a confirmation shows and the holding row shows the new figures.
 

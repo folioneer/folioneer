@@ -2,7 +2,7 @@
 //! transfer recorded the four-step way — with the transfer they stand for. AGT-093 — four
 //! that agents recorded it replaces without asking.
 
-use crate::shared::domain::quantity::to_surface;
+use crate::shared::domain::quantity::quantity_text;
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -127,7 +127,7 @@ impl AgentTools {
                     .get_transfer(&transfer_id)
                     .await
                     .ok()
-                    .map(|view| view.as_shown()),
+                    ,
                 None => None,
             };
             Ok(Some((parts.len(), view)))
@@ -226,7 +226,9 @@ fn shown_of(
         typed_of(&step.id).map(|t| {
             let transaction = shown(t, &t.transaction);
             ReplacedShown {
-                holding_moved: holding.map(|sign| sign * transaction.quantity),
+                holding_moved: holding.map(|sign| {
+                    quantity_text(&t.transaction.asset_id, sign * t.transaction.quantity)
+                }),
                 cash_moved: cash * transaction.amount,
                 transaction,
             }
@@ -247,9 +249,9 @@ fn shown_of(
         date: steps.sale.date.clone(),
         asset_name: asset.name.clone(),
         asset_reference: asset.reference.clone(),
-        quantity_sent: to_surface(steps.sale.quantity),
-        quantity_received: to_surface(steps.purchase.quantity),
-        quantity_not_received: Some(to_surface(steps.sale.quantity - steps.purchase.quantity))
+        quantity_sent: steps.sale.quantity,
+        quantity_received: steps.purchase.quantity,
+        quantity_not_received: Some(steps.sale.quantity - steps.purchase.quantity)
             .filter(|not_received| *not_received > 0),
         cost: asked.cost(),
         from_currency: sale.currency.clone(),

@@ -1,4 +1,4 @@
-import { microToFieldDecimal } from "@/lib/microUnits";
+import { microToFieldDecimal, quantityToFieldDecimal } from "@/lib/microUnits";
 import { otherAccounts, useAppStore } from "@/lib/store";
 import { transferAveragePriceMicro } from "../shared/presenter";
 import type { TransferTarget } from "../shared/types";
@@ -29,7 +29,7 @@ export function TransferEditModal({
 
   if (loaded === null) return null;
 
-  const { transfer, heldMicro } = loaded;
+  const { transfer, heldQuantity } = loaded;
   const asset = assets.find((a) => a.id === transfer.asset_id);
   const from = accounts.find((a) => a.id === transfer.from_account_id);
   const destinations = otherAccounts(accounts, transfer.from_account_id);
@@ -37,7 +37,7 @@ export function TransferEditModal({
     assetId: transfer.asset_id,
     assetName: asset?.name ?? "",
     assetReference: asset?.reference ?? "",
-    quantityMicro: heldMicro,
+    heldQuantity,
     averagePriceMicro: transferAveragePriceMicro(transfer),
     accountName: from?.name ?? "",
     accountCurrency: from?.currency ?? "",
@@ -55,10 +55,10 @@ export function TransferEditModal({
         transferId: transfer.transfer_id,
         toAccountId: transfer.to_account_id,
         initialDate: transfer.date,
-        initialSent: microToFieldDecimal(transfer.quantity_sent),
-        initialReceived: microToFieldDecimal(transfer.quantity_received),
+        initialSent: quantityToFieldDecimal(transfer.quantity_sent),
+        initialReceived: quantityToFieldDecimal(transfer.quantity_received),
         initialRate: microToFieldDecimal(transfer.exchange_rate),
-        initialSentMicro: transfer.quantity_sent,
+        initialSentQuantity: transfer.quantity_sent,
         initialNote: transfer.note ?? "",
       }}
     />

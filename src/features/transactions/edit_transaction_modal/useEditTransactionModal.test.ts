@@ -65,7 +65,7 @@ const baseTransaction: Transaction = {
   asset_id: "asset-1",
   transaction_type: "Purchase",
   date: "2024-01-10",
-  quantity: 2 * MICRO,
+  quantity: "2",
   unit_price: 50 * MICRO,
   exchange_rate: 1 * MICRO,
   fees: 0,
@@ -73,6 +73,11 @@ const baseTransaction: Transaction = {
   note: "initial note",
   realized_pnl: null,
   created_at: "2024-01-10T00:00:00Z",
+  write_off_reason: null,
+  transfer_id: null,
+  added_deposit: false,
+  split_factor: null,
+  dividend_amount: null,
 };
 
 // unit_price=0, fees=5 → totalMicro=5*MICRO > 0, passes validation; used for MKT-061
@@ -149,7 +154,7 @@ describe("useEditTransactionModal", () => {
       "tx-existing",
       "account-1",
       expect.objectContaining({
-        quantity: 2 * MICRO,
+        quantity: "2",
         unit_price: 50 * MICRO,
         exchange_rate: 1 * MICRO,
       }),
@@ -190,7 +195,7 @@ describe("useEditTransactionModal", () => {
   it.each([
     [
       "Sell",
-      { code: "Oversell", available: MICRO, requested: 2 * MICRO },
+      { code: "Oversell", available: "1", requested: "2" },
       {
         key: "transaction.error_over_held_on",
         vars: { held: "1", reference: "AAPL", date: "10/01/2024" },
@@ -297,7 +302,7 @@ describe("useEditTransactionModal", () => {
     const precise: Transaction = {
       ...baseTransaction,
       id: "tx-precise",
-      quantity: 123_456,
+      quantity: "0.123456",
       unit_price: 12_345_678,
       exchange_rate: 921_400,
       fees: 1_500,
@@ -325,7 +330,7 @@ describe("useEditTransactionModal", () => {
       "tx-precise",
       "account-1",
       expect.objectContaining({
-        quantity: 123_456,
+        quantity: "0.123456",
         unit_price: 12_345_678,
         exchange_rate: 921_400,
         fees: 1_500,

@@ -216,6 +216,20 @@ mod tests {
         dir
     }
 
+    // TRX-024B — eight decimals on a quantity.
+    #[tokio::test]
+    async fn trx_024b_a_satoshi_is_recorded_and_read_back_by_the_command_line() {
+        let dir = portfolio("satoshi").await;
+        let bought = run_line(
+            &dir,
+            "holding open --account PEA --asset CW8 --quantity 0.00000001 --total-cost 1 --date 2026-02-01 --json",
+        )
+        .await;
+        let value: serde_json::Value =
+            serde_json::from_str(bought.stdout.as_deref().expect("json")).expect("valid json");
+        assert_eq!(value["transaction"]["quantity"], "0.00000001");
+    }
+
     // CLI-010 / CLI-012 / CLI-020 / CLI-022 — an opening balance, a purchase and a sale are
     // recorded through the window's rules; a sale above the holding is refused like the Sell
     // dialog refuses it, and nothing is written.

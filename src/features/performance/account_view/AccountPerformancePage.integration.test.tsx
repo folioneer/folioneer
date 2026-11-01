@@ -90,7 +90,7 @@ const makeHolding = (overrides: Partial<HoldingDetail> = {}): HoldingDetail => (
   asset_id: "asset-1",
   asset_name: "Apple Inc",
   asset_reference: "AAPL",
-  quantity: 2_000_000,
+  quantity: "2",
   average_price: 100_000_000,
   cost_basis: 200_000_000,
   realized_pnl: 0,

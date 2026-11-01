@@ -37,7 +37,7 @@ const target: WriteOffTarget = {
   assetId: "asset-btc",
   assetName: "Bitcoin",
   assetReference: "BTC",
-  quantityMicro: 500_000,
+  heldQuantity: "0.5",
   averagePriceMicro: 20_000_000_000,
 };
 
@@ -47,7 +47,7 @@ const transaction = {
   asset_id: "asset-btc",
   transaction_type: "WriteOff",
   date: "2024-06-15",
-  quantity: 100_000,
+  quantity: "0.1",
 } as const;
 
 describe("useWriteOff (WOF-051 to WOF-058)", () => {
@@ -93,12 +93,19 @@ describe("useWriteOff (WOF-051 to WOF-058)", () => {
   });
 
   // WOF-053 — zero, or a figure below one micro-unit, is no quantity: nothing is sent.
-  it.each(["0", "0.0000001"])("keeps the action inactive for %s", async (quantity) => {
+  it.each(["0", "0.000000001"])("keeps the action inactive for %s", async (quantity) => {
     const { result } = setup();
     act(() => result.current.handleChange("quantity", quantity));
     expect(result.current.isFormValid).toBe(false);
     await act(async () => result.current.handleSubmit(fakeSubmit));
     expect(mockRecordWriteOff).not.toHaveBeenCalled();
+  });
+
+  // TRX-024B — a satoshi is a quantity, and what it is compared against is exact.
+  it("takes a satoshi as a quantity", () => {
+    const { result } = setup();
+    act(() => result.current.handleChange("quantity", "0.00000001"));
+    expect(result.current.isFormValid).toBe(true);
   });
 
   // WOF-056 — the window records through record_write_off with the reason.
@@ -116,7 +123,7 @@ describe("useWriteOff (WOF-051 to WOF-058)", () => {
       account_id: "account-1",
       asset_id: "asset-btc",
       date: "2024-06-15",
-      quantity: 100_000,
+      quantity: "0.1",
       reason: "Lost",
       note: "seed lost",
     });
@@ -129,7 +136,7 @@ describe("useWriteOff (WOF-051 to WOF-058)", () => {
   it("shows an oversell under the quantity until the quantity changes", async () => {
     mockRecordWriteOff.mockResolvedValue({
       status: "error",
-      error: { code: "Oversell", available: 200_000, requested: 300_000 },
+      error: { code: "Oversell", available: "0.2", requested: "0.3" },
     });
     const { result } = setup();
     act(() => result.current.handleChange("date", "2024-06-15"));
@@ -157,7 +164,7 @@ describe("useWriteOff (WOF-051 to WOF-058)", () => {
   it.each(["date", "reason"] as const)("clears a refusal when the %s changes", async (field) => {
     mockRecordWriteOff.mockResolvedValue({
       status: "error",
-      error: { code: "Oversell", available: 200_000, requested: 300_000 },
+      error: { code: "Oversell", available: "0.2", requested: "0.3" },
     });
     const { result } = setup();
     act(() => result.current.handleChange("quantity", "0.3"));
@@ -186,11 +193,11 @@ describe("useWriteOff (WOF-051 to WOF-058)", () => {
       transactionId: "tx-1",
       initialDate: "2024-06-15",
       initialQuantity: "0.1",
-      initialQuantityMicro: 100_000,
+      initialReadQuantity: "0.1",
       initialReason: "Dust",
       initialNote: "",
     });
-    expect(result.current.heldMicro).toBe(600_000);
+    expect(result.current.heldQuantity).toBe("0.6");
     act(() => {
       result.current.handleChange("quantity", "0.6");
       result.current.handleChange("reason", "Lost");
@@ -201,7 +208,7 @@ describe("useWriteOff (WOF-051 to WOF-058)", () => {
       account_id: "account-1",
       transaction_id: "tx-1",
       date: "2024-06-15",
-      quantity: 600_000,
+      quantity: "0.6",
       reason: "Lost",
       note: null,
     });

@@ -173,7 +173,7 @@ describe("open_balance", () => {
               account_id: accId,
               asset_id: astId,
               date: "2020-06-15",
-              quantity: 10_000_000, // 10 units in micro-units
+              quantity: "10",
               total_cost: 500_000_000, // 500.00 total in micro-units
             },
           })
@@ -212,7 +212,7 @@ describe("open_balance", () => {
               account_id: accId,
               asset_id: astId,
               date: "2020-08-01",
-              quantity: 0, // zero — must trigger QuantityNotPositive (TRX-044)
+              quantity: "0", // zero — must trigger QuantityNotPositive (TRX-044)
               total_cost: 100_000_000,
             },
           })

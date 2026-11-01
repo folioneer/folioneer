@@ -182,7 +182,9 @@ describe("assetMutationErrorToI18n", () => {
   });
 
   it("an unreachable BC-wide code falls back to error.Unknown", () => {
-    expect(assetMutationErrorToI18n({ code: "Oversell", available: 1, requested: 2 })).toEqual({
+    expect(
+      assetMutationErrorToI18n({ code: "Oversell", available: "0.000001", requested: "0.000002" }),
+    ).toEqual({
       key: "error.Unknown",
     });
   });

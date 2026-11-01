@@ -6,7 +6,7 @@ import type {
   TransactionPreview,
 } from "@/bindings";
 import { logger } from "@/lib/logger";
-import { decimalToMicro } from "@/lib/microUnits";
+import { decimalToMicro, decimalToQuantity } from "@/lib/microUnits";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { useLatestCheck } from "@/ui/hooks/useLatestCheck";
 import { transactionGateway } from "../gateway";
@@ -45,7 +45,7 @@ export function toTransactionDraft(
     account_id: form.accountId,
     asset_id: form.assetId,
     date: form.date,
-    quantity: decimalToMicro(form.quantity),
+    quantity: decimalToQuantity(form.quantity),
     entered:
       entryMode === "total"
         ? { mode: "Total", total: decimalToMicro(totalAmountInput), exchange_rate, fees }

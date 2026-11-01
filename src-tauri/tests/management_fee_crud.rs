@@ -425,7 +425,7 @@ async fn fee_028_resulting_quantity_out_of_bounds_is_rejected() {
             .expect_err("FEE-028: a resulting quantity not below the held one is rejected");
         assert_eq!(
             serde_json::to_value(&error).unwrap(),
-            serde_json::json!({ "code": "ResultingQuantityNotBelowHeld", "held_quantity": micro(25) })
+            serde_json::json!({ "code": "ResultingQuantityNotBelowHeld", "held_quantity": "25" })
         );
     }
 
@@ -524,7 +524,7 @@ async fn fee_029_preview_reports_held_removed_and_percentage_without_writing() {
         .expect_err("FEE-029: the preview rejects like the recording");
     assert_eq!(
         serde_json::to_value(&error).unwrap(),
-        serde_json::json!({ "code": "ResultingQuantityNotBelowHeld", "held_quantity": 0 })
+        serde_json::json!({ "code": "ResultingQuantityNotBelowHeld", "held_quantity": "0" })
     );
 
     let holding = ctx

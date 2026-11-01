@@ -35,14 +35,14 @@ vi.mock("./TransferModal", () => ({
     editMode,
   }: {
     accountId: string;
-    target: { quantityMicro: number; averagePriceMicro: number; accountCurrency: string };
+    target: { heldQuantity: string; averagePriceMicro: number; accountCurrency: string };
     destinations: { id: string }[];
-    editMode: { toAccountId: string; initialRate: string; initialSentMicro: number };
+    editMode: { toAccountId: string; initialRate: string; initialSentQuantity: string };
   }) => (
     <div data-testid="transfer-form">
-      {accountId}:{target.quantityMicro}:{target.averagePriceMicro}:{target.accountCurrency}:
+      {accountId}:{target.heldQuantity}:{target.averagePriceMicro}:{target.accountCurrency}:
       {destinations.map((d) => d.id).join(",")}:{editMode.toAccountId}:{editMode.initialRate}:
-      {editMode.initialSentMicro}
+      {editMode.initialSentQuantity}
     </div>
   ),
 }));
@@ -54,8 +54,8 @@ const transfer = {
   to_account_id: "acc-usd",
   asset_id: "asset-btc",
   date: "2024-06-15",
-  quantity_sent: 200_000,
-  quantity_received: 190_000,
+  quantity_sent: "0.2",
+  quantity_received: "0.19",
   cost: 4_000_000_000,
   exchange_rate: 1_080_000,
   note: null,
@@ -84,13 +84,13 @@ describe("TransferEditModal (TRF-057)", () => {
     mockGetTransfer.mockResolvedValue({ status: "ok", data: transfer });
     mockGetAccountDetails.mockResolvedValue({
       status: "ok",
-      data: { holdings: [{ asset_id: "asset-btc", quantity: 300_000 }] },
+      data: { holdings: [{ asset_id: "asset-btc", quantity: "0.3" }] },
     });
     render(<TransferEditModal {...props} />);
     await waitFor(() => expect(screen.getByTestId("transfer-form")).toBeInTheDocument());
     expect(mockGetAccountDetails).toHaveBeenCalledWith("acc-exchange");
     expect(screen.getByTestId("transfer-form").textContent).toBe(
-      "acc-exchange:300000:21052631578:EUR:acc-usd:acc-usd:1.080:200000",
+      "acc-exchange:0.3:21052631578:EUR:acc-usd:acc-usd:1.080:0.2",
     );
   });
 

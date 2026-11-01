@@ -19,7 +19,7 @@ const target = {
   assetId: "asset-btc",
   assetName: "Bitcoin",
   assetReference: "BTC",
-  quantityMicro: 500_000,
+  heldQuantity: "0.5",
   averagePriceMicro: 20_000_000_000,
 };
 

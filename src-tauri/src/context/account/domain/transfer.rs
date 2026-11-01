@@ -18,8 +18,12 @@ pub struct TransferView {
     pub date: String,
     /// What left the sending account: the transfer out's quantity plus its fee in kind's
     /// (TRX-024).
+    #[serde(serialize_with = "crate::shared::domain::quantity::as_text")]
+    #[specta(type = String)]
     pub quantity_sent: i64,
     /// What reached the receiving account: the transfer in's quantity (TRX-024).
+    #[serde(serialize_with = "crate::shared::domain::quantity::as_text")]
+    #[specta(type = String)]
     pub quantity_received: i64,
     /// The cost the transfer out moved, in the sending account's currency (micro-units).
     pub cost: i64,
@@ -27,17 +31,6 @@ pub struct TransferView {
     pub exchange_rate: i64,
     /// The transfer in's note.
     pub note: Option<String>,
-}
-
-impl TransferView {
-    /// The transfer as a surface gives it (TRX-024).
-    pub fn as_shown(self) -> Self {
-        Self {
-            quantity_sent: crate::shared::domain::quantity::to_surface(self.quantity_sent),
-            quantity_received: crate::shared::domain::quantity::to_surface(self.quantity_received),
-            ..self
-        }
-    }
 }
 
 impl TransferView {

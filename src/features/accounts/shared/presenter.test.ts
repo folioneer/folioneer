@@ -53,7 +53,13 @@ describe("accountMutationErrorToI18n", () => {
   });
 
   it("an unreachable BC-wide code falls back to error.Unknown", () => {
-    expect(accountMutationErrorToI18n({ code: "Oversell", available: 1, requested: 2 })).toEqual({
+    expect(
+      accountMutationErrorToI18n({
+        code: "Oversell",
+        available: "0.000001",
+        requested: "0.000002",
+      }),
+    ).toEqual({
       key: "error.Unknown",
     });
   });
@@ -104,7 +110,9 @@ describe("fetchPriceErrorToI18n", () => {
   });
 
   it("an unreachable BC-wide code falls back to the generic error.Unknown snackbar", () => {
-    expect(fetchPriceErrorToI18n({ code: "Oversell", available: 1, requested: 2 })).toEqual({
+    expect(
+      fetchPriceErrorToI18n({ code: "Oversell", available: "0.000001", requested: "0.000002" }),
+    ).toEqual({
       key: "error.Unknown",
       severity: "error",
     });

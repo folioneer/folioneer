@@ -37,7 +37,7 @@ const makeHolding = (overrides: Partial<HoldingDetail> = {}): HoldingDetail => (
   asset_id: "asset-1",
   asset_name: "Apple Inc",
   asset_reference: "AAPL",
-  quantity: 2_000_000,
+  quantity: "2",
   average_price: 100_000_000,
   cost_basis: 200_000_000,
   realized_pnl: 0,
@@ -129,12 +129,12 @@ describe("toHoldingRow", () => {
   });
 
   it("formats fractional quantity trimming trailing zeros", () => {
-    const row = toHoldingRow(makeHolding({ quantity: 1_500_000 }));
+    const row = toHoldingRow(makeHolding({ quantity: "1.5" }));
     expect(row.quantity).toBe("1,5");
   });
 
   it("formats a whole quantity with no decimals", () => {
-    const row = toHoldingRow(makeHolding({ quantity: 12_000_000 }));
+    const row = toHoldingRow(makeHolding({ quantity: "12" }));
     expect(row.quantity).toBe("12");
   });
 
@@ -178,9 +178,9 @@ describe("toHoldingRow", () => {
     expect(row.realizedPnlRaw).toBe(5_000_000);
   });
 
-  it("passes quantityMicro as raw value for sell modal (SEL-010)", () => {
-    const row = toHoldingRow(makeHolding({ quantity: 3_500_000 }));
-    expect(row.quantityMicro).toBe(3_500_000);
+  it("passes the quantity held as it came for the sell modal (SEL-010)", () => {
+    const row = toHoldingRow(makeHolding({ quantity: "3.5" }));
+    expect(row.heldQuantity).toBe("3.5");
   });
 
   // FXR-090 — no FX rate date → no staleness label
@@ -363,7 +363,7 @@ const makeCashHolding = (overrides: Partial<HoldingDetail> = {}): HoldingDetail 
     asset_id: "system-cash-eur",
     asset_name: "Cash EUR",
     asset_reference: "EUR",
-    quantity: 500_000_000,
+    quantity: "500",
     average_price: 1_000_000,
     cost_basis: 500_000_000,
     realized_pnl: 0,
@@ -406,7 +406,7 @@ describe("toHoldingRow — cash variant (CSH-090/091)", () => {
 
   // CSH-090 — quantity rendered as a 2-decimal amount (currency), not 6-decimal qty
   it("formats cash quantity with 2 decimals", () => {
-    const row = toHoldingRow(makeCashHolding({ quantity: 250_500_000 }));
+    const row = toHoldingRow(makeCashHolding({ quantity: "250.5" }));
     expect(row.quantity).toBe("250,50");
   });
 });
@@ -723,7 +723,7 @@ describe("transactionDraftErrorToI18n", () => {
   // SEL-021 — an oversell reports both quantities
   it("maps an oversell with the available and requested quantities", () => {
     expect(
-      transactionDraftErrorToI18n({ code: "Oversell", available: 1_000_000, requested: 2_500_000 }),
+      transactionDraftErrorToI18n({ code: "Oversell", available: "1", requested: "2.5" }),
     ).toEqual({
       key: "error.Oversell",
       vars: { available: expect.stringContaining("1"), requested: expect.stringContaining("2") },
@@ -819,7 +819,7 @@ describe("managementFeeErrorToI18n (FEE-021/011/027)", () => {
     expect(
       managementFeeErrorToI18n({
         code: "ResultingQuantityNotBelowHeld",
-        held_quantity: 25_000_000,
+        held_quantity: "25",
       }),
     ).toEqual({ key: "error.ResultingQuantityNotBelowHeld", vars: { held: "25" } });
   });
@@ -1107,10 +1107,8 @@ describe("toHoldingRow — inconsistency (SYN-040, CFR-042)", () => {
   });
 
   it("carries an Oversold inconsistency through with a formatted i18n message", () => {
-    const row = toHoldingRow(
-      makeHolding({ inconsistency: { Oversold: { quantity: -3_000_000 } } }),
-    );
-    expect(row.inconsistency).toEqual({ Oversold: { quantity: -3_000_000 } });
+    const row = toHoldingRow(makeHolding({ inconsistency: { Oversold: { quantity: "-3" } } }));
+    expect(row.inconsistency).toEqual({ Oversold: { quantity: "-3" } });
     expect(row.inconsistencyLabel).toEqual({
       key: "sync.inconsistency.oversold",
       vars: { quantity: "-3" },
@@ -1265,7 +1263,7 @@ describe("writeOffErrorToI18n", () => {
   const refuse = (err: unknown) => writeOffErrorToI18n(err as never, "BTC", "2026-10-21", "fr");
 
   it("names what was held on the date for an oversell", () => {
-    expect(refuse({ code: "Oversell", available: 200_000, requested: 300_000 })).toEqual({
+    expect(refuse({ code: "Oversell", available: "0.2", requested: "0.3" })).toEqual({
       message: {
         key: "transaction.error_over_held_on",
         vars: { held: "0,2", reference: "BTC", date: "21/10/2026" },
@@ -1310,8 +1308,8 @@ describe("transferAveragePriceMicro (TRF-057)", () => {
     to_account_id: "acc-b",
     asset_id: "asset-btc",
     date: "2024-06-15",
-    quantity_sent: 200_000,
-    quantity_received: 190_000,
+    quantity_sent: "0.2",
+    quantity_received: "0.19",
     cost: 3_800_000_000,
     exchange_rate: 1_000_000,
     note: null,
@@ -1322,17 +1320,17 @@ describe("transferAveragePriceMicro (TRF-057)", () => {
   });
 
   it("is zero for a transfer that received nothing", () => {
-    expect(transferAveragePriceMicro({ ...transfer, quantity_received: 0 })).toBe(0);
+    expect(transferAveragePriceMicro({ ...transfer, quantity_received: "0" })).toBe(0);
   });
 });
 
 describe("writeOffAveragePriceMicro", () => {
   it("is the cost taken out over the quantity", () => {
-    const tx = { quantity: 100_000, realized_pnl: -2_000_000_000 } as never;
+    const tx = { quantity: "0.1", realized_pnl: -2_000_000_000 } as never;
     expect(writeOffAveragePriceMicro(tx)).toBe(20_000_000_000);
   });
 
   it("is zero for no quantity", () => {
-    expect(writeOffAveragePriceMicro({ quantity: 0, realized_pnl: 0 } as never)).toBe(0);
+    expect(writeOffAveragePriceMicro({ quantity: "0", realized_pnl: 0 } as never)).toBe(0);
   });
 });

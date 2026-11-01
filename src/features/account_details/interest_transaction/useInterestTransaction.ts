@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { decimalToMicro } from "@/lib/microUnits";
+import { decimalsOf, decimalToMicro, decimalToQuantity } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -117,7 +117,7 @@ export function useInterestTransaction({
             // are inert (unit_price 0, exchange_rate 1.0, fees 0).
             await accountDetailsGateway.correctTransaction(editMode.transactionId, accountId, {
               date: formData.date,
-              quantity: decimalToMicro(formData.quantity),
+              quantity: decimalToQuantity(formData.quantity, decimalsOf(formData.assetId)),
               unit_price: 0,
               exchange_rate: 1_000_000,
               fees: 0,
@@ -130,7 +130,10 @@ export function useInterestTransaction({
               asset_id: formData.assetId,
               date: formData.date,
               percent_micros: formData.percent !== "" ? decimalToMicro(formData.percent) : null,
-              quantity_micros: formData.quantity !== "" ? decimalToMicro(formData.quantity) : null,
+              quantity:
+                formData.quantity !== ""
+                  ? decimalToQuantity(formData.quantity, decimalsOf(formData.assetId))
+                  : null,
               note,
             });
 

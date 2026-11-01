@@ -48,11 +48,11 @@ pub struct HoldingDetail {
     pub asset_name: String,
     /// Ticker or user-defined reference.
     pub asset_reference: String,
-    /// Current units held (i64 micro-units, ADR-001).
-    pub quantity: i64,
+    /// Current units held, as decimal text (TRX-024B).
+    pub quantity: String,
     /// VWAP purchase price in account currency (i64 micro-units, ADR-001).
     pub average_price: i64,
-    /// Total cost of position: quantity × average_price / MICRO (i64 micro-units, ACD-023).
+    /// Total cost of position: quantity × average_price / QUANTITY_UNIT (i64 micro-units, ACD-023).
     pub cost_basis: i64,
     /// Sum of realized P&L from all Sell transactions for this asset (i64 micro-units, SEL-042).
     pub realized_pnl: i64,
@@ -516,7 +516,7 @@ impl AccountDetailsUseCase {
             let fee_rate_percent_micros = fee_rate_by_asset.get(&holding.asset_id).copied();
             // ACD-054 — windowed position returns; the cash row carries all-None.
             let shown_quantity =
-                crate::shared::domain::quantity::shown_for(&holding.asset_id, holding.quantity);
+                crate::shared::domain::quantity::quantity_text(&holding.asset_id, holding.quantity);
             let period_performance = if is_cash {
                 HoldingPeriodPerformance::default()
             } else {
@@ -940,7 +940,9 @@ impl AccountDetailsUseCase {
                 asset_id: asset_id.to_string(),
                 asset_name: asset.name,
                 asset_reference: asset.reference,
-                quantity: crate::shared::domain::quantity::to_surface(reconstruction.quantity),
+                quantity: crate::shared::domain::quantity::non_cash_quantity_text(
+                    reconstruction.quantity,
+                ),
                 average_price: reconstruction.average_price,
                 cost_basis,
                 realized_pnl,
@@ -992,10 +994,13 @@ impl AccountDetailsUseCase {
                 })?;
             total_global_value = total_global_value.saturating_add(cash_balance);
             details.push(HoldingDetail {
+                quantity: crate::shared::domain::quantity::quantity_text(
+                    &cash_asset_id,
+                    cash_balance,
+                ),
                 asset_id: cash_asset_id,
                 asset_name: cash_asset.name,
                 asset_reference: cash_asset.reference,
-                quantity: cash_balance,
                 average_price: 1_000_000,
                 cost_basis: 0,
                 realized_pnl: 0,
@@ -2365,16 +2370,16 @@ mod tests {
                 .iter()
                 .find(|h| h.asset_name == "COIN")
                 .unwrap();
-            (h.quantity, h.realized_pnl, h.realized_lost)
+            (h.quantity.clone(), h.realized_pnl, h.realized_lost)
         };
         let resp = uc.get_account_details(&account.id, None).await.unwrap();
-        assert_eq!(read(&resp), (7_000_000, -300_000_000, -200_000_000));
+        assert_eq!(read(&resp), ("7".to_string(), -300_000_000, -200_000_000));
         // The dated view counts the write-offs dated on or before its date.
         let resp = uc
             .get_account_details(&account.id, Some("2024-03-01"))
             .await
             .unwrap();
-        assert_eq!(read(&resp), (8_000_000, -200_000_000, -200_000_000));
+        assert_eq!(read(&resp), ("8".to_string(), -200_000_000, -200_000_000));
 
         account_svc
             .correct_write_off(
@@ -2388,7 +2393,7 @@ mod tests {
             .await
             .unwrap();
         let resp = uc.get_account_details(&account.id, None).await.unwrap();
-        assert_eq!(read(&resp), (7_000_000, -300_000_000, 0));
+        assert_eq!(read(&resp), ("7".to_string(), -300_000_000, 0));
     }
 
     // MKT-231 (#529) — a holding lists the reported splits the account held through without
@@ -3654,7 +3659,7 @@ mod tests {
             .iter()
             .find(|h| h.asset_id.starts_with("system-cash-"))
             .expect("cash row must be present in active holdings even at quantity 0 (CSH-090)");
-        assert_eq!(cash.quantity, 0);
+        assert_eq!(cash.quantity, "0");
         assert!(
             !resp
                 .closed_holdings
@@ -3877,7 +3882,7 @@ mod tests {
     //   = 18_800_000 × 2 = 37_600_000 (37.60 EUR)
     //
     // cost_basis (ACD-023):
-    //   quantity × average_price / MICRO = 2_000_000 × 100_000_000 / 1_000_000 = 200_000_000
+    //   quantity × average_price / QUANTITY_UNIT = 2_000_000 × 100_000_000 / 1_000_000 = 200_000_000
     //
     // performance_pct (FXR-032):
     //   unrealized_pnl × 100_000_000 / cost_basis
@@ -4347,7 +4352,7 @@ mod tests {
             .iter()
             .find(|h| h.asset_name == "Early")
             .expect("Early present");
-        assert_eq!(early_row.quantity, 2_000_000);
+        assert_eq!(early_row.quantity, "2");
         assert_eq!(early_row.average_price, 100_000_000);
         assert_eq!(early_row.cost_basis, 200_000_000);
         assert_eq!(early_row.current_price, Some(120_000_000));
@@ -4361,7 +4366,7 @@ mod tests {
             .find(|h| is_cash_asset(&h.asset_id))
             .expect("cash row present");
         // Cash on the date = 1000 deposit − 200 buy = 800.
-        assert_eq!(cash.quantity, 800_000_000);
+        assert_eq!(cash.quantity, "800");
 
         assert_eq!(resp.total_cost_basis, 200_000_000);
         // Global value = 240 (Early) + 800 (cash) = 1040.
@@ -4504,7 +4509,7 @@ mod tests {
             .iter()
             .find(|h| h.asset_name == "Stock")
             .expect("Stock present");
-        assert_eq!(row.quantity, 3_000_000, "4 bought − 1 sold = 3");
+        assert_eq!(row.quantity, "3", "4 bought − 1 sold = 3");
         assert_eq!(
             row.average_price, 100_000_000,
             "VWAP preserved across the sell"
@@ -4699,7 +4704,7 @@ mod tests {
             .iter()
             .find(|h| h.asset_name == "Hold Co")
             .expect("Hold Co present");
-        assert_eq!(row.quantity, 3_000_000, "pre-sell quantity on the date");
+        assert_eq!(row.quantity, "3", "pre-sell quantity on the date");
         assert_eq!(
             row.realized_pnl, 0,
             "later sell not realized as of the date"
@@ -4806,7 +4811,7 @@ mod tests {
             .iter()
             .find(|holding| holding.asset_id == bought)
             .expect("a position bought on the day is held on the day");
-        assert_eq!(position.quantity, 2_000_000);
+        assert_eq!(position.quantity, "2");
         assert_eq!(resp.closed_holdings.len(), 1);
         assert_eq!(resp.holdings.len(), 2);
         assert_eq!(resp.total_holding_count, 3);
@@ -4815,13 +4820,13 @@ mod tests {
             (resp.holdings.len() + resp.closed_holdings.len()) as i64
         );
         // Cash once: 1 000 − 10 + 12 − 200 + 3 − 50.
-        let cash: Vec<i64> = resp
+        let cash: Vec<&str> = resp
             .holdings
             .iter()
             .filter(|holding| is_cash_asset(&holding.asset_id))
-            .map(|holding| holding.quantity)
+            .map(|holding| holding.quantity.as_str())
             .collect();
-        assert_eq!(cash, vec![755_000_000]);
+        assert_eq!(cash, vec!["755"]);
 
         let today = Local::now().date_naive().to_string();
         assert!(uc
@@ -5343,7 +5348,7 @@ mod tests {
         );
         // FEE-054 — the quantity removal itself is unaffected: 100 − 1 = 99 units.
         assert_eq!(
-            row.quantity, 99_000_000,
+            row.quantity, "99",
             "the share removal still happens even with no price (FEE-054)"
         );
     }

@@ -129,7 +129,7 @@ describe("free_shares", () => {
     await form.waitForExist({ timeout: 8000, reverse: true });
 
     // FSD-026/051 — the holding quantity <td> must reflect 10 + 5 = 15 units
-    // after the re-fetch triggered by TransactionUpdated. microToFormattedQuantity
+    // after the re-fetch triggered by TransactionUpdated. formatQuantity
     // renders integers without a separator, so "15" is locale-invariant here.
     const holdingQty = await $(`#holding-quantity-${astId}`);
     await holdingQty.waitForExist({ timeout: 8000 });

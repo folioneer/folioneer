@@ -34,7 +34,7 @@
  *
  * Quantity math (FEE-022): removed_qty = floor(holding_as_of(date) × percent / 100)
  *   10 units at 10% → floor(10 × 0.10) = 1 unit removed → 9 remaining.
- *   Displayed as "9" by microToFormattedQuantity (whole units have no decimal).
+ *   Displayed as "9" by formatQuantity (whole units have no decimal).
  *
  * Error variants (AssetNotHeld, ManagementFeeOnCashAsset, PercentageNotPositive,
  * PercentageAboveHundred, CascadingOversell, ScheduleAlreadyExists) are adequately
@@ -144,7 +144,7 @@ describe("management_fee", () => {
 
     // FEE-022/026 — the holding quantity <td> must reflect 10 - 1 = 9 units
     // after the re-fetch triggered by TransactionUpdated (FEE-026).
-    // microToFormattedQuantity renders whole units as plain integers: "9".
+    // formatQuantity renders whole units as plain integers: "9".
     const holdingQty = await $(`#holding-quantity-${astId}`);
     await holdingQty.waitForExist({ timeout: 8000 });
     await browser.waitUntil(async () => (await holdingQty.getText()) === "9", {

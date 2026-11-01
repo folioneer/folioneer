@@ -30,9 +30,9 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         // ----- account BC -----
         .typ::<account::Account>()
         .typ::<account::Holding>()
-        .typ::<account::HoldingSnapshot>()
+        .typ::<account::HoldingSnapshotView>()
         .typ::<account::AccountError>()
-        .typ::<account::Transaction>()
+        .typ::<account::TransactionView>()
         .typ::<account::TransactionType>()
         .typ::<account::FeeSchedule>()
         .typ::<account::FeeFrequency>()

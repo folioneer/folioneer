@@ -49,7 +49,7 @@ describe("SellTransactionModal — typing while the draft check answers (L-019)"
     mockDraft.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
     mockSnapshot.mockResolvedValue({
       status: "ok",
-      data: { quantity: 10_000_000, average_price: 1_000_000 },
+      data: { quantity: "10", average_price: 1_000_000 },
     });
   });
 
@@ -65,7 +65,7 @@ describe("SellTransactionModal — typing while the draft check answers (L-019)"
           assetName="Asset"
           assetCurrency="EUR"
           assetReference="AAPL"
-          holdingQuantityMicro={10_000_000}
+          holdingQuantity="10"
           onSubmitSuccess={() => {}}
         />,
       );

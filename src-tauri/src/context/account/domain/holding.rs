@@ -1,5 +1,5 @@
 use crate::context::account::error::AccountError;
-use crate::shared::domain::quantity::{shown_for, to_surface};
+use crate::shared::domain::quantity::quantity_text;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -28,10 +28,20 @@ pub struct Holding {
     pub last_sold_date: Option<String>,
 }
 
+/// `HoldingSnapshot` as the window reads it: its quantity as decimal text (TRX-024B).
+#[derive(Debug, Serialize, Clone, Type)]
+#[specta(rename = "HoldingSnapshot")]
+pub struct HoldingSnapshotView {
+    /// Units held as of the queried date, 0 when nothing is held.
+    pub quantity: String,
+    /// VWAP cost basis per unit, account currency (micro-units), 0 when never held.
+    pub average_price: i64,
+}
+
 /// Point-in-time reconstruction of a single holding's quantity and VWAP cost
 /// basis as of a date — the read-only "as of" valuation behind the trade-dialog
 /// insights (TDI-010). Fields are i64 fixed-point (ADR-001, TRX-024).
-#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HoldingSnapshot {
     /// Units held as of the queried date (TRX-024), 0 when nothing is held.
     pub quantity: i64,
@@ -40,14 +50,19 @@ pub struct HoldingSnapshot {
 }
 
 /// What a split would make of a position (SPL-020): the holding on the split's date,
-/// before and after the rescale. Fields are i64 fixed-point (ADR-001, TRX-024).
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
+/// before and after the rescale: quantities read as decimal text (TRX-024B), prices in
+/// micro-units.
+#[derive(Debug, Serialize, Clone, PartialEq, Eq, Type)]
 pub struct StockSplitPosition {
     /// Units held on the split's date, before it.
+    #[serde(serialize_with = "crate::shared::domain::quantity::as_text")]
+    #[specta(type = String)]
     pub old_quantity: i64,
     /// Average cost per unit before the split, account currency.
     pub old_average_price: i64,
     /// Units held once the split is applied.
+    #[serde(serialize_with = "crate::shared::domain::quantity::as_text")]
+    #[specta(type = String)]
     pub new_quantity: i64,
     /// Average cost per unit once the split is applied, account currency.
     pub new_average_price: i64,
@@ -70,22 +85,11 @@ pub(crate) struct HoldingAsOfReconstruction {
 }
 
 impl HoldingSnapshot {
-    /// The snapshot of an asset as a surface gives it (TRX-024).
-    pub fn as_shown(&self, asset_id: &str) -> Self {
-        Self {
-            quantity: shown_for(asset_id, self.quantity),
-            ..self.clone()
-        }
-    }
-}
-
-impl StockSplitPosition {
-    /// The position as a surface gives it (TRX-024).
-    pub fn as_shown(&self) -> Self {
-        Self {
-            old_quantity: to_surface(self.old_quantity),
-            new_quantity: to_surface(self.new_quantity),
-            ..self.clone()
+    /// The snapshot of `asset_id` as the window reads it (TRX-024B).
+    pub fn as_view(&self, asset_id: &str) -> HoldingSnapshotView {
+        HoldingSnapshotView {
+            quantity: quantity_text(asset_id, self.quantity),
+            average_price: self.average_price,
         }
     }
 }
@@ -200,37 +204,32 @@ pub trait HoldingRepository: Send + Sync {
 mod tests {
     use super::*;
 
-    // TRX-024 — a snapshot and a split's position reach a surface in millionths, the prices
-    // as they are.
+    // TRX-024B — a snapshot and a split's position reach a surface as decimal text, every
+    // decimal kept; the cash line on its own scale.
     #[test]
-    fn trx_024_a_position_is_shown_in_millionths() {
+    fn trx_024b_a_position_reads_as_decimal_text() {
         let snapshot = HoldingSnapshot {
-            quantity: 123_456_700,
+            quantity: 123_456_789,
             average_price: 50_000_000,
         };
-        let shown = snapshot.as_shown("asset");
-        assert_eq!(
-            (shown.quantity, shown.average_price),
-            (1_234_567, 50_000_000)
-        );
+        assert_eq!(snapshot.as_view("asset").quantity, "1.23456789");
+        let cash = HoldingSnapshot {
+            quantity: 1_500_000,
+            average_price: 1_000_000,
+        };
+        assert_eq!(cash.as_view("system-cash-eur").quantity, "1.5");
         let position = StockSplitPosition {
             old_quantity: 100_000_000,
             old_average_price: 50_000_000,
-            new_quantity: 200_000_000,
+            new_quantity: 200_000_001,
             new_average_price: 25_000_000,
         };
-        assert_eq!(
-            position.as_shown(),
-            StockSplitPosition {
-                old_quantity: 1_000_000,
-                old_average_price: 50_000_000,
-                new_quantity: 2_000_000,
-                new_average_price: 25_000_000,
-            }
-        );
+        let read = serde_json::to_value(position).unwrap();
+        assert_eq!(read["old_quantity"], "1");
+        assert_eq!(read["new_quantity"], "2.00000001");
+        assert_eq!(read["old_average_price"], 50_000_000);
     }
 
-    // A holding is active above a quantity of zero; a closed one stays, at zero.
     #[test]
     fn a_holding_is_active_above_a_quantity_of_zero() {
         let holding = |quantity: i64| {

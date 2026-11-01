@@ -7,7 +7,7 @@ import { takeOutRefusal } from "./presenter";
 describe("takeOutRefusal", () => {
   it("names what was held on the date above which the quantity was refused", () => {
     expect(
-      takeOutRefusal({ code: "Oversell", available: 200_000 }, "BTC", "2026-10-21", "fr"),
+      takeOutRefusal({ code: "Oversell", available: "0.2" }, "BTC", "2026-10-21", "fr"),
     ).toEqual({
       key: "transaction.error_over_held_on",
       vars: { held: microToFormattedQuantity(200_000), reference: "BTC", date: "21/10/2026" },

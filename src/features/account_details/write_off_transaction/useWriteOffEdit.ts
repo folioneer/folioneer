@@ -16,10 +16,10 @@ export function useWriteOffEdit(
   transaction: Transaction,
   assetReference: string,
   onClose: () => void,
-): number | null {
+): string | null {
   const { t, i18n } = useTranslation();
   const showSnackbar = useSnackbar();
-  const [heldMicro, setHeldMicro] = useState<number | null>(null);
+  const [heldQuantity, setHeldQuantity] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +39,7 @@ export function useWriteOffEdit(
         return;
       }
       const holding = result.data.holdings.find((h) => h.asset_id === transaction.asset_id);
-      setHeldMicro(holding?.quantity ?? 0);
+      setHeldQuantity(holding?.quantity ?? "0");
     })();
     return () => {
       cancelled = true;
@@ -55,5 +55,5 @@ export function useWriteOffEdit(
     i18n.language,
   ]);
 
-  return heldMicro;
+  return heldQuantity;
 }

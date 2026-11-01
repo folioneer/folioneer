@@ -30,7 +30,7 @@ describe("toTransactionDraft", () => {
       account_id: "account-1",
       asset_id: "asset-1",
       date: "2026-01-02",
-      quantity: 2_000_000,
+      quantity: "2",
       entered: {
         mode: "UnitPrice",
         unit_price: 100_000_000,

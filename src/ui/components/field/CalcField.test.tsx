@@ -51,6 +51,14 @@ describe("CalcField", () => {
     expect(onValue).toHaveBeenLastCalledWith("120");
   });
 
+  // TRX-024H — a calculation keeps the eight decimals a quantity carries.
+  it("reports a result to the eighth decimal", () => {
+    const onValue = vi.fn();
+    render(<Harness onValue={onValue} />);
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "1/3" } });
+    expect(onValue).toHaveBeenLastCalledWith("0.33333333");
+  });
+
   it("commits the result into the field on blur", () => {
     render(<Harness />);
     const input = screen.getByLabelText("Amount");

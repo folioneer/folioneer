@@ -34,8 +34,8 @@ pub struct RosterEntry {
 pub enum HoldingInconsistency {
     /// The replayed quantity is negative.
     Oversold {
-        /// The oversold quantity, in micros, negative by construction.
-        quantity: i64,
+        /// The oversold quantity, as decimal text, negative by construction.
+        quantity: String,
     },
     /// The replayed cash balance is negative, in the account's currency.
     CashOverdrawn {
@@ -315,7 +315,7 @@ mod tests {
             asset_id: "asset-1".into(),
             asset_name: "AAPL".into(),
             reason: HoldingInconsistency::Oversold {
-                quantity: -5_000_000,
+                quantity: "-0.05".to_string(),
             },
         }];
         let mut noticed = enrolled();

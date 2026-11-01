@@ -42,9 +42,12 @@ describe("useDraftProblemDisplay", () => {
   // Each problem is shown on the field the user fixes it in: a total that is not positive is
   // the unit price's while the price is typed, the total's while the total is.
   it("puts each problem on the field that fixes it", () => {
-    expect(draftProblemField({ code: "Oversell", available: 5, requested: 8 }, "price")).toBe(
-      "quantity",
-    );
+    expect(
+      draftProblemField(
+        { code: "Oversell", available: "0.000005", requested: "0.000008" },
+        "price",
+      ),
+    ).toBe("quantity");
     expect(draftProblemField({ code: "TotalAmountBelowFees" }, "total")).toBe("total");
     expect(draftProblemField({ code: "TotalAmountNotPositive" }, "price")).toBe("unitPrice");
     expect(draftProblemField({ code: "TotalAmountNotPositive" }, "total")).toBe("total");

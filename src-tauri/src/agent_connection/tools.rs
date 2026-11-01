@@ -8,7 +8,7 @@ use serde_json::Value;
 
 use crate::context::account::{
     AccountError, AccountServiceContract, AgentRecording, Transaction, TransactionType,
-    WriteOffReason,
+    TransactionView, WriteOffReason,
 };
 use crate::context::asset::{
     Asset, AssetClass, AssetCreationDefaults, AssetError, AssetKind, AssetServiceContract,
@@ -16,6 +16,7 @@ use crate::context::asset::{
 };
 use crate::context::currency::CurrencyService;
 use crate::core::BACKEND;
+use crate::shared::domain::quantity::{stored_non_cash_quantity, FigureTextError};
 use crate::use_cases::account_creation::AccountCreationUseCase;
 use crate::use_cases::account_details::AccountDetailsUseCase;
 use crate::use_cases::account_summary::AccountSummaryUseCase;
@@ -317,7 +318,7 @@ impl AgentTools {
         tracing::info!(target: BACKEND, session = granted.session_id, transaction = %recorded.transaction.id, kind = %recorded.transaction.transaction_type, "agent recording");
         as_json(&serde_json::json!({
             "status": "recorded",
-            "transaction": recorded.transaction.as_shown(),
+            "transaction": TransactionView::from(&*recorded.transaction),
             "account": recorded.account_name,
             "currency": recorded.currency,
             "asset": recorded.asset_reference,
@@ -408,7 +409,7 @@ impl AgentTools {
                     "date": transaction.date,
                     "transaction_type": transaction.transaction_type,
                     "asset": row.asset_reference,
-                    "quantity": transaction.shown_quantity(),
+                    "quantity": transaction.quantity,
                     "unit_price": transaction.unit_price,
                     "total_amount": transaction.total_amount,
                     "fees": transaction.fees,
@@ -727,7 +728,7 @@ impl AgentTools {
             .await
         {
             ChangeAnswer::Changed(changed) => as_json(
-                &serde_json::json!({ "status": "changed", "transaction": changed.as_shown() }),
+                &serde_json::json!({ "status": "changed", "transaction": TransactionView::from(&*changed) }),
             ),
             ChangeAnswer::Refused => Err(Refusal {
                 code: "ChangeRefused".to_string(),
@@ -791,7 +792,7 @@ impl AgentTools {
                 .map_err(refused)?;
             (previewed, false)
         };
-        let mut transaction = serde_json::to_value(previewed.transaction.as_shown())
+        let mut transaction = serde_json::to_value(TransactionView::from(&previewed.transaction))
             .map_err(|_| portfolio_unreadable())?;
         if !keeps_its_id {
             if let Some(id) = transaction.get_mut("id") {
@@ -829,7 +830,9 @@ impl AgentTools {
         })?;
         self.tell_recordings(granted).await;
         tracing::info!(target: BACKEND, session = granted.session_id, transaction = %corrected.id, "agent corrected its recording");
-        as_json(&serde_json::json!({ "status": "corrected", "transaction": corrected.as_shown() }))
+        as_json(
+            &serde_json::json!({ "status": "corrected", "transaction": TransactionView::from(&corrected) }),
+        )
     }
 
     /// AGT-043 — the one account with this name, case ignored; the refusal names only what
@@ -878,26 +881,67 @@ fn today() -> String {
         .to_string()
 }
 
-/// AGT-048 — a figure as an agent sends it: a decimal with a dot and at most six decimals,
-/// as text or as a JSON number.
-fn figure(arguments: &Value, name: &str) -> Result<Option<i64>, Refusal> {
-    let (typed, plain) = match arguments.get(name) {
-        None | Some(Value::Null) => return Ok(None),
-        Some(Value::String(text)) => (text.clone(), text.clone()),
+/// AGT-048 — what an agent sent as `name`: as it was typed, and as a plain decimal.
+fn written(arguments: &Value, name: &str) -> Option<(String, String)> {
+    match arguments.get(name) {
+        None | Some(Value::Null) => None,
+        Some(Value::String(text)) => Some((text.clone(), text.clone())),
         Some(Value::Number(number)) => {
             let typed = number.to_string();
             let plain = without_exponent(&typed);
-            (typed, plain)
+            Some((typed, plain))
         }
-        Some(_) => (String::new(), String::new()),
-    };
-    decimal_to_micro(&plain).map(Some).ok_or_else(|| Refusal {
+        Some(_) => Some((String::new(), String::new())),
+    }
+}
+
+fn not_a_figure(name: &str, typed: &str, most: &str) -> Refusal {
+    Refusal {
         code: "InvalidFigure".to_string(),
         message: format!(
-            "{name} is not a decimal with a dot and at most six decimals: \"{}\"",
+            "{name} is not a decimal with a dot and at most {most} decimals: \"{}\"",
             typed.chars().take(40).collect::<String>().escape_debug()
         ),
+    }
+}
+
+/// AGT-048 — a figure as an agent sends it: a decimal with a dot and at most six decimals,
+/// as text or as a JSON number.
+fn figure(arguments: &Value, name: &str) -> Result<Option<i64>, Refusal> {
+    let Some((typed, plain)) = written(arguments, name) else {
+        return Ok(None);
+    };
+    decimal_to_micro(&plain)
+        .map(Some)
+        .ok_or_else(|| not_a_figure(name, &typed, "six"))
+}
+
+/// AGT-048 — a quantity of a non-cash asset, up to eight decimals, as stored. One past what
+/// storage holds reaches the core at its limit, which refuses it (TRX-024C).
+pub(super) fn quantity(arguments: &Value, name: &str) -> Result<Option<i64>, Refusal> {
+    let Some((typed, plain)) = written(arguments, name) else {
+        return Ok(None);
+    };
+    match stored_non_cash_quantity(&plain) {
+        Ok(read) => Ok(Some(read)),
+        Err(FigureTextError::TooLarge) => Ok(Some(i64::MAX)),
+        Err(FigureTextError::NotAFigure) => Err(not_a_figure(name, &typed, "eight")),
+    }
+}
+
+/// `quantity`, required.
+pub(super) fn required_quantity(arguments: &Value, name: &str) -> Result<i64, Refusal> {
+    quantity(arguments, name)?.ok_or_else(|| Refusal {
+        code: "MissingArgument".to_string(),
+        message: format!("{name} is missing"),
     })
+}
+
+/// AGT-048 — a quantity whose scale depends on what it is applied to, which is read later:
+/// a plain decimal text of at most eight decimals.
+fn quantity_as_written(arguments: &Value, name: &str) -> Result<Option<String>, Refusal> {
+    quantity(arguments, name)?;
+    Ok(written(arguments, name).map(|(_, plain)| plain))
 }
 
 /// AGT-048 — a JSON number as its plain decimal: below 0.00001 or very large, it is written
@@ -947,7 +991,7 @@ fn change_of(arguments: &Value) -> Result<Change, Refusal> {
     Ok(Change {
         correction: Correction {
             date: optional_text(arguments, "date")?,
-            quantity: figure(arguments, "quantity")?,
+            quantity: quantity_as_written(arguments, "quantity")?,
             price: figure(arguments, "price")?,
             total: figure(arguments, "total")?,
             fees: figure(arguments, "fees")?,
@@ -1041,14 +1085,14 @@ fn previewable(tool: &str, arguments: &Value) -> Option<Result<Recording, Refusa
                 account: text(arguments, "account")?.to_string(),
                 asset: text(arguments, "asset")?.to_string(),
                 date: optional_text(arguments, "date")?,
-                quantity: amount(arguments, "quantity")?,
+                quantity: required_quantity(arguments, "quantity")?,
                 note: note(arguments)?,
             }),
             "record_write_off" => Recording::WriteOff(WriteOff {
                 account: text(arguments, "account")?.to_string(),
                 asset: text(arguments, "asset")?.to_string(),
                 date: optional_text(arguments, "date")?,
-                quantity: amount(arguments, "quantity")?,
+                quantity: required_quantity(arguments, "quantity")?,
                 reason: write_off_reason(arguments)?,
                 note: note(arguments)?,
             }),
@@ -1073,7 +1117,7 @@ fn interest_or_fee(tool: &str, arguments: &Value) -> Result<Recording, Refusal> 
             // AGT-066 — neither and both figures are refused by the window's rules (INT-021).
             let (percent, quantity) = (
                 figure(arguments, "percent")?,
-                figure(arguments, "quantity")?,
+                quantity_as_written(arguments, "quantity")?,
             );
             Ok(Recording::Interest(InterestCredit {
                 account: text(arguments, "account")?.to_string(),
@@ -1088,7 +1132,7 @@ fn interest_or_fee(tool: &str, arguments: &Value) -> Result<Recording, Refusal> 
             // AGT-066 — neither and both figures are refused by the window's rules (FEE-021).
             let (percent, resulting_quantity) = (
                 figure(arguments, "percent")?,
-                figure(arguments, "resulting_quantity")?,
+                quantity(arguments, "resulting_quantity")?,
             );
             Ok(Recording::ManagementFee(ManagementFee {
                 account: text(arguments, "account")?.to_string(),
@@ -1317,7 +1361,7 @@ fn target(arguments: &Value) -> Result<Target, Refusal> {
         account: text(arguments, "account")?.to_string(),
         asset: text(arguments, "asset")?.to_string(),
         date: optional_text(arguments, "date")?,
-        quantity: amount(arguments, "quantity")?,
+        quantity: required_quantity(arguments, "quantity")?,
     })
 }
 

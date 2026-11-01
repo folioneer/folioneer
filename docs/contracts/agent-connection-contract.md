@@ -1,7 +1,7 @@
 # Contract — AI Agent Connection
 
 > Domain: `agent-connection`
-> Last updated by: agent-connection (AGT-022–036, AGT-039, AGT-045, AGT-052–054, AGT-064, AGT-081, AGT-082, AGT-084, AGT-088, AGT-091)
+> Last updated by: agent-connection (AGT-022–036, AGT-039, AGT-045, AGT-052–054, AGT-064, AGT-081, AGT-082, AGT-084, AGT-088, AGT-091) — `financial-asset-transaction` (TRX-024B)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName" }` object; a variant with fields carries them beside `code`, as `TransactionNotRemoved { reason }` does. The FE matches on `code`.
 >
@@ -115,7 +115,7 @@ struct ReplacementRequest {
 // AGT-092 — one of the four a replacement removes, with what it moved, signed.
 struct ReplacedShown {
     transaction: TransactionShown, // the transaction as it stood when the agent asked
-    holding_moved: Option<i64>,    // micro-units: into the holding, negative out of it; None on the account's cash
+    holding_moved: Option<String>, // decimal text: into the holding, negative out of it; None on the account's cash
     cash_moved: i64,               // micro-units: into the account's cash, negative out of it
 }
 
@@ -126,9 +126,9 @@ struct TransferShown {
     date: String,                 // YYYY-MM-DD: the sale's date
     asset_name: String,
     asset_reference: String,
-    quantity_sent: i64,           // micro-units: the sale's quantity
-    quantity_received: i64,       // micro-units: the purchase's quantity
-    quantity_not_received: Option<i64>, // micro-units: quantity_sent − quantity_received, the fee in kind (TRF-021) the dialog names by its quantity alone (AGT-092); None when all is received
+    quantity_sent: String,        // decimal text: the sale's quantity
+    quantity_received: String,    // decimal text: the purchase's quantity
+    quantity_not_received: Option<String>, // decimal text: quantity_sent − quantity_received, the fee in kind (TRF-021) the dialog names by its quantity alone (AGT-092); None when all is received
     cost: i64,                    // micro-units, in `from_currency`: the cost the transfer moves
     from_currency: String,        // the sending account's currency
     exchange_rate: Option<i64>,   // micro-units; None between accounts of one currency
@@ -156,7 +156,7 @@ struct TransactionShown {
     kind: TransactionType,           // account-contract.md
     asset_name: Option<String>,      // None for a transaction on the account's cash
     asset_reference: Option<String>, // None for a transaction on the account's cash
-    quantity: i64,                   // micro-units
+    quantity: String,                // decimal text (TRX-024B)
     amount: i64,                     // micro-units, in the account's currency
     unit_price: i64,                 // micro-units, in the asset's currency, as stored (AGT-088)
     fees: i64,                       // micro-units, in the account's currency, as stored (AGT-088)
@@ -209,3 +209,4 @@ The mark of a transaction an AI agent recorded (AGT-045) reaches the window in t
 - 2026-10-24 — #513: `TransferShown` gains `quantity_not_received`, and `ReplacementRequest.transactions` are `ReplacedShown`, each with what it moved, signed (AGT-091, AGT-092). No command or error changes.
 - 2026-10-25 — #339: the tool `list_prices` (AGT-075) is no Tauri command. No command, type or error changes.
 - 2026-11-01 — #675: a session corrects and cancels what any session recorded (AGT-050, AGT-051), and the tool `replace_with_transfer` (AGT-093) is no Tauri command; its parts reach the window as `AgentSession.recordings` and `transactions_recorded` count them. No command, type or error changes.
+- 2026-11-01 — #579 (TRX-024B): the quantities of `TransactionShown`, `ReplacedShown` and `TransferShown` are decimal text.

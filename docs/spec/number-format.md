@@ -2,7 +2,7 @@
 
 ## Context
 
-A number's decimal separator follows the application's language everywhere in the window: a comma in French, a dot in English. The thousands separator is out of scope: no figure is typed or read with one. Figures travel between the window and the core as integers (TRX-024); these rules are about the text a user reads and types. The command line is ruled by CLI-015.
+A number's decimal separator follows the application's language everywhere in the window: a comma in French, a dot in English. The thousands separator is out of scope: no figure is typed or read with one. Quantities travel between the window and the core as decimal text (TRX-024B), the other figures as integers (TRX-024); these rules are about the text a user reads and types. The command line is ruled by CLI-015.
 
 No entity and no command: these rules add nothing to a contract.
 

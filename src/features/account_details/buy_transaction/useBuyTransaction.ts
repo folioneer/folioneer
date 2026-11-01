@@ -8,7 +8,12 @@ import { useTransactions } from "@/features/transactions/useTransactions";
 import { getAutoRecordPrice } from "@/lib/autoRecordPriceStorage";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { microToExactDecimal, microToFieldDecimal, microToFormatted } from "@/lib/microUnits";
+import {
+  isPositiveQuantity,
+  microToExactDecimal,
+  microToFieldDecimal,
+  microToFormatted,
+} from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -62,7 +67,10 @@ export function useBuyTransaction({ accountId, assetId, onSubmitSuccess }: UseBu
   // nothing is held as of that date (TDI-021).
   const { snapshot } = useHoldingSnapshotAsOf(accountId, assetId, formData.date);
   const averageCostAsOfDate = useMemo(
-    () => (snapshot && snapshot.quantity > 0 ? microToFormatted(snapshot.average_price) : null),
+    () =>
+      snapshot && isPositiveQuantity(snapshot.quantity)
+        ? microToFormatted(snapshot.average_price)
+        : null,
     [snapshot],
   );
 

@@ -2,7 +2,12 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TransactionDraft } from "@/bindings";
 import { logger } from "@/lib/logger";
-import { decimalToMicro, microToFormatted } from "@/lib/microUnits";
+import {
+  decimalToMicro,
+  decimalToQuantity,
+  MONEY_DECIMALS,
+  microToFormatted,
+} from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -64,7 +69,7 @@ export function useEditDividend({ dividend, onSubmitSuccess }: UseEditDividendPr
       account_id: accountId,
       asset_id: assetId,
       date: formData.date,
-      quantity: decimalToMicro(formData.amount),
+      quantity: decimalToQuantity(formData.amount, MONEY_DECIMALS),
       entered: {
         mode: "UnitPrice",
         unit_price: unitPriceMicro,
@@ -109,7 +114,7 @@ export function useEditDividend({ dividend, onSubmitSuccess }: UseEditDividendPr
           dividend.accountId,
           {
             date: formData.date,
-            quantity: decimalToMicro(formData.amount),
+            quantity: decimalToQuantity(formData.amount, MONEY_DECIMALS),
             unit_price: dividend.unitPriceMicro,
             exchange_rate: decimalToMicro(formData.exchangeRate),
             fees: 0,

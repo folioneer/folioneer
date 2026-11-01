@@ -16,7 +16,7 @@ const openingBalanceTx = {
   asset_id: "asset-1",
   transaction_type: "OpeningBalance" as const,
   date: "2024-01-10",
-  quantity: 2 * MICRO,
+  quantity: "2",
   unit_price: 50 * MICRO, // stored computed value (TRX-047: total_cost / quantity)
   exchange_rate: 1 * MICRO,
   fees: 0,
@@ -24,6 +24,11 @@ const openingBalanceTx = {
   note: null,
   realized_pnl: null,
   created_at: "2024-01-10T00:00:00Z",
+  write_off_reason: null,
+  transfer_id: null,
+  added_deposit: false,
+  split_factor: null,
+  dividend_amount: null,
 };
 
 describe("toTransactionRow — OpeningBalance", () => {
@@ -54,7 +59,7 @@ describe("toTransactionRow — cash transactions (CSH-101)", () => {
     asset_id: "system-cash-eur",
     transaction_type: "Deposit" as const,
     date: "2025-06-15",
-    quantity: 250 * MICRO,
+    quantity: "250",
     unit_price: 1 * MICRO,
     exchange_rate: 1 * MICRO,
     fees: 0,
@@ -62,6 +67,11 @@ describe("toTransactionRow — cash transactions (CSH-101)", () => {
     note: null,
     realized_pnl: null,
     created_at: "2025-06-15T10:00:00Z",
+    write_off_reason: null,
+    transfer_id: null,
+    added_deposit: false,
+    split_factor: null,
+    dividend_amount: null,
   };
   const withdrawalTx = { ...depositTx, transaction_type: "Withdrawal" as const, id: "tx-wd" };
 
@@ -93,7 +103,7 @@ describe("toTransactionRow — FreeShares (FSD-022/050)", () => {
     asset_id: "asset-equity-1",
     transaction_type: "FreeShares" as const,
     date: "2026-06-12",
-    quantity: 5 * MICRO,
+    quantity: "5",
     unit_price: 0,
     exchange_rate: 1 * MICRO,
     fees: 0,
@@ -101,6 +111,11 @@ describe("toTransactionRow — FreeShares (FSD-022/050)", () => {
     note: null,
     realized_pnl: null,
     created_at: "2026-06-12T10:00:00Z",
+    write_off_reason: null,
+    transfer_id: null,
+    added_deposit: false,
+    split_factor: null,
+    dividend_amount: null,
   };
 
   // FSD-050 — type field carries "FreeShares" so the component can build the i18n key
@@ -140,7 +155,7 @@ describe("toTransactionRow — WriteOff (WOF-057)", () => {
         asset_id: "asset-btc",
         transaction_type: "WriteOff",
         date: "2026-06-12",
-        quantity: 100_000,
+        quantity: "0.1",
         unit_price: 0,
         exchange_rate: 1_000_000,
         fees: 0,
@@ -149,6 +164,10 @@ describe("toTransactionRow — WriteOff (WOF-057)", () => {
         realized_pnl: -2_000_000_000,
         created_at: "2026-06-12T10:00:00Z",
         write_off_reason: "Lost",
+        transfer_id: null,
+        added_deposit: false,
+        split_factor: null,
+        dividend_amount: null,
       },
       "Bitcoin",
       "Wallet",
@@ -165,7 +184,7 @@ describe("toTransactionRow — WriteOff (WOF-057)", () => {
         asset_id: "asset-1",
         transaction_type: "Purchase",
         date: "2026-06-12",
-        quantity: 1_000_000,
+        quantity: "1",
         unit_price: 1_000_000,
         exchange_rate: 1_000_000,
         fees: 0,
@@ -173,6 +192,11 @@ describe("toTransactionRow — WriteOff (WOF-057)", () => {
         note: null,
         realized_pnl: null,
         created_at: "2026-06-12T10:00:00Z",
+        write_off_reason: null,
+        transfer_id: null,
+        added_deposit: false,
+        split_factor: null,
+        dividend_amount: null,
       },
       "Apple",
       "Wallet",
@@ -189,7 +213,7 @@ const splitTx = (factorMicros: number) => ({
   asset_id: "asset-equity-1",
   transaction_type: "Split" as const,
   date: "2026-07-01",
-  quantity: 0,
+  quantity: "0",
   split_factor: factorMicros,
   unit_price: 0,
   exchange_rate: 1_000_000,
@@ -198,6 +222,25 @@ const splitTx = (factorMicros: number) => ({
   note: null,
   realized_pnl: null,
   created_at: "2026-07-01T10:00:00Z",
+  write_off_reason: null,
+  transfer_id: null,
+  added_deposit: false,
+  dividend_amount: null,
+});
+
+describe("toTransactionRow — a quantity's decimals (TXL-025)", () => {
+  const quantityOf = (quantity: string) =>
+    toTransactionRow(
+      { ...splitTx(0), transaction_type: "Purchase" as const, split_factor: null, quantity },
+      "Bitcoin",
+      "My Account",
+    ).quantity;
+
+  it("TXL-025: a satoshi shows whole, a round quantity with three decimals", () => {
+    expect(quantityOf("0.00000001")).toBe("0,00000001");
+    expect(quantityOf("5")).toBe("5,000");
+    expect(quantityOf("1.2345")).toBe("1,2345");
+  });
 });
 
 describe("toTransactionRow — Split (SPL-060)", () => {
@@ -256,8 +299,8 @@ describe("transactionMutationErrorToI18n", () => {
     expect(
       transactionMutationErrorToI18n({
         code: "Oversell",
-        available: 1_500_000,
-        requested: 2_000_000,
+        available: "1.5",
+        requested: "2",
       }),
     ).toEqual({
       key: "error.Oversell",
@@ -331,12 +374,12 @@ describe("transactionDraftErrorToI18n", () => {
   // TRX-062 — a recording rejection keeps the message recording shows
   it("maps a recording rejection like the recording command", () => {
     expect(
-      transactionDraftErrorToI18n({ code: "Oversell", available: 1_000_000, requested: 2_000_000 }),
+      transactionDraftErrorToI18n({ code: "Oversell", available: "1", requested: "2" }),
     ).toEqual(
       transactionMutationErrorToI18n({
         code: "Oversell",
-        available: 1_000_000,
-        requested: 2_000_000,
+        available: "1",
+        requested: "2",
       }),
     );
   });

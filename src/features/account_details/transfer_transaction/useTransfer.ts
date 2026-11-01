@@ -2,7 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { decimalToMicro, microToFieldDecimal } from "@/lib/microUnits";
+import {
+  addQuantities,
+  compareQuantities,
+  decimalToMicro,
+  decimalToQuantity,
+  isPositiveQuantity,
+  microToFieldDecimal,
+  quantityCost,
+  subtractQuantities,
+} from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import { accountDetailsGateway } from "../gateway";
 import { type TransferRefusal, transferErrorToI18n } from "../shared/presenter";
@@ -18,8 +27,8 @@ export interface TransferEditMode {
   initialSent: string;
   initialReceived: string;
   initialRate: string;
-  /** The quantity sent in micro-units, counted back into what is held (TRF-057). */
-  initialSentMicro: number;
+  /** The quantity sent as decimal text, counted back into what is held (TRF-057). */
+  initialSentQuantity: string;
   initialNote: string;
 }
 
@@ -49,6 +58,13 @@ function positiveMicro(value: string): number | null {
   if (validateAmount(value) !== null) return null;
   const micro = decimalToMicro(value);
   return micro > 0 ? micro : null;
+}
+
+/** A quantity typed in a field; null when it is no positive figure (TRF-054). */
+function positiveQuantity(value: string): string | null {
+  if (validateAmount(value) !== null) return null;
+  const quantity = decimalToQuantity(value);
+  return isPositiveQuantity(quantity) ? quantity : null;
 }
 
 /** `a × b` in micro-units, rounded down (TRF-020, TRF-022). */
@@ -116,24 +132,24 @@ export function useTransfer({
   }, [accountId, betweenCurrencies, formData.toAccountId, formData.date, rateTyped]);
 
   // TRF-057 — when correcting, the transfer's quantity sent counts back into what is held.
-  const heldMicro = target.quantityMicro + (editMode?.initialSentMicro ?? 0);
+  const heldQuantity = addQuantities(target.heldQuantity, editMode?.initialSentQuantity ?? "0");
 
-  const sentMicro = useMemo(() => positiveMicro(formData.sent), [formData.sent]);
-  const receivedMicro = useMemo(() => positiveMicro(formData.received), [formData.received]);
+  const sent = useMemo(() => positiveQuantity(formData.sent), [formData.sent]);
+  const received = useMemo(() => positiveQuantity(formData.received), [formData.received]);
   const rateMicro = useMemo(
     () => (betweenCurrencies ? positiveMicro(formData.rate) : 1_000_000),
     [betweenCurrencies, formData.rate],
   );
 
   // TRF-054 — refused under their fields as they are typed.
-  const overHolding = sentMicro !== null && sentMicro > heldMicro;
+  const overHolding = sent !== null && compareQuantities(sent, heldQuantity) > 0;
   const receivedAboveSent =
-    sentMicro !== null && receivedMicro !== null && receivedMicro > sentMicro;
+    sent !== null && received !== null && compareQuantities(received, sent) > 0;
 
   const isFormValid =
     destination !== null &&
-    sentMicro !== null &&
-    receivedMicro !== null &&
+    sent !== null &&
+    received !== null &&
     rateMicro !== null &&
     !overHolding &&
     !receivedAboveSent &&
@@ -142,26 +158,26 @@ export function useTransfer({
   // TRF-053 — the form's estimate at the average price shown.
   const summary = useMemo(() => {
     if (
-      sentMicro === null ||
-      receivedMicro === null ||
+      sent === null ||
+      received === null ||
       overHolding ||
       receivedAboveSent ||
       destination === null
     ) {
       return null;
     }
-    const costMicro = times(receivedMicro, target.averagePriceMicro);
-    const feeMicro = sentMicro - receivedMicro;
+    const costMicro = quantityCost(received, target.averagePriceMicro);
+    const fee = subtractQuantities(sent, received);
     return {
       costMicro,
       convertedMicro: betweenCurrencies && rateMicro !== null ? times(costMicro, rateMicro) : null,
       rateMicro,
-      feeMicro,
-      feeCostMicro: times(feeMicro, target.averagePriceMicro),
+      fee,
+      feeCostMicro: quantityCost(fee, target.averagePriceMicro),
     };
   }, [
-    sentMicro,
-    receivedMicro,
+    sent,
+    received,
     overHolding,
     receivedAboveSent,
     destination,
@@ -191,7 +207,7 @@ export function useTransfer({
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!isFormValid || sentMicro === null || receivedMicro === null || rateMicro === null) {
+      if (!isFormValid || sent === null || received === null || rateMicro === null) {
         return;
       }
       setRefusal(null);
@@ -199,8 +215,8 @@ export function useTransfer({
       try {
         const figures = {
           date: formData.date,
-          quantity_sent: sentMicro,
-          quantity_received: receivedMicro,
+          quantity_sent: sent,
+          quantity_received: received,
           exchange_rate: betweenCurrencies ? rateMicro : null,
           note: formData.note || null,
         };
@@ -234,8 +250,8 @@ export function useTransfer({
       target,
       formData,
       isFormValid,
-      sentMicro,
-      receivedMicro,
+      sent,
+      received,
       rateMicro,
       betweenCurrencies,
       editMode,
@@ -254,7 +270,7 @@ export function useTransfer({
     refusal,
     isSubmitting,
     isFormValid,
-    heldMicro,
+    heldQuantity,
     overHolding,
     receivedAboveSent,
     summary,

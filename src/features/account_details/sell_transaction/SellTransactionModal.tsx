@@ -23,8 +23,8 @@ interface SellTransactionModalProps {
   /** The asset's reference, named by a refusal for lack of units (SEL-021). */
   assetReference: string;
   assetCurrency: string;
-  /** Holding quantity in micro-units — used for max hint and oversell guard (SEL-022). */
-  holdingQuantityMicro: number;
+  /** Holding quantity as decimal text — used for max hint and oversell guard (SEL-022). */
+  holdingQuantity: string;
   /** When true, asset currency differs from account currency — show exchange rate field (SEL-036). */
   showExchangeRate?: boolean;
   /** Called after a successful sell submission (SEL-045). Required — caller must refresh data. */
@@ -40,7 +40,7 @@ export function SellTransactionModal({
   assetName,
   assetReference,
   assetCurrency,
-  holdingQuantityMicro,
+  holdingQuantity,
   showExchangeRate = false,
   onSubmitSuccess,
 }: SellTransactionModalProps) {
@@ -74,7 +74,7 @@ export function SellTransactionModal({
     accountId,
     assetId,
     assetReference,
-    holdingQuantityMicro,
+    holdingQuantity,
     onSubmitSuccess,
   });
 

@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next";
 import type { ShownValue, TransactionShown } from "@/bindings";
 import {
+  decimalToMicro,
+  formatQuantity,
   microToFormatted,
   microToFormattedFactor,
   microToFormattedPrice,
@@ -37,8 +39,8 @@ export function transactionRows(
       "quantity",
       t("agent.transaction_quantity"),
       shown.kind === "Split"
-        ? microToFormattedFactor(shown.quantity)
-        : microToFormattedQuantity(shown.quantity),
+        ? microToFormattedFactor(decimalToMicro(shown.quantity))
+        : formatQuantity(shown.quantity),
     ]);
   }
   rows.push([

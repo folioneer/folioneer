@@ -65,7 +65,7 @@ const removal = (overrides = {}) => ({
     kind: "OpeningBalance",
     asset_name: "Amundi MSCI World",
     asset_reference: "CW8",
-    quantity: 118_000_000,
+    quantity: "118",
     amount: 31_204_000_000,
     unit_price: 264_440_000,
     fees: 0,
@@ -79,7 +79,7 @@ const shown = (
   kind: string,
   account: string,
   amount: number,
-  holding_moved: number | null,
+  holding_moved: string | null,
   cash_moved: number,
 ) => ({
   transaction: {
@@ -90,7 +90,7 @@ const shown = (
     kind,
     asset_name: holding_moved === null ? null : "Bitcoin",
     asset_reference: holding_moved === null ? null : "BTC",
-    quantity: holding_moved === null ? amount : 500_000,
+    quantity: holding_moved === null ? String(amount / 1_000_000) : "0.5",
     amount,
   },
   holding_moved,
@@ -102,10 +102,10 @@ const replacement = (overrides = {}) => ({
   client: "Claude Code",
   asked_at: "2026-10-24T09:00:00",
   transactions: [
-    shown("Sell", "Exchange", 21_000_000_000, -500_000, 21_000_000_000),
+    shown("Sell", "Exchange", 21_000_000_000, "-0.5", 21_000_000_000),
     shown("Withdrawal", "Exchange", 21_000_000_000, null, -21_000_000_000),
     shown("Deposit", "Hardware wallet", 21_000_000_000, null, 21_000_000_000),
-    shown("Purchase", "Hardware wallet", 21_000_000_000, 500_000, -21_000_000_000),
+    shown("Purchase", "Hardware wallet", 21_000_000_000, "0.5", -21_000_000_000),
   ],
   transfer: {
     from_account: "Exchange",
@@ -113,8 +113,8 @@ const replacement = (overrides = {}) => ({
     date: "2026-10-21",
     asset_name: "Bitcoin",
     asset_reference: "BTC",
-    quantity_sent: 500_000,
-    quantity_received: 500_000,
+    quantity_sent: "0.5",
+    quantity_received: "0.5",
     quantity_not_received: null,
     cost: 21_000_000_000,
     from_currency: "EUR",
@@ -292,7 +292,7 @@ describe("AgentConnectionMount", () => {
         change: {
           ...removal(),
           id: 11,
-          becomes: { ...asItIs, quantity: 100_000_000, amount: 26_400_000_000 },
+          becomes: { ...asItIs, quantity: "100", amount: 26_400_000_000 },
           moved: ["quantity", "amount"],
         },
       }),
@@ -374,7 +374,7 @@ describe("AgentConnectionMount", () => {
 
   // AGT-083 — a split's quantity is its factor, and a total of 0 is shown as 0.
   it("shows a split's factor and a total of 0", () => {
-    const split = { ...removal().transaction, kind: "Split", quantity: 2_000_000, amount: 0 };
+    const split = { ...removal().transaction, kind: "Split", quantity: "2", amount: 0 };
     hook.mockReturnValue(state({ removal: removal({ transaction: split }) }));
     render(<AgentConnectionMount />);
 
@@ -452,8 +452,8 @@ describe("AgentConnectionMount", () => {
   it("shows the rate between currencies and the fee in kind", () => {
     const transfer = {
       ...replacement().transfer,
-      quantity_received: 400_000,
-      quantity_not_received: 100_000,
+      quantity_received: "0.4",
+      quantity_not_received: "0.1",
       exchange_rate: 1_080_000,
       converted_cost: 22_680_000_000,
       to_currency: "USD",
@@ -672,7 +672,7 @@ describe("AgentIndicator", () => {
     hook.mockReturnValue(
       state({
         sessions: [session()],
-        change: { ...removal(), becomes: { ...asItIs, quantity: 1 }, moved: ["quantity"] },
+        change: { ...removal(), becomes: { ...asItIs, quantity: "0.000001" }, moved: ["quantity"] },
       }),
     );
     rerender(<AgentIndicator />);

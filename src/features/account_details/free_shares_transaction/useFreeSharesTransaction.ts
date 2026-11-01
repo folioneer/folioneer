@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { decimalToMicro } from "@/lib/microUnits";
+import { decimalToQuantity } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -93,7 +93,7 @@ export function useFreeSharesTransaction({
       setError(null);
       setIsSubmitting(true);
       try {
-        const quantityMicros = decimalToMicro(formData.quantity);
+        const quantity = decimalToQuantity(formData.quantity);
         const note = formData.note || null;
 
         const result = editMode
@@ -102,7 +102,7 @@ export function useFreeSharesTransaction({
             // are inert (unit_price 0, exchange_rate 1.0, fees 0).
             await accountDetailsGateway.correctTransaction(editMode.transactionId, accountId, {
               date: formData.date,
-              quantity: quantityMicros,
+              quantity,
               unit_price: 0,
               exchange_rate: 1_000_000,
               fees: 0,
@@ -113,7 +113,7 @@ export function useFreeSharesTransaction({
               account_id: accountId,
               asset_id: formData.assetId,
               date: formData.date,
-              quantity: quantityMicros,
+              quantity,
               note,
             });
 

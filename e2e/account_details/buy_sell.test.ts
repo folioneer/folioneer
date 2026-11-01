@@ -8,6 +8,7 @@
  *   TRX-030 — sell more than held → the draft check keeps submit disabled
  *   TRX-067 / SEL-046 — the form says why: the oversell on the quantity field, naming what
  *     was held of the asset on the sale's date
+ *   TRX-024B — a satoshi typed in the form is recorded and read back whole
  *
  * Seed strategy:
  *   - TRX-010: account + asset seeded via IPC; buy exercised through the UI.
@@ -15,7 +16,7 @@
  */
 
 import assert from "node:assert";
-import { $ } from "@wdio/globals";
+import { $, browser } from "@wdio/globals";
 import { isoToDisplayDate } from "../helpers/date";
 import { dismissLeftoverModal, waitForSnackbarGone } from "../helpers/modal";
 import { navigateToAccountDetails, navigateToAccounts } from "../helpers/navigation";
@@ -29,6 +30,7 @@ import { seedAccount, seedAsset, seedBuy, seedCategory } from "../helpers/seed";
 const DATES = {
   buy: isoToDisplayDate("2019-03-10"),
   buy2: isoToDisplayDate("2019-04-01"),
+  satoshi: isoToDisplayDate("2019-04-15"),
   sell: isoToDisplayDate("2019-05-01"),
   oversell: isoToDisplayDate("2019-06-01"),
 } as const;
@@ -91,6 +93,42 @@ describe("buy_sell", () => {
       await buyBtnAfter.isExisting(),
       "Holding row with Buy button must remain after buy transaction (TRX-010)",
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // TRX-024B — a satoshi typed in the buy form is what the holding row then shows
+  // -------------------------------------------------------------------------
+  it("TRX-024B: a satoshi typed in the buy form is read back whole", async () => {
+    const catId = await seedCategory("E2E Cat TRX024B");
+    const accId = await seedAccount("E2E Buy TRX-024B");
+    const astId = await seedAsset("E2E Asset TRX024B", catId);
+    await seedBuy(accId, astId, "2019-03-10", 1_000_000); // 1 unit
+
+    await navigateToAccounts();
+    await navigateToAccountDetails(accId);
+
+    const buyBtn = await $(`#action-buy-${astId}`);
+    await buyBtn.waitForExist({ timeout: 10000 });
+    await buyBtn.click();
+
+    const form = await $("form#buy-transaction-form");
+    await form.waitForExist({ timeout: 8000 });
+
+    await setReactInputValue("buy-trx-date", DATES.satoshi);
+    await setReactInputValue("buy-trx-quantity", "0.00000001");
+    await setReactInputValue("buy-trx-unit-price", "100");
+
+    const submitBtn = await $('button[type="submit"][form="buy-transaction-form"]');
+    await submitBtn.waitForEnabled({ timeout: 5000 });
+    await submitBtn.click();
+    await form.waitForExist({ timeout: 8000, reverse: true });
+
+    const holdingQty = await $(`#holding-quantity-${astId}`);
+    await holdingQty.waitForExist({ timeout: 8000 });
+    await browser.waitUntil(async () => /^1[.,]00000001$/.test(await holdingQty.getText()), {
+      timeout: 8000,
+      timeoutMsg: "The holding must read 1.00000001 after buying a satoshi (TRX-024B)",
+    });
   });
 
   // -------------------------------------------------------------------------

@@ -11,7 +11,7 @@ use super::wire::shown_name;
 const PROTOCOL_VERSION: &str = "2025-06-18";
 
 /// AGT-010, AGT-014 — the one convention on figures, said once.
-const FIGURES: &str = "Every figure you read and every figure you write is exact decimal text with a dot and up to six decimals: \"12.5\" is twelve and a half, and a percentage \"1.5\" is 1.5 %. Send a figure back as you read it. Only what counts things and the ratio of a split are whole numbers.";
+const FIGURES: &str = "Every figure you read and every figure you write is exact decimal text with a dot, up to six decimals and up to eight for a quantity of an asset: \"12.5\" is twelve and a half, and a percentage \"1.5\" is 1.5 %. Send a figure back as you read it. Only what counts things and the ratio of a split are whole numbers.";
 const METHOD_NOT_FOUND: i64 = -32601;
 const INVALID_PARAMS: i64 = -32602;
 const INVALID_REQUEST: i64 = -32600;

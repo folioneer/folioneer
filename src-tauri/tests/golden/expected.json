@@ -63,7 +63,7 @@
           "ytd": null
         },
         "price_outdated": false,
-        "quantity": 14860419,
+        "quantity": "14.86041934",
         "realized_lost": 0,
         "realized_pnl": -55423170,
         "total_return_pct": -2186371,
@@ -100,7 +100,7 @@
           "ytd": null
         },
         "price_outdated": false,
-        "quantity": 5848000000,
+        "quantity": "5848",
         "realized_lost": 0,
         "realized_pnl": 0,
         "total_return_pct": null,
@@ -153,7 +153,7 @@
           "ytd": null
         },
         "price_outdated": false,
-        "quantity": 44550000,
+        "quantity": "44.55",
         "realized_lost": 0,
         "realized_pnl": 287000000,
         "total_return_pct": 49799757,
@@ -190,7 +190,7 @@
           "ytd": null
         },
         "price_outdated": false,
-        "quantity": 10000000,
+        "quantity": "10",
         "realized_lost": 0,
         "realized_pnl": 0,
         "total_return_pct": 1776367,
@@ -227,7 +227,7 @@
           "ytd": null
         },
         "price_outdated": false,
-        "quantity": 13402500000,
+        "quantity": "13402.5",
         "realized_lost": 0,
         "realized_pnl": 0,
         "total_return_pct": null,
@@ -264,7 +264,7 @@
           "ytd": null
         },
         "price_outdated": false,
-        "quantity": 16000000,
+        "quantity": "16",
         "realized_lost": 0,
         "realized_pnl": 0,
         "total_return_pct": 111471321,

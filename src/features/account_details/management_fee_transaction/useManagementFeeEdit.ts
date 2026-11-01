@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
-import { decimalToMicro } from "@/lib/microUnits";
+import { decimalToQuantity } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -79,7 +79,7 @@ export function useManagementFeeEdit({
           accountId,
           {
             date: formData.date,
-            quantity: decimalToMicro(formData.quantity),
+            quantity: decimalToQuantity(formData.quantity),
             unit_price: 0,
             exchange_rate: 1_000_000,
             fees: 0,

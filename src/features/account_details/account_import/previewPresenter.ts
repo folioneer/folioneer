@@ -1,5 +1,5 @@
 import type { AccountError, AssetLookupResult, AssetRead, PreviewRow, RowReason } from "@/bindings";
-import { microToFormattedQuantity } from "@/lib/microUnits";
+import { formatQuantity } from "@/lib/microUnits";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { OPERATION_TYPE_LABELS } from "./presenter";
 
@@ -38,7 +38,7 @@ function refusalToI18n(refusal: AccountError): I18nMessage {
     case "Oversell":
       return {
         key: "account_import.reason_over_held",
-        vars: { held: microToFormattedQuantity(refusal.available) },
+        vars: { held: formatQuantity(refusal.available) },
       };
     case "ClosedPosition":
       return { key: "account_import.reason_none_held" };

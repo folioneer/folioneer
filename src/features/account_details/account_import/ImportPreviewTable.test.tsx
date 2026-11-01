@@ -32,7 +32,7 @@ const rows: PreviewRow[] = [
       status: "Rejected",
       reason: {
         code: "ManualEntry",
-        refusal: { code: "Oversell", available: M, requested: 2 * M },
+        refusal: { code: "Oversell", available: "1", requested: "2" },
       },
       operation: buy,
     },

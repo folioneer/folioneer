@@ -9,7 +9,7 @@ import { transferErrorToI18n } from "../shared/presenter";
 export interface TransferEditLoaded {
   transfer: TransferView;
   /** What the sending account holds of the asset today, the transfer's sending side apart. */
-  heldMicro: number;
+  heldQuantity: string;
 }
 
 /**
@@ -48,7 +48,7 @@ export function useTransferEdit(
         return;
       }
       const holding = details.data.holdings.find((h) => h.asset_id === transfer.asset_id);
-      setLoaded({ transfer, heldMicro: holding?.quantity ?? 0 });
+      setLoaded({ transfer, heldQuantity: holding?.quantity ?? "0" });
     })();
     return () => {
       cancelled = true;

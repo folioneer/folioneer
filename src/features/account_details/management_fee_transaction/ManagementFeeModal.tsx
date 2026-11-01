@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
-import { microToFormattedQuantity } from "@/lib/microUnits";
+import { formatQuantity, microToFormattedQuantity } from "@/lib/microUnits";
 import { Button } from "@/ui/components/button/Button";
 import { CalcField } from "@/ui/components/field/CalcField";
 import { DateField } from "@/ui/components/field/DateField";
@@ -168,8 +168,8 @@ export function ManagementFeeModal({
                 <p id="management-fee-preview" className="text-sm text-m3-on-surface-variant">
                   {t("management_fee.preview", {
                     date: formatIsoDateNumeric(formData.date, i18n.language),
-                    held: microToFormattedQuantity(preview.held_quantity),
-                    removed: microToFormattedQuantity(preview.removed_quantity),
+                    held: formatQuantity(preview.held_quantity),
+                    removed: formatQuantity(preview.removed_quantity),
                     percent: microToFormattedQuantity(preview.percent_micros),
                   })}
                 </p>

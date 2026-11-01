@@ -24,7 +24,7 @@ const baseRow: HoldingRowViewModel = {
   assetReference: "AAPL",
   assetCurrency: "USD",
   quantity: "2.000000",
-  quantityMicro: 2_000_000,
+  heldQuantity: "2",
   averagePrice: "100.00",
   averagePriceMicro: 100_000_000,
   currentValue: "300.00",
@@ -151,7 +151,7 @@ describe("HoldingRow — price cell (MKT-030, MKT-140, MKT-142)", () => {
       assetId: "asset-1",
       assetName: "Apple Inc",
       assetReference: "AAPL",
-      quantityMicro: 2_000_000,
+      heldQuantity: "2",
       averagePriceMicro: 100_000_000,
     });
     live.unmount();
@@ -195,7 +195,7 @@ describe("HoldingRow — price cell (MKT-030, MKT-140, MKT-142)", () => {
       assetId: "asset-1",
       assetName: "Apple Inc",
       assetReference: "AAPL",
-      quantityMicro: 2_000_000,
+      heldQuantity: "2",
       averagePriceMicro: 100_000_000,
       accountName: "Broker",
       accountCurrency: "EUR",
@@ -869,7 +869,7 @@ describe("HoldingRow — cash row (CSH-110 view transactions)", () => {
     assetName: "Cash EUR",
     assetReference: "EUR",
     isCash: true,
-    quantityMicro: 500_000_000,
+    heldQuantity: "500",
   };
 
   it("renders a View-transactions inspect action on the cash row (CSH-110)", () => {

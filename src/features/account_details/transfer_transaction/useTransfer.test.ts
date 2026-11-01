@@ -38,7 +38,7 @@ const target: TransferTarget = {
   assetId: "asset-btc",
   assetName: "Bitcoin",
   assetReference: "BTC",
-  quantityMicro: 500_000,
+  heldQuantity: "0.5",
   averagePriceMicro: 20_000_000_000,
   accountName: "Exchange",
   accountCurrency: "EUR",
@@ -56,7 +56,7 @@ const editMode: TransferEditMode = {
   initialSent: "0.2",
   initialReceived: "0.19",
   initialRate: "1.08",
-  initialSentMicro: 200_000,
+  initialSentQuantity: "0.2",
   initialNote: "",
 };
 
@@ -159,7 +159,7 @@ describe("useTransfer (TRF-051 to TRF-057)", () => {
       costMicro: 3_800_000_000,
       convertedMicro: 4_104_000_000,
       rateMicro: 1_080_000,
-      feeMicro: 10_000,
+      fee: "0.01",
       feeCostMicro: 200_000_000,
     });
   });
@@ -192,8 +192,8 @@ describe("useTransfer (TRF-051 to TRF-057)", () => {
       to_account_id: "acc-wallet",
       asset_id: "asset-btc",
       date: "2024-06-15",
-      quantity_sent: 200_000,
-      quantity_received: 200_000,
+      quantity_sent: "0.2",
+      quantity_received: "0.2",
       exchange_rate: null,
       note: "cold storage",
     });
@@ -206,7 +206,7 @@ describe("useTransfer (TRF-051 to TRF-057)", () => {
   it("shows a lack of units under the quantity sent until a figure changes", async () => {
     mockRecordTransfer.mockResolvedValue({
       status: "error",
-      error: { code: "Oversell", available: 100_000 },
+      error: { code: "Oversell", available: "0.1" },
     });
     const { result } = setup();
     act(() => result.current.handleChange("toAccountId", "acc-wallet"));
@@ -226,7 +226,7 @@ describe("useTransfer (TRF-051 to TRF-057)", () => {
     const { result } = setup(editMode);
     expect(result.current.storedRate).toBe("typed");
     expect(mockGetTransferRate).not.toHaveBeenCalled();
-    expect(result.current.heldMicro).toBe(700_000);
+    expect(result.current.heldQuantity).toBe("0.7");
     act(() => result.current.handleChange("sent", "0.6"));
     expect(result.current.overHolding).toBe(false);
     expect(result.current.formData.received).toBe("0.19");
@@ -234,8 +234,8 @@ describe("useTransfer (TRF-051 to TRF-057)", () => {
     expect(mockCorrectTransfer).toHaveBeenCalledWith({
       transfer_id: "trf-1",
       date: "2024-06-15",
-      quantity_sent: 600_000,
-      quantity_received: 190_000,
+      quantity_sent: "0.6",
+      quantity_received: "0.19",
       exchange_rate: 1_080_000,
       note: null,
     });

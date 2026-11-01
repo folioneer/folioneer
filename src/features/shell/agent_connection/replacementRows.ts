@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { ReplacedShown, TransferShown } from "@/bindings";
-import { microToFormatted, microToFormattedQuantity } from "@/lib/microUnits";
+import { formatQuantity, microToFormatted, microToFormattedQuantity } from "@/lib/microUnits";
 import { formatIsoDateNumeric } from "@/ui/format/date";
 import type { TransactionRow } from "./transactionRows";
 
@@ -12,6 +12,12 @@ const MINUS = "−";
 /** A figure the core signed, shown with its sign: a plus in, a minus out. */
 function signed(moved: number, format: (magnitude: number) => string): string {
   return `${moved < 0 ? MINUS : "+"}${format(Math.abs(moved))}`;
+}
+
+/** A holding's move as its sign and its figure. */
+function signedQuantity(moved: string): string {
+  const negative = moved.startsWith("-");
+  return `${negative ? MINUS : "+"}${formatQuantity(negative ? moved.slice(1) : moved)}`;
 }
 
 /**
@@ -27,8 +33,7 @@ export function replacedRow(
   language: string,
 ): ReplacedCell[] {
   const shown = replaced.transaction;
-  const quantity =
-    replaced.holding_moved === null ? "" : signed(replaced.holding_moved, microToFormattedQuantity);
+  const quantity = replaced.holding_moved === null ? "" : signedQuantity(replaced.holding_moved);
   return [
     ["account", shown.account],
     ["date", formatIsoDateNumeric(shown.date, language)],
@@ -74,8 +79,8 @@ export function transferRows(
         "quantity",
         t("agent.transaction_quantity"),
         t("agent.replacement_quantity", {
-          sent: microToFormattedQuantity(transfer.quantity_sent),
-          received: microToFormattedQuantity(transfer.quantity_received),
+          sent: formatQuantity(transfer.quantity_sent),
+          received: formatQuantity(transfer.quantity_received),
         }),
       ],
       ["cost", t("agent.replacement_cost"), costMoved],
@@ -83,6 +88,6 @@ export function transferRows(
     feeInKind:
       transfer.quantity_not_received === null
         ? null
-        : microToFormattedQuantity(transfer.quantity_not_received),
+        : formatQuantity(transfer.quantity_not_received),
   };
 }

@@ -1,7 +1,7 @@
 # Contract — Sync
 
 > Domain: `sync`
-> Last updated by: `multi-device-sync` + `sync-conflict-resolution` specs
+> Last updated by: `multi-device-sync` + `sync-conflict-resolution` specs — `financial-asset-transaction` (TRX-024B)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Per-command reachable codes are listed in the "Errors" column. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic chain preserved server-side via `tracing::error!`), consistent with the other contracts. Precondition guards not stated as rejections in the spec are marked _(precondition guard — inferred)_.
 >
@@ -15,7 +15,7 @@
 >
 > **One condition, two wire shapes.** `UpdateRequired` and `FolderUnavailable` exist both as error codes (on calls that cannot start) and as `SyncFailure` variants (on runs that completed partially). They describe the same user-facing condition; the frontend presenter maps both shapes to one message.
 >
-> **Wire conventions**: identifiers and logical timestamps are strings; instants are ISO-8601 strings; the folder is an absolute path string; money and quantities are `i64`, on the scales of TRX-024 (ADR-001).
+> **Wire conventions**: identifiers and logical timestamps are strings; instants are ISO-8601 strings; the folder is an absolute path string; money is `i64`, on the scale of TRX-024 (ADR-001); a quantity is decimal text (TRX-024B).
 
 ---
 
@@ -152,7 +152,7 @@ struct InconsistentHolding {
 
 // Shared with account-contract.md (HoldingDetail.inconsistency).
 enum HoldingInconsistency {
-    Oversold { quantity: i64 },             // micros; the replayed quantity, negative by construction
+    Oversold { quantity: String },          // decimal text; the replayed quantity, negative by construction
     CashOverdrawn { amount: i64 },          // micros, account currency; the replayed cash balance, negative
 }
 
@@ -201,6 +201,7 @@ Record identity per kind follows CFR-012: accounts, categories, assets, transact
 
 ## Changelog
 
+- 2026-11-01 — #579 (TRX-024B): `HoldingInconsistency::Oversold.quantity` is decimal text.
 - 2026-11-01 — #578 (SYN-038, TRX-024): a non-cash transaction's `quantity` is in hundred-millionths, an older segment's multiplied by 100 on read; data format version 14. No command changed.
 - 2026-11-01 — #577 (SYN-038, SPL-010, DIV-023): a split's factor and a dividend's amount leave a transaction's `quantity` for `split_factor` and `dividend_amount`; data format version 13. No command changed.
 - 2026-10-31 — #714 (SYN-014, SYN-021, SYN-038): `RecordKind` loses `ColumnMapping`, an import mapper being a file; data format version 12. No command changed.

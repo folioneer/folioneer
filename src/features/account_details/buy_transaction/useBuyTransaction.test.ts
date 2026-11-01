@@ -71,7 +71,7 @@ describe("useBuyTransaction", () => {
     mockRecordAssetPrice.mockReset();
     mockGetSnapshot.mockReset();
     mockValidateDraft.mockReset().mockImplementation(fakeDraftCheck);
-    mockGetSnapshot.mockResolvedValue({ status: "ok", data: { quantity: 0, average_price: 0 } });
+    mockGetSnapshot.mockResolvedValue({ status: "ok", data: { quantity: "0", average_price: 0 } });
   });
 
   // MKT-052 — recordPrice defaults to the global toggle value at hook mount (create mode)
@@ -84,7 +84,7 @@ describe("useBuyTransaction", () => {
   it("exposes averageCostAsOfDate when the asset is held as of the date", async () => {
     mockGetSnapshot.mockResolvedValue({
       status: "ok",
-      data: { quantity: 2_000_000, average_price: 100_000_000 },
+      data: { quantity: "2", average_price: 100_000_000 },
     });
     const { result } = renderHook(() => useBuyTransaction(BASE_PROPS));
     await waitFor(() => expect(result.current.averageCostAsOfDate).not.toBeNull());
@@ -163,7 +163,7 @@ describe("useBuyTransaction", () => {
       expect.objectContaining({
         total_amount: null,
         unit_price: 100_000_000,
-        quantity: 2_000_000,
+        quantity: "2",
         fees: 10_000_000,
       }),
     );
@@ -202,7 +202,7 @@ describe("useBuyTransaction", () => {
       expect.objectContaining({
         total_amount: 210_000_000,
         unit_price: 100_000_000,
-        quantity: 2_000_000,
+        quantity: "2",
         fees: 10_000_000,
       }),
     );

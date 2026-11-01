@@ -149,7 +149,7 @@ const editWithdrawal = {
   asset_id: "system-cash-eur",
   transaction_type: "Withdrawal",
   date: "2026-05-10",
-  quantity: 120_000_000,
+  quantity: "120",
   unit_price: 1_000_000,
   exchange_rate: 1_000_000,
   fees: 0,
@@ -157,6 +157,11 @@ const editWithdrawal = {
   note: null,
   realized_pnl: null,
   created_at: "2026-05-10T00:00:00Z",
+  write_off_reason: null,
+  transfer_id: null,
+  added_deposit: false,
+  split_factor: null,
+  dividend_amount: null,
 } as const;
 
 describe("useWithdrawalTransaction — edit mode (CSH-111)", () => {
@@ -171,7 +176,7 @@ describe("useWithdrawalTransaction — edit mode (CSH-111)", () => {
     const { result } = renderHook(() =>
       useWithdrawalTransaction({
         accountId: "account-1",
-        editTransaction: { ...editWithdrawal, quantity: 500_123_456, total_amount: 500_123_456 },
+        editTransaction: { ...editWithdrawal, quantity: "500.123456", total_amount: 500_123_456 },
       }),
     );
     expect(result.current.formData.amount).toBe("500.123456");
@@ -201,7 +206,7 @@ describe("useWithdrawalTransaction — edit mode (CSH-111)", () => {
     expect(mockCorrectTransaction).toHaveBeenCalledWith(
       "tx-wd-1",
       "account-1",
-      expect.objectContaining({ date: "2026-05-10", quantity: 90_000_000 }),
+      expect.objectContaining({ date: "2026-05-10", quantity: "90" }),
     );
     expect(mockShowSnackbar).toHaveBeenCalledWith("cash.withdrawal_updated", "success");
   });

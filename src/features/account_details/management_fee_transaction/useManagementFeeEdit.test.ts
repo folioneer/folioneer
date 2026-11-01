@@ -78,7 +78,7 @@ describe("useManagementFeeEdit (FEE-063)", () => {
 
     expect(mockCorrectTransaction).toHaveBeenCalledWith("tx-fee-1", "account-1", {
       date: "2024-06-15",
-      quantity: 2_500_000,
+      quantity: "2.5",
       unit_price: 0,
       exchange_rate: 1_000_000,
       fees: 0,
