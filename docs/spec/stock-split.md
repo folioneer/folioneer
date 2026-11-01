@@ -6,7 +6,7 @@ A stock split (or reverse split) is a corporate action that rescales a held posi
 
 ## Entity (reused)
 
-SPL reuses the TRX `Transaction` entity with a new `TransactionType::Split` variant. The wire encoding is load-bearing: the **split factor** rides micro-scaled in the `quantity` field; `unit_price`, `fees`, `total_amount` are `0`; `exchange_rate` is `1_000_000`.
+SPL reuses the TRX `Transaction` entity with a new `TransactionType::Split` variant. The **split factor** is micro-scaled in a field of its own, `split_factor`, absent on every other type; `quantity`, `unit_price`, `fees`, `total_amount` are `0`; `exchange_rate` is `1_000_000`. The surfaces that give a quantity give its factor there (TRX-024A).
 
 ---
 
@@ -14,7 +14,7 @@ SPL reuses the TRX `Transaction` entity with a new `TransactionType::Split` vari
 
 ### Recording
 
-**SPL-010 — Split transaction (backend)**: A new `TransactionType::Split` variant is introduced. `record_split` records a `Split` transaction on a held position `(account_id, asset_id)` at a date, carrying the split factor micro-scaled in `quantity` (20-for-1 → `20_000_000`; 1-for-10 reverse → `100_000`; 3-for-2 → `1_500_000`); the money fields are zero per the entity note (a split moves no money and has no FX leg), so the `Split` factory bypasses the generic money validation exactly as `FreeShares` / `Interest` / `ManagementFee` do. Date bounds are the shared transaction date validation (not in the future, TRX-046-style). An optional note is allowed.
+**SPL-010 — Split transaction (backend)**: A new `TransactionType::Split` variant is introduced. `record_split` records a `Split` transaction on a held position `(account_id, asset_id)` at a date, carrying the split factor micro-scaled in `split_factor` (20-for-1 → `20_000_000`; 1-for-10 reverse → `100_000`; 3-for-2 → `1_500_000`); the money fields are zero per the entity note (a split moves no money and has no FX leg), so the `Split` factory bypasses the generic money validation exactly as `FreeShares` / `Interest` / `ManagementFee` do. Date bounds are the shared transaction date validation (not in the future, TRX-046-style). An optional note is allowed.
 
 **SPL-011 — Factor validation (backend)**: The factor must be strictly positive (`SplitFactorNotPositive`) and different from ×1 (`SplitFactorIsOne` — a no-op split is a data-entry error). Both bounds are enforced in the domain factory.
 

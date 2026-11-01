@@ -324,7 +324,7 @@ struct CorrectTransactionDTO {
     account_id: String,
     transaction_id: String,
     date: String,
-    quantity: i64,
+    quantity: i64,             // a split's correction sends its factor here (SPL-030), a dividend's its net amount (DIV-040)
     unit_price: i64,
     exchange_rate: i64,
     fees: i64,
@@ -461,7 +461,7 @@ enum TransactionType {
     Dividend,        // DIV-023 — cash income; attributed to the paying asset, credits cash
     FreeShares,      // FSD-022 — zero-cost quantity event; attributed to the distributing asset, no cash leg
     ManagementFee,   // FEE-022 — quantity-reducing fee; attributed to the charged asset, no cash leg
-    Split,           // SPL-010 — rescales the position; the micro-scaled factor rides in quantity, no money moves
+    Split,           // SPL-010 — rescales the position; the micro-scaled factor is in split_factor, quantity 0, no money moves
     Interest,        // INT-024 — interest credited at zero cost: quantity rises, cost basis unchanged; on the cash line it credits the balance (INT-023)
     WriteOff,        // WOF-020 — a quantity leaving without proceeds at its average price; no cash leg, realized P&L = −cost taken out (WOF-021)
     TransferOut,     // TRF-020 — the sending side: leaves at its average price, total_amount the cost moved; no cash leg, nothing realized
@@ -509,6 +509,8 @@ struct Transaction {
     write_off_reason: Option<WriteOffReason>, // WOF entity — Some on a WriteOff only; a WriteOff stores unit_price 0, exchange_rate 1_000_000, fees 0, total_amount 0
     transfer_id: Option<String>,    // TRF entity — Some on the parts of a transfer only: its two sides and its fee in kind
     added_deposit: bool,            // IMP-051, IMP-051A — true on a deposit an import added before a purchase; kept by a correction
+    split_factor: Option<i64>,      // SPL-010 — micros; a split's factor, quantity then 0; None on every other type
+    dividend_amount: Option<i64>,   // DIV-023 — micros, in the currency it was entered in; a dividend's net amount, quantity then 0; None on every other type
 }
 ```
 
@@ -858,6 +860,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-11-01 — #577 (SPL-010, DIV-023): `Transaction` gains `split_factor` and `dividend_amount`, each moved out of `quantity`, which is 0 on a split and a dividend. No command changed.
 - 2026-10-25 — #502 (IMP-051): `Transaction` gains `added_deposit`, absent from a change written before data format 11 and then `false`. No command changed.
 - 2026-10-24 — #510 (TRF): `record_transfer` (`TransferDTO`, `TransferError`), `correct_transfer` (`CorrectTransferDTO`) and `cancel_transfer`; `TransactionType` gains `TransferOut` and `TransferIn`, `Transaction` gains `transfer_id`; `AccountError` gains `TransferToSameAccount`, `TransferReceivedAboveSent`, `TransferRateMissing { from_currency, to_currency }`, `TransferRateNotOne`, `PartOfTransfer` and `TransferNotFound`. `correct_transaction` and `correct_write_off` refuse a part of a transfer; `cancel_transaction` removes the whole transfer. Data format version 9 (SYN-038).
 

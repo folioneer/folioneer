@@ -598,7 +598,7 @@ impl Account {
                     (unit_price, quantity)
                 }
                 // DIV-040: dividend total_amount = floor(quantity × exchange_rate / MICRO).
-                // quantity holds amount_micros in asset currency on a Dividend correction.
+                // A correction takes the amount in the asset's currency as its quantity.
                 (TransactionType::Dividend, _) => {
                     (unit_price, Self::dividend_total(quantity, exchange_rate))
                 }
@@ -1907,7 +1907,7 @@ impl Account {
                     total_quantity += t.quantity as i128;
                 }
                 // SPL-020 — a split rescales the running quantity by the micro
-                // factor riding in `quantity`; the VWAP numerator is untouched, so
+                // factor in `split_factor`; the VWAP numerator is untouched, so
                 // the cost basis is preserved and the average price rescales
                 // implicitly. Deliberate deviation from the spec's display formula
                 // (`round(avg × old_qty / new_qty)`): deriving from the numerator
@@ -1917,7 +1917,7 @@ impl Account {
                     if enforced && total_quantity == 0 {
                         return Err(AccountError::ClosedPosition.into());
                     }
-                    let rescaled = total_quantity * t.quantity as i128 / MICRO;
+                    let rescaled = total_quantity * t.factor() as i128 / MICRO;
                     if enforced && rescaled == 0 {
                         return Err(AccountError::SplitCollapsesPosition.into());
                     }
@@ -2123,7 +2123,7 @@ impl Account {
                 // untouched (cost basis preserved). Guards live in the validating
                 // replay (`recalculate_holding`); this as-of read mirrors the math.
                 TransactionType::Split => {
-                    total_quantity = total_quantity * t.quantity as i128 / MICRO;
+                    total_quantity = total_quantity * t.factor() as i128 / MICRO;
                 }
                 // DIV-024 — a Dividend never affects the paying asset's holding.
                 TransactionType::Dividend => {}
@@ -5402,7 +5402,7 @@ mod tests {
     }
 
     // DIV-040 — correcting a dividend recomputes total_amount from the new
-    // amount (held in `quantity`) and exchange_rate; the cash holding then
+    // amount (held in `dividend_amount`) and exchange_rate; the cash holding then
     // reflects the corrected account-currency credit on replay.
     #[test]
     fn div_040_correct_dividend_recomputes_total_and_cash() {

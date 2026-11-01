@@ -181,7 +181,7 @@ describe("toTransactionRow — WriteOff (WOF-057)", () => {
   });
 });
 
-// SPL-060 — a split row shows the micro-scaled factor riding in `quantity`
+// SPL-060 — a split row shows its micro-scaled factor
 // as a trimmed "×N" ratio label.
 describe("toTransactionRow — Split (SPL-060)", () => {
   const splitTx = (factorMicros: number) => ({
@@ -190,7 +190,8 @@ describe("toTransactionRow — Split (SPL-060)", () => {
     asset_id: "asset-equity-1",
     transaction_type: "Split" as const,
     date: "2026-07-01",
-    quantity: factorMicros,
+    quantity: 0,
+    split_factor: factorMicros,
     unit_price: 0,
     exchange_rate: 1_000_000,
     fees: 0,
@@ -213,6 +214,17 @@ describe("toTransactionRow — Split (SPL-060)", () => {
   it("SPL-060: a reverse-split factor renders trimmed (100_000 → '×0,1' fr)", () => {
     const row = toTransactionRow(splitTx(100_000), "Alphabet Inc", "My Account");
     expect(row.quantity).toBe("×0,1");
+  });
+
+  // DIV-023 — a dividend row shows its amount, as when the amount was its quantity.
+  it("DIV-023: a dividend shows its amount in the quantity column", () => {
+    const dividend = {
+      ...splitTx(0),
+      transaction_type: "Dividend" as const,
+      split_factor: null,
+      dividend_amount: 2_500_000,
+    };
+    expect(toTransactionRow(dividend, "Asset", "Account").quantity).toMatch(/^2[.,]500$/);
   });
 
   it("SPL-060: type is 'Split' for i18n key construction", () => {

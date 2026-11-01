@@ -1394,8 +1394,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
+export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 
 /** user-defined types **/
 
@@ -6252,7 +6252,8 @@ transaction_type: TransactionType;
  */
 date: string; 
 /**
- * Number of units traded (micro-units: value × 10^6). Must be > 0.
+ * Number of units traded (micro-units: value × 10^6). Must be > 0, except on a split and
+ * a dividend, which hold their figure in a field of its own and leave this 0.
  */
 quantity: number; 
 /**
@@ -6298,7 +6299,18 @@ transfer_id?: string | null;
  * IMP-051 — a deposit the import added before a purchase the file left unfunded;
  * `false` on every other transaction, and on a change written before data format 11.
  */
-added_deposit?: boolean }
+added_deposit?: boolean; 
+/**
+ * SPL-010 — a split's factor (micro-units); `None` on every other type. Absent from a
+ * change written before data format 13, which carries it in `quantity` (SYN-038).
+ */
+split_factor?: number | null; 
+/**
+ * DIV-023 — a dividend's net amount, in the currency it was entered in (micro-units); `None` on every
+ * other type. Absent from a change written before data format 13, which carries it in
+ * `quantity` (SYN-038).
+ */
+dividend_amount?: number | null }
 /**
  * A transaction draft: a purchase or sale as the user is still entering it (TRX-062).
  * Empty strings are fields not filled yet; amounts are in micros.
@@ -6480,8 +6492,8 @@ export type TransactionType =
  */
 "ManagementFee" | 
 /**
- * A stock split rescaling the position; the micro-scaled factor rides in
- * `quantity`, no money moves (SPL-010/020).
+ * A stock split rescaling the position; the micro-scaled factor is in `split_factor`
+ * (SPL-010).
  */
 "Split" | 
 /**

@@ -293,7 +293,7 @@ impl AsShown {
         (
             &transaction.date,
             transaction.transaction_type,
-            transaction.quantity,
+            transaction.shown_quantity(),
             transaction.total_amount,
         ) == (&self.date, self.kind, self.quantity, self.amount)
     }
@@ -456,7 +456,7 @@ fn price_and_total(stored: &Transaction, correction: &Correction) -> (i64, Optio
 fn comparable(t: &Transaction) -> (&str, i64, i64, i64, i64, i64, Option<&str>) {
     (
         &t.date,
-        t.quantity,
+        t.shown_quantity(),
         t.total_amount,
         t.unit_price,
         t.fees,
@@ -561,10 +561,10 @@ fn change_fields(
     }
     let quantity = match kind {
         TransactionType::Deposit | TransactionType::Withdrawal | TransactionType::Dividend => {
-            change.amount.unwrap_or(stored.quantity)
+            change.amount.unwrap_or(stored.shown_quantity())
         }
         TransactionType::Split => match (change.new, change.old) {
-            (None, None) => stored.quantity,
+            (None, None) => stored.shown_quantity(),
             (Some(new), Some(old)) => SplitSize::Ratio {
                 new: Some(new),
                 old: Some(old),

@@ -25,10 +25,11 @@ A cash income event paid by a held asset, recorded against that asset and credit
 | `asset_id`         | The **paying asset** — the holding the dividend is attributed to. **Not** the Cash Asset. This is what makes the dividend appear under that asset (DIV-050). |
 | `date`             | Business date the dividend was received (must not be in the future, must not be older than the existing TRX lower bound).                                    |
 | `exchange_rate`    | Conversion rate from the asset's native currency to the account currency. Exactly `1` when the asset and account currencies match (DIV-022).                 |
+| `dividend_amount`  | The net amount, in the currency it was entered in (DIV-022, DIV-029); absent on every other type (DIV-023).                                                  |
 | `total_amount`     | The cash credited to the account's Cash Holding, in **account currency** (i64 micros) — the net dividend converted at `exchange_rate`.                       |
 | `note`             | Optional free-text note.                                                                                                                                     |
 
-> A dividend carries **no share quantity and no per-unit price** — it does not change how many units of the asset are held. The net amount the user receives is entered in the asset's native currency (DIV-020) and converted to `total_amount` in account currency (DIV-022). Fields that exist on `Transaction` but carry no business meaning for a dividend follow a fixed convention rather than user input; their exact packing is a contract/plan concern, not a business rule.
+> A dividend carries **no share quantity and no per-unit price** — it does not change how many units of the asset are held. The net amount the user receives is entered in the asset's native currency (DIV-020) and converted to `total_amount` in account currency (DIV-022). Fields that exist on `Transaction` but carry no business meaning for a dividend follow a fixed convention rather than user input: its `quantity` is 0, and the surfaces that give a quantity give its net amount there (TRX-024A).
 
 ### HoldingDetail (extended)
 
@@ -67,7 +68,7 @@ The `AccountDetailsResponse` DTO (owned by ACD) gains one field.
 
 **DIV-022 — Currency conversion (frontend + backend)**: The dividend is entered in the asset's native currency and credited to the account in account currency, converted via `exchange_rate`, reusing the same mechanism as Buy/Sell (TRX-021). When the asset currency equals the account currency, `exchange_rate` is `1` and no rate input is shown; otherwise the user supplies the rate and `total_amount = net_amount × exchange_rate`. An amount that converts to nothing in the account's currency — the product floors to zero — is refused.
 
-**DIV-023 — Recording effect (backend)**: Recording a Dividend, within a single Unit of Work ([ADR-006](../adr/006-unit-of-work.md)): (a) credits the account's always-present Cash Holding by `total_amount` (account currency) — identical to how Sell credits cash (CSH-050, CSH-012); (b) leaves the paying asset's holding `quantity`, average cost, and cost basis **unchanged**; (c) persists the Transaction with `transaction_type = Dividend` attributed to the paying asset. All steps commit together or all roll back.
+**DIV-023 — Recording effect (backend)**: Recording a Dividend, within a single Unit of Work ([ADR-006](../adr/006-unit-of-work.md)): (a) credits the account's always-present Cash Holding by `total_amount` (account currency) — identical to how Sell credits cash (CSH-050, CSH-012); (b) leaves the paying asset's holding `quantity`, average cost, and cost basis **unchanged**; (c) persists the Transaction with `transaction_type = Dividend` attributed to the paying asset, its net amount, in the currency it was entered in (DIV-022, DIV-029), in a field of its own, `dividend_amount`, and its `quantity` 0. All steps commit together or all roll back.
 
 **DIV-024 — No effect on cost basis or realized P&L (backend)**: A Dividend never alters the paying asset's `quantity`, average cost, or cost basis (the holding is left untouched per DIV-023b), and never contributes to realized P&L. Dividend income is kept distinct from capital gains so the two can be reported separately.
 

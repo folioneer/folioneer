@@ -490,12 +490,12 @@ pub(crate) fn end_value_as_of(
                     .entry(transaction.asset_id.as_str())
                     .or_insert(0) -= transaction.quantity as i128;
             }
-            // SPL-020 — a split rescales the running quantity (factor in `quantity`).
+            // SPL-020 — a split rescales the running quantity (factor in `split_factor`).
             TransactionType::Split => {
                 let quantity = quantity_by_asset
                     .entry(transaction.asset_id.as_str())
                     .or_insert(0);
-                *quantity = *quantity * transaction.quantity as i128 / 1_000_000;
+                *quantity = *quantity * transaction.factor() as i128 / 1_000_000;
             }
             TransactionType::Deposit | TransactionType::Withdrawal | TransactionType::Dividend => {}
         }
@@ -1047,9 +1047,9 @@ pub(crate) fn holding_close_date_as_of(
             | TransactionType::ManagementFee
             | TransactionType::WriteOff
             | TransactionType::TransferOut => quantity -= transaction.quantity as i128,
-            // SPL-020 — a split rescales the running quantity (factor in `quantity`).
+            // SPL-020 — a split rescales the running quantity (factor in `split_factor`).
             TransactionType::Split => {
-                quantity = quantity * transaction.quantity as i128 / 1_000_000
+                quantity = quantity * transaction.factor() as i128 / 1_000_000
             }
             TransactionType::Dividend => {}
         }

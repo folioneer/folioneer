@@ -41,8 +41,8 @@ pub enum TransactionType {
     FreeShares,
     /// Management fee deduction: shares removed at zero cost; cost basis unchanged, VWAP concentrates (FEE-012).
     ManagementFee,
-    /// A stock split rescaling the position; the micro-scaled factor rides in
-    /// `quantity`, no money moves (SPL-010/020).
+    /// A stock split rescaling the position; the micro-scaled factor is in `split_factor`
+    /// (SPL-010).
     Split,
     /// Interest credited at zero cost: quantity rises, cost basis unchanged (INT-024);
     /// on the account's cash line it credits the balance directly (INT-023).
@@ -110,7 +110,8 @@ pub struct Transaction {
     pub transaction_type: TransactionType,
     /// Date when the transaction was executed (ISO 8601, "YYYY-MM-DD").
     pub date: String,
-    /// Number of units traded (micro-units: value × 10^6). Must be > 0.
+    /// Number of units traded (micro-units: value × 10^6). Must be > 0, except on a split and
+    /// a dividend, which hold their figure in a field of its own and leave this 0.
     pub quantity: i64,
     /// Price per unit in asset's native currency (micro-units). Can be 0 (gifted assets).
     pub unit_price: i64,
@@ -139,6 +140,15 @@ pub struct Transaction {
     /// `false` on every other transaction, and on a change written before data format 11.
     #[serde(default)]
     pub added_deposit: bool,
+    /// SPL-010 — a split's factor (micro-units); `None` on every other type. Absent from a
+    /// change written before data format 13, which carries it in `quantity` (SYN-038).
+    #[serde(default)]
+    pub split_factor: Option<i64>,
+    /// DIV-023 — a dividend's net amount, in the currency it was entered in (micro-units); `None` on every
+    /// other type. Absent from a change written before data format 13, which carries it in
+    /// `quantity` (SYN-038).
+    #[serde(default)]
+    pub dividend_amount: Option<i64>,
 }
 
 impl Transaction {
@@ -191,7 +201,10 @@ impl Transaction {
             write_off_reason: None,
             transfer_id: None,
             added_deposit: false,
-        })
+            split_factor: None,
+            dividend_amount: None,
+        }
+        .with_figure_in_its_field())
     }
 
     /// Creates a Transaction with a provided ID (used for updates, TRX-033).
@@ -238,7 +251,10 @@ impl Transaction {
             write_off_reason: None,
             transfer_id: None,
             added_deposit: false,
-        })
+            split_factor: None,
+            dividend_amount: None,
+        }
+        .with_figure_in_its_field())
     }
 
     /// Factory: builds a Deposit transaction with cash-specific defaults
@@ -387,6 +403,8 @@ impl Transaction {
             write_off_reason: None,
             transfer_id: None,
             added_deposit: false,
+            split_factor: None,
+            dividend_amount: None,
         })
     }
 
@@ -412,7 +430,7 @@ impl Transaction {
 
     /// Factory: builds a Split transaction (SPL-010/011).
     ///
-    /// The micro-scaled split factor rides in `quantity` (20-for-1 →
+    /// The micro-scaled split factor is in `split_factor` (20-for-1 →
     /// 20_000_000); `unit_price = 0`, `exchange_rate = 1.0` micros, `fees = 0`,
     /// `total_amount = 0` (a split moves no money), `realized_pnl = None`.
     ///
@@ -440,7 +458,7 @@ impl Transaction {
             asset_id,
             transaction_type: TransactionType::Split,
             date,
-            quantity: factor,
+            quantity: 0,
             unit_price: 0,
             exchange_rate: 1_000_000,
             fees: 0,
@@ -453,6 +471,8 @@ impl Transaction {
             write_off_reason: None,
             transfer_id: None,
             added_deposit: false,
+            split_factor: Some(factor),
+            dividend_amount: None,
         })
     }
 
@@ -513,6 +533,8 @@ impl Transaction {
             write_off_reason: None,
             transfer_id: None,
             added_deposit: false,
+            split_factor: None,
+            dividend_amount: None,
         })
     }
 
@@ -592,6 +614,8 @@ impl Transaction {
             write_off_reason: None,
             transfer_id: None,
             added_deposit: false,
+            split_factor: None,
+            dividend_amount: None,
         })
     }
 
@@ -648,6 +672,8 @@ impl Transaction {
             write_off_reason: Some(reason),
             transfer_id: None,
             added_deposit: false,
+            split_factor: None,
+            dividend_amount: None,
         })
     }
 
@@ -694,6 +720,8 @@ impl Transaction {
             write_off_reason: None,
             transfer_id: Some(transfer_id),
             added_deposit: false,
+            split_factor: None,
+            dividend_amount: None,
         })
     }
 
@@ -743,7 +771,7 @@ impl Transaction {
         (
             &self.date,
             self.transaction_type,
-            self.quantity,
+            self.shown_quantity(),
             self.total_amount,
             self.unit_price,
             self.fees,
@@ -752,7 +780,7 @@ impl Transaction {
         ) == (
             &shown.date,
             shown.transaction_type,
-            shown.quantity,
+            shown.shown_quantity(),
             shown.total_amount,
             shown.unit_price,
             shown.fees,
@@ -803,6 +831,58 @@ impl Transaction {
         self
     }
 
+    /// SPL-010 / DIV-023 — a split's factor and a dividend's amount, in their fields, as
+    /// recording and a change written before data format 13 (SYN-038) carry them in
+    /// `quantity`. Any other type, and a record already in its fields, is left as it is.
+    pub fn with_figure_in_its_field(mut self) -> Self {
+        match self.transaction_type {
+            TransactionType::Split if self.split_factor.is_none() => {
+                self.split_factor = Some(self.quantity);
+                self.quantity = 0;
+            }
+            TransactionType::Dividend if self.dividend_amount.is_none() => {
+                self.dividend_amount = Some(self.quantity);
+                self.quantity = 0;
+            }
+            _ => {}
+        }
+        self
+    }
+
+    /// Sets the two fields a row stores apart from `quantity`.
+    pub fn with_own_figures(
+        mut self,
+        split_factor: Option<i64>,
+        dividend_amount: Option<i64>,
+    ) -> Self {
+        self.split_factor = split_factor;
+        self.dividend_amount = dividend_amount;
+        self
+    }
+
+    /// SPL-020 — the factor the replay rescales by.
+    pub fn factor(&self) -> i64 {
+        self.split_factor.unwrap_or(self.quantity)
+    }
+
+    /// TRX-024A — what a surface gives as this transaction's quantity: a split's
+    /// factor, a dividend's amount, otherwise its quantity.
+    pub fn shown_quantity(&self) -> i64 {
+        match self.transaction_type {
+            TransactionType::Split => self.factor(),
+            TransactionType::Dividend => self.dividend_amount.unwrap_or(self.quantity),
+            _ => self.quantity,
+        }
+    }
+
+    /// The transaction as the agent connection and the command line give it: its fields, its
+    /// `quantity` being `shown_quantity`.
+    pub fn as_shown(&self) -> Self {
+        let mut shown = self.clone();
+        shown.quantity = self.shown_quantity();
+        shown
+    }
+
     /// Reconstructs a Transaction from storage without validation.
     #[allow(clippy::too_many_arguments)]
     pub fn restore(
@@ -837,6 +917,8 @@ impl Transaction {
             write_off_reason: None,
             transfer_id: None,
             added_deposit: false,
+            split_factor: None,
+            dividend_amount: None,
         }
     }
 
@@ -1508,9 +1590,9 @@ mod tests {
         );
     }
 
-    // SPL-010 — the zero-money packing: factor in quantity, no money fields.
+    // SPL-010 — the zero-money packing: factor in `split_factor`, no money fields.
     #[test]
-    fn split_factory_packs_factor_in_quantity_with_no_money() {
+    fn split_factory_keeps_factor_in_its_field_with_no_money() {
         let tx = Transaction::split(
             "acc-1".to_string(),
             "asset-xyz".to_string(),
@@ -1520,7 +1602,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(tx.transaction_type, TransactionType::Split);
-        assert_eq!(tx.quantity, 20_000_000);
+        assert_eq!(tx.quantity, 0);
+        assert_eq!(tx.split_factor, Some(20_000_000));
         assert_eq!(tx.unit_price, 0);
         assert_eq!(tx.fees, 0);
         assert_eq!(tx.total_amount, 0);
@@ -1739,5 +1822,39 @@ mod tests {
             Transaction::validate_date("1899-12-31"),
             Err(AccountError::DateTooOld)
         ));
+    }
+
+    // SPL-010 / DIV-023 (#577) — a split and a dividend hold their figure in its own field,
+    // and surfaces still show it as the quantity.
+    #[test]
+    fn spl_010_div_023_the_figure_is_in_its_field_and_shown_as_the_quantity() {
+        let split = Transaction::split(
+            "a".to_string(),
+            "b".to_string(),
+            "2024-01-01".to_string(),
+            20_000_000,
+            None,
+        )
+        .expect("a split");
+        assert_eq!(
+            (split.quantity, split.split_factor, split.factor()),
+            (0, Some(20_000_000), 20_000_000)
+        );
+        assert_eq!(split.as_shown().quantity, 20_000_000);
+
+        let dividend = Transaction::new_dividend(
+            "a".to_string(),
+            "b".to_string(),
+            "2024-01-01".to_string(),
+            5_000_000,
+            1_000_000,
+            None,
+        )
+        .expect("a dividend");
+        assert_eq!(
+            (dividend.quantity, dividend.dividend_amount),
+            (0, Some(5_000_000))
+        );
+        assert_eq!(dividend.as_shown().quantity, 5_000_000);
     }
 }
