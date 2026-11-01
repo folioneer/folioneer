@@ -175,6 +175,8 @@ mod tests {
             "1.2.3",
             "abc",
             "0.000000001",
+            "1.000000000",
+            "+5",
         ] {
             assert_eq!(
                 stored_quantity("BTC", text),
@@ -184,6 +186,7 @@ mod tests {
         }
         assert_eq!(stored_quantity("BTC", "-2"), Ok(-200_000_000));
         assert_eq!(stored_quantity("BTC", ".5"), Ok(50_000_000));
+        assert_eq!(stored_quantity("BTC", " 2 "), Ok(200_000_000));
     }
 
     #[test]

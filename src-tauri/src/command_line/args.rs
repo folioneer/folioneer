@@ -345,7 +345,7 @@ impl Options {
             Ok(read) => Ok(read),
             Err(FigureTextError::TooLarge) => Ok(i64::MAX),
             Err(FigureTextError::NotAFigure) => {
-                let hint = comma_hint(value).unwrap_or_default();
+                let hint = quantity_comma_hint(value).unwrap_or_default();
                 Err(Reason(format!(
                     "{name} is not a decimal number: \"{value}\"{hint}"
                 )))
@@ -440,6 +440,13 @@ impl Options {
 fn comma_hint(value: &str) -> Option<String> {
     let dotted = value.replace(',', ".");
     (value.contains(',') && decimal_to_micro(&dotted).is_some())
+        .then(|| format!(" — write the decimals after a dot: {dotted}"))
+}
+
+/// CLI-015 — the same for a quantity, which carries eight decimals (TRX-024).
+fn quantity_comma_hint(value: &str) -> Option<String> {
+    let dotted = value.replace(',', ".");
+    (value.contains(',') && stored_non_cash_quantity(&dotted).is_ok())
         .then(|| format!(" — write the decimals after a dot: {dotted}"))
 }
 
@@ -818,6 +825,10 @@ mod tests {
         assert_eq!(
             reason("holding buy --account A --asset B --quantity 1,5 --price 1"),
             "--quantity is not a decimal number: \"1,5\" — write the decimals after a dot: 1.5"
+        );
+        assert_eq!(
+            reason("holding buy --account A --asset B --quantity 0,00000001 --price 1"),
+            "--quantity is not a decimal number: \"0,00000001\" — write the decimals after a dot: 0.00000001"
         );
         // CLI-015 — the hint shows a figure only when it is one: not for a comma used
         // between thousands, several commas, or no comma at all.

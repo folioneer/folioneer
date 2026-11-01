@@ -23,12 +23,12 @@ function hasArithmetic(raw: string): boolean {
 }
 
 /**
- * Normalises a result to ≤8 decimals, what a quantity carries (TRX-024H), with
- * trailing zeros trimmed, so float artifacts like `50 * 0.1 = 5.000000000000001` render and
+ * Normalises a result to ≤8 decimals, what a quantity carries (TRX-024H), never in
+ * exponent form, with trailing zeros trimmed, so float artifacts like `50 * 0.1 = 5.000000000000001` render and
  * commit as "5" (dot decimal).
  */
 function formatResult(n: number): string {
-  return String(Number(n.toFixed(8)));
+  return n.toFixed(8).replace(/\.?0+$/, "");
 }
 
 /** The value to report up: the formatted result for expressions, raw otherwise. */

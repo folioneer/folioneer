@@ -96,6 +96,13 @@ describe("useTransfer (TRF-051 to TRF-057)", () => {
   });
 
   // TRF-052 — within one currency, no rate is read and none is asked.
+  // TRX-024J — a quantity what the form keeps leaves at zero.
+  it("keeps the action inactive when a ninth decimal is all the quantity has", () => {
+    const { result } = setup();
+    act(() => result.current.handleChange("sent", "0.000000001"));
+    expect(result.current.isFormValid).toBe(false);
+  });
+
   it("reads no rate between accounts of one currency", () => {
     const { result } = setup();
     act(() => result.current.handleChange("toAccountId", "acc-wallet"));

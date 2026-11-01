@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
-import { decimalToQuantity } from "@/lib/microUnits";
+import { decimalToQuantity, isPositiveQuantity } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -51,7 +51,10 @@ export function useManagementFeeEdit({
 
   // FEE-063 — removed quantity strictly positive, date valid.
   const isFormValid = useMemo(
-    () => validateAmount(formData.quantity) === null && validateDate(formData.date) === null,
+    () =>
+      validateAmount(formData.quantity) === null &&
+      isPositiveQuantity(decimalToQuantity(formData.quantity)) &&
+      validateDate(formData.date) === null,
     [formData.quantity, formData.date],
   );
 

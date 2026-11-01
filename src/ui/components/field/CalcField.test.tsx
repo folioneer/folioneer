@@ -59,6 +59,19 @@ describe("CalcField", () => {
     expect(onValue).toHaveBeenLastCalledWith("0.33333333");
   });
 
+  // TRX-024H — a tiny result stays a decimal a form can read; float noise stays out of it.
+  it.each([
+    ["0.00000001*2", "0.00000002"],
+    ["2/3", "0.66666667"],
+    ["0.000001/2", "0.0000005"],
+    ["2.3*100", "230"],
+  ])("reports %s as %s", (typed, reported) => {
+    const onValue = vi.fn();
+    render(<Harness onValue={onValue} />);
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: typed } });
+    expect(onValue).toHaveBeenLastCalledWith(reported);
+  });
+
   it("commits the result into the field on blur", () => {
     render(<Harness />);
     const input = screen.getByLabelText("Amount");

@@ -110,12 +110,15 @@ describe("useInterestTransaction (INT-020/021/025)", () => {
     expect(mockRecordInterest).not.toHaveBeenCalled();
   });
 
-  // INT-021 — zero quantity surfaces as an inline error on submit.
-  it("surfaces a zero-quantity error on submit instead of disabling the gate", async () => {
+  // INT-021, TRX-024J — a zero quantity, or one left at zero, surfaces as an inline error on submit.
+  it.each([
+    "0",
+    "0.000000001",
+  ])("surfaces an error on submit for %s, the gate open", async (typed) => {
     const { result } = renderHook(() => useInterestTransaction(BASE_PROPS));
     act(() => {
       result.current.handleChange("assetId", "asset-fund-1");
-      result.current.handleChange("quantity", "0");
+      result.current.handleChange("quantity", typed);
     });
     expect(result.current.isFormValid).toBe(true);
     await act(async () => {

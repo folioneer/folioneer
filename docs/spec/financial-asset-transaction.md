@@ -74,11 +74,11 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-024G — A text the core does not read as a quantity (backend)**: The core reads digits with at most one dot, an optional minus before them, and spaces around them. Any other text, or one with more decimals than its figure carries, even zeros, is refused: in the window with a specific error, to an AI agent as an invalid figure (AGT-048), on the command line as a usage error (CLI-015, CLI-022).
 
-**TRX-024H — What a form keeps of a quantity (frontend)**: A form keeps the first eight decimals of a quantity of a non-cash asset, the first six of a Cash Asset's, a split's factor and a dividend's amount, whether they were typed or calculated (NUM-012).
+**TRX-024H — What a form keeps of a quantity (frontend)**: A form keeps the first eight decimals of a typed quantity of a non-cash asset, the first six of a Cash Asset's, a split's factor and a dividend's amount. A calculation's result (NUM-012) is rounded at the eighth decimal, never written with an exponent, then kept the same way.
 
-**TRX-024I — How a quantity shows (frontend)**: A journal row shows a quantity with at least three decimals and up to eight; a holding, a form's read-only line, a message and an AI agent's request dialog show it trimmed, up to eight.
+**TRX-024I — How a quantity shows (frontend)**: A journal row shows a quantity of a non-cash asset with at least three decimals and up to eight, and a Cash Asset's or a dividend's with three (TXL-025). A holding of a non-cash asset, a form's read-only line, a message and an AI agent's request dialog show it trimmed, up to eight; a sale's maximum and its oversell message show at least six and up to eight; the Cash Holding shows two.
 
-**TRX-024J — A quantity left at zero (frontend)**: A typed quantity that what the form keeps (TRX-024H) leaves at zero reads as zero, so the form's record action stays inactive.
+**TRX-024J — A quantity left at zero (frontend)**: A typed quantity that what the form keeps (TRX-024H) leaves at zero reads as zero, so the form's record action stays inactive; an interest credit keeps it active and refuses the zero on submit (INT-021).
 
 **TRX-024C — The largest quantity (backend)**: A transaction's quantity cannot pass 1,000,000,000 units of a non-cash asset, or 100,000,000,000 units of a Cash Asset, the same limits every device reads (SYN-034); a dividend's amount meets the Cash Asset's limit when recorded, and what a device reads of it is SYN-034's limit on other figures; a holding of a non-cash asset cannot pass 92,233,720,368.54775807 units, what storage holds. A recording or a correction past either, its replay included, is refused with a specific error; a merged ledger past what storage holds stands at it (CFR-042).
 

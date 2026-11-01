@@ -67,6 +67,13 @@ describe("useManagementFeeEdit (FEE-063)", () => {
     expect(result.current.isFormValid).toBe(false);
   });
 
+  // TRX-024J — a quantity what the form keeps leaves at zero.
+  it("is invalid when a ninth decimal is all the removed quantity has", () => {
+    const { result } = renderHook(() => useManagementFeeEdit(BASE_PROPS));
+    act(() => result.current.handleChange("quantity", "0.000000001"));
+    expect(result.current.isFormValid).toBe(false);
+  });
+
   it("submits via correct_transaction with the zero-cost money convention", async () => {
     mockCorrectTransaction.mockResolvedValue({ status: "ok", data: {} });
     const { result } = renderHook(() => useManagementFeeEdit(BASE_PROPS));

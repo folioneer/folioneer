@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getLastOperationDate, setLastOperationDate } from "@/lib/lastOperationDateStorage";
 import { logger } from "@/lib/logger";
-import { decimalToQuantity } from "@/lib/microUnits";
+import { decimalToQuantity, isPositiveQuantity } from "@/lib/microUnits";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
@@ -65,6 +65,7 @@ export function useFreeSharesTransaction({
     () =>
       formData.assetId !== "" &&
       validateAmount(formData.quantity) === null &&
+      isPositiveQuantity(decimalToQuantity(formData.quantity)) &&
       validateDate(formData.date) === null,
     [formData.assetId, formData.quantity, formData.date],
   );

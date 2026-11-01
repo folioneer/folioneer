@@ -264,7 +264,7 @@ pub enum AccountError {
 }
 
 impl From<crate::shared::domain::quantity::FigureTextError> for AccountError {
-    /// TRX-024B — a text that is no quantity is refused as a quantity that is not one.
+    /// TRX-024G — a text that is no quantity is refused by a window command.
     fn from(error: crate::shared::domain::quantity::FigureTextError) -> Self {
         use crate::shared::domain::quantity::FigureTextError;
         match error {
@@ -283,6 +283,18 @@ mod tests {
     /// flat `{ "code": "VariantName", ...payload }` object on the wire. A missing
     /// or mis-tagged variant collapses to `null` under an untagged composite —
     /// this test catches that regression for `AccountError` itself.
+    // TRX-024G — what the window gets for a text the core does not read.
+    #[test]
+    fn trx_024g_a_text_is_refused_with_a_code() {
+        use crate::shared::domain::quantity::stored_quantity;
+        let refusal = |text: &str| AccountError::from(stored_quantity("BTC", text).unwrap_err());
+        assert!(matches!(refusal("abc"), AccountError::QuantityNotPositive));
+        assert!(matches!(
+            refusal("99999999999999"),
+            AccountError::QuantityOutOfRange
+        ));
+    }
+
     #[test]
     fn each_variant_emits_a_code() {
         assert_eq!(
