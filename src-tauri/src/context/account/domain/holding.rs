@@ -1,5 +1,5 @@
 use crate::context::account::error::AccountError;
-use crate::shared::domain::quantity::to_surface;
+use crate::shared::domain::quantity::{shown_for, to_surface};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -70,10 +70,10 @@ pub(crate) struct HoldingAsOfReconstruction {
 }
 
 impl HoldingSnapshot {
-    /// The snapshot of a non-cash asset as a surface gives it (TRX-024).
-    pub fn as_shown(&self) -> Self {
+    /// The snapshot of an asset as a surface gives it (TRX-024).
+    pub fn as_shown(&self, asset_id: &str) -> Self {
         Self {
-            quantity: to_surface(self.quantity),
+            quantity: shown_for(asset_id, self.quantity),
             ..self.clone()
         }
     }
@@ -208,7 +208,7 @@ mod tests {
             quantity: 123_456_700,
             average_price: 50_000_000,
         };
-        let shown = snapshot.as_shown();
+        let shown = snapshot.as_shown("asset");
         assert_eq!(
             (shown.quantity, shown.average_price),
             (1_234_567, 50_000_000)

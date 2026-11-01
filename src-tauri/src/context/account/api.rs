@@ -8,7 +8,6 @@ use super::domain::{
 use crate::context::account::{
     AccountError, AccountJournal, HoldingSnapshot, JournalFilter, JournalRow, Transaction,
 };
-use crate::core::cash::is_cash_asset;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -160,13 +159,7 @@ pub async fn get_holding_snapshot_as_of(
         .account_service
         .holding_snapshot_as_of(&account_id, &asset_id, &date)
         .await
-        .map(|snapshot| {
-            if is_cash_asset(&asset_id) {
-                snapshot
-            } else {
-                snapshot.as_shown()
-            }
-        })
+        .map(|snapshot| snapshot.as_shown(&asset_id))
 }
 
 /// The account journal of an account: its transactions in date order, each with the cash

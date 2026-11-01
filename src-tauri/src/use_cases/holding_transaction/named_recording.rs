@@ -1458,13 +1458,9 @@ impl HoldingTransactionUseCase {
         };
         let date = interest.date.unwrap_or_else(|| today.to_string());
         // INT-023 — on the account's cash line the credit is money, in its own scale.
-        let credited = interest.quantity.map(|quantity| {
-            if crate::core::cash::is_cash_asset(&asset_id) {
-                quantity
-            } else {
-                from_surface(quantity)
-            }
-        });
+        let credited = interest
+            .quantity
+            .map(|quantity| crate::shared::domain::quantity::stored_for(&asset_id, quantity));
         self.record_interest(
             &account_id,
             asset_id,

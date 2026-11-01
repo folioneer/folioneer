@@ -7,7 +7,6 @@ use super::{
     StockSplitPreview, TransactionDraft, TransactionDraftError, TransactionPreview,
 };
 use crate::context::account::{AccountError, ManagementFeeRemoval, Transaction, WriteOffReason};
-use crate::core::cash::is_cash_asset;
 use crate::shared::domain::quantity::from_surface;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -572,13 +571,9 @@ pub async fn record_interest(
     dto: RecordInterestDTO,
 ) -> Result<Transaction, super::error::InterestError> {
     // INT-023 — on the account's cash line the credit is money, already in its own scale.
-    let credited = dto.quantity_micros.map(|quantity| {
-        if is_cash_asset(&dto.asset_id) {
-            quantity
-        } else {
-            from_surface(quantity)
-        }
-    });
+    let credited = dto
+        .quantity_micros
+        .map(|quantity| crate::shared::domain::quantity::stored_for(&dto.asset_id, quantity));
     uc.record_interest(
         &dto.account_id,
         dto.asset_id,
@@ -599,15 +594,7 @@ pub async fn validate_transaction_draft(
     uc: State<'_, HoldingTransactionUseCase>,
     draft: TransactionDraft,
 ) -> Result<TransactionPreview, TransactionDraftError> {
-    uc.validate_draft(TransactionDraft {
-        quantity: match draft.kind {
-            // TRX-062 — a dividend's draft carries its amount, which is money.
-            super::DraftKind::Dividend => draft.quantity,
-            super::DraftKind::Purchase | super::DraftKind::Sell => from_surface(draft.quantity),
-        },
-        ..draft
-    })
-    .await
+    uc.validate_draft(draft.as_stored()).await
 }
 
 /// Checks a split draft without writing anything (SPL-062): the factor recording would

@@ -34,11 +34,7 @@ mod tests {
             "h-1".into(),
             "account-1".into(),
             asset_id.into(),
-            if crate::core::cash::is_cash_asset(asset_id) {
-                quantity
-            } else {
-                crate::shared::domain::quantity::from_surface(quantity)
-            },
+            crate::shared::domain::quantity::stored_for(asset_id, quantity),
             1_000_000,
             0,
             None,

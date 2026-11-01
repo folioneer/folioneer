@@ -48,6 +48,22 @@ pub struct TransactionDraft {
     pub correcting: Option<String>,
 }
 
+impl TransactionDraft {
+    /// The draft as stored (TRX-024): a dividend's draft carries its amount, which is money
+    /// (TRX-062).
+    pub fn as_stored(self) -> Self {
+        Self {
+            quantity: match self.kind {
+                DraftKind::Dividend => self.quantity,
+                DraftKind::Purchase | DraftKind::Sell => {
+                    crate::shared::domain::quantity::from_surface(self.quantity)
+                }
+            },
+            ..self
+        }
+    }
+}
+
 /// An opening balance as the user is still entering it (TRX-066). Empty strings are fields
 /// not filled yet, and so is a total cost of `None`: a typed 0 is a figure (TRX-045).
 #[derive(Debug, Clone, serde::Deserialize, specta::Type)]

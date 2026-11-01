@@ -515,6 +515,8 @@ impl AccountDetailsUseCase {
             // FEE-074 — active schedule rate; None for cash and unscheduled assets.
             let fee_rate_percent_micros = fee_rate_by_asset.get(&holding.asset_id).copied();
             // ACD-054 — windowed position returns; the cash row carries all-None.
+            let shown_quantity =
+                crate::shared::domain::quantity::shown_for(&holding.asset_id, holding.quantity);
             let period_performance = if is_cash {
                 HoldingPeriodPerformance::default()
             } else {
@@ -556,11 +558,7 @@ impl AccountDetailsUseCase {
                 asset_id: holding.asset_id,
                 asset_name: asset.name,
                 asset_reference: asset.reference,
-                quantity: if is_cash {
-                    holding.quantity
-                } else {
-                    crate::shared::domain::quantity::to_surface(holding.quantity)
-                },
+                quantity: shown_quantity,
                 average_price: holding.average_price,
                 cost_basis,
                 realized_pnl: holding.total_realized_pnl,

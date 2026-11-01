@@ -72,7 +72,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-024B — A surface exchanges a quantity in micro-units (frontend + backend)**: The window, the AI agent connection and the command line read and send a quantity of a non-cash asset in micro-units, converted at the backend's boundary, so that what they read stops at the sixth decimal.
 
-**TRX-024C — The largest quantity (backend)**: A transaction's quantity cannot pass 1,000,000,000 units of a non-cash asset, or 100,000,000,000 units of a Cash Asset or a dividend's money, the same limits every device reads (SYN-034); a holding of a non-cash asset cannot pass 92,233,720,368.54775807 units, what storage holds. A recording or a correction past either, its replay included, is refused with a specific error; a merged ledger past what storage holds stands at it (CFR-042).
+**TRX-024C — The largest quantity (backend)**: A transaction's quantity cannot pass 1,000,000,000 units of a non-cash asset, or 100,000,000,000 units of a Cash Asset, the same limits every device reads (SYN-034); a dividend's amount meets the Cash Asset's limit when recorded, and what a device reads of it is SYN-034's limit on other figures; a holding of a non-cash asset cannot pass 92,233,720,368.54775807 units, what storage holds. A recording or a correction past either, its replay included, is refused with a specific error; a merged ledger past what storage holds stands at it (CFR-042).
 
 **TRX-024D — A correction sent back unchanged (backend)**: A correction whose quantity is the one its surface read leaves the stored quantity as it is, its last two decimals included, even one that reads as zero.
 
@@ -128,7 +128,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-046 — Opening balance date validation (frontend + backend)**: Date is required and must not be in the future, consistent with TRX-020. The submit action is disabled while the date is empty, invalid, or in the future.
 
-**TRX-047 — Opening balance stored fields (backend)**: An `OpeningBalance` transaction is persisted with `total_amount` = user-entered total cost (micro-units), `unit_price` = `floor(total_cost / quantity)` (micro-units, consistent with TRX-026 floor notation), `fees = 0`, `exchange_rate = 1_000_000`. The total amount formula defined in TRX-026 does not apply — `total_amount` is set directly from user input, both on creation and on edit.
+**TRX-047 — Opening balance stored fields (backend)**: An `OpeningBalance` transaction is persisted with `total_amount` = user-entered total cost (micro-units), `unit_price` = `floor(total_cost × QUANTITY_UNIT / quantity)` (micro-units, consistent with TRX-026 floor notation), `fees = 0`, `exchange_rate = 1_000_000`. The total amount formula defined in TRX-026 does not apply — `total_amount` is set directly from user input, both on creation and on edit.
 
 **TRX-048 — Opening balance VWAP participation (backend)**: `OpeningBalance` transactions participate in VWAP recalculation identically to `Purchase` transactions: their `total_amount` and `quantity` are included in the Σ of TRX-030. This extends TRX-030 to cover both `Purchase` and `OpeningBalance` types.
 
@@ -136,7 +136,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-050 — Opening balance archived asset guard (backend)**: If the target asset is archived when an opening balance is submitted, the backend rejects with `ArchivedAsset`. The asset selector (TRX-043) lists only active assets, so this guard is reached only via a race condition (asset archived between form load and submission); the frontend displays the error inline.
 
-**TRX-051 — Opening balance edit (frontend + backend)**: When editing an `OpeningBalance` transaction, the edit form shows date, quantity, and total cost — no fees field, no exchange rate field. The correction mechanism (TRX-031) is used. TRX-047 applies on edit: the entered total cost is stored as the transaction's total amount and the unit price is always derived from it as `floor(total_cost / quantity)` — any unit price sent is ignored; validation is that of TRX-044/TRX-045; TRX-026 does not apply.
+**TRX-051 — Opening balance edit (frontend + backend)**: When editing an `OpeningBalance` transaction, the edit form shows date, quantity, and total cost — no fees field, no exchange rate field. The correction mechanism (TRX-031) is used. TRX-047 applies on edit: the entered total cost is stored as the transaction's total amount and the unit price is always derived from it as `floor(total_cost × QUANTITY_UNIT / quantity)` — any unit price sent is ignored; validation is that of TRX-044/TRX-045; TRX-026 does not apply.
 
 **TRX-052 — Transaction list label (frontend)**: `OpeningBalance` entries are shown in the Transaction List with the label "Opening Balance", distinct from "Buy" and "Sell".
 

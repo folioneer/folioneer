@@ -1,6 +1,6 @@
 use crate::context::account::error::AccountError;
 use crate::core::cash::is_cash_asset;
-use crate::shared::domain::quantity::{from_surface, to_surface, QUANTITY_UNIT};
+use crate::shared::domain::quantity::{from_surface, shown_for, to_surface, QUANTITY_UNIT};
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDate;
@@ -865,8 +865,7 @@ impl Transaction {
         match self.transaction_type {
             TransactionType::Split => self.factor(),
             TransactionType::Dividend => self.dividend_amount.unwrap_or(self.quantity),
-            _ if is_cash_asset(&self.asset_id) => self.quantity,
-            _ => to_surface(self.quantity),
+            _ => shown_for(&self.asset_id, self.quantity),
         }
     }
 
