@@ -616,23 +616,19 @@ pub struct SessionRecordings {
 }
 
 /// AGT-051 — what an agent reads for a transaction it may not touch. One sentence for a
-/// transaction that does not exist, one the owner typed and one another session recorded:
-/// the refusal says nothing of what exists (AGT-042).
+/// transaction that does not exist and one the owner typed: the refusal says nothing of what
+/// exists (AGT-042).
 fn not_its_recording() -> Refusal {
     Refusal {
         code: "NotYourRecording".to_string(),
-        message: "this transaction was not recorded in this session: an agent changes only what it recorded itself".to_string(),
+        message: "no agent recorded this transaction: an agent changes only what an agent recorded, and asks the owner for the rest with request_removal, request_change or request_transfer_replacement".to_string(),
     }
 }
 
 impl HoldingTransactionUseCase {
-    /// AGT-050 / AGT-051 — the transaction `transaction_id` when the session `session`
-    /// recorded it; a refusal otherwise.
-    async fn recorded_by(
-        &self,
-        transaction_id: &str,
-        session: &str,
-    ) -> Result<Transaction, Refusal> {
+    /// AGT-051 / AGT-093 — the transaction `transaction_id` when an agent recorded it,
+    /// whichever session; a refusal otherwise.
+    pub async fn recorded_by_an_agent(&self, transaction_id: &str) -> Result<Transaction, Refusal> {
         // An id is a uuid: anything longer is no transaction, and is not looked up.
         if transaction_id.len() > TRANSACTION_ID_LENGTH {
             return Err(not_its_recording());
@@ -642,7 +638,7 @@ impl HoldingTransactionUseCase {
             .agent_recording_of(transaction_id)
             .await
             .map_err(|error| refusal_from_account(&error))?;
-        if !mark.is_some_and(|mark| mark.session == session) {
+        if mark.is_none() {
             return Err(not_its_recording());
         }
         self.account_service
@@ -652,14 +648,13 @@ impl HoldingTransactionUseCase {
             .ok_or_else(not_its_recording)
     }
 
-    /// AGT-050 — an agent cancels a transaction its session recorded, through the rules of
-    /// the window.
+    /// AGT-050 — an agent cancels a transaction an agent recorded, through the rules of the
+    /// window.
     pub async fn cancel_recorded_by_agent(
         &self,
         transaction_id: &str,
-        session: &str,
     ) -> Result<Transaction, Refusal> {
-        let transaction = self.recorded_by(transaction_id, session).await?;
+        let transaction = self.recorded_by_an_agent(transaction_id).await?;
         self.cancel_transaction(&transaction.account_id, &transaction.id)
             .await
             .map_err(|error| refusal_from_account(&error))?;
@@ -691,7 +686,7 @@ impl HoldingTransactionUseCase {
         if mark.is_some() {
             return Err(Refusal {
                 code: "NotTypedByOwner".to_string(),
-                message: "an agent recorded this transaction: a session cancels its own with cancel_recording".to_string(),
+                message: "an agent recorded this transaction: change it with cancel_recording or correct_recording, without asking".to_string(),
             });
         }
         let account = self
@@ -826,17 +821,16 @@ impl HoldingTransactionUseCase {
         .map_err(|error| refusal_from_account(&error))
     }
 
-    /// AGT-050 — an agent corrects a transaction its session recorded, whatever its type,
+    /// AGT-050 — an agent corrects a transaction an agent recorded, whatever its type,
     /// through the correction the window calls for it (TRX-031; WOF-030 for a write-off,
     /// whose reason it alone takes): what `change` gives replaces what was recorded.
     pub async fn correct_recorded_by_agent(
         &self,
         transaction_id: &str,
-        session: &str,
         change: Change,
         reason: Option<WriteOffReason>,
     ) -> Result<Transaction, Refusal> {
-        let recorded = self.recorded_by(transaction_id, session).await?;
+        let recorded = self.recorded_by_an_agent(transaction_id).await?;
         // AGT-065A — a part of a transfer is corrected with its transfer, never alone (TRF-031).
         if recorded.is_transfer_part() {
             return Err(refusal_from_account(&AccountError::PartOfTransfer));
@@ -881,11 +875,10 @@ impl HoldingTransactionUseCase {
     pub async fn preview_correction_by_agent(
         &self,
         transaction_id: &str,
-        session: &str,
         change: Change,
         reason: Option<WriteOffReason>,
     ) -> Result<Previewed, Refusal> {
-        let recorded = self.recorded_by(transaction_id, session).await?;
+        let recorded = self.recorded_by_an_agent(transaction_id).await?;
         // AGT-065A — a part of a transfer is corrected with its transfer, never alone (TRF-031).
         if recorded.is_transfer_part() {
             return Err(refusal_from_account(&AccountError::PartOfTransfer));

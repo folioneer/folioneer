@@ -1,9 +1,9 @@
 use super::error::TransferError;
 use super::orchestrator::{TransferFigures, TransferUseCase};
-use crate::context::account::{Transaction, TransactionType, TransferPreview};
+use crate::context::account::{AgentRecording, Transaction, TransactionType, TransferPreview};
 
-/// AGT-090 — four transactions the owner typed that record a transfer the four-step way, in
-/// the order the owner is shown them.
+/// AGT-090 / AGT-093 — four transactions that record a transfer the four-step way, in the
+/// order the owner is shown them.
 #[derive(Debug, Clone)]
 pub struct FourSteps {
     /// The sale, in the sending account.
@@ -142,10 +142,12 @@ impl TransferUseCase {
 
     /// AGT-091 — replaces the four of `asked` with its transfer in one write, at the rate
     /// the owner was shown, only while each of the four stands in full as it was shown and
-    /// the transfer still moves the cost shown; `None` when not, nothing written.
+    /// the transfer still moves the cost shown; `None` when not, nothing written. AGT-093 —
+    /// with `mark`, the transfer's parts are an agent's.
     pub async fn replace(
         &self,
         asked: &Replacement,
+        mark: Option<&AgentRecording>,
     ) -> Result<Option<Vec<Transaction>>, TransferError> {
         let steps = &asked.steps;
         let (from, to, asset_id) = sides(steps);
@@ -169,6 +171,7 @@ impl TransferUseCase {
                 figures.quantity_received,
                 asked.exchange_rate,
                 asked.cost(),
+                mark.cloned(),
             )
             .await?)
     }

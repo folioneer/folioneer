@@ -347,7 +347,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "correct_recording",
             title: "Correct a recording",
             only_reads: false,
-            description: "Correct a transaction this session recorded, of any type, as the window corrects it: give its id, as the recording returned it, and only what changes; the rest stays. Every type takes date and note; a purchase or a sale quantity, price or total (not both), fees and rate; an opening balance quantity and total (its total cost); a deposit or a withdrawal amount; a dividend amount (in the asset's currency) and rate; a split new and old, its ratio; free shares, interest or a management fee quantity; a write-off quantity and reason. A transaction the owner typed, or one another session recorded, is refused. Figures are decimals with a dot (12.5), not millionths.",
+            description: "Correct a transaction an agent recorded, in this session or an earlier one, of any type, as the window corrects it: give its id, as the recording returned it or list_transactions gives it, and only what changes; the rest stays. Every type takes date and note; a purchase or a sale quantity, price or total (not both), fees and rate; an opening balance quantity and total (its total cost); a deposit or a withdrawal amount; a dividend amount (in the asset's currency) and rate; a split new and old, its ratio; free shares, interest or a management fee quantity; a write-off quantity and reason. A transaction the owner typed is refused. Figures are decimals with a dot (12.5), not millionths.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -372,7 +372,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "cancel_recording",
             title: "Cancel a recording",
             only_reads: false,
-            description: "Cancel a transaction this session recorded: give its id, as the recording returned it. A transaction the owner typed, or one another session recorded, is refused.",
+            description: "Cancel a transaction an agent recorded, in this session or an earlier one: give its id, as the recording returned it or list_transactions gives it. A transaction the owner typed is refused: ask with request_removal.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -401,7 +401,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "request_removal",
             title: "Ask to remove a transaction you typed",
             only_reads: false,
-            description: "Ask the owner to remove a transaction the owner typed: give its id, as list_transactions gives it. The owner is shown it in the window and answers it alone; the call waits for that answer. Answered removed, or refused with RemovalRefused, which gives nothing else. A transaction an agent recorded is refused: a session cancels its own with cancel_recording.",
+            description: "Ask the owner to remove a transaction the owner typed: give its id, as list_transactions gives it. The owner is shown it in the window and answers it alone; the call waits for that answer. Answered removed, or refused with RemovalRefused, which gives nothing else. A transaction an agent recorded is refused: change it with cancel_recording or correct_recording, without asking.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -415,7 +415,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "request_change",
             title: "Ask to change a transaction you typed",
             only_reads: false,
-            description: "Ask the owner to change a transaction the owner typed: give its id, as list_transactions gives it, and what changes; the rest stays. Every type takes date and note; a purchase or a sale quantity, price or total (not both), fees and rate; an opening balance quantity and total (its total cost); a deposit or a withdrawal amount; a dividend amount (in the asset's currency) and rate; a split new and old, its ratio; free shares, interest, a management fee or a write-off quantity. A change the window's correction would refuse is refused before asking. The owner is shown it as it is and as it would become, and answers it alone; the call waits for that answer. Answered changed, with the transaction as it now stands, or refused with ChangeRefused, which gives nothing else. A transaction an agent recorded is refused: a session corrects its own with correct_recording.",
+            description: "Ask the owner to change a transaction the owner typed: give its id, as list_transactions gives it, and what changes; the rest stays. Every type takes date and note; a purchase or a sale quantity, price or total (not both), fees and rate; an opening balance quantity and total (its total cost); a deposit or a withdrawal amount; a dividend amount (in the asset's currency) and rate; a split new and old, its ratio; free shares, interest, a management fee or a write-off quantity. A change the window's correction would refuse is refused before asking. The owner is shown it as it is and as it would become, and answers it alone; the call waits for that answer. Answered changed, with the transaction as it now stands, or refused with ChangeRefused, which gives nothing else. A transaction an agent recorded is refused: change it with cancel_recording or correct_recording, without asking.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -440,6 +440,21 @@ pub fn definitions() -> Vec<ToolDefinition> {
             title: "Ask to replace four transactions you typed with a transfer",
             only_reads: false,
             description: "Ask the owner to replace four transactions the owner typed that record a transfer the four-step way — a sale and a withdrawal in one account, a deposit and a purchase in another, the sale and the purchase of one asset — with the one transfer they stand for: give their ids, as list_transactions gives them, and a rate between currencies if not the stored one. The transfer goes from the sale's account to the purchase's, on the sale's date, the sale's quantity sent and the purchase's received, at its cost. What the window's transfer would refuse on the accounts without the four is refused before asking. The owner is shown the four and the transfer, and answers them alone; the call waits for that answer. Answered replaced, with the transfer, or refused with ReplacementRefused, which gives nothing else. The transfer is the owner's: it is not marked as an agent's.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "transactions": { "type": "array", "items": { "type": "string" }, "description": "The ids of the four transactions, as list_transactions gives them." },
+                    "rate": { "type": ["string", "number"], "description": "Between accounts of different currencies, the rate from the sending account's currency to the receiving one's; the stored rate of the sale's date when not given." }
+                },
+                "required": ["transactions"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "replace_with_transfer",
+            title: "Replace four AI agent recordings with a transfer",
+            only_reads: false,
+            description: "Replace four transactions agents recorded, in this session or an earlier one, that record a transfer the four-step way — a sale and a withdrawal in one account, a deposit and a purchase in another, the sale and the purchase of one asset — with the one transfer they stand for, without asking: give their ids, as list_transactions gives them, and a rate between currencies if not the stored one. The transfer goes from the sale's account to the purchase's, on the sale's date, the sale's quantity sent and the purchase's received, and is marked as recorded by this session. A transaction the owner typed is refused: ask with request_transfer_replacement.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
