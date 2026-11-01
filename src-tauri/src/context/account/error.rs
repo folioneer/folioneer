@@ -125,6 +125,9 @@ pub enum AccountError {
     /// Quantity is zero or negative.
     #[error("Quantity must be strictly positive")]
     QuantityNotPositive,
+    /// A quantity above what storage holds (TRX-020, TRX-024).
+    #[error("Quantity is too large")]
+    QuantityOutOfRange,
     /// Cash deposit/withdrawal amount was zero or negative (CSH-021/CSH-031).
     /// Cash-specific framing of the same TRX-020 constraint that surfaces as
     /// `QuantityNotPositive` for non-cash transactions; raised by the cash

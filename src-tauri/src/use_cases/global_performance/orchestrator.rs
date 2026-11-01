@@ -871,6 +871,7 @@ mod tests {
     use crate::context::currency::domain::{
         CurrencyRate, CurrencyRateSource, MockCurrencyPairRepository, MockCurrencyRateRepository,
     };
+    use crate::shared::domain::quantity::from_surface;
     use crate::use_cases::account_performance::AccountPerformanceUseCase;
     use sqlx::sqlite::SqlitePoolOptions;
 
@@ -999,7 +1000,7 @@ mod tests {
                 &sending.id,
                 stock.clone(),
                 "2024-02-10".to_string(),
-                10_000_000,
+                from_surface(10_000_000),
                 50_000_000,
                 1_000_000,
                 0,
@@ -1014,8 +1015,8 @@ mod tests {
                 &receiving.id,
                 stock.clone(),
                 "2024-07-01".to_string(),
-                4_000_000,
-                4_000_000,
+                from_surface(4_000_000),
+                from_surface(4_000_000),
                 1_250_000,
                 None,
             )
@@ -1256,7 +1257,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 "2024-03-01".to_string(),
-                10_000_000,
+                from_surface(10_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -1324,7 +1325,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 "2024-03-01".to_string(),
-                10_000_000,
+                from_surface(10_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -1384,7 +1385,7 @@ mod tests {
                     account_id,
                     stock.clone(),
                     "2024-03-01".to_string(),
-                    10_000_000,
+                    from_surface(10_000_000),
                     100_000_000,
                     1_000_000,
                     0,
@@ -1567,7 +1568,7 @@ mod tests {
                 "asset".to_string(),
                 transaction_type,
                 date.to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 1_000_000,
                 1_000_000,
                 0,
@@ -1651,7 +1652,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 "2024-03-15".to_string(),
-                10_000_000,
+                from_surface(10_000_000),
                 100_000_000,
                 1_000_000,
                 0,
@@ -1669,7 +1670,7 @@ mod tests {
                 &account.id,
                 stock.clone(),
                 "2024-03-20".to_string(),
-                5_000_000,
+                from_surface(5_000_000),
                 None,
             )
             .await

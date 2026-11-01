@@ -235,6 +235,7 @@ mod tests {
         AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
         SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
     };
+    use crate::shared::domain::quantity::from_surface;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn setup_pool() -> sqlx::Pool<sqlx::Sqlite> {
@@ -391,7 +392,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -456,7 +457,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-01".to_string(),
-                micro(1000),
+                from_surface(micro(1000)),
                 micro(1),
                 micro(1),
                 0,
@@ -497,15 +498,15 @@ mod tests {
     }
 
     // FEE-041 — a removal is `floor(held × annual rate ÷ periods)`, floored once: 0.20 % a
-    // year, monthly, on 1000 shares removes 0.166666 of a share, and a rate smaller than
+    // year, monthly, on 1000 shares removes 0.16666666 of a share, and a rate smaller than
     // its number of periods still removes its share.
     #[tokio::test]
     async fn fee_041_a_removal_is_floored_once() {
         assert_eq!(
             monthly_removals_from_a_thousand_shares(200_000).await,
-            vec![166_666]
+            vec![16_666_666]
         );
-        assert_eq!(monthly_removals_from_a_thousand_shares(11).await, vec![9]);
+        assert_eq!(monthly_removals_from_a_thousand_shares(11).await, vec![916]);
     }
 
     // FEE-043 — last_applied_period advances even when a period is skipped.
@@ -627,7 +628,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -703,7 +704,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -762,7 +763,7 @@ mod tests {
         // floor(100 ×1%)=1_000_000; floor(99 ×1%)=990_000; floor(98.01 ×1%)=980_100.
         assert_eq!(
             fee_txs.iter().map(|t| t.quantity).collect::<Vec<_>>(),
-            vec![1_000_000, 990_000, 980_100],
+            vec![100_000_000, 99_000_000, 98_010_000],
             "per-period removals must compound sequentially (FEE-041)"
         );
 
@@ -802,7 +803,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -889,7 +890,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -970,7 +971,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -984,7 +985,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-03-15".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(60),
                 micro(1),
                 0,
@@ -998,7 +999,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-04-10".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -1049,7 +1050,7 @@ mod tests {
         // FEE-041 — Apr removes 1% of 100, May removes 1% of the reduced 99.
         assert_eq!(
             fee_txs.iter().map(|t| t.quantity).collect::<Vec<_>>(),
-            vec![1_000_000, 990_000],
+            vec![100_000_000, 99_000_000],
             "surviving deductions follow sequential per-period reduction (FEE-041)"
         );
         // FEE-043 — the cursor still advances past every period, skipped or not.
@@ -1090,7 +1091,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "1899-06-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -1104,7 +1105,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -1145,7 +1146,7 @@ mod tests {
             .filter(|t| t.transaction_type == TransactionType::ManagementFee)
             .map(|t| (t.date.as_str(), t.quantity))
             .collect();
-        assert_eq!(fees, vec![("2024-12-31", micro(12))]);
+        assert_eq!(fees, vec![("2024-12-31", 100 * micro(12))]);
         let after = account_svc
             .get_fee_schedule(&account.id, &stock_id)
             .await
@@ -1240,7 +1241,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -1328,7 +1329,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -1475,7 +1476,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-20".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(60),
                 micro(1),
                 0,
@@ -1498,7 +1499,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-03-20".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -1515,7 +1516,7 @@ mod tests {
                 .iter()
                 .map(|t| (t.date.as_str(), t.quantity))
                 .collect::<Vec<_>>(),
-            vec![("2024-03-31", micro(1))]
+            vec![("2024-03-31", 100 * micro(1))]
         );
     }
 
@@ -1817,7 +1818,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -1994,7 +1995,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,
@@ -2095,7 +2096,7 @@ mod tests {
                 &account.id,
                 stock_id.clone(),
                 "2024-01-01".to_string(),
-                micro(100),
+                from_surface(micro(100)),
                 micro(50),
                 micro(1),
                 0,

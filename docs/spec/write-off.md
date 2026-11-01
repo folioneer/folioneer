@@ -20,7 +20,7 @@ Figures follow TRX-024. A fund's ongoing charges taken in units are a management
 | `account_id`       | The account whose holding the quantity leaves.                                                                                            |
 | `asset_id`         | The asset written off. **Not** a Cash Asset.                                                                                              |
 | `date`             | The day the quantity left (not in the future, not older than the TRX lower bound, TRX-020).                                               |
-| `quantity`         | The quantity written off: strictly positive, micro-units (TRX-024).                                                                       |
+| `quantity`         | The quantity written off: strictly positive, on the scale of TRX-024.                                                                     |
 | `write_off_reason` | Why it left: `NetworkFee` (a fee paid in the asset), `Dust` (a remainder too small to use), `Lost` (sent away or lost for good), `Other`. |
 | `note`             | Optional free text.                                                                                                                       |
 | `transfer_id`      | Set only on a fee in kind: the transfer it belongs to (TRF-021). Empty on every other write-off.                                          |

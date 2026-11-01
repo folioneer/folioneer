@@ -36,6 +36,7 @@ const FIELD_OF: Partial<Record<TransactionDraftError["code"], DraftField>> = {
   TotalAmountNotPositive: "total",
   TotalAmountBelowFees: "total",
   UnitPriceOutOfRange: "total",
+  QuantityOutOfRange: "quantity",
   TotalCostMissing: "totalCost",
   InvalidTotalCost: "totalCost",
 };

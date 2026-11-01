@@ -48,6 +48,22 @@ pub struct TransactionDraft {
     pub correcting: Option<String>,
 }
 
+impl TransactionDraft {
+    /// The draft as stored (TRX-024): a dividend's draft carries its amount, which is money
+    /// (TRX-062).
+    pub fn as_stored(self) -> Self {
+        Self {
+            quantity: match self.kind {
+                DraftKind::Dividend => self.quantity,
+                DraftKind::Purchase | DraftKind::Sell => {
+                    crate::shared::domain::quantity::from_surface(self.quantity)
+                }
+            },
+            ..self
+        }
+    }
+}
+
 /// An opening balance as the user is still entering it (TRX-066). Empty strings are fields
 /// not filled yet, and so is a total cost of `None`: a typed 0 is a figure (TRX-045).
 #[derive(Debug, Clone, serde::Deserialize, specta::Type)]
@@ -712,6 +728,21 @@ impl HoldingTransactionUseCase {
             .await
     }
 
+    /// TRX-024 — a quantity a surface sent to correct `transaction_id`, as stored.
+    pub async fn stored_correction_quantity(
+        &self,
+        transaction_id: &str,
+        surface_quantity: i64,
+    ) -> Result<i64, AccountError> {
+        Ok(self
+            .account_service
+            .get_transaction_by_id(transaction_id)
+            .await?
+            .map_or(surface_quantity, |stored| {
+                stored.stored_correction_quantity(surface_quantity)
+            }))
+    }
+
     /// Corrects an existing transaction and recalculates the affected holding (TRX-031).
     /// Seeds the system Cash Asset; the aggregate replay re-evaluates the cash holding for
     /// any cash-affecting tx (CSH-042 / CSH-051) and may raise InsufficientCash.
@@ -1368,6 +1399,7 @@ mod tests {
         AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
         SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
     };
+    use crate::shared::domain::quantity::from_surface;
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn setup_pool() -> sqlx::Pool<sqlx::Sqlite> {
@@ -1439,7 +1471,7 @@ mod tests {
                 &account.id,
                 "nonexistent-asset".to_string(),
                 "2024-01-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(100),
             )
             .await
@@ -1472,7 +1504,7 @@ mod tests {
                 &account.id,
                 asset.id,
                 "2024-01-01".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(100),
             )
             .await
@@ -1511,7 +1543,7 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2024-01-02".to_string(),
-                micro(10),
+                from_surface(micro(10)),
                 micro(100),
                 micro(1),
                 0,
@@ -1520,7 +1552,10 @@ mod tests {
             )
             .await
             .expect("a purchase on an archived asset is saved");
-        assert_eq!(bought.quantity, micro(10));
+        assert_eq!(
+            bought.quantity,
+            crate::shared::domain::quantity::from_surface(micro(10))
+        );
         let still = asset_svc.get_asset_by_id(&asset.id).await.unwrap().unwrap();
         assert!(still.is_archived, "the purchase unarchives nothing");
 
@@ -1529,7 +1564,7 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2024-01-03".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(100),
                 micro(1),
                 0,
@@ -1548,7 +1583,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-03".to_string(),
-            micro(1),
+            from_surface(micro(1)),
             micro(100),
             micro(1),
             0,
@@ -1594,6 +1629,42 @@ mod tests {
 
     // TRX-047 — happy path: transaction and holding created with correct fields
     #[tokio::test]
+    async fn trx_024_a_correction_from_a_surface_reads_in_the_scale_of_what_it_corrects() {
+        let pool = setup_pool().await;
+        let (account_svc, asset_svc) = make_services(&pool);
+        let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
+        let account = account_svc
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
+            .await
+            .unwrap();
+        let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
+        let opening = uc
+            .open_holding(
+                &account.id,
+                asset.id.clone(),
+                "2024-01-01".to_string(),
+                from_surface(micro(2)),
+                micro(200),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            uc.stored_correction_quantity(&opening.id, micro(3))
+                .await
+                .unwrap(),
+            from_surface(micro(3))
+        );
+        // Nothing to read the scale from: the transaction's absence is refused further on.
+        assert_eq!(
+            uc.stored_correction_quantity("no-such-transaction", micro(3))
+                .await
+                .unwrap(),
+            micro(3)
+        );
+    }
+
+    #[tokio::test]
     async fn open_holding_happy_path() {
         use crate::context::account::TransactionType;
 
@@ -1611,7 +1682,7 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2024-01-01".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(200),
             )
             .await
@@ -1628,7 +1699,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(holdings.len(), 1);
-        assert_eq!(holdings[0].quantity, micro(2));
+        assert_eq!(
+            holdings[0].quantity,
+            crate::shared::domain::quantity::from_surface(micro(2))
+        );
         assert_eq!(holdings[0].average_price, micro(100));
     }
 
@@ -1661,7 +1735,7 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2024-01-15".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 micro(100),
                 micro(1),
                 0,
@@ -1690,7 +1764,7 @@ mod tests {
                 "nonexistent-account-id",
                 "irrelevant-asset".to_string(),
                 "2024-01-15".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 micro(100),
                 micro(1),
                 0,
@@ -1762,7 +1836,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -1804,7 +1878,7 @@ mod tests {
             .expect("paying asset holding must still exist");
         assert_eq!(
             paying_holding.quantity,
-            micro(10),
+            crate::shared::domain::quantity::from_surface(micro(10)),
             "quantity must be unchanged"
         );
     }
@@ -1953,7 +2027,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -2001,7 +2075,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -2052,7 +2126,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -2102,7 +2176,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             900_000, // 0.9 EUR/USD
             0,
@@ -2162,7 +2236,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -2179,7 +2253,7 @@ mod tests {
         let cost_basis_before = holdings_before
             .iter()
             .find(|h| h.asset_id == asset.id)
-            .map(|h| h.quantity as i128 * h.average_price as i128 / 1_000_000)
+            .map(|h| h.quantity as i128 * h.average_price as i128 / 100_000_000)
             .unwrap();
 
         let tx = uc
@@ -2187,7 +2261,7 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2024-06-15".to_string(),
-                micro(5),
+                from_surface(micro(5)),
                 None,
             )
             .await
@@ -2200,7 +2274,10 @@ mod tests {
             "transaction_type must be FreeShares"
         );
         assert_eq!(tx.asset_id, asset.id);
-        assert_eq!(tx.quantity, micro(5));
+        assert_eq!(
+            tx.quantity,
+            crate::shared::domain::quantity::from_surface(micro(5))
+        );
         // FSD-023 — zero-cost convention
         assert_eq!(tx.unit_price, 0);
         assert_eq!(tx.exchange_rate, 1_000_000);
@@ -2218,11 +2295,15 @@ mod tests {
             .unwrap();
 
         // FSD-022a — quantity increased by distributed amount
-        assert_eq!(holding_after.quantity, micro(15), "quantity must be 15");
+        assert_eq!(
+            holding_after.quantity,
+            crate::shared::domain::quantity::from_surface(micro(15)),
+            "quantity must be 15"
+        );
         // FSD-023 — underlying cost unchanged → VWAP dilutes to the exact floored
         // value (TRX-026 floor convention).
         let expected_diluted_vwap =
-            (cost_basis_before * 1_000_000 / holding_after.quantity as i128) as i64;
+            (cost_basis_before * 100_000_000 / holding_after.quantity as i128) as i64;
         assert_eq!(
             holding_after.average_price, expected_diluted_vwap,
             "average price must equal floor(cost_basis / new_quantity)"
@@ -2317,7 +2398,7 @@ mod tests {
                 "nonexistent-account",
                 asset.id.clone(),
                 "2024-06-15".to_string(),
-                micro(5),
+                from_surface(micro(5)),
                 None,
             )
             .await
@@ -2351,7 +2432,7 @@ mod tests {
                 &account.id,
                 "nonexistent-asset".to_string(),
                 "2024-06-15".to_string(),
-                micro(5),
+                from_surface(micro(5)),
                 None,
             )
             .await
@@ -2381,7 +2462,7 @@ mod tests {
                 &account.id,
                 "nonexistent-asset".to_string(),
                 "2024-06-15".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 WriteOffReason::Dust,
                 None,
             )
@@ -2411,7 +2492,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-10".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(1000),
         )
         .await
@@ -2421,7 +2502,7 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2024-06-15".to_string(),
-                micro(1),
+                from_surface(micro(1)),
                 WriteOffReason::Dust,
                 None,
             )
@@ -2433,7 +2514,7 @@ mod tests {
                 &account.id,
                 &written_off.id,
                 "2024-06-16".to_string(),
-                micro(2),
+                from_surface(micro(2)),
                 WriteOffReason::Lost,
                 Some("seed lost".to_string()),
             )
@@ -2441,7 +2522,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(corrected.id, written_off.id);
-        assert_eq!(corrected.quantity, micro(2));
+        assert_eq!(
+            corrected.quantity,
+            crate::shared::domain::quantity::from_surface(micro(2))
+        );
         assert_eq!(corrected.write_off_reason, Some(WriteOffReason::Lost));
         assert_eq!(corrected.realized_pnl, Some(-micro(200)));
         let refused = uc
@@ -2449,7 +2533,7 @@ mod tests {
                 &account.id,
                 &written_off.id,
                 "2024-06-16".to_string(),
-                micro(11),
+                from_surface(micro(11)),
                 WriteOffReason::Lost,
                 None,
             )
@@ -2486,7 +2570,7 @@ mod tests {
                 &account.id,
                 asset.id.clone(),
                 "2024-06-15".to_string(),
-                micro(5),
+                from_surface(micro(5)),
                 None,
             )
             .await
@@ -2552,7 +2636,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -2603,7 +2687,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -2617,8 +2701,11 @@ mod tests {
             .record_free_shares(
                 &account.id,
                 asset.id.clone(),
-                "2099-01-01".to_string(), // future
-                micro(5),
+                "2099-01-01".to_string(),
+                from_surface(
+                    // future
+                    micro(5),
+                ),
                 None,
             )
             .await
@@ -2728,7 +2815,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -2753,7 +2840,11 @@ mod tests {
 
         assert_eq!(tx.transaction_type, TransactionType::Interest);
         assert_eq!(tx.asset_id, asset.id);
-        assert_eq!(tx.quantity, micro(1), "credited qty must be 10% of 10");
+        assert_eq!(
+            tx.quantity,
+            crate::shared::domain::quantity::from_surface(micro(1)),
+            "credited qty must be 10% of 10"
+        );
         // INT-024 — zero-cost packing
         assert_eq!(tx.unit_price, 0);
         assert_eq!(tx.exchange_rate, 1_000_000);
@@ -2766,7 +2857,11 @@ mod tests {
             .await
             .unwrap();
         let holding = holdings.iter().find(|h| h.asset_id == asset.id).unwrap();
-        assert_eq!(holding.quantity, micro(11), "quantity must be 10 + 1");
+        assert_eq!(
+            holding.quantity,
+            crate::shared::domain::quantity::from_surface(micro(11)),
+            "quantity must be 10 + 1"
+        );
     }
 
     // INT-011 — AccountNotFound: unknown account is rejected before any asset check.
@@ -2783,7 +2878,7 @@ mod tests {
                 asset.id.clone(),
                 "2024-06-15".to_string(),
                 None,
-                Some(micro(5)),
+                Some(from_surface(micro(5))),
                 None,
             )
             .await
@@ -2815,7 +2910,7 @@ mod tests {
                 "nonexistent-asset".to_string(),
                 "2024-06-15".to_string(),
                 None,
-                Some(micro(5)),
+                Some(from_surface(micro(5))),
                 None,
             )
             .await
@@ -2850,7 +2945,7 @@ mod tests {
                 asset.id.clone(),
                 "2024-06-15".to_string(),
                 None,
-                Some(micro(5)),
+                Some(from_surface(micro(5))),
                 None,
             )
             .await
@@ -2881,7 +2976,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -2897,7 +2992,7 @@ mod tests {
                 asset.id.clone(),
                 "2024-06-15".to_string(),
                 None,
-                Some(micro(5)),
+                Some(from_surface(micro(5))),
                 None,
             )
             .await
@@ -2982,7 +3077,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -2998,7 +3093,7 @@ mod tests {
                 asset.id.clone(),
                 "2024-06-15".to_string(),
                 None,
-                Some(0),
+                Some(from_surface(0)),
                 None,
             )
             .await
@@ -3034,7 +3129,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -3088,7 +3183,7 @@ mod tests {
                 asset.id.clone(),
                 "2024-06-15".to_string(),
                 Some(1_000_000),
-                Some(micro(5)),
+                Some(from_surface(micro(5))),
                 None,
             )
             .await
@@ -3123,7 +3218,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -3139,7 +3234,7 @@ mod tests {
                 asset.id.clone(),
                 "2099-01-01".to_string(),
                 None,
-                Some(micro(5)),
+                Some(from_surface(micro(5))),
                 None,
             )
             .await
@@ -3172,7 +3267,7 @@ mod tests {
             &account.id,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -3216,6 +3311,7 @@ mod draft_tests {
     use super::*;
     use crate::context::account::{Holding, MockAccountServiceContract, RecordingPreview};
     use crate::context::asset::MockAssetServiceContract;
+    use crate::shared::domain::quantity::from_surface;
 
     const M: i64 = 1_000_000;
 
@@ -3225,7 +3321,7 @@ mod draft_tests {
             account_id: "acc-1".into(),
             asset_id: "asset-1".into(),
             date: "2026-01-02".into(),
-            quantity: 2 * M,
+            quantity: crate::shared::domain::quantity::from_surface(2 * M),
             entered: EnteredAmount::UnitPrice {
                 unit_price: 50 * M,
                 exchange_rate: M,
@@ -3248,14 +3344,19 @@ mod draft_tests {
         for &(date, units, price) in entries {
             if units > 0 {
                 account
-                    .open_holding("asset-1".into(), date.into(), units, units / M * price)
+                    .open_holding(
+                        "asset-1".into(),
+                        date.into(),
+                        from_surface(units),
+                        units / M * price,
+                    )
                     .expect("opening");
             } else {
                 account
                     .sell_holding(
                         "asset-1".into(),
                         date.into(),
-                        -units,
+                        from_surface(-units),
                         price,
                         M,
                         0,
@@ -3359,8 +3460,15 @@ mod draft_tests {
             .expect_get_holding_by_account_asset()
             .returning(move |account_id, asset_id| {
                 Ok(held_today.map(|quantity| {
-                    Holding::new(account_id.into(), asset_id.into(), quantity, M, 0, None)
-                        .expect("holding")
+                    Holding::new(
+                        account_id.into(),
+                        asset_id.into(),
+                        crate::shared::domain::quantity::from_surface(quantity),
+                        M,
+                        0,
+                        None,
+                    )
+                    .expect("holding")
                 }))
             });
         account
@@ -3510,8 +3618,15 @@ mod draft_tests {
             .expect_get_holding_by_account_asset()
             .returning(|account_id, asset_id| {
                 Ok(Some(
-                    Holding::new(account_id.into(), asset_id.into(), 4 * M, M, 0, None)
-                        .expect("holding"),
+                    Holding::new(
+                        account_id.into(),
+                        asset_id.into(),
+                        crate::shared::domain::quantity::from_surface(4 * M),
+                        M,
+                        0,
+                        None,
+                    )
+                    .expect("holding"),
                 ))
             });
         account
@@ -3856,6 +3971,7 @@ mod draft_tests {
         for (d, expected) in [
             (check(&|d| d.date = "2999-01-01".into()), "DateInFuture"),
             (check(&|d| d.quantity = 0), "QuantityNotPositive"),
+            (check(&|d| d.quantity = i64::MAX), "QuantityOutOfRange"),
             (
                 check(&|d| d.entered = entered(-1, 1_000_000, 0)),
                 "UnitPriceNegative",

@@ -1,4 +1,5 @@
 use crate::context::account::error::AccountError;
+use crate::shared::domain::quantity::{shown_for, to_surface};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -7,7 +8,7 @@ use std::result::Result as StdResult;
 use uuid::Uuid;
 
 /// Current state of a financial position: an asset held within an account (ADR-002).
-/// All financial fields are stored as i64 micro-units (ADR-001).
+/// All figures are stored as i64 fixed-point (ADR-001, TRX-024).
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct Holding {
     /// Unique identifier.
@@ -16,7 +17,8 @@ pub struct Holding {
     pub account_id: String,
     /// The financial asset held.
     pub asset_id: String,
-    /// Current number of units held (micro-units: value × 10^6).
+    /// Current number of units held: hundred-millionths, the Cash Holding's balance in
+    /// micro-units (TRX-024).
     pub quantity: i64,
     /// Volume-weighted average purchase price in account currency (micro-units).
     pub average_price: i64,
@@ -28,17 +30,17 @@ pub struct Holding {
 
 /// Point-in-time reconstruction of a single holding's quantity and VWAP cost
 /// basis as of a date — the read-only "as of" valuation behind the trade-dialog
-/// insights (TDI-010). All financial fields are i64 micro-units (ADR-001).
+/// insights (TDI-010). Fields are i64 fixed-point (ADR-001, TRX-024).
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct HoldingSnapshot {
-    /// Units held as of the queried date (micro-units), 0 when nothing is held.
+    /// Units held as of the queried date (TRX-024), 0 when nothing is held.
     pub quantity: i64,
     /// VWAP cost basis per unit, account currency (micro-units), 0 when never held.
     pub average_price: i64,
 }
 
 /// What a split would make of a position (SPL-020): the holding on the split's date,
-/// before and after the rescale. All fields are i64 micro-units (ADR-001).
+/// before and after the rescale. Fields are i64 fixed-point (ADR-001, TRX-024).
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
 pub struct StockSplitPosition {
     /// Units held on the split's date, before it.
@@ -54,10 +56,10 @@ pub struct StockSplitPosition {
 /// Full point-in-time reconstruction of a holding as of a date: quantity, VWAP
 /// cost basis, cumulative realized P&L, and the most recent sell date. Backs the
 /// account-details "as of a past date" view, which needs the realized-P&L and
-/// last-sold figures the lighter [`HoldingSnapshot`] omits. All financial fields
-/// are i64 micro-units (ADR-001). Crate-internal: never crosses the wire.
+/// last-sold figures the lighter [`HoldingSnapshot`] omits. Fields are i64 fixed-point
+/// (ADR-001, TRX-024). Crate-internal: never crosses the wire.
 pub(crate) struct HoldingAsOfReconstruction {
-    /// Units held as of the queried date (micro-units), 0 when nothing is held.
+    /// Units held as of the queried date (TRX-024), 0 when nothing is held.
     pub quantity: i64,
     /// VWAP cost basis per unit, account currency (micro-units), 0 when never held.
     pub average_price: i64,
@@ -65,6 +67,27 @@ pub(crate) struct HoldingAsOfReconstruction {
     pub total_realized_pnl: i64,
     /// ISO date of the most recent sell on or before the queried date, if any.
     pub last_sold_date: Option<String>,
+}
+
+impl HoldingSnapshot {
+    /// The snapshot of an asset as a surface gives it (TRX-024).
+    pub fn as_shown(&self, asset_id: &str) -> Self {
+        Self {
+            quantity: shown_for(asset_id, self.quantity),
+            ..self.clone()
+        }
+    }
+}
+
+impl StockSplitPosition {
+    /// The position as a surface gives it (TRX-024).
+    pub fn as_shown(&self) -> Self {
+        Self {
+            old_quantity: to_surface(self.old_quantity),
+            new_quantity: to_surface(self.new_quantity),
+            ..self.clone()
+        }
+    }
 }
 
 impl Holding {
@@ -177,12 +200,49 @@ pub trait HoldingRepository: Send + Sync {
 mod tests {
     use super::*;
 
+    // TRX-024 — a snapshot and a split's position reach a surface in millionths, the prices
+    // as they are.
+    #[test]
+    fn trx_024_a_position_is_shown_in_millionths() {
+        let snapshot = HoldingSnapshot {
+            quantity: 123_456_700,
+            average_price: 50_000_000,
+        };
+        let shown = snapshot.as_shown("asset");
+        assert_eq!(
+            (shown.quantity, shown.average_price),
+            (1_234_567, 50_000_000)
+        );
+        let position = StockSplitPosition {
+            old_quantity: 100_000_000,
+            old_average_price: 50_000_000,
+            new_quantity: 200_000_000,
+            new_average_price: 25_000_000,
+        };
+        assert_eq!(
+            position.as_shown(),
+            StockSplitPosition {
+                old_quantity: 1_000_000,
+                old_average_price: 50_000_000,
+                new_quantity: 2_000_000,
+                new_average_price: 25_000_000,
+            }
+        );
+    }
+
     // A holding is active above a quantity of zero; a closed one stays, at zero.
     #[test]
     fn a_holding_is_active_above_a_quantity_of_zero() {
         let holding = |quantity: i64| {
-            Holding::new("acc".into(), "asset".into(), quantity, 1_000_000, 0, None)
-                .expect("holding")
+            Holding::new(
+                "acc".into(),
+                "asset".into(),
+                crate::shared::domain::quantity::from_surface(quantity),
+                1_000_000,
+                0,
+                None,
+            )
+            .expect("holding")
         };
         assert!(holding(1).is_active());
         assert!(!holding(0).is_active());

@@ -9,7 +9,7 @@ Existing financial values in the database (e.g., `average_price`, `quantity` in 
 
 ## Decision
 
-All new financial amounts within the `Transaction` entity, and any future financial entities or fields, will be stored as `i64` (64-bit integers). A consistent micro-unit scale (e.g., multiplying by 1,000,000 for 6 decimal places of precision) will be applied consistently at the application boundary (e.g., frontend-to-backend and vice-versa) to convert between human-readable decimal values and the `i64` micro-unit representation. This approach ensures exact precision for all monetary calculations.
+All new financial amounts within the `Transaction` entity, and any future financial entities or fields, will be stored as `i64` (64-bit integers). A consistent micro-unit scale (e.g., multiplying by 1,000,000 for 6 decimal places of precision) will be applied consistently at the application boundary (e.g., frontend-to-backend and vice-versa) to convert between human-readable decimal values and the `i64` micro-unit representation. A non-cash quantity is on a finer scale (TRX-024), because a millionth cannot hold a satoshi. This approach ensures exact precision for all monetary calculations.
 
 ## Consequences
 
@@ -18,6 +18,7 @@ All new financial amounts within the `Transaction` entity, and any future financ
   - **Consistency**: Establishes a clear standard for handling money within the application.
   - **Safety**: Reduces the risk of subtle bugs related to financial rounding or comparisons.
 - **Cons**:
+  - **Range**: A finer scale leaves a smaller range for a quantity (TRX-024C).
   - **Migration**: Existing `REAL` fields in `asset_accounts` and `asset_prices` will eventually need to be migrated to `i64` to maintain consistency across the entire financial domain. This is an anticipated future refactoring.
   - **Conversion Overhead**: Requires explicit conversion logic at the application layer when interacting with external systems or displaying values to users.
   - **Storage Size**: `i64` might use slightly more storage than `REAL` for very small numbers, but this is negligible for typical financial values and outweighed by precision benefits.

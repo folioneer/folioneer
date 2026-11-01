@@ -9,8 +9,10 @@ use serde_json::Value;
 
 use crate::shared::domain::{Operation, RecordIdentity, RecordKind};
 
-/// The widest amount, quantity, price, or rate a record may carry, in micros (±10⁹ units).
+/// The widest amount, price, or rate a record may carry, in micros (±10⁹ units).
 pub const AMOUNT_BOUND: i64 = 1_000_000_000_000_000;
+/// The widest `quantity` a record may carry: what a device can record (TRX-024C).
+pub const QUANTITY_BOUND: i64 = crate::shared::domain::quantity::LARGEST_QUANTITY;
 /// The longest text a record may carry, in characters (the holding note's own cap, HNO-011).
 pub const TEXT_BOUND: usize = 500;
 
@@ -32,7 +34,7 @@ pub enum MalformedChange {
         /// The identity its content derives; the expected shape when content is absent.
         derived: String,
     },
-    /// A number is not an integer within `±AMOUNT_BOUND`.
+    /// A number is not an integer within its bound.
     #[error("field {field} is out of bounds")]
     AmountOutOfBounds {
         /// The offending field, dotted when nested.
@@ -80,11 +82,20 @@ fn derived_identity(kind: RecordKind, content: &Value) -> Option<RecordIdentity>
     parts.map(|parts| RecordIdentity::canonical(kind, &parts))
 }
 
-/// Every number within `±AMOUNT_BOUND` and every text within `TEXT_BOUND`, at any depth.
+fn bound_of(path: &str) -> i64 {
+    if path == "quantity" || path.ends_with(".quantity") {
+        QUANTITY_BOUND
+    } else {
+        AMOUNT_BOUND
+    }
+}
+
+/// Every `quantity` within `±QUANTITY_BOUND`, every other number within `±AMOUNT_BOUND` and
+/// every text within `TEXT_BOUND`, at any depth.
 fn bounded(value: &Value, path: &str) -> Result<(), MalformedChange> {
     match value {
         Value::Number(number) => match number.as_i64() {
-            Some(amount) if amount.abs() <= AMOUNT_BOUND => Ok(()),
+            Some(amount) if amount.abs() <= bound_of(path) => Ok(()),
             _ => Err(MalformedChange::AmountOutOfBounds {
                 field: path.to_string(),
             }),
@@ -241,10 +252,11 @@ mod tests {
         );
     }
 
-    // An amount beyond ±10¹⁵ micros is malformed, at any depth; the bound itself is fine.
+    // A quantity beyond ±10¹⁷ hundred-millionths is malformed, at any depth; the bound itself is
+    // fine, and the wider bound is a quantity's alone.
     #[test]
     fn amount_beyond_the_bound_is_malformed() {
-        let content = format!(r#"{{"id":"tx-1","quantity":{}}}"#, AMOUNT_BOUND + 1);
+        let content = format!(r#"{{"id":"tx-1","quantity":{}}}"#, QUANTITY_BOUND + 1);
         assert_eq!(
             check_received_change(
                 RecordKind::Transaction,
@@ -256,7 +268,7 @@ mod tests {
                 field: "quantity".into()
             })
         );
-        let content = format!(r#"{{"id":"tx-1","quantity":{}}}"#, -AMOUNT_BOUND);
+        let content = format!(r#"{{"id":"tx-1","quantity":{}}}"#, -QUANTITY_BOUND);
         assert_eq!(
             check_received_change(
                 RecordKind::Transaction,

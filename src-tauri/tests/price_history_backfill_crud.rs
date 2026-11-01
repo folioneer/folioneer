@@ -150,7 +150,7 @@ async fn build_ctx(opened_on: &str, today: &str, provider: ScriptedProvider) -> 
             &account.id,
             asset.id.clone(),
             opened_on.to_string(),
-            1_000_000,
+            folioneer_lib::shared::domain::quantity::from_surface(1_000_000),
             100_000_000,
         )
         .await

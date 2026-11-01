@@ -225,6 +225,7 @@ mod tests {
         SYSTEM_CATEGORY_ID,
     };
     use crate::core::cash::system_cash_asset_id;
+    use crate::shared::domain::quantity::from_surface;
 
     const ACCOUNT: &str = "acc-1";
     const ASSET: &str = "asset-1";
@@ -275,7 +276,7 @@ mod tests {
             asset_id.to_string(),
             TransactionType::Purchase,
             date.to_string(),
-            1_000_000,
+            from_surface(1_000_000),
             50_000_000,
             1_000_000,
             0,
@@ -313,7 +314,7 @@ mod tests {
                     "holding-1".to_string(),
                     ACCOUNT.to_string(),
                     ASSET.to_string(),
-                    quantity,
+                    crate::shared::domain::quantity::from_surface(quantity),
                     50_000_000,
                     0,
                     None,

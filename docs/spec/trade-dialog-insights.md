@@ -20,7 +20,7 @@ replaying only the transactions dated on or before a cut-off date.
 
 | Field           | Type | Notes                                                                                                                                        |
 | --------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `quantity`      | i64  | Units held as of the date (micro-units), 0 when nothing is held.                                                                             |
+| `quantity`      | i64  | Units held as of the date, stored on the scale of TRX-024 and read in micro-units (TRX-024B), 0 when nothing is held.                        |
 | `average_price` | i64  | VWAP cost basis per unit in **account** currency (micro-units; fees + FX included, identical to `Holding.average_price`), 0 when never held. |
 
 ## Business Rules
@@ -64,7 +64,7 @@ display.
 **TDI-030 — Potential P&L on the sell dialog (backend + frontend)**: the sell dialog
 shows the potential realized P&L of the typed sell as an info line under the computed
 total proceeds. The draft check of a new sale (TRX-062) returns it:
-`total_proceeds − floor(average_price × quantity / 1_000_000)`, where `average_price` is
+`total_proceeds − floor(average_price × quantity / QUANTITY_UNIT)`, where `average_price` is
 the holding's VWAP as of the sell date (TDI-010) — the rule recording a sell applies
 (SEL-024), computed by the same code. The dialog shows the figure it is given and
 computes none.

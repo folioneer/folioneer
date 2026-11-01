@@ -4,6 +4,7 @@
 use super::error::TransferError;
 use super::orchestrator::{TransferFigures, TransferUseCase};
 use crate::context::account::{Transaction, TransferView};
+use crate::shared::domain::quantity::from_surface;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;
@@ -61,13 +62,14 @@ pub async fn record_transfer(
         dto.asset_id,
         TransferFigures {
             date: dto.date,
-            quantity_sent: dto.quantity_sent,
-            quantity_received: dto.quantity_received,
+            quantity_sent: from_surface(dto.quantity_sent),
+            quantity_received: from_surface(dto.quantity_received),
             exchange_rate: dto.exchange_rate,
             note: dto.note,
         },
     )
     .await
+    .map(|parts| parts.iter().map(Transaction::as_shown).collect())
 }
 
 /// Corrects a transfer as one operation (TRF-030); returns its parts.
@@ -81,13 +83,14 @@ pub async fn correct_transfer(
         &dto.transfer_id,
         TransferFigures {
             date: dto.date,
-            quantity_sent: dto.quantity_sent,
-            quantity_received: dto.quantity_received,
+            quantity_sent: from_surface(dto.quantity_sent),
+            quantity_received: from_surface(dto.quantity_received),
             exchange_rate: dto.exchange_rate,
             note: dto.note,
         },
     )
     .await
+    .map(|parts| parts.iter().map(Transaction::as_shown).collect())
 }
 
 /// Removes every part of a transfer together (TRF-040).
@@ -107,7 +110,9 @@ pub async fn get_transfer(
     uc: State<'_, TransferUseCase>,
     transfer_id: String,
 ) -> Result<TransferView, TransferError> {
-    uc.get_transfer(&transfer_id).await
+    uc.get_transfer(&transfer_id)
+        .await
+        .map(TransferView::as_shown)
 }
 
 /// The rate a transfer between two accounts on a date takes when none is given (TRF-061);

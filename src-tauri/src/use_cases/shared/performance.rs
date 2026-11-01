@@ -6,12 +6,13 @@
 use crate::context::account::{AccountError, AccountServiceContract, Transaction, TransactionType};
 use crate::context::asset::{AssetClass, AssetServiceContract};
 use crate::context::currency::CurrencyService;
+use crate::shared::domain::quantity::QUANTITY_UNIT;
 use crate::use_cases::shared::valuation::{
     at_rate, end_value_as_of, holding_close_date_as_of, holding_end_value_as_of,
     holding_performance_for_span, holding_performance_for_span_windowed, load_priced_assets,
     load_rate_map, metric_for_span, metric_for_span_windowed, month_periods,
     opening_balance_flow_value, parse_date, year_periods, MonthPeriod, PerformanceMetric,
-    PricedAsset, RateMap, YearPeriod, MICRO, PERCENT_SCALE,
+    PricedAsset, RateMap, YearPeriod, PERCENT_SCALE,
 };
 use chrono::{Datelike, Local, NaiveDate};
 use serde::Serialize;
@@ -581,10 +582,10 @@ pub(crate) fn zero_cost_credit_value(
     };
     let quantity = transaction.quantity as i128;
     if priced.currency == account_currency {
-        quantity * price / MICRO
+        quantity * price / QUANTITY_UNIT
     } else if let Some(rate) = rate_map.get(&(priced.currency.clone(), grant_date)) {
         let converted_price = at_rate(price, *rate);
-        quantity * converted_price / MICRO
+        quantity * converted_price / QUANTITY_UNIT
     } else {
         0
     }
@@ -923,6 +924,7 @@ pub(crate) fn annualized_yield_metric(
 #[cfg(test)]
 mod lifetime_unavailable_tests {
     use super::*;
+    use crate::shared::domain::quantity::from_surface;
 
     fn row(since_pct: Option<i64>) -> PerformancePeriod {
         PerformancePeriod {
@@ -951,7 +953,7 @@ mod lifetime_unavailable_tests {
             asset.to_string(),
             TransactionType::OpeningBalance,
             date.to_string(),
-            1_000_000,
+            from_surface(1_000_000),
             0,
             1_000_000,
             0,

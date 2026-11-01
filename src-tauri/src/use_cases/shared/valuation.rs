@@ -6,6 +6,7 @@ use crate::context::account::{Account, AccountError, Transaction, TransactionTyp
 use crate::context::asset::{AssetClass, AssetPrice, AssetServiceContract};
 use crate::context::currency::CurrencyService;
 use crate::core::logger::BACKEND;
+use crate::shared::domain::quantity::QUANTITY_UNIT;
 use chrono::{Datelike, NaiveDate};
 use serde::Serialize;
 use specta::Type;
@@ -200,7 +201,7 @@ pub(crate) fn opening_balance_flow_value(
                 *rate_map.get(&(priced.currency.clone(), entry_date))?,
             )
         };
-        let value = transaction.quantity as i128 * converted_price / MICRO;
+        let value = transaction.quantity as i128 * converted_price / QUANTITY_UNIT;
         i64::try_from(value).ok()
     };
     market_value().unwrap_or(transaction.total_amount)
@@ -518,11 +519,11 @@ pub(crate) fn end_value_as_of(
         };
         if priced.currency == account_currency {
             // Same-currency holding — no conversion (PRF-020/024 pre-FXR behaviour).
-            total += quantity * price / MICRO;
+            total += quantity * price / QUANTITY_UNIT;
         } else if let Some(rate) = rate_map.get(&(priced.currency.clone(), period_end)) {
             // FXR-042 — value the foreign holding using the rate as of period_end.
             let converted_price = at_rate(price, *rate);
-            total += quantity * converted_price / MICRO;
+            total += quantity * converted_price / QUANTITY_UNIT;
         }
         // FXR-034 — a foreign holding with no usable rate as-of period_end contributes 0.
     }
@@ -995,10 +996,10 @@ pub(crate) fn holding_end_value_as_of(
     };
     let quantity = quantity as i128;
     let value = if priced.currency == account_currency {
-        quantity * price / MICRO
+        quantity * price / QUANTITY_UNIT
     } else if let Some(rate) = rate_map.get(&(priced.currency.clone(), period_end)) {
         let converted_price = at_rate(price, *rate);
-        quantity * converted_price / MICRO
+        quantity * converted_price / QUANTITY_UNIT
     } else {
         0
     };
@@ -1068,6 +1069,7 @@ pub(crate) fn holding_close_date_as_of(
 mod tests {
     use super::test_fixtures::{day, transaction_on};
     use super::*;
+    use crate::shared::domain::quantity::from_surface;
 
     // FXR-035/042 — period_end_dates must pre-resolve a rate for every date the
     // build_* methods actually value (end_value_as_of), or a foreign holding
@@ -1196,7 +1198,7 @@ mod tests {
                 "asset".to_string(),
                 transaction_type,
                 date.to_string(),
-                quantity,
+                from_surface(quantity),
                 1_000_000,
                 1_000_000,
                 0,
@@ -1479,7 +1481,7 @@ mod tests {
             "acc".into(),
             "asset-1".into(),
             "2024-03-01".into(),
-            2_000_000,
+            from_surface(2_000_000),
             crate::context::account::WriteOffReason::Lost,
             None,
         )
@@ -1739,7 +1741,7 @@ mod tests {
                 "usd-stock".to_string(),
                 TransactionType::Purchase,
                 "2025-02-01".to_string(),
-                10_000_000,
+                from_surface(10_000_000),
                 100_000_000,
                 900_000,
                 0,
@@ -1783,7 +1785,13 @@ pub(crate) mod test_fixtures {
             asset_id.to_string(),
             transaction_type,
             date.to_string(),
-            amount,
+            if crate::core::cash::is_cash_asset(asset_id)
+                || transaction_type == TransactionType::Split
+            {
+                amount
+            } else {
+                crate::shared::domain::quantity::from_surface(amount)
+            },
             1_000_000,
             1_000_000,
             0,

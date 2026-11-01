@@ -242,7 +242,7 @@ async fn sync_now_after_a_new_transaction_publishes_a_second_segment() {
             &account_id,
             asset_id,
             "2026-02-01".into(),
-            10_000_000,
+            folioneer_lib::shared::domain::quantity::from_surface(10_000_000),
             50_000_000,
             1_000_000,
             0,

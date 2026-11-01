@@ -717,6 +717,7 @@ export function writeOffErrorToI18n(
   if (takenOut) return { message: takenOut, onQuantity: true };
   switch (err.code) {
     case "QuantityNotPositive":
+    case "QuantityOutOfRange":
       return { message: { key: `error.${err.code}` }, onQuantity: true };
     case "ArchivedAsset":
       return { message: { key: "write_off.error_archived" }, onQuantity: false };
@@ -750,6 +751,7 @@ export function transferErrorToI18n(
   if (takenOut) return { message: takenOut, onQuantity: true };
   switch (err.code) {
     case "QuantityNotPositive":
+    case "QuantityOutOfRange":
       return { message: { key: `error.${err.code}` }, onQuantity: true };
     case "ArchivedAsset":
       return { message: { key: "transfer.error_archived" }, onQuantity: false };

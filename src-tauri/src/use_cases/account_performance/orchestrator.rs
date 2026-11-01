@@ -59,6 +59,7 @@ mod tests {
         AssetService, CreateAssetDTO, SqliteAssetCategoryRepository, SqliteAssetPriceRepository,
         SqliteAssetRepository, SYSTEM_CATEGORY_ID,
     };
+    use crate::shared::domain::quantity::from_surface;
     use chrono::Datelike;
     use sqlx::sqlite::SqlitePoolOptions;
 
@@ -449,10 +450,10 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-03-01".to_string(),
-                10_000_000,    // 10 units
-                1_000_000_000, // 1000 EUR unit price
-                1_000_000,     // exchange_rate 1:1
-                0,             // no fees
+                from_surface(10_000_000), // 10 units
+                1_000_000_000,            // 1000 EUR unit price
+                1_000_000,                // exchange_rate 1:1
+                0,                        // no fees
                 None,
                 None,
             )
@@ -741,7 +742,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-03-01".to_string(),
-                10_000_000,
+                from_surface(10_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -770,7 +771,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-09-01".to_string(),
-                4_000_000,
+                from_surface(4_000_000),
                 1_400_000_000,
                 1_000_000,
                 0,
@@ -887,7 +888,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-02-01".to_string(),
-                5_000_000,
+                from_surface(5_000_000),
                 5_000_000_000,
             )
             .await
@@ -960,7 +961,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-03-01".to_string(),
-                5_000_000,
+                from_surface(5_000_000),
                 1_000_000_000,
             )
             .await
@@ -1045,7 +1046,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-03-01".to_string(),
-                5_000_000,
+                from_surface(5_000_000),
                 1_000_000_000,
             )
             .await
@@ -1152,7 +1153,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-03-01".to_string(),
-                5_000_000,
+                from_surface(5_000_000),
                 1_000_000_000,
             )
             .await
@@ -1224,7 +1225,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-03-01".to_string(),
-                5_000_000,
+                from_surface(5_000_000),
                 2_000_000_000,
             )
             .await
@@ -1290,7 +1291,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-02-01".to_string(),
-                5_000_000,
+                from_surface(5_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -1308,7 +1309,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-03-01".to_string(),
-                2_000_000,
+                from_surface(2_000_000),
                 None,
             )
             .await
@@ -1386,8 +1387,8 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-06-10".to_string(),
-                1_000_000,     // 1 unit
-                1_000_000_000, // 1000 EUR
+                from_surface(1_000_000), // 1 unit
+                1_000_000_000,           // 1000 EUR
                 1_000_000,
                 0,
                 None,
@@ -1453,7 +1454,7 @@ mod tests {
                 &account.id,
                 usd_stock.id.clone(),
                 "2024-03-10".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -1528,7 +1529,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-01-10".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -1542,7 +1543,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-01-20".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 1_200_000_000,
                 1_000_000,
                 0,
@@ -1615,7 +1616,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-01-10".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -1704,7 +1705,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-03-10".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -1719,7 +1720,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-03-15".to_string(),
-                2_000_000,
+                from_surface(2_000_000),
                 None,
             )
             .await
@@ -1862,7 +1863,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-03-10".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -1941,7 +1942,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2023-01-05".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -2222,9 +2223,9 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-01-10".to_string(),
-                1_000_000,   // 1 unit
-                100_000_000, // 100.00 USD unit price
-                1_000_000,   // exchange_rate 1:1
+                from_surface(1_000_000), // 1 unit
+                100_000_000,             // 100.00 USD unit price
+                1_000_000,               // exchange_rate 1:1
                 0,
                 None,
                 None,
@@ -2305,7 +2306,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-01-10".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 100_000_000,
                 1_000_000,
                 0,
@@ -2383,7 +2384,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 inception.to_string(),
-                1_000_000, // 1 unit
+                from_surface(1_000_000), // 1 unit
                 (unit_price_eur * 1_000_000.0) as i64,
                 1_000_000, // exchange_rate 1:1
                 0,         // no fees
@@ -2621,7 +2622,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-01-01".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 100_000_000,
                 1_000_000,
                 0,
@@ -2710,7 +2711,7 @@ mod tests {
                 &account.id,
                 stock_a.clone(),
                 "2023-02-01".to_string(),
-                10_000_000,
+                from_surface(10_000_000),
                 100_000_000,
                 1_000_000,
                 0,
@@ -2724,7 +2725,7 @@ mod tests {
                 &account.id,
                 stock_b.clone(),
                 "2024-03-01".to_string(),
-                5_000_000,
+                from_surface(5_000_000),
                 200_000_000,
                 1_000_000,
                 0,
@@ -2787,7 +2788,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2023-06-01".to_string(),
-                10_000_000,
+                from_surface(10_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -2805,7 +2806,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-06-01".to_string(),
-                10_000_000,
+                from_surface(10_000_000),
                 1_200_000_000,
                 1_000_000,
                 0,
@@ -2905,7 +2906,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2023-06-01".to_string(),
-                10_000_000,
+                from_surface(10_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -2919,7 +2920,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-06-01".to_string(),
-                10_000_000,
+                from_surface(10_000_000),
                 1_200_000_000,
                 1_000_000,
                 0,
@@ -2934,7 +2935,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2025-03-01".to_string(),
-                5_000_000,
+                from_surface(5_000_000),
                 1_100_000_000,
                 1_000_000,
                 0,
@@ -3120,7 +3121,7 @@ mod tests {
                 &account.id,
                 stock_a.clone(),
                 "2024-01-10".to_string(),
-                10_000_000,
+                from_surface(10_000_000),
                 100_000_000,
                 1_000_000,
                 0,
@@ -3134,7 +3135,7 @@ mod tests {
                 &account.id,
                 stock_b.clone(),
                 "2024-01-10".to_string(),
-                1_000_000,
+                from_surface(1_000_000),
                 500_000_000,
                 1_000_000,
                 0,
@@ -3259,7 +3260,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-02-01".to_string(),
-                5_000_000,
+                from_surface(5_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -3277,7 +3278,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-03-01".to_string(),
-                2_000_000,
+                from_surface(2_000_000),
                 None,
             )
             .await
@@ -3361,7 +3362,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-02-01".to_string(),
-                5_000_000,
+                from_surface(5_000_000),
                 1_000_000_000,
                 1_000_000,
                 0,
@@ -3379,7 +3380,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-03-01".to_string(),
-                2_000_000,
+                from_surface(2_000_000),
                 None,
             )
             .await
@@ -3391,7 +3392,7 @@ mod tests {
                 &account.id,
                 stock.id.clone(),
                 "2024-06-15".to_string(),
-                7_000_000,
+                from_surface(7_000_000),
                 1_200_000_000,
                 1_000_000,
                 0,

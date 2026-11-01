@@ -190,7 +190,7 @@ mod tests {
             "holding-1".to_string(),
             "acc-1".to_string(),
             asset_id.to_string(),
-            quantity,
+            crate::shared::domain::quantity::stored_for(asset_id, quantity),
             0,
             0,
             None,

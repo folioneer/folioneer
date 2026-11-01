@@ -10,6 +10,7 @@ use crate::context::account_import::{
 };
 use crate::context::asset::{Asset, AssetClass, AssetServiceContract};
 use crate::core::logger::BACKEND;
+use crate::shared::domain::quantity::from_surface;
 use crate::shared::infrastructure::uow::TransactionManager;
 use serde::Serialize;
 use specta::Type;
@@ -624,7 +625,7 @@ fn pend(read: RowRead, matches: &[AssetMatch], assets: &[Asset], currency: &str)
             let trade = |quantity: i64, unit_price: i64, fees: i64| TradeOp {
                 asset_id: asset.id.clone(),
                 date: date.clone(),
-                quantity,
+                quantity: from_surface(quantity),
                 unit_price,
                 exchange_rate: SAME_CURRENCY,
                 fees,
@@ -829,12 +830,14 @@ fn amount_of(status: &RowStatus) -> Option<i64> {
             quantity,
             unit_price,
             fees,
-        } => Account::compute_purchase_total(quantity, unit_price, SAME_CURRENCY, fees),
+        } => {
+            Account::compute_purchase_total(from_surface(quantity), unit_price, SAME_CURRENCY, fees)
+        }
         RowFigures::Sale {
             quantity,
             unit_price,
             fees,
-        } => Account::compute_sell_total(quantity, unit_price, SAME_CURRENCY, fees),
+        } => Account::compute_sell_total(from_surface(quantity), unit_price, SAME_CURRENCY, fees),
         RowFigures::Dividend { amount }
         | RowFigures::Deposit { amount }
         | RowFigures::Withdrawal { amount }

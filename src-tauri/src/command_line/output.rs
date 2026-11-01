@@ -312,7 +312,7 @@ mod tests {
             "cw8".to_string(),
             TransactionType::Purchase,
             "2026-09-28".to_string(),
-            2_000_000,
+            200_000_000,
             495_100_000,
             1_000_000,
             1_990_000,

@@ -8,7 +8,7 @@ The `Transaction` entity owns its own bounded context (`context/transaction/`). 
 
 ### Holding entity
 
-The `Holding` entity represents the current state of a financial position: an asset held within an account. It is owned by the `account/` bounded context and replaces the former `AssetAccount` entity (see [ADR-002](../adr/002-replace-asset-account-with-holding.md)). All financial fields are stored as `i64` micro-units per [ADR-001](../adr/001-use-i64-for-monetary-amounts.md).
+The `Holding` entity represents the current state of a financial position: an asset held within an account. It is owned by the `account/` bounded context and replaces the former `AssetAccount` entity (see [ADR-002](../adr/002-replace-asset-account-with-holding.md)). All financial fields are stored as `i64` fixed-point per [ADR-001](../adr/001-use-i64-for-monetary-amounts.md), on the scales of TRX-024.
 
 ---
 
@@ -25,7 +25,7 @@ Represents a single purchase (or sale) event for an asset in an account.
 | `asset_id`         | The financial asset involved in the transaction.                                                                                                                                                                                                             |
 | `transaction_type` | Type of transaction: `Purchase`, `Sell`, `OpeningBalance`, and the kinds other specs add (`Deposit`, `Withdrawal`, `Dividend`, `FreeShares`, `ManagementFee`, `Split`, `Interest`, `WriteOff`, `TransferOut`, `TransferIn`). Immutable once saved (SEL-035). |
 | `date`             | Date when the transaction was executed.                                                                                                                                                                                                                      |
-| `quantity`         | Number of units acquired (positive, stored in micros: value \* 10^6); 0 on a split (SPL-010) and a dividend (DIV-023).                                                                                                                                       |
+| `quantity`         | Number of units acquired (positive, on the scale of TRX-024); 0 on a split (SPL-010) and a dividend (DIV-023).                                                                                                                                               |
 | `split_factor`     | A split's factor (stored in micros); absent on every other type (SPL-010).                                                                                                                                                                                   |
 | `dividend_amount`  | A dividend's net amount (stored in micros); absent on every other type (DIV-023).                                                                                                                                                                            |
 | `unit_price`       | Price per unit in asset's currency (stored in micros: value \* 10^6).                                                                                                                                                                                        |
@@ -43,7 +43,7 @@ Represents the current state of a position (asset held within an account). Compu
 | `id`            | Unique identifier of the holding.                                        |
 | `account_id`    | The account holding the asset.                                           |
 | `asset_id`      | The financial asset held.                                                |
-| `quantity`      | Current number of units held (i64 micros).                               |
+| `quantity`      | Current number of units held (i64, on the scale of TRX-024).             |
 | `average_price` | Volume-weighted average purchase price in account currency (i64 micros). |
 
 ---
@@ -66,13 +66,23 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-023 — Form default values (frontend)**: The transaction date defaults to the current day. The `transaction_type` defaults to `Purchase` and is not displayed in the form while only `Purchase` is supported. `exchange_rate` defaults to 1.0.
 
-**TRX-024 — Micro-unit representation (full stack)**: All financial amounts (quantity, price, fees, total) are represented as 64-bit integers (`i64`) using a micro-unit scale (×1,000,000) throughout the stack, as per [ADR-001](../adr/001-use-i64-for-monetary-amounts.md). The frontend stores and manipulates these values internally as micro-units. The only decimal↔micro conversion occurs at the UI boundary: user input (decimal string → `i64` micro) and display (`i64` micro → formatted decimal string, 3 decimal places). A form field filled from a recorded or computed figure is the exception to the three decimals: it shows every decimal the figure carries, and at least three, so that a form saved without typing sends back the figures it was filled with; a price recorded with a trade carries the trade's unit price to its last decimal.
+**TRX-024 — Fixed-point representation (frontend + backend)**: Every figure is a 64-bit integer (`i64`), as per [ADR-001](../adr/001-use-i64-for-monetary-amounts.md). A quantity of a non-cash asset is stored in hundred-millionths (×100,000,000, `QUANTITY_UNIT`); a quantity of a Cash Asset, a price, a rate, fees, a total, a split's factor and a dividend's amount are in micro-units (×1,000,000, `MICRO`). The window handles a quantity in micro-units (TRX-024B), as it does these other figures. The only decimal↔micro conversion occurs at the UI boundary: user input (decimal string → `i64` micro) and display (`i64` micro → formatted decimal string, 3 decimal places). A form field filled from a recorded or computed figure is the exception to the three decimals: it shows every decimal the figure carries, and at least three, so that a form saved without typing sends back the figures it was filled with; a price recorded with a trade carries the trade's unit price to its last decimal.
 
 **TRX-024A — What is given as a quantity (frontend + backend)**: The tools of the AI agent connection (AGT-070, AGT-072, AGT-081, AGT-083, AGT-087, AGT-088) and the window's journal (SPL-060, DIV-050) give a split's factor (SPL-010) and a dividend's net amount (DIV-023) as the transaction's quantity; the command line, which records no split, does so for a dividend (CLI-021). An answer that returns a whole transaction, a recording's or a correction's, also carries `split_factor` and `dividend_amount` as such.
 
+**TRX-024B — A surface exchanges a quantity in micro-units (frontend + backend)**: The window, the AI agent connection and the command line read and send a quantity of a non-cash asset in micro-units, converted at the backend's boundary, so that what they read stops at the sixth decimal.
+
+**TRX-024C — The largest quantity (backend)**: A transaction's quantity cannot pass 1,000,000,000 units of a non-cash asset, or 100,000,000,000 units of a Cash Asset, the same limits every device reads (SYN-034); a dividend's amount meets the Cash Asset's limit when recorded, and what a device reads of it is SYN-034's limit on other figures; a holding of a non-cash asset cannot pass 92,233,720,368.54775807 units, what storage holds. A recording or a correction past either, its replay included, is refused with a specific error; a merged ledger past what storage holds stands at it (CFR-042).
+
+**TRX-024D — A correction sent back unchanged (backend)**: A correction whose quantity is the one its surface read leaves the stored quantity as it is, its last two decimals included, even one that reads as zero.
+
+**TRX-024E — A portfolio already past the largest quantity (backend)**: A portfolio that holds a quantity past what storage holds (TRX-024C) when this representation arrives is left as it was: the migration fails, and UPD-034 and UPD-035 apply.
+
+**TRX-024F — A computed quantity (backend)**: A quantity computed by FEE-022, FEE-041, INT-022 or SPL-020 is floored at the scale of TRX-024.
+
 **TRX-025 — Holding cost basis update (backend)**: Creating a purchase transaction updates the `Holding.average_price` using the VWAP method (TRX-030).
 
-**TRX-026 — Total amount computation for purchases (backend)**: For `Purchase` transactions, `total_amount` is computed by the backend as `floor(floor(quantity × unit_price / MICRO) × exchange_rate / MICRO) + fees` (fees increase cost). All values are `i64` micro-units (TRX-024); arithmetic uses `i128` intermediates to prevent overflow. `total_amount` is never received from the frontend — the DTO (`CreateTransactionDTO`) intentionally omits it. The form displays the total returned by the transaction draft check (TRX-062), which applies this formula; it does not compute it. For `Sell` transactions, the formula differs in fee sign — see SEL-023. In total-entry mode the user-typed total is stored instead and this formula does not apply — see TRX-060.
+**TRX-026 — Total amount computation for purchases (backend)**: For `Purchase` transactions, `total_amount` is computed by the backend as `floor(floor(quantity × unit_price / QUANTITY_UNIT) × exchange_rate / MICRO) + fees` (fees increase cost). All values are `i64` (TRX-024): the quantity in hundred-millionths, the other figures in micro-units; arithmetic uses `i128` intermediates to prevent overflow. `total_amount` is never received from the frontend — the DTO (`CreateTransactionDTO`) intentionally omits it. The form displays the total returned by the transaction draft check (TRX-062), which applies this formula; it does not compute it. For `Sell` transactions, the formula differs in fee sign — see SEL-023. In total-entry mode the user-typed total is stored instead and this formula does not apply — see TRX-060.
 
 **TRX-027 — Atomicity of transaction and holding updates (backend)**: The transaction record insert and all associated `Holding` mutations (quantity and average_price) must be performed within a single database transaction. A failure in any step rolls back the entire operation.
 
@@ -118,7 +128,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-046 — Opening balance date validation (frontend + backend)**: Date is required and must not be in the future, consistent with TRX-020. The submit action is disabled while the date is empty, invalid, or in the future.
 
-**TRX-047 — Opening balance stored fields (backend)**: An `OpeningBalance` transaction is persisted with `total_amount` = user-entered total cost (micro-units), `unit_price` = `floor(total_cost / quantity)` (micro-units, consistent with TRX-026 floor notation), `fees = 0`, `exchange_rate = 1_000_000`. The total amount formula defined in TRX-026 does not apply — `total_amount` is set directly from user input, both on creation and on edit.
+**TRX-047 — Opening balance stored fields (backend)**: An `OpeningBalance` transaction is persisted with `total_amount` = user-entered total cost (micro-units), `unit_price` = `floor(total_cost × QUANTITY_UNIT / quantity)` (micro-units, consistent with TRX-026 floor notation), `fees = 0`, `exchange_rate = 1_000_000`. The total amount formula defined in TRX-026 does not apply — `total_amount` is set directly from user input, both on creation and on edit.
 
 **TRX-048 — Opening balance VWAP participation (backend)**: `OpeningBalance` transactions participate in VWAP recalculation identically to `Purchase` transactions: their `total_amount` and `quantity` are included in the Σ of TRX-030. This extends TRX-030 to cover both `Purchase` and `OpeningBalance` types.
 
@@ -126,7 +136,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-050 — Opening balance archived asset guard (backend)**: If the target asset is archived when an opening balance is submitted, the backend rejects with `ArchivedAsset`. The asset selector (TRX-043) lists only active assets, so this guard is reached only via a race condition (asset archived between form load and submission); the frontend displays the error inline.
 
-**TRX-051 — Opening balance edit (frontend + backend)**: When editing an `OpeningBalance` transaction, the edit form shows date, quantity, and total cost — no fees field, no exchange rate field. The correction mechanism (TRX-031) is used. TRX-047 applies on edit: the entered total cost is stored as the transaction's total amount and the unit price is always derived from it as `floor(total_cost / quantity)` — any unit price sent is ignored; validation is that of TRX-044/TRX-045; TRX-026 does not apply.
+**TRX-051 — Opening balance edit (frontend + backend)**: When editing an `OpeningBalance` transaction, the edit form shows date, quantity, and total cost — no fees field, no exchange rate field. The correction mechanism (TRX-031) is used. TRX-047 applies on edit: the entered total cost is stored as the transaction's total amount and the unit price is always derived from it as `floor(total_cost × QUANTITY_UNIT / quantity)` — any unit price sent is ignored; validation is that of TRX-044/TRX-045; TRX-026 does not apply.
 
 **TRX-052 — Transaction list label (frontend)**: `OpeningBalance` entries are shown in the Transaction List with the label "Opening Balance", distinct from "Buy" and "Sell".
 
@@ -150,7 +160,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 ### Total-Entry Mode (060–069)
 
-**TRX-060 — Total-entry purchase (backend)**: `buy_holding` accepts an optional user-entered `total_amount` — the all-in amount debited by the broker, in account-currency micro-units, fees included. When provided, the typed total is ground truth: it is stored verbatim as `total_amount` (the TRX-026 formula does not apply) and the unit price is derived as `unit_price = round(((total_amount − fees) × MICRO × MICRO) / (quantity × exchange_rate))`, rounding half away from zero, with `i128` intermediates. Validation: `total_amount` must be strictly positive (`TotalAmountNotPositive`) and at least `fees` (`TotalAmountBelowFees`) — the securities part `total_amount − fees` must not be negative. When absent, TRX-026 applies unchanged. Downstream consumers — VWAP (TRX-030) and realized P&L (SEL-024) — read the stored `total_amount` unchanged. The entry mode is not persisted: a correction (TRX-031) operates on the stored decomposition (`quantity`, `unit_price`, `exchange_rate`, `fees`) and recomputes `total_amount` per TRX-026, unless the correction itself supplies a typed total (TRX-061). For sells, see SEL-050.
+**TRX-060 — Total-entry purchase (backend)**: `buy_holding` accepts an optional user-entered `total_amount` — the all-in amount debited by the broker, in account-currency micro-units, fees included. When provided, the typed total is ground truth: it is stored verbatim as `total_amount` (the TRX-026 formula does not apply) and the unit price is derived as `unit_price = round(((total_amount − fees) × MICRO × QUANTITY_UNIT) / (quantity × exchange_rate))`, rounding half away from zero, with `i128` intermediates. Validation: `total_amount` must be strictly positive (`TotalAmountNotPositive`) and at least `fees` (`TotalAmountBelowFees`) — the securities part `total_amount − fees` must not be negative. When absent, TRX-026 applies unchanged. Downstream consumers — VWAP (TRX-030) and realized P&L (SEL-024) — read the stored `total_amount` unchanged. The entry mode is not persisted: a correction (TRX-031) operates on the stored decomposition (`quantity`, `unit_price`, `exchange_rate`, `fees`) and recomputes `total_amount` per TRX-026, unless the correction itself supplies a typed total (TRX-061). For sells, see SEL-050.
 
 **TRX-061 — Total-entry correction (backend)**: `correct_transaction` accepts an optional user-entered `total_amount` with the exact TRX-060 semantics. When provided on a `Purchase` correction, the typed total is ground truth: it is stored verbatim as `total_amount` and the unit price is derived per the TRX-060 formula, with the same validation (`TotalAmountNotPositive`, `TotalAmountBelowFees`, `UnitPriceOutOfRange`); the caller-supplied `unit_price` is ignored. When provided on a `Sell` correction, the SEL-051 semantics apply. On an `OpeningBalance` correction the typed total cost is used as sent (TRX-047/TRX-051). On every other transaction type the field is ignored — the type-specific recompute (TRX-026, CSH-022/032, DIV-040) applies as if it were absent. When absent, the existing recompute per TRX-026 applies unchanged.
 
@@ -180,7 +190,7 @@ Represents the current state of a position (asset held within an account). Compu
           │
           └─ [Save] → Backend validates (TRX-020, TRX-033)
                      → Backend computes total_amount (TRX-026)
-                     → Persists Transaction in micro-units (TRX-024)
+                     → Persists Transaction on the scales of TRX-024
                      → Updates Holding atomically (TRX-022, TRX-025, TRX-027)
                        using VWAP in chronological order (TRX-030, TRX-036)
                      → Publishes TransactionUpdated (TRX-037)
@@ -232,3 +242,9 @@ _`transaction_type` is not shown in the form. It is hardcoded to `Purchase` unti
 ## Cross-amendments
 
 - **CFR-041** — when the portfolio is shared between devices, `created_at` is carried verbatim with the transaction and never re-derived, and the TRX-036 order gains a third key — transaction identity — for same-date, same-`created_at` entries from different devices (see `sync-conflict-resolution.md`).
+
+---
+
+## Open Questions
+
+- [ ] TRX-024B: no surface can send the eight decimals storage now holds, nor sell a residue below one micro-unit. #385 and #579 move the surfaces to eight decimals.

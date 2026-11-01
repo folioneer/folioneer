@@ -36,12 +36,14 @@ pub(super) struct Intake {
 /// malformed — the whole segment is unreadable (SYN-034).
 fn segment_changes(segment: Segment, after: i64) -> Result<Vec<IncomingChange>, MalformedChange> {
     let device_id = segment.device_id;
+    let written_in = segment.data_format_version;
     segment
         .changes
         .into_iter()
         .filter(|change| change.sequence > after)
         .map(|change| {
             let sequence = change.sequence;
+            let change = change.in_current_format(written_in);
             Change::from_segment_change(&device_id, change).map(|change| IncomingChange {
                 origin_device_id: device_id.clone(),
                 sequence,
@@ -168,4 +170,41 @@ async fn read_segments(
         reached = reached.max(last);
     }
     Ok(reached)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::sync::domain::SegmentChange;
+    use crate::shared::domain::{Operation, Origin, RecordKind};
+
+    // SYN-038 — a segment written in an older format is taken in, in the current form.
+    #[test]
+    fn syn_038_an_older_segment_is_taken_in_in_the_current_form() {
+        let segment = Segment {
+            device_id: "other".into(),
+            first_sequence: 1,
+            last_sequence: 1,
+            data_format_version: 13,
+            changes: vec![SegmentChange {
+                sequence: 1,
+                logical_timestamp: "00000000000000000001".into(),
+                based_on: None,
+                record_kind: RecordKind::Transaction,
+                record_identity: "tx-1".into(),
+                operation: Operation::Created,
+                origin: Origin::User,
+                content: Some(
+                    r#"{"id":"tx-1","asset_id":"asset-1","transaction_type":"Purchase","quantity":7}"#
+                        .into(),
+                ),
+            }],
+        };
+
+        let incoming = segment_changes(segment, 0).expect("readable");
+
+        let content = incoming[0].change.content.as_deref().expect("content");
+        let read: serde_json::Value = serde_json::from_str(content).expect("json");
+        assert_eq!(read["quantity"], 700);
+    }
 }

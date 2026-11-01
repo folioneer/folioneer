@@ -127,7 +127,7 @@ async fn seed(ctx: &Ctx, to_currency: &str) -> (String, String, String) {
             &from,
             asset.id.clone(),
             "2024-01-15".to_string(),
-            micro(10),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(10)),
             micro(50),
             micro(1),
             0,
@@ -142,8 +142,8 @@ async fn seed(ctx: &Ctx, to_currency: &str) -> (String, String, String) {
 fn figures(sent: i64, received: i64, rate: Option<i64>) -> TransferFigures {
     TransferFigures {
         date: "2024-03-01".to_string(),
-        quantity_sent: sent,
-        quantity_received: received,
+        quantity_sent: folioneer_lib::shared::domain::quantity::from_surface(sent),
+        quantity_received: folioneer_lib::shared::domain::quantity::from_surface(received),
         exchange_rate: rate,
         note: Some("to cold storage".to_string()),
     }
@@ -204,14 +204,29 @@ async fn trf_020_a_transfer_moves_quantity_and_cost_without_cash() {
     assert_eq!(parts.len(), 2, "no fee in kind when all is received");
     let out = part(&parts, TransactionType::TransferOut);
     let inn = part(&parts, TransactionType::TransferIn);
-    assert_eq!((out.quantity, out.total_amount), (micro(4), micro(200)));
-    assert_eq!((inn.quantity, inn.total_amount), (micro(4), micro(200)));
+    assert_eq!(
+        (out.quantity, out.total_amount),
+        (
+            folioneer_lib::shared::domain::quantity::from_surface(micro(4)),
+            micro(200)
+        )
+    );
+    assert_eq!(
+        (inn.quantity, inn.total_amount),
+        (
+            folioneer_lib::shared::domain::quantity::from_surface(micro(4)),
+            micro(200)
+        )
+    );
     assert_eq!(out.transfer_id, inn.transfer_id);
     assert!(out.transfer_id.is_some());
     assert_eq!(out.realized_pnl, None);
 
     let sending = holding(&ctx, &from, &asset).await.unwrap();
-    assert_eq!(sending.quantity, micro(6));
+    assert_eq!(
+        sending.quantity,
+        folioneer_lib::shared::domain::quantity::from_surface(micro(6))
+    );
     assert_eq!(
         sending.average_price,
         micro(50),
@@ -219,7 +234,10 @@ async fn trf_020_a_transfer_moves_quantity_and_cost_without_cash() {
     );
     assert_eq!(sending.total_realized_pnl, 0, "TRF-023");
     let receiving = holding(&ctx, &to, &asset).await.unwrap();
-    assert_eq!(receiving.quantity, micro(4));
+    assert_eq!(
+        receiving.quantity,
+        folioneer_lib::shared::domain::quantity::from_surface(micro(4))
+    );
     assert_eq!(receiving.average_price, micro(50));
     assert_eq!(receiving.total_realized_pnl, 0);
     assert_eq!(cash(&ctx, &from).await, cash_from, "no cash leaves");
@@ -245,7 +263,7 @@ async fn trf_024_a_transfer_of_everything_closes_the_sending_position() {
     assert_eq!(sending.last_sold_date.as_deref(), Some("2024-03-01"));
     assert_eq!(
         holding(&ctx, &to, &asset).await.unwrap().quantity,
-        micro(10)
+        folioneer_lib::shared::domain::quantity::from_surface(micro(10))
     );
 }
 
@@ -268,7 +286,10 @@ async fn trf_021_a_quantity_received_below_the_quantity_sent_is_a_fee_in_kind() 
 
     let fee = part(&parts, TransactionType::WriteOff);
     let out = part(&parts, TransactionType::TransferOut);
-    assert_eq!(fee.quantity, 100_000);
+    assert_eq!(
+        fee.quantity,
+        folioneer_lib::shared::domain::quantity::from_surface(100_000)
+    );
     assert_eq!(fee.write_off_reason, Some(WriteOffReason::NetworkFee));
     assert_eq!(fee.transfer_id, out.transfer_id);
     assert_eq!(
@@ -276,18 +297,27 @@ async fn trf_021_a_quantity_received_below_the_quantity_sent_is_a_fee_in_kind() 
         Some(-micro(5)),
         "the fee leaves at its cost"
     );
-    assert_eq!(out.quantity, 3_900_000);
+    assert_eq!(
+        out.quantity,
+        folioneer_lib::shared::domain::quantity::from_surface(3_900_000)
+    );
     assert_eq!(out.total_amount, micro(195));
 
     let sending = holding(&ctx, &from, &asset).await.unwrap();
-    assert_eq!(sending.quantity, micro(6));
+    assert_eq!(
+        sending.quantity,
+        folioneer_lib::shared::domain::quantity::from_surface(micro(6))
+    );
     assert_eq!(
         sending.total_realized_pnl,
         -micro(5),
         "only the fee realizes"
     );
     let receiving = holding(&ctx, &to, &asset).await.unwrap();
-    assert_eq!(receiving.quantity, 3_900_000);
+    assert_eq!(
+        receiving.quantity,
+        folioneer_lib::shared::domain::quantity::from_surface(3_900_000)
+    );
     assert_eq!(receiving.average_price, micro(50));
 }
 
@@ -485,11 +515,11 @@ async fn trf_030_a_transfer_is_corrected_together() {
     assert_eq!(part(&corrected, TransactionType::TransferOut).id, out_id);
     assert_eq!(
         holding(&ctx, &from, &asset).await.unwrap().quantity,
-        micro(4)
+        folioneer_lib::shared::domain::quantity::from_surface(micro(4))
     );
     assert_eq!(
         holding(&ctx, &to, &asset).await.unwrap().quantity,
-        5_500_000
+        folioneer_lib::shared::domain::quantity::from_surface(5_500_000)
     );
 
     let back = ctx
@@ -508,9 +538,12 @@ async fn trf_030_a_transfer_is_corrected_together() {
         .all(|t| t.transaction_type != TransactionType::WriteOff));
     assert_eq!(
         holding(&ctx, &from, &asset).await.unwrap().quantity,
-        micro(8)
+        folioneer_lib::shared::domain::quantity::from_surface(micro(8))
     );
-    assert_eq!(holding(&ctx, &to, &asset).await.unwrap().quantity, micro(2));
+    assert_eq!(
+        holding(&ctx, &to, &asset).await.unwrap().quantity,
+        folioneer_lib::shared::domain::quantity::from_surface(micro(2))
+    );
 
     let unknown = ctx
         .transfer
@@ -540,7 +573,7 @@ async fn trf_040_a_removal_leaving_the_receiving_account_short_is_refused() {
             &to,
             asset.clone(),
             "2024-04-01".to_string(),
-            micro(3),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(3)),
             micro(60),
             micro(1),
             0,
@@ -570,9 +603,12 @@ async fn trf_040_a_removal_leaving_the_receiving_account_short_is_refused() {
     ));
     assert_eq!(
         holding(&ctx, &from, &asset).await.unwrap().quantity,
-        micro(6)
+        folioneer_lib::shared::domain::quantity::from_surface(micro(6))
     );
-    assert_eq!(holding(&ctx, &to, &asset).await.unwrap().quantity, micro(1));
+    assert_eq!(
+        holding(&ctx, &to, &asset).await.unwrap().quantity,
+        folioneer_lib::shared::domain::quantity::from_surface(micro(1))
+    );
 }
 
 // TRF-040, TRX-034 — removing any part removes the whole transfer and restores both
@@ -599,7 +635,10 @@ async fn trf_040_a_transfer_is_cancelled_together() {
         .unwrap();
 
     let sending = holding(&ctx, &from, &asset).await.unwrap();
-    assert_eq!(sending.quantity, micro(10));
+    assert_eq!(
+        sending.quantity,
+        folioneer_lib::shared::domain::quantity::from_surface(micro(10))
+    );
     assert_eq!(
         sending.total_realized_pnl, 0,
         "the fee in kind went with it"
@@ -653,7 +692,7 @@ async fn trf_031_a_part_is_not_corrected_alone() {
             &from,
             &out.id,
             out.date.clone(),
-            micro(1),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(1)),
             micro(50),
             micro(1),
             0,
@@ -670,7 +709,7 @@ async fn trf_031_a_part_is_not_corrected_alone() {
             &from,
             &fee.id,
             fee.date.clone(),
-            micro(1),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(1)),
             WriteOffReason::Dust,
             None,
         )
@@ -716,7 +755,7 @@ async fn trf_025_the_receiving_cost_follows_the_sending_cost() {
             &from,
             &purchase.id,
             purchase.date.clone(),
-            micro(10),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(10)),
             micro(60),
             micro(1),
             0,
@@ -782,7 +821,7 @@ async fn trf_012_a_backdated_transfer_keeps_later_sales_covered() {
             &from,
             asset.clone(),
             "2024-04-01".to_string(),
-            micro(8),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(8)),
             micro(60),
             micro(1),
             0,
@@ -815,7 +854,7 @@ async fn trf_012_a_backdated_transfer_keeps_later_sales_covered() {
             &from,
             asset.clone(),
             "2024-02-01".to_string(),
-            micro(1),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(1)),
             micro(60),
             micro(1),
             0,
@@ -841,7 +880,7 @@ async fn trf_025_a_backdated_opening_balance_recosts_the_transfer() {
             &from,
             asset.clone(),
             "2024-01-05".to_string(),
-            micro(10),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(10)),
             micro(1_500),
         )
         .await
@@ -904,7 +943,10 @@ async fn trf_041_a_removed_account_leaves_the_other_side() {
     let receiving = holding(&ctx, &to, &asset).await.unwrap();
     assert_eq!(
         (receiving.quantity, receiving.average_price),
-        (micro(4), micro(50))
+        (
+            folioneer_lib::shared::domain::quantity::from_surface(micro(4)),
+            micro(50)
+        )
     );
     let refused = ctx
         .transfer
@@ -1050,7 +1092,11 @@ async fn trf_060_a_transfer_is_read_as_one() {
             view.quantity_sent,
             view.quantity_received
         ),
-        ("2024-03-01", micro(4), 3_500_000)
+        (
+            "2024-03-01",
+            folioneer_lib::shared::domain::quantity::from_surface(micro(4)),
+            350_000_000
+        )
     );
     assert_eq!(
         (view.cost, view.exchange_rate, view.note.as_deref()),

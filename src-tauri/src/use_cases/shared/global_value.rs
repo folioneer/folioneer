@@ -6,6 +6,7 @@
 
 use crate::context::account::Holding;
 use crate::context::asset::{AssetClass, AssetPrice};
+use crate::shared::domain::quantity::QUANTITY_UNIT;
 use std::collections::HashMap;
 
 use super::valuation::convert_at_rate;
@@ -66,7 +67,8 @@ pub fn account_global_value(
             continue;
         };
         let converted_price = convert_at_rate(latest.price, rate);
-        let market_value = (holding.quantity as i128 * converted_price as i128 / 1_000_000) as i64;
+        let market_value =
+            (holding.quantity as i128 * converted_price as i128 / QUANTITY_UNIT) as i64;
         total = total.saturating_add(market_value);
     }
     total
@@ -82,7 +84,7 @@ mod tests {
             "holding-1".to_string(),
             "account-1".to_string(),
             asset_id.to_string(),
-            quantity,
+            crate::shared::domain::quantity::stored_for(asset_id, quantity),
             0,
             0,
             None,

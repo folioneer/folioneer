@@ -404,7 +404,7 @@ async fn imp_036_a_row_already_recorded_is_shown_so() {
             &account_id,
             acme,
             "2024-01-03".to_string(),
-            micro(10),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(10)),
             12_500_000,
             micro(1),
             2_330_000,
