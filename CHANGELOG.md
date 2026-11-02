@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-11-02
+
+### Added
+
+- a quantity carries eight decimals in the window, for an AI agent and on the command line
+- [agent] an AI agent and the command line's JSON read every figure as decimal text
+- [agent] an AI agent corrects and cancels what any agent session recorded, your entries stay yours
+
 ## [0.17.0] - 2026-11-01
 
 ### Added
