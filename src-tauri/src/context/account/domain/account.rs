@@ -2224,7 +2224,10 @@ impl Account {
         // TRX-045 — a zero-cost position is valid (e.g. a mined / gifted /
         // airdropped asset seeded as a starting position); only a negative
         // total cost is rejected.
-        Self::derive_opening_balance_from_total(total_cost, quantity)?;
+        let (unit_price, _) = Self::derive_opening_balance_from_total(total_cost, quantity)?;
+        // TRX-020 — the draft refuses what recording would: a figure past the limit.
+        Transaction::ensure_amount(total_cost)?;
+        Transaction::ensure_amount(unit_price)?;
         Transaction::validate_date(date)?;
         Ok(OpeningBalanceNotice {
             zero_cost: total_cost == 0,
@@ -2234,7 +2237,10 @@ impl Account {
     /// DIV-040 — a dividend's total in account currency: its amount at the exchange rate,
     /// rounded down.
     fn dividend_total(amount: i64, exchange_rate: i64) -> i64 {
-        ((amount as i128 * exchange_rate as i128) / 1_000_000) as i64
+        // Saturated, never wrapped: a total past the limit is refused (TRX-020).
+        crate::shared::domain::amount::saturate(
+            (amount as i128 * exchange_rate as i128) / 1_000_000,
+        )
     }
 
     /// TRX-062 / DIV-040 — the total a corrected dividend would record, validated as
@@ -2341,7 +2347,10 @@ impl Account {
         let qty = quantity as i128;
         let price = unit_price as i128;
         let rate = exchange_rate as i128;
-        ((qty * price / QUANTITY_UNIT) * rate / MICRO) as i64 + fees
+        // Saturated, never wrapped: a total past i64 is refused as past the limit (TRX-020).
+        crate::shared::domain::amount::saturate(
+            (qty.saturating_mul(price) / QUANTITY_UNIT).saturating_mul(rate) / MICRO + fees as i128,
+        )
     }
 
     /// Computes total_amount for a Sell (SEL-023).
@@ -2356,7 +2365,9 @@ impl Account {
         let qty = quantity as i128;
         let price = unit_price as i128;
         let rate = exchange_rate as i128;
-        ((qty * price / QUANTITY_UNIT) * rate / MICRO) as i64 - fees
+        crate::shared::domain::amount::saturate(
+            (qty.saturating_mul(price) / QUANTITY_UNIT).saturating_mul(rate) / MICRO - fees as i128,
+        )
     }
 
     /// Derives the unit price implied by a user-entered all-in total (TRX-060, SEL-050).
@@ -2380,6 +2391,10 @@ impl Account {
         let numerator = securities_amount * MICRO * QUANTITY_UNIT;
         let denominator = quantity as i128 * exchange_rate as i128;
         let rounded = (numerator + denominator / 2) / denominator;
+        // TRX-020 — no larger than every device reads (SYN-034).
+        if rounded > crate::shared::domain::amount::LARGEST_AMOUNT as i128 {
+            return Err(AccountError::UnitPriceOutOfRange);
+        }
         i64::try_from(rounded).map_err(|_| AccountError::UnitPriceOutOfRange)
     }
 
@@ -2440,8 +2455,11 @@ impl Account {
         if total_cost < 0 {
             return Err(AccountError::InvalidTotalCost);
         }
+        // Saturated, never wrapped: a unit price past the limit is refused (TRX-020).
         Ok((
-            (total_cost as i128 * QUANTITY_UNIT / quantity as i128) as i64,
+            crate::shared::domain::amount::saturate(
+                total_cost as i128 * QUANTITY_UNIT / quantity as i128,
+            ),
             total_cost,
         ))
     }
@@ -2449,7 +2467,9 @@ impl Account {
     /// Computes total_amount for an OpeningBalance correction (TRX-051).
     /// Formula: floor(qty × unit_price / QUANTITY_UNIT) — no exchange_rate factor.
     fn compute_opening_balance_total(quantity: i64, unit_price: i64) -> i64 {
-        (quantity as i128 * unit_price as i128 / QUANTITY_UNIT) as i64
+        crate::shared::domain::amount::saturate(
+            quantity as i128 * unit_price as i128 / QUANTITY_UNIT,
+        )
     }
 
     /// SPL-062 — what a split of `factor` on `date` would make of an asset's position:
@@ -3237,6 +3257,55 @@ mod tests {
         assert_eq!(tx.total_amount, micro(140));
         // SEL-024 consumes the stored total: 140 − VWAP cost basis 100 = +40
         assert_eq!(tx.realized_pnl, Some(micro(40)));
+    }
+
+    // TRX-020 / TRX-060 — a unit price a small quantity gives a typed total, past what every
+    // device reads, is refused as the price it is; a purchase total past i64 does not wrap
+    // into a figure that would pass.
+    #[test]
+    fn a_derived_price_or_total_past_the_limit_is_refused_not_wrapped() {
+        use crate::shared::domain::amount::LARGEST_AMOUNT;
+        // A million in total over half a millionth of a unit: a price of 2·10¹² units, which
+        // fits an i64 but passes the limit.
+        let err = Account::derive_unit_price_from_total(micro(1_000_000) as i128, 50, micro(1))
+            .unwrap_err();
+        assert!(matches!(err, AccountError::UnitPriceOutOfRange), "{err:?}");
+        let total = Account::compute_purchase_total(
+            from_surface(micro(1_000_000_000)),
+            LARGEST_AMOUNT,
+            LARGEST_AMOUNT,
+            0,
+        );
+        assert!(total > LARGEST_AMOUNT, "saturated, not wrapped: {total}");
+    }
+
+    // TRX-020 — an opening balance's unit price and a corrected dividend's total, past
+    // i64, are held at its end and so refused, never wrapped into a figure that would pass.
+    #[test]
+    fn an_opening_balance_price_and_a_dividend_total_never_wrap() {
+        use crate::shared::domain::amount::LARGEST_AMOUNT;
+        let (unit_price, _) =
+            Account::derive_opening_balance_from_total(LARGEST_AMOUNT, 1).expect("derived");
+        assert!(
+            unit_price > LARGEST_AMOUNT,
+            "saturated, not wrapped: {unit_price}"
+        );
+        let total = Account::dividend_total(LARGEST_AMOUNT, LARGEST_AMOUNT);
+        assert!(total > LARGEST_AMOUNT, "saturated, not wrapped: {total}");
+    }
+
+    // TRX-020 — the opening balance draft refuses a unit price past the limit, as
+    // recording it would.
+    #[test]
+    fn the_opening_balance_draft_refuses_a_price_past_the_limit() {
+        let err = Account::preview_opening_balance(
+            "asset-1",
+            "2024-01-01",
+            1,
+            crate::shared::domain::amount::LARGEST_AMOUNT,
+        )
+        .unwrap_err();
+        assert!(matches!(err, AccountError::AmountOutOfRange), "{err:?}");
     }
 
     // TRX-060 / SEL-050 — an exact .5 fraction rounds up

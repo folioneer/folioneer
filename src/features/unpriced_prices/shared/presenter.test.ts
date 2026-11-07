@@ -4,6 +4,9 @@ import { recordPriceErrorToI18n } from "./presenter";
 describe("recordPriceErrorToI18n (F27)", () => {
   it("maps a payload-free error code to error.<code>", () => {
     expect(recordPriceErrorToI18n({ code: "NotPositive" })).toEqual({ key: "error.NotPositive" });
+    expect(recordPriceErrorToI18n({ code: "PriceOutOfRange" })).toEqual({
+      key: "error.PriceOutOfRange",
+    });
     expect(recordPriceErrorToI18n({ code: "DatabaseError" })).toEqual({
       key: "error.DatabaseError",
     });

@@ -88,6 +88,9 @@ pub enum AssetError {
     /// Price must be strictly positive.
     #[error("Price must be strictly positive")]
     NotPositive,
+    /// Price passes a trillion units, what every device reads (MKT-021, SYN-034).
+    #[error("Price is larger than every device reads")]
+    PriceOutOfRange,
     /// Price value is not a finite floating-point number.
     #[error("Price must be a finite number")]
     NonFinite,
@@ -165,6 +168,10 @@ mod tests {
     /// flat `{ "code": "VariantName", ...payload }` object on the wire.
     #[test]
     fn each_variant_emits_a_code() {
+        assert_eq!(
+            to_value(AssetError::PriceOutOfRange).unwrap(),
+            json!({ "code": "PriceOutOfRange" })
+        );
         assert_eq!(
             to_value(AssetError::NameEmpty).unwrap(),
             json!({ "code": "NameEmpty" })

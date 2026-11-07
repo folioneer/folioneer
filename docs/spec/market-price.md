@@ -150,7 +150,7 @@ The `Asset` entity (owned by the AST spec) gains one field for this feature.
 
 **MKT-020 — Required fields (frontend)**: The price form requires a non-empty date and a non-empty price. The submit button is disabled while either field is empty. The asset is implicit from the entry point and is not modifiable by the user.
 
-**MKT-021 — Price validation (frontend + backend)**: A valid price is strictly greater than zero. The backend rejects a submitted price of zero or below with a specific error. The frontend validates inline and disables the submit button until corrected.
+**MKT-021 — Price validation (frontend + backend)**: A valid price is strictly greater than zero and no larger than a trillion units of money, what every device reads (SYN-034). The backend rejects a submitted price of zero or below, or one past a trillion, each with a specific error. The frontend checks the sign inline and disables the submit button until corrected; a price past the limit is refused on submit.
 
 **MKT-022 — Date validation (frontend + backend)**: A valid date is a well-formed ISO 8601 calendar date (`YYYY-MM-DD`) that is not in the future. Any past date is accepted; no lower bound applies (users may backdate historical prices). The backend rejects an invalid or future date with a specific error. The frontend validates inline and disables the submit button until corrected.
 

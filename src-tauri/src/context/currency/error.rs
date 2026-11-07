@@ -9,6 +9,9 @@ pub enum CurrencyError {
     /// The rate value is zero or negative (FXR-021).
     #[error("Rate must be strictly positive")]
     NotPositive,
+    /// Rate passes a trillion, what every device reads (FXR-021, SYN-034).
+    #[error("Rate is larger than every device reads")]
+    RateOutOfRange,
 
     /// The rate value is not a finite floating-point number (FXR-021). Raised
     /// only at the IPC boundary by `api::rate_f64_to_micros`, before the `f64`
@@ -74,6 +77,10 @@ mod tests {
     /// composite — this test catches that regression for `CurrencyError` itself.
     #[test]
     fn each_variant_emits_a_code() {
+        assert_eq!(
+            to_value(CurrencyError::RateOutOfRange).unwrap(),
+            json!({ "code": "RateOutOfRange" })
+        );
         assert_eq!(
             to_value(CurrencyError::NotPositive).unwrap(),
             json!({ "code": "NotPositive" })

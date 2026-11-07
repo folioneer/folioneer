@@ -56,6 +56,11 @@ pub enum AccountError {
     #[error("An archived asset cannot be sold")]
     ArchivedAssetSell,
 
+    /// A price, a rate, fees, a total, a dividend's amount or a note's threshold passes a
+    /// trillion, what every device reads (TRX-020, HNO-011, SYN-034).
+    #[error("An amount is larger than every device reads")]
+    AmountOutOfRange,
+
     // --- Account aggregate operations (buy/sell/correct/cancel/cash) ---
     /// Attempt to sell an asset with no open position (quantity = 0).
     #[error("No units available to sell (closed position)")]
@@ -297,6 +302,10 @@ mod tests {
 
     #[test]
     fn each_variant_emits_a_code() {
+        assert_eq!(
+            to_value(AccountError::AmountOutOfRange).unwrap(),
+            json!({ "code": "AmountOutOfRange" })
+        );
         assert_eq!(
             to_value(AccountError::NameEmpty).unwrap(),
             json!({ "code": "NameEmpty" })

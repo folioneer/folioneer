@@ -418,8 +418,11 @@ impl Transaction {
         if exchange_rate <= 0 {
             return Err(AccountError::ExchangeRateNotPositive);
         }
-        // total_amount in account currency = amount × rate (i128 intermediate, ADR-001).
-        let total_amount = ((amount_micros as i128 * exchange_rate as i128) / 1_000_000) as i64;
+        // total_amount in account currency = amount × rate (i128 intermediate, ADR-001),
+        // saturated, so a total past i64 is refused, never wrapped (TRX-020).
+        let total_amount = crate::shared::domain::amount::saturate(
+            (amount_micros as i128 * exchange_rate as i128) / 1_000_000,
+        );
         Self::new(
             account_id,
             paying_asset_id,
@@ -765,6 +768,10 @@ impl Transaction {
         if exchange_rate <= 0 {
             return Err(AccountError::ExchangeRateNotPositive);
         }
+        Self::ensure_amount(total_amount)?;
+        Self::ensure_amount(exchange_rate)?;
+        let unit_price = Self::unit_cost(total_amount, quantity);
+        Self::ensure_amount(unit_price)?;
         Ok(Self {
             id: Uuid::new_v4().to_string(),
             account_id,
@@ -772,7 +779,7 @@ impl Transaction {
             transaction_type,
             date,
             quantity,
-            unit_price: Self::unit_cost(total_amount, quantity),
+            unit_price,
             exchange_rate,
             fees: 0,
             total_amount,
@@ -825,7 +832,9 @@ impl Transaction {
         if quantity <= 0 {
             return 0;
         }
-        ((total_amount as i128 * QUANTITY_UNIT) / quantity as i128) as i64
+        crate::shared::domain::amount::saturate(
+            (total_amount as i128 * QUANTITY_UNIT) / quantity as i128,
+        )
     }
 
     /// AGT-088 / AGT-091 — whether this transaction still stands in full as `shown` stood
@@ -1012,7 +1021,15 @@ impl Transaction {
     ) -> StdResult<(), AccountError> {
         Self::validate_date(date)?;
 
-        Self::ensure_quantity(quantity)?;
+        // TRX-020 — a dividend's amount, carried here, is money: held to that limit.
+        if *transaction_type == TransactionType::Dividend {
+            if quantity <= 0 {
+                return Err(AccountError::QuantityNotPositive);
+            }
+            Self::ensure_amount(quantity)?;
+        } else {
+            Self::ensure_quantity(quantity)?;
+        }
 
         // TRX-020 — unit_price must be >= 0
         if unit_price < 0 {
@@ -1029,6 +1046,10 @@ impl Transaction {
             return Err(AccountError::ExchangeRateNotPositive);
         }
 
+        for figure in [unit_price, exchange_rate, fees, total_amount] {
+            Self::ensure_amount(figure)?;
+        }
+
         // TRX-020 — total_amount must be > 0, EXCEPT an OpeningBalance position
         // may have a zero total cost (TRX-045 — a mined / gifted / airdropped
         // position seeded at zero cost). Negative is always rejected.
@@ -1040,6 +1061,14 @@ impl Transaction {
             return Err(AccountError::TotalAmountNotPositive);
         }
 
+        Ok(())
+    }
+
+    /// TRX-020, SYN-034 — a figure of money no larger than every device reads.
+    pub fn ensure_amount(amount: i64) -> StdResult<(), AccountError> {
+        if amount > crate::shared::domain::amount::LARGEST_AMOUNT {
+            return Err(AccountError::AmountOutOfRange);
+        }
         Ok(())
     }
 
@@ -1188,6 +1217,103 @@ mod tests {
             None,
             None,
         )
+    }
+
+    // TRX-020 / SYN-034 — a figure of money passing a billion units, what every device
+    // reads, is refused; one at the limit is recorded.
+    #[test]
+    fn a_figure_past_what_every_device_reads_is_refused() {
+        use crate::shared::domain::amount::LARGEST_AMOUNT;
+        let micro = 1_000_000i64;
+        let past = LARGEST_AMOUNT + 1;
+        for (label, result) in [
+            ("unit price", make_transaction(micro, past, micro, 0, micro)),
+            (
+                "exchange rate",
+                make_transaction(micro, micro, past, 0, micro),
+            ),
+            ("fees", make_transaction(micro, micro, micro, past, micro)),
+            ("total", make_transaction(micro, micro, micro, 0, past)),
+        ] {
+            assert!(
+                matches!(result, Err(AccountError::AmountOutOfRange)),
+                "{label}: {result:?}"
+            );
+        }
+        assert!(make_transaction(micro, micro, micro, 0, LARGEST_AMOUNT).is_ok());
+        // A dividend's amount in the asset's currency is a figure of its own.
+        let dividend = Transaction::new_dividend(
+            "account-1".to_string(),
+            "asset-1".to_string(),
+            "2020-01-01".to_string(),
+            past,
+            1,
+            None,
+        );
+        assert!(
+            matches!(dividend, Err(AccountError::AmountOutOfRange)),
+            "{dividend:?}"
+        );
+        let transfer = Transaction::new_transfer_side(
+            "account-1".to_string(),
+            "asset-1".to_string(),
+            TransactionType::TransferIn,
+            "2020-01-01".to_string(),
+            from_surface(micro),
+            past,
+            micro,
+            None,
+            "transfer-1".to_string(),
+        );
+        assert!(
+            matches!(transfer, Err(AccountError::AmountOutOfRange)),
+            "{transfer:?}"
+        );
+
+        // A dividend's amount is money: held to that limit however it is written, a
+        // correction included.
+        let corrected = Transaction::validate(
+            &TransactionType::Dividend,
+            "2020-01-01",
+            past,
+            micro,
+            micro,
+            0,
+            micro,
+        );
+        assert!(
+            matches!(corrected, Err(AccountError::AmountOutOfRange)),
+            "{corrected:?}"
+        );
+        // A dividend total past i64 does not wrap into a figure that would pass.
+        let huge = Transaction::new_dividend(
+            "account-1".to_string(),
+            "asset-1".to_string(),
+            "2020-01-01".to_string(),
+            LARGEST_AMOUNT,
+            LARGEST_AMOUNT,
+            None,
+        );
+        assert!(
+            matches!(huge, Err(AccountError::AmountOutOfRange)),
+            "{huge:?}"
+        );
+        // A transfer's unit price, its cost over a very small quantity, is held to it too.
+        let tiny = Transaction::new_transfer_side(
+            "account-1".to_string(),
+            "asset-1".to_string(),
+            TransactionType::TransferIn,
+            "2020-01-01".to_string(),
+            1,
+            micro * 1_000_000_000,
+            micro,
+            None,
+            "transfer-1".to_string(),
+        );
+        assert!(
+            matches!(tiny, Err(AccountError::AmountOutOfRange)),
+            "{tiny:?}"
+        );
     }
 
     // TRX-020 — quantity must be > 0
@@ -1800,7 +1926,8 @@ mod tests {
             Err(AccountError::QuantityOutOfRange)
         ));
 
-        // Money on a deposit, a withdrawal or a dividend reaches the same check.
+        // Money on a deposit or a withdrawal reaches the same check (a dividend's amount is
+        // money, TRX-020).
         for refused in [
             Transaction::new_deposit(
                 "account".to_string(),
@@ -1814,14 +1941,6 @@ mod tests {
                 "cash".to_string(),
                 "2024-01-01".to_string(),
                 crate::shared::domain::quantity::LARGEST_QUANTITY + 1,
-                None,
-            ),
-            Transaction::new_dividend(
-                "account".to_string(),
-                "asset".to_string(),
-                "2024-01-01".to_string(),
-                crate::shared::domain::quantity::LARGEST_QUANTITY + 1,
-                1_000_000,
                 None,
             ),
         ] {

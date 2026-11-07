@@ -36,6 +36,10 @@ impl AssetPrice {
         if price <= 0 {
             return Err(AssetError::NotPositive);
         }
+        // SYN-034 — no larger than every device reads.
+        if price > crate::shared::domain::amount::LARGEST_AMOUNT {
+            return Err(AssetError::PriceOutOfRange);
+        }
         let parsed = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
             .map_err(|_| AssetError::InvalidDateFormat { date: date.clone() })?;
         let today = chrono::Local::now().date_naive();
@@ -262,6 +266,24 @@ mod tests {
             AssetPriceSource::YahooFinance,
         );
         assert_eq!(ap.source, AssetPriceSource::YahooFinance);
+    }
+
+    // MKT-021 / SYN-034 — a price passing a billion units, what every device reads, is
+    // refused; one at the limit is recorded.
+    #[test]
+    fn new_rejects_a_price_past_what_every_device_reads() {
+        use crate::shared::domain::amount::LARGEST_AMOUNT;
+        let price = |price| {
+            AssetPrice::new(
+                "a".to_string(),
+                "2026-01-01".to_string(),
+                price,
+                AssetPriceSource::Manual,
+            )
+        };
+        let err = price(LARGEST_AMOUNT + 1).unwrap_err();
+        assert!(matches!(err, AssetError::PriceOutOfRange), "got: {err:?}");
+        assert!(price(LARGEST_AMOUNT).is_ok());
     }
 
     // MKT-021 — new() rejects price <= 0
