@@ -2224,7 +2224,10 @@ impl Account {
         // TRX-045 — a zero-cost position is valid (e.g. a mined / gifted /
         // airdropped asset seeded as a starting position); only a negative
         // total cost is rejected.
-        Self::derive_opening_balance_from_total(total_cost, quantity)?;
+        let (unit_price, _) = Self::derive_opening_balance_from_total(total_cost, quantity)?;
+        // TRX-020 — the draft refuses what recording would: a figure past the limit.
+        Transaction::ensure_amount(total_cost)?;
+        Transaction::ensure_amount(unit_price)?;
         Transaction::validate_date(date)?;
         Ok(OpeningBalanceNotice {
             zero_cost: total_cost == 0,
@@ -3289,6 +3292,20 @@ mod tests {
         );
         let total = Account::dividend_total(LARGEST_AMOUNT, LARGEST_AMOUNT);
         assert!(total > LARGEST_AMOUNT, "saturated, not wrapped: {total}");
+    }
+
+    // TRX-020 — the opening balance draft refuses a unit price past the limit, as
+    // recording it would.
+    #[test]
+    fn the_opening_balance_draft_refuses_a_price_past_the_limit() {
+        let err = Account::preview_opening_balance(
+            "asset-1",
+            "2024-01-01",
+            1,
+            crate::shared::domain::amount::LARGEST_AMOUNT,
+        )
+        .unwrap_err();
+        assert!(matches!(err, AccountError::AmountOutOfRange), "{err:?}");
     }
 
     // TRX-060 / SEL-050 — an exact .5 fraction rounds up
