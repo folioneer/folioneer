@@ -300,7 +300,7 @@ pub async fn record_withdrawal(
 pub struct DividendDTO {
     /// Account receiving the dividend.
     pub account_id: String,
-    /// The paying asset — must be actively held (quantity > 0) and not a Cash Asset (DIV-011).
+    /// The paying asset — held on the dividend's date (quantity > 0) and not a Cash Asset (DIV-011).
     pub asset_id: String,
     /// Business date the dividend was received (YYYY-MM-DD, DIV-021).
     pub date: String,

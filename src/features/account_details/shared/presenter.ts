@@ -131,7 +131,6 @@ export function dividendErrorToI18n(err: DividendError): I18nMessage {
     case "AccountNotFound":
     case "DatabaseError":
     case "AssetNotFound":
-    case "AssetNotHeld":
     case "DividendOnCashAsset":
     case "AmountNotPositive":
     case "ExchangeRateNotPositive":
@@ -139,6 +138,9 @@ export function dividendErrorToI18n(err: DividendError): I18nMessage {
     case "DateTooOld":
     case "InvalidDate":
       return { key: `error.${err.code}` };
+    // DIV-011 — a dividend is judged on its date, not today.
+    case "AssetNotHeld":
+      return { key: "dividend.error_not_held_on_date" };
     default:
       return { key: "error.Unknown" };
   }

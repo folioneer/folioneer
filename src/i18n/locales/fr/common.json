@@ -868,6 +868,7 @@
     "modal_title": "Enregistrer un dividende",
     "form_asset_label": "Actif payeur",
     "form_select_asset": "Sélectionner un actif…",
+    "error_not_held_on_date": "Cet actif n'était pas détenu dans ce compte à cette date.",
     "form_amount_label": "Montant net",
     "form_amount_placeholder": "0.00",
     "form_account_currency_mode": "Saisir le montant en {{currency}} (ce que le compte a réellement reçu)",

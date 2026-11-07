@@ -906,6 +906,53 @@ async fn agt_050_a_session_corrects_and_cancels_what_it_recorded() {
     assert_eq!(told.last_recording, None);
 }
 
+// AGT-060 / DIV-011 — a dividend counts what the account held on its date: one paid while
+// the position was open is recorded though it is sold since; one dated before the purchase
+// or after the sale is refused.
+#[tokio::test]
+async fn agt_060_a_dividend_counts_what_was_held_on_its_date() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+    for (tool, arguments) in [
+        (
+            "record_deposit",
+            json!({ "account": "PEA", "amount": 1000, "date": "2019-01-15" }),
+        ),
+        (
+            "record_purchase",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 2, "price": 100, "date": "2019-03-01" }),
+        ),
+        (
+            "record_sale",
+            json!({ "account": "PEA", "asset": "CW8", "quantity": 2, "price": 110, "date": "2019-09-01" }),
+        ),
+    ] {
+        call(tool, arguments).await.expect(tool);
+    }
+
+    let paid = call(
+        "record_dividend",
+        json!({ "account": "PEA", "asset": "CW8", "amount": 4, "date": "2019-06-01" }),
+    )
+    .await
+    .expect("held on its date");
+    assert_eq!(paid["transaction"]["transaction_type"], "Dividend");
+    for date in ["2019-02-15", "2019-10-01"] {
+        let refused = call(
+            "record_dividend",
+            json!({ "account": "PEA", "asset": "CW8", "amount": 4, "date": date }),
+        )
+        .await
+        .expect_err("not held on its date");
+        assert_eq!(refused.code, "AssetNotHeld", "{date}");
+    }
+}
+
 // AGT-060 / AGT-050 — a session records a deposit, a withdrawal and a dividend through the
 // rules of the window: each is marked and counted, corrected and cancelled like any recording.
 #[tokio::test]

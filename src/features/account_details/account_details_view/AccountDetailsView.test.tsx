@@ -130,6 +130,7 @@ const makeView = (overrides: Record<string, unknown> = {}) => ({
   hasNonCashActiveHoldings: false,
   hasClosedHoldings: false,
   activeNonCashHoldings: [],
+  dividendPayingAssets: [],
   interestEligibleHoldings: [],
   buyTarget: null,
   sellTarget: null,

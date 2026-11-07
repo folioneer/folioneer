@@ -868,6 +868,7 @@
     "modal_title": "Record a dividend",
     "form_asset_label": "Paying asset",
     "form_select_asset": "Select an asset…",
+    "error_not_held_on_date": "This asset was not held in this account on that date.",
     "form_amount_label": "Net amount",
     "form_amount_placeholder": "0.00",
     "form_account_currency_mode": "Enter the amount in {{currency}} (what the account actually received)",

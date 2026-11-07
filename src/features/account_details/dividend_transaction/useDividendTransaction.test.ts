@@ -190,7 +190,7 @@ describe("useDividendTransaction (DIV-020/021/022/025)", () => {
       await result.current.handleSubmit(fakeSubmit);
     });
 
-    expect(result.current.error).toEqual({ key: "error.AssetNotHeld" });
+    expect(result.current.error).toEqual({ key: "dividend.error_not_held_on_date" });
     expect(mockShowSnackbar).not.toHaveBeenCalled();
   });
 

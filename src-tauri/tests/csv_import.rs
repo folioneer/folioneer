@@ -885,6 +885,80 @@ async fn imp_035a_the_order_of_a_days_rows() {
     );
 }
 
+// IMP-035 / DIV-011 — a dividend is judged on what the account held on its date, the
+// transactions it already holds included: one paid on a position sold since is ready, one
+// dated before a purchase it already holds is rejected.
+#[tokio::test]
+async fn imp_035_a_dividend_counts_what_was_held_on_its_date() {
+    let ctx = build_ctx().await;
+    let acme = asset(&ctx, "Acme World", "ACM", Some("FR0000000010"), "EUR").await;
+    let beta = asset(&ctx, "Beta Power", "BTP", Some("FR0000000002"), "EUR").await;
+    let account_id = account(&ctx, micro(1_000)).await;
+    let trade = |asset_id: &str, date: &str| {
+        (
+            asset_id.to_string(),
+            date.to_string(),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(1)),
+            micro(100),
+        )
+    };
+    for (asset_id, date, quantity, price) in
+        [trade(&acme, "2024-02-01"), trade(&beta, "2024-06-01")]
+    {
+        ctx.recording
+            .buy_holding(
+                &account_id,
+                asset_id,
+                date,
+                quantity,
+                price,
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .expect("buy");
+    }
+    let (asset_id, date, quantity, price) = trade(&acme, "2024-05-01");
+    ctx.recording
+        .sell_holding(
+            &account_id,
+            asset_id,
+            date,
+            quantity,
+            price,
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .expect("sell");
+    let rows = format!(
+        "{HEADER}2024-03-01,Dividend,FR0000000010,,,,,2.00,,EUR\n\
+         2024-03-01,Dividend,FR0000000002,,,,,2.00,,EUR\n"
+    );
+    let file = picked(&ctx, &rows, false).await;
+    let previewed = preview(&ctx, &account_id, &file, &english_mapper()).await;
+    assert!(
+        matches!(status(&previewed, 2), RowStatus::Ready { .. }),
+        "held on its date, sold since: {:?}",
+        status(&previewed, 2)
+    );
+    assert!(
+        matches!(
+            status(&previewed, 3),
+            RowStatus::Rejected {
+                reason: RowReason::AssetNotHeld,
+                ..
+            }
+        ),
+        "held today, bought after its date: {:?}",
+        status(&previewed, 3)
+    );
+}
+
 // IMP-038 — the rows after a funded purchase are judged as if its deposit were added, and a
 // day's own deposit leaves only what it does not cover to add.
 #[tokio::test]

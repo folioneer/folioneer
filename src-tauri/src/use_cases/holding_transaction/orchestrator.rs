@@ -828,7 +828,7 @@ impl HoldingTransactionUseCase {
         exchange_rate: i64,
         note: Option<String>,
     ) -> Result<Transaction, DividendError> {
-        let account = self.ensure_payable(account_id, &asset_id).await?;
+        let account = self.ensure_payable(account_id, &asset_id, &date).await?;
 
         // CSH-010 — ensure the system Cash Asset for the account's currency exists.
         ensure_cash_asset(&self.asset_service, &account.currency)
@@ -1162,14 +1162,15 @@ impl HoldingTransactionUseCase {
             .map_err(InterestError::Account)
     }
 
-    /// DIV-011 — the account exists, the paying asset exists, is not the cash line and is
-    /// held today. The account is returned for its currency.
+    /// DIV-011 — the account exists, the paying asset exists, is not the cash line and was
+    /// held on the dividend's date. The account is returned for its currency.
     async fn ensure_payable(
         &self,
         account_id: &str,
         asset_id: &str,
+        date: &str,
     ) -> Result<crate::context::account::Account, DividendError> {
-        self.ensure_held_asset(account_id, asset_id)
+        self.ensure_held_asset(account_id, asset_id, Some(date))
             .await
             .map_err(|refused| match refused {
                 HeldAsset::Refused(error) => error.into(),
@@ -1186,7 +1187,9 @@ impl HoldingTransactionUseCase {
         account_id: &str,
         asset_id: &str,
     ) -> Result<(), FreeSharesError> {
-        self.ensure_held_asset(account_id, asset_id)
+        // FSD-011 — free shares need the asset held today (`None`); only a dividend is
+        // judged on its own date (DIV-011).
+        self.ensure_held_asset(account_id, asset_id, None)
             .await
             .map(|_| ())
             .map_err(|refused| match refused {
@@ -1198,11 +1201,13 @@ impl HoldingTransactionUseCase {
     }
 
     /// DIV-011 / FSD-011 — what a dividend and free shares both check: the account exists,
-    /// the asset exists, is not the cash line and is held today. The account is returned.
+    /// the asset exists, is not the cash line and is held — on `held_on` when given (a
+    /// dividend's date), today otherwise. The account is returned.
     async fn ensure_held_asset(
         &self,
         account_id: &str,
         asset_id: &str,
+        held_on: Option<&str>,
     ) -> Result<crate::context::account::Account, HeldAsset> {
         let account = self
             .account_service
@@ -1227,14 +1232,34 @@ impl HoldingTransactionUseCase {
             Some(a) if a.class == AssetClass::Cash => return Err(HeldAsset::Cash),
             Some(_) => {}
         }
-        if !self
-            .holds(account_id, asset_id)
-            .await
-            .map_err(HeldAsset::Refused)?
-        {
+        let held = match held_on {
+            Some(date) => self.held_on(account_id, asset_id, date).await,
+            None => self.holds(account_id, asset_id).await,
+        };
+        if !held.map_err(HeldAsset::Refused)? {
             return Err(HeldAsset::NotHeld);
         }
         Ok(account)
+    }
+
+    /// DIV-011 — whether the account held the asset on `date`: a quantity above zero once
+    /// every transaction of the pair dated on or before it is counted (TDI-010). A date
+    /// that does not read is left to the recorder, which refuses it as such (TRX-020).
+    async fn held_on(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        date: &str,
+    ) -> Result<bool, AccountError> {
+        match self
+            .account_service
+            .holding_snapshot_as_of(account_id, asset_id, date)
+            .await
+        {
+            Ok(snapshot) => Ok(snapshot.quantity > 0),
+            Err(AccountError::InvalidDate) => Ok(true),
+            Err(error) => Err(error),
+        }
     }
 
     /// AGT-072 — what recording a deposit or a withdrawal would do, nothing written: the
@@ -1258,7 +1283,7 @@ impl HoldingTransactionUseCase {
         exchange_rate: i64,
         note: Option<String>,
     ) -> Result<RecordingPreview, DividendError> {
-        self.ensure_payable(account_id, &asset_id).await?;
+        self.ensure_payable(account_id, &asset_id, &date).await?;
         let op = RecordingOp::Dividend {
             asset_id,
             date,
@@ -1385,6 +1410,7 @@ mod tests {
         SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
     };
     use crate::shared::domain::quantity::from_surface;
+    use crate::use_cases::holding_transaction::{DividendError, DividendTask};
     use sqlx::sqlite::SqlitePoolOptions;
 
     async fn setup_pool() -> sqlx::Pool<sqlx::Sqlite> {
@@ -1889,7 +1915,6 @@ mod tests {
             .unwrap_err();
 
         use crate::context::account::AccountError;
-        use crate::use_cases::holding_transaction::DividendError;
         assert!(
             matches!(
                 err,
@@ -1921,8 +1946,6 @@ mod tests {
             )
             .await
             .unwrap_err();
-
-        use crate::use_cases::holding_transaction::{DividendError, DividendTask};
         assert!(
             matches!(err, DividendError::UseCase(DividendTask::AssetNotFound)),
             "expected UseCase(AssetNotFound), got: {err:?}"
@@ -1952,12 +1975,147 @@ mod tests {
             )
             .await
             .unwrap_err();
-
-        use crate::use_cases::holding_transaction::{DividendError, DividendTask};
         assert!(
             matches!(err, DividendError::UseCase(DividendTask::AssetNotHeld)),
             "expected UseCase(AssetNotHeld), got: {err:?}"
         );
+    }
+
+    // DIV-011 / TRX-012 — a dividend counts what the account held on its date: paid while
+    // the position was open it is recorded though the position is closed since; dated
+    // before the purchase, while the asset is held today, it is refused.
+    #[tokio::test]
+    async fn record_dividend_counts_what_was_held_on_its_date() {
+        let pool = setup_pool().await;
+        let (account_svc, asset_svc) = make_services(&pool);
+        let closed = asset_svc.create_asset(base_asset_dto()).await.unwrap();
+        let held = asset_svc
+            .create_asset(CreateAssetDTO {
+                reference: "HELD".to_string(),
+                name: "Held".to_string(),
+                ..base_asset_dto()
+            })
+            .await
+            .unwrap();
+        let account = account_svc
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
+            .await
+            .unwrap();
+        let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
+        uc.record_deposit(&account.id, "2024-01-01".to_string(), micro(1_000), None)
+            .await
+            .unwrap();
+        for (asset_id, date) in [(&closed.id, "2024-02-01"), (&held.id, "2024-06-01")] {
+            uc.buy_holding(
+                &account.id,
+                asset_id.clone(),
+                date.to_string(),
+                from_surface(micro(1)),
+                micro(100),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        }
+        uc.sell_holding(
+            &account.id,
+            closed.id.clone(),
+            "2024-05-01".to_string(),
+            from_surface(micro(1)),
+            micro(100),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let dividend = |asset_id: &str| {
+            uc.record_dividend(
+                &account.id,
+                asset_id.to_string(),
+                "2024-03-01".to_string(),
+                micro(2),
+                micro(1),
+                None,
+            )
+        };
+
+        dividend(&closed.id).await.expect("held on its date");
+        let err = dividend(&held.id).await.unwrap_err();
+        assert!(
+            matches!(err, DividendError::UseCase(DividendTask::AssetNotHeld)),
+            "bought after its date: {err:?}"
+        );
+    }
+
+    // DIV-011 — a dividend falls in a holding period: a position sold, then bought back,
+    // takes a dividend dated in either period and refuses one dated in the gap between.
+    #[tokio::test]
+    async fn record_dividend_refuses_the_gap_between_two_holding_periods() {
+        let pool = setup_pool().await;
+        let (account_svc, asset_svc) = make_services(&pool);
+        let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
+        let account = account_svc
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
+            .await
+            .unwrap();
+        let uc = HoldingTransactionUseCase::new(account_svc, asset_svc);
+        uc.record_deposit(&account.id, "2024-01-01".to_string(), micro(1_000), None)
+            .await
+            .unwrap();
+        let buy = |date: &str| {
+            uc.buy_holding(
+                &account.id,
+                asset.id.clone(),
+                date.to_string(),
+                from_surface(micro(1)),
+                micro(100),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+        };
+        let sell = |date: &str| {
+            uc.sell_holding(
+                &account.id,
+                asset.id.clone(),
+                date.to_string(),
+                from_surface(micro(1)),
+                micro(100),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+        };
+        buy("2024-02-01").await.unwrap();
+        sell("2024-05-01").await.unwrap();
+        buy("2024-08-01").await.unwrap();
+        let dividend = |date: &str| {
+            uc.record_dividend(
+                &account.id,
+                asset.id.clone(),
+                date.to_string(),
+                micro(2),
+                micro(1),
+                None,
+            )
+        };
+        for date in ["2024-03-01", "2024-09-01"] {
+            dividend(date).await.expect(date);
+        }
+        for date in ["2024-01-15", "2024-06-15"] {
+            let err = dividend(date).await.unwrap_err();
+            assert!(
+                matches!(err, DividendError::UseCase(DividendTask::AssetNotHeld)),
+                "{date}: {err:?}"
+            );
+        }
     }
 
     // DIV-011 — DividendOnCashAsset: the paying asset is a Cash Asset.
@@ -1983,8 +2141,6 @@ mod tests {
             )
             .await
             .unwrap_err();
-
-        use crate::use_cases::holding_transaction::{DividendError, DividendTask};
         assert!(
             matches!(
                 err,
@@ -2035,7 +2191,6 @@ mod tests {
             .unwrap_err();
 
         use crate::context::account::AccountError;
-        use crate::use_cases::holding_transaction::DividendError;
         assert!(
             matches!(err, DividendError::Account(AccountError::AmountNotPositive)),
             "expected Validation(AmountNotPositive), got: {err:?}"
@@ -2083,7 +2238,6 @@ mod tests {
             .unwrap_err();
 
         use crate::context::account::AccountError;
-        use crate::use_cases::holding_transaction::DividendError;
         assert!(
             matches!(
                 err,

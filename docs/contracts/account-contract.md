@@ -110,9 +110,9 @@
 > (DIV-040/041) — a dividend **delete** can surface `InsufficientCash` on replay (removing the credit
 > may underflow a later debit), via `cancel_transaction`'s existing variant.
 
-| Command           | Args          | Return        | Errors                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ----------------- | ------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `record_dividend` | `DividendDTO` | `Transaction` | `AccountNotFound { account_id }` (DIV-011), `AssetNotFound` (DIV-011), `AssetNotHeld` (DIV-011 — no active holding, `quantity = 0` or never held), `DividendOnCashAsset` (DIV-011 — asset is a Cash Asset), `QuantityOutOfRange` (TRX-024C), `AmountNotPositive` (DIV-021), `InvalidDate` (DIV-021), `DateInFuture` (DIV-021), `DateTooOld` (DIV-021), `ExchangeRateNotPositive` (DIV-022), `TotalAmountNotPositive` (DIV-022 — an amount that converts to nothing in the account's currency), `DatabaseError` |
+| Command           | Args          | Return        | Errors                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------- | ------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `record_dividend` | `DividendDTO` | `Transaction` | `AccountNotFound { account_id }` (DIV-011), `AssetNotFound` (DIV-011), `AssetNotHeld` (DIV-011 — not held on the dividend's date), `DividendOnCashAsset` (DIV-011 — asset is a Cash Asset), `QuantityOutOfRange` (TRX-024C), `AmountNotPositive` (DIV-021), `InvalidDate` (DIV-021), `DateInFuture` (DIV-021), `DateTooOld` (DIV-021), `ExchangeRateNotPositive` (DIV-022), `TotalAmountNotPositive` (DIV-022 — an amount that converts to nothing in the account's currency), `DatabaseError` |
 
 ### Free Share Distribution
 
@@ -374,7 +374,7 @@ struct WithdrawalDTO {
 // leaves the paying asset's holding untouched (DIV-023/024). No quantity, no unit price, no fees.
 struct DividendDTO {
     account_id: String,
-    asset_id: String,       // the paying asset (must be an active, non-cash holding — DIV-011)
+    asset_id: String,       // the paying asset (non-cash, held on the dividend's date — DIV-011)
     date: String,           // ISO date YYYY-MM-DD; same TRX-020 / DIV-021 bounds as buy/sell
     amount_micros: i64,     // micro-units, ASSET currency; net dividend received; strictly positive (DIV-021)
     exchange_rate: i64,     // micro-units, asset→account rate; strictly positive; 1_000_000 when currencies match (DIV-022)

@@ -654,7 +654,7 @@ export function AccountDetailsView() {
           onClose={view.handleDividendClose}
           accountId={accountId}
           accountCurrency={view.accountCurrency}
-          heldAssets={view.activeNonCashHoldings}
+          heldAssets={view.dividendPayingAssets}
           onSubmitSuccess={view.handleDividendSuccess}
           onRecorded={view.handleDividendRecorded}
         />
