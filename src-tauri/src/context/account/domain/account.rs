@@ -2234,7 +2234,10 @@ impl Account {
     /// DIV-040 — a dividend's total in account currency: its amount at the exchange rate,
     /// rounded down.
     fn dividend_total(amount: i64, exchange_rate: i64) -> i64 {
-        ((amount as i128 * exchange_rate as i128) / 1_000_000) as i64
+        // Saturated, never wrapped: a total past the limit is refused (TRX-020).
+        crate::shared::domain::amount::saturate(
+            (amount as i128 * exchange_rate as i128) / 1_000_000,
+        )
     }
 
     /// TRX-062 / DIV-040 — the total a corrected dividend would record, validated as
@@ -2449,8 +2452,11 @@ impl Account {
         if total_cost < 0 {
             return Err(AccountError::InvalidTotalCost);
         }
+        // Saturated, never wrapped: a unit price past the limit is refused (TRX-020).
         Ok((
-            (total_cost as i128 * QUANTITY_UNIT / quantity as i128) as i64,
+            crate::shared::domain::amount::saturate(
+                total_cost as i128 * QUANTITY_UNIT / quantity as i128,
+            ),
             total_cost,
         ))
     }
@@ -2458,7 +2464,9 @@ impl Account {
     /// Computes total_amount for an OpeningBalance correction (TRX-051).
     /// Formula: floor(qty × unit_price / QUANTITY_UNIT) — no exchange_rate factor.
     fn compute_opening_balance_total(quantity: i64, unit_price: i64) -> i64 {
-        (quantity as i128 * unit_price as i128 / QUANTITY_UNIT) as i64
+        crate::shared::domain::amount::saturate(
+            quantity as i128 * unit_price as i128 / QUANTITY_UNIT,
+        )
     }
 
     /// SPL-062 — what a split of `factor` on `date` would make of an asset's position:
@@ -3265,6 +3273,21 @@ mod tests {
             LARGEST_AMOUNT,
             0,
         );
+        assert!(total > LARGEST_AMOUNT, "saturated, not wrapped: {total}");
+    }
+
+    // TRX-020 — an opening balance's unit price and a corrected dividend's total, past
+    // i64, are held at its end and so refused, never wrapped into a figure that would pass.
+    #[test]
+    fn an_opening_balance_price_and_a_dividend_total_never_wrap() {
+        use crate::shared::domain::amount::LARGEST_AMOUNT;
+        let (unit_price, _) =
+            Account::derive_opening_balance_from_total(LARGEST_AMOUNT, 1).expect("derived");
+        assert!(
+            unit_price > LARGEST_AMOUNT,
+            "saturated, not wrapped: {unit_price}"
+        );
+        let total = Account::dividend_total(LARGEST_AMOUNT, LARGEST_AMOUNT);
         assert!(total > LARGEST_AMOUNT, "saturated, not wrapped: {total}");
     }
 
