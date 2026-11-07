@@ -1286,6 +1286,8 @@ impl AccountRepository for SqliteAccountRepository {
                    management_fees_enabled = excluded.management_fees_enabled,
                    country = excluded.country,
                    wrapper = excluded.wrapper,
+                   -- reviewer-sql FP: an older device's change keeps the local method, laid in by
+                   -- SYN-035's upgrade before this write (upgraded_content) — see PR #791.
                    cost_basis_method = excluded.cost_basis_method,
                    sync_logical_timestamp = excluded.sync_logical_timestamp,
                    sync_origin = excluded.sync_origin,
