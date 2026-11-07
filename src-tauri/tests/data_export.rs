@@ -357,7 +357,7 @@ async fn exp_015_a_failed_export_leaves_nothing() {
         let refused = original.export.export(ExportFormat::Csv, out.path()).await;
         std::fs::set_permissions(out.path(), std::fs::Permissions::from_mode(0o755))
             .expect("writable again");
-        assert_eq!(refused.unwrap_err(), DataExportError::WriteFailed);
+        assert!(matches!(refused, Err(DataExportError::WriteFailed)));
         assert_eq!(std::fs::read_dir(out.path()).expect("listed").count(), 0);
     }
 }

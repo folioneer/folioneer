@@ -173,10 +173,14 @@ impl DataExportUseCase {
     }
 
     /// EXP-020 / EXP-022 — the accounts and their transactions, then the assets and their
-    /// prices; a transaction whose asset was not read, and a transfer missing a side, is
-    /// left out, so every link the export holds is whole. The reads are not one database
-    /// transaction: the links hold through these filters.
+    /// prices; a transaction whose asset was not read, and a transfer recorded while the
+    /// export reads with a side missing, is left out, so every link the export holds is
+    /// whole. The reads are not one database transaction: the links hold through these
+    /// filters.
     async fn read(&self) -> Result<Snapshot, DataExportError> {
+        let started = chrono::Utc::now()
+            .format("%Y-%m-%dT%H:%M:%S%.6fZ")
+            .to_string();
         let database = |e: &dyn std::fmt::Debug, what: &str| {
             tracing::error!(target: BACKEND, err = ?e, what, "data export: read failed");
             DataExportError::DatabaseError
@@ -209,7 +213,7 @@ impl DataExportUseCase {
                     .map_err(|e| database(&e, "prices"))?,
             );
         }
-        let transactions = whole_links(transactions, &assets);
+        let transactions = whole_links(transactions, &assets, &started);
         Ok(Snapshot {
             accounts,
             assets,
@@ -220,18 +224,28 @@ impl DataExportUseCase {
 }
 
 /// EXP-022 — the transactions whose links are whole: on the cash or on an asset read, and
-/// a transfer only with both its sides — its fee in kind with them.
-fn whole_links(transactions: Vec<Transaction>, assets: &[Asset]) -> Vec<Transaction> {
+/// a transfer with both its sides — its fee in kind with them — or with the one side its
+/// deleted account left (TRF-041), recorded before the export began reading (`started`);
+/// a side alone that was recorded since is a transfer being written, and is left out.
+fn whole_links(
+    transactions: Vec<Transaction>,
+    assets: &[Asset],
+    started: &str,
+) -> Vec<Transaction> {
     let asset_ids: HashSet<&str> = assets.iter().map(|asset| asset.id.as_str()).collect();
-    let mut sides: HashMap<String, (bool, bool)> = HashMap::new();
+    // Per transfer: its out side, its in side, and whether every part predates the read.
+    let mut sides: HashMap<String, (bool, bool, bool)> = HashMap::new();
     for transaction in &transactions {
         if let Some(transfer_id) = &transaction.transfer_id {
-            let side = sides.entry(transfer_id.clone()).or_default();
+            let side = sides
+                .entry(transfer_id.clone())
+                .or_insert((false, false, true));
             match transaction.transaction_type {
                 TransactionType::TransferOut => side.0 = true,
                 TransactionType::TransferIn => side.1 = true,
                 _ => {}
             }
+            side.2 &= transaction.created_at.as_str() < started;
         }
     }
     transactions
@@ -241,10 +255,11 @@ fn whole_links(transactions: Vec<Transaction>, assets: &[Asset]) -> Vec<Transact
                 || asset_ids.contains(transaction.asset_id.as_str())
         })
         .filter(|transaction| {
-            transaction
-                .transfer_id
-                .as_ref()
-                .is_none_or(|transfer_id| sides.get(transfer_id) == Some(&(true, true)))
+            transaction.transfer_id.as_ref().is_none_or(|transfer_id| {
+                sides
+                    .get(transfer_id)
+                    .is_some_and(|&(out, into, before)| (out && into) || before)
+            })
         })
         .collect()
 }
@@ -319,8 +334,8 @@ fn account_row(account: &Account) -> Vec<Cell> {
         text(&account.name),
         text(&account.bank_name),
         text(&account.currency),
-        optional_text(account.country.clone()),
-        optional_text(account.wrapper.clone()),
+        optional_text(account.country.as_deref()),
+        optional_text(account.wrapper.as_deref()),
         Cell::Flag(account.management_fees_enabled),
     ]
 }
@@ -330,7 +345,7 @@ fn asset_row(asset: &Asset) -> Vec<Cell> {
         text(&asset.id),
         text(&asset.name),
         text(&asset.reference),
-        optional_text(asset.isin.clone()),
+        optional_text(asset.isin.as_deref()),
         text(asset.kind.to_string()),
         text(asset.class.to_string()),
         text(&asset.currency),
@@ -340,7 +355,7 @@ fn asset_row(asset: &Asset) -> Vec<Cell> {
             asset
                 .exchange
                 .as_ref()
-                .map(|exchange| exchange.code.clone()),
+                .map(|exchange| exchange.code.as_str()),
         ),
         Cell::Flag(asset.interest_bearing),
         Cell::Flag(asset.price_refresh_blocked),
@@ -708,8 +723,9 @@ mod tests {
         )
     }
 
-    // EXP-022 — a transfer is kept with both sides and its fee in kind, or not at all; a
-    // transaction on an asset not read is left out; the cash is always kept.
+    // EXP-022 — a transfer is kept with both sides and its fee in kind; one being written,
+    // a side missing, is left out; a transaction on an asset not read is left out; the cash
+    // is always kept.
     #[test]
     fn a_transfer_and_its_fee_are_whole_or_absent() {
         let mut fee = Transaction::write_off(
@@ -739,10 +755,19 @@ mod tests {
                 .expect("deposit"),
             ],
             &[asset()],
+            "2000-01-01T00:00:00.000000Z",
         );
         let ids: Vec<Option<&str>> = kept.iter().map(|t| t.transfer_id.as_deref()).collect();
         assert_eq!(ids, [Some("t1"), Some("t1"), Some("t1"), None]);
-        assert!(whole_links(vec![side(TransactionType::TransferOut, "t3")], &[]).is_empty());
+        let later = "9999-01-01T00:00:00.000000Z";
+        assert!(whole_links(vec![side(TransactionType::TransferOut, "t3")], &[], later).is_empty());
+        // TRF-041 — the side a deleted account left, recorded before the read, stays.
+        let orphan = whole_links(
+            vec![side(TransactionType::TransferOut, "t4")],
+            &[asset()],
+            later,
+        );
+        assert_eq!(orphan.len(), 1);
     }
 
     // EXP-023 / EXP-033 — a transaction entered before its moment was kept sorts first on its
