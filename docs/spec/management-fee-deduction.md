@@ -111,7 +111,7 @@ A recurring rule that generates fee deductions for one (account, asset) holding 
 
 ### Cost Basis, Valuation & Management Fees Display (050–059)
 
-**FEE-050 — Cost-basis model (backend)**: A fee deduction reduces `quantity` and leaves the recorded cost basis **unchanged**. The position's value and unrealized P&L drop by the market value of the removed shares; later sells compute realized P&L against the raised average price. The fee is thus fully reflected in returns without a separate realized-loss line.
+**FEE-050 — Cost-basis model (backend)**: A fee deduction reduces `quantity` and leaves the recorded cost basis **unchanged**. The position's value and unrealized P&L drop by the market value of the removed shares; later sells compute realized P&L against the raised average price. The fee is thus fully reflected in returns without a separate realized-loss line. Under FIFO every lot shrinks and later sales take lots (CBM-022, CBM-023).
 
 **FEE-051 — Fee value derivation (backend)**: The fee value of a deduction = `quantity_removed × carry-forward market price as of the deduction date` (PRF-022 carry-forward lookup), converted to the account currency (FXR as-of the deduction date). It is **derived on read**, never stored — consistent with [ADR-013](../adr/013-recompute-account-performance-on-read.md). It is a **historical cost metric** (each deduction valued at its own date's price); it intentionally does not reconcile to the live drop in position value (FEE-050), which uses the current price.
 

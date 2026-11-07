@@ -1,3 +1,5 @@
+use super::cost_basis::{CostBasis, MICRO};
+use super::country::CostBasisMethod;
 use super::fee_schedule::{FeeCatchUpPosition, FeeSchedule};
 use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot, StockSplitPosition};
 use super::holding_note::HoldingNote;
@@ -5,7 +7,7 @@ use super::journal::CashEffect;
 use super::transaction::{
     AgentRecording, EnteredAmount, Transaction, TransactionType, WriteOffReason,
 };
-use super::wrapper::{country_well_formed, wrapper_known, PORTFOLIO_COUNTRY};
+use super::wrapper::{all_wrappers, country_well_formed, wrapper_known, PORTFOLIO_COUNTRY};
 use crate::context::account::error::AccountError;
 use crate::shared::domain::quantity::QUANTITY_UNIT;
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
@@ -49,6 +51,8 @@ pub enum AccountChange {
         /// Asset the holding represented.
         asset_id: String,
     },
+    /// CBM-030 — the account's cost basis method changed; synced with the account.
+    MethodChanged(CostBasisMethod),
 }
 
 /// TRF-022 — a cost in the sending account's currency, converted at `exchange_rate`
@@ -93,6 +97,16 @@ struct RecordingMark {
     holdings: Vec<Holding>,
 }
 
+/// What `Account::replay_pair` gives for one (account, asset) pair.
+struct ReplayedPair {
+    quantity: i128,
+    average_price: i64,
+    total_realized_pnl: i64,
+    last_sold_date: Option<String>,
+    /// A sale's or write-off's realized P&L, a transfer out's cost, by transaction id.
+    pnl_map: std::collections::HashMap<String, i64>,
+}
+
 /// Represents a financial account — the Aggregate Root of the Account bounded context.
 /// Owns all holdings and transactions for this account.
 ///
@@ -119,6 +133,10 @@ pub struct Account {
     /// ACC-043 — the identifier of the tax wrapper the account sits in (ACC-040).
     #[serde(default)]
     pub wrapper: Option<String>,
+    /// CBM-010 — how the account sets the cost of the units that leave it; read as the
+    /// weighted average from a change written before it existed (CBM-012).
+    #[serde(default)]
+    pub cost_basis_method: CostBasisMethod,
     /// Holdings owned by this account. Populated only in aggregate load — excluded from bindings.
     #[serde(skip)]
     #[specta(skip)]
@@ -158,6 +176,7 @@ impl Account {
             management_fees_enabled,
             country: None,
             wrapper: None,
+            cost_basis_method: CostBasisMethod::default(),
             holdings: Vec::new(),
             transactions: Vec::new(),
             pending_changes: Vec::new(),
@@ -186,6 +205,7 @@ impl Account {
             management_fees_enabled,
             country: None,
             wrapper: None,
+            cost_basis_method: CostBasisMethod::default(),
             holdings: Vec::new(),
             transactions: Vec::new(),
             pending_changes: Vec::new(),
@@ -208,6 +228,7 @@ impl Account {
             management_fees_enabled,
             country: None,
             wrapper: None,
+            cost_basis_method: CostBasisMethod::default(),
             holdings: Vec::new(),
             transactions: Vec::new(),
             pending_changes: Vec::new(),
@@ -234,6 +255,7 @@ impl Account {
             management_fees_enabled,
             country: None,
             wrapper: None,
+            cost_basis_method: CostBasisMethod::default(),
             holdings,
             transactions,
             pending_changes: Vec::new(),
@@ -273,6 +295,30 @@ impl Account {
         self.country = country;
         self.wrapper = wrapper;
         Ok(self)
+    }
+
+    /// CBM-011 — the method the account's country implies: its wrapper's country when the
+    /// wrapper belongs to a country's list, otherwise its own country.
+    pub fn implied_cost_basis(&self) -> CostBasisMethod {
+        let wrapper_country = self.wrapper.as_deref().and_then(|id| {
+            all_wrappers()
+                .iter()
+                .find(|wrapper| wrapper.id == id)
+                .and_then(|wrapper| wrapper.country)
+        });
+        CostBasisMethod::implied_by(wrapper_country.unwrap_or(self.effective_country()))
+    }
+
+    /// CBM-011 — a new account on the method its country implies.
+    pub fn with_implied_cost_basis(mut self) -> Self {
+        self.cost_basis_method = self.implied_cost_basis();
+        self
+    }
+
+    /// The account with the method storage holds (CBM-010).
+    pub fn with_cost_basis_method(mut self, method: CostBasisMethod) -> Self {
+        self.cost_basis_method = method;
+        self
     }
 
     /// ACC-041 — the account's country: its own, or the portfolio's.
@@ -402,7 +448,7 @@ impl Account {
         Self::ensure_tradable(&asset_id)?;
         // SEL-012 / SEL-021 — what was held on the sale's date; the replay below refuses a
         // backdated sale that leaves a later one short (SEL-032).
-        let held = Self::reconstruct_holding_as_of(&self.transactions, &asset_id, &date).quantity;
+        let held = Self::quantity_held_as_of(&self.transactions, &asset_id, &date);
         Self::ensure_held(held, quantity)?;
 
         let (unit_price, total_amount) = match total_amount {
@@ -662,8 +708,7 @@ impl Account {
                 })
                 .cloned()
                 .collect();
-            let held =
-                Self::reconstruct_holding_as_of(&before, &asset_id, &updated_tx.date).quantity;
+            let held = Self::quantity_held_as_of(&before, &asset_id, &updated_tx.date);
             Self::ensure_held(held, updated_tx.quantity)?;
         }
 
@@ -1074,8 +1119,7 @@ impl Account {
     /// takes out, negated, set from the replay.
     pub fn apply_write_off(&mut self, tx: Transaction) -> Result<Transaction> {
         Self::ensure_tradable(&tx.asset_id)?;
-        let held =
-            Self::reconstruct_holding_as_of(&self.transactions, &tx.asset_id, &tx.date).quantity;
+        let held = Self::quantity_held_as_of(&self.transactions, &tx.asset_id, &tx.date);
         Self::ensure_held(held, tx.quantity)?;
         self.transactions.push(tx.clone());
         let pair_txs: Vec<&Transaction> = self
@@ -1208,7 +1252,7 @@ impl Account {
                     .filter(|t| t.transfer_id.as_deref() != Some(transfer_id))
                     .cloned()
                     .collect();
-                let held = Self::reconstruct_holding_as_of(&others, asset_id, &date).quantity;
+                let held = Self::quantity_held_as_of(&others, asset_id, &date);
                 Self::ensure_held(held, taken)?;
             }
         }
@@ -1313,6 +1357,52 @@ impl Account {
                 .push(AccountChange::TransactionDeleted(id));
         }
         Ok(())
+    }
+
+    /// CBM-030 — the account on `method`: every holding replayed under it and every sale's
+    /// and write-off's realized P&L refreshed; the transfers out are re-costed by
+    /// `restate_transfers_out`, which the caller follows (TRF-025). The replay tolerates a
+    /// ledger a merge left inconsistent (CFR-042): the quantities do not move (CBM-026).
+    /// The method it has already changes nothing (CBM-031).
+    pub fn change_cost_basis_method(&mut self, method: CostBasisMethod) -> Result<()> {
+        if self.cost_basis_method == method {
+            return Ok(());
+        }
+        self.cost_basis_method = method;
+        self.pending_changes
+            .push(AccountChange::MethodChanged(method));
+        for asset_id in self.non_cash_assets() {
+            let pair_txs: Vec<&Transaction> = self
+                .transactions
+                .iter()
+                .filter(|t| t.asset_id == asset_id)
+                .collect();
+            let (holding, pnl_map) =
+                self.replay_holding(&asset_id, &pair_txs, Invariants::Tolerated)?;
+            // No transfer is left out: every sale and write-off follows the new method.
+            self.refresh_leaving(&asset_id, &pnl_map, "");
+            self.pending_changes
+                .push(AccountChange::HoldingUpserted(holding.clone()));
+            self.upsert_holding_in_memory(holding);
+        }
+        Ok(())
+    }
+
+    /// The assets of the account's non-cash holdings, in a stable order.
+    fn non_cash_assets(&self) -> std::collections::BTreeSet<String> {
+        self.transactions
+            .iter()
+            .filter(|t| !crate::core::cash::is_cash_asset(&t.asset_id))
+            .map(|t| t.asset_id.clone())
+            .collect()
+    }
+
+    /// CBM-033 — every holding replayed under the account's method after a synced change of
+    /// the account, as `apply_synced_transaction` replays one (CFR-042).
+    pub fn replay_every_holding_tolerantly(&mut self) {
+        for asset_id in self.non_cash_assets() {
+            self.replay_holding_tolerantly(&asset_id);
+        }
     }
 
     /// The realized P&L of the asset's sales and write-offs, as the replay `pnl_map` gives
@@ -1798,145 +1888,14 @@ impl Account {
         transactions: &[&Transaction],
         invariants: Invariants,
     ) -> Result<(Holding, std::collections::HashMap<String, i64>)> {
-        use std::collections::HashMap;
-        const MICRO: i128 = 1_000_000;
         let enforced = invariants == Invariants::Enforced;
+        let replayed = Self::replay_pair(transactions, self.cost_basis_method, enforced)?;
+        let total_quantity = replayed.quantity;
+        let average_price = replayed.average_price;
+        let total_realized_pnl = replayed.total_realized_pnl;
+        let last_sold_date = replayed.last_sold_date;
+        let pnl_map = replayed.pnl_map;
 
-        // SEL-024 — replay strictly in chronological order (date ASC, created_at ASC),
-        // independent of the physical storage order of the input slice. The running
-        // oversell guard is order-sensitive, so a sell must be evaluated against the
-        // holding as it stands immediately before it in date order (SEL-030/031).
-        let mut txs_by_date: Vec<&Transaction> = transactions.to_vec();
-        txs_by_date.sort_by(|a, b| {
-            a.date
-                .cmp(&b.date)
-                .then_with(|| a.created_at.cmp(&b.created_at))
-        });
-
-        let mut total_quantity: i128 = 0;
-        let mut vwap_numerator: i128 = 0;
-        let mut last_vwap: i64 = 0;
-        let mut pnl_map: HashMap<String, i64> = HashMap::new();
-        let mut total_realized_pnl: i64 = 0;
-        let mut last_sold_date: Option<String> = None;
-
-        for t in &txs_by_date {
-            match t.transaction_type {
-                // TRF-020 — a transfer in enters at the cost it moved, as an opening balance.
-                TransactionType::Purchase
-                | TransactionType::OpeningBalance
-                | TransactionType::TransferIn => {
-                    let qty = t.quantity as i128;
-                    total_quantity += qty;
-                    vwap_numerator += t.total_amount as i128 * QUANTITY_UNIT;
-                }
-                // TRF-020/023/024 — a transfer out leaves at the average price at its place,
-                // the cost it moves, kept in the map under its id; it realizes nothing and,
-                // leaving nothing held, closes the position as a sale does.
-                TransactionType::TransferOut => {
-                    if enforced && t.quantity as i128 > total_quantity {
-                        return Err(AccountError::CascadingOversell.into());
-                    }
-                    let vwap_before: i64 = if total_quantity > 0 {
-                        (vwap_numerator / total_quantity) as i64
-                    } else {
-                        0
-                    };
-                    last_vwap = vwap_before;
-                    pnl_map.insert(
-                        t.id.clone(),
-                        -Self::compute_realized_pnl(0, vwap_before, t.quantity),
-                    );
-                    last_sold_date = Some(t.date.clone());
-                    let qty = t.quantity as i128;
-                    vwap_numerator -= vwap_before as i128 * qty;
-                    total_quantity -= qty;
-                }
-                // WOF-020/021 — a write-off leaves as a sale does, with no proceeds.
-                TransactionType::Sell | TransactionType::WriteOff => {
-                    if enforced && t.quantity as i128 > total_quantity {
-                        return Err(AccountError::CascadingOversell.into());
-                    }
-                    let vwap_before: i64 = if total_quantity > 0 {
-                        (vwap_numerator / total_quantity) as i64
-                    } else {
-                        0
-                    };
-                    last_vwap = vwap_before;
-                    let pnl = Self::compute_realized_pnl(t.total_amount, vwap_before, t.quantity);
-                    pnl_map.insert(t.id.clone(), pnl);
-                    total_realized_pnl += pnl;
-                    // The replay runs in date order: the sale at hand is the latest so far.
-                    last_sold_date = Some(t.date.clone());
-                    let qty = t.quantity as i128;
-                    vwap_numerator -= vwap_before as i128 * qty;
-                    total_quantity -= qty;
-                }
-                // The Cash Holding is replayed by `replay_cash_holding` alone (CSH-013): a
-                // Deposit or a Withdrawal never belongs to the pair replayed here.
-                TransactionType::Deposit | TransactionType::Withdrawal => {}
-                // DIV-024 — a Dividend has no effect on the paying asset's holding
-                // quantity, average cost, or cost basis. The Dividend type ONLY appears
-                // in `replay_cash_holding` (where it credits cash). It is NOT part of
-                // any non-cash (account, asset) pair, so `recalculate_holding` never
-                // receives Dividend transactions for non-cash assets. If encountered
-                // here it is a bug; we skip it to prevent a non-exhaustive match.
-                TransactionType::Dividend => {
-                    // DIV-024 — a Dividend never affects the paying asset's holding. A Dividend
-                    // IS legitimately present in `pair_txs` (which is filtered by `asset_id`
-                    // only, and a Dividend's `asset_id` is the paying asset), so this arm is
-                    // reached on any correct/cancel replay of a dividend-bearing asset. It is a
-                    // deliberate no-op: quantity, VWAP, and realized P&L are left untouched; the
-                    // dividend's only effect (the cash credit) lives in `replay_cash_holding`.
-                }
-                // FSD-022/023 — free shares add quantity at zero cost: the VWAP numerator
-                // is unchanged, so the average price dilutes to cost_basis / new_quantity.
-                // No cash effect (FSD-022d — the type never enters `replay_cash_holding`).
-                TransactionType::FreeShares => {
-                    total_quantity += t.quantity as i128;
-                }
-                // FEE-023 — management fee removes quantity at zero cost: the VWAP numerator
-                // is unchanged, so the average price concentrates to cost_basis / new_quantity.
-                // No cash effect (the type never enters `replay_cash_holding`).
-                TransactionType::ManagementFee => {
-                    // FEE-027 — a fee that finds fewer shares than it removes is a
-                    // downstream oversell, like a sale that does.
-                    if enforced && t.quantity as i128 > total_quantity {
-                        return Err(AccountError::CascadingOversell.into());
-                    }
-                    total_quantity -= t.quantity as i128;
-                }
-                // INT-024 — interest adds quantity at zero cost exactly like FreeShares:
-                // the VWAP numerator is unchanged, so the average price dilutes.
-                TransactionType::Interest => {
-                    total_quantity += t.quantity as i128;
-                }
-                // SPL-020 — a split rescales the running quantity by the micro
-                // factor in `split_factor`; the VWAP numerator is untouched, so
-                // the cost basis is preserved and the average price rescales
-                // implicitly. Deliberate deviation from the spec's display formula
-                // (`round(avg × old_qty / new_qty)`): deriving from the numerator
-                // rounds once instead of twice. SPL-012/021 guards: no split on a
-                // closed position, no rescale that floors an open position to zero.
-                TransactionType::Split => {
-                    if enforced && total_quantity == 0 {
-                        return Err(AccountError::ClosedPosition.into());
-                    }
-                    let rescaled = total_quantity * t.factor() as i128 / MICRO;
-                    if enforced && rescaled == 0 {
-                        return Err(AccountError::SplitCollapsesPosition.into());
-                    }
-                    total_quantity = rescaled;
-                }
-            }
-        }
-
-        // SEL-026 / TRX-040 — retain holding at qty=0, preserve last VWAP
-        let average_price: i64 = if total_quantity > 0 {
-            (vwap_numerator / total_quantity) as i64
-        } else {
-            last_vwap
-        };
         // TRX-024C — a holding past what storage holds is refused; a merged ledger stands at it.
         let quantity = match i64::try_from(total_quantity) {
             Ok(quantity) => quantity,
@@ -1982,10 +1941,107 @@ impl Account {
         Ok((holding, pnl_map))
     }
 
+    /// One (account, asset) pair replayed in chronological order (SEL-024: date, then the
+    /// moment entered, TRX-036) under `method` (CBM): its quantity, average price, realized
+    /// P&L and last sale date, and for each sale and write-off its realized P&L and for each
+    /// transfer out the cost it moved, by id (TRF-020/023). `enforced`, a sale, a fee or a
+    /// transfer beyond the position, a split on a closed position or one that collapses it
+    /// is refused (SEL-030/031, FEE-027, SPL-012/021); otherwise the arithmetic stands
+    /// (CFR-042).
+    fn replay_pair(
+        transactions: &[&Transaction],
+        method: CostBasisMethod,
+        enforced: bool,
+    ) -> Result<ReplayedPair> {
+        let mut txs_by_date: Vec<&Transaction> = transactions.to_vec();
+        txs_by_date.sort_by(|a, b| {
+            a.date
+                .cmp(&b.date)
+                .then_with(|| a.created_at.cmp(&b.created_at))
+        });
+        let mut basis = CostBasis::new(method);
+        let mut last_vwap: i64 = 0;
+        let mut pnl_map = std::collections::HashMap::new();
+        let mut total_realized_pnl: i64 = 0;
+        let mut last_sold_date: Option<String> = None;
+        let beyond =
+            |basis: &CostBasis, t: &Transaction| enforced && t.quantity as i128 > basis.quantity();
+        for t in &txs_by_date {
+            match t.transaction_type {
+                // TRX-030/048, TRF-020, CBM-020/024 — units in at their cost.
+                TransactionType::Purchase
+                | TransactionType::OpeningBalance
+                | TransactionType::TransferIn => basis.acquire(&t.date, t.quantity, t.total_amount),
+                // TRF-020/023/024 — a transfer out leaves at its cost (CBM-022), the cost it
+                // moves kept in the map under its id; it realizes nothing and, leaving nothing
+                // held, closes the position as a sale does.
+                TransactionType::TransferOut => {
+                    if beyond(&basis, t) {
+                        return Err(AccountError::CascadingOversell.into());
+                    }
+                    let taken = basis.take(t.quantity);
+                    last_vwap = taken.average_before;
+                    pnl_map.insert(t.id.clone(), taken.cost);
+                    last_sold_date = Some(t.date.clone());
+                }
+                // SEL-024, WOF-020/021, CBM-022 — a sale realizes its proceeds minus the cost
+                // of what it took; a write-off is a sale with no proceeds.
+                TransactionType::Sell | TransactionType::WriteOff => {
+                    if beyond(&basis, t) {
+                        return Err(AccountError::CascadingOversell.into());
+                    }
+                    let taken = basis.take(t.quantity);
+                    last_vwap = taken.average_before;
+                    let pnl = t.total_amount - taken.cost;
+                    pnl_map.insert(t.id.clone(), pnl);
+                    total_realized_pnl = total_realized_pnl.saturating_add(pnl);
+                    // The replay runs in date order: the sale at hand is the latest so far.
+                    last_sold_date = Some(t.date.clone());
+                }
+                // The cash line is replayed on its own (CSH-013); a Dividend never affects
+                // the paying asset's holding (DIV-024).
+                TransactionType::Deposit
+                | TransactionType::Withdrawal
+                | TransactionType::Dividend => {}
+                // FSD-022/023, INT-024, CBM-020 — units in at no cost: the average dilutes.
+                TransactionType::FreeShares | TransactionType::Interest => {
+                    basis.acquire(&t.date, t.quantity, 0)
+                }
+                // FEE-023/027, CBM-023 — units out at no cost: the average concentrates; a fee
+                // that finds fewer units than it removes is a downstream oversell.
+                TransactionType::ManagementFee => {
+                    if beyond(&basis, t) {
+                        return Err(AccountError::CascadingOversell.into());
+                    }
+                    basis.shrink(t.quantity);
+                }
+                // SPL-020, CBM-025 — the quantity rescales by the factor, the cost kept; no
+                // split on a closed position, none that floors an open one to zero.
+                TransactionType::Split => {
+                    if enforced && basis.quantity() == 0 {
+                        return Err(AccountError::ClosedPosition.into());
+                    }
+                    if enforced && basis.quantity() * t.factor() as i128 / MICRO == 0 {
+                        return Err(AccountError::SplitCollapsesPosition.into());
+                    }
+                    basis.split(t.factor());
+                }
+            }
+        }
+        // SEL-026 / TRX-040 / CBM-027 — at zero, the average price before the last removal.
+        Ok(ReplayedPair {
+            quantity: basis.quantity(),
+            average_price: basis.average_price().unwrap_or(last_vwap),
+            total_realized_pnl,
+            last_sold_date,
+            pnl_map,
+        })
+    }
+
     /// FEE-022a — the held quantity of `asset_id` as of `date`, reconstructed from
     /// this account's transactions (read-only replay; mirrors `holding_snapshot_as_of`).
     pub fn holding_quantity_as_of(&self, asset_id: &str, date: &str) -> i64 {
-        Self::reconstruct_holding_as_of(&self.transactions, asset_id, date).quantity
+        Self::quantity_held_as_of(&self.transactions, asset_id, date)
     }
 
     /// FEE-028 — what a one-off management fee removes when it is entered as the quantity
@@ -2028,6 +2084,7 @@ impl Account {
         transactions: &[Transaction],
         asset_id: &str,
         as_of: &str,
+        method: CostBasisMethod,
     ) -> HoldingSnapshot {
         // The cash line has one computation, over every transaction of the account that
         // moves cash; its unit is its own, so its average price is 1. Like every as-of
@@ -2038,7 +2095,7 @@ impl Account {
                 average_price: 1_000_000,
             };
         }
-        let reconstruction = Self::reconstruct_holding_as_of(transactions, asset_id, as_of);
+        let reconstruction = Self::reconstruct_holding_as_of(transactions, asset_id, as_of, method);
         HoldingSnapshot {
             quantity: reconstruction.quantity,
             average_price: reconstruction.average_price,
@@ -2057,103 +2114,36 @@ impl Account {
         transactions: &[Transaction],
         asset_id: &str,
         as_of: &str,
+        method: CostBasisMethod,
     ) -> HoldingAsOfReconstruction {
-        const MICRO: i128 = 1_000_000;
-
-        let mut txs: Vec<&Transaction> = transactions
+        let txs: Vec<&Transaction> = transactions
             .iter()
             .filter(|t| t.asset_id == asset_id && t.date.as_str() <= as_of)
             .collect();
-        txs.sort_by(|a, b| {
-            a.date
-                .cmp(&b.date)
-                .then_with(|| a.created_at.cmp(&b.created_at))
-        });
-
-        let mut total_quantity: i128 = 0;
-        let mut vwap_numerator: i128 = 0;
-        let mut last_vwap: i64 = 0;
-        let mut total_realized_pnl: i64 = 0;
-        let mut last_sold_date: Option<String> = None;
-        for t in &txs {
-            match t.transaction_type {
-                TransactionType::Purchase
-                | TransactionType::OpeningBalance
-                | TransactionType::TransferIn => {
-                    total_quantity += t.quantity as i128;
-                    vwap_numerator += t.total_amount as i128 * QUANTITY_UNIT;
-                }
-                // TRF-020/023 — a transfer out leaves at its average cost, realizing nothing.
-                TransactionType::TransferOut => {
-                    let vwap_before: i64 = if total_quantity > 0 {
-                        (vwap_numerator / total_quantity) as i64
-                    } else {
-                        0
-                    };
-                    last_vwap = vwap_before;
-                    last_sold_date = Some(t.date.clone());
-                    let qty = t.quantity as i128;
-                    vwap_numerator -= vwap_before as i128 * qty;
-                    total_quantity -= qty;
-                }
-                // WOF-020/021 — a write-off leaves as a sale does, with no proceeds.
-                TransactionType::Sell | TransactionType::WriteOff => {
-                    let vwap_before: i64 = if total_quantity > 0 {
-                        (vwap_numerator / total_quantity) as i64
-                    } else {
-                        0
-                    };
-                    last_vwap = vwap_before;
-                    // SEL-024 — realized P&L for the sell, accumulated as of the date.
-                    let pnl = Self::compute_realized_pnl(t.total_amount, vwap_before, t.quantity);
-                    total_realized_pnl = total_realized_pnl.saturating_add(pnl);
-                    // The replay runs in date order: the sale at hand is the latest so far.
-                    last_sold_date = Some(t.date.clone());
-                    let qty = t.quantity as i128;
-                    vwap_numerator -= vwap_before as i128 * qty;
-                    total_quantity -= qty;
-                }
-                // The cash line is read by `cash_balance_as_of` alone: a Deposit or a
-                // Withdrawal never belongs to the pair replayed here.
-                TransactionType::Deposit | TransactionType::Withdrawal => {}
-                // FSD-022/023 — free shares add quantity at zero cost (dilutes VWAP).
-                TransactionType::FreeShares => {
-                    total_quantity += t.quantity as i128;
-                }
-                // FEE-023 — management fee removes quantity at zero cost (concentrates VWAP).
-                TransactionType::ManagementFee => {
-                    total_quantity -= t.quantity as i128;
-                }
-                // INT-024 — interest adds quantity at zero cost exactly like FreeShares
-                // (dilutes VWAP).
-                TransactionType::Interest => {
-                    total_quantity += t.quantity as i128;
-                }
-                // SPL-020 — rescale the running quantity; the VWAP numerator is
-                // untouched (cost basis preserved). Guards live in the validating
-                // replay (`recalculate_holding`); this as-of read mirrors the math.
-                TransactionType::Split => {
-                    total_quantity = total_quantity * t.factor() as i128 / MICRO;
-                }
-                // DIV-024 — a Dividend never affects the paying asset's holding.
-                TransactionType::Dividend => {}
-            }
-        }
-
-        let average_price: i64 = if total_quantity > 0 {
-            (vwap_numerator / total_quantity) as i64
-        } else {
-            last_vwap
+        let replayed = match Self::replay_pair(&txs, method, false) {
+            Ok(replayed) => replayed,
+            // Tolerated, the replay refuses nothing.
+            Err(_) => return HoldingAsOfReconstruction::default(),
         };
         HoldingAsOfReconstruction {
             // A read-only replay over already-validated history never goes negative;
             // clamp defensively so internally-inconsistent stored data can never
             // surface a negative quantity (the field contract is "0 when not held").
-            quantity: total_quantity.clamp(0, i64::MAX as i128) as i64,
-            average_price,
-            total_realized_pnl,
-            last_sold_date,
+            quantity: replayed.quantity.clamp(0, i64::MAX as i128) as i64,
+            average_price: replayed.average_price,
+            total_realized_pnl: replayed.total_realized_pnl,
+            last_sold_date: replayed.last_sold_date,
         }
+    }
+
+    /// CBM-026 — the quantity of `asset_id` held as of `as_of`, which no method changes.
+    pub(crate) fn quantity_held_as_of(
+        transactions: &[Transaction],
+        asset_id: &str,
+        as_of: &str,
+    ) -> i64 {
+        Self::reconstruct_holding_as_of(transactions, asset_id, as_of, CostBasisMethod::default())
+            .quantity
     }
 
     /// The cash a transaction moves on the account's cash line: Deposit / Sell / Dividend
@@ -2343,7 +2333,6 @@ impl Account {
         exchange_rate: i64,
         fees: i64,
     ) -> i64 {
-        const MICRO: i128 = 1_000_000;
         let qty = quantity as i128;
         let price = unit_price as i128;
         let rate = exchange_rate as i128;
@@ -2361,7 +2350,6 @@ impl Account {
         exchange_rate: i64,
         fees: i64,
     ) -> i64 {
-        const MICRO: i128 = 1_000_000;
         let qty = quantity as i128;
         let price = unit_price as i128;
         let rate = exchange_rate as i128;
@@ -2387,7 +2375,6 @@ impl Account {
         if exchange_rate <= 0 {
             return Err(AccountError::ExchangeRateNotPositive);
         }
-        const MICRO: i128 = 1_000_000;
         let numerator = securities_amount * MICRO * QUANTITY_UNIT;
         let denominator = quantity as i128 * exchange_rate as i128;
         let rounded = (numerator + denominator / 2) / denominator;
@@ -2488,10 +2475,20 @@ impl Account {
             factor,
             None,
         )?;
-        let before = Self::holding_snapshot_as_of(&self.transactions, asset_id, date);
+        let before = Self::holding_snapshot_as_of(
+            &self.transactions,
+            asset_id,
+            date,
+            self.cost_basis_method,
+        );
         let mut replayed = self.clone();
         replayed.apply_split(split)?;
-        let after = Self::holding_snapshot_as_of(&replayed.transactions, asset_id, date);
+        let after = Self::holding_snapshot_as_of(
+            &replayed.transactions,
+            asset_id,
+            date,
+            self.cost_basis_method,
+        );
         Ok(StockSplitPosition {
             old_quantity: before.quantity,
             old_average_price: before.average_price,
@@ -3860,14 +3857,24 @@ mod tests {
             ),
         ];
         // As of 2024-07-01 — only the first buy is in scope.
-        let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-01");
+        let snap = Account::holding_snapshot_as_of(
+            &txs,
+            "asset-1",
+            "2024-07-01",
+            CostBasisMethod::WeightedAverage,
+        );
         assert_eq!(
             snap.quantity,
             crate::shared::domain::quantity::from_surface(micro(2))
         );
         assert_eq!(snap.average_price, micro(100));
         // As of 2024-08-01 — both buys: VWAP = 600 / 4 = 150.
-        let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-08-01");
+        let snap = Account::holding_snapshot_as_of(
+            &txs,
+            "asset-1",
+            "2024-08-01",
+            CostBasisMethod::WeightedAverage,
+        );
         assert_eq!(
             snap.quantity,
             crate::shared::domain::quantity::from_surface(micro(4))
@@ -3877,7 +3884,12 @@ mod tests {
 
     #[test]
     fn holding_snapshot_as_of_is_empty_when_nothing_held() {
-        let snap = Account::holding_snapshot_as_of(&[], "asset-1", "2024-07-01");
+        let snap = Account::holding_snapshot_as_of(
+            &[],
+            "asset-1",
+            "2024-07-01",
+            CostBasisMethod::WeightedAverage,
+        );
         assert_eq!(snap.quantity, 0);
         assert_eq!(snap.average_price, 0);
     }
@@ -3902,7 +3914,12 @@ mod tests {
                 150,
             ),
         ];
-        let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-15");
+        let snap = Account::holding_snapshot_as_of(
+            &txs,
+            "asset-1",
+            "2024-07-15",
+            CostBasisMethod::WeightedAverage,
+        );
         assert_eq!(
             snap.quantity,
             crate::shared::domain::quantity::from_surface(micro(1))
@@ -3921,7 +3938,12 @@ mod tests {
             200,
         )];
         // TDI-011 — inclusive cut-off.
-        let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-06-01");
+        let snap = Account::holding_snapshot_as_of(
+            &txs,
+            "asset-1",
+            "2024-06-01",
+            CostBasisMethod::WeightedAverage,
+        );
         assert_eq!(
             snap.quantity,
             crate::shared::domain::quantity::from_surface(micro(2))
@@ -3948,7 +3970,12 @@ mod tests {
                 500,
             ),
         ];
-        let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-01");
+        let snap = Account::holding_snapshot_as_of(
+            &txs,
+            "asset-1",
+            "2024-07-01",
+            CostBasisMethod::WeightedAverage,
+        );
         assert_eq!(
             snap.quantity,
             crate::shared::domain::quantity::from_surface(micro(2))
@@ -3977,7 +4004,12 @@ mod tests {
                 0,
             ),
         ];
-        let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-01");
+        let snap = Account::holding_snapshot_as_of(
+            &txs,
+            "asset-1",
+            "2024-07-01",
+            CostBasisMethod::WeightedAverage,
+        );
         assert_eq!(
             snap.quantity,
             crate::shared::domain::quantity::from_surface(micro(4))
@@ -4006,7 +4038,12 @@ mod tests {
                 0,
             ),
         ];
-        let snap = Account::holding_snapshot_as_of(&txs, "asset-1", "2024-07-01");
+        let snap = Account::holding_snapshot_as_of(
+            &txs,
+            "asset-1",
+            "2024-07-01",
+            CostBasisMethod::WeightedAverage,
+        );
         assert_eq!(
             snap.quantity,
             crate::shared::domain::quantity::from_surface(micro(4))
@@ -4054,12 +4091,17 @@ mod tests {
             ),
         ];
 
-        let snap = Account::holding_snapshot_as_of(&txs, &cash, "2024-07-01");
+        let snap = Account::holding_snapshot_as_of(
+            &txs,
+            &cash,
+            "2024-07-01",
+            CostBasisMethod::WeightedAverage,
+        );
 
         assert_eq!(snap.quantity, micro(30));
         assert_eq!(snap.average_price, micro(1));
         assert_eq!(
-            Account::reconstruct_holding_as_of(&txs, &cash, "2024-07-01").quantity,
+            Account::quantity_held_as_of(&txs, &cash, "2024-07-01"),
             0,
             "the non-cash reconstruction holds no cash arithmetic"
         );
@@ -7283,7 +7325,12 @@ mod two_asset_and_synced_ledger_tests {
 
         for asset in [A, B] {
             let kept = holding(&acc, asset).unwrap();
-            let read = Account::reconstruct_holding_as_of(&acc.transactions, asset, "9999-12-31");
+            let read = Account::reconstruct_holding_as_of(
+                &acc.transactions,
+                asset,
+                "9999-12-31",
+                CostBasisMethod::WeightedAverage,
+            );
             assert_eq!(
                 (
                     read.quantity,
@@ -7306,7 +7353,13 @@ mod two_asset_and_synced_ledger_tests {
             acc.holding_quantity(&cash)
         );
         assert_eq!(
-            Account::holding_snapshot_as_of(&acc.transactions, &cash, "9999-12-31").quantity,
+            Account::holding_snapshot_as_of(
+                &acc.transactions,
+                &cash,
+                "9999-12-31",
+                CostBasisMethod::WeightedAverage
+            )
+            .quantity,
             acc.holding_quantity(&cash)
         );
     }
@@ -7462,7 +7515,12 @@ mod two_asset_and_synced_ledger_tests {
     fn an_as_of_read_of_a_sale_with_nothing_behind_it_does_not_divide_by_zero() {
         let sale = synced(A, TransactionType::Sell, "2024-01-03", 5, 150);
 
-        let read = Account::reconstruct_holding_as_of(&[sale], A, "2024-12-31");
+        let read = Account::reconstruct_holding_as_of(
+            &[sale],
+            A,
+            "2024-12-31",
+            CostBasisMethod::WeightedAverage,
+        );
 
         assert_eq!(read.quantity, 0);
         assert_eq!(read.total_realized_pnl, micro(750));

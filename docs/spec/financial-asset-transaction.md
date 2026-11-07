@@ -38,13 +38,13 @@ Represents a single purchase (or sale) event for an asset in an account.
 
 Represents the current state of a position (asset held within an account). Computed from transactions.
 
-| Field           | Business meaning                                                         |
-| --------------- | ------------------------------------------------------------------------ |
-| `id`            | Unique identifier of the holding.                                        |
-| `account_id`    | The account holding the asset.                                           |
-| `asset_id`      | The financial asset held.                                                |
-| `quantity`      | Current number of units held (i64, on the scale of TRX-024).             |
-| `average_price` | Volume-weighted average purchase price in account currency (i64 micros). |
+| Field           | Business meaning                                                                                                             |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `id`            | Unique identifier of the holding.                                                                                            |
+| `account_id`    | The account holding the asset.                                                                                               |
+| `asset_id`      | The financial asset held.                                                                                                    |
+| `quantity`      | Current number of units held (i64, on the scale of TRX-024).                                                                 |
+| `average_price` | Volume-weighted average purchase price in account currency (i64 micros); under FIFO the cost of its lots per unit (CBM-027). |
 
 ---
 
@@ -102,7 +102,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 ### Update and Deletion
 
-**TRX-030 — VWAP Calculation (backend)**: Average purchase price for a `Holding` is calculated using the Volume Weighted Average Price (VWAP) method: `average_price = Sum(total_amount_i) / Total Quantity`, where `total_amount_i` is computed per TRX-026 (fees included). This ensures the displayed transaction cost and the cost basis use the same value. Only `Purchase` transactions are included. _(Extended by TRX-048 to include `OpeningBalance` transactions.)_ This rule applies on creation (TRX-025) and on recalculation triggered by modification or deletion.
+**TRX-030 — VWAP Calculation (backend)**: Average purchase price for a `Holding` is calculated using the Volume Weighted Average Price (VWAP) method: `average_price = Sum(total_amount_i) / Total Quantity`, where `total_amount_i` is computed per TRX-026 (fees included). This ensures the displayed transaction cost and the cost basis use the same value. Only `Purchase` transactions are included. An account on FIFO sets its average price from its lots instead (CBM-027). _(Extended by TRX-048 to include `OpeningBalance` transactions.)_ This rule applies on creation (TRX-025) and on recalculation triggered by modification or deletion.
 
 **TRX-031 — Transaction modification (backend)**: Modifying a transaction triggers a full recalculation of the `Holding` cost basis and quantity for the `(account_id, asset_id)` pair, processing all associated transactions in chronological order (TRX-036). A part of a transfer is corrected as its transfer, never alone (TRF-030, TRF-031).
 

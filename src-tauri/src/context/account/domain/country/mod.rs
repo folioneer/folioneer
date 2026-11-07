@@ -12,14 +12,48 @@ mod pl;
 mod uk;
 mod us;
 
-/// How the cost of the units sold is chosen (#514): their weighted average, or the first
-/// bought first.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// CBM-010 — how an account sets the cost of the units that leave it: their weighted
+/// average, or the first acquired first. Stored and synced by its name.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize, specta::Type,
+)]
 pub enum CostBasisMethod {
-    /// The average cost of every unit held (VWAP).
+    /// The average cost of every unit held (VWAP, TRX-030); what an account that existed
+    /// before the method did is on (CBM-012).
+    #[default]
     WeightedAverage,
-    /// The units bought first are sold first.
+    /// The units acquired first leave first (CBM-022).
     Fifo,
+}
+
+impl CostBasisMethod {
+    /// Its stored name.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::WeightedAverage => "WeightedAverage",
+            Self::Fifo => "Fifo",
+        }
+    }
+
+    /// The method a stored name holds; the weighted average for any other (CBM-012).
+    pub fn from_stored(name: &str) -> Self {
+        match name {
+            "Fifo" => Self::Fifo,
+            "WeightedAverage" => Self::WeightedAverage,
+            other => {
+                tracing::warn!(target: crate::core::logger::BACKEND, name = other, "an unknown cost basis method is read as the weighted average");
+                Self::WeightedAverage
+            }
+        }
+    }
+
+    /// CBM-011 — the method a new account starts with: the one `country` implies, the
+    /// weighted average where it implies none.
+    pub fn implied_by(country: &str) -> Self {
+        rules_of(country)
+            .and_then(|rules| rules.default_cost_basis())
+            .unwrap_or_default()
+    }
 }
 
 /// The rules a country's file states; each method's default is the generic one.

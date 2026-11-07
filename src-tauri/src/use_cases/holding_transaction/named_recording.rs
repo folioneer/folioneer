@@ -1288,12 +1288,17 @@ impl HoldingTransactionUseCase {
         currency: String,
         date: String,
     ) -> Previewed {
+        let account_id = previewed.transaction.account_id.clone();
         Previewed {
             transaction: previewed.transaction,
             account_name,
             currency,
-            before: self.account_as_of(&previewed.before, &date).await,
-            after: self.account_as_of(&previewed.after, &date).await,
+            before: self
+                .account_as_of(&account_id, &previewed.before, &date)
+                .await,
+            after: self
+                .account_as_of(&account_id, &previewed.after, &date)
+                .await,
             date,
         }
     }
@@ -1326,7 +1331,12 @@ impl HoldingTransactionUseCase {
 
     /// AGT-072 — the account `transactions` make on the evening of `date`: each asset held,
     /// by reference, and the cash.
-    pub async fn account_as_of(&self, transactions: &[Transaction], date: &str) -> AccountAsOf {
+    pub async fn account_as_of(
+        &self,
+        account_id: &str,
+        transactions: &[Transaction],
+        date: &str,
+    ) -> AccountAsOf {
         let mut assets: Vec<&str> = transactions.iter().map(|tx| tx.asset_id.as_str()).collect();
         assets.sort_unstable();
         assets.dedup();
@@ -1334,11 +1344,20 @@ impl HoldingTransactionUseCase {
         // The cash moves with every transaction that brings or takes it, not only those on
         // the cash line: an account of opening balances alone has none there (DEBT-135).
         let cash = Account::cash_balance_as_of(transactions, date);
+        // CBM-032 — the figures follow the account's method; a preview the method cannot be
+        // read for shows the weighted average's, as it shows an asset it cannot read by its id.
+        let method = match self.account_service.cost_basis_method(account_id).await {
+            Ok(method) => method,
+            Err(error) => {
+                tracing::error!(target: BACKEND, account_id = %account_id, err = ?error, "preview: the account's method could not be read");
+                Default::default()
+            }
+        };
         for asset_id in assets {
             if crate::core::cash::is_cash_asset(asset_id) {
                 continue;
             }
-            let snapshot = Account::holding_snapshot_as_of(transactions, asset_id, date);
+            let snapshot = Account::holding_snapshot_as_of(transactions, asset_id, date, method);
             if snapshot.quantity == 0 {
                 continue;
             }

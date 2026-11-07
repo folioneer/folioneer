@@ -1,7 +1,7 @@
 # Contract — Account
 
 > Domain: `account`
-> Last updated by: `account` spec, `financial-asset-transaction` spec, `sell-transaction` spec, `transaction-list` spec, `account-details` spec, `cash-tracking` spec, `cash-dividend` spec, `free-share-distribution` spec, `management-fee-deduction` spec, `interest-credit` spec, `stock-split` spec, `holding-note` spec, `account-performance` spec, `global-performance` spec, `foreign-exchange-rate` spec, `market-price` spec, `trade-dialog-insights` spec, `multi-device-sync` spec, `sync-conflict-resolution` spec, `agent-connection` spec, `write-off` spec, `transfer` spec
+> Last updated by: `account` spec, `financial-asset-transaction` spec, `sell-transaction` spec, `transaction-list` spec, `account-details` spec, `cash-tracking` spec, `cash-dividend` spec, `free-share-distribution` spec, `management-fee-deduction` spec, `interest-credit` spec, `stock-split` spec, `holding-note` spec, `account-performance` spec, `global-performance` spec, `foreign-exchange-rate` spec, `market-price` spec, `trade-dialog-insights` spec, `multi-device-sync` spec, `sync-conflict-resolution` spec, `agent-connection` spec, `write-off` spec, `transfer` spec, `cost-basis` spec
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Per-command reachable codes are listed in the "Errors" column of each table below. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic chain preserved server-side via `tracing::error!`).
 >
@@ -15,14 +15,15 @@
 
 ### Account CRUD
 
-| Command                        | Args                 | Return                   | Errors                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------------------ | -------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_accounts`                 | —                    | `Vec<Account>`           | `DatabaseError`                                                                                                                                                                                                                                                                                                                                                             |
-| `add_account`                  | `CreateAccountDTO`   | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists), `DatabaseError`                                                                                                                 |
-| `update_account`               | `UpdateAccountDTO`   | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set; editing other fields of an account whose name already clashes after a merge is accepted, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists, nor the account's own), `DatabaseError` |
-| `get_wrapper_lists`            | —                    | `WrapperLists`           | _(infallible — the lists are the application's own, ACC-040)_                                                                                                                                                                                                                                                                                                               |
-| `delete_account`               | `id: String`         | `()`                     | `DatabaseError` _(ACC-005, ACC-006 — plain DELETE, silent on missing row)_                                                                                                                                                                                                                                                                                                  |
-| `get_account_deletion_summary` | `account_id: String` | `AccountDeletionSummary` | `DatabaseError` _(read-only; counts are 0 if account has no data — no NotFound raised)_                                                                                                                                                                                                                                                                                     |
+| Command                         | Args                                          | Return                   | Errors                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------- | --------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_accounts`                  | —                                             | `Vec<Account>`           | `DatabaseError`                                                                                                                                                                                                                                                                                                                                                             |
+| `add_account`                   | `CreateAccountDTO`                            | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists), `DatabaseError`                                                                                                                 |
+| `update_account`                | `UpdateAccountDTO`                            | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set; editing other fields of an account whose name already clashes after a merge is accepted, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists, nor the account's own), `DatabaseError` |
+| `get_wrapper_lists`             | —                                             | `WrapperLists`           | _(infallible — the lists are the application's own, ACC-040)_                                                                                                                                                                                                                                                                                                               |
+| `set_account_cost_basis_method` | `account_id: String, method: CostBasisMethod` | `Account`                | `AccountNotFound { account_id }` (CBM-030), `DatabaseError` _(the method it already has: accepted, nothing recomputed, CBM-031)_                                                                                                                                                                                                                                            |
+| `delete_account`                | `id: String`                                  | `()`                     | `DatabaseError` _(ACC-005, ACC-006 — plain DELETE, silent on missing row)_                                                                                                                                                                                                                                                                                                  |
+| `get_account_deletion_summary`  | `account_id: String`                          | `AccountDeletionSummary` | `DatabaseError` _(read-only; counts are 0 if account has no data — no NotFound raised)_                                                                                                                                                                                                                                                                                     |
 
 ### Account Details
 
@@ -238,6 +239,12 @@ struct Account {
     management_fees_enabled: bool,       // whether one-off fees and fee schedules are available on this account (FEE-075); a new account starts disabled
     country: Option<String>,             // the account's own country (ISO 3166-1 alpha-2) when one is set, kept even if it equals the portfolio's (ACC-041, ACC-045)
     wrapper: Option<String>,             // identifier of its tax wrapper (ACC-040/043); none when unset
+    cost_basis_method: CostBasisMethod,  // how it sets the cost of the units that leave it (CBM-010); a new account takes its country's (CBM-011); changed by `set_account_cost_basis_method` alone (CBM-030), or by a synced change (CBM-033)
+}
+
+enum CostBasisMethod {
+    WeightedAverage,                     // every unit at the average cost of all held (TRX-030); an account that existed before (CBM-012)
+    Fifo,                                // the oldest lots leave first (CBM-022)
 }
 
 struct CreateAccountDTO {
@@ -288,7 +295,7 @@ struct AccountDeletionSummary {
 
 struct HoldingSnapshot {
     quantity: String,        // units held as of the queried date (decimal text, TRX-024B), "0" when not held (TDI-010)
-    average_price: i64,   // VWAP cost basis per unit, account currency (micro-units), 0 when never held
+    average_price: i64,   // cost basis per unit under the account's method (VWAP, or the lots' cost ÷ quantity under FIFO, CBM-027/032), account currency (micro-units), 0 when never held
 }
 ```
 
@@ -463,8 +470,8 @@ enum TransactionType {
     ManagementFee,   // FEE-022 — quantity-reducing fee; attributed to the charged asset, no cash leg
     Split,           // SPL-010 — rescales the position; the micro-scaled factor is in split_factor, quantity gives it as decimal text (TRX-024A), no money moves
     Interest,        // INT-024 — interest credited at zero cost: quantity rises, cost basis unchanged; on the cash line it credits the balance (INT-023)
-    WriteOff,        // WOF-020 — a quantity leaving without proceeds at its average price; no cash leg, realized P&L = −cost taken out (WOF-021)
-    TransferOut,     // TRF-020 — the sending side: leaves at its average price, total_amount the cost moved; no cash leg, nothing realized
+    WriteOff,        // WOF-020 — a quantity leaving without proceeds at its cost under the account's method (CBM-022); no cash leg, realized P&L = −cost taken out (WOF-021)
+    TransferOut,     // TRF-020 — the sending side: leaves at its cost under the account's method (CBM-022), total_amount the cost moved; no cash leg, nothing realized
     TransferIn,      // TRF-020 — the receiving side: enters at the cost moved, converted (TRF-022); exchange_rate the rate used
 }
 
@@ -521,7 +528,7 @@ struct HoldingDetail {
     asset_name: String,
     asset_reference: String,
     quantity: String,                      // decimal text, above zero except the Cash Holding (CSH-097)
-    average_price: i64,                 // micros, VWAP
+    average_price: i64,                 // micros, VWAP or the lots' under FIFO (CBM-027)
     cost_basis: i64,                    // micros, quantity × average_price (ACD-023)
     realized_pnl: i64,                  // micros, cumulative from partial sells and write-offs; 0 if none (SEL-042, WOF-021)
     realized_lost: i64,                 // micros, ≤ 0 — the part of realized_pnl from write-offs whose reason is Lost (WOF-022); 0 for cash; in a read with a date, the Lost write-offs dated on or before it
@@ -835,12 +842,12 @@ struct AccountJournal {
 
 ### Published
 
-| Event                | Payload | Rule                                                                    |
-| -------------------- | ------- | ----------------------------------------------------------------------- |
-| `AccountUpdated`     | —       | ACC-022                                                                 |
-| `TransactionUpdated` | —       | TRX-037, DIV-026, FSD-026, FEE-026, AGT-044, AGT-045, TRF-029, IMP-050A |
-| `FeeScheduleUpdated` | —       | FEE-064                                                                 |
-| `HoldingNoteUpdated` | —       | HNO-020, HNO-021                                                        |
+| Event                | Payload | Rule                                                                             |
+| -------------------- | ------- | -------------------------------------------------------------------------------- |
+| `AccountUpdated`     | —       | ACC-022, CBM-030                                                                 |
+| `TransactionUpdated` | —       | TRX-037, DIV-026, FSD-026, FEE-026, AGT-044, AGT-045, TRF-029, IMP-050A, CBM-030 |
+| `FeeScheduleUpdated` | —       | FEE-064                                                                          |
+| `HoldingNoteUpdated` | —       | HNO-020, HNO-021                                                                 |
 
 ### Subscribed (frontend re-fetch triggers)
 
@@ -860,6 +867,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-11-07 — #514 (CBM-010–033): `Account` gains `cost_basis_method` and the `CostBasisMethod` type; new `set_account_cost_basis_method`, which recomputes the account's history and the transfers in it feeds (CBM-030). `add_account` / `update_account` are unchanged: a new account takes its country's method (CBM-011), an update keeps it.
 - 2026-11-07 — #748 (TRX-020, HNO-011, SYN-034): `AccountError` gains `AmountOutOfRange`, a price, rate, fee or total above a trillion units of money, refused by the recordings, corrections and draft checks that carry one, and by `upsert_holding_note` for its threshold.
 - 2026-11-07 — #682 (PRF-076, PRF-071, PRF-073, PRF-084, GPF-040): free shares and interest leave `PerformancePeriod.asset_flow` (and cash-line interest `cash_flow`) and count in `pnl`. No command or type changed.
 - 2026-11-01 — #579 (TRX-024B): every quantity crosses as decimal text, but in a CSV import's preview. `ManagementFeeDTO.resulting_quantity_micros` and `RecordInterestDTO.quantity_micros` become `resulting_quantity` and `quantity`, as does the argument of `preview_management_fee`; `Oversell { available, requested }` and `ResultingQuantityNotBelowHeld { held_quantity }` carry text; `Transaction.quantity` gives a split's factor and a dividend's amount (TRX-024A).

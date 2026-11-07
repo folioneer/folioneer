@@ -47,9 +47,7 @@ pub fn unrecorded_splits(
                     && NaiveDate::parse_from_str(&transaction.date, "%Y-%m-%d")
                         .is_ok_and(|recorded| (recorded - date).num_days().abs() <= MATCHING_DAYS)
             });
-            let held = Account::reconstruct_holding_as_of(transactions, asset_id, &day_before)
-                .quantity
-                > 0;
+            let held = Account::quantity_held_as_of(transactions, asset_id, &day_before) > 0;
             (date <= today && held && !recorded).then(|| UnrecordedSplit {
                 date: split.date.clone(),
                 new: split.new,

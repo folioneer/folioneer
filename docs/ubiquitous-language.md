@@ -39,7 +39,26 @@ The tax wrapper an account sits in — a PEA, an assurance vie, a Depot: a label
 ### Holding
 
 An internal entity of `Account`. Represents the current position in a given asset within
-an account — quantity held, average price (VWAP), and realized P&L.
+an account — quantity held, average price (VWAP, or of its lots under FIFO — see Cost basis method), and realized P&L.
+
+> Status: confirmed
+
+### Cost basis method
+
+How an account sets the cost of the units that leave it: the weighted average (every unit
+at the average cost of all held; France, Italy) or FIFO, first in, first out (the units
+acquired first leave first; Germany, Spain, Poland). One per account, preselected from its
+wrapper's country, else the account's country; weighted average where the country sets
+none (CBM). Code: `CostBasisMethod` — `WeightedAverage`, `Fifo` (owner, 2026-11-07).
+
+> Status: confirmed
+
+### Lot
+
+Under FIFO, the units one transaction brought in (a purchase, an opening balance, free
+shares, interest, a transfer in), with their acquisition date and cost; a sale, a
+write-off or a transfer out takes the oldest lots first (CBM-020, CBM-022) (owner,
+2026-11-07).
 
 > Status: confirmed
 
@@ -71,7 +90,7 @@ rename) never creates a new one. A reverse split uses a factor below one.
 ### Write-off
 
 A quantity that leaves a holding without proceeds — a network fee paid in the asset, dust,
-coins sent away or lost — taken out at its weighted-average cost, moving no cash; its
+coins sent away or lost — taken out at its cost under the account's cost basis method, moving no cash; its
 realized result is the cost taken out, negated, and a write-off whose reason is Lost is
 also counted apart (WOF). Its reason is one of `NetworkFee`, `Dust`, `Lost`, `Other`. In French: "Sortie sans contrepartie" (owner, 2026-10-19).
 

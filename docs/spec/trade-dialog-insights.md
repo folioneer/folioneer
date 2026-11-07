@@ -18,10 +18,10 @@ anything and never affect the transaction being recorded.
 A point-in-time reconstruction of a single (account, asset) holding, implied by
 replaying only the transactions dated on or before a cut-off date.
 
-| Field           | Type | Notes                                                                                                                                        |
-| --------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `quantity`      | text | Units held as of the date, as decimal text (TRX-024B), 0 when nothing is held.                                                               |
-| `average_price` | i64  | VWAP cost basis per unit in **account** currency (micro-units; fees + FX included, identical to `Holding.average_price`), 0 when never held. |
+| Field           | Type | Notes                                                                                                                                                                            |
+| --------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `quantity`      | text | Units held as of the date, as decimal text (TRX-024B), 0 when nothing is held.                                                                                                   |
+| `average_price` | i64  | Cost basis per unit (VWAP, or its lots' under FIFO, CBM-027) in **account** currency (micro-units; fees + FX included, identical to `Holding.average_price`), 0 when never held. |
 
 ## Business Rules
 
@@ -32,7 +32,7 @@ asset_id, date)` returns the holding's `quantity` and `average_price` implied by
 replaying every transaction for that (account, asset) pair dated on or before
 `date`, using the same chronological VWAP algorithm as `recalculate_holding`
 (TRX-040 / SEL-026). The transaction currently being entered is not part of the
-history (it is unsaved), so the snapshot reflects the state the trade acts on.
+history (it is unsaved), so the snapshot reflects the state the trade acts on. The replay follows the account's cost basis method (CBM-032).
 
 **TDI-011 — Inclusive cut-off**: a transaction dated exactly on `date` is
 included in the snapshot.
@@ -67,7 +67,7 @@ total proceeds. The draft check of a new sale (TRX-062) returns it:
 `total_proceeds − floor(average_price × quantity / QUANTITY_UNIT)`, where `average_price` is
 the holding's VWAP as of the sell date (TDI-010) — the rule recording a sell applies
 (SEL-024), computed by the same code. The dialog shows the figure it is given and
-computes none.
+computes none. Under FIFO the cost deducted is that of the lots the sale would take (CBM-022), the recorded sale's by the same code.
 
 **TDI-031 — Shown only when computable (backend + frontend)**: the draft check returns a
 potential P&L only for a new sale whose position, as of the sell date, holds at least the

@@ -153,7 +153,8 @@ pub struct TransactionPreview {
     /// Total in account currency.
     pub total_amount: i64,
     /// The gain a new sale would realize (TDI-030), in account currency: its proceeds minus
-    /// the average cost, as of its date, of the quantity sold. `None` for anything but a
+    /// the cost, as of its date, of the quantity sold under the account's cost basis method
+    /// (CBM-022). `None` for anything but a
     /// new sale (TDI-031); a sale that cannot be recorded is the draft's refusal instead.
     pub realized_pnl: Option<i64>,
 }

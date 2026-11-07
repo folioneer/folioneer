@@ -22,7 +22,7 @@ SPL reuses the TRX `Transaction` entity with a new `TransactionType::Split` vari
 
 ### Position rescale
 
-**SPL-020 — Value-neutral rescale (backend)**: During holding replay, a `Split` transaction rescales the running position at its date: `quantity ← floor(quantity × factor / MICRO)`, then `average_price ← round(previous_average_price × previous_quantity / new_quantity)` — deriving the new average from the preserved cost basis rather than dividing by the factor, so `quantity × average_price` (the cost basis) is preserved up to last-micro rounding across the rescale. Realized P&L already booked is untouched; sells after the split consume the rescaled average price.
+**SPL-020 — Value-neutral rescale (backend)**: During holding replay, a `Split` transaction rescales the running position at its date: `quantity ← floor(quantity × factor / MICRO)`, then `average_price ← round(previous_average_price × previous_quantity / new_quantity)` — deriving the new average from the preserved cost basis rather than dividing by the factor, so `quantity × average_price` (the cost basis) is preserved up to last-micro rounding across the rescale. Realized P&L already booked is untouched; sells after the split consume the rescaled average price. Under FIFO every lot rescales, each keeping its cost (CBM-025).
 
 **SPL-021 — Position-collapse guard (backend)**: A rescale whose `new_quantity` floors to `0` on an open position is rejected (`SplitCollapsesPosition`) — on the record path and on every replay-revalidation path (corrections that move transactions across the split, cancellation of a purchase the split depended on). The guard runs before the average-price derivation, so the division in SPL-020 is never reached with a zero quantity.
 

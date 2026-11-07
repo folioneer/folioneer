@@ -965,13 +965,11 @@ pub(crate) fn position_held_as_of(
     asset_id: &str,
     as_of: NaiveDate,
 ) -> bool {
-    Account::reconstruct_holding_as_of(
+    Account::quantity_held_as_of(
         asset_transactions,
         asset_id,
         &as_of.format("%Y-%m-%d").to_string(),
-    )
-    .quantity
-        > 0
+    ) > 0
 }
 
 /// PRF-082 — market value of ONE asset's position as of `period_end`, in
@@ -990,12 +988,11 @@ pub(crate) fn holding_end_value_as_of(
     account_currency: &str,
     period_end: NaiveDate,
 ) -> i64 {
-    let quantity = Account::reconstruct_holding_as_of(
+    let quantity = Account::quantity_held_as_of(
         asset_transactions,
         asset_id,
         &period_end.format("%Y-%m-%d").to_string(),
-    )
-    .quantity;
+    );
     if quantity <= 0 {
         return 0;
     }

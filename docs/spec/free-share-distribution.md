@@ -55,7 +55,7 @@ A quantity-only corporate event: shares of a held asset received for free, recor
 
 **FSD-026 — Reactivity (frontend + backend)**: Recording a distribution publishes the existing `TransactionUpdated` event (per the AccountService convention, as Dividend does in DIV-026). The Account Details view re-fetches on that event (ACD-039), so the holding row's quantity, diluted average price, and recomputed performance figures appear without a manual refresh.
 
-**FSD-027 — Interaction with later sells (backend)**: A distribution participates in the chronological replay (TRX-031/036) at its `date` like any other transaction: sells dated **after** the distribution compute their realized P&L against the **diluted** average price; sells dated **before** it are unaffected. Same-date ordering follows the existing TRX-036 convention.
+**FSD-027 — Interaction with later sells (backend)**: A distribution participates in the chronological replay (TRX-031/036) at its `date` like any other transaction: sells dated **after** the distribution compute their realized P&L against the **diluted** average price; sells dated **before** it are unaffected. Same-date ordering follows the existing TRX-036 convention. Under FIFO the free shares are a lot at no cost, which a later sale takes in its turn (CBM-020, CBM-022).
 
 **FSD-028 — Reversibility (backend)**: A distribution's entire effect is derived from the transaction log via the standard chronological replay (TRX-031/036) — it never irreversibly mutates any derived value. Deleting a distribution restores the holding **exactly** to its pre-distribution state (quantity, average price, cost basis). Independently verifiable by a record → delete → compare test.
 

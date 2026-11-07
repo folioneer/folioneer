@@ -1,9 +1,10 @@
 use super::domain::{
     generated_deduction_id, Account, AccountJournal, AccountRepository, AgentRecording,
-    EnteredAmount, FeeCatchUpPosition, FeeCatchUpRepository, FeeSchedule, FeeScheduleRepository,
-    Holding, HoldingNote, HoldingNoteRepository, HoldingRepository, HoldingSnapshot, JournalFilter,
-    ManagementFeeRemoval, SessionRecording, StockSplitPosition, ThresholdDirection, Transaction,
-    TransactionRepository, TransactionType, TransferView, WriteOffReason,
+    CostBasisMethod, EnteredAmount, FeeCatchUpPosition, FeeCatchUpRepository, FeeSchedule,
+    FeeScheduleRepository, Holding, HoldingNote, HoldingNoteRepository, HoldingRepository,
+    HoldingSnapshot, JournalFilter, ManagementFeeRemoval, SessionRecording, StockSplitPosition,
+    ThresholdDirection, Transaction, TransactionRepository, TransactionType, TransferView,
+    WriteOffReason,
 };
 use super::error::AccountError;
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
@@ -296,7 +297,8 @@ impl AccountService {
         currency: String,
         management_fees_enabled: bool,
     ) -> Result<Account, AccountError> {
-        let account = Account::new(name, bank_name, currency, management_fees_enabled)?;
+        let account = Account::new(name, bank_name, currency, management_fees_enabled)?
+            .with_implied_cost_basis();
         self.create_account(account).await
     }
 
@@ -314,7 +316,8 @@ impl AccountService {
         wrapper: Option<String>,
     ) -> Result<Account, AccountError> {
         let account = Account::new(name, bank_name, currency, management_fees_enabled)?
-            .classified(country, wrapper, None)?;
+            .classified(country, wrapper, None)?
+            .with_implied_cost_basis();
         self.create_account(account).await
     }
 
@@ -416,7 +419,8 @@ impl AccountService {
         Ok(())
     }
 
-    /// Updates an existing account; its country and wrapper (ACC-041) stay as they are.
+    /// Updates an existing account; its country and wrapper (ACC-041) and its cost basis
+    /// method (CBM-030) stay as they are.
     pub async fn update(
         &self,
         id: String,
@@ -427,10 +431,33 @@ impl AccountService {
     ) -> Result<Account, AccountError> {
         let account = Account::with_id(id, name, bank_name, currency, management_fees_enabled)?;
         let account = match self.get_by_id(&account.id).await? {
-            Some(current) => account.with_stored_classification(current.country, current.wrapper),
+            Some(current) => account
+                .with_stored_classification(current.country, current.wrapper)
+                .with_cost_basis_method(current.cost_basis_method),
             None => account,
         };
         self.update_account(account).await
+    }
+
+    /// CBM-030 / CBM-031 — puts the account on `method`: its holdings replayed, its sales'
+    /// and write-offs re-realized and the transfers in its transfers out feed re-costed
+    /// (TRF-025), saved together. An unknown account is rejected.
+    pub async fn change_cost_basis_method(
+        &self,
+        account_id: &str,
+        method: CostBasisMethod,
+    ) -> Result<Account, AccountError> {
+        let mut account = load_account(&*self.account_repo, account_id).await?;
+        if account.cost_basis_method == method {
+            return Ok(account);
+        }
+        account
+            .change_cost_basis_method(method)
+            .map_err(to_holding_tx_error)?;
+        save_accounts(&*self.account_repo, &mut [&mut account]).await?;
+        self.emit_account_updated();
+        self.emit_transaction_updated();
+        Ok(account)
     }
 
     /// ACC-041 — updates an existing account, its country and wrapper included.
@@ -449,9 +476,15 @@ impl AccountService {
     ) -> Result<Account, AccountError> {
         // ACC-043 — read apart from the write: a sync landing in between is a single-user race
         // whose worst case keeps a wrapper another device set, which ACC-040 allows anyway.
-        let stored_wrapper = self.get_by_id(&id).await?.and_then(|stored| stored.wrapper);
+        let stored = self.get_by_id(&id).await?;
+        let stored_wrapper = stored.as_ref().and_then(|stored| stored.wrapper.clone());
+        // CBM-030 — the method changes only through its own action.
+        let method = stored
+            .map(|stored| stored.cost_basis_method)
+            .unwrap_or_default();
         let account = Account::with_id(id, name, bank_name, currency, management_fees_enabled)?
-            .classified(country, wrapper, stored_wrapper.as_deref())?;
+            .classified(country, wrapper, stored_wrapper.as_deref())?
+            .with_cost_basis_method(method);
         self.update_account(account).await
     }
 
@@ -613,11 +646,29 @@ impl AccountService {
                 tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "holding_snapshot_as_of: repository failure");
                 AccountError::DatabaseError
             })?;
+        // CBM-032 — the figures follow the account's method.
+        let method = self.cost_basis_method(account_id).await?;
         Ok(Account::holding_snapshot_as_of(
             &transactions,
             asset_id,
             date,
+            method,
         ))
+    }
+
+    /// CBM-010 — the account's cost basis method; the weighted average for an unknown
+    /// account, whose history is empty (TDI-010).
+    pub async fn cost_basis_method(
+        &self,
+        account_id: &str,
+    ) -> StdResult<CostBasisMethod, AccountError> {
+        match self.account_repo.get_by_id(account_id).await {
+            Ok(account) => Ok(account.map(|a| a.cost_basis_method).unwrap_or_default()),
+            Err(e) => {
+                tracing::error!(target: BACKEND, account_id = %account_id, err = ?e, "cost_basis_method: repository failure");
+                Err(AccountError::DatabaseError)
+            }
+        }
     }
 
     /// SPL-062 — what a split of `factor` on `date` would make of the (account, asset)
@@ -2567,6 +2618,8 @@ impl AccountService {
             .map_err(|e| applied_write_error("apply_account", e))?;
         let mut aggregate = self.load_applied(conn, &account.id).await?;
         aggregate.seed_cash_holding();
+        // CBM-033 — a change of method from another device replays the account here.
+        aggregate.replay_every_holding_tolerantly();
         self.account_repo
             .save_applied(conn, &mut aggregate, None)
             .await
@@ -2850,6 +2903,9 @@ pub trait AccountServiceContract: Send + Sync {
         asset_id: &str,
         date: &str,
     ) -> StdResult<HoldingSnapshot, AccountError>;
+    /// The account's cost basis method (CBM-010, CBM-032).
+    async fn cost_basis_method(&self, account_id: &str)
+        -> StdResult<CostBasisMethod, AccountError>;
     /// Retrieves every transaction for an account across all assets (PRF-021).
     async fn get_all_transactions_for_account(
         &self,
@@ -3342,6 +3398,13 @@ impl AccountServiceContract for AccountService {
         date: &str,
     ) -> StdResult<HoldingSnapshot, AccountError> {
         AccountService::holding_snapshot_as_of(self, account_id, asset_id, date).await
+    }
+
+    async fn cost_basis_method(
+        &self,
+        account_id: &str,
+    ) -> StdResult<CostBasisMethod, AccountError> {
+        AccountService::cost_basis_method(self, account_id).await
     }
 
     async fn preview_split(
@@ -4241,7 +4304,7 @@ fn holds(account: &Account, op: &RecordingOp) -> bool {
     let RecordingOp::Dividend { asset_id, date, .. } = op else {
         return true;
     };
-    Account::holding_snapshot_as_of(&account.transactions, asset_id, date).quantity > 0
+    Account::quantity_held_as_of(&account.transactions, asset_id, date) > 0
 }
 
 /// IMP-036 — the transactions the account held when judging began, each matched once.
@@ -5348,6 +5411,14 @@ mod tests {
         assert!(matches!(err, AccountError::InvalidDate));
     }
 
+    /// An account repository that knows no account: the method read is the weighted
+    /// average (CBM-012).
+    fn unknown_account_repo() -> MockAccountRepository {
+        let mut repo = MockAccountRepository::new();
+        repo.expect_get_by_id().returning(|_| Ok(None));
+        repo
+    }
+
     // TDI-010 — a valid date over an empty history yields an empty snapshot.
     #[tokio::test]
     async fn holding_snapshot_as_of_returns_empty_for_an_account_with_no_transactions() {
@@ -5357,7 +5428,7 @@ mod tests {
             .once()
             .returning(|_, _| Ok(vec![]));
         let svc = AccountService::new(
-            Box::new(MockAccountRepository::new()),
+            Box::new(unknown_account_repo()),
             Box::new(MockHoldingRepository::new()),
             Box::new(mock_tr),
         );
@@ -5402,7 +5473,7 @@ mod tests {
             .once()
             .returning(move |_| Ok(vec![deposit.clone(), purchase.clone()]));
         let svc = AccountService::new(
-            Box::new(MockAccountRepository::new()),
+            Box::new(unknown_account_repo()),
             Box::new(MockHoldingRepository::new()),
             Box::new(mock_tr),
         );

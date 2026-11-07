@@ -20,13 +20,13 @@ This feature consumes data from two bounded contexts: `account` (for Holding dat
 
 Represents the current state of a financial position within the account. Persisted in the `holdings` table; all financial fields are computed by `RecordTransactionUseCase` via a full chronological replay of transactions on every create/edit/delete.
 
-| Field                | Business meaning                                                                                                                    |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `asset_id`           | The financial asset held.                                                                                                           |
-| `quantity`           | Current number of units held (on the scale of TRX-024; decimal text in the view, TRX-024B). Zero when the position is closed.       |
-| `average_price`      | Volume-weighted average purchase price in account currency (i64 micros). Preserved at closure (TRX-040).                            |
-| `last_sold_date`     | ISO date of the most recent Sell transaction for this holding. NULL if no sell has ever occurred.                                   |
-| `total_realized_pnl` | Cumulative realized profit or loss across all Sell and write-off transactions for this holding (i64 micros, WOF-021). Zero if none. |
+| Field                | Business meaning                                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `asset_id`           | The financial asset held.                                                                                                                                    |
+| `quantity`           | Current number of units held (on the scale of TRX-024; decimal text in the view, TRX-024B). Zero when the position is closed.                                |
+| `average_price`      | Volume-weighted average purchase price in account currency (i64 micros); under FIFO the cost of its lots per unit (CBM-027). Preserved at closure (TRX-040). |
+| `last_sold_date`     | ISO date of the most recent Sell transaction for this holding. NULL if no sell has ever occurred.                                                            |
+| `total_realized_pnl` | Cumulative realized profit or loss across all Sell and write-off transactions for this holding (i64 micros, WOF-021). Zero if none.                          |
 
 ### HoldingDetail (Backend DTO)
 
@@ -38,7 +38,7 @@ Read projection for **open** positions (`quantity > 0`). Enriched by `AccountDet
 | `asset_name`      | `AssetService`               | Display name of the asset.                                                                                                                    |
 | `asset_reference` | `AssetService`               | Ticker or user-defined reference.                                                                                                             |
 | `quantity`        | `Holding`                    | Current number of units held, as decimal text (TRX-024B). Always > 0.                                                                         |
-| `average_price`   | `Holding`                    | VWAP purchase price in account currency (i64 micros).                                                                                         |
+| `average_price`   | `Holding`                    | VWAP purchase price in account currency (i64 micros); under FIFO its lots' (CBM-027).                                                         |
 | `cost_basis`      | computed                     | `quantity × average_price` (i128 intermediate, per ACD-023/ACD-024). Not stored in DB.                                                        |
 | `realized_pnl`    | `Holding.total_realized_pnl` | Cumulative realized P&L from partial sells and write-offs (i64 micros, WOF-021). Zero if none. See SEL-042.                                   |
 | `market_value`    | computed                     | Value in account currency (i64 micros), the holding's contribution to `total_global_value`; `None` when unpriced or no usable rate (ACD-052). |

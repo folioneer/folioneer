@@ -63,7 +63,8 @@ impl AccountCreationUseCase {
         // ACC-002 / TRX-021 / ACC-041 — the account's own fields are checked before anything
         // is seeded for it: a value it refuses is answered with its own code.
         let account = Account::new(name, bank_name, currency, management_fees_enabled)?
-            .classified(country, wrapper, None)?;
+            .classified(country, wrapper, None)?
+            .with_implied_cost_basis();
         self.create_with_cash(account, None).await
     }
 
@@ -78,8 +79,9 @@ impl AccountCreationUseCase {
         wrapper: Option<String>,
         mark: AgentRecording,
     ) -> StdResult<Account, AccountError> {
-        let account =
-            Account::new(name, bank_name, currency, false)?.classified(country, wrapper, None)?;
+        let account = Account::new(name, bank_name, currency, false)?
+            .classified(country, wrapper, None)?
+            .with_implied_cost_basis();
         self.create_with_cash(account, Some(mark)).await
     }
 

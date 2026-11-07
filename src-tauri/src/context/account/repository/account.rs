@@ -5,9 +5,9 @@ use std::sync::Arc;
 
 use super::transaction::insert_agent_recording;
 use crate::context::account::domain::{
-    Account, AccountChange, AccountRepository, AgentRecording, FeeCatchUpPosition, FeeFrequency,
-    FeeSchedule, Holding, HoldingNote, ThresholdDirection, Transaction, TransactionType,
-    WriteOffReason,
+    Account, AccountChange, AccountRepository, AgentRecording, CostBasisMethod, FeeCatchUpPosition,
+    FeeFrequency, FeeSchedule, Holding, HoldingNote, ThresholdDirection, Transaction,
+    TransactionType, WriteOffReason,
 };
 use crate::context::account::repository::fee_schedule::schedule_content;
 use crate::shared::domain::{
@@ -28,6 +28,7 @@ struct AccountRow {
     management_fees_enabled: i64,
     country: Option<String>,
     wrapper: Option<String>,
+    cost_basis_method: String,
 }
 
 impl From<AccountRow> for Account {
@@ -40,6 +41,7 @@ impl From<AccountRow> for Account {
             row.management_fees_enabled != 0,
         )
         .with_stored_classification(row.country, row.wrapper)
+        .with_cost_basis_method(CostBasisMethod::from_stored(&row.cost_basis_method))
     }
 }
 
@@ -179,17 +181,19 @@ impl SqliteAccountRepository {
         mark: Option<AgentRecording>,
     ) -> Result<()> {
         let management_fees_enabled = account.management_fees_enabled as i64;
+        let cost_basis_method = account.cost_basis_method.as_str();
         sqlx::query!(
             r#"INSERT INTO accounts (id, name, bank_name, currency, management_fees_enabled,
-                                     country, wrapper)
-               VALUES (?, ?, ?, ?, ?, ?, ?)"#,
+                                     country, wrapper, cost_basis_method)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
             account.id,
             account.name,
             account.bank_name,
             account.currency,
             management_fees_enabled,
             account.country,
-            account.wrapper
+            account.wrapper,
+            cost_basis_method
         )
         .execute(&mut *db_tx)
         .await
@@ -362,6 +366,32 @@ impl SqliteAccountRepository {
                             None,
                         );
                         self.change_recorder.record(&mut *conn, draft).await?;
+                    }
+                }
+                AccountChange::MethodChanged(method) => {
+                    let based_on = match capture {
+                        Capture::Record => current_account_timestamp(conn, &account.id).await?,
+                        Capture::Applied(_) => None,
+                    };
+                    let name = method.as_str();
+                    sqlx::query!(
+                        r#"UPDATE accounts SET cost_basis_method = ? WHERE id = ?"#,
+                        name,
+                        account.id
+                    )
+                    .execute(&mut *conn)
+                    .await
+                    .with_context(|| format!("Failed to change the method of {}", account.id))?;
+                    if matches!(capture, Capture::Record) {
+                        let draft = ChangeDraft::new(
+                            RecordKind::Account,
+                            account_identity(&account.id),
+                            Operation::Updated,
+                            Origin::User,
+                            based_on,
+                            Some(serde_json::to_string(&*account)?),
+                        );
+                        self.record_account(conn, &account.id, draft).await?;
                     }
                 }
                 AccountChange::HoldingUpserted(h) => {
@@ -584,7 +614,7 @@ async fn insert_transaction(conn: &mut SqliteConnection, tx: &Transaction) -> Re
 async fn load_aggregate_on(conn: &mut SqliteConnection, id: &str) -> Result<Option<Account>> {
     let account_row = sqlx::query_as!(
         AccountRow,
-        r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper FROM accounts WHERE id = ?"#,
+        r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method FROM accounts WHERE id = ?"#,
         id
     )
     .fetch_optional(&mut *conn)
@@ -637,7 +667,8 @@ async fn load_aggregate_on(conn: &mut SqliteConnection, id: &str) -> Result<Opti
             holdings,
             transactions,
         )
-        .with_stored_classification(base.country, base.wrapper),
+        .with_stored_classification(base.country, base.wrapper)
+        .with_cost_basis_method(base.cost_basis_method),
     ))
 }
 
@@ -648,7 +679,7 @@ async fn account_by_name<'e>(
 ) -> Result<Option<Account>> {
     let row = sqlx::query_as!(
         AccountRow,
-        r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper FROM accounts WHERE LOWER(name) = LOWER(?)"#,
+        r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method FROM accounts WHERE LOWER(name) = LOWER(?)"#,
         name
     )
     .fetch_optional(executor)
@@ -729,7 +760,7 @@ impl AccountRepository for SqliteAccountRepository {
     async fn get_all(&self) -> Result<Vec<Account>> {
         let rows = sqlx::query_as!(
             AccountRow,
-            r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper FROM accounts"#
+            r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method FROM accounts"#
         )
         .fetch_all(&self.pool)
         .await
@@ -741,7 +772,7 @@ impl AccountRepository for SqliteAccountRepository {
     async fn get_by_id(&self, id: &str) -> Result<Option<Account>> {
         let row = sqlx::query_as!(
             AccountRow,
-            r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper FROM accounts WHERE id = ?"#,
+            r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method FROM accounts WHERE id = ?"#,
             id
         )
         .fetch_optional(&self.pool)
@@ -801,6 +832,7 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn update(&self, account: Account) -> Result<Account> {
         let management_fees_enabled = account.management_fees_enabled as i64;
+        let cost_basis_method = account.cost_basis_method.as_str();
         let mut db_tx = self
             .pool
             .begin()
@@ -810,7 +842,7 @@ impl AccountRepository for SqliteAccountRepository {
         let written = sqlx::query!(
             r#"UPDATE accounts
                SET name = ?, bank_name = ?, currency = ?, management_fees_enabled = ?,
-                   country = ?, wrapper = ?
+                   country = ?, wrapper = ?, cost_basis_method = ?
                WHERE id = ?"#,
             account.name,
             account.bank_name,
@@ -818,6 +850,7 @@ impl AccountRepository for SqliteAccountRepository {
             management_fees_enabled,
             account.country,
             account.wrapper,
+            cost_basis_method,
             account.id
         )
         .execute(&mut *db_tx)
@@ -945,7 +978,8 @@ impl AccountRepository for SqliteAccountRepository {
             RecordKind::Account => {
                 let row = sqlx::query!(
                     r#"SELECT id, name, bank_name, currency, management_fees_enabled,
-                              country, wrapper, sync_logical_timestamp, sync_origin, sync_device_id
+                              country, wrapper, cost_basis_method,
+                              sync_logical_timestamp, sync_origin, sync_device_id
                        FROM accounts WHERE id = ?"#,
                     identity
                 )
@@ -961,6 +995,7 @@ impl AccountRepository for SqliteAccountRepository {
                         management_fees_enabled: row.management_fees_enabled,
                         country: row.country,
                         wrapper: row.wrapper,
+                        cost_basis_method: row.cost_basis_method,
                     });
                     Ok(SyncedRecord {
                         rank: rank_from_columns(
@@ -1237,11 +1272,13 @@ impl AccountRepository for SqliteAccountRepository {
         rank: &Rank,
     ) -> Result<()> {
         let management_fees_enabled = account.management_fees_enabled as i64;
+        let cost_basis_method = account.cost_basis_method.as_str();
         let columns = RankColumns::from(rank.clone());
         sqlx::query!(
             r#"INSERT INTO accounts (id, name, bank_name, currency, management_fees_enabled,
-                                     country, wrapper, sync_logical_timestamp, sync_origin, sync_device_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                     country, wrapper, cost_basis_method,
+                                     sync_logical_timestamp, sync_origin, sync_device_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(id) DO UPDATE SET
                    name = excluded.name,
                    bank_name = excluded.bank_name,
@@ -1249,6 +1286,7 @@ impl AccountRepository for SqliteAccountRepository {
                    management_fees_enabled = excluded.management_fees_enabled,
                    country = excluded.country,
                    wrapper = excluded.wrapper,
+                   cost_basis_method = excluded.cost_basis_method,
                    sync_logical_timestamp = excluded.sync_logical_timestamp,
                    sync_origin = excluded.sync_origin,
                    sync_device_id = excluded.sync_device_id"#,
@@ -1259,6 +1297,7 @@ impl AccountRepository for SqliteAccountRepository {
             management_fees_enabled,
             account.country,
             account.wrapper,
+            cost_basis_method,
             columns.logical_timestamp,
             columns.origin,
             columns.device_id
