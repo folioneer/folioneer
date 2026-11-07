@@ -57,7 +57,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-016 — No resident presence (backend)**: Outside its brief daily execution, nothing runs and nothing is visible — no tray icon, no background service, no window.
 
-**SPF-017 — All desktop platforms supported (backend)**: The schedule registration works on Linux, Windows, and macOS through each system's native scheduling facility. Behavior is identical across platforms; only Linux is covered by automated end-to-end verification (Windows and macOS registrations are verified by unit-level checks on the generated scheduling definitions). On Linux, an application run as an AppImage schedules the AppImage file itself, never the executable inside the temporary folder it runs from, which is gone once it exits.
+**SPF-017 — All desktop platforms supported (backend)**: The schedule registration works on Linux, Windows, and macOS through each system's native scheduling facility. Behavior is identical across platforms; Linux is covered by automated end-to-end verification, Windows by an automated test that registers a schedule on a Windows machine and reads it back, macOS by unit-level checks on the generated definition. On Linux, an application run as an AppImage schedules the AppImage file itself, never the executable inside the temporary folder it runs from, which is gone once it exits.
 
 **SPF-018 — Default trigger time (frontend)**: When the user enables the feature without choosing a time, the trigger time defaults to **22:15** local time (after the same-day NYSE close as seen from Europe; a machine off at that hour is covered by the catch-up, SPF-022).
 
@@ -69,11 +69,13 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-021 — Once-per-day guard (backend)**: Every run settles the **latest pending trigger**: the most recent calendar day whose trigger time has already passed at execution. Before any external call, the run checks whether a successful run has already settled that same trigger day; if so, it records a skipped run and exits without downloading.
 
-**SPF-022 — Missed-trigger catch-up (backend)**: A trigger missed because the machine was off or asleep executes at the next opportunity (machine start or wake). Multiple missed days coalesce into a single catch-up run that settles the latest pending trigger (SPF-021); the earlier missed days are recovered by the backfill (SPF-031), not by additional run records.
+**SPF-022 — Missed-trigger catch-up (backend)**: A trigger missed because the machine was off or asleep executes at the next opportunity, once the machine is on and the user who enabled the download is logged in (start, logon or wake). Multiple missed days coalesce into a single catch-up run that settles the latest pending trigger (SPF-021); the earlier missed days are recovered by the backfill (SPF-031), not by additional run records.
 
 **SPF-023 — Independent of in-app fetch tasks (backend)**: The scheduled run is a separate, short-lived execution of the application alongside any open instance — neither replaces, focuses, nor blocks the other. It is not subject to the in-app single-fetch guard (MKT-113), and vice versa. Simultaneous execution converges safely: all price writes are per-`(asset, date)` upserts (MKT-025), and concurrent access to the shared data store must be safe by construction.
 
 **SPF-024 — Open app reflects values on its next read (frontend)**: A running app is not live-notified by the scheduled run. New values appear the next time the app naturally re-reads its data (navigation, manual refresh, relaunch).
+
+**SPF-025 — Runs on battery power (backend)**: A scheduled run starts and completes whether the machine is on battery or mains power.
 
 ### Values Recorded (030–039)
 
