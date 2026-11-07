@@ -9,8 +9,9 @@ use serde_json::Value;
 
 use crate::shared::domain::{Operation, RecordIdentity, RecordKind};
 
-/// The widest amount, price, or rate a record may carry, in micros (±10⁹ units).
-pub const AMOUNT_BOUND: i64 = 1_000_000_000_000_000;
+/// The widest amount, price, or rate a record may carry, in micros (±10¹² units): what a
+/// device can record (TRX-020).
+pub const AMOUNT_BOUND: i64 = crate::shared::domain::amount::LARGEST_AMOUNT;
 /// The widest `quantity` a record may carry: what a device can record (TRX-024C).
 pub const QUANTITY_BOUND: i64 = crate::shared::domain::quantity::LARGEST_QUANTITY;
 /// The longest text a record may carry, in characters (the holding note's own cap, HNO-011).
@@ -250,6 +251,26 @@ mod tests {
             ),
             Err(MalformedChange::ContentMissing)
         );
+    }
+
+    // TRX-020 / SYN-034 — the largest figure of money a device records is one every device
+    // reads.
+    #[test]
+    fn the_largest_figure_a_device_records_is_read() {
+        let largest = crate::shared::domain::amount::LARGEST_AMOUNT;
+        let content = format!(
+            r#"{{"id":"tx-1","unit_price":{largest},"fees":{largest},"total_amount":{largest},"exchange_rate":{largest}}}"#
+        );
+        assert_eq!(
+            check_received_change(
+                RecordKind::Transaction,
+                "tx-1",
+                Operation::Created,
+                Some(&content)
+            ),
+            Ok(())
+        );
+        assert_eq!(AMOUNT_BOUND, largest);
     }
 
     // A quantity beyond ±10¹⁷ hundred-millionths is malformed, at any depth; the bound itself is

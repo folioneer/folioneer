@@ -57,6 +57,7 @@ export function transactionMutationErrorToI18n(err: AccountError | OpenHoldingEr
     case "UnitPriceNegative":
     case "UnitPriceOutOfRange":
     case "QuantityOutOfRange":
+    case "AmountOutOfRange":
     case "FeesNegative":
     case "ExchangeRateNotPositive":
     case "TotalAmountNotPositive":

@@ -1268,6 +1268,7 @@
       "DatabaseError": "An unexpected database error occurred. Please try again."
     },
     "currency": {
+      "RateOutOfRange": "This rate is above a trillion.",
       "NotPositive": "Rate must be greater than 0.",
       "NonFinite": "Rate must be a finite number.",
       "DateInFuture": "Date cannot be in the future.",
@@ -1353,6 +1354,8 @@
     "TotalAmountBelowFees": "Total amount cannot be lower than the fees it includes.",
     "UnitPriceOutOfRange": "The derived unit price is out of range — check quantity and total.",
     "QuantityOutOfRange": "This quantity is too large.",
+    "AmountOutOfRange": "This figure is above a trillion.",
+    "PriceOutOfRange": "This price is above a trillion.",
     "ArchivedAsset": "Cannot open a balance for an archived asset.",
     "InvalidTotalCost": "Total cost must not be negative.",
     "AmountNotPositive": "Amount must be greater than 0.",

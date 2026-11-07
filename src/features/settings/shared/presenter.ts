@@ -203,6 +203,7 @@ export function referenceCurrencyErrorToI18n(error: CurrencyError): I18nMessage 
     case "InvalidDateFormat":
       return { key: "error.currency.InvalidDateFormat", vars: { date: error.date } };
     case "NotPositive":
+    case "RateOutOfRange":
     case "NonFinite":
     case "DateInFuture":
     case "InvalidCurrency":

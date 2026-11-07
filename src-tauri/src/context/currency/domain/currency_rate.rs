@@ -40,6 +40,10 @@ impl CurrencyRate {
         if rate_micros <= 0 {
             return Err(CurrencyError::NotPositive);
         }
+        // SYN-034 — no larger than every device reads.
+        if rate_micros > crate::shared::domain::amount::LARGEST_AMOUNT {
+            return Err(CurrencyError::RateOutOfRange);
+        }
         let parsed = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
             .map_err(|_| CurrencyError::InvalidDateFormat { date: date.clone() })?;
         let today = chrono::Local::now().date_naive();
@@ -154,6 +158,24 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(err, CurrencyError::NotPositive), "got: {err:?}");
+    }
+
+    // FXR-021 / SYN-034 — a rate past what every device reads is refused; one at it is kept.
+    #[test]
+    fn new_rejects_a_rate_past_what_every_device_reads() {
+        use crate::shared::domain::amount::LARGEST_AMOUNT;
+        let rate = |rate| {
+            CurrencyRate::new(
+                "USD".to_string(),
+                "EUR".to_string(),
+                "2026-01-01".to_string(),
+                rate,
+                CurrencyRateSource::Manual,
+            )
+        };
+        let err = rate(LARGEST_AMOUNT + 1).unwrap_err();
+        assert!(matches!(err, CurrencyError::RateOutOfRange), "got: {err:?}");
+        assert!(rate(LARGEST_AMOUNT).is_ok());
     }
 
     // FXR-021 — new() rejects negative rate

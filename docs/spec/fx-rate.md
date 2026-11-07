@@ -90,7 +90,7 @@ This feature does not add fields to `HoldingDetail`; it changes the **conditions
 
 **FXR-020 — Required fields (frontend)**: The manual rate form requires `from_currency`, `to_currency`, a non-empty `date`, and a non-empty `rate`. The submit action is disabled while any field is empty.
 
-**FXR-021 — Rate validation (frontend + backend)**: A valid rate is strictly greater than zero. The backend rejects a rate of zero or below with a specific error. The frontend validates inline and disables submit until corrected.
+**FXR-021 — Rate validation (frontend + backend)**: A valid rate is strictly greater than zero and no larger than a trillion, what every device reads (SYN-034). The backend rejects a rate of zero or below, or one past a trillion, each with a specific error. The frontend checks the sign inline and disables submit until corrected; a rate past the limit is refused on submit.
 
 **FXR-022 — Date validation (frontend + backend)**: A valid date is a well-formed ISO 8601 calendar date (`YYYY-MM-DD`) not in the future. Any past date is accepted (users may backdate historical rates). The backend rejects an invalid or future date with a specific error; the frontend validates inline.
 

@@ -633,6 +633,7 @@ describe("assetPriceMutationErrorToI18n", () => {
   it.each([
     "DatabaseError",
     "NotPositive",
+    "PriceOutOfRange",
     "NonFinite",
     "DateInFuture",
   ] as const)("%s unit variant maps to its flat error key", (code) => {

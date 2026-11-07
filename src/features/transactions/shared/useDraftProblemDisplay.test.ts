@@ -49,6 +49,8 @@ describe("useDraftProblemDisplay", () => {
       ),
     ).toBe("quantity");
     expect(draftProblemField({ code: "TotalAmountBelowFees" }, "total")).toBe("total");
+    // TRX-020 — a figure past the limit has no one field: it shows beside the actions.
+    expect(draftProblemField({ code: "AmountOutOfRange" }, "total")).toBeNull();
     expect(draftProblemField({ code: "TotalAmountNotPositive" }, "price")).toBe("unitPrice");
     expect(draftProblemField({ code: "TotalAmountNotPositive" }, "total")).toBe("total");
     expect(draftProblemField({ code: "TotalCostMissing" }, "price")).toBe("totalCost");
