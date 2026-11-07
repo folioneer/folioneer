@@ -505,7 +505,7 @@ The once-daily automatic download of closing prices and exchange rates, launched
 
 ### Trigger time
 
-The local wall-clock time of day the scheduled fetch runs (default 22:15). A trigger missed while the machine was off or asleep executes at the next opportunity, once the user is logged in (SPF-022); the run settles the latest pending trigger day.
+The local wall-clock time of day the scheduled fetch runs (default 22:15). A trigger missed while the machine was off or asleep executes at the next opportunity, once the user who enabled it is logged in (SPF-022); the run settles the latest pending trigger day.
 
 > Status: confirmed
 

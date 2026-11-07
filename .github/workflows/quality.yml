@@ -296,7 +296,7 @@ jobs:
     name: Windows — the application compiles
     # The release is not the first compilation of the Windows-only code (DEBT-086): a pull
     # request that touches the Rust code is compiled for Windows, and the tests of the
-    # agent connection — its channel is a named pipe there — and of the daily task, which
+    # agent connection — its channel is a named pipe there — and of the scheduled fetch's Windows task, which
     # registers one in the Task Scheduler and reads it back (SPF-017), run on Windows.
     runs-on: windows-latest
     # 45: a Cargo.lock change misses the Rust cache and the cold build is the slow path.
@@ -352,7 +352,7 @@ jobs:
         working-directory: src-tauri
         shell: bash
         run: cargo check --all-targets
-      - name: The agent connection's and the daily task's tests
+      - name: The agent connection's and the scheduled fetch's tests
         # Without the Tauri shell: the channel and what it serves are the core's.
         if: steps.scope.outputs.backend == 'true'
         working-directory: src-tauri
