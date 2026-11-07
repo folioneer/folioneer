@@ -4,6 +4,9 @@ import {
   type AgentConnectionState,
   type CurrencyError,
   commands,
+  type DataExportError,
+  type ExportFormat,
+  type ExportReport,
   type FetchAllAssetPricesError,
   type PortfolioSyncError,
   type PriceProviderChoice,
@@ -119,6 +122,19 @@ export async function pickSyncFolder(): Promise<string | null> {
   return await open({ directory: true, multiple: false });
 }
 
+// EXP-010 — the folder an export is written into; `null` when the picker is closed.
+export async function pickExportFolder(): Promise<string | null> {
+  return await open({ directory: true, multiple: false });
+}
+
+// EXP-011 to EXP-016 — writes every account, asset, transaction and price into `folder`.
+export async function exportPortfolio(
+  format: ExportFormat,
+  folder: string,
+): Promise<Result<ExportReport, DataExportError>> {
+  return await commands.exportPortfolio(format, folder);
+}
+
 // AGT-036 — the owner's setting, and whether this system has an agent connection.
 export async function getAgentConnectionState(): Promise<AgentConnectionState> {
   return await commands.getAgentConnectionState();
@@ -148,6 +164,8 @@ export const settingsGateway = {
   changeSyncFolder,
   dismissConflictNotice,
   pickSyncFolder,
+  pickExportFolder,
+  exportPortfolio,
 };
 
 // GPF-011 / FXR-127 — the reference currency, with every code it may be set to. Each feature

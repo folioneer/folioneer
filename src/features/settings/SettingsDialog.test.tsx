@@ -34,6 +34,9 @@ vi.mock("./reference_currency/ReferenceCurrencySection", () => ({
 vi.mock("./sync/SyncSection", () => ({
   SyncSection: () => <div data-testid="sync-section-mounted" />,
 }));
+vi.mock("./your_data/YourDataSection", () => ({
+  YourDataSection: () => <div id="your-data-section" />,
+}));
 vi.mock("./agent_connection/AgentsAllowedSetting", () => ({
   AgentsAllowedSetting: () => <div data-testid="agents-allowed-mounted" />,
 }));
@@ -89,6 +92,16 @@ describe("SettingsDialog", () => {
     open("settings-auto-record-price");
 
     expect(toggleAutoRecordPrice).toHaveBeenCalledTimes(1);
+  });
+
+  // EXP-010 — "Your data" is the last section, and holds the export.
+  it("lists Your data last, and opens it", () => {
+    render(<SettingsDialog isOpen onClose={vi.fn()} />);
+
+    const sections = Array.from(document.querySelectorAll("nav button")).map((button) => button.id);
+    expect(sections.at(-1)).toBe("settings-section-your_data");
+    open("settings-section-your_data");
+    expect(element("your-data-section")).toBeInTheDocument();
   });
 
   // SPF-010, MKT-120 — the fetch settings sit in Prices.

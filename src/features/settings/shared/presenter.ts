@@ -1,6 +1,8 @@
 import type {
   ConflictNotice,
   CurrencyError,
+  DataExportError,
+  ExportReport,
   FolderProblem,
   PortfolioSyncError,
   PriceProviderChoiceError,
@@ -225,6 +227,44 @@ export function rateHistoryErrorToI18n(error: RateHistoryBackfillError): I18nMes
     case "ProviderUnreachable":
     case "DatabaseError":
       return { key: `error.currency.${error.code}` };
+    default: {
+      const _exhaustive: never = error;
+      return _exhaustive;
+    }
+  }
+}
+
+/** EXP-016 — the last part of a path, whatever its separator. */
+function lastPart(path: string): string {
+  return (
+    path
+      .replace(/[\\/]+$/, "")
+      .split(/[\\/]/)
+      .pop() ?? path
+  );
+}
+
+/** EXP-016 — where the export went and what it holds. */
+export function exportDoneMessage(report: ExportReport): I18nMessage {
+  return {
+    key: "settings.your_data.done",
+    vars: {
+      name: lastPart(report.written_to),
+      accounts: report.accounts,
+      assets: report.assets,
+      transactions: report.transactions,
+      prices: report.prices,
+    },
+  };
+}
+
+/** F27 / EXP-016 — a failed export: nothing written, and why. */
+export function exportErrorToI18n(error: DataExportError): I18nMessage {
+  switch (error.code) {
+    case "FolderUnavailable":
+    case "WriteFailed":
+    case "DatabaseError":
+      return { key: `settings.your_data.failed.${error.code}` };
     default: {
       const _exhaustive: never = error;
       return _exhaustive;

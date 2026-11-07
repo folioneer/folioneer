@@ -24,6 +24,8 @@ pub mod asset_web_lookup;
 pub mod capabilities;
 /// CSV import: a broker's export read through an import mapper and previewed (IMP).
 pub mod csv_import;
+/// Data export: every account, asset, transaction and price as CSV or JSON (EXP).
+pub mod data_export;
 /// Delete asset: guards hard-deletion against existing transactions.
 pub mod delete_asset;
 /// Fee generation: lazy catch-up management fee deduction across all active schedules (FEE-040+).

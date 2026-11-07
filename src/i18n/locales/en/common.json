@@ -228,6 +228,7 @@
     "section_prices": "Prices",
     "section_sync": "Sync",
     "section_agents": "AI agents",
+    "section_your_data": "Your data",
     "language_label": "Language",
     "language_auto": "System default",
     "language_en": "English",
@@ -267,7 +268,21 @@
     "agents_unavailable_description": "Not available on this system yet. Nothing can connect.",
     "reference_currency_label": "Reference currency",
     "reference_currency_help": "The portfolio's totals, performance and price movements are given in this currency, on every computer of the sync.",
-    "reference_currency_fetching": "Fetching the rate histories…"
+    "reference_currency_fetching": "Fetching the rate histories…",
+    "your_data": {
+      "description": "Every account, asset, transaction and price, written where you choose on this computer. Nothing is sent anywhere.",
+      "format_label": "Format",
+      "format_csv": "CSV — one file per table, in a folder",
+      "format_json": "JSON — one file",
+      "action_export": "Export…",
+      "working": "Exporting…",
+      "done": "Exported to {{name}} — accounts: {{accounts}}, assets: {{assets}}, transactions: {{transactions}}, prices: {{prices}}.",
+      "failed": {
+        "FolderUnavailable": "Nothing was written: the folder is not available.",
+        "WriteFailed": "Nothing was written: the folder could not be written to.",
+        "DatabaseError": "Nothing was written: the portfolio could not be read."
+      }
+    }
   },
   "agent": {
     "connection_title": "An AI agent asks to connect",

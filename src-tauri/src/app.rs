@@ -34,6 +34,7 @@ use crate::use_cases::asset_price_fetch::{AssetPriceFetchUseCase, FetchGuard};
 use crate::use_cases::asset_web_lookup::AssetWebLookupUseCase;
 use crate::use_cases::capabilities::Capabilities;
 use crate::use_cases::csv_import::CsvImportUseCase;
+use crate::use_cases::data_export::DataExportUseCase;
 use crate::use_cases::delete_asset::DeleteAssetUseCase;
 use crate::use_cases::fee_generation::{FeeGenerationOrchestrator, LaunchSyncSurface};
 use crate::use_cases::global_performance::GlobalPerformanceUseCase;
@@ -342,6 +343,11 @@ pub fn run() {
                 // MKT-201 — this installation's fetch log, written by both fetch paths.
                 let price_fetch_log: Arc<dyn PriceFetchLogRepository> =
                     Arc::new(SqlitePriceFetchLogRepository::new(db.pool.clone()));
+                // EXP — the data export reads every account, asset, transaction and price.
+                app_handle.manage(Arc::new(DataExportUseCase::new(
+                    account_service.clone(),
+                    asset_service.clone(),
+                )));
                 // MKT-200/201 — the header's price item. It reads prices already
                 // recorded and this device's fetch log, so it is built whether or not
                 // anything can fetch.
