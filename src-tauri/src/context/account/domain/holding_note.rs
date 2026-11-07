@@ -78,6 +78,10 @@ impl HoldingNote {
         }
         match (threshold_price, threshold_direction) {
             (Some(price), Some(_)) if price <= 0 => return Err(AccountError::ThresholdNotPositive),
+            // SYN-034 — no larger than every device reads.
+            (Some(price), Some(_)) if price > crate::shared::domain::amount::LARGEST_AMOUNT => {
+                return Err(AccountError::AmountOutOfRange)
+            }
             (Some(_), Some(_)) | (None, None) => {}
             _ => return Err(AccountError::ThresholdIncomplete),
         }
@@ -186,6 +190,18 @@ mod tests {
         ));
         let boundary = "é".repeat(500); // chars, not bytes
         assert!(make_note(&boundary, None, None).is_ok());
+    }
+
+    // HNO-011 / SYN-034 — an alarm threshold is a price: past what every device reads it
+    // is refused.
+    #[test]
+    fn a_threshold_past_what_every_device_reads_is_rejected() {
+        let largest = crate::shared::domain::amount::LARGEST_AMOUNT;
+        assert!(matches!(
+            make_note("n", Some(largest + 1), Some(ThresholdDirection::Above)),
+            Err(AccountError::AmountOutOfRange)
+        ));
+        assert!(make_note("n", Some(largest), Some(ThresholdDirection::Above)).is_ok());
     }
 
     // HNO-011 — an alarm threshold must be strictly positive

@@ -2005,6 +2005,7 @@ fn refusal_from_write_off(error: &WriteOffError) -> Refusal {
 fn refusal_from_asset(error: &AssetError) -> Refusal {
     let message = match error {
         AssetError::NotPositive => "the price must be above zero".to_string(),
+        AssetError::PriceOutOfRange => "the price is above a trillion".to_string(),
         AssetError::InvalidDateFormat { .. } => "the date is not a valid date".to_string(),
         AssetError::DateInFuture => "the date is in the future".to_string(),
         AssetError::Archived => "the asset is archived: unarchive it to record a price".to_string(),
@@ -2089,6 +2090,9 @@ pub fn refusal_from_account(error: &AccountError) -> Refusal {
         AccountError::QuantityNotPositive => "the quantity must be above zero".to_string(),
         AccountError::UnitPriceNegative => "the price cannot be negative".to_string(),
         AccountError::QuantityOutOfRange => "the quantity is too large".to_string(),
+        AccountError::AmountOutOfRange => {
+            "a price, rate, fee or total is above a trillion".to_string()
+        }
         AccountError::UnitPriceOutOfRange => {
             "the price this total gives cannot be stored".to_string()
         }
@@ -2217,6 +2221,11 @@ mod tests {
                 "the quantity is too large",
             ),
             (
+                AccountError::AmountOutOfRange,
+                "AmountOutOfRange",
+                "a price, rate, fee or total is above a trillion",
+            ),
+            (
                 AccountError::UnitPriceOutOfRange,
                 "UnitPriceOutOfRange",
                 "the price this total gives cannot be stored",
@@ -2326,6 +2335,11 @@ mod tests {
                 AssetError::NotPositive,
                 "NotPositive",
                 "the price must be above zero",
+            ),
+            (
+                AssetError::PriceOutOfRange,
+                "PriceOutOfRange",
+                "the price is above a trillion",
             ),
             (
                 AssetError::DateInFuture,

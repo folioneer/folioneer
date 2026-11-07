@@ -56,6 +56,11 @@ pub enum AccountError {
     #[error("An archived asset cannot be sold")]
     ArchivedAssetSell,
 
+    /// A price, a rate, fees or a total passes a billion units of money, what every device
+    /// reads (TRX-020, SYN-034).
+    #[error("An amount is larger than every device reads")]
+    AmountOutOfRange,
+
     // --- Account aggregate operations (buy/sell/correct/cancel/cash) ---
     /// Attempt to sell an asset with no open position (quantity = 0).
     #[error("No units available to sell (closed position)")]

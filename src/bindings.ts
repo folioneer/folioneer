@@ -1570,6 +1570,11 @@ export type AccountError =
  */
 { code: "ArchivedAssetSell" } | 
 /**
+ * A price, a rate, fees or a total passes a billion units of money, what every device
+ * reads (TRX-020, SYN-034).
+ */
+{ code: "AmountOutOfRange" } | 
+/**
  * Attempt to sell an asset with no open position (quantity = 0).
  */
 { code: "ClosedPosition" } | 
@@ -2392,6 +2397,10 @@ export type AssetError =
  */
 { code: "NotPositive" } | 
 /**
+ * Price passes a billion units of money, what every device reads (MKT-021, SYN-034).
+ */
+{ code: "PriceOutOfRange" } | 
+/**
  * Price value is not a finite floating-point number.
  */
 { code: "NonFinite" } | 
@@ -3051,6 +3060,10 @@ export type CurrencyError =
  * The rate value is zero or negative (FXR-021).
  */
 { code: "NotPositive" } | 
+/**
+ * Rate passes a trillion, what every device reads (FXR-021, SYN-034).
+ */
+{ code: "RateOutOfRange" } | 
 /**
  * The rate value is not a finite floating-point number (FXR-021). Raised
  * only at the IPC boundary by `api::rate_f64_to_micros`, before the `f64`

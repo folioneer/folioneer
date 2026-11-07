@@ -1,5 +1,7 @@
 //! Shared kernel — cross-BC domain vocabulary (B1, ddd-reference.md § Shared Kernel).
 
+/// The largest figure of money a record carries (TRX-020, SYN-034).
+pub mod amount;
 pub mod quantity;
 /// The multi-device sync record-change vocabulary (`RecordKind`, `Origin`, `Operation`,
 /// `LogicalTimestamp`, `RecordIdentity`, `Rank`, `ChangeDraft`) — SYN-021, CFR-010/012/014/016/020.

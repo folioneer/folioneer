@@ -20,6 +20,11 @@ describe("currencyErrorToI18n", () => {
     expect(currencyErrorToI18n(error)).toEqual({ key: "error.currency.NotPositive" });
   });
 
+  it("maps RateOutOfRange to its flat i18n key (FXR-021)", () => {
+    const error: CurrencyError = { code: "RateOutOfRange" };
+    expect(currencyErrorToI18n(error)).toEqual({ key: "error.currency.RateOutOfRange" });
+  });
+
   it("maps NonFinite to its flat i18n key (FXR-021)", () => {
     const error: CurrencyError = { code: "NonFinite" };
     expect(currencyErrorToI18n(error)).toEqual({ key: "error.currency.NonFinite" });

@@ -4110,7 +4110,8 @@ mod draft_tests {
         for (d, expected) in [
             (check(&|d| d.date = "2999-01-01".into()), "DateInFuture"),
             (check(&|d| d.quantity = 0), "QuantityNotPositive"),
-            (check(&|d| d.quantity = i64::MAX), "QuantityOutOfRange"),
+            // TRX-020 — a dividend's amount is money: past that limit, whatever its size.
+            (check(&|d| d.quantity = i64::MAX), "AmountOutOfRange"),
             (
                 check(&|d| d.entered = entered(-1, 1_000_000, 0)),
                 "UnitPriceNegative",

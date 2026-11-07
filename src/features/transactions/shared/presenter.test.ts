@@ -323,6 +323,7 @@ describe("transactionMutationErrorToI18n", () => {
     "UnitPriceNegative",
     "UnitPriceOutOfRange",
     "QuantityOutOfRange",
+    "AmountOutOfRange",
     "FeesNegative",
     "ExchangeRateNotPositive",
     "TotalAmountNotPositive",

@@ -201,6 +201,7 @@ Record identity per kind follows CFR-012: accounts, categories, assets, transact
 
 ## Changelog
 
+- 2026-11-07 — #748 (SYN-034, SYN-038): data format version 15 widens the bound on a figure of money to ±10¹⁸; the written form is version 14's.
 - 2026-11-01 — #579 (TRX-024B): `HoldingInconsistency::Oversold.quantity` is decimal text.
 - 2026-11-01 — #578 (SYN-038, TRX-024): a non-cash transaction's `quantity` is in hundred-millionths, an older segment's multiplied by 100 on read; data format version 14. No command changed.
 - 2026-11-01 — #577 (SYN-038, SPL-010, DIV-023): a split's factor and a dividend's amount leave a transaction's `quantity` for `split_factor` and `dividend_amount`; data format version 13. No command changed.

@@ -54,6 +54,7 @@ export function assetPriceMutationErrorToI18n(err: AssetError): I18nMessage {
     case "DatabaseError":
     case "PriceNotFound":
     case "NotPositive":
+    case "PriceOutOfRange":
     case "NonFinite":
     case "DateInFuture":
       return { key: `error.${err.code}` };

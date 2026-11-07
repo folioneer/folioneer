@@ -2341,7 +2341,10 @@ impl Account {
         let qty = quantity as i128;
         let price = unit_price as i128;
         let rate = exchange_rate as i128;
-        ((qty * price / QUANTITY_UNIT) * rate / MICRO) as i64 + fees
+        // Saturated, never wrapped: a total past i64 is refused as past the limit (TRX-020).
+        saturate(
+            (qty.saturating_mul(price) / QUANTITY_UNIT).saturating_mul(rate) / MICRO + fees as i128,
+        )
     }
 
     /// Computes total_amount for a Sell (SEL-023).
@@ -2356,7 +2359,9 @@ impl Account {
         let qty = quantity as i128;
         let price = unit_price as i128;
         let rate = exchange_rate as i128;
-        ((qty * price / QUANTITY_UNIT) * rate / MICRO) as i64 - fees
+        saturate(
+            (qty.saturating_mul(price) / QUANTITY_UNIT).saturating_mul(rate) / MICRO - fees as i128,
+        )
     }
 
     /// Derives the unit price implied by a user-entered all-in total (TRX-060, SEL-050).
@@ -2380,6 +2385,10 @@ impl Account {
         let numerator = securities_amount * MICRO * QUANTITY_UNIT;
         let denominator = quantity as i128 * exchange_rate as i128;
         let rounded = (numerator + denominator / 2) / denominator;
+        // TRX-020 — no larger than every device reads (SYN-034).
+        if rounded > crate::shared::domain::amount::LARGEST_AMOUNT as i128 {
+            return Err(AccountError::UnitPriceOutOfRange);
+        }
         i64::try_from(rounded).map_err(|_| AccountError::UnitPriceOutOfRange)
     }
 
@@ -2705,6 +2714,12 @@ impl Account {
                 .expect("test transaction inputs must be valid");
         self.apply_withdrawal(tx)
     }
+}
+
+/// An i128 figure as an i64, held at the nearest end instead of wrapping: a figure past
+/// either end is then refused by the limit on money (TRX-020).
+pub(crate) fn saturate(figure: i128) -> i64 {
+    figure.clamp(i64::MIN as i128, i64::MAX as i128) as i64
 }
 
 #[cfg(test)]
@@ -3237,6 +3252,26 @@ mod tests {
         assert_eq!(tx.total_amount, micro(140));
         // SEL-024 consumes the stored total: 140 − VWAP cost basis 100 = +40
         assert_eq!(tx.realized_pnl, Some(micro(40)));
+    }
+
+    // TRX-020 / TRX-060 — a unit price a small quantity gives a typed total, past what every
+    // device reads, is refused as the price it is; a purchase total past i64 does not wrap
+    // into a figure that would pass.
+    #[test]
+    fn a_derived_price_or_total_past_the_limit_is_refused_not_wrapped() {
+        use crate::shared::domain::amount::LARGEST_AMOUNT;
+        // A million in total over half a millionth of a unit: a price of 2·10¹² units, which
+        // fits an i64 but passes the limit.
+        let err = Account::derive_unit_price_from_total(micro(1_000_000) as i128, 50, micro(1))
+            .unwrap_err();
+        assert!(matches!(err, AccountError::UnitPriceOutOfRange), "{err:?}");
+        let total = Account::compute_purchase_total(
+            from_surface(micro(1_000_000_000)),
+            LARGEST_AMOUNT,
+            LARGEST_AMOUNT,
+            0,
+        );
+        assert!(total > LARGEST_AMOUNT, "saturated, not wrapped: {total}");
     }
 
     // TRX-060 / SEL-050 — an exact .5 fraction rounds up
