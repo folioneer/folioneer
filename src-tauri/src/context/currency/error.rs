@@ -78,6 +78,10 @@ mod tests {
     #[test]
     fn each_variant_emits_a_code() {
         assert_eq!(
+            to_value(CurrencyError::RateOutOfRange).unwrap(),
+            json!({ "code": "RateOutOfRange" })
+        );
+        assert_eq!(
             to_value(CurrencyError::NotPositive).unwrap(),
             json!({ "code": "NotPositive" })
         );

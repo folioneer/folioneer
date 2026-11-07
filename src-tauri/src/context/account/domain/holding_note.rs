@@ -79,10 +79,8 @@ impl HoldingNote {
         match (threshold_price, threshold_direction) {
             (Some(price), Some(_)) if price <= 0 => return Err(AccountError::ThresholdNotPositive),
             // SYN-034 — no larger than every device reads.
-            (Some(price), Some(_)) if price > crate::shared::domain::amount::LARGEST_AMOUNT => {
-                return Err(AccountError::AmountOutOfRange)
-            }
-            (Some(_), Some(_)) | (None, None) => {}
+            (Some(price), Some(_)) => super::transaction::Transaction::ensure_amount(price)?,
+            (None, None) => {}
             _ => return Err(AccountError::ThresholdIncomplete),
         }
         Ok(Self {

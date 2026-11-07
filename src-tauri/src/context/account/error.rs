@@ -303,6 +303,10 @@ mod tests {
     #[test]
     fn each_variant_emits_a_code() {
         assert_eq!(
+            to_value(AccountError::AmountOutOfRange).unwrap(),
+            json!({ "code": "AmountOutOfRange" })
+        );
+        assert_eq!(
             to_value(AccountError::NameEmpty).unwrap(),
             json!({ "code": "NameEmpty" })
         );

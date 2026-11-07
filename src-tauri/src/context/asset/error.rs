@@ -169,6 +169,10 @@ mod tests {
     #[test]
     fn each_variant_emits_a_code() {
         assert_eq!(
+            to_value(AssetError::PriceOutOfRange).unwrap(),
+            json!({ "code": "PriceOutOfRange" })
+        );
+        assert_eq!(
             to_value(AssetError::NameEmpty).unwrap(),
             json!({ "code": "NameEmpty" })
         );

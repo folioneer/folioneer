@@ -1570,8 +1570,8 @@ export type AccountError =
  */
 { code: "ArchivedAssetSell" } | 
 /**
- * A price, a rate, fees or a total passes a billion units of money, what every device
- * reads (TRX-020, SYN-034).
+ * A price, a rate, fees, a total, a dividend's amount or a note's threshold passes a
+ * trillion, what every device reads (TRX-020, HNO-011, SYN-034).
  */
 { code: "AmountOutOfRange" } | 
 /**
@@ -2397,7 +2397,7 @@ export type AssetError =
  */
 { code: "NotPositive" } | 
 /**
- * Price passes a billion units of money, what every device reads (MKT-021, SYN-034).
+ * Price passes a trillion units, what every device reads (MKT-021, SYN-034).
  */
 { code: "PriceOutOfRange" } | 
 /**
