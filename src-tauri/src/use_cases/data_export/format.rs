@@ -15,7 +15,7 @@ use crate::shared::domain::quantity::{quantity_text, scaled_text};
 pub const FORMAT_NAME: &str = "folioneer-export";
 /// EXP-032 — raised by any change to the format.
 pub const FORMAT_VERSION: u32 = 1;
-/// EXP-011 — the characters of an account's name kept in its file name.
+/// EXP-011C — the characters of an account's name kept in its file name.
 const FILE_NAME_LENGTH: usize = 64;
 
 /// One field of a row, by how it is written (EXP-023, EXP-032).
@@ -138,7 +138,7 @@ fn header_lines(exported_at: &str) -> Vec<String> {
     ]
 }
 
-/// EXP-011 — `format.json`: the format, its version and the moment, without the tables.
+/// EXP-011A — `format.json`: the format, its version and the moment, without the tables.
 pub fn format_file(exported_at: &str) -> String {
     format!("{{\n{}\n}}\n", header_lines(exported_at).join(",\n"))
 }
@@ -171,7 +171,7 @@ pub fn json(tables: &[Table], exported_at: &str) -> String {
     format!("{{\n{}\n}}\n", members.join(",\n"))
 }
 
-/// EXP-011 — an account's name made a valid file name on any system: its first 64
+/// EXP-011C — an account's name made a valid file name on any system: its first 64
 /// characters, each one a system refuses replaced by `_`.
 fn file_safe(name: &str) -> String {
     name.chars()
@@ -186,7 +186,7 @@ fn file_safe(name: &str) -> String {
         .collect()
 }
 
-/// EXP-011 — each account's `transactions-{account}.csv`, by its identifier; two names that
+/// EXP-011B / EXP-011C — each account's `transactions-{account}.csv`, by its identifier; two names that
 /// meet, case ignored, each carry their identifier.
 pub fn account_file_names(accounts: &[(String, String)]) -> HashMap<String, String> {
     let mut by_name: HashMap<String, Vec<&(String, String)>> = HashMap::new();
@@ -410,7 +410,7 @@ mod tests {
         assert_eq!(quantity("system-cash-eur", 1_500_000), "1.5");
     }
 
-    // EXP-011 — a file name holds no character a system refuses, 64 characters at most, and
+    // EXP-011C — a file name holds no character a system refuses, 64 characters at most, and
     // two names that meet, case ignored, each carry their identifier.
     #[test]
     fn account_file_names_stay_valid_and_apart() {

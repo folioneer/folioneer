@@ -28,7 +28,15 @@ The export persists nothing: what it writes is computed from the portfolio when 
 
 **EXP-010 — What an export is asked with (backend)**: An export is asked with its format, CSV or JSON, and a folder the owner chose on this computer; it writes there and nowhere else, and sends nothing anywhere.
 
-**EXP-011 — The CSV folder (backend)**: An export in CSV writes a folder named `folioneer-export-{date}` holding `accounts.csv`, `assets.csv`, `transactions.csv` and `prices.csv`; `format.json`, holding `format`, `version` and `exported_at` as the JSON file does (EXP-032), without the tables; one `transactions-{account}.csv` per account holding a transaction, with exactly that account's rows of `transactions.csv`, in their order (EXP-033); and `import-mapper.json`, an import mapper that reads those per-account files (EXP-051) (owner, 2026-11-07). `{account}` is the account's name, its first 64 characters, with each of `< > : " / \ | ? *` and every control character replaced by `_`, so the folder stays valid on any system; when two names give one file name, case ignored, each of them becomes `transactions-{account}-{id}.csv`.
+**EXP-011 — The CSV folder (backend)**: An export in CSV writes a folder named `folioneer-export-{date}` holding the four tables as `accounts.csv`, `assets.csv`, `transactions.csv` and `prices.csv`.
+
+**EXP-011A — Its format file (backend)**: The folder holds `format.json`, with `format`, `version` and `exported_at` as the JSON file has them (EXP-032), without the tables.
+
+**EXP-011B — One file per account (backend)**: The folder holds one `transactions-{account}.csv` per account holding a transaction, with exactly that account's rows of `transactions.csv`, in their order (EXP-033) (owner, 2026-11-07).
+
+**EXP-011C — An account's file name (backend)**: `{account}` is the account's name, its first 64 characters, with each of `< > : " / \ | ? *` and every control character replaced by `_`, so the folder stays valid on any system; when two names give one file name, case ignored, each of them becomes `transactions-{account}-{id}.csv`.
+
+**EXP-011D — The import mapper (backend)**: The folder holds `import-mapper.json`, an import mapper that reads the per-account files (EXP-051) (owner, 2026-11-07).
 
 **EXP-012 — The JSON file (backend)**: An export in JSON writes one file `folioneer-export-{date}.json` holding the four tables (EXP-032).
 
