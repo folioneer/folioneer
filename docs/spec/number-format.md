@@ -20,7 +20,7 @@ No entity and no command: these rules add nothing to a contract.
 
 **NUM-012 — A calculation typed in a field (frontend)**: A number field accepts a calculation (`+ - * / ( )`): its numbers are read per NUM-010, its result is shown per NUM-011, and the form receives the result.
 
-**NUM-013 — Figures that are only shown (frontend)**: A figure the user does not type — in a table, a total, a form's read-only line, a message, a chart's axis, the exchange rates list, a split's factor — is written by the number format of the application's language.
+**NUM-013 — Figures that are only shown (frontend)**: A figure the user does not type — in a table, a total, a form's read-only line, a message, a chart's axis, the exchange rates list, a split's factor — is written by the number format of the application's language, its thousands grouped with the language's mark — a space in French, a dot in German, a comma in English.
 
 ---
 
