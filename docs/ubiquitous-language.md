@@ -292,7 +292,7 @@ The full economic value of an account: cash balance + Σ (market value of non-ca
 
 > Status: confirmed
 
-What the owner brought into or took out of an account within a period, in money or in kind: deposits less withdrawals, plus opening balances and transfers at their entry-date market value, typed cost when unpriced (PRF-070, PRF-071, PRF-086). For a holding it is its purchases less its sales plus its opening balances (PRF-084); for the whole portfolio, transfers between accounts are left out (TRF-028). Nothing earned shows here — free shares, interest and dividends are gains (PRF-076). Code: `cash_flow` + `asset_flow`. In French: "Entrée/sortie" (owner, 2026-11-07).
+What the owner brought into or took out of an account within a period, in money or in kind: deposits less withdrawals, plus opening balances and transfers at their entry-date market value, typed cost when unpriced (PRF-070, PRF-071, PRF-086). For a holding it is its purchases less its sales plus its opening balances (PRF-084); for the whole portfolio, transfers between accounts are left out (TRF-028). Nothing earned shows here: free shares and interest are gains (PRF-076), dividends their own column (PRF-072, PRF-074). Code: `cash_flow` + `asset_flow`. In French: "Entrée/sortie" (owner, 2026-11-07).
 
 ### Gain for the period
 
