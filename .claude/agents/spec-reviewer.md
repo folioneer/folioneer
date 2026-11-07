@@ -16,9 +16,9 @@ report rules: CI runs this reviewer on every pull request that changes a spec.
 
 ## Step 1 — Read
 
-The spec in full: every TRIGRAM-NNN rule with its scope, the UX draft and the Open
-Questions. Then, for comparison: `ARCHITECTURE.md` (bounded contexts, data flow),
-`docs/spec/README.md` (numbering, trigram registry, format), `docs/backend-rules.md`, `docs/frontend-rules.md`,
+The spec in full: every TRIGRAM-NNN rule with its scope and the Open Questions. Then, for
+comparison: `ARCHITECTURE.md` (bounded contexts, data flow), `docs/spec/README.md`
+(numbering, trigram registry, format, what a spec holds), `docs/backend-rules.md`,
 every ADR in `docs/adr/`, and the other specs in `docs/spec/` but its `README.md` (functional conflicts).
 
 ## Step 2 — Check
@@ -30,16 +30,16 @@ every ADR in `docs/adr/`, and the other specs in `docs/spec/` but its `README.md
 - 🔴 Prose not in English.
 - 🟡 A rule not in the `**TRIGRAM-NNN — Title (scope)**: description` format.
 - 🟡 The trigram missing from the title (`# Business Rules — Transactions (TRX)`).
-- 🟡 No `## UX Draft` while frontend rules exist.
+- 🔴 A rule the branch adds or changes that describes a surface — scoped `(frontend)` or
+  `(frontend + backend)`, a UX Draft added, a wording in any language, a layout, a
+  command-line argument or an AI agent tool's shape: it belongs to that surface's
+  description (`docs/spec/README.md`, `docs/surfaces/README.md`).
 
 **B — Rule quality**
 
 - 🔴 A rule holding several behaviours (not atomic), or not testable ("the UI should be nice").
-- 🔴 A scope missing, ambiguous (one of `frontend`, `backend`, `frontend + backend`) or
-  inaccurate — `(backend)` on UI or navigation behaviour, `(frontend)` on server-side
-  validation, persistence or authorisation.
+- 🔴 A scope missing on a rule the branch adds or changes.
 - 🟡 "should" or "may" instead of assertive language.
-- 🟡 A frontend rule that reads or writes data with no backend rule.
 - 🟡 Terminology drift — one entity, field, status or concept under two names.
 - 🟡 Contract or runtime vocabulary in a rule (`command`, `caller`, `request`, `DTO`,
   `payload`, `response`, `background job`, `thread`, `worker`, `frontend store`): reword in
@@ -49,9 +49,8 @@ every ADR in `docs/adr/`, and the other specs in `docs/spec/` but its `README.md
 
 - 🟡 A create with no validation rule, a delete with no guard or cascade rule, an update
   with no rule on which fields may change.
-- 🟡 Frontend rules with no empty / loading / error / success coverage.
 - 🟡 A prerequisite ("requires an account to exist") not captured as a rule.
-- 🔵 No workflow diagram for a multi-step user action.
+- 🔵 No workflow diagram for a core process of several states or steps.
 
 **D — DDD and architecture**
 
@@ -87,7 +86,10 @@ every ADR in `docs/adr/`, and the other specs in `docs/spec/` but its `README.md
 
 **Not a finding**: a missing command name, return type or error variant name — those are
 the contract's, and the spec states failures as behaviour. A missing "wire shape rule":
-the `## Entity Definition` table is the wire shape.
+the `## Entity Definition` table is the wire shape. A missing wording, translation, layout,
+empty or loading state, command-line argument or tool shape — each surface's description
+holds it. An existing `(frontend)` rule or UX Draft the branch did not change: it leaves
+the spec when a task touches it.
 
 ## Output
 

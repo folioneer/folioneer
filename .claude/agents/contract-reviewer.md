@@ -20,13 +20,13 @@ The contract in full; its source spec (`docs/spec/{feature}.md`, named on the co
 `> Last updated by:` line); `ARCHITECTURE.md` (bounded contexts, aggregate boundaries);
 `docs/adr/` (ADRs constrain types); every other `docs/contracts/*-contract.md`.
 
-From the spec, every rule scoped `backend` or `frontend + backend`, with its operation
+From the spec, every rule scoped `backend` (or `frontend + backend`, in a spec that still has one), with its operation
 (create / read / update / delete / transition), its error cases and its entities. From the
 contract, every command (name, args, return, errors) and shared type.
 
 ## Step 2 — Check
 
-**A — Coverage** — 🔴 a `backend` or `frontend + backend` rule with no command; 🟡 a state
+**A — Coverage** — 🔴 a `backend` (or `frontend + backend`) rule with no command; 🟡 a state
 transition implying a named event with no event row.
 
 **B — Traceability** — 🔴 a command no spec rule justifies.

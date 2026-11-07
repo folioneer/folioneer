@@ -12,8 +12,9 @@ show does not exist — and cite file and line for every finding.
 
 ## Step 1 — Read
 
-Every TRIGRAM-NNN rule of the spec with its scope (`frontend`, `backend`, `frontend +
-backend`) and its UX Draft. Then `ARCHITECTURE.md` (contexts, module layout),
+Every TRIGRAM-NNN rule of the spec with its scope — `backend`, or in a spec that still has
+them `frontend` and `frontend + backend`, with its UX Draft (`docs/spec/README.md`). Then
+`ARCHITECTURE.md` (contexts, module layout),
 `docs/adr/`, `docs/backend-rules.md`, `docs/frontend-rules.md`.
 
 ## Step 2 — Check each rule
@@ -21,8 +22,9 @@ backend`) and its UX Draft. Then `ARCHITECTURE.md` (contexts, module layout),
 - **Backend** (`src-tauri/src/`): the logic matches the rule — status transitions, field
   values, constraints; factories used, the right service called, the right event
   published; the active ADRs respected (types, libraries, patterns).
-- **Frontend** (`src/features/`): the component, hook or gateway call — the right command
-  and arguments, an error path, `t()` for text; the structure matches the UX Draft.
+- **Frontend** (`src/features/`), for a spec's remaining frontend rules: the component, hook
+  or gateway call — the right command and arguments, an error path, `t()` for text; the
+  structure matches the UX Draft.
 - **Test**: a test that exercises this rule's behaviour (`#[test]` / `#[tokio::test]`,
   `*.test.ts(x)`) — a test file existing is not one.
 

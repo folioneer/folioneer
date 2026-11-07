@@ -5,6 +5,7 @@ Each kind of rule has one home. Other documents link to it and never restate it;
 | Kind          | Home                                                                                                                                              | Holds                                                                                                                                            |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Domain        | `spec/` (`TRIGRAM-NNN`; its `README.md` holds the numbering, the trigrams and the format), `ubiquitous-language.md`                               | business rules, and what the domain words mean — validated by the owner                                                                          |
+| Surfaces      | `surfaces/` (the command line, an AI agent's connection), the mocks in `folioneer/folioneer-design` (the window)                                  | how each surface shows the core — what the window, the command line and an AI agent show, ask and answer                                         |
 | Rules         | `backend-rules.md` (B), `frontend-rules.md` (F), `e2e-rules.md` (E), `i18n-rules.md`, `test-rules.md`, `commit-rules.md`, `visual-proof-rules.md` | how code, tests, strings, commits and visual proofs are written                                                                                  |
 | Rule examples | `backend-patterns.md`, `error-model.md`                                                                                                           | worked shapes for rules already stated in the rules docs                                                                                         |
 | Decisions     | `adr/` (its `README.md` holds the gate and the format)                                                                                            | technical choices costly to reverse, never domain ones                                                                                           |
@@ -18,11 +19,12 @@ Each kind of rule has one home. Other documents link to it and never restate it;
 
 ## When two documents disagree
 
-The home wins: a spec over anything about business behaviour, a rules doc over anything about how code is written, an ADR over the code it guards. The copy is removed, not reconciled.
+The home wins: a spec over anything about business behaviour, a surface's description over anything about what that surface shows, a rules doc over anything about how code is written, an ADR over the code it guards. The copy is removed, not reconciled.
 
 ## Where a new statement goes
 
 - A business behaviour → a spec rule (and the vocabulary if a new word appears).
+- What a surface shows, asks or answers → its description (`surfaces/`, or the window's mock).
 - How to write code, tests, strings or commits → the matching `*-rules.md`, with an ID where it can be checked.
 - A technical choice costly to reverse → an ADR with its guard (the gate of `adr/README.md`); code organisation and a domain decision are never an ADR.
 - A deliberate deviation from a rule → next to that rule, or in `ddd-divergences.md` when it is a DDD textbook deviation.
