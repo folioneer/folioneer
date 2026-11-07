@@ -190,6 +190,8 @@ the real components and tokens (`/design-proposal`): `{id}-{light|dark}-{state}.
 plus a five-line note (what moves, is added, is removed, stays), pushed to
 `folioneer/folioneer-design` (owner, 2026-10-19) — one folder per issue, straight to its
 `main`, no pull request, review or CI — and posted on the issue with each image inline.
+Once validated, the mocks are the window's description: no spec restates them
+(`docs/surfaces/README.md`).
 
 - **In chat:** the human is pointed to the issue; nothing is built until they say yes.
   The yes sets the issue's Design field to `validated`.
