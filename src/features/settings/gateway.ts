@@ -122,7 +122,7 @@ export async function pickSyncFolder(): Promise<string | null> {
   return await open({ directory: true, multiple: false });
 }
 
-// EXP-010 — the folder an export is written into; `null` when the picker is closed.
+// #509 (the validated mock) — the folder an export is written into; `null` when the picker is closed.
 export async function pickExportFolder(): Promise<string | null> {
   return await open({ directory: true, multiple: false });
 }

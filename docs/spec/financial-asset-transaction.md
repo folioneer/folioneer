@@ -33,6 +33,7 @@ Represents a single purchase (or sale) event for an asset in an account.
 | `fees`             | Transaction fees in the account's currency (stored in micros).                                                                                                                                                                                               |
 | `total_amount`     | Total cost in account's currency (incl. fees, stored in micros).                                                                                                                                                                                             |
 | `note`             | Optional user comment.                                                                                                                                                                                                                                       |
+| `created_at`       | The moment the transaction was entered (ISO 8601, UTC): the order of transactions sharing a date, unknown for one entered before it was kept (TRX-036).                                                                                                      |
 
 ### Holding
 

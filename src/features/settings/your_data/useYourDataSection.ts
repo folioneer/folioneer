@@ -5,14 +5,14 @@ import type { I18nMessage } from "@/ui/format/i18n";
 import { exportPortfolio, pickExportFolder } from "../gateway";
 import { exportDoneMessage, exportErrorToI18n } from "../shared/presenter";
 
-/** EXP-016 — what the section shows under its action. */
+/** #509 (the validated mock) — what the section shows under its action. */
 export type ExportOutcome =
   | { kind: "idle" }
   | { kind: "working" }
   | { kind: "done"; message: I18nMessage }
   | { kind: "failed"; message: I18nMessage };
 
-/** EXP-010 / EXP-016 — the format, the export and what it gave. */
+/** #509 (the validated mock), EXP-010 / EXP-016 — the format, the export and what it gave. */
 export function useYourDataSection() {
   const [format, setFormatState] = useState<ExportFormat>("Csv");
   const [outcome, setOutcome] = useState<ExportOutcome>({ kind: "idle" });

@@ -14,11 +14,11 @@ The export persists nothing: what it writes is computed from the portfolio when 
 
 ### Export
 
-| Concept      | Business meaning                                                                                                            |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `format`     | CSV — a folder of files (EXP-011) — or JSON — one file (EXP-012).                                                           |
-| `written_to` | The full path of the folder or the file written, in the folder the owner chose; the owner is shown its last part (EXP-016). |
-| `counts`     | How many accounts, assets, transactions and prices it holds (EXP-016).                                                      |
+| Concept      | Business meaning                                                                          |
+| ------------ | ----------------------------------------------------------------------------------------- |
+| `format`     | CSV — a folder of files (EXP-011) — or JSON — one file (EXP-012).                         |
+| `written_to` | The full path of the folder or the file written, in the folder the owner chose (EXP-016). |
+| `counts`     | How many accounts, assets, transactions and prices it holds (EXP-016).                    |
 
 ---
 
@@ -26,7 +26,7 @@ The export persists nothing: what it writes is computed from the portfolio when 
 
 ### The action (010–019)
 
-**EXP-010 — Where the export is asked (frontend)**: Settings holds a section "Your data", the last in its list. It offers a format — CSV or JSON, CSV chosen when the section opens, the choice not remembered — and an action "Export…" that opens the system's folder picker. Choosing a folder exports there; closing the picker exports nothing.
+**EXP-010 — What an export is asked with (backend)**: An export is asked with its format, CSV or JSON, and a folder the owner chose on this computer; it writes there and nowhere else, and sends nothing anywhere.
 
 **EXP-011 — The CSV folder (backend)**: An export in CSV writes a folder named `folioneer-export-{date}` holding `accounts.csv`, `assets.csv`, `transactions.csv` and `prices.csv`; `format.json`, holding `format`, `version` and `exported_at` as the JSON file does (EXP-032), without the tables; one `transactions-{account}.csv` per account holding a transaction, with exactly that account's rows of `transactions.csv`, in their order (EXP-033); and `import-mapper.json`, an import mapper that reads those per-account files (EXP-051) (owner, 2026-11-07). `{account}` is the account's name, its first 64 characters, with each of `< > : " / \ | ? *` and every control character replaced by `_`, so the folder stays valid on any system; when two names give one file name, case ignored, each of them becomes `transactions-{account}-{id}.csv`.
 
@@ -38,7 +38,7 @@ The export persists nothing: what it writes is computed from the portfolio when 
 
 **EXP-015 — Complete or nothing (backend)**: What an export writes appears in the chosen folder complete or not at all. A folder that is not there or is not a folder is refused with a specific error; a write that fails — a folder that cannot be written, a full disk — leaves nothing of the export behind and is refused with another.
 
-**EXP-016 — What the owner is told (frontend)**: While an export is written, the action shows it is working and cannot be started again. After an export, one line under the action says where it went and what it holds: the folder or file name, then the number of accounts, assets, transactions and prices. A failed export says that nothing was written, with its reason.
+**EXP-016 — What an export reports (backend)**: An export that succeeds reports the full path of the folder or the file it wrote and how many accounts, assets, transactions and prices it holds; one that fails reports its reason, nothing having been written (EXP-015).
 
 ### What is exported (020–029)
 
@@ -67,7 +67,7 @@ The export persists nothing: what it writes is computed from the portfolio when 
 | `transactions` | `id`, `account_id`, `account_name`, `account_currency`, `date`, `type`, `asset_id`, `asset_name`, `asset_reference`, `asset_isin`, `quantity`, `unit_price`, `exchange_rate`, `fees`, `total_amount`, `realized_pnl`, `split_factor`, `dividend_amount`, `dividend_currency`, `write_off_reason`, `transfer_id`, `added_deposit`, `note`, `entered_at`                         |
 | `prices`       | `asset_id`, `asset_reference`, `date`, `price`, `currency` (the asset's), `source` (`Manual`, `YahooFinance`, `Agent`)                                                                                                                                                                                                                                                         |
 
-A transaction's `type` is one of `Purchase`, `Sell`, `OpeningBalance`, `Deposit`, `Withdrawal`, `Dividend`, `FreeShares`, `ManagementFee`, `Split`, `Interest`, `WriteOff`, `TransferOut`, `TransferIn`. `unit_price` is in the asset's currency and `exchange_rate` converts the asset's currency to the account's, but for an opening balance and a transfer's sides, whose unit price is in the account's currency (TRX-047, TRF-022), a transfer in's rate converting the sending account's currency to its own; `fees`, `total_amount` and `realized_pnl` are in the account's currency. On a split and on a dividend `quantity` is 0, their figures being `split_factor` — a split's new shares per old one (SPL-010) — and `dividend_amount` — a dividend's net amount (DIV-023) in `dividend_currency`, the currency it was entered in (DIV-029, DIV-043). `write_off_reason` is one of `NetworkFee`, `Dust`, `Lost`, `Other`. A flag — `management_fees_enabled`, `interest_bearing`, `price_typed_by_hand`, `archived`, `added_deposit` — is `true` or `false`. Each type fills its figures so: a purchase and a sale `quantity`, `unit_price`, `exchange_rate`, `fees` and `total_amount`, a sale `realized_pnl` too; an opening balance `quantity`, `unit_price` and `total_amount`, its cost; a deposit and a withdrawal `quantity` and `total_amount`, its amount; a dividend `quantity` (0), `dividend_amount`, `dividend_currency`, `exchange_rate` and `total_amount`, what the account was credited; free shares and interest on a holding `quantity`, at no cost; interest on the cash `quantity`, its amount; a management fee `quantity`, the units removed; a split `quantity` (0) and `split_factor`; a write-off `quantity`, `realized_pnl` — minus its cost, since it has no proceeds (WOF-021) — and `write_off_reason`, and `transfer_id` when it is a transfer's fee in kind (TRF-021); a transfer's sides `quantity`, `unit_price`, `exchange_rate`, `total_amount` and `transfer_id`. A figure a type does not fill is empty, even one stored at a fixed value — an opening balance's or a split's exchange rate of one (TRX-047) — since nothing was typed for it.
+A transaction's `type` is one of `Purchase`, `Sell`, `OpeningBalance`, `Deposit`, `Withdrawal`, `Dividend`, `FreeShares`, `ManagementFee`, `Split`, `Interest`, `WriteOff`, `TransferOut`, `TransferIn`. `unit_price` is in the asset's currency and `exchange_rate` converts the asset's currency to the account's, but for an opening balance and a transfer's sides, whose unit price is in the account's currency (TRX-047, TRF-022), a transfer in's rate converting the sending account's currency to its own and a transfer out's rate of one, so a transfer's two sides read alike (TRF entity); `fees`, `total_amount` and `realized_pnl` are in the account's currency. On a split and on a dividend `quantity` is 0, their figures being `split_factor` — a split's new shares per old one (SPL-010) — and `dividend_amount` — a dividend's net amount (DIV-023) in `dividend_currency`, the currency it was entered in (DIV-029, DIV-043). `write_off_reason` is one of `NetworkFee`, `Dust`, `Lost`, `Other`. A flag — `management_fees_enabled`, `interest_bearing`, `price_typed_by_hand`, `archived`, `added_deposit` — is `true` or `false`. Each type fills its figures so: a purchase and a sale `quantity`, `unit_price`, `exchange_rate`, `fees` and `total_amount`, a sale `realized_pnl` too; an opening balance `quantity`, `unit_price` and `total_amount`, its cost; a deposit and a withdrawal `quantity` and `total_amount`, its amount; a dividend `quantity` (0), `dividend_amount`, `dividend_currency`, `exchange_rate` and `total_amount`, what the account was credited; free shares and interest on a holding `quantity`, at no cost; interest on the cash `quantity`, its amount; a management fee `quantity`, the units removed; a split `quantity` (0) and `split_factor`; a write-off `quantity`, `realized_pnl` — minus its cost, since it has no proceeds (WOF-021) — and `write_off_reason`, and `transfer_id` when it is a transfer's fee in kind (TRF-021); a transfer's sides `quantity`, `unit_price`, `exchange_rate`, `total_amount` and `transfer_id`. A figure a type does not fill is empty, even one stored at a fixed value — an opening balance's exchange rate of one (TRX-047) or a split's (SPL entity) — since nothing was typed for it.
 
 **EXP-032 — JSON (backend)**: The JSON file is one object: `format` (`"folioneer-export"`), `version` (`1`), `exported_at` (ISO 8601, UTC), then `accounts`, `assets`, `transactions` and `prices`, each an array of objects whose keys are EXP-031's columns, in the same order: a figure is a string (EXP-023), a flag a boolean, `risk_level` a number, an empty field `null`. A change to the format raises `version`.
 
@@ -78,47 +78,6 @@ A transaction's `type` is one of `Purchase`, `Sell`, `OpeningBalance`, `Deposit`
 **EXP-050 — The round trip (backend)**: An account's `transactions-{account}.csv`, read through `import-mapper.json` into a new account of the same currency, in a portfolio where the exported assets exist, gives that account the same holdings, the same cash and the same realized P&L as the original, when no holding of it is inconsistent (CFR-042), every one of its transactions is a purchase, a sale, a dividend, a deposit or a withdrawal; every asset it touches is in its currency (IMP-037), told apart by its ISIN or its reference (IMP-032) and, if it sells it, not archived (SEL-037); every quantity has six decimals at most (IMP-013A); every purchase's and sale's `total_amount` is what its quantity, unit price, a rate of 1 and its fees give (TRX-026, SEL-023, IMP-037); every purchase is funded by the cash the rows before it leave, in IMP-035A's order (IMP-038); no dividend is dated on a day its asset was not held the day before (DIV-011, IMP-035A); and no field of its rows holds a line break, which the import does not read inside a quoted field yet (#782). An account's file over 10 MB is beyond the import (IMP-010).
 
 **EXP-051 — The mapper written beside it (backend)**: `import-mapper.json` is an import mapper (IMP-020) whose provider is "Folioneer export {date}": comma separator, dot decimal mark, year-month-day dates, UTF-8; its columns `date` for the date, `type` for the operation, `asset_isin`, `asset_reference` and `asset_name` for the asset, `quantity`, `unit_price`, `fees`, `total_amount` for the net amount and `account_currency` for the currency; and its operation types `Purchase` → purchase, `Sell` → sale, `Dividend` → dividend, `Deposit` → deposit, `Withdrawal` → withdrawal, every other type → not imported. It holds no asset match. The owner adds it to the import from its file (IMP-020B); a second export of the same day writes the same mapper, which the import then holds already — the round trip reads through that held mapper as written, not as the owner may have changed it since.
-
----
-
-## Workflow
-
-```
-Settings → Your data
-  → format: CSV | JSON                                               (EXP-010)
-  → Export… → system folder picker
-      → closed: nothing                                              (EXP-010)
-      → folder chosen → the action works, cannot be started again    (EXP-016)
-          → CSV: folioneer-export-2026-11-07/ — the four tables, format.json, one file per account, import-mapper.json (EXP-011)
-          → JSON: folioneer-export-2026-11-07.json                   (EXP-012)
-          → done: "folioneer-export-2026-11-07 — 3 accounts, 12 assets, 418 transactions, 2 960 prices" (EXP-016)
-          → failed: nothing written, the reason                      (EXP-015, EXP-016)
-```
-
----
-
-## UX Draft
-
-### Entry Point
-
-Settings → "Your data", the last section (EXP-010), validated on #509 (folioneer/folioneer-design, `509/`).
-
-### Main Component
-
-A Format choice (CSV, JSON) and an "Export…" button.
-
-### States
-
-- **Idle**: the format and the button.
-- **Working**: the button shows it is working and cannot be pressed (EXP-016).
-- **Done**: one line naming where the export went and what it holds.
-- **Failed**: one line saying nothing was written, with its reason.
-
-### User Flow
-
-1. The owner opens Settings → Your data, keeps CSV or picks JSON, presses Export….
-2. The system's folder picker opens; the owner picks a folder.
-3. The line under the button names the export and its counts.
 
 ---
 

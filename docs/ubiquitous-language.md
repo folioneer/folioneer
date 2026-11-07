@@ -725,7 +725,7 @@ The installed program run from a terminal or a script, recording without opening
 
 > Status: confirmed
 
-The dialog where the owner makes the application's choices: language, reference currency, prices, sync, AI agents, and takes their data out ("Your data", EXP-010). In French: "Paramètres".
+The dialog where the owner makes the application's choices: language, reference currency, prices, sync, AI agents, and takes their data out (EXP). In French: "Paramètres".
 
 ### Sync
 

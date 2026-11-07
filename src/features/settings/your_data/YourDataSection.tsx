@@ -10,7 +10,7 @@ const FORMATS: { value: ExportFormat; labelKey: string }[] = [
 ];
 
 /**
- * EXP-010 / EXP-016 — Settings' "Your data": the format, the Export… action and one line
+ * #509 (the validated mock) — Settings' "Your data": the format, the Export… action and one line
  * saying where the export went, or that nothing was written. Stable ids per F25:
  * `settings-your-data-format`, `settings-your-data-export`, `settings-your-data-outcome`.
  */

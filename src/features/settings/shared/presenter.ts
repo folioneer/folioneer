@@ -234,7 +234,7 @@ export function rateHistoryErrorToI18n(error: RateHistoryBackfillError): I18nMes
   }
 }
 
-/** EXP-016 — the last part of a path, whatever its separator. */
+/** #509 (the validated mock) — the last part of a path, whatever its separator. */
 function lastPart(path: string): string {
   return (
     path

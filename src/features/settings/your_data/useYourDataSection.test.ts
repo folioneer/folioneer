@@ -24,14 +24,14 @@ describe("useYourDataSection", () => {
     vi.clearAllMocks();
   });
 
-  // EXP-010 — CSV is chosen when the section opens.
+  // #509 (the validated mock) — CSV is chosen when the section opens.
   it("opens on CSV, idle", () => {
     const { result } = renderHook(() => useYourDataSection());
     expect(result.current.format).toBe("Csv");
     expect(result.current.outcome).toEqual({ kind: "idle" });
   });
 
-  // EXP-010 — closing the picker exports nothing.
+  // #509 (the validated mock) — closing the picker exports nothing.
   it("exports nothing when the picker is closed", async () => {
     vi.mocked(gateway.pickExportFolder).mockResolvedValue(null);
     const { result } = renderHook(() => useYourDataSection());
@@ -42,7 +42,7 @@ describe("useYourDataSection", () => {
     expect(result.current.outcome).toEqual({ kind: "idle" });
   });
 
-  // EXP-016 — after an export, where it went and what it holds.
+  // #509 (the validated mock), EXP-016 — after an export, where it went and what it holds.
   it("exports in the chosen format and tells where and how much", async () => {
     vi.mocked(gateway.pickExportFolder).mockResolvedValue("/home/me/exports");
     vi.mocked(gateway.exportPortfolio).mockResolvedValue({ status: "ok", data: report });
@@ -67,7 +67,7 @@ describe("useYourDataSection", () => {
     });
   });
 
-  // EXP-016 — a failed export says that nothing was written, with its reason.
+  // #509 (the validated mock), EXP-016 — a failed export says that nothing was written, with its reason.
   it("says nothing was written when the export fails", async () => {
     vi.mocked(gateway.pickExportFolder).mockResolvedValue("C:\\exports");
     vi.mocked(gateway.exportPortfolio).mockResolvedValue({
@@ -84,7 +84,7 @@ describe("useYourDataSection", () => {
     });
   });
 
-  // EXP-016 — while an export is written, it cannot be started again.
+  // #509 (the validated mock) — while an export is written, it cannot be started again.
   it("is working while the export is written", async () => {
     vi.mocked(gateway.pickExportFolder).mockResolvedValue("/home/me/exports");
     vi.mocked(gateway.exportPortfolio).mockReturnValue(new Promise(() => {}));

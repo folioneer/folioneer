@@ -94,7 +94,7 @@ describe("SettingsDialog", () => {
     expect(toggleAutoRecordPrice).toHaveBeenCalledTimes(1);
   });
 
-  // EXP-010 — "Your data" is the last section, and holds the export.
+  // #509 (the validated mock) — "Your data" is the last section, and holds the export.
   it("lists Your data last, and opens it", () => {
     render(<SettingsDialog isOpen onClose={vi.fn()} />);
 
