@@ -68,10 +68,7 @@ pub fn fills(kind: TransactionType) -> Fills {
         fees: trade,
         total_amount: trade
             || transfer
-            || matches!(
-                kind,
-                OpeningBalance | Deposit | Withdrawal | Dividend | WriteOff
-            ),
+            || matches!(kind, OpeningBalance | Deposit | Withdrawal | Dividend),
         realized_pnl: matches!(kind, Sell | WriteOff),
     }
 }
@@ -365,7 +362,7 @@ mod tests {
         assert_eq!(all(fills(Deposit)), (false, false, false, true, false));
         assert_eq!(all(fills(Dividend)), (false, true, false, true, false));
         assert_eq!(all(fills(Split)), (false, false, false, false, false));
-        assert_eq!(all(fills(WriteOff)), (false, false, false, true, true));
+        assert_eq!(all(fills(WriteOff)), (false, false, false, false, true));
         assert_eq!(all(fills(TransferIn)), (true, true, false, true, false));
         assert_eq!(all(fills(Interest)), (false, false, false, false, false));
     }

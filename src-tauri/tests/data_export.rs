@@ -498,6 +498,8 @@ async fn exp_031_each_type_writes_its_own_figures() {
     let write_off = of("WriteOff")[0];
     assert_eq!(write_off["write_off_reason"], "NetworkFee");
     assert!(write_off["realized_pnl"].is_string());
+    // A write-off has no proceeds: its cost is minus its realized P&L, not a total.
+    assert!(write_off["total_amount"].is_null());
     let dividends = of("Dividend");
     assert_eq!(
         (

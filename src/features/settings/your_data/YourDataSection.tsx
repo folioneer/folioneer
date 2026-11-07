@@ -12,7 +12,7 @@ const FORMATS: { value: ExportFormat; labelKey: string }[] = [
 /**
  * EXP-010 / EXP-016 — Settings' "Your data": the format, the Export… action and one line
  * saying where the export went, or that nothing was written. Stable ids per F25:
- * `your-data-format`, `your-data-export`, `your-data-outcome`.
+ * `settings-your-data-format`, `settings-your-data-export`, `settings-your-data-outcome`.
  */
 export function YourDataSection() {
   const { t } = useTranslation();
@@ -23,7 +23,7 @@ export function YourDataSection() {
     <div className="flex flex-col gap-4">
       <p className="text-sm text-m3-on-surface-variant">{t("settings.your_data.description")}</p>
       <SelectField
-        id="your-data-format"
+        id="settings-your-data-format"
         label={t("settings.your_data.format_label")}
         value={format}
         onChange={(event) => setFormat(event.target.value as ExportFormat)}
@@ -32,7 +32,7 @@ export function YourDataSection() {
       />
       <div>
         <Button
-          id="your-data-export"
+          id="settings-your-data-export"
           variant="primary"
           onClick={() => void exportData()}
           disabled={working}
@@ -43,7 +43,7 @@ export function YourDataSection() {
       </div>
       {(outcome.kind === "done" || outcome.kind === "failed") && (
         <p
-          id="your-data-outcome"
+          id="settings-your-data-outcome"
           role={outcome.kind === "failed" ? "alert" : "status"}
           className={`text-sm ${outcome.kind === "failed" ? "text-m3-error" : "text-m3-on-surface"}`}
         >
