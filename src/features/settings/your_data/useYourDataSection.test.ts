@@ -80,7 +80,7 @@ describe("useYourDataSection", () => {
     });
     expect(result.current.outcome).toEqual({
       kind: "failed",
-      message: { key: "settings.your_data.failed.WriteFailed" },
+      message: { key: "settings.your_data.failed.write_failed" },
     });
   });
 

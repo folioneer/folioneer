@@ -278,9 +278,9 @@
       "working": "Exporting…",
       "done": "Exported to {{name}} — accounts: {{accounts}}, assets: {{assets}}, transactions: {{transactions}}, prices: {{prices}}.",
       "failed": {
-        "FolderUnavailable": "Nothing was written: the folder is not available.",
-        "WriteFailed": "Nothing was written: the folder could not be written to.",
-        "DatabaseError": "Nothing was written: the portfolio could not be read."
+        "folder_unavailable": "Nothing was written: the folder is not available.",
+        "write_failed": "Nothing was written: the folder could not be written to.",
+        "database_error": "Nothing was written: the portfolio could not be read."
       }
     }
   },

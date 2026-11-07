@@ -278,9 +278,9 @@
       "working": "Export en cours…",
       "done": "Exporté dans {{name}} — comptes : {{accounts}}, actifs : {{assets}}, transactions : {{transactions}}, prix : {{prices}}.",
       "failed": {
-        "FolderUnavailable": "Rien n'a été écrit : le dossier n'est pas disponible.",
-        "WriteFailed": "Rien n'a été écrit : impossible d'écrire dans le dossier.",
-        "DatabaseError": "Rien n'a été écrit : le portefeuille n'a pas pu être lu."
+        "folder_unavailable": "Rien n'a été écrit : le dossier n'est pas disponible.",
+        "write_failed": "Rien n'a été écrit : impossible d'écrire dans le dossier.",
+        "database_error": "Rien n'a été écrit : le portefeuille n'a pas pu être lu."
       }
     }
   },

@@ -262,9 +262,11 @@ export function exportDoneMessage(report: ExportReport): I18nMessage {
 export function exportErrorToI18n(error: DataExportError): I18nMessage {
   switch (error.code) {
     case "FolderUnavailable":
+      return { key: "settings.your_data.failed.folder_unavailable" };
     case "WriteFailed":
+      return { key: "settings.your_data.failed.write_failed" };
     case "DatabaseError":
-      return { key: `settings.your_data.failed.${error.code}` };
+      return { key: "settings.your_data.failed.database_error" };
     default: {
       const _exhaustive: never = error;
       return _exhaustive;

@@ -44,7 +44,7 @@ export function YourDataSection() {
       {(outcome.kind === "done" || outcome.kind === "failed") && (
         <p
           id="your-data-outcome"
-          role="status"
+          role={outcome.kind === "failed" ? "alert" : "status"}
           className={`text-sm ${outcome.kind === "failed" ? "text-m3-error" : "text-m3-on-surface"}`}
         >
           {t(outcome.message.key, outcome.message.vars)}

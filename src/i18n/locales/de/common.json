@@ -280,9 +280,9 @@
       "working": "Export läuft…",
       "done": "Exportiert nach {{name}} — Konten: {{accounts}}, Anlagen: {{assets}}, Transaktionen: {{transactions}}, Kurse: {{prices}}.",
       "failed": {
-        "FolderUnavailable": "Nichts wurde geschrieben: Der Ordner ist nicht verfügbar.",
-        "WriteFailed": "Nichts wurde geschrieben: In den Ordner konnte nicht geschrieben werden.",
-        "DatabaseError": "Nichts wurde geschrieben: Das Portfolio konnte nicht gelesen werden."
+        "folder_unavailable": "Nichts wurde geschrieben: Der Ordner ist nicht verfügbar.",
+        "write_failed": "Nichts wurde geschrieben: In den Ordner konnte nicht geschrieben werden.",
+        "database_error": "Nichts wurde geschrieben: Das Portfolio konnte nicht gelesen werden."
       }
     }
   },

@@ -38,7 +38,7 @@ export function useYourDataSection() {
       }
     } catch (error) {
       logger.error(`[YourDataSection] export threw: ${String(error)}`);
-      setOutcome({ kind: "failed", message: { key: "settings.your_data.failed.WriteFailed" } });
+      setOutcome({ kind: "failed", message: { key: "settings.your_data.failed.write_failed" } });
     }
   }, [format]);
 
