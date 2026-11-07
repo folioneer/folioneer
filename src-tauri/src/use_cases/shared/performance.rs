@@ -4,11 +4,10 @@
 //! cases, so neither imports from the other (B18).
 
 use crate::context::account::{AccountError, AccountServiceContract, Transaction, TransactionType};
-use crate::context::asset::{AssetClass, AssetServiceContract};
+use crate::context::asset::AssetServiceContract;
 use crate::context::currency::CurrencyService;
-use crate::shared::domain::quantity::QUANTITY_UNIT;
 use crate::use_cases::shared::valuation::{
-    at_rate, end_value_as_of, holding_close_date_as_of, holding_end_value_as_of,
+    end_value_as_of, holding_close_date_as_of, holding_end_value_as_of,
     holding_performance_for_span, holding_performance_for_span_windowed, load_priced_assets,
     load_rate_map, metric_for_span, metric_for_span_windowed, month_periods,
     opening_balance_flow_value, parse_date, position_held_as_of, year_periods, MonthPeriod,
@@ -41,11 +40,11 @@ pub struct PerformancePeriod {
     pub previous_value: i64,
     /// Net external cash flow within the period: deposits − withdrawals, account-currency micros (PRF-070).
     pub cash_flow: i64,
-    /// In-kind asset contributions within the period: opening-balance cost + zero-cost credits at grant-date market value (PRF-071).
+    /// In-kind asset contributions within the period: opening balances and transfers at their entry-date market value (PRF-071).
     pub asset_flow: i64,
     /// Dividend income received within the period, account-currency micros (PRF-072).
     pub dividends: i64,
-    /// Investment P&L vs the previous period (realized gains + price movement); the bridge residual (PRF-073).
+    /// Investment P&L vs the previous period (realized gains, price movement, free shares and interest); the bridge residual (PRF-073).
     pub pnl: i64,
     /// Performance vs the preceding period of the same granularity (PRF-033).
     /// None when no preceding period exists (PRF-042).
@@ -446,7 +445,7 @@ fn build_monthly(
 pub(crate) struct PeriodBridge {
     /// Deposits − withdrawals within the period (PRF-070).
     pub(crate) cash_flow: i64,
-    /// Opening-balance cost + zero-cost credits at grant-date market value within the period (PRF-071).
+    /// Opening balances and transfers at their entry-date market value within the period (PRF-071).
     pub(crate) asset_flow: i64,
     /// Dividend income received within the period (PRF-072).
     pub(crate) dividends: i64,
@@ -506,36 +505,18 @@ fn period_bridge(
                     account_currency,
                 ) as i128;
             }
-            // FSD-070/PRF-071 — free shares carry no cost, so their grant-date
-            // market value is the in-kind contribution (valued like `end_value_as_of`).
-            TransactionType::FreeShares => {
-                asset_flow +=
-                    zero_cost_credit_value(transaction, priced_assets, rate_map, account_currency);
-            }
-            // INT-024 — interest on a non-cash asset is an in-kind credit valued like
-            // free shares (FSD-070). INT-023 — interest on the cash line IS a cash
-            // credit of `quantity` (`zero_cost_credit_value` cannot value the Cash Asset —
-            // it returns 0 for the Cash class).
-            TransactionType::Interest => {
-                if crate::core::cash::is_cash_asset(&transaction.asset_id) {
-                    cash_flow += transaction.quantity as i128;
-                } else {
-                    asset_flow += zero_cost_credit_value(
-                        transaction,
-                        priced_assets,
-                        rate_map,
-                        account_currency,
-                    );
-                }
-            }
             // DIV-023 — a dividend credits cash income from a holding.
             TransactionType::Dividend => dividends += transaction.total_amount as i128,
             // Cash↔asset swaps; net zero to Global Value (a sell's realized gain → residual pnl).
+            // PRF-076 — free shares (FSD-070) and interest (INT-023/024) are earned, not
+            // brought in: their value lands in the residual pnl.
             // FEE-071 — a management fee is not a flow; its drag surfaces via the reduced
             // position value at period end, not as a flow adjustment.
             // SPL-050 — a split is not a flow.
             TransactionType::Purchase
             | TransactionType::Sell
+            | TransactionType::FreeShares
+            | TransactionType::Interest
             | TransactionType::ManagementFee
             | TransactionType::Split
             | TransactionType::WriteOff => {}
@@ -552,42 +533,6 @@ fn period_bridge(
         cash_flow: cash_flow as i64,
         asset_flow: asset_flow as i64,
         dividends: dividends as i64,
-    }
-}
-
-/// PRF-071 — market value of a zero-cost in-kind credit (free shares, or interest
-/// on a non-cash asset per INT-024) as of its **grant date**, in account-currency
-/// micros, using the same carry-forward price + FX rules as `end_value_as_of`.
-/// Post-grant price movement therefore surfaces in the residual pnl, and the
-/// decomposition stays intact when the credit is disposed of within the same
-/// period. Contributes 0 when the asset has no usable price or rate as of the
-/// grant date (PRF-022 / FXR-034) — that value then surfaces via the residual pnl.
-pub(crate) fn zero_cost_credit_value(
-    transaction: &Transaction,
-    priced_assets: &HashMap<String, PricedAsset>,
-    rate_map: &RateMap,
-    account_currency: &str,
-) -> i128 {
-    let Some(grant_date) = parse_date(&transaction.date) else {
-        return 0;
-    };
-    let Some(priced) = priced_assets.get(transaction.asset_id.as_str()) else {
-        return 0;
-    };
-    if priced.class == AssetClass::Cash {
-        return 0;
-    }
-    let Some(price) = priced.price_as_of(grant_date).map(|p| p as i128) else {
-        return 0;
-    };
-    let quantity = transaction.quantity as i128;
-    if priced.currency == account_currency {
-        quantity * price / QUANTITY_UNIT
-    } else if let Some(rate) = rate_map.get(&(priced.currency.clone(), grant_date)) {
-        let converted_price = at_rate(price, *rate);
-        quantity * converted_price / QUANTITY_UNIT
-    } else {
-        0
     }
 }
 
@@ -737,10 +682,10 @@ fn bridge_for_scope(
 
 /// PRF-084 — the bridge flow terms for one asset's position within
 /// `[period_start, period_end]`. `cash_flow` is the net money the position
-/// absorbed or released through trades: Purchase (`+total_amount`),
-/// OpeningBalance (`+total_amount`), Sell (`−total_amount`). `asset_flow` is the
-/// zero-cost in-kind credits (free shares, non-cash interest) at their
-/// grant-date market value (PRF-071 valuation). `dividends` is the asset's
+/// absorbed or released through trades: Purchase (`+total_amount`), Sell
+/// (`−total_amount`). `asset_flow` is the
+/// opening balances and transfers at their entry-date market value (PRF-086);
+/// free shares and interest are earned, no flow. `dividends` is the asset's
 /// dividend income within the period — income that accrues to the account's
 /// cash, not to the scoped position value, so `residual_pnl` leaves it outside
 /// the scoped bridge identity.
@@ -799,18 +744,15 @@ fn holding_period_bridge(
             }
             TransactionType::Sell => cash_flow -= transaction.total_amount as i128,
             TransactionType::Dividend => dividends += transaction.total_amount as i128,
-            // FSD-070 / INT-024 — zero-cost in-kind credits valued at the
-            // grant-date carry-forward market price (0 for the Cash class).
-            TransactionType::FreeShares | TransactionType::Interest => {
-                asset_flow +=
-                    zero_cost_credit_value(transaction, priced_assets, rate_map, account_currency);
-            }
             // Deposit/Withdrawal move the account's cash, never a position;
-            // FEE-071 — a management fee's drag surfaces via the reduced
+            // PRF-084 — free shares and interest are earned, no flow of the
+            // position; FEE-071 — a management fee's drag surfaces via the reduced
             // position value at period end, not as a flow. SPL-050 — a split
             // is not a flow.
             TransactionType::Deposit
             | TransactionType::Withdrawal
+            | TransactionType::FreeShares
+            | TransactionType::Interest
             | TransactionType::ManagementFee
             | TransactionType::Split
             | TransactionType::WriteOff => {}
@@ -1017,10 +959,11 @@ mod period_bridge_tests {
     };
 
     // PRF-070/071/072 — the terms of a period's bridge, on figures computed by hand:
-    // cash 100 − 20 + 4; in kind 3 × 10 + 2 × 10 × 2 + 1 × 10; dividends 6. The first and
+    // cash 100 − 20; in kind the opening balance 3 × 10; dividends 6. The interest and
+    // the free shares are earned, no flow: their value lands in the P&L. The first and
     // the last day of the period count, the days around it do not.
     #[test]
-    fn the_bridge_of_a_period_sums_its_cash_its_in_kind_flows_and_its_dividends() {
+    fn the_bridge_of_a_period_sums_what_the_owner_brought_and_the_dividends() {
         let bridge = period_bridge(
             &a_year_of_transactions(),
             &priced_assets(),
@@ -1029,22 +972,42 @@ mod period_bridge_tests {
             day("2024-01-01"),
             day("2024-12-31"),
         );
-        assert_eq!(bridge.cash_flow, 84_000_000);
-        assert_eq!(bridge.asset_flow, 80_000_000);
+        assert_eq!(bridge.cash_flow, 80_000_000);
+        assert_eq!(bridge.asset_flow, 30_000_000);
         assert_eq!(bridge.dividends, 6_000_000);
     }
 
-    // FXR-034 — free shares in a currency with no rate on their date are worth nothing.
+    // PRF-084 / PRF-076 — a position's free shares and interest are earned, no flow
+    // of it: the dollar stock's in-kind flow is its opening balance 3 × 10 alone, and
+    // the euro stock, free shares only, has none.
     #[test]
-    fn free_shares_without_a_rate_add_nothing_to_the_bridge() {
-        let bridge = period_bridge(
-            &a_year_of_transactions(),
+    fn a_positions_credits_are_no_flow_of_its_bridge() {
+        let position = |asset_id: &str| -> Vec<Transaction> {
+            a_year_of_transactions()
+                .into_iter()
+                .filter(|transaction| transaction.asset_id == asset_id)
+                .collect()
+        };
+        let dollar_stock = holding_period_bridge(
+            &position("stock-usd"),
             &priced_assets(),
-            &RateMap::new(),
+            &euro_rate_on_the_grant_date(),
             "USD",
             day("2024-01-01"),
             day("2024-12-31"),
         );
-        assert_eq!(bridge.asset_flow, 40_000_000);
+        assert_eq!(
+            (dollar_stock.cash_flow, dollar_stock.asset_flow),
+            (0, 30_000_000)
+        );
+        let bridge = holding_period_bridge(
+            &position("stock-eur"),
+            &priced_assets(),
+            &euro_rate_on_the_grant_date(),
+            "USD",
+            day("2024-01-01"),
+            day("2024-12-31"),
+        );
+        assert_eq!((bridge.cash_flow, bridge.asset_flow), (0, 0));
     }
 }

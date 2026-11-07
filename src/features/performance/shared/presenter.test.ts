@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   AccountDetailsResponse,
   HoldingDetail,
@@ -257,6 +257,20 @@ describe("presentPeriodRow — year row", () => {
     const row = presentPeriodRow(makeYearRow({ period_over_period: null }));
     expect(row.periodOverPeriod.gainFormatted).toBe("—");
     expect(row.periodOverPeriod.pctFormatted).toBe("—");
+  });
+});
+
+describe("presentPeriodRow — the current year (PRF-044)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("marks the current year's row, and no other, as running to today", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 7, 12));
+    expect(presentPeriodRow(makeYearRow({ year: 2026 })).isCurrentYear).toBe(true);
+    expect(presentPeriodRow(makeYearRow({ year: 2025 })).isCurrentYear).toBe(false);
+    expect(presentPeriodRow(makeMonthRow({ year: 2026 })).isCurrentYear).toBe(false);
   });
 });
 

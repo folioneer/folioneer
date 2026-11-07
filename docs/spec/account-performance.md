@@ -88,7 +88,7 @@ Money entering or leaving the account from outside the tracked world: a `Deposit
 
 **PRF-035 — Since-inception metric (backend)**: For each row, the since-inception performance compares the row's period-end value to the total net invested up to that period end (`Σ inflows − Σ outflows` since the account's inception). The inception start value is `0`; the gain is therefore `period_end_value − total_net_invested`, and the percentage uses the Simple Dietz denominator over the full lifetime span.
 
-**PRF-036 — Value-and-percent pairing (frontend)**: Each of the three metrics (PRF-033, PRF-034, PRF-035) is displayed as a pair — the gain in the account's currency and the percentage. A gain is colour-coded by sign per existing P&L presentation; an absent percentage (PRF-032) renders as "—".
+**PRF-036 — Value-and-percent pairing (frontend)**: The period-over-period column reads "Gain for the period" (French "Gain de la période"). Each of the three metrics (PRF-033, PRF-034, PRF-035) is displayed as a pair — the gain in the account's currency and the percentage. A gain is colour-coded by sign per existing P&L presentation; an absent percentage (PRF-032) renders as "—".
 
 **PRF-037 — Year-to-date column omitted in year view (frontend)**: In year view the year-to-date metric (PRF-034) is exactly equal to the period-over-period metric (PRF-033) for every row, because both use the prior 31 December end value as their start value and net the same in-year flows. The year-to-date column is therefore omitted in year view as redundant; year view shows period-over-period and since-inception only. Month view shows all three.
 
@@ -101,6 +101,8 @@ Money entering or leaving the account from outside the tracked world: a `Deposit
 **PRF-042 — Absent baseline renders as "—" (backend + frontend)**: When a metric's comparison baseline does not exist — for example the first period has no preceding period for the period-over-period metric — that metric's gain and percentage are reported as absent and rendered "—". In an asset-scoped read, a period-over-period or year-to-date "—" carries the tooltip "No figure for this period: the holding was not held throughout it, or has no price at its start" — the sentence the Account Details view shows on a windowed figure it does not give, in each language (PRF-083); the whole-account read gives no tooltip.
 
 **PRF-043 — No transactions (backend)**: An account with no transactions has no data span (PRF-040) and produces an empty result; the frontend shows the empty state (PRF-051).
+
+**PRF-044 — Current-year row label (frontend)**: In year view the current year's row reads `{year} (YTD)`, e.g. "2026 (YTD)", in every interface language, since it runs only to today. Every other year row reads its year alone.
 
 ### States (050–059)
 
@@ -120,17 +122,19 @@ Money entering or leaving the account from outside the tracked world: a `Deposit
 
 Each period row decomposes how its end value (PRF-020) was built from the previous period's, reported in the account currency. Unlike the performance metrics (PRF-030–039), which express change as a percentage across a span, the bridge expresses it as **values that occurred within the period**. It applies to both the yearly and the monthly tables.
 
-**PRF-070 — Cash in/out (backend)**: The net external cash flow within the period — deposits minus withdrawals, dated within `[period start, period end]`. Purchases and sales are excluded: they move value between cash and holdings without crossing the account boundary. Sign-coloured (positive in / negative out).
+**PRF-070 — Cash in/out (backend)**: The net external cash flow within the period — deposits minus withdrawals, dated within `[period start, period end]`. Purchases and sales are excluded: they move value between cash and holdings without crossing the account boundary; interest on the cash line is earned, not brought in (PRF-076). Sign-coloured (positive in / negative out).
 
-**PRF-071 — Asset in/out (backend)**: The value of securities that enter or leave the portfolio in kind within the period, without a cash trade — opening-balance positions valued at their **entry-date** market price (PRF-086; fallback typed cost when unpriced/unrated as of that date) plus zero-cost credits (free shares FSD-070, non-cash interest INT-024) valued at their **grant-date** carry-forward market price (PRF-022) and FX rate (FXR-042); credits contribute 0 when unpriced or unrated as of the grant date, the value then surfacing via the residual pnl. Valuing the credit at grant rather than period end attributes post-grant price movement to P&L and keeps the decomposition intact when the credit is disposed of within the same period. Sign-coloured. A transfer in enters and a transfer out leaves the account in kind, valued as an opening balance is (TRF-026).
+**PRF-071 — Asset in/out (backend)**: The value of securities that enter or leave the account in kind within the period, without a cash trade — opening-balance positions valued at their **entry-date** market price (PRF-086; fallback typed cost when unpriced/unrated as of that date). Sign-coloured. A transfer in enters and a transfer out leaves the account in kind, valued as an opening balance is (TRF-026).
 
 **PRF-072 — Dividends (backend + frontend)**: Dividend income received within the period (DIV-023). Rendered as a plain account-currency amount.
 
-**PRF-073 — P&L vs n-1 (backend + frontend)**: The investment profit and loss versus the previous period — realized gains on sales plus the market revaluation of held positions. Computed as the bridge residual `end value − previous value − cash in/out − asset in/out − dividends`, which by the value decomposition equals exactly that. Sign-coloured (PRF-036).
+**PRF-073 — P&L vs n-1 (backend + frontend)**: The investment profit and loss versus the previous period — realized gains on sales, the market revaluation of held positions, and what the account earned in kind or as interest (free shares, interest — PRF-076). Computed as the bridge residual `end value − previous value − cash in/out − asset in/out − dividends`, which by the value decomposition equals exactly that. Sign-coloured (PRF-036).
 
-**PRF-074 — Bridge identity (backend + frontend)**: Every row satisfies, to the cent, `End Value(n) = Previous Value(n-1) + Cash in/out + Asset in/out + Dividends + P&L`. The previous value is the prior period's end value (0 for the first period in the span, PRF-040). The row displays the previous value, the combined In/Out cell (PRF-075), dividends, P&L, and the end value as a left-to-right sum.
+**PRF-074 — Bridge identity (backend + frontend)**: Every row satisfies, to the cent, `End Value(n) = Previous Value(n-1) + Cash in/out + Asset in/out + Dividends + P&L`. The previous value is the prior period's end value (0 for the first period in the span, PRF-040). The row displays the previous value, the combined In/Out cell (PRF-075), dividends, P&L, and the end value as a left-to-right sum. Since the in/out terms are the net external flow (PRF-076), the row's gain for the period (PRF-033), whenever that gain is present, equals its dividends plus its P&L.
 
-**PRF-075 — Combined In/Out column (frontend)**: The table renders `cash_flow + asset_flow` as a single sign-coloured "In/Out" cell — the period's total external contribution/withdrawal, in money or in kind. The backend keeps the two terms separate (the bridge identity PRF-074 and the converted GPF-040 terms are defined on them); the merge is display-only.
+**PRF-075 — Combined In/Out column (frontend)**: The table renders `cash_flow + asset_flow` as a single sign-coloured "In/Out" cell — what the owner brought in or took out within the period, in money or in kind; nothing earned shows there (PRF-076). The backend keeps the two terms separate (the bridge identity PRF-074 and the converted GPF-040 terms are defined on them); the merge is display-only.
+
+**PRF-076 — What is earned is no flow (backend)**: What the account earns is no flow, in money or in kind: free shares (FSD-070), interest on a holding (INT-024) or on the cash line (INT-023) count in no in/out term (PRF-070, PRF-071), and their value lands in the P&L (PRF-073). Cash in/out plus asset in/out is thus the period's windowed net external flow of PRF-030 (PRF-086).
 
 ### Asset Scope (080–089)
 
@@ -144,7 +148,7 @@ The performance read optionally narrows to one asset's position within the accou
 
 **PRF-083 — Scoped performance metrics (backend)**: The period-over-period, year-to-date, and since-inception metrics (and the year-row annualized yield derived from since-inception) apply the position Simple Dietz of ACD-056 over the scoped span: the external flows of a position are its own `Purchase` (inflow), `Sell` (outflow), and `OpeningBalance` (inflow — entry-date market value in windowed metrics, typed cost in lifetime metrics per PRF-086) transactions — `Deposit`/`Withdrawal` move the account's cash, not the position — and the asset's dividends received within the span are added to the gain (`gain = end_value − start_value − net_flow + dividends`). The percentage is absent when the Dietz denominator is not positive. Baselines follow the unscoped definitions evaluated on the scoped values: the previous period's scoped end value (PRF-033), the prior 31 December scoped value (PRF-034), and inception `0` at the scoped span start (PRF-035). A period-over-period or year-to-date figure is absent when the position held nothing on the window's baseline day — the end of the day before the window opens (bought inside the window, or sold out before it), as ACD-057 has it; since-inception keeps its figure, covering the position's whole life. A write-off is no flow of the position (WOF-023). A transfer in is an inflow and a transfer out an outflow of the position (TRF-027).
 
-**PRF-084 — Scoped bridge (backend)**: In a scoped row, `cash_flow` is the net money the position absorbed or released through trades within the period: `Σ Purchase − Σ Sell` (at `total_amount`). `asset_flow` is the in-kind contributions: opening balances at their entry-date market value (PRF-086 — an opening balance has no cash leg) plus the asset's zero-cost credits (free shares, non-cash interest) at their grant-date carry-forward market value (PRF-071 valuation). `dividends` is the asset's dividend income received within the period — income that accrues to the account's cash, not to the position's value, so it stands outside the scoped bridge identity: `pnl = end_value − previous_value − cash_flow − asset_flow`, and every scoped row satisfies `End Value(n) = Previous Value(n-1) + Cash flow + Asset flow + P&L` to the cent. This deviates from the account-wide PRF-074 (whose end value contains the dividend cash); it keeps `pnl` equal to the position's market movement plus realized gains instead of netting the dividend out of it. A management fee remains a non-flow (FEE-071): its drag surfaces via the reduced position value. A transfer in adds to and a transfer out takes from the position's asset in/out, valued as TRF-026 says (TRF-027).
+**PRF-084 — Scoped bridge (backend)**: In a scoped row, `cash_flow` is the net money the position absorbed or released through trades within the period: `Σ Purchase − Σ Sell` (at `total_amount`). `asset_flow` is the in-kind contributions: opening balances at their entry-date market value (PRF-086 — an opening balance has no cash leg). The asset's free shares and interest are earned, no flow of the position: their value lands in its P&L (PRF-076). `dividends` is the asset's dividend income received within the period — income that accrues to the account's cash, not to the position's value, so it stands outside the scoped bridge identity: `pnl = end_value − previous_value − cash_flow − asset_flow`, and every scoped row satisfies `End Value(n) = Previous Value(n-1) + Cash flow + Asset flow + P&L` to the cent. This deviates from the account-wide PRF-074 (whose end value contains the dividend cash); it keeps `pnl` equal to the position's market movement plus realized gains instead of netting the dividend out of it. A management fee remains a non-flow (FEE-071): its drag surfaces via the reduced position value. A transfer in adds to and a transfer out takes from the position's asset in/out, valued as TRF-026 says (TRF-027).
 
 **PRF-085 — Closed-position metric freeze (backend)**: When the scoped position's replayed quantity is `0` as of a row's period end, the row's cumulative metrics — since-inception, year-to-date, and the year-row annualized yield — are computed over the span ending at the **close date** (the date of the last transaction that brought the replayed quantity to zero) instead of the period end. The Simple Dietz weights therefore stop shifting once the position is closed: every subsequent row reports the frozen percentage the position had at close (its gain is already constant by construction). A later row has no year-to-date figure at all once the position held nothing on the window's baseline day (PRF-083); the freeze then shows in since-inception and the annualized yield only. Dividends dated after the close date are excluded from the frozen cumulative metrics — they accrue to the account's cash, not to the closed position. A later purchase reopens the position, and rows from that point resume the period-end span. Period-over-period metrics keep their fixed calendar window and are unaffected.
 
@@ -192,11 +196,13 @@ A full-page table at `/accounts/:id/performance`.
 
 - **Header**: account name, a view-mode toggle (Month / Year, PRF-011), and, in month view, a year selector (PRF-015).
 - **Table columns**:
-  - Period (month label in month view, year in year view)
+  - Period (month label in month view, year in year view — the current year "2026 (YTD)", PRF-044)
+  - Previous value, In/Out, Dividends, P&L vs n-1 (PRF-070–075)
   - End value (account currency)
-  - Period-over-period — gain + %
+  - Gain for the period — gain + % (PRF-033, PRF-036)
   - Year-to-date — gain + % _(month view only, PRF-037)_
   - Since inception — gain + %
+  - Annualized yield _(year view only)_
 
 ### States
 
@@ -209,7 +215,7 @@ A full-page table at `/accounts/:id/performance`.
 
 1. User opens an account and clicks "Performance" in the header.
 2. The page opens in the default view (PRF-014): the month view of the current year, unless the year view was last chosen for this account.
-3. User reads the end value and the period-over-period / YTD / since-inception figures per row.
+3. User reads the bridge (In/Out, dividends, P&L), the end value and the gain for the period / YTD / since-inception figures per row.
 4. In month view, the user changes the year via the selector (PRF-015) or switches to year view (PRF-011).
 5. Recording a transaction or price elsewhere refreshes the page automatically (PRF-060).
 

@@ -636,10 +636,10 @@ struct PerformancePeriod {
     month: Option<u8>,                              // Some(1..=12) for month rows; None for year rows (PRF-011)
     end_value: i64,                                 // micros, account currency; Global Value at period end (PRF-020)
     previous_value: i64,                            // Global Value at the previous period end; 0 for the first period (PRF-074)
-    cash_flow: i64,                                 // deposits minus withdrawals within the period (PRF-070)
-    asset_flow: i64,                                // contributions in kind within the period: opening balances at cost, zero-cost credits at market value (PRF-071)
+    cash_flow: i64,                                 // deposits minus withdrawals within the period (PRF-070); asset-scoped rows: purchases minus sales (PRF-084)
+    asset_flow: i64,                                // in-kind entries and exits within the period: opening balances and transfers at entry-date market value, typed cost when unpriced (PRF-071, PRF-086); transfers excluded in the all-accounts read (TRF-028)
     dividends: i64,                                 // dividend income within the period (PRF-072)
-    pnl: i64,                                       // realized gains and price movement: end_value − previous_value − the three flows (PRF-073)
+    pnl: i64,                                       // realized gains, price movement, free shares and interest: end_value − previous_value − the three flows (PRF-073); asset-scoped rows leave dividends out (PRF-084)
     period_over_period: Option<PerformanceMetric>,  // None when no preceding period exists (PRF-033, PRF-042)
     year_to_date: Option<PerformanceMetric>,        // None for year rows (PRF-037); always Some for month rows — inception-year months use baseline 0, equal to since-inception (PRF-034)
     since_inception: Option<PerformanceMetric>,     // measured from net invested; inception baseline value 0 (PRF-035)
@@ -860,6 +860,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-11-07 — #682 (PRF-076, PRF-071, PRF-073, PRF-084, GPF-040): free shares and interest leave `PerformancePeriod.asset_flow` (and cash-line interest `cash_flow`) and count in `pnl`. No command or type changed.
 - 2026-11-01 — #579 (TRX-024B): every quantity crosses as decimal text, but in a CSV import's preview. `ManagementFeeDTO.resulting_quantity_micros` and `RecordInterestDTO.quantity_micros` become `resulting_quantity` and `quantity`, as does the argument of `preview_management_fee`; `Oversell { available, requested }` and `ResultingQuantityNotBelowHeld { held_quantity }` carry text; `Transaction.quantity` gives a split's factor and a dividend's amount (TRX-024A).
 - 2026-11-01 — #578 (TRX-024): a non-cash quantity is stored in hundred-millionths; commands still exchange micro-units, and `AccountError` gains `QuantityOutOfRange` for one that would not fit.
 - 2026-11-01 — #577 (SPL-010, DIV-023): `Transaction` gains `split_factor` and `dividend_amount`, each moved out of `quantity`, which is 0 on a split and a dividend. No command changed.
