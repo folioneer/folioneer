@@ -1,7 +1,7 @@
 # Contract — Sync
 
 > Domain: `sync`
-> Last updated by: `multi-device-sync` + `sync-conflict-resolution` specs — `financial-asset-transaction` (TRX-024B)
+> Last updated by: `multi-device-sync` + `sync-conflict-resolution` specs — `financial-asset-transaction` (TRX-024B), `cost-basis` (CBM-010, CBM-012A/B, CBM-033)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Per-command reachable codes are listed in the "Errors" column. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic chain preserved server-side via `tracing::error!`), consistent with the other contracts. Precondition guards not stated as rejections in the spec are marked _(precondition guard — inferred)_.
 >
@@ -201,6 +201,7 @@ Record identity per kind follows CFR-012: accounts, categories, assets, transact
 
 ## Changelog
 
+- 2026-11-07 — #514 (SYN-038, CBM-010): data format version 16 adds `cost_basis_method` to the account record.
 - 2026-11-07 — #748 (SYN-034, SYN-038): data format version 15 widens the bound on a figure of money to ±10¹⁸; the written form is version 14's.
 - 2026-11-01 — #579 (TRX-024B): `HoldingInconsistency::Oversold.quantity` is decimal text.
 - 2026-11-01 — #578 (SYN-038, TRX-024): a non-cash transaction's `quantity` is in hundred-millionths, an older segment's multiplied by 100 on read; data format version 14. No command changed.

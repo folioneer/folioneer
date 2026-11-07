@@ -54,6 +54,7 @@ Once assigned, a rule number never changes; a removed rule leaves its number vac
 | WOF     | Write-off                   | A quantity leaving a holding without proceeds — a network fee, dust, coins lost — at its cost, no cash moved, lost kept apart                                                                    | active  |
 | TRF     | Transfer                    | A holding moved between two accounts at its cost — no cash, no realized result, a fee in kind, the rate between currencies recorded                                                              | active  |
 | IMP     | Account import              | A broker's CSV file read through an import mapper, previewed row by row, then confirmed into one account                                                                                         | active  |
+| CBM     | Cost Basis Method           | Each account's cost basis method — the weighted average or FIFO, preselected from its country — and the lots FIFO takes the oldest first                                                         | active  |
 
 ---
 

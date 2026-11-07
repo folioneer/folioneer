@@ -172,6 +172,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             account::update_account,
             account::get_wrapper_lists,
             account::delete_account,
+            account::set_account_cost_basis_method,
             account::get_asset_ids_for_account,
             account::get_transactions,
             account::get_account_journal,

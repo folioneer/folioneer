@@ -1040,6 +1040,91 @@ async fn imp_051a_an_added_deposits_mark_is_the_other_devices() {
     assert_eq!(added[0].date, "2026-02-01");
 }
 
+// CBM-033 — a change of method on one device is the other's, which replays the account:
+// its sales re-realized and its holding at the new method's average price.
+#[tokio::test]
+async fn cbm_033_a_change_of_method_is_the_other_devices() {
+    use folioneer_lib::context::account::{CostBasisMethod, TransactionType};
+    use folioneer_lib::shared::domain::quantity::from_surface;
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop, account_id, _) = two_devices_sharing(dir.path()).await;
+    let asset_id = desktop
+        .asset_service
+        .get_all_assets()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|asset| asset.reference == "AAPL")
+        .unwrap()
+        .id;
+    let accounts = &desktop.account_service;
+    accounts
+        .record_deposit(&account_id, "2026-01-02".into(), 10_000_000_000, None)
+        .await
+        .unwrap();
+    for (date, unit_price) in [("2026-02-01", 100_000_000), ("2026-03-01", 200_000_000)] {
+        accounts
+            .buy_holding(
+                &account_id,
+                asset_id.clone(),
+                date.into(),
+                from_surface(10_000_000),
+                unit_price,
+                1_000_000,
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+    }
+    accounts
+        .sell_holding(
+            &account_id,
+            asset_id.clone(),
+            "2026-04-01".into(),
+            from_surface(5_000_000),
+            200_000_000,
+            1_000_000,
+            0,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+
+    accounts
+        .change_cost_basis_method(&account_id, CostBasisMethod::Fifo)
+        .await
+        .unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+
+    let on_laptop = &laptop.account_service;
+    let account = on_laptop.get_by_id(&account_id).await.unwrap().unwrap();
+    assert_eq!(account.cost_basis_method, CostBasisMethod::Fifo);
+    let sale = on_laptop
+        .get_all_transactions_for_account(&account_id)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|t| t.transaction_type == TransactionType::Sell)
+        .unwrap();
+    // FIFO: the 5 sold cost 5 × 100; the 15 left cost 5 × 100 + 10 × 200.
+    assert_eq!(sale.realized_pnl, Some(500_000_000));
+    let holding = on_laptop
+        .get_holding_by_account_asset(&account_id, &asset_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        holding.average_price,
+        2_500_000_000 * 100_000_000 / (15 * 100_000_000)
+    );
+}
+
 // SYN-021 / MKT-230 (#529) — the reported splits a device keeps travel to the other: those
 // kept before sync with the first publish, a later reading's change and its removal after.
 #[tokio::test]
@@ -1891,7 +1976,9 @@ fn sync_format_snapshot_path(version: u32) -> std::path::PathBuf {
 
 /// Every value of every enum that travels in a synced record or in its envelope.
 fn written_values_of_every_synced_enum() -> serde_json::Value {
-    use folioneer_lib::context::account::{FeeFrequency, ThresholdDirection, TransactionType};
+    use folioneer_lib::context::account::{
+        CostBasisMethod, FeeFrequency, ThresholdDirection, TransactionType,
+    };
     use folioneer_lib::context::asset::{AssetKind, AssetPriceSource};
     use folioneer_lib::context::currency::CurrencyRateSource;
     use folioneer_lib::shared::domain::{Operation, Origin, RecordKind};
@@ -1920,6 +2007,9 @@ fn written_values_of_every_synced_enum() -> serde_json::Value {
         ]),
         "CurrencyRateSource": written_values!(CurrencyRateSource, [
             CurrencyRateSource::Manual, CurrencyRateSource::Frankfurter, CurrencyRateSource::Ecb,
+        ]),
+        "CostBasisMethod": written_values!(CostBasisMethod, [
+            CostBasisMethod::WeightedAverage, CostBasisMethod::Fifo,
         ]),
         "FeeFrequency": written_values!(FeeFrequency, [
             FeeFrequency::Monthly, FeeFrequency::Quarterly, FeeFrequency::Annually,

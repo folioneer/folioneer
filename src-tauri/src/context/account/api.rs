@@ -2,8 +2,8 @@
 #![allow(clippy::unreachable)]
 
 use super::domain::{
-    all_wrappers, country_offers, generic_wrapper_ids, offered_countries, Account, FeeFrequency,
-    FeeSchedule, HoldingNote, ThresholdDirection, Wrapper, PORTFOLIO_COUNTRY,
+    all_wrappers, country_offers, generic_wrapper_ids, offered_countries, Account, CostBasisMethod,
+    FeeFrequency, FeeSchedule, HoldingNote, ThresholdDirection, Wrapper, PORTFOLIO_COUNTRY,
 };
 use crate::context::account::{
     AccountError, AccountJournal, HoldingSnapshotView, JournalFilter, TransactionView,
@@ -108,6 +108,20 @@ pub fn get_wrapper_lists() -> WrapperLists {
             .collect(),
         generic: owned(generic_wrapper_ids()),
     }
+}
+
+/// CBM-030 — puts an account on a cost basis method, its history recomputed.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_account_cost_basis_method(
+    state: State<'_, AppState>,
+    account_id: String,
+    method: CostBasisMethod,
+) -> Result<Account, AccountError> {
+    state
+        .account_service
+        .change_cost_basis_method(&account_id, method)
+        .await
 }
 
 /// Deletes an account (R5 — cascades to its holdings at the repo level).

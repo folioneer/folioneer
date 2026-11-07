@@ -808,7 +808,12 @@ impl AccountDetailsUseCase {
                 continue;
             }
 
-            let reconstruction = Account::reconstruct_holding_as_of(&all_txs, asset_id, as_of_date);
+            let reconstruction = Account::reconstruct_holding_as_of(
+                &all_txs,
+                asset_id,
+                as_of_date,
+                account.cost_basis_method,
+            );
             let realized_pnl = reconstruction.total_realized_pnl;
             total_realized_pnl = total_realized_pnl.saturating_add(realized_pnl);
 
@@ -1178,12 +1183,11 @@ fn window_position_pct(
     end_value: i64,
     window_start: NaiveDate,
 ) -> Option<i64> {
-    let quantity_at_start = Account::reconstruct_holding_as_of(
+    let quantity_at_start = Account::quantity_held_as_of(
         inputs.all_transactions,
         asset_id,
         &window_start.format("%Y-%m-%d").to_string(),
-    )
-    .quantity;
+    );
     // ACD-057 — a window the position was not held through has no figure: the since-start
     // return covers the holding's whole life (TODO-084).
     if quantity_at_start <= 0 {

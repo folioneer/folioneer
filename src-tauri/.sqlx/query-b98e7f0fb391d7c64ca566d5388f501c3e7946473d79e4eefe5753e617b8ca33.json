@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE accounts SET cost_basis_method = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "b98e7f0fb391d7c64ca566d5388f501c3e7946473d79e4eefe5753e617b8ca33"
+}

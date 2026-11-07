@@ -122,7 +122,8 @@ impl AgentTools {
                 }
             }
         }
-        let as_of = |transactions| self.recorder.account_as_of(transactions, &date);
+        let as_of =
+            |account_id, transactions| self.recorder.account_as_of(account_id, transactions, &date);
         as_json(&serde_json::json!({
             "status": "previewed",
             "transactions": parts,
@@ -131,14 +132,14 @@ impl AgentTools {
             "from": {
                 "account": sending.account_name,
                 "currency": sending.currency,
-                "before": as_of(&previewed.sending_before).await,
-                "after": as_of(&previewed.sending_after).await,
+                "before": as_of(&sending.account_id, &previewed.sending_before).await,
+                "after": as_of(&sending.account_id, &previewed.sending_after).await,
             },
             "to": {
                 "account": receiving.account_name,
                 "currency": receiving.currency,
-                "before": as_of(&previewed.receiving_before).await,
-                "after": as_of(&previewed.receiving_after).await,
+                "before": as_of(&receiving.account_id, &previewed.receiving_before).await,
+                "after": as_of(&receiving.account_id, &previewed.receiving_after).await,
             },
         }))
     }

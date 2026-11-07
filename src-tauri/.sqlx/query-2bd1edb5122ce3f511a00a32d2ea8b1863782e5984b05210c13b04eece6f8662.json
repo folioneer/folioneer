@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO accounts (id, name, bank_name, currency, management_fees_enabled,\n                                     country, wrapper, cost_basis_method,\n                                     sync_logical_timestamp, sync_origin, sync_device_id)\n               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n               ON CONFLICT(id) DO UPDATE SET\n                   name = excluded.name,\n                   bank_name = excluded.bank_name,\n                   currency = excluded.currency,\n                   management_fees_enabled = excluded.management_fees_enabled,\n                   country = excluded.country,\n                   wrapper = excluded.wrapper,\n                   -- reviewer-sql FP: an older device's change keeps the local method, laid in by\n                   -- SYN-035's upgrade before this write (upgraded_content) — see PR #791.\n                   cost_basis_method = excluded.cost_basis_method,\n                   sync_logical_timestamp = excluded.sync_logical_timestamp,\n                   sync_origin = excluded.sync_origin,\n                   sync_device_id = excluded.sync_device_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 11
+    },
+    "nullable": []
+  },
+  "hash": "2bd1edb5122ce3f511a00a32d2ea8b1863782e5984b05210c13b04eece6f8662"
+}

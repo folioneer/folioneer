@@ -282,6 +282,17 @@ async deleteAccount(id: string) : Promise<Result<null, AccountError>> {
 }
 },
 /**
+ * CBM-030 — puts an account on a cost basis method, its history recomputed.
+ */
+async setAccountCostBasisMethod(accountId: string, method: CostBasisMethod) : Promise<Result<Account, AccountError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_account_cost_basis_method", { accountId, method }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Returns the distinct asset IDs that have transactions for the given account (TXL-013).
  */
 async getAssetIdsForAccount(accountId: string) : Promise<Result<string[], AccountError>> {
@@ -1437,7 +1448,12 @@ country?: string | null;
 /**
  * ACC-043 — the identifier of the tax wrapper the account sits in (ACC-040).
  */
-wrapper?: string | null }
+wrapper?: string | null; 
+/**
+ * CBM-010 — how the account sets the cost of the units that leave it; read as the
+ * weighted average from a change written before it existed (CBM-012).
+ */
+cost_basis_method?: CostBasisMethod }
 /**
  * Pre-deletion counts for an account (ACC-020).
  */
@@ -2891,6 +2907,20 @@ reason: WriteOffReason;
  * Corrected note.
  */
 note: string | null }
+/**
+ * CBM-010 — how an account sets the cost of the units that leave it: their weighted
+ * average, or the first acquired first. Stored and synced by its name.
+ */
+export type CostBasisMethod = 
+/**
+ * The average cost of every unit held (VWAP, TRX-030); what an account that existed
+ * before the method did is on (CBM-012).
+ */
+"WeightedAverage" | 
+/**
+ * The units acquired first leave first (CBM-022).
+ */
+"Fifo"
 /**
  * ACC-045 — the wrappers one country is offered, in order.
  */
@@ -6401,7 +6431,8 @@ unit_price: number;
 total_amount: number; 
 /**
  * The gain a new sale would realize (TDI-030), in account currency: its proceeds minus
- * the average cost, as of its date, of the quantity sold. `None` for anything but a
+ * the cost, as of its date, of the quantity sold under the account's cost basis method
+ * (CBM-022). `None` for anything but a
  * new sale (TDI-031); a sale that cannot be recorded is the draft's refusal instead.
  */
 realized_pnl: number | null }

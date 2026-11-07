@@ -73,6 +73,7 @@ pub struct StockSplitPosition {
 /// account-details "as of a past date" view, which needs the realized-P&L and
 /// last-sold figures the lighter [`HoldingSnapshot`] omits. Fields are i64 fixed-point
 /// (ADR-001, TRX-024). Crate-internal: never crosses the wire.
+#[derive(Default)]
 pub(crate) struct HoldingAsOfReconstruction {
     /// Units held as of the queried date (TRX-024), 0 when nothing is held.
     pub quantity: i64,
