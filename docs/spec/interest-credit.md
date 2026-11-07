@@ -66,6 +66,11 @@ interest gain surfaces as unrealized P&L). Wire packing mirrors FreeShares:
 **INT-025 — Reactivity (backend + frontend)**: a persisted Interest publishes
 `TransactionUpdated`, so the account views re-fetch (ACD-039).
 
+**INT-026 — Performance treatment (backend)**: interest is earned, not brought
+in: account performance applies no flow adjustment for it, on the cash line or on
+a holding, and counts in no in/out term of the bridge; its value lands in the P&L
+(PRF-076), as free shares' does (FSD-070).
+
 **INT-030 — Journal rendering (frontend)**: the transaction list shows the
 localized "Interest" type label; the unit-price and total-amount cells render
 the neutral placeholder (extends the FSD-050 / FEE-055 quantity-only

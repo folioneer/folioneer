@@ -145,28 +145,26 @@ pub(crate) async fn load_rate_map(
     today: NaiveDate,
 ) -> StdResult<RateMap, AccountError> {
     let mut dates = period_end_dates(earliest_date, today);
-    // PRF-071/PRF-086 — zero-cost credits and opening balances are valued at
-    // their own transaction date, so those dates need a pre-resolved rate too.
+    // PRF-086 — opening balances and transfers are valued at their own
+    // transaction date, so those dates need a pre-resolved rate too.
     dates.extend(market_valued_flow_dates(transactions));
     let dates: Vec<NaiveDate> = dates.into_iter().collect();
     load_rate_map_for_dates(currency_service, priced_assets, account_currency, &dates).await
 }
 
-/// PRF-071/PRF-086 — the transaction dates of the flows valued at their own-date
-/// market price: zero-cost in-kind credits (free shares, non-cash interest, the
-/// dates `zero_cost_credit_value` resolves) and opening balances (the dates
-/// `opening_balance_flow_value` resolves). Cash-line interest is a plain cash
-/// credit and needs no valuation date.
+/// PRF-086 — the transaction dates of the flows valued at their own-date market
+/// price: opening balances and transfers (the dates `opening_balance_flow_value`
+/// resolves). Free shares and interest are earned, no flow (PRF-076).
 pub(crate) fn market_valued_flow_dates(transactions: &[Transaction]) -> BTreeSet<NaiveDate> {
     transactions
         .iter()
-        .filter(|t| match t.transaction_type {
-            TransactionType::FreeShares
-            | TransactionType::OpeningBalance
-            | TransactionType::TransferIn
-            | TransactionType::TransferOut => true,
-            TransactionType::Interest => !crate::core::cash::is_cash_asset(&t.asset_id),
-            _ => false,
+        .filter(|t| {
+            matches!(
+                t.transaction_type,
+                TransactionType::OpeningBalance
+                    | TransactionType::TransferIn
+                    | TransactionType::TransferOut
+            )
         })
         .filter_map(|t| parse_date(&t.date))
         .collect()
@@ -1298,11 +1296,10 @@ mod tests {
         );
     }
 
-    // PRF-071 — the dates whose flows are valued at the market: free shares, opening
-    // balances and interest credited in units. Interest on the cash line and trades are
-    // none of them.
+    // PRF-071/PRF-086 — the dates whose flows are valued at the market: opening
+    // balances. Free shares, interest and trades are none of them.
     #[test]
-    fn market_valued_flow_dates_are_those_of_in_kind_contributions() {
+    fn market_valued_flow_dates_are_those_of_opening_balances() {
         let transactions = [
             transaction_on(
                 "asset",
@@ -1327,7 +1324,7 @@ mod tests {
         ];
         assert_eq!(
             market_valued_flow_dates(&transactions),
-            BTreeSet::from([day("2024-01-10"), day("2024-02-10"), day("2024-03-10")])
+            BTreeSet::from([day("2024-02-10")])
         );
     }
 

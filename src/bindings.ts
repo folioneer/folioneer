@@ -3857,7 +3857,7 @@ quantity: string;
  */
 average_price: number; 
 /**
- * Total cost of position: quantity × average_price / MICRO (i64 micro-units, ACD-023).
+ * Total cost of position: quantity × average_price / QUANTITY_UNIT (i64 micro-units, ACD-023).
  */
 cost_basis: number; 
 /**
@@ -4787,7 +4787,7 @@ previous_value: number;
  */
 cash_flow: number; 
 /**
- * In-kind asset contributions within the period: opening-balance cost + zero-cost credits at grant-date market value (PRF-071).
+ * In-kind asset contributions within the period: opening balances and transfers at their entry-date market value (PRF-071).
  */
 asset_flow: number; 
 /**
@@ -4795,7 +4795,7 @@ asset_flow: number;
  */
 dividends: number; 
 /**
- * Investment P&L vs the previous period (realized gains + price movement); the bridge residual (PRF-073).
+ * Investment P&L vs the previous period (realized gains, price movement, free shares and interest); the bridge residual (PRF-073).
  */
 pnl: number; 
 /**

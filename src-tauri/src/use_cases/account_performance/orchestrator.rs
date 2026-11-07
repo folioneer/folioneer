@@ -856,8 +856,8 @@ mod tests {
         assert_eq!(year_2024.end_value, 1_500_000_000);
     }
 
-    // PRF-071 / PRF-074 — an opening-balance position contributes its book cost to
-    // asset_flow (no cash leg), and the bridge balances. Priced at cost so pnl = 0.
+    // PRF-071 / PRF-074 — an opening-balance position contributes its entry-date
+    // value to asset_flow (no cash leg), and the bridge balances. Priced at cost so pnl = 0.
     #[tokio::test]
     async fn asset_flow_captures_opening_balance() {
         let pool = make_pool().await;
@@ -1253,11 +1253,11 @@ mod tests {
         );
     }
 
-    // PRF-071 / PRF-074 — free shares contribute their grant-date market value to
-    // asset_flow (the price + FX carry-forward path); post-grant movement lands in
-    // pnl, and the bridge balances.
+    // PRF-076 / PRF-073 / PRF-074 — free shares are earned, not brought in: no
+    // asset_flow, their whole value lands in pnl, the bridge balances, and the
+    // period's gain is its dividends plus its pnl.
     #[tokio::test]
-    async fn asset_flow_values_free_shares_at_market() {
+    async fn free_shares_are_a_gain_not_an_in_out_flow() {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
@@ -1280,8 +1280,8 @@ mod tests {
             })
             .await
             .unwrap();
-        // Fund + buy 5 units @ 1000 (cost 5_000), then receive 2 free shares at a
-        // 1 150 grant-date price; the price then moves to 1 200 by period end.
+        // Fund + buy 5 units @ 1000 (cost 5_000), then receive 2 free shares; the
+        // price is 1 200 at period end, which values all 7 units.
         account_svc
             .record_deposit(&account.id, "2024-01-10".to_string(), 10_000_000_000, None)
             .await
@@ -1329,22 +1329,93 @@ mod tests {
             .iter()
             .find(|p| p.year == 2024)
             .expect("2024 row");
-        // 2 free shares × 1 150 grant-date price = 2 300 EUR.
-        assert_eq!(
-            row.asset_flow, 2_300_000_000,
-            "free shares at grant-date market"
-        );
+        assert_eq!(row.asset_flow, 0, "free shares are no in-kind contribution");
         assert_eq!(row.cash_flow, 10_000_000_000, "deposit only");
-        // pnl = 5 bought × (1200 − 1000) + 2 free × (1200 − 1150) = 1 100 EUR.
+        // pnl = 5 bought × (1200 − 1000) + 2 free × 1200 = 3 400 EUR.
         assert_eq!(
-            row.pnl, 1_100_000_000,
-            "appreciation on bought units plus post-grant movement of the credits"
+            row.pnl, 3_400_000_000,
+            "appreciation on bought units plus the free shares' whole value"
         );
         assert_eq!(
             row.end_value,
             row.previous_value + row.cash_flow + row.asset_flow + row.dividends + row.pnl,
             "PRF-074 bridge identity balances"
         );
+        let months_with_a_gain: Vec<_> = resp
+            .monthly
+            .iter()
+            .filter_map(|month| month.period_over_period.as_ref().map(|pop| (month, pop)))
+            .collect();
+        assert!(!months_with_a_gain.is_empty());
+        for (month, pop) in months_with_a_gain {
+            assert_eq!(
+                pop.gain,
+                month.dividends + month.pnl,
+                "{}-{:?}: the gain for the period is its dividends plus its P&L",
+                month.year,
+                month.month
+            );
+        }
+    }
+
+    // PRF-076 / INT-026 — interest on the cash line is earned, not brought in: no
+    // cash_flow, its amount lands in pnl, and the month's gain is its P&L.
+    #[tokio::test]
+    async fn cash_interest_is_a_gain_not_an_in_out_flow() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let account = account_svc
+            .create(
+                "Interest".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                false,
+            )
+            .await
+            .unwrap();
+        asset_svc.seed_cash_asset("EUR").await.unwrap();
+        account_svc
+            .record_deposit(&account.id, "2024-01-10".to_string(), 1_000_000_000, None)
+            .await
+            .unwrap();
+        account_svc
+            .record_interest(
+                &account.id,
+                crate::core::cash::system_cash_asset_id("EUR"),
+                "2024-06-01".to_string(),
+                None,
+                Some(25_000_000),
+                None,
+            )
+            .await
+            .unwrap();
+        let uc = AccountPerformanceUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let resp = uc.get_account_performance(&account.id, None).await.unwrap();
+        let year = resp
+            .yearly
+            .iter()
+            .find(|p| p.year == 2024)
+            .expect("2024 row");
+        assert_eq!(year.end_value, 1_025_000_000);
+        assert_eq!(year.cash_flow, 1_000_000_000, "the deposit alone");
+        assert_eq!(year.asset_flow, 0);
+        assert_eq!(year.pnl, 25_000_000, "the interest is a gain");
+        let june = resp
+            .monthly
+            .iter()
+            .find(|p| p.year == 2024 && p.month == Some(6))
+            .expect("June 2024");
+        assert_eq!(june.cash_flow, 0);
+        assert_eq!(
+            june.period_over_period.as_ref().map(|pop| pop.gain),
+            Some(june.dividends + june.pnl),
+            "the gain for the period is dividends plus P&L"
+        );
+        assert_eq!(june.pnl, 25_000_000);
     }
 
     // PRF-022 — an asset with no recorded price on or before the period end contributes 0
@@ -3345,10 +3416,10 @@ mod tests {
         assert_eq!(since_inception.pct, Some(20_000_000));
     }
 
-    // PRF-084 — free shares of the scoped asset enter asset_flow at their
-    // period-end market value; the residual pnl isolates the bought units' move.
+    // PRF-084 — free shares of the scoped asset are no flow of the position:
+    // their whole value lands in the residual pnl.
     #[tokio::test]
-    async fn scoped_free_shares_enter_asset_flow_at_market_value() {
+    async fn scoped_free_shares_are_a_gain_of_the_position() {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
@@ -3430,13 +3501,10 @@ mod tests {
 
         assert_eq!(row.end_value, 8_400_000_000, "7 units × 1 200 EUR");
         assert_eq!(row.cash_flow, 5_000_000_000, "purchase cost");
+        assert_eq!(row.asset_flow, 0, "free shares are no flow of the position");
         assert_eq!(
-            row.asset_flow, 2_300_000_000,
-            "2 free shares at the 1 150 EUR grant-date market price"
-        );
-        assert_eq!(
-            row.pnl, 1_100_000_000,
-            "5 bought × (1 200 − 1 000) + 2 free × (1 200 − 1 150) EUR"
+            row.pnl, 3_400_000_000,
+            "5 bought × (1 200 − 1 000) + 2 free × 1 200 EUR"
         );
         assert_eq!(
             row.end_value,
@@ -3445,10 +3513,9 @@ mod tests {
         );
     }
 
-    // PRF-071 — a credit granted AND disposed of within the same period keeps a
-    // truthful decomposition: the grant-date valuation is unaffected by price
-    // movement after the sale (a period-end valuation would inject an
-    // equal-and-opposite phantom offset into asset_flow and pnl).
+    // PRF-084 — a credit granted and sold within the same period: its sale is the
+    // position's outflow, its whole value its realized gain, and the price after
+    // the sale moves nothing.
     #[tokio::test]
     async fn credit_disposed_within_period_carries_no_phantom_pnl() {
         let pool = make_pool().await;
@@ -3552,13 +3619,10 @@ mod tests {
             5_000_000_000 - 8_400_000_000,
             "buy 5 000 − sell 7 × 1 200"
         );
+        assert_eq!(row.asset_flow, 0, "the credit is no flow of the position");
         assert_eq!(
-            row.asset_flow, 2_300_000_000,
-            "credit at its 1 150 grant-date value, immune to the post-sale 2 000 price"
-        );
-        assert_eq!(
-            row.pnl, 1_100_000_000,
-            "realized: 5 × (1 200 − 1 000) + 2 × (1 200 − 1 150), no phantom offset"
+            row.pnl, 3_400_000_000,
+            "realized: 5 × (1 200 − 1 000) + 2 × 1 200, untouched by the post-sale 2 000 price"
         );
         assert_eq!(
             row.end_value,

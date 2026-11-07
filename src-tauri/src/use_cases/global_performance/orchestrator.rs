@@ -6,7 +6,7 @@ use crate::context::currency::CurrencyService;
 use crate::core::logger::BACKEND;
 use crate::use_cases::shared::performance::{
     account_performance_series, annualized_yield_metric, lifetime_unavailable, residual_pnl,
-    zero_cost_credit_value, AccountPerformanceResponse, PerformancePeriod, PeriodBridge,
+    AccountPerformanceResponse, PerformancePeriod, PeriodBridge,
 };
 use crate::use_cases::shared::valuation::{
     at_rate, convert_at_rate, end_value_as_of, external_cash_flows, external_cash_flows_windowed,
@@ -211,8 +211,8 @@ impl GlobalPerformanceUseCase {
         reference: &str,
     ) -> StdResult<ConvertedAccount, AccountError> {
         let priced_assets = load_priced_assets(self.asset_service.as_ref(), &transactions).await?;
-        // PRF-071 — zero-cost credits are valued at their grant date, so this
-        // account's grant dates join the valued-date set for its own rate map.
+        // PRF-086 — opening balances and transfers are valued at their entry date,
+        // so those dates join the valued-date set for this account's own rate map.
         let mut asset_rate_dates: BTreeSet<NaiveDate> = valued_dates.iter().copied().collect();
         asset_rate_dates.extend(market_valued_flow_dates(&transactions));
         let asset_rate_dates: Vec<NaiveDate> = asset_rate_dates.into_iter().collect();
@@ -320,13 +320,13 @@ fn reference_rate_dates(
         .filter(|transaction| match transaction.transaction_type {
             TransactionType::Deposit | TransactionType::Withdrawal => asset_scope.is_none(),
             TransactionType::Purchase | TransactionType::Sell => asset_scope.is_some(),
-            TransactionType::OpeningBalance
-            | TransactionType::Dividend
-            | TransactionType::FreeShares
-            | TransactionType::Interest => true,
+            TransactionType::OpeningBalance | TransactionType::Dividend => true,
+            // PRF-076 — free shares and interest are earned, no flow.
             // SPL-050 — a split is not a flow and needs no rate.
             // TRF-028 — a transfer is no flow of the portfolio.
-            TransactionType::ManagementFee
+            TransactionType::FreeShares
+            | TransactionType::Interest
+            | TransactionType::ManagementFee
             | TransactionType::Split
             | TransactionType::WriteOff
             | TransactionType::TransferIn
@@ -413,9 +413,8 @@ impl ConvertedAccount {
     /// in reference-currency micros, mirroring the PRF-070–072 account bridge or
     /// the PRF-084 position bridge: every flow term converts at the rate of its
     /// own date — cash and dividend flows at their transaction date, an opening
-    /// balance at its entry-date market value (PRF-086), and zero-cost in-kind
-    /// credits at their grant date (PRF-071). A term with no usable rate
-    /// contributes 0.
+    /// balance at its entry-date market value (PRF-086). Free shares and interest
+    /// are earned, no flow (PRF-076). A term with no usable rate contributes 0.
     fn bridge_reference(
         &self,
         asset_scope: Option<&str>,
@@ -457,26 +456,16 @@ impl ConvertedAccount {
                             transaction_date_rate,
                         );
                     }
-                    TransactionType::FreeShares => {
-                        asset_flow += self.in_kind_credit_reference(transaction);
-                    }
-                    // INT-023 — interest on the cash line is a cash credit of
-                    // `quantity`; on a non-cash asset it is an in-kind credit (INT-024).
-                    TransactionType::Interest => {
-                        if crate::core::cash::is_cash_asset(&transaction.asset_id) {
-                            cash_flow +=
-                                convert_or_zero(transaction.quantity, transaction_date_rate);
-                        } else {
-                            asset_flow += self.in_kind_credit_reference(transaction);
-                        }
-                    }
                     TransactionType::Dividend => {
                         dividends +=
                             convert_or_zero(transaction.total_amount, transaction_date_rate);
                     }
+                    // PRF-076 — free shares and interest are earned, no flow.
                     // SPL-050 — a split is not a flow.
                     TransactionType::Purchase
                     | TransactionType::Sell
+                    | TransactionType::FreeShares
+                    | TransactionType::Interest
                     | TransactionType::ManagementFee
                     | TransactionType::Split
                     | TransactionType::WriteOff
@@ -510,12 +499,12 @@ impl ConvertedAccount {
                         dividends +=
                             convert_or_zero(transaction.total_amount, transaction_date_rate);
                     }
-                    TransactionType::FreeShares | TransactionType::Interest => {
-                        asset_flow += self.in_kind_credit_reference(transaction);
-                    }
+                    // PRF-084 — free shares and interest are earned, no flow.
                     // SPL-050 — a split is not a flow.
                     TransactionType::Deposit
                     | TransactionType::Withdrawal
+                    | TransactionType::FreeShares
+                    | TransactionType::Interest
                     | TransactionType::ManagementFee
                     | TransactionType::Split
                     | TransactionType::WriteOff
@@ -536,25 +525,6 @@ impl ConvertedAccount {
             cash_flow: cash_flow as i64,
             asset_flow: asset_flow as i64,
             dividends: dividends as i64,
-        }
-    }
-
-    /// The reference-currency market value of a zero-cost in-kind credit as of
-    /// its grant date (PRF-071 valuation converted at the grant-date rate,
-    /// consistent with GPF-030's flow-at-its-own-date conversion).
-    fn in_kind_credit_reference(&self, transaction: &Transaction) -> i128 {
-        let Some(grant_date) = parse_date(&transaction.date) else {
-            return 0;
-        };
-        let own_currency_value = zero_cost_credit_value(
-            transaction,
-            &self.priced_assets,
-            &self.rate_map,
-            &self.currency,
-        );
-        match self.reference_rate(grant_date) {
-            Some(rate) => at_rate(own_currency_value, rate),
-            None => 0,
         }
     }
 
@@ -1691,6 +1661,8 @@ mod tests {
             tx(TransactionType::Dividend, "2024-04-01"),
             tx(TransactionType::ManagementFee, "2024-05-01"),
             tx(TransactionType::OpeningBalance, "2024-06-01"),
+            tx(TransactionType::FreeShares, "2024-07-01"),
+            tx(TransactionType::Interest, "2024-08-01"),
         ];
         let date = |raw: &str| parse_date(raw).unwrap();
 
@@ -1709,6 +1681,13 @@ mod tests {
             unscoped.contains(&date("2024-06-01")),
             "opening balance converts at its own date"
         );
+        for scope in [None, Some("asset")] {
+            let dates = reference_rate_dates(&transactions, scope);
+            assert!(
+                !dates.contains(&date("2024-07-01")) && !dates.contains(&date("2024-08-01")),
+                "free shares and interest are earned, no flow to convert"
+            );
+        }
 
         let scoped = reference_rate_dates(&transactions, Some("asset"));
         assert!(
@@ -1721,12 +1700,11 @@ mod tests {
         );
     }
 
-    // GPF-040/PRF-071 — a foreign account's zero-cost in-kind credit (FreeShares)
-    // lands in asset_flow valued at its GRANT date and converted at the
-    // grant-date rate (0.80), consistent with GPF-030's flow-at-its-own-date
-    // conversion; the period-end rate (0.90) applies only to end values.
+    // GPF-040/PRF-071 — a foreign account's free shares are no flow in the
+    // reference currency either: their value, at the period-end rate (0.90) as
+    // the end value has it, lands in pnl.
     #[tokio::test]
-    async fn foreign_in_kind_credit_converts_at_grant_date_rate() {
+    async fn foreign_free_shares_are_a_gain_in_the_reference_currency() {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         asset_svc.seed_cash_asset("USD").await.unwrap();
@@ -1794,18 +1772,13 @@ mod tests {
         let response = uc.get_global_performance(None, None).await.unwrap();
 
         let row = year_row(&response, 2024);
-        // 5 free shares × $100 (grant-date price, 2024-03-20) × 0.80 (USD→EUR
-        // rate as of the grant date) = 400 EUR. A period-end (0.90) conversion
-        // would read 450 EUR.
-        assert_eq!(
-            row.asset_flow, 400_000_000,
-            "in-kind credit valued and converted at its grant date"
-        );
+        assert_eq!(row.asset_flow, 0, "free shares are no in-kind contribution");
         // 2000 USD deposit × 0.80 (rate as of 2024-03-15).
         assert_eq!(row.cash_flow, 1_600_000_000);
         // Cash 1000 USD + 15 shares × $100 = 2500 USD × 0.90 (period-end rate).
         assert_eq!(row.end_value, 2_250_000_000);
         assert_eq!(row.dividends, 0);
+        assert_eq!(row.pnl, 650_000_000, "the free shares' value is in the P&L");
         assert_eq!(
             row.end_value,
             row.previous_value + row.cash_flow + row.asset_flow + row.dividends + row.pnl,
@@ -1842,9 +1815,9 @@ mod bridge_reference_tests {
     }
 
     // GPF-030 — the bridge of a period in the reference currency, each term converted at
-    // the rate of its date (half a euro a dollar): cash (100 − 20 + 4) / 2; in kind
-    // (30 + 40 + 10) / 2; dividends 6 / 2. The first and the last day of the period
-    // count, the days around it do not.
+    // the rate of its date (half a euro a dollar): cash (100 − 20) / 2; in kind the
+    // opening balance 30 / 2; dividends 6 / 2. Interest and free shares are earned, no
+    // flow. The first and the last day of the period count, the days around it do not.
     #[test]
     fn the_account_bridge_converts_each_term_at_the_rate_of_its_date() {
         let bridge = dollar_account(a_year_of_transactions()).bridge_reference(
@@ -1852,16 +1825,16 @@ mod bridge_reference_tests {
             day("2024-01-01"),
             day("2024-12-31"),
         );
-        assert_eq!(bridge.cash_flow, 42_000_000);
-        assert_eq!(bridge.asset_flow, 40_000_000);
+        assert_eq!(bridge.cash_flow, 40_000_000);
+        assert_eq!(bridge.asset_flow, 15_000_000);
         assert_eq!(bridge.dividends, 3_000_000);
     }
 
     // PRF-084 — the bridge of one position: its purchases less its sales are its cash
-    // flow, (40 − 10) / 2; its opening balance, free shares and interest its in-kind
-    // flow, (30 + 20 + 10) / 2; its dividends 6 / 2. Deposits are not the position's.
+    // flow, (40 − 10) / 2; its opening balance its in-kind flow, 30 / 2; its dividends
+    // 6 / 2. Free shares and interest are earned, no flow; deposits are not the position's.
     #[test]
-    fn the_position_bridge_takes_trades_as_cash_and_credits_as_in_kind() {
+    fn the_position_bridge_takes_trades_as_cash_and_opening_balances_as_in_kind() {
         use TransactionType::*;
         let position = vec![
             transaction_on("stock-usd", Purchase, "2024-01-01", 40_000_000),
@@ -1878,7 +1851,7 @@ mod bridge_reference_tests {
             day("2024-12-31"),
         );
         assert_eq!(bridge.cash_flow, 15_000_000);
-        assert_eq!(bridge.asset_flow, 30_000_000);
+        assert_eq!(bridge.asset_flow, 15_000_000);
         assert_eq!(bridge.dividends, 3_000_000);
     }
 }

@@ -636,7 +636,7 @@
       },
       {
         "annualized_yield": null,
-        "asset_flow": 560000000,
+        "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
         "end_value": 28931267253,
@@ -645,7 +645,7 @@
           "gain": 650058397,
           "pct": 2298552
         },
-        "pnl": 90058397,
+        "pnl": 650058397,
         "previous_value": 28281208856,
         "since_inception": {
           "gain": 1731267253,
@@ -868,13 +868,13 @@
           "gain": 1881568353,
           "pct": 7227636
         },
-        "asset_flow": 560000000,
+        "asset_flow": 0,
         "cash_flow": 27200000000,
         "dividends": 75500000,
         "end_value": 29081568353,
         "month": null,
         "period_over_period": null,
-        "pnl": 1246068353,
+        "pnl": 1806068353,
         "previous_value": 0,
         "since_inception": {
           "gain": 1881568353,
@@ -1792,7 +1792,7 @@
       },
       {
         "annualized_yield": null,
-        "asset_flow": 560000000,
+        "asset_flow": 0,
         "cash_flow": 0,
         "dividends": 0,
         "end_value": 21482600000,
@@ -1801,7 +1801,7 @@
           "gain": 661900000,
           "pct": 3179047
         },
-        "pnl": 101900000,
+        "pnl": 661900000,
         "previous_value": 20820700000,
         "since_inception": {
           "gain": 1482600000,
@@ -2024,13 +2024,13 @@
           "gain": 1668300000,
           "pct": 8341500
         },
-        "asset_flow": 560000000,
+        "asset_flow": 0,
         "cash_flow": 20000000000,
         "dividends": 75500000,
         "end_value": 21668300000,
         "month": null,
         "period_over_period": null,
-        "pnl": 1032800000,
+        "pnl": 1592800000,
         "previous_value": 0,
         "since_inception": {
           "gain": 1668300000,

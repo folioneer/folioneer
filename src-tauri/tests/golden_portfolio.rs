@@ -705,3 +705,55 @@ async fn the_account_page_the_performance_and_the_price_movement_agree_on_value(
         assert_ne!(row["before"], row["after"], "the refresh moved the value");
     }
 }
+
+// PRF-076/PRF-074 — In/Out is what the owner brought in or took out, everything earned
+// is a gain: on every row of every series, the period's gain is its dividends plus its
+// P&L, the free shares of the year included.
+#[tokio::test]
+async fn every_period_gain_is_its_dividends_plus_its_pnl() {
+    let p = build_portfolio().await;
+    let performance = AccountPerformanceUseCase::new(
+        p.account_service.clone(),
+        p.asset_service.clone(),
+        p.currency_service.clone(),
+    );
+    let global = GlobalPerformanceUseCase::new(
+        p.account_service.clone(),
+        p.asset_service.clone(),
+        p.currency_service.clone(),
+    );
+    let mut series = Vec::new();
+    for id in [&p.main_eur, &p.growth_usd] {
+        series.push(
+            performance
+                .get_account_performance(id, None)
+                .await
+                .expect("performance"),
+        );
+    }
+    series.push(
+        global
+            .get_global_performance(None, None)
+            .await
+            .expect("global"),
+    );
+
+    let mut compared = 0;
+    for response in &series {
+        for period in response.yearly.iter().chain(response.monthly.iter()) {
+            let Some(pop) = &period.period_over_period else {
+                continue;
+            };
+            assert_eq!(
+                pop.gain,
+                period.dividends + period.pnl,
+                "{} {}-{:?}: gain is dividends plus P&L",
+                response.account_name,
+                period.year,
+                period.month
+            );
+            compared += 1;
+        }
+    }
+    assert!(compared > 24, "several years of periods are compared");
+}

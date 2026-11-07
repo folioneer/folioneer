@@ -288,6 +288,18 @@ A `Holding` whose asset is a Cash Asset. Represents the cash balance held in the
 
 The full economic value of an account: cash balance + Σ (market value of non-cash active holdings). Surfaced as `AccountDetailsResponse.total_global_value` (CSH-094). Used as the canonical "what is this account worth right now?" metric across the Account Details header and (later) the portfolio dashboard.
 
+### In/Out
+
+> Status: confirmed
+
+What the owner brought into or took out of an account within a period, in money or in kind: deposits less withdrawals, plus opening balances and transfers at their entry-date market value, typed cost when unpriced (PRF-070, PRF-071, PRF-086). For a holding it is its purchases less its sales plus its opening balances (PRF-084); for the whole portfolio, transfers between accounts are left out (TRF-028). Nothing earned shows here — free shares, interest and dividends are gains (PRF-076). Code: `cash_flow` + `asset_flow`. In French: "Entrée/sortie" (owner, 2026-11-07).
+
+### Gain for the period
+
+> Status: confirmed
+
+What an account, the portfolio or a holding earned over a month or a year, the owner's In/Out left out: its dividends plus its P&L vs n-1 (PRF-033, PRF-074). Code: `period_over_period`. In French: "Gain de la période" (owner, 2026-10-25).
+
 ## Dividend Domain Concepts (introduced by DIV spec)
 
 ### Current value

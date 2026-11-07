@@ -7,7 +7,7 @@ import type {
 } from "@/bindings";
 import { isCashAsset } from "@/lib/cashAsset";
 import { microToFormatted } from "@/lib/microUnits";
-import { formatIsoDateNumeric } from "@/ui/format/date";
+import { formatIsoDateNumeric, todayIso } from "@/ui/format/date";
 import type { I18nMessage } from "@/ui/format/i18n";
 
 const DASH = "—";
@@ -178,6 +178,8 @@ export interface PeriodRowViewModel {
   month: number | null;
   /** Display label: the month i18n key for month rows, the year string for year rows. */
   periodLabel: string;
+  /** PRF-044 — a year row of the current year: it runs only to today. */
+  isCurrentYear: boolean;
   /** Formatted period-end Global Value (PRF-020). */
   endValueFormatted: string;
   /** Formatted previous period-end Global Value — the bridge baseline (PRF-074). */
@@ -251,6 +253,7 @@ export function presentPeriodRow(period: PerformancePeriod): PeriodRowViewModel 
     year: period.year,
     month: period.month,
     periodLabel: period.month !== null ? monthLabel(period.month) : String(period.year),
+    isCurrentYear: isYearRow && String(period.year) === todayIso().slice(0, 4),
     endValueFormatted: formatEndValue(period.end_value),
     previousValueFormatted: formatEndValue(period.previous_value),
     externalFlow: toPnlCell(period.cash_flow + period.asset_flow),

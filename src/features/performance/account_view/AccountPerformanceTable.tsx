@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import { Info } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { PeriodRowViewModel } from "../shared/presenter";
@@ -14,6 +15,13 @@ interface AccountPerformanceTableProps {
    * account details' own sentence (ACD-057), so the two screens say it alike.
    */
   absentWindowHint?: string;
+}
+
+/** A row's period: its month, its year, or its year to date (PRF-044). */
+function periodText(row: PeriodRowViewModel, t: TFunction): string {
+  if (row.month !== null) return t(row.periodLabel);
+  if (row.isCurrentYear) return t("account_performance.period_current_year", { year: row.year });
+  return row.periodLabel;
 }
 
 /** PRF-088 — a lifetime percentage the Dietz guard suppressed: "—" with an info mark. */
@@ -129,7 +137,7 @@ export function AccountPerformanceTable({
               id={`${idPrefix}-row-${row.rowKey}`}
               data-testid={`${idPrefix}-row-${row.rowKey}`}
             >
-              <td className="m3-td">{row.month !== null ? t(row.periodLabel) : row.periodLabel}</td>
+              <td className="m3-td">{periodText(row, t)}</td>
               <td data-testid={`${idPrefix}-prev-value-${row.rowKey}`} className="m3-td text-right">
                 {row.previousValueFormatted}
               </td>

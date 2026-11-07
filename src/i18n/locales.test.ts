@@ -85,6 +85,26 @@ describe("i18n locales — staleness labels carry the age alone (TODO-004)", () 
   });
 });
 
+// PRF-036 / PRF-044 — the gain column and the current year's row, in every language.
+describe("i18n locales — the performance table names its gain and its running year", () => {
+  it.each([
+    ["en", en, "Gain for the period"],
+    ["fr", fr, "Gain de la période"],
+  ])("%s", async (lng, resources, gainColumn) => {
+    const instance = i18next.createInstance();
+    await instance.init({
+      lng,
+      resources: { [lng]: { translation: resources } },
+      interpolation: { escapeValue: false },
+    });
+
+    expect(instance.t("account_performance.column_period_over_period")).toBe(gainColumn);
+    expect(instance.t("account_performance.period_current_year", { year: 2026 })).toBe(
+      "2026 (YTD)",
+    );
+  });
+});
+
 function collectValues(obj: Record<string, unknown>): string[] {
   return Object.values(obj).flatMap((value) =>
     value !== null && typeof value === "object"

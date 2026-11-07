@@ -1,24 +1,34 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type { PerformancePeriod } from "@/bindings";
 import { presentPeriodRow } from "../shared/presenter";
 import { AccountPerformanceTable } from "./AccountPerformanceTable";
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, vars?: Record<string, unknown>) =>
+      vars?.year === undefined ? key : `${key}(${vars.year})`,
+  }),
 }));
+
+const basePeriod: PerformancePeriod = {
+  year: 2025,
+  month: null,
+  end_value: 1_000_000_000,
+  previous_value: 900_000_000,
+  cash_flow: 0,
+  asset_flow: 0,
+  dividends: 0,
+  pnl: 100_000_000,
+  period_over_period: { gain: 100_000_000, pct: 11_110_000 },
+  year_to_date: null,
+  since_inception: { gain: 400_000_000, pct: 20_000_000 },
+  annualized_yield: { gain: 400_000_000, pct: 5_000_000 },
+};
 
 const period = (sincePct: number | null) =>
   presentPeriodRow({
-    year: 2025,
-    month: null,
-    end_value: 1_000_000_000,
-    previous_value: 900_000_000,
-    cash_flow: 0,
-    asset_flow: 0,
-    dividends: 0,
-    pnl: 100_000_000,
-    period_over_period: { gain: 100_000_000, pct: 11_110_000 },
-    year_to_date: null,
+    ...basePeriod,
     since_inception: { gain: 400_000_000, pct: sincePct },
     annualized_yield: sincePct === null ? null : { gain: 400_000_000, pct: 5_000_000 },
   });
@@ -84,5 +94,21 @@ describe("AccountPerformanceTable", () => {
   it("gives no hint outside an asset scope", () => {
     render(<AccountPerformanceTable rows={[period(20_000_000)]} showYtd={false} showAnnualized />);
     expect(screen.getByTestId("account-performance-pop-pct-2025").getAttribute("title")).toBeNull();
+  });
+
+  // PRF-044 — the current year's row says it runs only to today.
+  it("labels the current year's row as year to date", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 7, 12));
+    const current = presentPeriodRow({ ...basePeriod, year: 2026 });
+    const past = presentPeriodRow(basePeriod);
+    vi.useRealTimers();
+    render(<AccountPerformanceTable rows={[current, past]} showYtd={false} showAnnualized />);
+    expect(screen.getByTestId("account-performance-row-2026").firstElementChild?.textContent).toBe(
+      "account_performance.period_current_year(2026)",
+    );
+    expect(screen.getByTestId("account-performance-row-2025").firstElementChild?.textContent).toBe(
+      "2025",
+    );
   });
 });
