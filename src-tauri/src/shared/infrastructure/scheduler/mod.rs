@@ -2,16 +2,16 @@
 //! probes the OS-native daily task that triggers the scheduled price download.
 //!
 //! Three platform adapters ship: [`systemd`] (Linux, fully verified), [`windows_task`]
-//! (Windows, unit-verified generated definitions only), and [`launchd`] (macOS,
-//! unit-verified generated definitions only) — SPF-017. [`NoopScheduler`] is what a
-//! debug build gets, so a development or E2E run never touches the host's real
-//! task scheduler — the installed application owns it.
+//! (Windows, registered from its definition and read back by a Windows test), and
+//! [`launchd`] (macOS, unit-verified generated definitions only) — SPF-017.
+//! [`NoopScheduler`] is what a debug build gets, so a development or E2E run never
+//! touches the host's real task scheduler — the installed application owns it.
 
 /// macOS launchd adapter — generates the `.plist` definition (SPF-017).
 pub mod launchd;
 /// Linux systemd user-timer adapter — generates the `.service`/`.timer` units (SPF-017).
 pub mod systemd;
-/// Windows Task Scheduler adapter — generates `schtasks` args + task XML (SPF-017).
+/// Windows Task Scheduler adapter — registers the task XML through `schtasks` (SPF-017).
 pub mod windows_task;
 
 use async_trait::async_trait;
