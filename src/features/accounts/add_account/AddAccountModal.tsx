@@ -19,7 +19,15 @@ export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
     logger.info("[AddAccountModal] mounted");
   }, []);
 
-  const { formData, error, isSubmitting, handleChange, setCountry, handleSubmit } = useAddAccount({
+  const {
+    formData,
+    error,
+    isSubmitting,
+    handleChange,
+    setCountry,
+    handleSubmit,
+    impliedCostBasis,
+  } = useAddAccount({
     onSubmitSuccess: onClose,
   });
 
@@ -54,6 +62,7 @@ export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
           handleChange={handleChange}
           setCountry={setCountry}
           wrapperLists={wrapperLists}
+          impliedCostBasis={impliedCostBasis}
           idPrefix="add-account"
         />
         {/* R13 — inline error stays modal open */}

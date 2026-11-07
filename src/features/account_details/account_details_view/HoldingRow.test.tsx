@@ -1285,3 +1285,35 @@ describe("HoldingRow — an unrecorded split (MKT-233)", () => {
     expect(document.querySelector("[id^='action-record-unrecorded-split-']")).toBeNull();
   });
 });
+
+describe("HoldingRow — lots (#515, the validated mock)", () => {
+  beforeEach(() => {
+    useAppStore.setState({ assets: [], accounts: [] });
+  });
+
+  // The Lots action shows only when the account offers lots, and opens this holding's.
+  it("offers the holding's lots only when the account has them", () => {
+    const onLots = vi.fn();
+    const { container, unmount } = render(
+      <table>
+        <tbody>
+          <HoldingRow
+            row={baseRow}
+            accountId="account-1"
+            onBuy={vi.fn()}
+            onSell={vi.fn()}
+            onPriceHistory={vi.fn()}
+            onLots={onLots}
+          />
+        </tbody>
+      </table>,
+    );
+    const action = container.querySelector("#action-lots-asset-1");
+    expect(action).not.toBeNull();
+    fireEvent.click(action as Element);
+    expect(onLots).toHaveBeenCalledWith("asset-1");
+    unmount();
+    const { container: without } = renderInTable(baseRow);
+    expect(without.querySelector("#action-lots-asset-1")).toBeNull();
+  });
+});

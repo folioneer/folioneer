@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "@/lib/store";
 import { useAddAccount } from "./useAddAccount";
@@ -17,11 +17,22 @@ vi.mock("../useAccounts", () => ({
   }),
 }));
 
+const mockImplied = vi.fn((..._args: unknown[]) =>
+  Promise.resolve({ method: "WeightedAverage", country: "FR" }),
+);
+
+vi.mock("../gateway", () => ({
+  accountGateway: {
+    getImpliedCostBasis: (...args: unknown[]) => mockImplied(...args),
+  },
+}));
+
 const fakeSubmit = { preventDefault: vi.fn() } as unknown as React.FormEvent;
 
 describe("useAddAccount", () => {
   beforeEach(() => {
     mockAddAccount.mockReset();
+    mockImplied.mockResolvedValue({ method: "WeightedAverage", country: "FR" });
   });
 
   // R14 — empty name blocks submission
@@ -140,6 +151,7 @@ describe("useAddAccount — country and wrapper (ACC-044)", () => {
 describe("useAddAccount — bank name (ACC-026)", () => {
   beforeEach(() => {
     mockAddAccount.mockReset();
+    mockImplied.mockResolvedValue({ method: "WeightedAverage", country: "FR" });
   });
 
   it("passes the bank name field through to the create DTO", async () => {
@@ -186,6 +198,7 @@ describe("useAddAccount — bank name (ACC-026)", () => {
 describe("useAddAccount — management fees opt-in (FEE-075)", () => {
   beforeEach(() => {
     mockAddAccount.mockReset();
+    mockImplied.mockResolvedValue({ method: "WeightedAverage", country: "FR" });
   });
 
   it("passes the checkbox state through to the create DTO", async () => {
@@ -236,5 +249,48 @@ describe("useAddAccount — reference currency (FXR-128)", () => {
     const { result } = renderHook(() => useAddAccount());
     expect(result.current.formData.currency).toBe("CHF");
     useAppStore.setState({ referenceCurrency: "EUR" });
+  });
+
+  // CBM-014 — the method the country and wrapper imply is read again when either changes.
+  it("reads the implied method for the country and the wrapper", async () => {
+    mockImplied.mockResolvedValue({ method: "WeightedAverage", country: "FR" });
+    const { result } = renderHook(() => useAddAccount());
+    await waitFor(() => expect(result.current.impliedCostBasis?.country).toBe("FR"));
+    mockImplied.mockResolvedValue({ method: "Fifo", country: "DE" });
+    act(() => result.current.setCountry("DE"));
+    await waitFor(() => expect(result.current.impliedCostBasis?.method).toBe("Fifo"));
+    expect(mockImplied).toHaveBeenLastCalledWith("DE", null);
+  });
+
+  // CBM-011 / CBM-011A — a method left to the country is sent as none; a chosen one is sent.
+  it("sends the chosen method, or none to follow the country", async () => {
+    mockImplied.mockResolvedValue({ method: "Fifo", country: "DE" });
+    mockAddAccount.mockResolvedValue({ data: {}, error: null });
+    const { result } = renderHook(() => useAddAccount());
+    act(() => {
+      result.current.handleChange({
+        target: { name: "name", value: "Depot" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(mockAddAccount).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cost_basis_method: null }),
+    );
+    act(() => {
+      result.current.handleChange({
+        target: { name: "name", value: "Depot" },
+      } as React.ChangeEvent<HTMLInputElement>);
+      result.current.handleChange({
+        target: { name: "cost_basis_method", value: "WeightedAverage" },
+      } as React.ChangeEvent<HTMLSelectElement>);
+    });
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(mockAddAccount).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cost_basis_method: "WeightedAverage" }),
+    );
   });
 });

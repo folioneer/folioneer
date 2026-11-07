@@ -21,8 +21,15 @@ export function EditAccountModal({ isOpen, onClose, account }: EditAccountModalP
     logger.info("[EditAccountModal] mounted");
   }, []);
 
-  const { formData, error, isSubmitting, handleChange, setCountry, handleSubmit } =
-    useEditAccountModal({ account, onClose });
+  const {
+    formData,
+    error,
+    isSubmitting,
+    handleChange,
+    setCountry,
+    handleSubmit,
+    costBasisChanged,
+  } = useEditAccountModal({ account, onClose });
 
   const actions = (
     <>
@@ -56,6 +63,8 @@ export function EditAccountModal({ isOpen, onClose, account }: EditAccountModalP
           handleChange={handleChange}
           setCountry={setCountry}
           wrapperLists={wrapperLists}
+          impliedCostBasis={null}
+          costBasisChanged={costBasisChanged}
           idPrefix="edit-account"
         />
         {/* R13 — inline error, modal stays open */}

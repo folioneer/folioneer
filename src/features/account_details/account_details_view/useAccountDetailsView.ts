@@ -15,6 +15,7 @@ import { otherAccounts, useAppStore } from "@/lib/store";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import { formatIsoDateNumeric, todayIso } from "@/ui/format/date";
 import { accountDetailsGateway, useCachedAssets } from "../gateway";
+import { toLotsTarget } from "../holding_lots/presenter";
 import {
   priceHistoryBackfillErrorToI18n,
   priceHistoryBackfillOutcomeToMessage,
@@ -22,6 +23,7 @@ import {
   toPriceableAssets,
 } from "../shared/presenter";
 import type {
+  HoldingLotsTarget,
   HoldingNoteTarget,
   ModalTarget,
   SellTarget,
@@ -102,6 +104,7 @@ export function useAccountDetailsView(accountId: string) {
   const [writeOffTarget, setWriteOffTarget] = useState<WriteOffTarget | null>(null);
   const [transferTarget, setTransferTarget] = useState<TransferTarget | null>(null);
   const [holdingNoteTarget, setHoldingNoteTarget] = useState<HoldingNoteTarget | null>(null);
+  const [lotsTarget, setLotsTarget] = useState<HoldingLotsTarget | null>(null);
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -328,6 +331,20 @@ export function useAccountDetailsView(accountId: string) {
     [isAsOf, data.holdingDetails],
   );
   const handleHoldingNoteClose = useCallback(() => setHoldingNoteTarget(null), []);
+
+  // #515 (the validated mock), CBM-034 — the lots of a holding, on an account under FIFO
+  // (under the weighted average there are none).
+  const showsLots =
+    !isAsOf && accounts.find((a) => a.id === accountId)?.cost_basis_method === "Fifo";
+  const handleLotsOpen = useCallback(
+    (assetId: string) => {
+      const holding = data.holdingDetails.find((h) => h.asset_id === assetId);
+      if (!holding) return;
+      setLotsTarget(toLotsTarget(holding, accountCurrency));
+    },
+    [data.holdingDetails, accountCurrency],
+  );
+  const handleLotsClose = useCallback(() => setLotsTarget(null), []);
   // HNO-022 — the success path re-fetches the read so the row's note + bell update.
   const handleHoldingNoteSuccess = useCallback(() => {
     setHoldingNoteTarget(null);
@@ -500,6 +517,8 @@ export function useAccountDetailsView(accountId: string) {
     transferTarget,
     transferDestinations,
     holdingNoteTarget,
+    lotsTarget,
+    showsLots,
     // Handlers
     handleAddTransaction,
     handleBuyOpen,
@@ -548,6 +567,8 @@ export function useAccountDetailsView(accountId: string) {
     handleTransferSuccess,
     handleHoldingNoteOpen,
     handleHoldingNoteClose,
+    handleLotsOpen,
+    handleLotsClose,
     handleHoldingNoteSuccess,
     handleTogglePriceRefreshBlocked,
     backfillingAssetIds,

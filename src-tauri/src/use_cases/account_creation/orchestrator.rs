@@ -1,4 +1,6 @@
-use crate::context::account::{Account, AccountError, AccountServiceContract, AgentRecording};
+use crate::context::account::{
+    Account, AccountError, AccountServiceContract, AgentRecording, CostBasisMethod,
+};
 use crate::context::asset::AssetServiceContract;
 use crate::core::logger::BACKEND;
 use crate::shared::infrastructure::uow::TransactionManager;
@@ -60,11 +62,42 @@ impl AccountCreationUseCase {
         country: Option<String>,
         wrapper: Option<String>,
     ) -> StdResult<Account, AccountError> {
+        self.create_with_method(
+            name,
+            bank_name,
+            currency,
+            management_fees_enabled,
+            country,
+            wrapper,
+            None,
+        )
+        .await
+    }
+
+    /// CBM-011A — the account with its country and wrapper and the cost basis method chosen
+    /// for it, or the one its country implies when none is (CBM-011).
+    // The account's own fields, one argument each as `create_classified` takes them, plus
+    // the method chosen.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_with_method(
+        &self,
+        name: String,
+        bank_name: String,
+        currency: String,
+        management_fees_enabled: bool,
+        country: Option<String>,
+        wrapper: Option<String>,
+        method: Option<CostBasisMethod>,
+    ) -> StdResult<Account, AccountError> {
         // ACC-002 / TRX-021 / ACC-041 — the account's own fields are checked before anything
         // is seeded for it: a value it refuses is answered with its own code.
         let account = Account::new(name, bank_name, currency, management_fees_enabled)?
             .classified(country, wrapper, None)?
             .with_implied_cost_basis();
+        let account = match method {
+            Some(method) => account.with_cost_basis_method(method),
+            None => account,
+        };
         self.create_with_cash(account, None).await
     }
 

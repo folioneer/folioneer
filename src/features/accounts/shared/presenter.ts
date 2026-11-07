@@ -2,6 +2,7 @@ import type {
   AccountError,
   FetchAccountAssetPricesError,
   FetchAllAssetPricesError,
+  ImpliedCostBasis,
   Wrapper,
   WrapperLists,
 } from "@/bindings";
@@ -217,4 +218,12 @@ export function groupByWrapper<T extends { wrapper: string | null }>(
   }
   if (withoutWrapper) groups.push({ wrapper: null, label: null, rows: withoutWrapper });
   return groups;
+}
+
+/** #515 (the validated mock), CBM-014 — under the method, the country it was preselected from. */
+export function impliedCostBasisHint(implied: ImpliedCostBasis, language: string): I18nMessage {
+  const country = countryName(implied.country, language);
+  return implied.method === "Fifo"
+    ? { key: "account.form_cost_basis_implied_fifo", vars: { country } }
+    : { key: "account.form_cost_basis_implied_weighted_average", vars: { country } };
 }

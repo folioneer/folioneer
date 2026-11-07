@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { ImpliedCostBasis } from "@/bindings";
+import { logger } from "@/lib/logger";
 import { useAppStore } from "@/lib/store";
 import type { I18nMessage } from "@/ui/format/i18n";
+import { accountGateway } from "../gateway";
 import type { AccountFormData } from "../shared/AccountForm";
 import { validateAccountCurrency, validateAccountName } from "../shared/validateAccount";
 import { useAccounts } from "../useAccounts";
@@ -21,9 +24,28 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
     management_fees_enabled: false,
     country: "",
     wrapper: "",
+    cost_basis_method: "",
   });
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // CBM-014 — the method the country and wrapper imply, read again when either changes.
+  const [impliedCostBasis, setImpliedCostBasis] = useState<ImpliedCostBasis | null>(null);
+  const { country, wrapper } = formData;
+  useEffect(() => {
+    let current = true;
+    accountGateway
+      .getImpliedCostBasis(country || null, wrapper || null)
+      .then((implied) => {
+        if (current) setImpliedCostBasis(implied);
+      })
+      .catch((err) => {
+        logger.warn("[useAddAccount] the implied method could not be read", { err });
+        if (current) setImpliedCostBasis(null);
+      });
+    return () => {
+      current = false;
+    };
+  }, [country, wrapper]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -57,6 +79,7 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
       management_fees_enabled: formData.management_fees_enabled,
       country: formData.country || null,
       wrapper: formData.wrapper || null,
+      cost_basis_method: formData.cost_basis_method || null,
     });
 
     setIsSubmitting(false);
@@ -74,6 +97,7 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
       management_fees_enabled: false,
       country: "",
       wrapper: "",
+      cost_basis_method: "",
     });
 
     if (onSubmitSuccess) {
@@ -88,5 +112,6 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
     handleChange,
     setCountry,
     handleSubmit,
+    impliedCostBasis,
   };
 }

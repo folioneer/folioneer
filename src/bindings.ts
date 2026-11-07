@@ -293,6 +293,24 @@ async setAccountCostBasisMethod(accountId: string, method: CostBasisMethod) : Pr
 }
 },
 /**
+ * CBM-014 — the cost basis method an account of `country` in `wrapper` would start with,
+ * and the country it comes from.
+ */
+async getImpliedCostBasis(country: string | null, wrapper: string | null) : Promise<ImpliedCostBasis> {
+    return await TAURI_INVOKE("get_implied_cost_basis", { country, wrapper });
+},
+/**
+ * CBM-034 — a holding's lots, every one, oldest first.
+ */
+async getHoldingLots(accountId: string, assetId: string) : Promise<Result<HoldingLots, AccountError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_holding_lots", { accountId, assetId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Returns the distinct asset IDs that have transactions for the given account (TXL-013).
  */
 async getAssetIdsForAccount(accountId: string) : Promise<Result<string[], AccountError>> {
@@ -1417,8 +1435,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
+export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 
 /** user-defined types **/
 
@@ -2974,7 +2992,11 @@ country: string | null;
 /**
  * ACC-043 — the identifier of its tax wrapper (ACC-040); none when unset.
  */
-wrapper: string | null }
+wrapper: string | null; 
+/**
+ * CBM-011A — the cost basis method chosen for it; none takes its country's (CBM-011).
+ */
+cost_basis_method?: CostBasisMethod | null }
 /**
  * Parameters for creating a new asset.
  */
@@ -4118,6 +4140,43 @@ quantity: string } } |
  */
 amount: number } }
 /**
+ * CBM-034 — one lot of a holding as it is shown: when it came in, what it brought and cost,
+ * what it still holds, and whether it came at no cost.
+ */
+export type HoldingLot = { 
+/**
+ * The date of the transaction that brought it in (`YYYY-MM-DD`).
+ */
+acquired_on: string; 
+/**
+ * The units it brought in, rescaled by the splits since, as decimal text (TRX-024B).
+ */
+quantity: string; 
+/**
+ * What they cost when they came in, in the account's currency (micro-units).
+ */
+cost: number; 
+/**
+ * The units it still holds, as decimal text; "0" once taken whole.
+ */
+remaining: string; 
+/**
+ * Whether it came at no cost: free shares or interest (CBM-020).
+ */
+free: boolean }
+/**
+ * CBM-034 — a holding's lots and the method they follow.
+ */
+export type HoldingLots = { 
+/**
+ * The account's cost basis method; no lot under the weighted average.
+ */
+method: CostBasisMethod; 
+/**
+ * Every lot, oldest first, those taken whole included.
+ */
+lots: HoldingLot[] }
+/**
  * A free-text note pinned to an (account, asset) holding pair, with an optional
  * price alarm — at most one note per pair (HNO-010).
  * 
@@ -4185,6 +4244,19 @@ quantity: string;
  * VWAP cost basis per unit, account currency (micro-units), 0 when never held.
  */
 average_price: number }
+/**
+ * CBM-014 — the method a country implies, with the country it comes from.
+ */
+export type ImpliedCostBasis = { 
+/**
+ * The method (CBM-011).
+ */
+method: CostBasisMethod; 
+/**
+ * The country it comes from (ISO 3166-1 alpha-2): the wrapper's, else the account's,
+ * else the portfolio's.
+ */
+country: string }
 /**
  * IMP-020 — how one provider's export is read: a file in the mappers folder, reused.
  */

@@ -2,7 +2,7 @@
 #![allow(clippy::unreachable)]
 
 use super::AccountCreationUseCase;
-use crate::context::account::{Account, AccountError};
+use crate::context::account::{Account, AccountError, CostBasisMethod};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::State;
@@ -24,6 +24,9 @@ pub struct CreateAccountDTO {
     pub country: Option<String>,
     /// ACC-043 — the identifier of its tax wrapper (ACC-040); none when unset.
     pub wrapper: Option<String>,
+    /// CBM-011A — the cost basis method chosen for it; none takes its country's (CBM-011).
+    #[serde(default)]
+    pub cost_basis_method: Option<CostBasisMethod>,
 }
 
 /// Adds a new account, eagerly seeding its Cash Asset + 0-balance Cash Holding
@@ -34,13 +37,14 @@ pub async fn add_account(
     uc: State<'_, AccountCreationUseCase>,
     dto: CreateAccountDTO,
 ) -> Result<Account, AccountError> {
-    uc.create_classified(
+    uc.create_with_method(
         dto.name,
         dto.bank_name,
         dto.currency,
         dto.management_fees_enabled,
         dto.country,
         dto.wrapper,
+        dto.cost_basis_method,
     )
     .await
 }
