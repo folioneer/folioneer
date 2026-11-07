@@ -182,7 +182,7 @@ describe("InterestModal (INT-020/021/025)", () => {
     mockUseInterestTransaction.mockReturnValue(makeHookReturn({ handleChange }));
     render(<InterestModal {...BASE_PROPS} />);
 
-    fireEvent.change(screen.getByTestId("interest-percent"), { target: { value: "2.5" } });
+    fireEvent.change(screen.getByTestId("interest-percent"), { target: { value: "2,5" } });
     expect(handleChange).toHaveBeenCalledWith("percent", "2.5");
   });
 

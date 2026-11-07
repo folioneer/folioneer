@@ -288,7 +288,7 @@ describe("validateRateForm (FXR-020–023)", () => {
         fromCurrency: "USD",
         toCurrency: "EUR",
         date: "2026-06-01",
-        rate: "0.92",
+        rate: "0,92",
       },
       new Date("2026-06-02"),
     );

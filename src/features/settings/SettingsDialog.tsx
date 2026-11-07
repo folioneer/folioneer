@@ -22,6 +22,7 @@ const LANGUAGE_OPTIONS: { value: LanguageChoice; labelKey: string }[] = [
   { value: "auto", labelKey: "settings.language_auto" },
   { value: "en", labelKey: "settings.language_en" },
   { value: "fr", labelKey: "settings.language_fr" },
+  { value: "de", labelKey: "settings.language_de" },
 ];
 
 function GeneralSection() {

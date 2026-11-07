@@ -35,14 +35,15 @@ describe("useRecordRate — the rate field by language (NUM-010/011)", () => {
   });
   afterEach(() => setDisplayLocale("fr"));
 
-  // In French the field shows a comma, reads a comma or a dot, and records the figure.
-  it("in French, reads a comma or a dot and shows a comma", async () => {
+  // In French the field keeps what is typed, reads a comma, and records the figure; a dot is
+  // no French mark (owner, 2026-11-07, #390).
+  it("in French, keeps what is typed and reads a comma", async () => {
     setDisplayLocale("fr");
     const { result } = renderHook(() => useRecordRate(props));
     act(() => result.current.setDate("2026-01-02"));
 
     act(() => result.current.setRate("1.09"));
-    expect(result.current.rate).toBe("1,09");
+    expect(result.current.rate).toBe("1.09");
     act(() => result.current.setRate("1,0845"));
     expect(result.current.rate).toBe("1,0845");
 

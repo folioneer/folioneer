@@ -60,7 +60,7 @@ The feature lives in `features/transactions/` and reads the account context. It 
 
 **TXL-040 — Delete action (frontend)**: Each transaction row exposes a delete action. Clicking it opens a confirmation dialog before proceeding, per TRX-035.
 
-**TXL-041 — Delete confirmation content (frontend)**: The confirmation dialog uses the existing `transaction.delete_confirm_title` and `transaction.delete_confirm_message` i18n keys (already defined in EN and FR locales). It does not display individual transaction details.
+**TXL-041 — Delete confirmation content (frontend)**: The confirmation dialog uses the existing `transaction.delete_confirm_title` and `transaction.delete_confirm_message` i18n keys (already defined in every locale). It does not display individual transaction details.
 
 **TXL-042 — Delete success feedback (frontend)**: On successful deletion, the confirmation dialog closes, a success snackbar is shown, and the transaction list refreshes (TXL-026).
 

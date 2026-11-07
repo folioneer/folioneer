@@ -1,10 +1,11 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { setDisplayLocale } from "@/lib/microUnits";
+import commonDe from "./locales/de/common.json";
 import commonEn from "./locales/en/common.json";
 import commonFr from "./locales/fr/common.json";
 
-const SUPPORTED_LANGS = ["fr", "en"];
+const SUPPORTED_LANGS = ["fr", "en", "de"];
 const LANG_OVERRIDE_KEY = "language_override";
 
 export function resolveBrowserLang(): string {
@@ -39,6 +40,7 @@ i18n.use(initReactI18next).init({
   resources: {
     fr: { common: commonFr },
     en: { common: commonEn },
+    de: { common: commonDe },
   },
   interpolation: {
     escapeValue: false,

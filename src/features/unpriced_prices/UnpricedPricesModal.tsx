@@ -2,12 +2,7 @@ import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { UnpricedAsset } from "@/bindings";
-import {
-  decimalToDisplayed,
-  decimalToNumber,
-  microToFormattedPrice,
-  typedToDecimal,
-} from "@/lib/microUnits";
+import { decimalToNumber, microToFormattedPrice, typedToDecimal } from "@/lib/microUnits";
 import { Button } from "@/ui/components/button/Button";
 import { TextField } from "@/ui/components/field/TextField";
 import { FormModal } from "@/ui/components/modal/FormModal";
@@ -95,7 +90,7 @@ function UnpricedRowItem({ row, onRecord, onSkip, t }: UnpricedRowItemProps) {
           type="text"
           inputMode="decimal"
           value={value}
-          onChange={(event) => setValue(decimalToDisplayed(typedToDecimal(event.target.value)))}
+          onChange={(event) => setValue(event.target.value)}
           disabled={row.isSubmitting}
         />
       </div>

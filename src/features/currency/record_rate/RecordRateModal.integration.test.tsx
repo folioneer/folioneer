@@ -56,7 +56,7 @@ describe("RecordRateModal — create mode (FXR-025/027/028/029)", () => {
     );
 
     setDate("06/01/2026");
-    await userEvent.type(screen.getByTestId("record-rate-rate"), "0.92");
+    await userEvent.type(screen.getByTestId("record-rate-rate"), "0,92");
     await userEvent.click(screen.getByTestId("record-rate-submit"));
 
     expect(screen.getByTestId("record-rate-submit")).toBeDisabled();
@@ -98,7 +98,7 @@ describe("RecordRateModal — create mode (FXR-025/027/028/029)", () => {
     );
 
     setDate("06/01/2026");
-    await userEvent.type(screen.getByTestId("record-rate-rate"), "0.92");
+    await userEvent.type(screen.getByTestId("record-rate-rate"), "0,92");
     await userEvent.click(screen.getByTestId("record-rate-submit"));
 
     expect(await screen.findByTestId("record-rate-submit")).toBeDefined();
@@ -150,7 +150,7 @@ describe("RecordRateModal — create mode (FXR-025/027/028/029)", () => {
     );
 
     setDate("12/31/2099");
-    await userEvent.type(screen.getByTestId("record-rate-rate"), "0.92");
+    await userEvent.type(screen.getByTestId("record-rate-rate"), "0,92");
     await userEvent.click(screen.getByTestId("record-rate-submit"));
 
     expect(await screen.findByTestId("record-rate-error")).toBeInTheDocument();
@@ -242,7 +242,7 @@ describe("RecordRateModal — create mode (FXR-025/027/028/029)", () => {
     );
 
     setDate("06/01/2026");
-    await userEvent.type(screen.getByTestId("record-rate-rate"), "0.92");
+    await userEvent.type(screen.getByTestId("record-rate-rate"), "0,92");
     await userEvent.click(screen.getByTestId("record-rate-submit"));
 
     await screen.findByTestId("record-rate-submit");

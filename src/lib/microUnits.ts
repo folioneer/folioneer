@@ -62,18 +62,43 @@ export function setDisplayLocale(locale: string): void {
   _displayLocale = locale;
 }
 
-/** NUM-001 — the decimal separator of the display language: a comma in French, a dot otherwise. */
+/** The languages that write a decimal comma (NUM-001). */
+const COMMA_LANGUAGES = ["fr", "de"];
+
+/** NUM-001 — the decimal separator of the display language: a comma in French and German, a dot otherwise. */
 function decimalSeparator(): "," | "." {
-  return _displayLocale.toLowerCase().startsWith("fr") ? "," : ".";
+  const language = _displayLocale.toLowerCase().split("-")[0] ?? "";
+  return COMMA_LANGUAGES.includes(language) ? "," : ".";
 }
 
+/** NUM-010 — the mark grouping thousands in a language that writes a decimal comma. */
+const GROUP_MARK: Record<string, string> = { fr: "[ \u00a0\u202f]", de: "\\." };
+
+/** A run of a typed text that is one number: digits with their marks, a space only between digits. */
+const NUMBER_RUN = /\d(?:[\d.,]|[ \u00a0\u202f](?=\d))*|[.,]\d+/g;
+
+/** What a number this language does not write becomes: a text no figure reads. */
+const NO_NUMBER = "'";
+
 /**
- * NUM-010 — reads what is typed in a number field: in French a comma or a dot is the decimal
- * separator; in English only the dot is, and a comma is left as typed, which is no number.
- * The result is written with a dot, the form in which every figure travels.
+ * NUM-010 — reads what is typed in a number field as the display language writes numbers
+ * (owner, 2026-11-07, #390). French and German: the comma is the decimal separator and digits
+ * may be grouped by three, with a space in French, a dot in German; any other dot or space
+ * makes it no number — a German "1.5" is never one and a half. English: the dot is the
+ * decimal separator and a comma is left as typed, which is no number. The result is written
+ * with a dot, the form in which every figure travels.
  */
 export function typedToDecimal(typed: string): string {
-  return decimalSeparator() === "," ? typed.replaceAll(",", ".") : typed;
+  const language = _displayLocale.toLowerCase().split("-")[0] ?? "";
+  const group = GROUP_MARK[language];
+  if (group === undefined) return typed;
+  const grouped = new RegExp(`^\\d{1,3}(?:${group}\\d{3})+(?:,\\d*)?$`);
+  const groupMarks = new RegExp(group, "g");
+  return typed.replace(NUMBER_RUN, (run) => {
+    if (/^\d*(?:,\d*)?$/.test(run)) return run.replace(",", ".");
+    if (grouped.test(run)) return run.replace(groupMarks, "").replace(",", ".");
+    return NO_NUMBER;
+  });
 }
 
 /**

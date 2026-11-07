@@ -217,7 +217,7 @@ describe("ManagementFeeModal (FEE-020/021/022)", () => {
     render(<ManagementFeeModal {...BASE_PROPS} />);
 
     fireEvent.change(screen.getByTestId("management-fee-percent"), {
-      target: { value: "1.5" },
+      target: { value: "1,5" },
     });
     expect(handleChange).toHaveBeenCalledWith("percent", "1.5");
   });

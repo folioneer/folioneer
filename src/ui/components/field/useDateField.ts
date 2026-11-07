@@ -48,13 +48,13 @@ export function useDateField(
     [locale],
   );
 
-  // Parse locale string (e.g., DD/MM/YYYY) to ISO date (YYYY-MM-DD)
+  // Parse locale string (e.g., DD/MM/YYYY, DD.MM.YYYY) to ISO date (YYYY-MM-DD)
   const formatDateForStorage = useCallback(
     (displayDate: string): string => {
       if (!displayDate) return "";
       const localeObj = new Intl.DateTimeFormat(locale);
       const parts = localeObj.formatToParts(new Date());
-      const dateParts = displayDate.split(/[/-]/);
+      const dateParts = displayDate.split(/[/.-]/);
       if (dateParts.length !== 3) return "";
 
       const pattern = parts
