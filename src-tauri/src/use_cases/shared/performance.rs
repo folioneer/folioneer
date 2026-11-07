@@ -11,8 +11,8 @@ use crate::use_cases::shared::valuation::{
     at_rate, end_value_as_of, holding_close_date_as_of, holding_end_value_as_of,
     holding_performance_for_span, holding_performance_for_span_windowed, load_priced_assets,
     load_rate_map, metric_for_span, metric_for_span_windowed, month_periods,
-    opening_balance_flow_value, parse_date, year_periods, MonthPeriod, PerformanceMetric,
-    PricedAsset, RateMap, YearPeriod, PERCENT_SCALE,
+    opening_balance_flow_value, parse_date, position_held_as_of, year_periods, MonthPeriod,
+    PerformanceMetric, PricedAsset, RateMap, YearPeriod, PERCENT_SCALE,
 };
 use chrono::{Datelike, Local, NaiveDate};
 use serde::Serialize;
@@ -264,7 +264,7 @@ fn build_yearly(
         let period_over_period = if year == first_year {
             None
         } else {
-            Some(windowed_metric_for_scope(
+            windowed_metric_for_scope(
                 transactions,
                 priced_assets,
                 rate_map,
@@ -274,7 +274,7 @@ fn build_yearly(
                 period_start,
                 period_end,
                 asset_scope,
-            ))
+            )
         };
         // PRF-085 — a closed scoped position freezes its cumulative metrics at
         // the close date, so the Dietz weights stop shifting after the close.
@@ -362,7 +362,7 @@ fn build_monthly(
         let period_over_period = if is_first_period {
             None
         } else {
-            Some(windowed_metric_for_scope(
+            windowed_metric_for_scope(
                 transactions,
                 priced_assets,
                 rate_map,
@@ -372,7 +372,7 @@ fn build_monthly(
                 period_start,
                 period_end,
                 asset_scope,
-            ))
+            )
         };
 
         // PRF-085 — a closed scoped position freezes its cumulative metrics at
@@ -388,7 +388,7 @@ fn build_monthly(
             year_start_baseline,
             asset_scope,
         );
-        let year_to_date = Some(windowed_metric_for_scope(
+        let year_to_date = windowed_metric_for_scope(
             transactions,
             priced_assets,
             rate_map,
@@ -398,7 +398,7 @@ fn build_monthly(
             year_start,
             cumulative_end,
             asset_scope,
-        ));
+        );
 
         let since_inception = Some(since_inception_metric(
             transactions,
@@ -625,7 +625,9 @@ fn end_value_for_scope(
 /// span metric with the flow set matching the scope: Deposit/Withdrawal/
 /// OpeningBalance for the account, the asset's own Purchase/Sell/OpeningBalance
 /// (dividends added to gain) for a scoped position. Windowed metrics value an
-/// opening balance at its entry-date market value (PRF-086).
+/// opening balance at its entry-date market value (PRF-086). A scoped window the
+/// position was not held at the start of has no figure, as account details give
+/// none (ACD-057): its baseline is the end of the day before `period_start`.
 #[allow(clippy::too_many_arguments)]
 fn windowed_metric_for_scope(
     transactions: &[Transaction],
@@ -637,9 +639,9 @@ fn windowed_metric_for_scope(
     period_start: NaiveDate,
     period_end: NaiveDate,
     asset_scope: Option<&str>,
-) -> PerformanceMetric {
+) -> Option<PerformanceMetric> {
     match asset_scope {
-        None => metric_for_span_windowed(
+        None => Some(metric_for_span_windowed(
             transactions,
             priced_assets,
             rate_map,
@@ -648,10 +650,14 @@ fn windowed_metric_for_scope(
             end_value,
             period_start,
             period_end,
-        ),
-        Some(_) => {
+        )),
+        Some(asset_id) => {
+            let baseline = period_start.pred_opt()?;
+            if !position_held_as_of(transactions, asset_id, baseline) {
+                return None;
+            }
             let asset_transactions: Vec<&Transaction> = transactions.iter().collect();
-            holding_performance_for_span_windowed(
+            Some(holding_performance_for_span_windowed(
                 &asset_transactions,
                 priced_assets,
                 rate_map,
@@ -660,7 +666,7 @@ fn windowed_metric_for_scope(
                 end_value,
                 period_start,
                 period_end,
-            )
+            ))
         }
     }
 }

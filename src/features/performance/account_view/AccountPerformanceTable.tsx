@@ -8,6 +8,12 @@ interface AccountPerformanceTableProps {
   showAnnualized: boolean;
   /** Base of every id/data-testid, so two pages rendering this table never emit colliding ids. */
   idPrefix?: string;
+  /**
+   * PRF-083 — in an asset-scoped read, why a period-over-period or year-to-date cell has no
+   * figure (the position was not held at the window's start), shown as the dash's tooltip —
+   * account details' own sentence (ACD-057), so the two screens say it alike.
+   */
+  absentWindowHint?: string;
 }
 
 /** PRF-088 — a lifetime percentage the Dietz guard suppressed: "—" with an info mark. */
@@ -24,6 +30,7 @@ export function AccountPerformanceTable({
   showYtd,
   showAnnualized,
   idPrefix = "account-performance",
+  absentWindowHint,
 }: AccountPerformanceTableProps) {
   const { t } = useTranslation();
 
@@ -145,12 +152,14 @@ export function AccountPerformanceTable({
               <td
                 data-testid={`${idPrefix}-pop-value-${row.rowKey}`}
                 className={`m3-td text-right ${row.periodOverPeriod.colorClass}`}
+                title={row.periodOverPeriod.absent ? absentWindowHint : undefined}
               >
                 {row.periodOverPeriod.gainFormatted}
               </td>
               <td
                 data-testid={`${idPrefix}-pop-pct-${row.rowKey}`}
                 className={`m3-td text-right ${row.periodOverPeriod.colorClass}`}
+                title={row.periodOverPeriod.absent ? absentWindowHint : undefined}
               >
                 {row.periodOverPeriod.pctFormatted}
               </td>
@@ -159,12 +168,14 @@ export function AccountPerformanceTable({
                   <td
                     data-testid={`${idPrefix}-ytd-value-${row.rowKey}`}
                     className={`m3-td text-right ${row.yearToDate?.colorClass ?? ""}`}
+                    title={row.yearToDate?.absent ? absentWindowHint : undefined}
                   >
                     {row.yearToDate?.gainFormatted ?? "—"}
                   </td>
                   <td
                     data-testid={`${idPrefix}-ytd-pct-${row.rowKey}`}
                     className={`m3-td text-right ${row.yearToDate?.colorClass ?? ""}`}
+                    title={row.yearToDate?.absent ? absentWindowHint : undefined}
                   >
                     {row.yearToDate?.pctFormatted ?? "—"}
                   </td>

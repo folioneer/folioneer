@@ -13,8 +13,8 @@ use crate::use_cases::shared::valuation::{
     holding_close_date_as_of, holding_end_value_as_of, holding_performance_for_span_over_flows,
     load_priced_assets, load_rate_map_for_dates, market_valued_flow_dates,
     metric_for_span_over_flows, month_periods, opening_balance_flow_value, parse_date,
-    position_flows, position_flows_windowed, year_periods, DatedFlow, MonthPeriod,
-    PerformanceMetric, PricedAsset, RateMap, YearPeriod,
+    position_flows, position_flows_windowed, position_held_as_of, year_periods, DatedFlow,
+    MonthPeriod, PerformanceMetric, PricedAsset, RateMap, YearPeriod,
 };
 use chrono::{Datelike, Local, NaiveDate};
 use std::collections::{BTreeSet, HashMap};
@@ -638,6 +638,37 @@ fn aggregated_metric(
     }
 }
 
+/// PRF-083, ACD-057 — a calendar-window metric of the aggregation: in asset scope, a
+/// window whose baseline day (the end of the day before `period_start`) finds the
+/// position holding nothing across the included accounts has no figure.
+#[allow(clippy::too_many_arguments)]
+fn windowed_aggregated_metric(
+    scoped_transactions: &[Transaction],
+    trades: &[DatedFlow],
+    dividends: &[DatedFlow],
+    asset_scope: Option<&str>,
+    start_value: i64,
+    end_value: i64,
+    period_start: NaiveDate,
+    period_end: NaiveDate,
+) -> Option<PerformanceMetric> {
+    if let Some(asset_id) = asset_scope {
+        let baseline = period_start.pred_opt()?;
+        if !position_held_as_of(scoped_transactions, asset_id, baseline) {
+            return None;
+        }
+    }
+    Some(aggregated_metric(
+        trades,
+        dividends,
+        asset_scope,
+        start_value,
+        end_value,
+        period_start,
+        period_end,
+    ))
+}
+
 /// GPF-020 — Σ over included accounts of the converted end value at `period_end`.
 fn summed_end_value(
     accounts: &[ConvertedAccount],
@@ -709,7 +740,8 @@ fn build_yearly_aggregated(
         let period_over_period = if year == first_year {
             None
         } else {
-            Some(aggregated_metric(
+            windowed_aggregated_metric(
+                scoped_transactions,
                 &flows.windowed_trades,
                 &flows.dividends,
                 asset_scope,
@@ -717,7 +749,7 @@ fn build_yearly_aggregated(
                 end_value,
                 period_start,
                 period_end,
-            ))
+            )
         };
         // PRF-085 — a scoped position closed across every included account
         // freezes its cumulative metrics at the aggregation-wide close date.
@@ -792,7 +824,8 @@ fn build_monthly_aggregated(
         let period_over_period = if is_first_period {
             None
         } else {
-            Some(aggregated_metric(
+            windowed_aggregated_metric(
+                scoped_transactions,
                 &flows.windowed_trades,
                 &flows.dividends,
                 asset_scope,
@@ -800,7 +833,7 @@ fn build_monthly_aggregated(
                 end_value,
                 period_start,
                 period_end,
-            ))
+            )
         };
 
         // PRF-085 — a scoped position closed across every included account
@@ -814,7 +847,8 @@ fn build_monthly_aggregated(
         // PRF-034 — year-to-date baseline is the prior 31 December end value.
         let year_start_baseline_value =
             summed_end_value(accounts, asset_scope, year_start_baseline);
-        let year_to_date = Some(aggregated_metric(
+        let year_to_date = windowed_aggregated_metric(
+            scoped_transactions,
             &flows.windowed_trades,
             &flows.dividends,
             asset_scope,
@@ -822,7 +856,7 @@ fn build_monthly_aggregated(
             end_value,
             year_start,
             cumulative_end,
-        ));
+        );
 
         let since_inception = Some(aggregated_metric(
             &flows.trades,
@@ -1362,6 +1396,78 @@ mod tests {
             serde_json::to_value(&actual).unwrap(),
             serde_json::to_value(&expected).unwrap(),
             "asset-scoped global read must equal get_account_performance"
+        );
+    }
+
+    // #495, PRF-083 — across accounts, a window the position was held at the start of in
+    // no included account has no figure: the stock is bought 2024-03-01 in one account
+    // and 2025-02-03 in another, so its 2024 month rows carry no year-to-date figure,
+    // while 2025's do (held on 2024-12-31 in the first account).
+    #[tokio::test]
+    async fn cross_account_asset_scope_has_no_figure_for_a_window_not_held_at_its_start() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        asset_svc.seed_cash_asset("EUR").await.unwrap();
+        let stock = create_stock(&asset_svc, "Shared Stock", "SHR").await;
+        for (name, date) in [("First", "2024-03-01"), ("Second", "2025-02-03")] {
+            let account = create_account(&account_svc, name, "EUR").await;
+            account_svc
+                .record_deposit(&account.id, date.to_string(), 2_000_000_000, None)
+                .await
+                .unwrap();
+            account_svc
+                .buy_holding(
+                    &account.id,
+                    stock.clone(),
+                    date.to_string(),
+                    from_surface(10_000_000),
+                    100_000_000,
+                    1_000_000,
+                    0,
+                    None,
+                    None,
+                )
+                .await
+                .unwrap();
+        }
+        asset_svc
+            .record_asset_price(&stock, "2024-12-31", 110.0)
+            .await
+            .unwrap();
+        let global_uc = GlobalPerformanceUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+
+        let scoped = global_uc
+            .get_global_performance(None, Some(&stock))
+            .await
+            .unwrap();
+        for row in scoped.monthly.iter().filter(|row| row.year == 2024) {
+            assert!(
+                row.year_to_date.is_none(),
+                "2024-{:?}: held nowhere on 2023-12-31, no year-to-date figure",
+                row.month
+            );
+        }
+        let march_2025 = scoped
+            .monthly
+            .iter()
+            .find(|row| row.year == 2025 && row.month == Some(3))
+            .expect("March 2025 row");
+        assert!(
+            march_2025.year_to_date.is_some(),
+            "held on 2024-12-31 in the first account: the year-to-date figure stands"
+        );
+        let april_2024 = scoped
+            .monthly
+            .iter()
+            .find(|row| row.year == 2024 && row.month == Some(4))
+            .expect("April 2024 row");
+        assert!(
+            april_2024.since_inception.is_some(),
+            "since-inception stays across accounts"
         );
     }
 

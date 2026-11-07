@@ -129,6 +129,8 @@ export interface MetricCellViewModel {
   colorClass: string;
   /** PRF-088 — the percentage is absent because the Dietz denominator is not positive. */
   pctSuppressed: boolean;
+  /** PRF-042 / PRF-083 — the whole metric is absent (a first period, or a scoped window not held at its start). */
+  absent: boolean;
 }
 
 function toMetricCell(metric: PerformanceMetric | null): MetricCellViewModel {
@@ -137,6 +139,7 @@ function toMetricCell(metric: PerformanceMetric | null): MetricCellViewModel {
     pctFormatted: formatMetricPct(metric),
     colorClass: gainColorClass(metric),
     pctSuppressed: metric !== null && metric.pct === null,
+    absent: metric === null,
   };
 }
 

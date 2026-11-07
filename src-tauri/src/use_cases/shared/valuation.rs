@@ -960,6 +960,22 @@ pub(crate) fn holding_metric_for_span(
     .pct
 }
 
+/// ACD-057, PRF-083 — whether the position holds a positive quantity at the end of
+/// `as_of`, from the asset's transaction replay (PRF-021).
+pub(crate) fn position_held_as_of(
+    asset_transactions: &[Transaction],
+    asset_id: &str,
+    as_of: NaiveDate,
+) -> bool {
+    Account::reconstruct_holding_as_of(
+        asset_transactions,
+        asset_id,
+        &as_of.format("%Y-%m-%d").to_string(),
+    )
+    .quantity
+        > 0
+}
+
 /// PRF-082 — market value of ONE asset's position as of `period_end`, in
 /// account-currency micros: the quantity reconstructed from the asset's
 /// transaction replay (PRF-021) valued at the carry-forward price (PRF-022) and
