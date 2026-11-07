@@ -33,11 +33,11 @@ export function useYourDataSection() {
         logger.info("[YourDataSection] exported");
         setOutcome({ kind: "done", message: exportDoneMessage(result.data) });
       } else {
-        logger.warn(`[YourDataSection] export failed: ${result.error.code}`);
+        logger.warn("[YourDataSection] export failed", { code: result.error.code });
         setOutcome({ kind: "failed", message: exportErrorToI18n(result.error) });
       }
     } catch (error) {
-      logger.error(`[YourDataSection] export threw: ${String(error)}`);
+      logger.error("[YourDataSection] export threw", { error });
       setOutcome({ kind: "failed", message: { key: "settings.your_data.failed.write_failed" } });
     }
   }, [format]);

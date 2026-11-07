@@ -177,36 +177,36 @@ impl DataExportUseCase {
     /// left out, so every link the export holds is whole. The reads are not one database
     /// transaction: the links hold through these filters.
     async fn read(&self) -> Result<Snapshot, DataExportError> {
-        let database = |e: &dyn std::fmt::Debug| {
-            tracing::error!(target: BACKEND, err = ?e, "data export: read failed");
+        let database = |e: &dyn std::fmt::Debug, what: &str| {
+            tracing::error!(target: BACKEND, err = ?e, what, "data export: read failed");
             DataExportError::DatabaseError
         };
         let accounts = self
             .account_service
             .get_all()
             .await
-            .map_err(|e| database(&e))?;
+            .map_err(|e| database(&e, "accounts"))?;
         let mut transactions = Vec::new();
         for account in &accounts {
             transactions.extend(
                 self.account_service
                     .get_all_transactions_for_account(&account.id)
                     .await
-                    .map_err(|e| database(&e))?,
+                    .map_err(|e| database(&e, "transactions"))?,
             );
         }
         let assets = self
             .asset_service
             .get_non_cash_assets()
             .await
-            .map_err(|e| database(&e))?;
+            .map_err(|e| database(&e, "assets"))?;
         let mut prices = Vec::new();
         for asset in &assets {
             prices.extend(
                 self.asset_service
                     .get_asset_prices(&asset.id)
                     .await
-                    .map_err(|e| database(&e))?,
+                    .map_err(|e| database(&e, "prices"))?,
             );
         }
         let transactions = whole_links(transactions, &assets);
