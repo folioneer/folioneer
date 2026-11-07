@@ -101,7 +101,7 @@ Settings → Your data
 
 ### Entry Point
 
-Settings → "Your data", the last section (EXP-010), validated on #509 (folioneer-design@9515d08/509).
+Settings → "Your data", the last section (EXP-010), validated on #509 (folioneer/folioneer-design, `509/`).
 
 ### Main Component
 

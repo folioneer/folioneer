@@ -539,7 +539,7 @@ fn csv_files(
 }
 
 fn write_failed(e: std::io::Error) -> DataExportError {
-    tracing::warn!(target: BACKEND, err = ?e, "data export: write failed");
+    tracing::error!(target: BACKEND, err = ?e, "data export: write failed");
     DataExportError::WriteFailed
 }
 
