@@ -151,7 +151,7 @@ export function CurrencyRatesView() {
         </div>
 
         {selectedPair && (
-          <div className="flex min-h-0 flex-1 flex-col gap-2 border-t border-neutral-30 pt-2">
+          <div className="flex min-h-0 flex-1 flex-col gap-2 border-t border-m3-outline/20 pt-2">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium">
                 {selectedPair.fromCurrency} → {selectedPair.toCurrency}

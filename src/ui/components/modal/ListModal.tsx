@@ -41,20 +41,20 @@ export function ListModal({
   return (
     <ModalContainer isOpen={isOpen} onClose={onClose} maxWidth={maxWidth} maxHeight="max-h-[80vh]">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-neutral-30">
-        <h2 className="text-lg font-semibold text-neutral-90">{title}</h2>
+      <div className="flex items-center justify-between p-6 border-b border-m3-outline/20">
+        <h2 className="text-lg font-semibold text-m3-on-surface">{title}</h2>
         <button
           type="button"
           onClick={onClose}
-          className="p-1 hover:bg-neutral-20 rounded transition-colors"
+          className="p-1 hover:bg-m3-on-surface/5 text-m3-on-surface-variant rounded transition-colors"
         >
-          <X size={20} className="text-neutral-70" />
+          <X size={20} />
         </button>
       </div>
 
       {/* Search/Filter Bar (Optional, Fixed) */}
       {searchComponent && (
-        <div className="flex-shrink-0 px-6 pt-4 pb-2 border-b border-neutral-30">
+        <div className="flex-shrink-0 px-6 pt-4 pb-2 border-b border-m3-outline/20">
           {searchComponent}
         </div>
       )}
@@ -63,7 +63,7 @@ export function ListModal({
       <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">{children}</div>
 
       {/* Stats/Footer (Fixed) */}
-      {footer && <div className="border-t border-neutral-30 bg-neutral-5 p-4">{footer}</div>}
+      {footer && <div className="border-t border-m3-outline/20 p-4">{footer}</div>}
     </ModalContainer>
   );
 }

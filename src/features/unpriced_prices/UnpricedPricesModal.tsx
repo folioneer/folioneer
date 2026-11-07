@@ -36,7 +36,7 @@ export function UnpricedPricesModal({ assets, onClose }: UnpricedPricesModalProp
       maxWidth="max-w-3xl"
     >
       <p className="text-sm text-m3-on-surface-variant">{t("unpriced_prices.description")}</p>
-      <ul className="flex flex-col divide-y divide-neutral-30">
+      <ul className="flex flex-col divide-y divide-m3-outline/20">
         {rows.map((row) => (
           <UnpricedRowItem key={row.asset_id} row={row} onRecord={record} onSkip={skip} t={t} />
         ))}
