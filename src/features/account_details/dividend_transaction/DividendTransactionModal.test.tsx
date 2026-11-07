@@ -212,7 +212,7 @@ describe("DividendTransactionModal (DIV-020/021/022/025)", () => {
     mockUseDividendTransaction.mockReturnValue(makeHookReturn({ handleChange }));
     render(<DividendTransactionModal {...BASE_PROPS} />);
 
-    fireEvent.change(screen.getByTestId("dividend-trx-amount"), { target: { value: "12.50" } });
+    fireEvent.change(screen.getByTestId("dividend-trx-amount"), { target: { value: "12,50" } });
     expect(handleChange).toHaveBeenCalledWith("amount", "12.50");
 
     fireEvent.change(screen.getByTestId("dividend-trx-note"), { target: { value: "Q2" } });
@@ -240,7 +240,7 @@ describe("DividendTransactionModal (DIV-020/021/022/025)", () => {
     render(<DividendTransactionModal {...BASE_PROPS} />);
 
     fireEvent.change(screen.getByTestId("dividend-trx-exchange-rate"), {
-      target: { value: "1.10" },
+      target: { value: "1,10" },
     });
     expect(handleChange).toHaveBeenCalledWith("exchangeRate", "1.10");
     // selectedCurrency resolves from the chosen asset (USD), not the account (EUR).

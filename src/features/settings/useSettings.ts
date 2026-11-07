@@ -4,7 +4,7 @@ import { getLanguageOverride, resolveBrowserLang, setLanguageOverride } from "@/
 import { getAutoFetch, setAutoFetch } from "@/lib/autoFetchStorage";
 import { getAutoRecordPrice, setAutoRecordPrice } from "@/lib/autoRecordPriceStorage";
 
-export type LanguageChoice = "auto" | "en" | "fr";
+export type LanguageChoice = "auto" | "en" | "fr" | "de";
 
 export function useSettings() {
   const { i18n } = useTranslation();

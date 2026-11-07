@@ -74,6 +74,14 @@ describe("SettingsDialog", () => {
     expect(setLanguage).toHaveBeenCalledWith("fr");
   });
 
+  it("offers German", () => {
+    render(<SettingsDialog isOpen onClose={vi.fn()} />);
+
+    fireEvent.change(element("settings-language") as HTMLElement, { target: { value: "de" } });
+
+    expect(setLanguage).toHaveBeenCalledWith("de");
+  });
+
   // MKT-050 — the toggle in General.
   it("switching the auto-record calls its setting", () => {
     render(<SettingsDialog isOpen onClose={vi.fn()} />);

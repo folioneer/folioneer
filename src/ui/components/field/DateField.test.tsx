@@ -19,11 +19,17 @@ const todayIso = () => {
 };
 
 /** Controlled harness mirroring real usage: parent stores the emitted ISO string. */
-function Harness({ initial = "" }: { initial?: string }) {
+function Harness({ initial = "", locale }: { initial?: string; locale?: string }) {
   const [value, setValue] = useState(initial);
   return (
     <>
-      <DateField id="d" label="Date" value={value} onChange={(e) => setValue(e.target.value)} />
+      <DateField
+        id="d"
+        label="Date"
+        locale={locale}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
       <span data-testid="iso">{value}</span>
     </>
   );
@@ -51,6 +57,17 @@ describe("DateField", () => {
 
     expect(input).toHaveValue("05/06/2026");
     expect(screen.getByTestId("iso")).toHaveTextContent("2026-06-05");
+  });
+
+  // German writes a date with dots: typed so, it reads.
+  it("parses a German date written with dots", async () => {
+    const user = userEvent.setup();
+    render(<Harness locale="de-DE" />);
+    const input = screen.getByLabelText("Date");
+
+    await user.type(input, "07.11.2026");
+
+    expect(screen.getByTestId("iso")).toHaveTextContent("2026-11-07");
   });
 
   it("does not wipe the field on a partial (incomplete) edit", async () => {

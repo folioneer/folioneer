@@ -45,10 +45,8 @@ export function useRecordRate({
   const [rate, setRateText] = useState(
     initialRate !== undefined ? decimalToDisplayed(microToFieldDecimal(initialRate.rate)) : "",
   );
-  const setRate = useCallback(
-    (typed: string) => setRateText(decimalToDisplayed(typedToDecimal(typed))),
-    [],
-  );
+  // NUM-011 — the field keeps what is typed.
+  const setRate = useCallback((typed: string) => setRateText(typed), []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<I18nMessage | null>(null);
 

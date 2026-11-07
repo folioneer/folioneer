@@ -175,15 +175,15 @@ describe("UnpricedPricesModal — confirm wiring (MKT-175)", () => {
 
     render(<UnpricedPricesModal assets={[asset]} onClose={vi.fn()} />);
 
-    await user.type(screen.getByTestId("unpriced-price-input-asset-1"), "15.50");
+    await user.type(screen.getByTestId("unpriced-price-input-asset-1"), "15,50");
     await user.click(screen.getByTestId("unpriced-confirm-asset-1"));
 
     expect(mockRecord).toHaveBeenCalledWith("asset-1", 15.5);
   });
 
-  // NUM-010/011 — the price is typed with a comma in French (the tests' language); a
-  // dot typed on the keypad is read too and shows as a comma.
-  it("reads a price typed with a comma, and shows a typed dot as a comma", async () => {
+  // NUM-010/011 — the price is typed as French writes it (the tests' language), and the
+  // field keeps what is typed.
+  it("reads a price typed with a comma and a space grouping thousands", async () => {
     const user = userEvent.setup();
     const asset = makeAsset({ asset_id: "asset-1" });
     setupHook([makeRow(asset)]);
@@ -191,13 +191,11 @@ describe("UnpricedPricesModal — confirm wiring (MKT-175)", () => {
     render(<UnpricedPricesModal assets={[asset]} onClose={vi.fn()} />);
     const input = screen.getByTestId("unpriced-price-input-asset-1");
 
-    await user.type(input, "15.5");
-    expect(input).toHaveValue("15,5");
-    await user.clear(input);
-    await user.type(input, "12,25");
+    await user.type(input, "1 212,25");
+    expect(input).toHaveValue("1 212,25");
     await user.click(screen.getByTestId("unpriced-confirm-asset-1"));
 
-    expect(mockRecord).toHaveBeenCalledWith("asset-1", 12.25);
+    expect(mockRecord).toHaveBeenCalledWith("asset-1", 1212.25);
   });
 
   // NUM-010 — a text that is not a number cannot be confirmed.

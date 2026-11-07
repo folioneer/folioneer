@@ -194,7 +194,7 @@ describe("FeeScheduleModal (FEE-030/032/060/061/062)", () => {
     mockUseFeeSchedule.mockReturnValue(makeHookReturn({ handleChange }));
     render(<FeeScheduleModal {...BASE_PROPS} />);
 
-    fireEvent.change(screen.getByTestId("fee-schedule-rate"), { target: { value: "1.5" } });
+    fireEvent.change(screen.getByTestId("fee-schedule-rate"), { target: { value: "1,5" } });
     expect(handleChange).toHaveBeenCalledWith("ratePercent", "1.5");
   });
 

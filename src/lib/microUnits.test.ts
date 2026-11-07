@@ -90,14 +90,17 @@ describe("microToFieldDecimal", () => {
 describe("typedToDecimal and decimalToDisplayed", () => {
   afterEach(() => setDisplayLocale("fr"));
 
-  it("in French, read a comma or a dot and write a comma", () => {
+  // Owner, 2026-11-07 (#390) — French and German follow their locale.
+  it("in French, read a comma and a space grouping thousands, and write a comma", () => {
     setDisplayLocale("fr");
     expect(typedToDecimal("1,5")).toBe("1.5");
-    expect(typedToDecimal("1.5")).toBe("1.5");
     expect(typedToDecimal("100*1,2")).toBe("100*1.2");
-    // A thousands separator is no part of a number: both together are not one.
+    expect(typedToDecimal("1 234,56")).toBe("1234.56");
+    expect(typedToDecimal("1\u202f234,56")).toBe("1234.56");
+    // A dot is no French mark, and a space groups by three or not at all.
+    expect(decimalToNumber(typedToDecimal("1.5"))).toBeNaN();
     expect(decimalToNumber(typedToDecimal("1.234,56"))).toBeNaN();
-    expect(decimalToNumber(typedToDecimal("1 234,5"))).toBeNaN();
+    expect(decimalToNumber(typedToDecimal("12 34"))).toBeNaN();
     expect(decimalToDisplayed("12.345678")).toBe("12,345678");
     expect(decimalToMicro(typedToDecimal(decimalToDisplayed("12.345678")))).toBe(12_345_678);
   });
@@ -108,6 +111,19 @@ describe("typedToDecimal and decimalToDisplayed", () => {
     expect(typedToDecimal("1,5")).toBe("1,5");
     expect(decimalToMicro(typedToDecimal("1,5"))).toBe(0);
     expect(decimalToDisplayed("12.345678")).toBe("12.345678");
+  });
+
+  it("in German, read a comma and a dot grouping thousands, and write a comma", () => {
+    setDisplayLocale("de");
+    expect(typedToDecimal("1,5")).toBe("1.5");
+    expect(typedToDecimal("1.500")).toBe("1500");
+    expect(typedToDecimal("1.500,25")).toBe("1500.25");
+    expect(typedToDecimal("12.345.678,9")).toBe("12345678.9");
+    // A dot that does not group three digits is no number: never one and a half.
+    expect(decimalToNumber(typedToDecimal("1.5"))).toBeNaN();
+    expect(decimalToNumber(typedToDecimal("1.50"))).toBeNaN();
+    expect(decimalToNumber(typedToDecimal("1 500"))).toBeNaN();
+    expect(decimalToDisplayed("12.345678")).toBe("12,345678");
   });
 
   it("follow a regional variant of the language", () => {

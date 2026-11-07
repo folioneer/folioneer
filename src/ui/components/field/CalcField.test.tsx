@@ -137,22 +137,24 @@ describe("CalcField — in French", () => {
     expect(onValue).toHaveBeenLastCalledWith("120.50");
   });
 
-  it("reads a dot typed on the keypad, and shows a comma", () => {
+  // Owner, 2026-11-07 (#390) — the field keeps what is typed; a space groups thousands,
+  // and a dot is no French mark.
+  it("reads a space grouping thousands, and keeps what is typed", () => {
+    const onValue = vi.fn();
+    render(<Harness onValue={onValue} />);
+    const input = screen.getByLabelText("Amount");
+    fireEvent.change(input, { target: { value: "1 200,50" } });
+    expect(input).toHaveValue("1 200,50");
+    expect(onValue).toHaveBeenLastCalledWith("1200.50");
+  });
+
+  it("reads a dot as no number", () => {
     const onValue = vi.fn();
     render(<Harness onValue={onValue} />);
     const input = screen.getByLabelText("Amount");
     fireEvent.change(input, { target: { value: "120.50" } });
-    expect(input).toHaveValue("120,50");
-    expect(onValue).toHaveBeenLastCalledWith("120.50");
-  });
-
-  // A typed dot becomes a comma at the keystroke: the caret stays where it was.
-  it("keeps the caret in place when a dot typed mid-text becomes a comma", () => {
-    render(<Harness initial="125" />);
-    const input = screen.getByLabelText("Amount") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "1.25", selectionStart: 2, selectionEnd: 2 } });
-    expect(input).toHaveValue("1,25");
-    expect(input.selectionStart).toBe(2);
+    expect(input).toHaveValue("120.50");
+    expect(Number(onValue.mock.lastCall?.[0])).toBeNaN();
   });
 
   // NUM-002 — a change of language rewrites what the field shows from the form's value.
@@ -183,5 +185,27 @@ describe("CalcField — in French", () => {
     expect(onValue).toHaveBeenLastCalledWith("125.5");
     fireEvent.blur(input);
     expect(input).toHaveValue("125,5");
+  });
+});
+
+// Owner, 2026-11-07 (#390) — in German a dot groups thousands and a comma is the decimal.
+describe("CalcField — in German", () => {
+  beforeEach(() => setDisplayLocale("de"));
+  afterEach(() => setDisplayLocale("fr"));
+
+  it("reads a dot grouping thousands, keeps what is typed, and hands the form a dot", () => {
+    const onValue = vi.fn();
+    render(<Harness onValue={onValue} />);
+    const input = screen.getByLabelText("Amount");
+    fireEvent.change(input, { target: { value: "1.500,25" } });
+    expect(input).toHaveValue("1.500,25");
+    expect(onValue).toHaveBeenLastCalledWith("1500.25");
+  });
+
+  it("reads a dot that groups no three digits as no number, never as a decimal", () => {
+    const onValue = vi.fn();
+    render(<Harness onValue={onValue} />);
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "1.5" } });
+    expect(Number(onValue.mock.lastCall?.[0])).toBeNaN();
   });
 });

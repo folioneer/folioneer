@@ -232,6 +232,7 @@
     "language_auto": "Langue du système",
     "language_en": "English",
     "language_fr": "Français",
+    "language_de": "Deutsch",
     "auto_record_price_label": "Enregistrer automatiquement le prix de transaction comme prix de marché",
     "auto_record_price_description": "Si activé, la case d'enregistrement automatique sera pré-cochée dans les nouveaux formulaires de transaction.",
     "price_provider_label": "Source des prix, sur cet ordinateur",

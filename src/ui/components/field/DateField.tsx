@@ -16,6 +16,7 @@ interface DateFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "ty
 const I18N_TO_BCP47: Record<string, string> = {
   en: "en-US",
   fr: "fr-FR",
+  de: "de-DE",
 };
 
 /**
@@ -23,7 +24,7 @@ const I18N_TO_BCP47: Record<string, string> = {
  *
  * Modern date input field with custom calendar popup, label and optional error message.
  * Uses ISO format (YYYY-MM-DD) internally, displays in locale format (MM/DD/YYYY for en-US,
- * DD/MM/YYYY for fr-FR). Locale follows the active i18n language unless overridden.
+ * DD/MM/YYYY for fr-FR, DD.MM.YYYY for de-DE). Locale follows the active i18n language unless overridden.
  * Calendar uses fixed positioning calculated from input bounding rect to avoid viewport overflow.
  */
 export function DateField({

@@ -232,6 +232,7 @@
     "language_auto": "System default",
     "language_en": "English",
     "language_fr": "Français",
+    "language_de": "Deutsch",
     "auto_record_price_label": "Automatically record transaction price as market price",
     "auto_record_price_description": "When enabled, new transaction forms will have the auto-record checkbox pre-checked.",
     "price_provider_label": "Price source, on this computer",

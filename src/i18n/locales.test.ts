@@ -1,5 +1,6 @@
 import i18next from "i18next";
 import { describe, expect, it } from "vitest";
+import de from "./locales/de/common.json";
 import en from "./locales/en/common.json";
 import fr from "./locales/fr/common.json";
 
@@ -18,6 +19,45 @@ function collectKeyPaths(obj: Record<string, unknown>, prefix: string): string[]
     return [path];
   });
 }
+
+// #390 — every language carries every key of the English one, and no other (i18n-rules.md).
+describe("i18n locales — every key in every language", () => {
+  const english = collectKeyPaths(en as Record<string, unknown>, "").sort();
+  it.each([
+    ["fr", fr],
+    ["de", de],
+  ])("%s has exactly the English keys", (_lang, locale) => {
+    expect(collectKeyPaths(locale as Record<string, unknown>, "").sort()).toEqual(english);
+  });
+
+  // Every value keeps the placeholders and nested keys of its English one.
+  it.each([
+    ["fr", fr],
+    ["de", de],
+  ])("%s keeps every placeholder", (_lang, locale) => {
+    const marks = (text: string) => (text.match(/\{\{\s*\w+\s*\}\}|\$t\([^)]*\)/g) ?? []).sort();
+    const valueAt = (tree: unknown, path: string) =>
+      path.split(".").reduce<unknown>((node, key) => (node as Record<string, unknown>)[key], tree);
+    for (const path of english) {
+      expect([path, marks(String(valueAt(locale, path)))]).toEqual([
+        path,
+        marks(String(valueAt(en, path))),
+      ]);
+    }
+  });
+
+  it("German resolves its interpolations", async () => {
+    const instance = i18next.createInstance();
+    await instance.init({
+      lng: "de",
+      resources: { de: { translation: de } },
+      interpolation: { escapeValue: false },
+    });
+    expect(instance.t("account_performance.period_current_year", { year: 2026 })).toBe(
+      "2026 (YTD)",
+    );
+  });
+});
 
 // SYN — every locale must declare the same `sync.*` key set (i18n-rules.md).
 // A locale-only PR (this one) is the only place both files change together, so

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { decimalToDisplayed, typedToDecimal } from "@/lib/microUnits";
 import { evaluateArithmetic } from "./arithmetic";
@@ -73,24 +73,13 @@ export function CalcField({
     }
   }, [value, language]);
 
-  // A typed dot shown as a comma rewrites the text: the caret is put back where it was.
-  const inputRef = useRef<HTMLInputElement>(null);
-  const caret = useRef<number | null>(null);
-  useLayoutEffect(() => {
-    if (caret.current !== null) {
-      inputRef.current?.setSelectionRange(caret.current, caret.current);
-      caret.current = null;
-    }
-  });
-
   const typed = typedToDecimal(display);
   const previewResult = hasArithmetic(typed) ? evaluateArithmetic(typed) : null;
 
-  const handleInput = (raw: string, caretAt: number | null) => {
+  // NUM-011 — the field keeps what is typed; the form receives it read as a dot figure.
+  const handleInput = (raw: string) => {
     const decimal = typedToDecimal(raw);
-    const displayed = decimalToDisplayed(decimal);
-    if (displayed !== raw) caret.current = caretAt;
-    setDisplay(displayed);
+    setDisplay(raw);
     const reported = reportedValue(decimal);
     lastReported.current = reported;
     onValueChange(reported);
@@ -115,8 +104,7 @@ export function CalcField({
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
         value={display}
-        ref={inputRef}
-        onChange={(e) => handleInput(e.target.value, e.target.selectionStart)}
+        onChange={(e) => handleInput(e.target.value)}
         onBlur={handleBlur}
         placeholder={placeholder}
         required={required}
