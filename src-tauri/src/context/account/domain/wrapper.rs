@@ -1,7 +1,11 @@
 //! ACC-040/041 — the tax wrapper an account sits in: a label from a generic list or from its
-//! country's list, never a tax rule.
+//! country's list, never a tax rule. A country's list lives in its file (ADR-025).
 
 use serde::Serialize;
+
+use std::sync::LazyLock;
+
+use super::country::COUNTRY_RULES;
 use specta::Type;
 
 /// ACC-041 — the portfolio's country, which an account without its own takes. Fixed until the
@@ -23,7 +27,7 @@ pub struct Wrapper {
     pub label_de: &'static str,
 }
 
-const fn wrapper(
+pub(super) const fn wrapper(
     id: &'static str,
     country: Option<&'static str>,
     labels: [&'static str; 3],
@@ -37,8 +41,8 @@ const fn wrapper(
     }
 }
 
-/// ACC-040 — the lists. A further country is rows added here, nothing else.
-pub const WRAPPERS: &[Wrapper] = &[
+/// ACC-040 — the generic list, offered to every country.
+const GENERIC_WRAPPERS: &[Wrapper] = &[
     wrapper("brokerage", None, ["Brokerage", "Compte-titres", "Depot"]),
     wrapper("savings", None, ["Savings", "Épargne", "Sparkonto"]),
     wrapper("pension", None, ["Pension", "Retraite", "Altersvorsorge"]),
@@ -53,22 +57,22 @@ pub const WRAPPERS: &[Wrapper] = &[
         ["Crypto wallet", "Portefeuille crypto", "Krypto-Wallet"],
     ),
     wrapper("other", None, ["Other", "Autre", "Sonstiges"]),
-    wrapper("fr_pea", Some("FR"), ["PEA", "PEA", "PEA"]),
-    wrapper("fr_pea_pme", Some("FR"), ["PEA-PME", "PEA-PME", "PEA-PME"]),
-    wrapper(
-        "fr_assurance_vie",
-        Some("FR"),
-        ["Assurance vie", "Assurance vie", "Assurance vie"],
-    ),
-    wrapper("fr_per", Some("FR"), ["PER", "PER", "PER"]),
-    wrapper("de_depot", Some("DE"), ["Depot", "Compte-titres", "Depot"]),
-    wrapper(
-        "de_riester_ruerup",
-        Some("DE"),
-        ["Riester / Rürup", "Riester / Rürup", "Riester / Rürup"],
-    ),
-    wrapper("de_bav", Some("DE"), ["bAV", "bAV", "bAV"]),
 ];
+
+/// ACC-040 — the lists, gathered once: the generic one, then each country's from its file,
+/// in the order of `COUNTRY_RULES` (ADR-025).
+static ALL_WRAPPERS: LazyLock<Vec<Wrapper>> = LazyLock::new(|| {
+    GENERIC_WRAPPERS
+        .iter()
+        .chain(COUNTRY_RULES.iter().flat_map(|rules| rules.wrappers()))
+        .cloned()
+        .collect()
+});
+
+/// ACC-040 — the lists: the generic one, then each country's (ADR-025).
+pub fn all_wrappers() -> &'static [Wrapper] {
+    &ALL_WRAPPERS
+}
 
 /// ACC-045 — every country, ISO 3166-1 alpha-2 in code order (from the iso-codes data); the
 /// window names each in its language.
@@ -94,13 +98,15 @@ pub const COUNTRIES: &[&str] = &[
 /// ACC-043 — whether the lists hold `wrapper_id`: a known wrapper fits an account of any
 /// country (a wrapper belongs to its country, holding it elsewhere is the user's choice).
 pub fn wrapper_known(wrapper_id: &str) -> bool {
-    WRAPPERS.iter().any(|wrapper| wrapper.id == wrapper_id)
+    all_wrappers()
+        .iter()
+        .any(|wrapper| wrapper.id == wrapper_id)
 }
 
 /// ACC-045 — the wrappers an account of `country` is offered, in order: its country's list,
 /// then the generic one (ACC-043).
 pub fn wrapper_ids_for(country: &str) -> Vec<&'static str> {
-    let of_country = WRAPPERS
+    let of_country = all_wrappers()
         .iter()
         .filter(|wrapper| wrapper.country == Some(country));
     of_country
@@ -113,7 +119,7 @@ pub fn wrapper_ids_for(country: &str) -> Vec<&'static str> {
 /// other country with a list of its own in the lists' order, then the others in code order.
 pub fn offered_countries() -> Vec<&'static str> {
     let mut countries = vec![PORTFOLIO_COUNTRY];
-    let listed = WRAPPERS.iter().filter_map(|wrapper| wrapper.country);
+    let listed = all_wrappers().iter().filter_map(|wrapper| wrapper.country);
     for country in listed.chain(COUNTRIES.iter().copied()) {
         if !countries.contains(&country) {
             countries.push(country);
@@ -124,7 +130,7 @@ pub fn offered_countries() -> Vec<&'static str> {
 
 /// ACC-040 — the generic list, which a country with no list of its own is offered.
 pub fn generic_wrapper_ids() -> Vec<&'static str> {
-    WRAPPERS
+    all_wrappers()
         .iter()
         .filter(|wrapper| wrapper.country.is_none())
         .map(|wrapper| wrapper.id)
@@ -138,7 +144,7 @@ pub fn country_offers() -> Vec<(&'static str, Vec<&'static str>)> {
         .into_iter()
         .filter(|country| {
             *country == PORTFOLIO_COUNTRY
-                || WRAPPERS
+                || all_wrappers()
                     .iter()
                     .any(|wrapper| wrapper.country == Some(country))
         })
@@ -158,18 +164,62 @@ mod tests {
     // ACC-040 — every wrapper is listed once, and the lists hold what the entry names.
     #[test]
     fn acc_040_the_lists_hold_the_generic_french_and_german_wrappers_once() {
-        let mut ids: Vec<&str> = WRAPPERS.iter().map(|wrapper| wrapper.id).collect();
+        let mut ids: Vec<&str> = all_wrappers().iter().map(|wrapper| wrapper.id).collect();
         let count = ids.len();
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), count, "a wrapper identifier is listed twice");
         let of = |country: Option<&str>| {
-            WRAPPERS
+            all_wrappers()
                 .iter()
                 .filter(|wrapper| wrapper.country == country)
                 .count()
         };
         assert_eq!((of(None), of(Some("FR")), of(Some("DE"))), (6, 4, 3));
+    }
+
+    // ADR-025 — moving the country lists into their files changed no identifier, no label
+    // and no order.
+    #[test]
+    fn the_lists_are_those_published() {
+        let listed: Vec<(&str, Option<&str>, [&str; 3])> = all_wrappers()
+            .iter()
+            .map(|w| (w.id, w.country, [w.label_en, w.label_fr, w.label_de]))
+            .collect();
+        assert_eq!(
+            listed,
+            [
+                ("brokerage", None, ["Brokerage", "Compte-titres", "Depot"]),
+                ("savings", None, ["Savings", "Épargne", "Sparkonto"]),
+                ("pension", None, ["Pension", "Retraite", "Altersvorsorge"]),
+                (
+                    "life_insurance",
+                    None,
+                    ["Life insurance", "Assurance vie", "Lebensversicherung"]
+                ),
+                (
+                    "crypto_wallet",
+                    None,
+                    ["Crypto wallet", "Portefeuille crypto", "Krypto-Wallet"]
+                ),
+                ("other", None, ["Other", "Autre", "Sonstiges"]),
+                ("fr_pea", Some("FR"), ["PEA", "PEA", "PEA"]),
+                ("fr_pea_pme", Some("FR"), ["PEA-PME", "PEA-PME", "PEA-PME"]),
+                (
+                    "fr_assurance_vie",
+                    Some("FR"),
+                    ["Assurance vie", "Assurance vie", "Assurance vie"]
+                ),
+                ("fr_per", Some("FR"), ["PER", "PER", "PER"]),
+                ("de_depot", Some("DE"), ["Depot", "Compte-titres", "Depot"]),
+                (
+                    "de_riester_ruerup",
+                    Some("DE"),
+                    ["Riester / Rürup", "Riester / Rürup", "Riester / Rürup"]
+                ),
+                ("de_bav", Some("DE"), ["bAV", "bAV", "bAV"]),
+            ]
+        );
     }
 
     // ACC-043 — a wrapper the lists hold is known, whatever its country; an unknown

@@ -59,3 +59,4 @@ decision stays an open question in its spec.
 | [ADR-022](022-withdraw-the-code-organisation-decisions.md)                   | Withdraw the Code-Organisation Decisions into the Rules                       | Accepted — supersedes ADR-003, ADR-004, ADR-005, ADR-007 |
 | [ADR-023](023-agents-reach-the-portfolio-through-the-running-application.md) | An Agent Reaches the Portfolio Only Through the Running Application           | Accepted                                                 |
 | [ADR-024](024-the-public-build-offers-a-list-of-price-providers.md)          | The Public Build Offers a List of Price Providers, One Active per Computer    | Accepted — supersedes ADR-021                            |
+| [ADR-025](025-country-rules-one-file-per-country.md)                         | Country Rules Live in One Rust File per Country                               | Accepted                                                 |

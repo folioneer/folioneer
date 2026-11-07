@@ -2,8 +2,8 @@
 #![allow(clippy::unreachable)]
 
 use super::domain::{
-    country_offers, generic_wrapper_ids, offered_countries, Account, FeeFrequency, FeeSchedule,
-    HoldingNote, ThresholdDirection, Wrapper, PORTFOLIO_COUNTRY, WRAPPERS,
+    all_wrappers, country_offers, generic_wrapper_ids, offered_countries, Account, FeeFrequency,
+    FeeSchedule, HoldingNote, ThresholdDirection, Wrapper, PORTFOLIO_COUNTRY,
 };
 use crate::context::account::{
     AccountError, AccountJournal, HoldingSnapshotView, JournalFilter, TransactionView,
@@ -97,7 +97,7 @@ pub fn get_wrapper_lists() -> WrapperLists {
     let owned = |ids: Vec<&str>| ids.into_iter().map(str::to_string).collect::<Vec<_>>();
     WrapperLists {
         portfolio_country: PORTFOLIO_COUNTRY.to_string(),
-        wrappers: WRAPPERS.to_vec(),
+        wrappers: all_wrappers().to_vec(),
         countries: owned(offered_countries()),
         offered: country_offers()
             .into_iter()

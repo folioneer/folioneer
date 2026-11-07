@@ -19,6 +19,7 @@ This file is a **map** — where code lives and what each place holds. Rules liv
 context/{bc}/        bounded contexts: account/, asset/ (older layout: domain/, repository/, service.rs)
                      currency/, account_import/, sync/ (gold layout: application/, domain/, infrastructure/) — each with
                      api.rs (its Tauri commands), error.rs, mod.rs (its public surface)
+context/account/domain/country/  what differs by country (ADR-025): one file per country behind `CountryRules`
 use_cases/{name}/    cross-context orchestrators: orchestrator.rs, api.rs, error.rs, mod.rs
 use_cases/shared/    what use cases share (Global Value, price movement, fetch scope, the chosen External provider)
 core/                legacy shared bucket: db.rs, event_bus/ (Event enum), logger.rs,
