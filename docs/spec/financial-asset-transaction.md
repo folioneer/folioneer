@@ -56,7 +56,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-011 — Contextual pre-filling (frontend)**: When initiated from a specific asset (entry point 1), the asset is pre-selected and the user selects the account. When initiated from the account standalone button (entry point 2), the account is pre-selected and the user selects the asset. When initiated from a holding row (entry point 3), both account and asset are pre-filled and read-only — no selection needed.
 
-**TRX-012 — One set of rules whatever records it (backend)**: A transaction follows the same rules whatever records it — the window, the command line, an AI agent or an import: the same entry, judged after the same transactions, is taken or refused alike, with the same reason (owner, 2026-10-25). An import judges its rows in the order IMP-035A gives them.
+**TRX-012 — One set of rules whatever records it (backend)**: A transaction follows the same rules whatever records it — the window, the command line, an AI agent or an import: the same entry, judged after the same transactions, is taken or refused alike, with the same reason (owner, 2026-10-25). An import judges its rows in the order IMP-035A gives them, and adds the deposit a purchase the cash cannot fund needs instead of refusing it (IMP-038).
 
 ### Creation
 
