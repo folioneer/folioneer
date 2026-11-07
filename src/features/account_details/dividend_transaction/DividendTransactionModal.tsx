@@ -15,7 +15,7 @@ interface DividendTransactionModalProps {
   onClose: () => void;
   accountId: string;
   accountCurrency: string;
-  /** Active non-cash holdings the dividend can be attributed to (DIV-011/020). */
+  /** Open, then closed, non-cash positions the dividend can be attributed to (DIV-011/020). */
   heldAssets: DividendPayingAsset[];
   onSubmitSuccess: () => void;
   /** Refresh-only callback for "Record & add another" — keeps the modal open (DIV-010). */

@@ -463,6 +463,49 @@ describe("useAccountDetailsView — activeNonCashHoldings filter (DIV-011/020)",
     ]);
   });
 
+  // DIV-020 / DIV-011 — the dividend candidates are the open positions, then the closed
+  // ones, so a dividend dated while a position sold since was held can be recorded; a closed
+  // position takes its currency from the asset catalog.
+  it("dividendPayingAssets lists the open positions, then the closed ones", async () => {
+    useAppStore.setState({
+      assets: [{ id: "asset-closed", currency: "USD" }] as never,
+    });
+    mockGetAccountDetails.mockResolvedValueOnce({
+      status: "ok",
+      data: {
+        account_name: "Main",
+        holdings: [
+          makeHoldingDetail({ asset_id: "system-cash-eur", asset_name: "Cash EUR" }),
+          makeHoldingDetail({ asset_id: "asset-active", asset_name: "Active Co" }),
+        ],
+        closed_holdings: [
+          {
+            asset_id: "asset-closed",
+            asset_name: "Closed Co",
+            asset_reference: "CC",
+            realized_pnl: 0,
+            dividends_received: 0,
+            last_sold_date: "2024-05-01",
+          },
+        ],
+        total_holding_count: 2,
+        total_cost_basis: 0,
+        total_realized_pnl: 0,
+        total_unrealized_pnl: null,
+        total_global_value: 0,
+        total_dividends_received: 0,
+      },
+    } as never);
+
+    const { result } = renderHook(() => useAccountDetailsView("acc-1"));
+    await act(async () => {});
+
+    expect(result.current.dividendPayingAssets).toEqual([
+      { assetId: "asset-active", assetName: "Active Co", assetCurrency: "EUR" },
+      { assetId: "asset-closed", assetName: "Closed Co", assetCurrency: "USD" },
+    ]);
+  });
+
   // INT-020/023 — the interest candidates are the cash line plus the active
   // non-cash holdings whose asset is flagged interest_bearing (AST-024);
   // zero-quantity non-cash assets stay excluded even when flagged.

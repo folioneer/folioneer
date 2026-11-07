@@ -671,10 +671,16 @@ describe("dividendErrorToI18n", () => {
     });
   });
 
+  // DIV-011 — a dividend is judged on its date: its refusal says so.
+  it("AssetNotHeld maps to the dividend's own key: not held on that date", () => {
+    expect(dividendErrorToI18n({ code: "AssetNotHeld" })).toEqual({
+      key: "dividend.error_not_held_on_date",
+    });
+  });
+
   it.each([
     "DatabaseError",
     "AssetNotFound",
-    "AssetNotHeld",
     "DividendOnCashAsset",
     "AmountNotPositive",
     "ExchangeRateNotPositive",

@@ -4235,15 +4235,13 @@ fn recorded_key(op: &RecordingOp, cash_asset_id: &str) -> Option<RecordedKey> {
     }
 }
 
-/// DIV-011 — the account holds the step's asset today.
+/// DIV-011 — the account held the step's asset on its date, the steps taken before it
+/// included.
 fn holds(account: &Account, op: &RecordingOp) -> bool {
-    let RecordingOp::Dividend { asset_id, .. } = op else {
+    let RecordingOp::Dividend { asset_id, date, .. } = op else {
         return true;
     };
-    account
-        .holdings
-        .iter()
-        .any(|holding| holding.asset_id == *asset_id && holding.quantity > 0)
+    Account::holding_snapshot_as_of(&account.transactions, asset_id, date).quantity > 0
 }
 
 /// IMP-036 — the transactions the account held when judging began, each matched once.

@@ -415,6 +415,17 @@ export function useAccountDetailsView(accountId: string) {
         })),
     [data.holdingDetails],
   );
+  // DIV-020 / DIV-011 — the dividend modal's candidates: the open positions, then the closed
+  // ones, since a dividend counts what was held on its date. A closed position's currency
+  // comes from the cached asset catalog; one the catalog does not know is left out.
+  const dividendPayingAssets = useMemo(() => {
+    const currencyByAssetId = new Map(cachedAssets.map((asset) => [asset.id, asset.currency]));
+    const closed = data.closedHoldings.flatMap((h) => {
+      const assetCurrency = currencyByAssetId.get(h.assetId);
+      return assetCurrency ? [{ assetId: h.assetId, assetName: h.assetName, assetCurrency }] : [];
+    });
+    return [...activeNonCashHoldings, ...closed];
+  }, [activeNonCashHoldings, data.closedHoldings, cachedAssets]);
   // INT-020/023 — candidate assets for the interest modal: the account's cash
   // line (always a valid interest target, even at a zero balance) plus the
   // active non-cash holdings whose asset carries the `interest_bearing` flag
@@ -468,6 +479,7 @@ export function useAccountDetailsView(accountId: string) {
     hasNonCashActiveHoldings,
     hasClosedHoldings,
     activeNonCashHoldings,
+    dividendPayingAssets,
     interestEligibleHoldings,
     priceableAssets,
     // Modal targets / flags

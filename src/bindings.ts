@@ -3318,7 +3318,7 @@ export type DividendDTO = {
  */
 account_id: string; 
 /**
- * The paying asset — must be actively held (quantity > 0) and not a Cash Asset (DIV-011).
+ * The paying asset — held on the dividend's date (quantity > 0) and not a Cash Asset (DIV-011).
  */
 asset_id: string; 
 /**
@@ -3368,7 +3368,7 @@ export type DividendTask =
  */
 { code: "AssetNotFound" } | 
 /**
- * The asset is not currently held (quantity = 0 or no holding) (DIV-011).
+ * The asset was not held on the dividend's date (DIV-011).
  */
 { code: "AssetNotHeld" } | 
 /**

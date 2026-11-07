@@ -2028,7 +2028,7 @@ fn refusal_from_dividend(error: &DividendError) -> Refusal {
             message: match task {
                 DividendTask::AssetNotFound => "the asset no longer exists".to_string(),
                 DividendTask::AssetNotHeld => {
-                    "nothing of this asset is held in the account".to_string()
+                    "the asset was not held in the account on that date".to_string()
                 }
                 DividendTask::DividendOnCashAsset => {
                     "a dividend cannot be recorded on cash".to_string()
@@ -2360,7 +2360,7 @@ mod tests {
             (
                 DividendTask::AssetNotHeld,
                 "AssetNotHeld",
-                "nothing of this asset is held in the account",
+                "the asset was not held in the account on that date",
             ),
             (
                 DividendTask::AssetNotFound,

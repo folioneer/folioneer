@@ -56,13 +56,13 @@ The `AccountDetailsResponse` DTO (owned by ACD) gains one field.
 
 **DIV-010 — Entry point (frontend)**: The dividend recording flow is initiated from the Account Details header's consolidated "Record" menu (DIV-012), via a "Dividend" item that opens the dividend modal (DIV-020). The paying asset is chosen inside the modal (DIV-020), not derived from a holding row. v1 does **not** add a per-holding-row dividend action (deferred — see Open Questions / Deferred).
 
-**DIV-011 — Eligibility (backend)**: A dividend may be recorded only for an `(account, asset)` pair where the account currently holds the asset with `quantity > 0` and the asset is not a Cash Asset. The action is rejected with a specific error when the account is unknown, the asset is unknown, the asset is not currently held in that account (no active holding), or the asset is a Cash Asset.
+**DIV-011 — Eligibility (backend)**: A dividend may be recorded only for an `(account, asset)` pair where the account held the asset on the dividend's date — a quantity above zero once every transaction of the pair dated on or before it is counted (TDI-010) — and the asset is not a Cash Asset (owner, 2026-10-25). A dividend received on a share sold since is thus recorded. The action is rejected with a specific error when the account is unknown, the asset is unknown, the asset was not held in that account on that date, or the asset is a Cash Asset. The rule is the same whatever records the dividend (TRX-012).
 
 **DIV-012 — Header "Record" menu consolidation (frontend)**: The Account Details header groups its "record an entry" actions under a single "Record" dropdown menu rather than separate buttons. The menu's items are: New position (the Opening-balance action, TRX-055), Import (IMP-060), Dividend (DIV-010), and Record free shares (FSD-010). Each item opens its existing dedicated modal. This **supersedes the standalone-button header placement** of TRX-055 (Add a position) — see the reciprocal back-reference in that rule. The menu carries **no** cash actions: Deposit and Withdrawal are reached exclusively from the Cash _row's_ inline actions (CSH-091 / CSH-019), since the cash row is always present (CSH-095). The Performance and Refresh-prices header actions, and the primary "Add transaction" (buy/sell) action, are unchanged and remain outside this menu.
 
 ### Recording a Dividend (020–029)
 
-**DIV-020 — Form fields (frontend)**: The Record-dividend form accepts an **asset selector** listing the account's active (`quantity > 0`), non-cash holdings (the paying asset; the Cash Holding is excluded), `date` (default: today), the **total net amount received** (positive decimal, in the selected asset's native currency), an `exchange_rate` (shown only when the asset currency differs from the account currency — DIV-022), and an optional `note`. There is no quantity, unit-price, or fees input. The currency label next to the amount reflects the selected asset's currency.
+**DIV-020 — Form fields (frontend)**: The Record-dividend form accepts an **asset selector** (the paying asset; the Cash Holding is excluded) listing the account's non-cash active holdings first, then its closed positions (ACD-044), since a dividend counts what was held on its date (DIV-011; owner, 2026-11-07) — a closed position with a date it was not held on is refused on submit, the reason shown as DIV-025 says —, `date` (default: today), the **total net amount received** (positive decimal, in the selected asset's native currency), an `exchange_rate` (shown only when the asset currency differs from the account currency — DIV-022), and an optional `note`. There is no quantity, unit-price, or fees input. The currency label next to the amount reflects the selected asset's currency.
 
 **DIV-021 — Input validation (frontend + backend)**: The amount must parse as a strictly positive decimal (`> 0`); the `date` must be a well-formed ISO 8601 calendar date that is not in the future and not older than the TRX lower bound; when an exchange rate is required (DIV-022, currencies differ) it must be strictly positive (mirroring TRX-020). The frontend validates inline and disables submit until valid; the backend re-validates and rejects with explicit error variants.
 
@@ -116,10 +116,10 @@ The `AccountDetailsResponse` DTO (owned by ACD) gains one field.
 
 ```
 Account Details header → "Record" menu → "Dividend" (DIV-010/012)
-  → modal: asset selector (active non-cash holdings), date (today),
+  → modal: asset selector (active non-cash holdings, then closed positions), date (today),
            net amount (selected-asset currency), exchange rate (if currencies differ), note (DIV-020)
   → submit
-      backend validate: amount > 0, date ≤ today, asset held (qty > 0), not cash (DIV-011/021)
+      backend validate: amount > 0, date ≤ today, asset held on the date (DIV-011), not cash (DIV-011/021)
       backend (single Unit of Work, ADR-006):
         ├─ credit the always-present Cash Holding by total_amount        (DIV-023, CSH-050/012)
         ├─ leave paying asset's holding qty / cost basis unchanged        (DIV-024)
@@ -146,7 +146,7 @@ A "Dividend" item in the Account Details header's consolidated "Record" dropdown
 
 A small `FormModal` — `DividendTransactionModal`:
 
-- Asset selector — the account's active, non-cash holdings (the paying asset).
+- Asset selector — the account's active, non-cash holdings, then its closed positions (the paying asset).
 - Date (default today, `DateField`).
 - Net amount received (positive decimal, `AmountField` with the selected asset's currency suffix).
 - Exchange rate (shown only when asset currency ≠ account currency, mirroring the Buy/Sell exchange-rate input).
@@ -164,7 +164,7 @@ A small `FormModal` — `DividendTransactionModal`:
 
 1. User opens Account Details for an account holding 50 shares of an asset.
 2. User opens the header "Record" menu and chooses "Dividend".
-3. Modal opens; user picks the paying asset from their active holdings, enters the net amount received (asset currency), adjusts the date if needed, supplies an exchange rate if the asset trades in another currency.
+3. Modal opens; user picks the paying asset from the account's active holdings or closed positions, enters the net amount received (asset currency), adjusts the date if needed, supplies an exchange rate if the asset trades in another currency.
 4. User submits.
 5. Backend validates, credits the cash holding, leaves the position unchanged, persists the dividend, publishes `TransactionUpdated`.
 6. Modal closes, snackbar confirms; the Cash row balance and Global Value update; the holding row's Dividends-received and Total-return % update (DIV-072); the account header's Total dividends received updates (DIV-073); and the dividend now shows in the transaction list under that asset with Type "Dividend".
@@ -181,7 +181,7 @@ A small `FormModal` — `DividendTransactionModal`:
 - **Withholding-tax breakdown** — capturing gross dividend, withholding tax, and net separately (v1 records the net cash received only).
 - **Richer dividend reporting** — dividend **yield**, per-period income statements, and a dividend **timeline**. (v1 _does_ include a per-`(account, asset)` dividends-received total, a dividend-inclusive total-return % per holding, and a per-account dividends-received total — DIV-070–073.)
 - **Dividends-received on closed positions in the holdings view** — v1 sums _all_ the account's dividends into `total_dividends_received` (DIV-073), but the per-holding `dividends_received` row figure surfaces on active holdings only; showing it on closed-position rows is deferred.
-- **Dividends on closed positions** — recording a _new_ dividend declared while held but paid after the position was fully sold (v1 allows recording only on actively-held positions, `quantity > 0`).
+- **Dividends on closed positions** — recording a _new_ dividend declared while held but paid after the position was fully sold (v1 records a dividend only on a date the asset was held — DIV-011).
 - **Per-holding-row dividend action** — a contextual "Record dividend" action directly on a holding row (asset pre-selected). v1 initiates the flow from the header "Record" menu with an in-modal asset picker (DIV-010/012); a row-level shortcut is to be designed later.
 
 None — all questions have been resolved.

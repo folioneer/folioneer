@@ -426,26 +426,32 @@ mod tests {
         assert_eq!(value["price"]["asset_id"], cw8.id);
     }
 
-    // CLI-028 — a dividend of a position since closed is refused: the asset must be held
-    // today, whatever the date of the dividend.
+    // CLI-028 / DIV-011 — a dividend counts what the account held on its date: paid while
+    // the position was open, it is recorded though the position is closed since; dated
+    // before the purchase or after the sale, it is refused.
     #[tokio::test]
-    async fn cli_028_a_dividend_of_a_position_since_closed_is_refused() {
+    async fn cli_028_a_dividend_counts_what_was_held_on_its_date() {
         let dir = portfolio("dividend-closed").await;
         for line in [
             "holding buy --account PEA --asset CW8 --quantity 2 --price 100 --date 2026-02-01",
             "holding sell --account PEA --asset CW8 --quantity 2 --price 110 --date 2026-03-01",
+            "holding dividend --account PEA --asset CW8 --amount 5 --date 2026-02-15",
         ] {
             assert_eq!(run_line(&dir, line).await.exit_code, RECORDED, "{line}");
         }
-        let refused = run_line(
-            &dir,
-            "holding dividend --account PEA --asset CW8 --amount 5 --date 2026-02-15 --json",
-        )
-        .await;
-        assert_eq!(refused.exit_code, REFUSED);
-        let value: serde_json::Value =
-            serde_json::from_str(refused.stdout.as_deref().expect("json")).expect("valid json");
-        assert_eq!(value["code"], "AssetNotHeld");
+        for date in ["2026-01-15", "2026-03-15"] {
+            let refused = run_line(
+                &dir,
+                &format!(
+                    "holding dividend --account PEA --asset CW8 --amount 5 --date {date} --json"
+                ),
+            )
+            .await;
+            assert_eq!(refused.exit_code, REFUSED, "{date}");
+            let value: serde_json::Value =
+                serde_json::from_str(refused.stdout.as_deref().expect("json")).expect("valid json");
+            assert_eq!(value["code"], "AssetNotHeld", "{date}");
+        }
     }
 
     // CLI-014, its date — a command without `--date` records today, on the computer running it.

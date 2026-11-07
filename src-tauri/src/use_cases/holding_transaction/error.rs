@@ -12,8 +12,8 @@ pub enum DividendTask {
     /// No asset exists with the requested ID (DIV-011).
     #[error("Asset not found")]
     AssetNotFound,
-    /// The asset is not currently held (quantity = 0 or no holding) (DIV-011).
-    #[error("Asset is not currently held in this account")]
+    /// The asset was not held on the dividend's date (DIV-011).
+    #[error("Asset was not held in this account on that date")]
     AssetNotHeld,
     /// Target asset is a system Cash Asset — dividends must be on non-cash
     /// holdings (DIV-011).
