@@ -3074,6 +3074,133 @@ mod tests {
         assert_eq!(annualized.pct, Some(25_000_000));
     }
 
+    // #495, PRF-083 — a scoped window the position was not held at the start of has no
+    // figure, as account details give none (ACD-057): stock B, bought 2024-03-01, has
+    // no year-to-date figure on its 2024 month rows, and has one in 2025, held at the
+    // prior 31 December. Stock A, held since 2023, keeps its 2024 year-over-year figure.
+    #[tokio::test]
+    async fn scoped_windows_not_held_at_their_start_have_no_figure() {
+        let (account_svc, asset_svc, account_id, stock_a, stock_b) =
+            setup_two_stock_account().await;
+        let uc = AccountPerformanceUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let scoped_b = uc
+            .get_account_performance(&account_id, Some(&stock_b))
+            .await
+            .unwrap();
+        let rows_2024: Vec<_> = scoped_b
+            .monthly
+            .iter()
+            .filter(|row| row.year == 2024)
+            .collect();
+        assert_eq!(rows_2024.len(), 10, "March to December 2024");
+        for row in &rows_2024 {
+            assert!(
+                row.year_to_date.is_none(),
+                "{}-{:?}: not held on 2023-12-31, no year-to-date figure",
+                row.year,
+                row.month
+            );
+        }
+        let january_2025 = scoped_b
+            .monthly
+            .iter()
+            .find(|row| row.year == 2025 && row.month == Some(1))
+            .expect("January 2025 row");
+        assert!(
+            january_2025.year_to_date.is_some(),
+            "held on 2024-12-31: the year-to-date figure stands"
+        );
+
+        let scoped_a = uc
+            .get_account_performance(&account_id, Some(&stock_a))
+            .await
+            .unwrap();
+        let year_2024 = scoped_a
+            .yearly
+            .iter()
+            .find(|row| row.year == 2024)
+            .expect("stock A's 2024 row");
+        assert!(
+            year_2024.period_over_period.is_some(),
+            "held on 2023-12-31: the year-over-year figure stands"
+        );
+    }
+
+    // #495, PRF-083 — a position sold out, then bought again in a later year: the year
+    // it came back opens with nothing held, so that year has no year-over-year figure.
+    #[tokio::test]
+    async fn scoped_year_reopened_after_a_full_sale_has_no_year_over_year_figure() {
+        let (account_svc, asset_svc, account_id, _stock_a, stock_b) =
+            setup_two_stock_account().await;
+        account_svc
+            .sell_holding(
+                &account_id,
+                stock_b.clone(),
+                "2024-06-03".to_string(),
+                from_surface(5_000_000),
+                220_000_000,
+                1_000_000,
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        account_svc
+            .buy_holding(
+                &account_id,
+                stock_b.clone(),
+                "2025-04-01".to_string(),
+                from_surface(2_000_000),
+                230_000_000,
+                1_000_000,
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        let uc = AccountPerformanceUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let scoped = uc
+            .get_account_performance(&account_id, Some(&stock_b))
+            .await
+            .unwrap();
+        let year_2025 = scoped
+            .yearly
+            .iter()
+            .find(|row| row.year == 2025)
+            .expect("2025 row");
+        assert!(
+            year_2025.period_over_period.is_none(),
+            "nothing held on 2024-12-31: no year-over-year figure for 2025"
+        );
+        let april_2025 = scoped
+            .monthly
+            .iter()
+            .find(|row| row.year == 2025 && row.month == Some(4))
+            .expect("April 2025 row");
+        assert!(
+            april_2025.period_over_period.is_none(),
+            "nothing held on 2025-03-31: no month-over-month figure for April"
+        );
+        assert!(
+            april_2025.year_to_date.is_none(),
+            "nothing held on 2024-12-31: no year-to-date figure"
+        );
+        assert!(
+            april_2025.since_inception.is_some(),
+            "since-inception covers the position's whole life"
+        );
+    }
+
     // PRF-083/084 — scoped month rows: dividends of the scoped asset add to the
     // metric gains and land in the dividends column (another asset's dividend is
     // excluded), while the pnl residual reports the pure price movement.
@@ -3208,11 +3335,9 @@ mod tests {
         let period_over_period = may.period_over_period.as_ref().expect("period_over_period");
         assert_eq!(period_over_period.gain, 200_000_000);
         assert_eq!(period_over_period.pct, Some(20_000_000));
-        // year-to-date: prior 31 December baseline 0, purchase 1 000 within the
-        // span → gain = 1 100 − 0 − 1 000 + 100 = 200 EUR.
-        let year_to_date = may.year_to_date.as_ref().expect("year_to_date");
-        assert_eq!(year_to_date.gain, 200_000_000);
-        assert!(year_to_date.pct.is_some());
+        // year-to-date: nothing held on the prior 31 December, so no figure (PRF-083,
+        // ACD-057, #495).
+        assert!(may.year_to_date.is_none(), "not held on 2023-12-31");
         // since-inception: the span opens at the purchase date, so its flow gets
         // full Dietz weight → 200 / 1 000 = 20 %.
         let since_inception = may.since_inception.as_ref().expect("since_inception");

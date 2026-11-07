@@ -200,6 +200,9 @@ export function AccountPerformancePage() {
                 rows={view.rows}
                 showYtd={showYtdColumn}
                 showAnnualized={showAnnualizedColumn}
+                absentWindowHint={
+                  view.selectedAssetId !== null ? t("account_details.perf_period_none") : undefined
+                }
               />
             </div>
           )}

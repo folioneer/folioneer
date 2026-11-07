@@ -240,6 +240,9 @@ export function GlobalPerformancePage() {
                 rows={view.rows}
                 showYtd={showYtdColumn}
                 showAnnualized={showAnnualizedColumn}
+                absentWindowHint={
+                  view.selectedAssetId !== null ? t("account_details.perf_period_none") : undefined
+                }
                 idPrefix="global-performance"
               />
             </div>
