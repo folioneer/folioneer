@@ -15,15 +15,17 @@
 
 ### Account CRUD
 
-| Command                         | Args                                          | Return                   | Errors                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------------------- | --------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_accounts`                  | —                                             | `Vec<Account>`           | `DatabaseError`                                                                                                                                                                                                                                                                                                                                                             |
-| `add_account`                   | `CreateAccountDTO`                            | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists), `DatabaseError`                                                                                                                 |
-| `update_account`                | `UpdateAccountDTO`                            | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set; editing other fields of an account whose name already clashes after a merge is accepted, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists, nor the account's own), `DatabaseError` |
-| `get_wrapper_lists`             | —                                             | `WrapperLists`           | _(infallible — the lists are the application's own, ACC-040)_                                                                                                                                                                                                                                                                                                               |
-| `set_account_cost_basis_method` | `account_id: String, method: CostBasisMethod` | `Account`                | `AccountNotFound { account_id }` (CBM-030), `DatabaseError` _(the method it already has: accepted, nothing recomputed, CBM-031)_                                                                                                                                                                                                                                            |
-| `delete_account`                | `id: String`                                  | `()`                     | `DatabaseError` _(ACC-005, ACC-006 — plain DELETE, silent on missing row)_                                                                                                                                                                                                                                                                                                  |
-| `get_account_deletion_summary`  | `account_id: String`                          | `AccountDeletionSummary` | `DatabaseError` _(read-only; counts are 0 if account has no data — no NotFound raised)_                                                                                                                                                                                                                                                                                     |
+| Command                         | Args                                               | Return                   | Errors                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------- | -------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_accounts`                  | —                                                  | `Vec<Account>`           | `DatabaseError`                                                                                                                                                                                                                                                                                                                                                             |
+| `add_account`                   | `CreateAccountDTO`                                 | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists), `DatabaseError`                                                                                                                 |
+| `update_account`                | `UpdateAccountDTO`                                 | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003 — binds the name being set; editing other fields of an account whose name already clashes after a merge is accepted, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists, nor the account's own), `DatabaseError` |
+| `get_wrapper_lists`             | —                                                  | `WrapperLists`           | _(infallible — the lists are the application's own, ACC-040)_                                                                                                                                                                                                                                                                                                               |
+| `set_account_cost_basis_method` | `account_id: String, method: CostBasisMethod`      | `Account`                | `AccountNotFound { account_id }` (CBM-030), `DatabaseError` _(the method it already has: accepted, nothing recomputed, CBM-031)_                                                                                                                                                                                                                                            |
+| `get_implied_cost_basis`        | `country: Option<String>, wrapper: Option<String>` | `ImpliedCostBasis`       | _(infallible — CBM-014)_                                                                                                                                                                                                                                                                                                                                                    |
+| `get_holding_lots`              | `account_id: String, asset_id: String`             | `HoldingLots`            | `AccountNotFound { account_id }` (CBM-034), `DatabaseError` _(an unknown asset, or one never held: no lot, CBM-034A; a history a merge left inconsistent is read as it stands, no guard, CBM-034B)_                                                                                                                                                                         |
+| `delete_account`                | `id: String`                                       | `()`                     | `DatabaseError` _(ACC-005, ACC-006 — plain DELETE, silent on missing row)_                                                                                                                                                                                                                                                                                                  |
+| `get_account_deletion_summary`  | `account_id: String`                               | `AccountDeletionSummary` | `DatabaseError` _(read-only; counts are 0 if account has no data — no NotFound raised)_                                                                                                                                                                                                                                                                                     |
 
 ### Account Details
 
@@ -242,6 +244,24 @@ struct Account {
     cost_basis_method: CostBasisMethod,  // how it sets the cost of the units that leave it (CBM-010); a new account takes its country's (CBM-011); changed by `set_account_cost_basis_method` alone (CBM-030), or by a synced change (CBM-033)
 }
 
+struct ImpliedCostBasis {
+    method: CostBasisMethod,             // the method a new account would start with (CBM-011, CBM-014)
+    country: String,                     // the country it comes from: the wrapper's, the account's or the portfolio's
+}
+
+struct HoldingLots {
+    method: CostBasisMethod,             // the account's method; no lot under the weighted average (CBM-034)
+    lots: Vec<HoldingLot>,               // every lot, oldest first, those taken whole included
+}
+
+struct HoldingLot {
+    acquired_on: String,                 // YYYY-MM-DD
+    quantity: String,                    // units brought in, rescaled by the splits since; decimal text (TRX-024B)
+    cost: i64,                           // what they cost when they came in, account currency (micros)
+    remaining: String,                   // units still held; "0" once taken whole; decimal text
+    free: bool,                          // came at no cost: free shares or interest (CBM-020)
+}
+
 enum CostBasisMethod {
     WeightedAverage,                     // every unit at the average cost of all held (TRX-030); an account that existed before (CBM-012)
     Fifo,                                // the oldest lots leave first (CBM-022)
@@ -254,6 +274,7 @@ struct CreateAccountDTO {
     management_fees_enabled: bool,       // FEE-075
     country: Option<String>,             // ACC-041
     wrapper: Option<String>,             // ACC-043
+    cost_basis_method: Option<CostBasisMethod>, // CBM-011A — the method chosen; none takes the country's (CBM-011)
 }
 
 struct UpdateAccountDTO {
@@ -867,6 +888,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-11-08 — #515 (CBM-011A, CBM-014, CBM-034): `CreateAccountDTO` gains `cost_basis_method: Option<CostBasisMethod>` (none: the country's); new `get_implied_cost_basis` and `get_holding_lots`, with `ImpliedCostBasis`, `HoldingLots` and `HoldingLot`.
 - 2026-11-07 — #514 (CBM-010–033): `Account` gains `cost_basis_method` and the `CostBasisMethod` type; new `set_account_cost_basis_method`, which recomputes the account's history and the transfers in it feeds (CBM-030). `add_account` / `update_account` are unchanged: a new account takes its country's method (CBM-011), an update keeps it.
 - 2026-11-07 — #748 (TRX-020, HNO-011, SYN-034): `AccountError` gains `AmountOutOfRange`, a price, rate, fee or total above a trillion units of money, refused by the recordings, corrections and draft checks that carry one, and by `upsert_holding_note` for its threshold.
 - 2026-11-07 — #682 (PRF-076, PRF-071, PRF-073, PRF-084, GPF-040): free shares and interest leave `PerformancePeriod.asset_flow` (and cash-line interest `cash_flow`) and count in `pnl`. No command or type changed.

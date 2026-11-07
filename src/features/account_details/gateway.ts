@@ -15,6 +15,7 @@ import type {
   FetchAccountAssetPricesError,
   FreeSharesDTO,
   FreeSharesError,
+  HoldingLots,
   HoldingNote,
   HoldingSnapshot,
   InterestError,
@@ -53,6 +54,14 @@ import type { CorrectTransactionFields } from "@/features/transactions/shared/ty
 import { useAppStore } from "@/lib/store";
 
 export const accountDetailsGateway = {
+  // CBM-034 — a holding's lots, every one, oldest first; none under the weighted average.
+  async getHoldingLots(
+    accountId: string,
+    assetId: string,
+  ): Promise<Result<HoldingLots, AccountError>> {
+    return await commands.getHoldingLots(accountId, assetId);
+  },
+
   // `asOfDate` selects the valuation date: null/omitted is the live view (today),
   // an ISO "YYYY-MM-DD" reconstructs the account read-only as of that past date.
   async getAccountDetails(

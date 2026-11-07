@@ -16,13 +16,15 @@ Each account has a cost basis method: the weighted average (TRX-030), the rule i
 
 ### Lot
 
-Under FIFO, the units one transaction brought into a holding, with their acquisition date and cost. A lot belongs to its holding and is derived from the account's transactions on every replay: none is stored, and none is shown or sent anywhere.
+Under FIFO, the units one transaction brought into a holding, with their acquisition date and cost. A lot belongs to its holding and is derived from the account's transactions on every replay: none is stored, and a holding's lots are read as CBM-034 says.
 
-| Field         | Business meaning                                                 |
-| ------------- | ---------------------------------------------------------------- |
-| `acquired_on` | The date of the transaction that brought the units in.           |
-| `quantity`    | The units of the lot still held.                                 |
-| `cost`        | What those units cost, in the account's currency, fees included. |
+| Field         | Business meaning                                                                       |
+| ------------- | -------------------------------------------------------------------------------------- |
+| `acquired_on` | The date of the transaction that brought the units in.                                 |
+| `quantity`    | The units it brought in, rescaled by the splits since.                                 |
+| `cost`        | What those units cost when they came in, in the account's currency, fees included.     |
+| `remaining`   | The units it still holds: none once taken whole, fewer after a fee (CBM-022, CBM-023). |
+| `free`        | Whether it came from free shares or interest, whatever its cost (CBM-020).             |
 
 ---
 
@@ -32,7 +34,9 @@ Under FIFO, the units one transaction brought into a holding, with their acquisi
 
 **CBM-010 — One method per account (backend)**: Every account has exactly one cost basis method, the weighted average or FIFO; it applies to every holding of the account. Its cash line is not affected: cash is its own unit, at an average price of one (CSH, Holding entity).
 
-**CBM-011 — The method a new account starts with (backend)**: A new account takes the method its country implies (ADR-025): the country of its wrapper when the wrapper belongs to a country's list (ACC-040), otherwise the account's country, its own or the portfolio's (ACC-041). France and Italy imply the weighted average; Germany, Spain and Poland FIFO; every other country the weighted average. An account a synced change creates is the exception (CBM-012B).
+**CBM-011 — The method a new account starts with (backend)**: A new account takes the method its country implies (ADR-025): the country of its wrapper when the wrapper belongs to a country's list (ACC-040), otherwise the account's country, its own or the portfolio's (ACC-041). France and Italy imply the weighted average; Germany, Spain and Poland FIFO; every other country the weighted average. A method chosen at creation (CBM-011A) and an account a synced change creates (CBM-012B) are the exceptions.
+
+**CBM-011A — A method chosen at creation (backend)**: A new account takes the method chosen at its creation, whatever its country implies; with none chosen, it takes the one CBM-011 says.
 
 **CBM-012 — Accounts that existed before (backend)**: An account that existed before the method did is on the weighted average, and none of its figures moves.
 
@@ -41,6 +45,8 @@ Under FIFO, the units one transaction brought into a holding, with their acquisi
 **CBM-012B — An account an older device created (backend)**: An account a synced change creates takes the method the change carries, and the weighted average when the change predates the method.
 
 **CBM-013 — The method stays put (backend)**: Once an account is created, only a change of method (CBM-030) or a synced change of the account (CBM-012A, CBM-033) changes it: editing its name, bank, currency, country or wrapper leaves it, and so would a change of the portfolio's country (ACC-041).
+
+**CBM-014 — The method a country implies is read (backend)**: For a country (none: the portfolio's) and a wrapper (none, or any of the lists), the method a new account would start with (CBM-011) is read, with the country it comes from: the wrapper's, the account's or the portfolio's. A wrapper the lists do not hold is read as none; a country with no rules of its own, well formed or not, implies the weighted average and is named as given. Reading it changes nothing and cannot fail.
 
 ### Creation (020–029)
 
@@ -66,13 +72,19 @@ Under FIFO, the units one transaction brought into a holding, with their acquisi
 
 **CBM-030 — Changing the method (backend)**: The owner can change an account's method. (a) The change replays every holding of the account under the new method: every sale's and write-off's realized P&L, every holding's average price and every transfer out's cost are recomputed, and a transfer in that a recomputed transfer out feeds is re-costed as TRF-025 says. (b) The change and what it recomputes are saved together, or nothing is. (c) An unknown account is rejected with a specific error. (d) The change is signaled by `AccountUpdated` and `TransactionUpdated`.
 
-**CBM-030A — Who changes it (backend)**: An AI agent and the command line cannot change an account's method; no tool or command of theirs offers it.
+**CBM-030A — Who changes it (backend)**: An AI agent and the command line cannot change an account's method, nor choose one at creation: an account an AI agent creates takes the one CBM-011 says; no tool or command of theirs offers it.
 
 **CBM-031 — Choosing the method in place (backend)**: Setting an account's method to the one it has changes nothing and is accepted: nothing is recomputed, signaled or published.
 
 **CBM-032 — Figures as of a date (backend)**: Every figure reconstructed as of a date — a holding's average price and realized P&L as of a day (TDI-010), in the account's details as of a past date and in an AI agent's preview (AGT-072) — follows the account's method.
 
 **CBM-033 — The method is synced (backend)**: The method is part of the account, carried to every device of the sync with it (SYN-038). The device that changes it publishes what the change recomputed, its transfers in elsewhere included (TRF-025). A device that receives the change replays the account's holdings under the new method and takes the recomputed transactions as they were published. A sale or a write-off recorded under the old method on another device and crossing the change is replayed under the new one wherever it lands; a transfer out crossing it keeps the cost it was published with, as any transfer out a device receives (TRF-025), until a change of that transfer re-costs it. An account change that outranks the change of method (CFR-020) carries the method it holds, and every device replays under the method that wins, so every device ends with the same figures (CFR-013).
+
+**CBM-034 — A holding's lots are read (backend)**: Under FIFO, a holding's lots are read, oldest first, those taken whole included: each with the date it was acquired on, the units it brought in (rescaled by the splits since, each rescale rounded down), what they cost when they came in, the units it still holds (none once taken whole, fewer after a fee, CBM-023) and whether it came from free shares or interest, whatever its cost (CBM-020). The account's method is read with them. An unknown account is rejected with a specific error.
+
+**CBM-034A — No lot to read (backend)**: An account under the weighted average has no lot; a holding the account does not have, its cash line included, reads none.
+
+**CBM-034B — An inconsistent history (backend)**: A history a merge left inconsistent is read as it stands (CFR-042): reading the lots refuses nothing.
 
 ---
 

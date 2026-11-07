@@ -118,6 +118,7 @@
     }
   },
   "account": {
+    "form_cost_basis_change_failed": "Ihre übrigen Änderungen wurden gespeichert; die Methode der Anschaffungskosten wurde nicht geändert.",
     "title": "Konten",
     "fab_label": "Konto hinzufügen",
     "refresh_prices": "Kurse aktualisieren",
@@ -158,6 +159,12 @@
     "form_wrapper_label": "Steuerhülle",
     "form_wrapper_none": "Keine",
     "form_wrapper_hint": "Die steuerliche Hülle, in der das Konto geführt wird. Nur eine Bezeichnung: Es wird keine Steuer berechnet.",
+    "form_cost_basis_label": "Methode der Anschaffungskosten",
+    "form_cost_basis_fifo": "FIFO — älteste Anteile zuerst verkauft",
+    "form_cost_basis_weighted_average": "Gewichteter Durchschnittspreis",
+    "form_cost_basis_implied_fifo": "Nach dem Land vorausgewählt: {{country}} verwendet FIFO.",
+    "form_cost_basis_implied_weighted_average": "Nach dem Land vorausgewählt: {{country}} verwendet den gewichteten Durchschnittspreis.",
+    "form_cost_basis_change_warning": "Ein Methodenwechsel berechnet die realisierten Gewinne dieses Kontos seit seiner ersten Transaktion neu.",
     "column_wrapper": "Steuerhülle",
     "group_by_label": "Gruppieren nach",
     "group_by_none": "Nichts",
@@ -238,9 +245,7 @@
     "auto_record_price_description": "Wenn aktiviert, ist das Kontrollkästchen zur automatischen Erfassung in neuen Transaktionsformularen vorausgewählt.",
     "price_provider_label": "Kursquelle auf diesem Computer",
     "price_provider_off": "Aus",
-    "price_provider_option": {
-      "yahoo_finance": "Yahoo Finance — private Nutzung"
-    },
+    "price_provider_option": { "yahoo_finance": "Yahoo Finance — private Nutzung" },
     "price_provider_notice": {
       "yahoo_finance": "Yahoo Finance ist eine inoffizielle Quelle. Die Kurse werden von diesem Computer aus, gemäß den Bedingungen von Yahoo, für Ihre private Nutzung abgerufen, und die Quelle kann jederzeit wegfallen."
     },
@@ -1402,5 +1407,17 @@
     "none": "Noch kein Kurs erfasst",
     "last_fetch": "Dieser Computer hat die Kurse zuletzt am {{when}} abgerufen",
     "never_fetched": "Dieser Computer hat noch nie Kurse abgerufen"
+  },
+  "lots": {
+    "loading": "Lose werden gelesen…",
+    "empty": "Kein Los.",
+    "action": "Lose",
+    "title": "Lose — {{asset}}",
+    "summary": "FIFO: Ein Verkauf nimmt zuerst das älteste Los. {{held}} gehalten, Kosten {{cost}} {{currency}}.",
+    "column_acquired_on": "Erworben am",
+    "column_quantity": "Menge",
+    "column_cost": "Kosten ({{currency}})",
+    "column_remaining": "Verbleibend",
+    "free_shares": "Gratisaktien"
   }
 }

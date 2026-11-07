@@ -32,6 +32,7 @@ import { DepositTransactionModal } from "../deposit_transaction/DepositTransacti
 import { DividendTransactionModal } from "../dividend_transaction/DividendTransactionModal";
 import { FeeScheduleModal } from "../fee_schedule/FeeScheduleModal";
 import { FreeSharesModal } from "../free_shares_transaction/FreeSharesModal";
+import { HoldingLotsModal } from "../holding_lots/HoldingLotsModal";
 import { HoldingNoteModal } from "../holding_note/HoldingNoteModal";
 import { InterestModal } from "../interest_transaction/InterestModal";
 import { ManagementFeeModal } from "../management_fee_transaction/ManagementFeeModal";
@@ -435,6 +436,7 @@ export function AccountDetailsView() {
                         }
                         onSplit={view.handleSplitOpen}
                         onNote={view.handleHoldingNoteOpen}
+                        onLots={view.showsLots ? view.handleLotsOpen : undefined}
                         showManagementFees={view.managementFeesEnabled}
                         perfPeriod={view.perfPeriod}
                         readOnly={view.isAsOf}
@@ -724,6 +726,16 @@ export function AccountDetailsView() {
           target={view.transferTarget}
           destinations={view.transferDestinations}
           onSubmitSuccess={view.handleTransferSuccess}
+        />
+      )}
+
+      {/* #515 (the validated mock) — a holding's lots (opened from its row action) */}
+      {view.lotsTarget && (
+        <HoldingLotsModal
+          isOpen
+          onClose={view.handleLotsClose}
+          accountId={accountId}
+          target={view.lotsTarget}
         />
       )}
 

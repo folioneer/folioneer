@@ -3,12 +3,14 @@ import {
   type AccountDeletionSummary,
   type AccountError,
   type AccountSummaries,
+  type CostBasisMethod,
   type CreateAccountDTO,
   commands,
   type Event,
   events,
   type FetchAllAssetPricesError,
   type FetchTrigger,
+  type ImpliedCostBasis,
   type Result,
   type UpdateAccountDTO,
   type WrapperLists,
@@ -38,6 +40,22 @@ export const accountGateway = {
   // ACC-040 — the wrapper lists; infallible, the lists are the application's own.
   async getWrapperLists(): Promise<WrapperLists> {
     return await commands.getWrapperLists();
+  },
+
+  // CBM-014 — the method a country implies, with the country it comes from; infallible.
+  async getImpliedCostBasis(
+    country: string | null,
+    wrapper: string | null,
+  ): Promise<ImpliedCostBasis> {
+    return await commands.getImpliedCostBasis(country, wrapper);
+  },
+
+  // CBM-030 — puts an account on a method, its history recomputed.
+  async setAccountCostBasisMethod(
+    accountId: string,
+    method: CostBasisMethod,
+  ): Promise<Result<Account, AccountError>> {
+    return await commands.setAccountCostBasisMethod(accountId, method);
   },
 
   async deleteAccount(id: string): Promise<Result<null, AccountError>> {

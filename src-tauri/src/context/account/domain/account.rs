@@ -97,6 +97,51 @@ struct RecordingMark {
     holdings: Vec<Holding>,
 }
 
+/// CBM-014 — the method a country implies, with the country it comes from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct ImpliedCostBasis {
+    /// The method (CBM-011).
+    pub method: CostBasisMethod,
+    /// The country it comes from (ISO 3166-1 alpha-2): the wrapper's, else the account's,
+    /// else the portfolio's.
+    pub country: String,
+}
+
+/// CBM-011 / CBM-014 — the method an account of `country` (none: the portfolio's) in
+/// `wrapper` starts with: its wrapper's country's when the wrapper belongs to a country's
+/// list, otherwise its own country's; the weighted average where the country sets none.
+pub fn implied_cost_basis(country: Option<&str>, wrapper: Option<&str>) -> ImpliedCostBasis {
+    let wrapper_country = wrapper.and_then(|id| {
+        all_wrappers()
+            .iter()
+            .find(|candidate| candidate.id == id)
+            .and_then(|candidate| candidate.country)
+    });
+    let country = wrapper_country
+        .or(country.filter(|country| !country.is_empty()))
+        .unwrap_or(PORTFOLIO_COUNTRY);
+    ImpliedCostBasis {
+        method: CostBasisMethod::implied_by(country),
+        country: country.to_string(),
+    }
+}
+
+/// CBM-034 — one lot of a holding as it is shown: when it came in, what it brought and cost,
+/// what it still holds, and whether it came at no cost.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct HoldingLot {
+    /// The date of the transaction that brought it in (`YYYY-MM-DD`).
+    pub acquired_on: String,
+    /// The units it brought in, rescaled by the splits since, as decimal text (TRX-024B).
+    pub quantity: String,
+    /// What they cost when they came in, in the account's currency (micro-units).
+    pub cost: i64,
+    /// The units it still holds, as decimal text; "0" once taken whole.
+    pub remaining: String,
+    /// Whether it came at no cost: free shares or interest (CBM-020).
+    pub free: bool,
+}
+
 /// What `Account::replay_pair` gives for one (account, asset) pair.
 struct ReplayedPair {
     quantity: i128,
@@ -105,6 +150,8 @@ struct ReplayedPair {
     last_sold_date: Option<String>,
     /// A sale's or write-off's realized P&L, a transfer out's cost, by transaction id.
     pnl_map: std::collections::HashMap<String, i64>,
+    /// The cost basis as the replay left it: its lots are read only when shown (CBM-034).
+    basis: CostBasis,
 }
 
 /// Represents a financial account — the Aggregate Root of the Account bounded context.
@@ -300,13 +347,7 @@ impl Account {
     /// CBM-011 — the method the account's country implies: its wrapper's country when the
     /// wrapper belongs to a country's list, otherwise its own country.
     pub fn implied_cost_basis(&self) -> CostBasisMethod {
-        let wrapper_country = self.wrapper.as_deref().and_then(|id| {
-            all_wrappers()
-                .iter()
-                .find(|wrapper| wrapper.id == id)
-                .and_then(|wrapper| wrapper.country)
-        });
-        CostBasisMethod::implied_by(wrapper_country.unwrap_or(self.effective_country()))
+        implied_cost_basis(self.country.as_deref(), self.wrapper.as_deref()).method
     }
 
     /// CBM-011 — a new account on the method its country implies.
@@ -2005,7 +2046,7 @@ impl Account {
                 | TransactionType::Dividend => {}
                 // FSD-022/023, INT-024, CBM-020 — units in at no cost: the average dilutes.
                 TransactionType::FreeShares | TransactionType::Interest => {
-                    basis.acquire(&t.date, t.quantity, 0)
+                    basis.acquire_free(&t.date, t.quantity)
                 }
                 // FEE-023/027, CBM-023 — units out at no cost: the average concentrates; a fee
                 // that finds fewer units than it removes is a downstream oversell.
@@ -2035,6 +2076,7 @@ impl Account {
             total_realized_pnl,
             last_sold_date,
             pnl_map,
+            basis,
         })
     }
 
@@ -2134,6 +2176,45 @@ impl Account {
             total_realized_pnl: replayed.total_realized_pnl,
             last_sold_date: replayed.last_sold_date,
         }
+    }
+
+    /// CBM-034 — the lots of the account's holding of `asset_id`, every one, oldest first;
+    /// none under the weighted average. Read over a history a merge may have left
+    /// inconsistent (CFR-042): nothing is refused.
+    pub fn lots_of(&self, asset_id: &str) -> Vec<HoldingLot> {
+        // CBM-034A — the cash line is its own unit: it has no lot.
+        if crate::core::cash::is_cash_asset(asset_id) {
+            return Vec::new();
+        }
+        let pair: Vec<&Transaction> = self
+            .transactions
+            .iter()
+            .filter(|t| t.asset_id == asset_id)
+            .collect();
+        let replayed = match Self::replay_pair(&pair, self.cost_basis_method, false) {
+            Ok(replayed) => replayed,
+            // Tolerated, the replay refuses nothing; logged should a guard ever reach it.
+            Err(e) => {
+                tracing::debug!(target: crate::core::logger::BACKEND, err = ?e, "lots_of: the replay refused");
+                return Vec::new();
+            }
+        };
+        replayed
+            .basis
+            .history()
+            .into_iter()
+            .map(|lot| HoldingLot {
+                acquired_on: lot.acquired_on,
+                quantity: crate::shared::domain::quantity::non_cash_quantity_text(
+                    lot.acquired.clamp(0, i64::MAX as i128) as i64,
+                ),
+                cost: (lot.acquired_cost / QUANTITY_UNIT) as i64,
+                remaining: crate::shared::domain::quantity::non_cash_quantity_text(
+                    lot.quantity.clamp(0, i64::MAX as i128) as i64,
+                ),
+                free: lot.free,
+            })
+            .collect()
     }
 
     /// CBM-026 — the quantity of `asset_id` held as of `as_of`, which no method changes.

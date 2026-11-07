@@ -70,3 +70,14 @@ export interface TransferDestination {
   name: string;
   currency: string;
 }
+
+/** #515 (the validated mock), CBM-034 — the holding whose lots the dialog shows. */
+export interface HoldingLotsTarget {
+  assetId: string;
+  assetName: string;
+  /** Units held, formatted. */
+  quantity: string;
+  /** What they cost, formatted, in `currency`. */
+  costBasis: string;
+  currency: string;
+}

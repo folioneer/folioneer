@@ -40,6 +40,7 @@ const formData = (overrides: Partial<AccountFormData> = {}): AccountFormData => 
   management_fees_enabled: false,
   country: "",
   wrapper: "",
+  cost_basis_method: "",
   ...overrides,
 });
 
@@ -116,5 +117,42 @@ describe("AccountForm — country and wrapper (ACC-045, ACC-048)", () => {
     );
     expect(document.getElementById("account-update-frequency")).toBeNull();
     expect(screen.queryByText("account.form_frequency_label")).toBeNull();
+  });
+});
+
+describe("AccountForm — cost basis method (#515, the validated mock)", () => {
+  // CBM-014 — left to the country, the method shows the implied one and names its country.
+  it("shows the implied method and the country it comes from", () => {
+    render(
+      <AccountForm
+        formData={formData()}
+        handleChange={vi.fn()}
+        setCountry={vi.fn()}
+        wrapperLists={lists}
+        impliedCostBasis={{ method: "Fifo", country: "DE" }}
+      />,
+    );
+    expect(
+      (screen.getByLabelText("account.form_cost_basis_label") as HTMLSelectElement).value,
+    ).toBe("Fifo");
+    expect(screen.getByText("account.form_cost_basis_implied_fifo:Germany")).toBeInTheDocument();
+  });
+
+  // A chosen method hides the hint; a changed one on an edited account warns instead.
+  it("warns instead of hinting when an edited account's method changed", () => {
+    render(
+      <AccountForm
+        formData={formData({ cost_basis_method: "WeightedAverage" })}
+        handleChange={vi.fn()}
+        setCountry={vi.fn()}
+        wrapperLists={lists}
+        costBasisChanged
+        idPrefix="edit-account"
+      />,
+    );
+    expect(document.getElementById("edit-account-cost-basis-warning")).toHaveTextContent(
+      "account.form_cost_basis_change_warning",
+    );
+    expect(screen.queryByText(/form_cost_basis_implied/)).toBeNull();
   });
 });

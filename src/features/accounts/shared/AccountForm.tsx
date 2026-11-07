@@ -1,10 +1,10 @@
 import type { ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
-import type { WrapperLists } from "@/bindings";
+import type { CostBasisMethod, ImpliedCostBasis, WrapperLists } from "@/bindings";
 import { ComboboxField } from "@/ui/components/field/ComboboxField";
 import { SelectField } from "@/ui/components/field/SelectField";
 import { TextField } from "@/ui/components/field/TextField";
-import { countryOptions, wrapperOptions } from "./presenter";
+import { countryOptions, impliedCostBasisHint, wrapperOptions } from "./presenter";
 
 export interface AccountFormData {
   name: string;
@@ -17,6 +17,8 @@ export interface AccountFormData {
   country: string;
   /** ACC-043 — the identifier of its tax wrapper; "" for none. */
   wrapper: string;
+  /** CBM-011A — the cost basis method chosen; "" follows the country's (CBM-014). */
+  cost_basis_method: CostBasisMethod | "";
 }
 
 interface AccountFormProps {
@@ -26,6 +28,10 @@ interface AccountFormProps {
   setCountry: (country: string) => void;
   /** ACC-045 — the wrapper lists; the two fields show once they are read. */
   wrapperLists: WrapperLists | null;
+  /** CBM-014 — the method the country implies, once read. */
+  impliedCostBasis?: ImpliedCostBasis | null;
+  /** #515 (the validated mock) — an edited account's method changed: its gains recompute. */
+  costBasisChanged?: boolean;
   idPrefix?: string;
 }
 
@@ -34,9 +40,15 @@ export function AccountForm({
   handleChange,
   setCountry,
   wrapperLists,
+  impliedCostBasis = null,
+  costBasisChanged = false,
   idPrefix = "account",
 }: AccountFormProps) {
   const { t, i18n } = useTranslation();
+  const hint =
+    formData.cost_basis_method === "" && impliedCostBasis
+      ? impliedCostBasisHint(impliedCostBasis, i18n.language)
+      : null;
 
   return (
     <div className="space-y-6">
@@ -106,6 +118,30 @@ export function AccountForm({
           </div>
         </>
       )}
+
+      {/* #515 (the validated mock) — the cost basis method, preselected from the country */}
+      <div className="flex flex-col gap-1.5">
+        <SelectField
+          label={t("account.form_cost_basis_label")}
+          id={`${idPrefix}-cost-basis-method`}
+          name="cost_basis_method"
+          value={formData.cost_basis_method || impliedCostBasis?.method || "WeightedAverage"}
+          onChange={handleChange}
+          options={[
+            { value: "Fifo", label: t("account.form_cost_basis_fifo") },
+            { value: "WeightedAverage", label: t("account.form_cost_basis_weighted_average") },
+          ]}
+        />
+        {costBasisChanged ? (
+          <span id={`${idPrefix}-cost-basis-warning`} className="text-xs text-m3-error">
+            {t("account.form_cost_basis_change_warning")}
+          </span>
+        ) : (
+          hint && (
+            <span className="text-xs text-m3-on-surface-variant">{t(hint.key, hint.vars)}</span>
+          )
+        )}
+      </div>
 
       {/* FEE-075 — opt-in gate for the % management-fee mechanism */}
       <label className="flex items-center gap-3 cursor-pointer group">

@@ -118,6 +118,7 @@
     }
   },
   "account": {
+    "form_cost_basis_change_failed": "Vos autres modifications sont enregistrées ; la méthode de calcul du coût n'a pas été changée.",
     "title": "Comptes",
     "fab_label": "Ajouter un compte",
     "refresh_prices": "Actualiser les prix",
@@ -158,6 +159,12 @@
     "form_wrapper_label": "Enveloppe",
     "form_wrapper_none": "Aucune",
     "form_wrapper_hint": "L'enveloppe fiscale du compte. Une étiquette seulement : aucun impôt n'est calculé.",
+    "form_cost_basis_label": "Méthode de calcul du coût",
+    "form_cost_basis_fifo": "FIFO — les titres les plus anciens vendus en premier",
+    "form_cost_basis_weighted_average": "Coût moyen pondéré",
+    "form_cost_basis_implied_fifo": "Présélectionnée d'après le pays : {{country}} applique FIFO.",
+    "form_cost_basis_implied_weighted_average": "Présélectionnée d'après le pays : {{country}} applique le coût moyen pondéré.",
+    "form_cost_basis_change_warning": "Changer de méthode recalcule les plus-values réalisées de ce compte depuis sa première transaction.",
     "column_wrapper": "Enveloppe",
     "group_by_label": "Grouper par",
     "group_by_none": "Rien",
@@ -1400,5 +1407,17 @@
     "none": "Aucun prix enregistré",
     "last_fetch": "Dernière récupération des prix sur cet ordinateur : {{when}}",
     "never_fetched": "Cet ordinateur n'a jamais récupéré de prix"
+  },
+  "lots": {
+    "loading": "Lecture des lots…",
+    "empty": "Aucun lot.",
+    "action": "Lots",
+    "title": "Lots — {{asset}}",
+    "summary": "FIFO : une vente prend d'abord le lot le plus ancien. {{held}} détenus, coût {{cost}} {{currency}}.",
+    "column_acquired_on": "Acquis le",
+    "column_quantity": "Quantité",
+    "column_cost": "Coût ({{currency}})",
+    "column_remaining": "Restant",
+    "free_shares": "Actions gratuites"
   }
 }

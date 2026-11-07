@@ -9,6 +9,7 @@ import {
   CalendarSync,
   Hand,
   History,
+  Layers,
   Minus,
   PackageMinus,
   Percent,
@@ -69,6 +70,8 @@ type HoldingRowProps = {
   onSplit?: (assetId: string, prefill?: SplitTarget["prefill"]) => void;
   /** HNO-042 — open the holding-note modal for this holding. */
   onNote?: (assetId: string) => void;
+  /** #515 (the validated mock) — open this holding's lots; absent when the account has none. */
+  onLots?: (assetId: string) => void;
   /** FEE-076 — render the Management Fees column; false when the account has the mechanism disabled. */
   showManagementFees?: boolean;
   /** ACD-054 — selected period for the Performance % column. */
@@ -93,6 +96,7 @@ export function HoldingRow({
   onManageFee,
   onSplit,
   onNote,
+  onLots,
   showManagementFees = true,
   perfPeriod = "since_start",
   readOnly = false,
@@ -374,6 +378,16 @@ export function HoldingRow({
                   id={`action-note-${row.assetId}`}
                   aria-label={t("account_details.action_note")}
                   onClick={handleNote}
+                />
+              )}
+              {/* #515 (the validated mock) — the holding's lots, on an account under FIFO */}
+              {onLots && (
+                <IconButton
+                  icon={<Layers size={16} />}
+                  size="sm"
+                  id={`action-lots-${row.assetId}`}
+                  aria-label={t("lots.action")}
+                  onClick={() => onLots(row.assetId)}
                 />
               )}
               {/* MKT-070 — Price history button (active holdings only); add-price lives inside */}

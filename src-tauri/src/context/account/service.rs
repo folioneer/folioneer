@@ -1,10 +1,10 @@
 use super::domain::{
-    generated_deduction_id, Account, AccountJournal, AccountRepository, AgentRecording,
-    CostBasisMethod, EnteredAmount, FeeCatchUpPosition, FeeCatchUpRepository, FeeSchedule,
-    FeeScheduleRepository, Holding, HoldingNote, HoldingNoteRepository, HoldingRepository,
-    HoldingSnapshot, JournalFilter, ManagementFeeRemoval, SessionRecording, StockSplitPosition,
-    ThresholdDirection, Transaction, TransactionRepository, TransactionType, TransferView,
-    WriteOffReason,
+    generated_deduction_id, implied_cost_basis, Account, AccountJournal, AccountRepository,
+    AgentRecording, CostBasisMethod, EnteredAmount, FeeCatchUpPosition, FeeCatchUpRepository,
+    FeeSchedule, FeeScheduleRepository, Holding, HoldingLot, HoldingNote, HoldingNoteRepository,
+    HoldingRepository, HoldingSnapshot, ImpliedCostBasis, JournalFilter, ManagementFeeRemoval,
+    SessionRecording, StockSplitPosition, ThresholdDirection, Transaction, TransactionRepository,
+    TransactionType, TransferView, WriteOffReason,
 };
 use super::error::AccountError;
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
@@ -437,6 +437,30 @@ impl AccountService {
             None => account,
         };
         self.update_account(account).await
+    }
+
+    /// CBM-014 — the method an account of `country` in `wrapper` would start with, and the
+    /// country it comes from; reading it changes nothing.
+    pub fn implied_cost_basis(
+        &self,
+        country: Option<&str>,
+        wrapper: Option<&str>,
+    ) -> ImpliedCostBasis {
+        implied_cost_basis(country, wrapper)
+    }
+
+    /// CBM-034 — the lots of the account's holding of `asset_id`, with the account's method;
+    /// none under the weighted average. An unknown account is rejected.
+    pub async fn holding_lots(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+    ) -> Result<HoldingLots, AccountError> {
+        let account = load_account(&*self.account_repo, account_id).await?;
+        Ok(HoldingLots {
+            method: account.cost_basis_method,
+            lots: account.lots_of(asset_id),
+        })
     }
 
     /// CBM-030 / CBM-031 — puts the account on `method`: its holdings replayed, its sales'
@@ -4066,6 +4090,15 @@ impl StagedTransfer {
             receiving_after: self.receiving.transactions,
         }
     }
+}
+
+/// CBM-034 — a holding's lots and the method they follow.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub struct HoldingLots {
+    /// The account's cost basis method; no lot under the weighted average.
+    pub method: CostBasisMethod,
+    /// Every lot, oldest first, those taken whole included.
+    pub lots: Vec<HoldingLot>,
 }
 
 /// The figures a transfer is placed from (TRF entity).

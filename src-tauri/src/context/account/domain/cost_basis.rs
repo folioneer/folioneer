@@ -25,6 +25,12 @@ pub(crate) struct Lot {
     /// What those units cost, in money micro-units × `QUANTITY_UNIT`, so a lot taken in part
     /// keeps the rest of its cost exactly.
     pub(crate) cost: i128,
+    /// CBM-034 — the units it brought in, rescaled by the splits since.
+    pub(crate) acquired: i128,
+    /// CBM-034 — what they cost when they came in, in money micro-units × `QUANTITY_UNIT`.
+    pub(crate) acquired_cost: i128,
+    /// CBM-034 — whether they came at no cost: free shares or interest (CBM-020).
+    pub(crate) free: bool,
 }
 
 /// What a removal took: the average price just before it, and the cost of what left.
@@ -45,6 +51,8 @@ pub(crate) struct CostBasis {
     /// Σ cost, in money micro-units × `QUANTITY_UNIT` — the VWAP numerator (TRX-030).
     cost: i128,
     lots: Vec<Lot>,
+    /// CBM-034 — the lots taken whole, oldest first, kept to be shown.
+    spent: Vec<Lot>,
 }
 
 impl CostBasis {
@@ -54,6 +62,7 @@ impl CostBasis {
             quantity: 0,
             cost: 0,
             lots: Vec::new(),
+            spent: Vec::new(),
         }
     }
 
@@ -73,6 +82,15 @@ impl CostBasis {
     /// CBM-020 / CBM-021 — units brought in on `acquired_on` at `total_amount` (zero for
     /// free shares and interest), after every lot acquired on or before that date.
     pub(crate) fn acquire(&mut self, acquired_on: &str, quantity: i64, total_amount: i64) {
+        self.acquire_lot(acquired_on, quantity, total_amount, false);
+    }
+
+    /// CBM-020 — free shares or interest: units in at no cost, a lot named as such.
+    pub(crate) fn acquire_free(&mut self, acquired_on: &str, quantity: i64) {
+        self.acquire_lot(acquired_on, quantity, 0, true);
+    }
+
+    fn acquire_lot(&mut self, acquired_on: &str, quantity: i64, total_amount: i64, free: bool) {
         let cost = total_amount as i128 * QUANTITY_UNIT;
         self.quantity += quantity as i128;
         self.cost += cost;
@@ -88,6 +106,9 @@ impl CostBasis {
                     acquired_on: acquired_on.to_string(),
                     quantity: quantity as i128,
                     cost,
+                    acquired: quantity as i128,
+                    acquired_cost: cost,
+                    free,
                 },
             );
         }
@@ -119,7 +140,10 @@ impl CostBasis {
             if lot.quantity <= wanted {
                 wanted -= lot.quantity;
                 taken += lot.cost;
-                self.lots.remove(0);
+                let mut spent = self.lots.remove(0);
+                spent.quantity = 0;
+                spent.cost = 0;
+                self.spent.push(spent);
                 if wanted == 0 && self.lots.first().is_none_or(|next| next.quantity > 0) {
                     break;
                 }
@@ -151,6 +175,9 @@ impl CostBasis {
         let rescaled = self.quantity * factor as i128 / MICRO;
         if self.fifo() {
             self.rescale_lots(|units| units * factor as i128 / MICRO, rescaled.max(0));
+            for lot in self.lots.iter_mut().chain(self.spent.iter_mut()) {
+                lot.acquired = lot.acquired * factor as i128 / MICRO;
+            }
         }
         self.quantity = rescaled;
     }
@@ -172,6 +199,12 @@ impl CostBasis {
     #[cfg(test)]
     pub(crate) fn lots(&self) -> &[Lot] {
         &self.lots
+    }
+
+    /// CBM-034 — every lot, those taken whole included, oldest first; none under the
+    /// weighted average. A lot taken whole is always older than the lots still held.
+    pub(crate) fn history(&self) -> Vec<Lot> {
+        self.spent.iter().chain(self.lots.iter()).cloned().collect()
     }
 }
 
@@ -300,6 +333,42 @@ mod tests {
             basis.take(quantity - quantity / 3).cost,
             666_666_666_666_666_667
         );
+    }
+
+    // CBM-034 — the history keeps a lot taken whole, with what it brought in and cost; a split
+    // rescales what each brought in; free shares are named.
+    #[test]
+    fn the_history_keeps_every_lot() {
+        let mut basis = two_lots(Fifo);
+        basis.acquire_free("2024-03-15", units(2));
+        basis.take(units(12));
+        basis.split(2_000_000);
+        let history = basis.history();
+        let seen: Vec<(i128, i128, i128, bool)> = history
+            .iter()
+            .map(|l| {
+                (
+                    l.acquired,
+                    l.quantity,
+                    l.acquired_cost / QUANTITY_UNIT,
+                    l.free,
+                )
+            })
+            .collect();
+        assert_eq!(
+            seen,
+            [
+                (units(20) as i128, 0, money(1_000) as i128, false),
+                (
+                    units(20) as i128,
+                    units(16) as i128,
+                    money(2_000) as i128,
+                    false
+                ),
+                (units(4) as i128, units(4) as i128, 0, true),
+            ]
+        );
+        assert!(CostBasis::new(WeightedAverage).history().is_empty());
     }
 
     // CBM-026 — the quantity is the same under either method.

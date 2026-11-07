@@ -25,6 +25,14 @@ vi.mock("../useAccounts", () => ({
   }),
 }));
 
+const mockSetMethod = vi.fn();
+
+vi.mock("../gateway", () => ({
+  accountGateway: {
+    setAccountCostBasisMethod: (...args: unknown[]) => mockSetMethod(...args),
+  },
+}));
+
 const fakeSubmit = { preventDefault: vi.fn() } as unknown as React.FormEvent;
 
 describe("useEditAccountModal", () => {
@@ -182,5 +190,49 @@ describe("useEditAccountModal — country and wrapper (ACC-043, ACC-044)", () =>
     expect(mockUpdateAccount).toHaveBeenCalledWith(
       expect.objectContaining({ name: "Plan pensiones", country: "ES", wrapper: "es_plan" }),
     );
+  });
+
+  // #515 (the validated mock), CBM-030 — a changed method warns, and saving changes it
+  // after the account's other fields; an unchanged one is not sent.
+  it("changes the method after saving, and warns while it differs", async () => {
+    mockUpdateAccount.mockResolvedValue({ data: mockAccount, error: null });
+    mockSetMethod.mockResolvedValue({ status: "ok", data: mockAccount });
+    const onClose = vi.fn();
+    const { result } = renderHook(() => useEditAccountModal({ account: mockAccount, onClose }));
+    expect(result.current.costBasisChanged).toBe(false);
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(mockSetMethod).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.handleChange({
+        target: { name: "cost_basis_method", value: "Fifo" },
+      } as React.ChangeEvent<HTMLSelectElement>);
+    });
+    expect(result.current.costBasisChanged).toBe(true);
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(mockSetMethod).toHaveBeenCalledWith("account-1", "Fifo");
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  // CBM-030 — a refused change keeps the dialog open with its error.
+  it("keeps the dialog open when the change of method is refused", async () => {
+    mockUpdateAccount.mockResolvedValue({ data: mockAccount, error: null });
+    mockSetMethod.mockResolvedValue({ status: "error", error: { code: "DatabaseError" } });
+    const onClose = vi.fn();
+    const { result } = renderHook(() => useEditAccountModal({ account: mockAccount, onClose }));
+    act(() => {
+      result.current.handleChange({
+        target: { name: "cost_basis_method", value: "Fifo" },
+      } as React.ChangeEvent<HTMLSelectElement>);
+    });
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(result.current.error).not.toBeNull();
   });
 });

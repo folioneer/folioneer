@@ -6,7 +6,8 @@ use super::domain::{
     FeeFrequency, FeeSchedule, HoldingNote, ThresholdDirection, Wrapper, PORTFOLIO_COUNTRY,
 };
 use crate::context::account::{
-    AccountError, AccountJournal, HoldingSnapshotView, JournalFilter, TransactionView,
+    AccountError, AccountJournal, HoldingLots, HoldingSnapshotView, ImpliedCostBasis,
+    JournalFilter, TransactionView,
 };
 use crate::AppState;
 use serde::{Deserialize, Serialize};
@@ -108,6 +109,34 @@ pub fn get_wrapper_lists() -> WrapperLists {
             .collect(),
         generic: owned(generic_wrapper_ids()),
     }
+}
+
+/// CBM-014 — the cost basis method an account of `country` in `wrapper` would start with,
+/// and the country it comes from.
+#[tauri::command]
+#[specta::specta]
+pub fn get_implied_cost_basis(
+    state: State<'_, AppState>,
+    country: Option<String>,
+    wrapper: Option<String>,
+) -> ImpliedCostBasis {
+    state
+        .account_service
+        .implied_cost_basis(country.as_deref(), wrapper.as_deref())
+}
+
+/// CBM-034 — a holding's lots, every one, oldest first.
+#[tauri::command]
+#[specta::specta]
+pub async fn get_holding_lots(
+    state: State<'_, AppState>,
+    account_id: String,
+    asset_id: String,
+) -> Result<HoldingLots, AccountError> {
+    state
+        .account_service
+        .holding_lots(&account_id, &asset_id)
+        .await
 }
 
 /// CBM-030 — puts an account on a cost basis method, its history recomputed.

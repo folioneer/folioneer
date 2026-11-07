@@ -118,6 +118,7 @@
     }
   },
   "account": {
+    "form_cost_basis_change_failed": "Your other changes were saved; the cost basis method was not changed.",
     "title": "Accounts",
     "fab_label": "Add account",
     "refresh_prices": "Refresh prices",
@@ -158,6 +159,12 @@
     "form_wrapper_label": "Wrapper",
     "form_wrapper_none": "None",
     "form_wrapper_hint": "The tax wrapper the account sits in. A label only: no tax is computed.",
+    "form_cost_basis_label": "Cost basis method",
+    "form_cost_basis_fifo": "FIFO — oldest shares sold first",
+    "form_cost_basis_weighted_average": "Weighted average cost",
+    "form_cost_basis_implied_fifo": "Preselected from the country: {{country}} uses FIFO.",
+    "form_cost_basis_implied_weighted_average": "Preselected from the country: {{country}} uses the weighted average cost.",
+    "form_cost_basis_change_warning": "Changing the method recomputes this account's realized gains since its first transaction.",
     "column_wrapper": "Wrapper",
     "group_by_label": "Group by",
     "group_by_none": "Nothing",
@@ -1400,5 +1407,17 @@
     "none": "No price recorded yet",
     "last_fetch": "This computer last fetched prices on {{when}}",
     "never_fetched": "This computer has never fetched prices"
+  },
+  "lots": {
+    "loading": "Reading the lots…",
+    "empty": "No lot.",
+    "action": "Lots",
+    "title": "Lots — {{asset}}",
+    "summary": "FIFO: a sale takes the oldest lot first. {{held}} held, cost {{cost}} {{currency}}.",
+    "column_acquired_on": "Acquired on",
+    "column_quantity": "Quantity",
+    "column_cost": "Cost ({{currency}})",
+    "column_remaining": "Remaining",
+    "free_shares": "Free shares"
   }
 }

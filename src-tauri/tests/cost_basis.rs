@@ -420,3 +420,141 @@ async fn cbm_033_a_synced_change_of_method_replays_the_account() {
         .unwrap();
     assert_eq!(holding.average_price, micro(2_500) / 15);
 }
+
+// CBM-014 — the method a country implies comes with the country it comes from: the
+// wrapper's, else the account's, else the portfolio's.
+#[test]
+fn cbm_014_the_implied_method_names_its_country() {
+    use folioneer_lib::context::account::implied_cost_basis;
+    let read = |country, wrapper| {
+        let implied = implied_cost_basis(country, wrapper);
+        (implied.method, implied.country)
+    };
+    assert_eq!(
+        read(Some("FR"), Some("de_depot")),
+        (CostBasisMethod::Fifo, "DE".to_string())
+    );
+    assert_eq!(
+        read(Some("ES"), Some("brokerage")),
+        (CostBasisMethod::Fifo, "ES".to_string())
+    );
+    assert_eq!(
+        read(None, None),
+        (CostBasisMethod::WeightedAverage, "FR".to_string())
+    );
+    assert_eq!(
+        read(Some(""), None),
+        (CostBasisMethod::WeightedAverage, "FR".to_string())
+    );
+    assert_eq!(
+        read(Some("US"), None),
+        (CostBasisMethod::WeightedAverage, "US".to_string())
+    );
+}
+
+// CBM-011A — a method chosen at creation is kept, even against the country's.
+#[tokio::test]
+async fn cbm_011a_a_chosen_method_is_kept() {
+    use folioneer_lib::shared::infrastructure::uow::SqliteTransactionManager;
+    use folioneer_lib::use_cases::account_creation::AccountCreationUseCase;
+    let ctx = ctx().await;
+    let creation = AccountCreationUseCase::new(
+        ctx.accounts.clone(),
+        ctx.assets.clone(),
+        Arc::new(SqliteTransactionManager::new(ctx.pool.clone())),
+    );
+    let chosen = creation
+        .create_with_method(
+            "Depot".into(),
+            String::new(),
+            "EUR".into(),
+            false,
+            Some("DE".into()),
+            None,
+            Some(CostBasisMethod::WeightedAverage),
+        )
+        .await
+        .expect("created");
+    assert_eq!(
+        method_of(&ctx, &chosen.id).await,
+        CostBasisMethod::WeightedAverage
+    );
+    let implied = creation
+        .create_with_method(
+            "Depot 2".into(),
+            String::new(),
+            "EUR".into(),
+            false,
+            Some("DE".into()),
+            None,
+            None,
+        )
+        .await
+        .expect("created");
+    assert_eq!(method_of(&ctx, &implied.id).await, CostBasisMethod::Fifo);
+}
+
+// CBM-034 — a holding's lots, oldest first: a lot taken whole shows what it brought and
+// cost with nothing left, free shares are named; none under the weighted average.
+#[tokio::test]
+async fn cbm_034_a_holdings_lots_are_read() {
+    let ctx = ctx().await;
+    let acme = asset(&ctx).await;
+    let fifo = account(&ctx, "Depot", Some("DE"), None).await;
+    let average = account(&ctx, "Compte", Some("FR"), None).await;
+    for account in [&fifo, &average] {
+        two_lots(&ctx, account, &acme).await;
+        ctx.recording
+            .record_free_shares(account, acme.clone(), "2024-03-15".into(), units(2), None)
+            .await
+            .expect("free shares");
+        sell(&ctx, account, &acme, "2024-04-01", 12, 200).await;
+    }
+    let lots = ctx.accounts.holding_lots(&fifo, &acme).await.expect("lots");
+    assert_eq!(lots.method, CostBasisMethod::Fifo);
+    let seen: Vec<(&str, &str, i64, &str, bool)> = lots
+        .lots
+        .iter()
+        .map(|l| {
+            (
+                l.acquired_on.as_str(),
+                l.quantity.as_str(),
+                l.cost,
+                l.remaining.as_str(),
+                l.free,
+            )
+        })
+        .collect();
+    assert_eq!(
+        seen,
+        [
+            ("2024-02-01", "10", micro(1_000), "0", false),
+            ("2024-03-01", "10", micro(2_000), "8", false),
+            ("2024-03-15", "2", 0, "2", true),
+        ]
+    );
+    // CBM-034A — the cash line and an asset never held read no lot.
+    let cash = ctx
+        .accounts
+        .holding_lots(&fifo, "system-cash-eur")
+        .await
+        .expect("lots");
+    assert!(cash.lots.is_empty());
+    let never = ctx
+        .accounts
+        .holding_lots(&fifo, "never-held")
+        .await
+        .expect("lots");
+    assert!(never.lots.is_empty());
+    let none = ctx
+        .accounts
+        .holding_lots(&average, &acme)
+        .await
+        .expect("lots");
+    assert_eq!(none.method, CostBasisMethod::WeightedAverage);
+    assert!(none.lots.is_empty());
+    assert!(matches!(
+        ctx.accounts.holding_lots("nope", &acme).await,
+        Err(AccountError::AccountNotFound { .. })
+    ));
+}
