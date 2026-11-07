@@ -420,8 +420,9 @@ impl Transaction {
         }
         // total_amount in account currency = amount × rate (i128 intermediate, ADR-001),
         // saturated, so a total past i64 is refused, never wrapped (TRX-020).
-        let total_amount =
-            super::account::saturate((amount_micros as i128 * exchange_rate as i128) / 1_000_000);
+        let total_amount = crate::shared::domain::amount::saturate(
+            (amount_micros as i128 * exchange_rate as i128) / 1_000_000,
+        );
         Self::new(
             account_id,
             paying_asset_id,
@@ -831,7 +832,9 @@ impl Transaction {
         if quantity <= 0 {
             return 0;
         }
-        super::account::saturate((total_amount as i128 * QUANTITY_UNIT) / quantity as i128)
+        crate::shared::domain::amount::saturate(
+            (total_amount as i128 * QUANTITY_UNIT) / quantity as i128,
+        )
     }
 
     /// AGT-088 / AGT-091 — whether this transaction still stands in full as `shown` stood

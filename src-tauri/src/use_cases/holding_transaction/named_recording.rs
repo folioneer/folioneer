@@ -2090,9 +2090,7 @@ pub fn refusal_from_account(error: &AccountError) -> Refusal {
         AccountError::QuantityNotPositive => "the quantity must be above zero".to_string(),
         AccountError::UnitPriceNegative => "the price cannot be negative".to_string(),
         AccountError::QuantityOutOfRange => "the quantity is too large".to_string(),
-        AccountError::AmountOutOfRange => {
-            "a price, rate, fee or total is above a trillion".to_string()
-        }
+        AccountError::AmountOutOfRange => "a figure is above a trillion".to_string(),
         AccountError::UnitPriceOutOfRange => {
             "the price this total gives cannot be stored".to_string()
         }
@@ -2223,7 +2221,7 @@ mod tests {
             (
                 AccountError::AmountOutOfRange,
                 "AmountOutOfRange",
-                "a price, rate, fee or total is above a trillion",
+                "a figure is above a trillion",
             ),
             (
                 AccountError::UnitPriceOutOfRange,

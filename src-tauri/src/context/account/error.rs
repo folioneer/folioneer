@@ -56,8 +56,8 @@ pub enum AccountError {
     #[error("An archived asset cannot be sold")]
     ArchivedAssetSell,
 
-    /// A price, a rate, fees or a total passes a billion units of money, what every device
-    /// reads (TRX-020, SYN-034).
+    /// A price, a rate, fees, a total, a dividend's amount or a note's threshold passes a
+    /// trillion, what every device reads (TRX-020, HNO-011, SYN-034).
     #[error("An amount is larger than every device reads")]
     AmountOutOfRange,
 

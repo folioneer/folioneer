@@ -2342,7 +2342,7 @@ impl Account {
         let price = unit_price as i128;
         let rate = exchange_rate as i128;
         // Saturated, never wrapped: a total past i64 is refused as past the limit (TRX-020).
-        saturate(
+        crate::shared::domain::amount::saturate(
             (qty.saturating_mul(price) / QUANTITY_UNIT).saturating_mul(rate) / MICRO + fees as i128,
         )
     }
@@ -2359,7 +2359,7 @@ impl Account {
         let qty = quantity as i128;
         let price = unit_price as i128;
         let rate = exchange_rate as i128;
-        saturate(
+        crate::shared::domain::amount::saturate(
             (qty.saturating_mul(price) / QUANTITY_UNIT).saturating_mul(rate) / MICRO - fees as i128,
         )
     }
@@ -2714,12 +2714,6 @@ impl Account {
                 .expect("test transaction inputs must be valid");
         self.apply_withdrawal(tx)
     }
-}
-
-/// An i128 figure as an i64, held at the nearest end instead of wrapping: a figure past
-/// either end is then refused by the limit on money (TRX-020).
-pub(crate) fn saturate(figure: i128) -> i64 {
-    figure.clamp(i64::MIN as i128, i64::MAX as i128) as i64
 }
 
 #[cfg(test)]

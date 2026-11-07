@@ -88,7 +88,7 @@ pub enum AssetError {
     /// Price must be strictly positive.
     #[error("Price must be strictly positive")]
     NotPositive,
-    /// Price passes a billion units of money, what every device reads (MKT-021, SYN-034).
+    /// Price passes a trillion units, what every device reads (MKT-021, SYN-034).
     #[error("Price is larger than every device reads")]
     PriceOutOfRange,
     /// Price value is not a finite floating-point number.
