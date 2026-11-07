@@ -652,6 +652,26 @@ async fn write_file(folder: &Path, stem: &str, bytes: Vec<u8>) -> Result<PathBuf
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // EXP-015 — an account that cannot be read refuses the export with the database error,
+    // and nothing is written.
+    #[tokio::test]
+    async fn an_unreadable_portfolio_is_refused_and_nothing_written() {
+        use crate::context::account::{AccountError, MockAccountServiceContract};
+        use crate::context::asset::MockAssetServiceContract;
+        let mut accounts = MockAccountServiceContract::new();
+        accounts
+            .expect_get_all()
+            .returning(|| Err(AccountError::DatabaseError));
+        let export = DataExportUseCase::new(
+            Arc::new(accounts),
+            Arc::new(MockAssetServiceContract::new()),
+        );
+        let out = tempfile::tempdir().expect("folder");
+        let refused = export.export(ExportFormat::Json, out.path()).await;
+        assert!(matches!(refused, Err(DataExportError::DatabaseError)));
+        assert_eq!(std::fs::read_dir(out.path()).expect("listed").count(), 0);
+    }
     use crate::context::account::WriteOffReason;
     use crate::shared::domain::quantity::from_surface;
 

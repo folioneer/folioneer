@@ -13,7 +13,7 @@
 | ------------------ | -------------------------------------- | -------------- | ----------------------------------------------------------------------- |
 | `export_portfolio` | `format: ExportFormat, folder: String` | `ExportReport` | `FolderUnavailable` (EXP-015), `WriteFailed` (EXP-015), `DatabaseError` |
 
-Traceability: `export_portfolio` ← EXP-010 (the action, after the system's folder picker), EXP-011 to EXP-014 (what is written, under which name), EXP-015 (complete or nothing: `FolderUnavailable` for a folder that is not there or not a folder, `WriteFailed` for one that cannot be written, nothing left behind), EXP-016 (the report), EXP-020 to EXP-025 and EXP-030 to EXP-033 (the format), EXP-051 (the mapper written beside the CSV tables).
+Traceability: `export_portfolio` ← EXP-010 (the action, after the system's folder picker), EXP-011 to EXP-014 (what is written, under which name), EXP-015 (complete or nothing: `FolderUnavailable` for a folder that is not there or not a folder, `WriteFailed` for one that cannot be written, nothing left behind), EXP-016 (the report), EXP-020 to EXP-025 and EXP-030 to EXP-033 (the format), EXP-050 (the per-account files and the mapper read back through the account import), EXP-051 (the mapper written beside the CSV tables).
 
 The folder is chosen in the system's picker by the frontend; closing it calls nothing (EXP-010).
 
