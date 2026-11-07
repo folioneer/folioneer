@@ -160,7 +160,7 @@ Every day at trigger time (app open or closed)
         └─ exit                                                          (SPF-016)
 
 Machine was off at the trigger
-    → next machine start/wake: OS fires the missed trigger once          (SPF-022)
+    → next start, logon or wake of the enabling user: fired once         (SPF-022)
     → run records the missed days' closes via the backfill               (SPF-030, SPF-031)
 
 App opened later
@@ -201,4 +201,4 @@ Settings section (no modal): enable toggle, time-of-day field, read-only status 
 
 ## Open Questions
 
-None — all questions have been resolved.
+- [ ] SPF-022 on a computer shared by several users: the schedule is registered for the user who enabled it, while its configuration is the device's; whether another user's session should run it, and what happens when the enabling user's account is gone, is not decided.
