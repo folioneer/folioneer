@@ -108,7 +108,9 @@ jobs:
     # into the release's existing latest.json, a read-modify-write that would
     # race if both jobs uploaded the manifest at once.
     needs: windows
-    runs-on: ubuntu-latest
+    # The Linux build stays on 24.04: built on a newer image, the binary would need a
+    # newer glibc than the distributions it ran on so far (#795).
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: write

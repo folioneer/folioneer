@@ -24,7 +24,10 @@ concurrency:
 jobs:
   e2e:
     name: E2E — headless WebDriver
-    runs-on: ubuntu-latest
+    # Ubuntu 26.04 (ubuntu-latest, run 42482015918) names WebKitWebDriver's package
+    # webkitgtk-webdriver, not webkit2gtk-driver: the E2E stays on 24.04 until #795
+    # checks its dependencies there.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
