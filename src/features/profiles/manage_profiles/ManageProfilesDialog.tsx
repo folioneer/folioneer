@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
 import { Button, IconButton } from "@/ui/components/button";
-import { Dialog } from "@/ui/components/modal/Dialog";
+import { ConfirmationDialog, Dialog } from "@/ui/components/modal/Dialog";
 import { ProfileNameDialog } from "../profile_name_dialog/ProfileNameDialog";
 import { accountCountMessage, profileDisplayName } from "../shared/presenter";
 import { useManageProfiles } from "./useManageProfiles";
@@ -19,8 +19,18 @@ interface ManageProfilesDialogProps {
  */
 export function ManageProfilesDialog({ isOpen, onClose }: ManageProfilesDialogProps) {
   const { t } = useTranslation();
-  const { profiles, error, remove, nameDialog, openAdd, openRename, closeNameDialog } =
-    useManageProfiles(isOpen);
+  const {
+    profiles,
+    error,
+    pendingRemoval,
+    requestRemoval,
+    cancelRemoval,
+    confirmRemoval,
+    nameDialog,
+    openAdd,
+    openRename,
+    closeNameDialog,
+  } = useManageProfiles(isOpen);
 
   useEffect(() => {
     if (isOpen) logger.info("[ManageProfilesDialog] mounted");
@@ -36,7 +46,7 @@ export function ManageProfilesDialog({ isOpen, onClose }: ManageProfilesDialogPr
         onClose={onClose}
         title={t("profile.manage.title")}
         actions={
-          <Button id="manage-profiles-close" variant="tonal" onClick={onClose}>
+          <Button id="manage-profiles-close" variant="secondary" onClick={onClose}>
             {t("action.close")}
           </Button>
         }
@@ -67,7 +77,7 @@ export function ManageProfilesDialog({ isOpen, onClose }: ManageProfilesDialogPr
                   icon={<Trash2 size={18} />}
                   aria-label={t("profile.manage.remove", { name })}
                   disabled={!summary.removable}
-                  onClick={() => void remove(summary.profile.id)}
+                  onClick={() => requestRemoval(summary.profile)}
                 />
               </li>
             );
@@ -90,6 +100,19 @@ export function ManageProfilesDialog({ isOpen, onClose }: ManageProfilesDialogPr
           </Button>
         </div>
       </Dialog>
+      <ConfirmationDialog
+        isOpen={pendingRemoval !== null}
+        onCancel={cancelRemoval}
+        onConfirm={() => void confirmRemoval()}
+        title={t("profile.manage.remove_confirm_title")}
+        message={t("profile.manage.remove_confirm_message", {
+          name: pendingRemoval ? profileDisplayName(pendingRemoval, defaultName) : "",
+        })}
+        confirmLabel={t("action.delete")}
+        cancelLabel={t("action.cancel")}
+        variant="danger"
+        confirmId="manage-profiles-remove-confirm"
+      />
       <ProfileNameDialog
         isOpen={nameDialog.open}
         profile={nameDialog.open ? nameDialog.profile : null}

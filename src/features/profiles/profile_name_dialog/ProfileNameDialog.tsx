@@ -36,7 +36,7 @@ export function ProfileNameDialog({ isOpen, profile, onClose }: ProfileNameDialo
       title={profile ? t("profile.name_dialog.rename_title") : t("profile.name_dialog.add_title")}
       actions={
         <>
-          <Button id="profile-name-cancel" variant="tonal" onClick={onClose}>
+          <Button id="profile-name-cancel" variant="secondary" onClick={onClose}>
             {t("action.cancel")}
           </Button>
           <Button

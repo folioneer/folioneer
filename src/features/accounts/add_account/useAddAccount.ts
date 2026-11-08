@@ -31,7 +31,8 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // PFL-021 — a new account starts in the profile in use, once the profiles are read.
-  const profiles = useProfileChoices();
+  const { list: profiles, error: profilesError } = useProfileChoices();
+
   const inUse = profiles?.in_use ?? "";
   useEffect(() => {
     if (inUse) setFormData((prev) => (prev.profile_id ? prev : { ...prev, profile_id: inUse }));
@@ -117,7 +118,8 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
 
   return {
     formData,
-    error,
+    // F27 — the profiles that cannot be read show as the form's error.
+    error: error ?? profilesError,
     isSubmitting,
     handleChange,
     setCountry,

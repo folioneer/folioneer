@@ -29,8 +29,9 @@ const mockProfiles = {
   ],
   in_use: "p-parent",
 };
+let mockChoicesError: { key: string } | null = null;
 vi.mock("../shared/useProfileChoices", () => ({
-  useProfileChoices: () => mockProfiles,
+  useProfileChoices: () => ({ list: mockProfiles, error: mockChoicesError }),
 }));
 
 vi.mock("../gateway", () => ({
@@ -327,5 +328,13 @@ describe("useAddAccount — reference currency (FXR-128)", () => {
     expect(mockAddAccount).toHaveBeenCalledWith(
       expect.objectContaining({ name: "PEA", profile_id: "default-profile" }),
     );
+  });
+
+  // F27 — the profiles that cannot be read show as the form's error.
+  it("shows that the profiles could not be read", () => {
+    mockChoicesError = { key: "error.DatabaseError" };
+    const { result } = renderHook(() => useAddAccount());
+    expect(result.current.error).toEqual({ key: "error.DatabaseError" });
+    mockChoicesError = null;
   });
 });

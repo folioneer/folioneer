@@ -3,8 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { ProfileList } from "@/bindings";
 import { logger } from "@/lib/logger";
 import type { I18nMessage } from "@/ui/format/i18n";
-import { profileGateway } from "../gateway";
-import { profileErrorToI18n } from "../shared/presenter";
+import { listProfiles, onProfilesChanged, setProfileInUse } from "../gateway";
+import { profileChipErrorToI18n } from "./presenter";
 
 /** Which dialog the chip opened, if any. */
 type ProfileDialog = "add" | "manage" | null;
@@ -22,10 +22,10 @@ export function useProfileChip() {
   const [error, setError] = useState<I18nMessage | null>(null);
 
   const load = useCallback(async () => {
-    const result = await profileGateway.listProfiles();
+    const result = await listProfiles();
     if (result.status === "error") {
       logger.error("[useProfileChip] the profiles could not be read", { code: result.error.code });
-      setError(profileErrorToI18n(result.error));
+      setError(profileChipErrorToI18n(result.error));
       return;
     }
     setList(result.data);
@@ -34,11 +34,8 @@ export function useProfileChip() {
   useEffect(() => {
     let isMounted = true;
     void load();
-    const unlisten = profileGateway.subscribeToEvents((type) => {
-      if (!isMounted) return;
-      if (type === "ProfileUpdated" || type === "AccountUpdated" || type === "SyncCompleted") {
-        void load();
-      }
+    const unlisten = onProfilesChanged(() => {
+      if (isMounted) void load();
     });
     return () => {
       isMounted = false;
@@ -51,10 +48,10 @@ export function useProfileChip() {
   const choose = async (profileId: string) => {
     setMenuOpen(false);
     if (list?.in_use === profileId) return;
-    const result = await profileGateway.setProfileInUse(profileId);
+    const result = await setProfileInUse(profileId);
     if (result.status === "error") {
       logger.warn("[useProfileChip] the profile was not chosen", { code: result.error.code });
-      setError(profileErrorToI18n(result.error));
+      setError(profileChipErrorToI18n(result.error));
       return;
     }
     void navigate({ to: "/accounts" });

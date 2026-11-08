@@ -1,16 +1,15 @@
 import { Check, ChevronDown, Pencil, Plus, User } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { ManageProfilesDialog, ProfileNameDialog } from "@/features/profiles";
 import { logger } from "@/lib/logger";
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
-import { ManageProfilesDialog } from "../manage_profiles/ManageProfilesDialog";
-import { ProfileNameDialog } from "../profile_name_dialog/ProfileNameDialog";
-import { profileDisplayName } from "../shared/presenter";
+import { chipProfileName } from "./presenter";
 import { useProfileChip } from "./useProfileChip";
 
 /**
  * PFL-012 / PFL-032 — the profile in use, at the header's far right, always shown (#767,
- * the validated mock). With one profile its menu adds one; with several it switches and
+ * the validated mock): shell chrome, hosting the profiles feature's dialogs (F26, F31). With one profile its menu adds one; with several it switches and
  * opens the Profiles dialog. Listens through `useProfileChip`.
  */
 export function ProfileChip() {
@@ -54,7 +53,9 @@ export function ProfileChip() {
   }, [menuOpen]);
 
   const defaultName = t("profile.default_name");
-  const inUseName = inUse ? profileDisplayName(inUse, defaultName) : defaultName;
+  const inUseName = chipProfileName(inUse, defaultName);
+  // Nothing until the profiles are read, so another profile's name never flashes as "Me".
+  if (!inUse) return null;
 
   // Raw white tokens are intentional: the chip lives on the fixed-brand indigo header
   // gradient, which never changes in dark mode (see ThemeToggle).
@@ -119,7 +120,7 @@ export function ProfileChip() {
                     >
                       <span className="w-4">{active && <Check size={16} />}</span>
                       <span className="truncate">
-                        {profileDisplayName(summary.profile, defaultName)}
+                        {chipProfileName(summary.profile, defaultName)}
                       </span>
                     </button>
                   );

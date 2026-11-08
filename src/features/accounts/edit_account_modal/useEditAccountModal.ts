@@ -35,7 +35,8 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
     formData.cost_basis_method !== "" &&
     formData.cost_basis_method !== (account.cost_basis_method ?? "WeightedAverage");
   // PFL-031 — the profiles to choose from; a different one moves the account with its history.
-  const profiles = useProfileChoices();
+  const { list: profiles, error: profilesError } = useProfileChoices();
+
   const profileChanged =
     account !== null && formData.profile_id !== "" && formData.profile_id !== account.profile_id;
   const profileOf = (id: string | undefined) =>
@@ -148,7 +149,8 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
 
   return {
     formData,
-    error,
+    // F27 — the profiles that cannot be read show as the form's error.
+    error: error ?? profilesError,
     isSubmitting,
     handleChange,
     setCountry,

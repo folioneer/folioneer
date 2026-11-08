@@ -1,5 +1,6 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  AccountError,
   AgentConnectionError,
   AgentConnectionState,
   Capabilities,
@@ -10,6 +11,7 @@ import type {
   PortfolioSyncError,
   PriceFreshness,
   PriceFreshnessError,
+  ProfileList,
   ReferenceCurrency,
   Result,
   SessionRemoval,
@@ -31,6 +33,26 @@ export function getSyncStatus(): Promise<Result<SyncStatusView, PortfolioSyncErr
 export function onSyncCompleted(callback: () => void): Promise<UnlistenFn> {
   return events.event.listen((event) => {
     if (event.payload.type === "SyncCompleted") {
+      callback();
+    }
+  });
+}
+
+// PFL-012 / PFL-023 — the header's profile chip reads the profiles and the one in use.
+export function listProfiles(): Promise<Result<ProfileList, AccountError>> {
+  return commands.listProfiles();
+}
+
+// PFL-032 — another profile becomes the one in use.
+export function setProfileInUse(profileId: string): Promise<Result<null, AccountError>> {
+  return commands.setProfileInUse(profileId);
+}
+
+// PFL-034 — the profiles or their counts changed, here or by a sync (SYN-064).
+export function onProfilesChanged(callback: () => void): Promise<UnlistenFn> {
+  return events.event.listen((event) => {
+    const type = event.payload.type;
+    if (type === "ProfileUpdated" || type === "AccountUpdated" || type === "SyncCompleted") {
       callback();
     }
   });

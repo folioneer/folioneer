@@ -6,13 +6,11 @@ const mockList = vi.fn();
 const mockSetInUse = vi.fn();
 let emit: (type: string) => void = () => {};
 vi.mock("../gateway", () => ({
-  profileGateway: {
-    listProfiles: () => mockList(),
-    setProfileInUse: (...args: unknown[]) => mockSetInUse(...args),
-    subscribeToEvents: (callback: (type: string) => void) => {
-      emit = callback;
-      return Promise.resolve(() => {});
-    },
+  listProfiles: () => mockList(),
+  setProfileInUse: (...args: unknown[]) => mockSetInUse(...args),
+  onProfilesChanged: (callback: () => void) => {
+    emit = () => callback();
+    return Promise.resolve(() => {});
   },
 }));
 const mockNavigate = vi.fn();

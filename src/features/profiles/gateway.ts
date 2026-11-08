@@ -17,11 +17,6 @@ export const profileGateway = {
     return await commands.listProfiles();
   },
 
-  // PFL-032 — makes an existing profile the profile in use.
-  async setProfileInUse(profileId: string): Promise<Result<null, AccountError>> {
-    return await commands.setProfileInUse(profileId);
-  },
-
   // PFL-020 — a new profile.
   async createProfile(name: string): Promise<Result<Profile, AccountError>> {
     return await commands.createProfile(name);

@@ -45,7 +45,7 @@ const mockProfiles = {
   in_use: "default-profile",
 };
 vi.mock("../shared/useProfileChoices", () => ({
-  useProfileChoices: () => mockProfiles,
+  useProfileChoices: () => ({ list: mockProfiles, error: null }),
 }));
 
 const fakeSubmit = { preventDefault: vi.fn() } as unknown as React.FormEvent;

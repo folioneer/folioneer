@@ -1444,6 +1444,8 @@
       "no_account": "kein Konto",
       "rename": "{{name}} umbenennen",
       "remove": "{{name}} löschen",
+      "remove_confirm_title": "Dieses Profil löschen?",
+      "remove_confirm_message": "„{{name}}“ enthält kein Konto. Es wird auf allen Geräten gelöscht.",
       "remove_hint": "Ein Profil lässt sich löschen, sobald es kein Konto mehr enthält.",
       "add": "Profil hinzufügen"
     },

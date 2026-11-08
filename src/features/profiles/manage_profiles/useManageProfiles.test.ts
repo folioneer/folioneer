@@ -38,13 +38,15 @@ describe("useManageProfiles", () => {
     await waitFor(() => expect(result.current.profiles).toHaveLength(2));
   });
 
-  // PFL-040 — a refused removal is kept as the error to show.
+  // PFL-040 — a removal waits for the confirmation; a refused one is kept as the error to show.
   it("keeps a refused removal as the error to show", async () => {
     mockRemove.mockResolvedValue({ status: "error", error: { code: "ProfileNotEmpty" } });
     const { result } = renderHook(() => useManageProfiles(true));
     await waitFor(() => expect(result.current.profiles).toHaveLength(2));
+    act(() => result.current.requestRemoval({ id: "p-1", name: "Parent" }));
+    expect(mockRemove).not.toHaveBeenCalled();
     await act(async () => {
-      await result.current.remove("p-1");
+      await result.current.confirmRemoval();
     });
     expect(mockRemove).toHaveBeenCalledWith("p-1");
     expect(result.current.error).toEqual({ key: "error.ProfileNotEmpty" });

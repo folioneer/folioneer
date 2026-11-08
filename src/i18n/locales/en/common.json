@@ -1444,6 +1444,8 @@
       "no_account": "no account",
       "rename": "Rename {{name}}",
       "remove": "Delete {{name}}",
+      "remove_confirm_title": "Delete this profile?",
+      "remove_confirm_message": "“{{name}}” holds no account. It is deleted on every device.",
       "remove_hint": "A profile is deleted once it holds no account.",
       "add": "Add a profile"
     },

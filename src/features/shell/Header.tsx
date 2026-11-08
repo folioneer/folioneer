@@ -1,11 +1,11 @@
 import { ArrowLeft } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { ProfileChip } from "@/features/profiles";
 import { logger } from "@/lib/logger";
 import { IconButton } from "@/ui/components/button/IconButton";
 import { AgentIndicator } from "./agent_connection/AgentIndicator";
 import { PriceFreshnessIndicator } from "./price_freshness/PriceFreshnessIndicator";
+import { ProfileChip } from "./profile_chip/ProfileChip";
 import { SyncIndicator } from "./sync_indicator/SyncIndicator";
 import { ThemeToggle } from "./theme_toggle/ThemeToggle";
 import { useHeaderConfig } from "./useHeaderConfig";
