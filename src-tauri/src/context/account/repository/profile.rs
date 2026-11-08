@@ -74,10 +74,7 @@ impl ProfileRepository for SqliteProfileRepository {
         Ok(rows
             .into_iter()
             .map(|row| ProfileSummary {
-                profile: Profile {
-                    id: row.id,
-                    name: row.name,
-                },
+                profile: Profile::restore(row.id, row.name),
                 account_count: u32::try_from(row.account_count).unwrap_or(u32::MAX),
             })
             .collect())
@@ -88,10 +85,7 @@ impl ProfileRepository for SqliteProfileRepository {
             .fetch_optional(&self.pool)
             .await
             .context("get profile")?;
-        Ok(row.map(|row| Profile {
-            id: row.id,
-            name: row.name,
-        }))
+        Ok(row.map(|row| Profile::restore(row.id, row.name)))
     }
 
     async fn name_taken(&self, name: &str, except_id: Option<String>) -> Result<bool> {

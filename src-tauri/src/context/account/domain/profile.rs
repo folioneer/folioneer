@@ -34,6 +34,19 @@ impl Profile {
         })
     }
 
+    /// A profile read back from storage or a synced change, as it was stored.
+    pub fn restore(id: String, name: Option<String>) -> Self {
+        Self { id, name }
+    }
+
+    /// PFL-030 — this profile under a new name, trimmed; an empty one is refused.
+    pub fn renamed(self, name: &str) -> Result<Self, AccountError> {
+        Ok(Self {
+            name: Some(Self::checked_name(name)?),
+            ..self
+        })
+    }
+
     /// PFL-020 / PFL-030 — a name trimmed, refused when empty.
     pub fn checked_name(name: &str) -> Result<String, AccountError> {
         let trimmed = name.trim();
@@ -96,11 +109,21 @@ mod tests {
     // PFL-011 — the default profile is told apart by its identifier.
     #[test]
     fn the_default_profile_is_known_by_its_identifier() {
-        let default = Profile {
-            id: default_profile_id(),
-            name: None,
-        };
+        let default = Profile::restore(default_profile_id(), None);
         assert!(default.is_default());
         assert!(!Profile::new("Parent").expect("named").is_default());
+    }
+
+    // PFL-030 — a rename trims the name, keeps the identifier, and refuses an empty one.
+    #[test]
+    fn a_rename_trims_and_keeps_the_identifier() {
+        let default = Profile::restore(default_profile_id(), None);
+        let renamed = default.clone().renamed(" Me ").expect("renamed");
+        assert_eq!(renamed.id, default.id);
+        assert_eq!(renamed.name.as_deref(), Some("Me"));
+        assert!(matches!(
+            default.renamed(" "),
+            Err(AccountError::ProfileNameEmpty)
+        ));
     }
 }

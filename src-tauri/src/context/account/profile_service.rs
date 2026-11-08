@@ -95,10 +95,10 @@ impl ProfileService {
 
     /// PFL-030 — renames a profile, the default one included.
     pub async fn rename(&self, id: &str, name: &str) -> Result<Profile, AccountError> {
-        let mut profile = self.existing(id).await?;
-        let name = Profile::checked_name(name)?;
-        self.ensure_free(&name, Some(id.to_string())).await?;
-        profile.name = Some(name);
+        let profile = self.existing(id).await?.renamed(name)?;
+        if let Some(name) = &profile.name {
+            self.ensure_free(name, Some(id.to_string())).await?;
+        }
         self.profiles
             .save(&profile)
             .await

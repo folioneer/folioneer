@@ -1187,10 +1187,7 @@ impl AccountRepository for SqliteAccountRepository {
                 .await
                 .with_context(|| format!("Failed to read synced profile {}", identity))?;
                 row.map(|row| {
-                    let profile = Profile {
-                        id: row.id,
-                        name: row.name,
-                    };
+                    let profile = Profile::restore(row.id, row.name);
                     Ok(SyncedRecord {
                         rank: rank_from_columns(
                             row.sync_logical_timestamp,
@@ -1447,10 +1444,7 @@ impl AccountRepository for SqliteAccountRepository {
             .context("Failed to read profiles")?;
         Ok(rows
             .into_iter()
-            .map(|row| Profile {
-                id: row.id,
-                name: row.name,
-            })
+            .map(|row| Profile::restore(row.id, row.name))
             .collect())
     }
 
