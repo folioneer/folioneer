@@ -1,7 +1,7 @@
 # Contract — Asset
 
 > Domain: `asset`
-> Last updated by: market-price (MKT-103, MKT-190–214, MKT-230–232), financial-asset-transaction (TRX-064), asset (AST-030–040)
+> Last updated by: market-price (MKT-103, MKT-190–214, MKT-230–232), financial-asset-transaction (TRX-064), asset (AST-030–040), profile (PFL-050)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Per-command reachable codes are listed in the "Errors" column of each table below. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic chain preserved server-side via `tracing::error!`).
 >
@@ -82,7 +82,7 @@
 
 ### Price Freshness
 
-> `get_price_freshness` is implemented in `use_cases/price_freshness/`. It reads the newest price date among the assets held in any account (MKT-200) and the moment this installation last fetched prices, kept outside the synced data (MKT-201).
+> `get_price_freshness` is implemented in `use_cases/price_freshness/`. It reads the newest price date among the assets held in any account of the profile in use (MKT-200, PFL-050) and the moment this installation last fetched prices, kept outside the synced data (MKT-201).
 
 | Command               | Args | Return           | Errors          |
 | --------------------- | ---- | ---------------- | --------------- |
@@ -292,9 +292,9 @@ enum FetchTrigger { Launch, Manual }
 // account-contract AccountSummary.total_global_value) — never a second valuation path. Produced only when `trigger == Manual`; carried in AssetPriceFetchCompleted.
 // Asset counts are NOT repeated here — the event's existing `ok` / `skipped` carry them.
 struct PriceMovementReport {
-    rows: Vec<PriceMovementRow>,          // one per account, by account name ascending (PMV-030/033)
-    total_before: i64,                    // portfolio value before, reference-currency micros (PMV-040, GPF-011, ADR-001)
-    total_after: i64,                     // portfolio value after, reference-currency micros (PMV-040)
+    rows: Vec<PriceMovementRow>,          // one per account of the profile in use (PFL-050), by account name ascending (PMV-030/033)
+    total_before: i64,                    // the report's accounts' value before, reference-currency micros (PMV-040, PFL-050, GPF-011, ADR-001)
+    total_after: i64,                     // the report's accounts' value after, reference-currency micros (PMV-040, PFL-050)
     total_currency: String,               // the reference currency both totals are in (PMV-040) — on the
                                           // wire rather than assumed, matching AccountPerformanceResponse.currency
     total_movement_pct: Option<i64>,      // micro-percent from the two totals (PMV-041); absent when the
@@ -312,7 +312,7 @@ struct PriceMovementReport {
     incomplete: bool,                     // any row incomplete (PMV-043)
 }
 
-// PMV-030 — one account's share of the report. Present for every account, including those
+// PMV-030 — one account's share of the report. Present for every account of the profile in use (PFL-050), including those
 // that did not move and those holding no priced asset.
 struct PriceMovementRow {
     account_id: String,
@@ -410,6 +410,7 @@ struct AssetClassDefault {
 
 ## Changelog
 
+- 2026-11-08 — #766 (PFL-050): `get_price_freshness` and the price movement report read the accounts of the profile in use. No signature changed.
 - 2026-11-07 — #748 (MKT-021, SYN-034): `AssetError` gains `PriceOutOfRange`, a price above a trillion units, refused by `record_asset_price` and `update_asset_price`.
 - 2026-10-19 — #529 (MKT-230, MKT-232): `backfill_holding_price_history` also reads and keeps the asset's reported splits, a failed reading answering `ProviderUnreachable`; `AssetPriceUpdated` is also published when it changed them. No command or type added.
 - 2026-10-18 — TODO-085 (MKT-220, MKT-221): new `get_price_fetch_failures` command and the `PriceFetchFailure` / `PriceFetchFailureReason` types. No event added; the holding row re-reads after `AssetPriceFetchCompleted`.

@@ -17,7 +17,7 @@
 
 | Command                         | Args                                               | Return                   | Errors                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------------- | -------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_accounts`                  | —                                                  | `Vec<Account>`           | `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                          |
+| `get_accounts`                  | —                                                  | `Vec<Account>`           | `DatabaseError` _(the accounts of the profile in use, PFL-051)_                                                                                                                                                                                                                                                                                                                                          |
 | `add_account`                   | `CreateAccountDTO`                                 | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003, PFL-022 — within one profile; binds the name being set, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists), `ProfileNotFound { profile_id }` (PFL-021 — only for a `profile_id` given), `DatabaseError`                                     |
 | `update_account`                | `UpdateAccountDTO`                                 | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003, PFL-022 — within one profile; binds the name being set; editing other fields of an account whose name already clashes after a merge is accepted, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists, nor the account's own), `DatabaseError` |
 | `get_wrapper_lists`             | —                                                  | `WrapperLists`           | _(infallible — the lists are the application's own, ACC-040)_                                                                                                                                                                                                                                                                                                                                            |
@@ -52,9 +52,9 @@
 > `get_account_summaries` is implemented in `use_cases/account_summary/` — it reads from both the
 > account and asset BCs (price lookups for each account's holdings) but mutates neither.
 
-| Command                 | Args | Return             | Errors                                                                              |
-| ----------------------- | ---- | ------------------ | ----------------------------------------------------------------------------------- |
-| `get_account_summaries` | —    | `AccountSummaries` | `DatabaseError`; price lookup failures silently contribute 0 to the value (MKT-031) |
+| Command                 | Args | Return             | Errors                                                                                                                                            |
+| ----------------------- | ---- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_account_summaries` | —    | `AccountSummaries` | `DatabaseError`; price lookup failures silently contribute 0 to the value (MKT-031); the accounts of the profile in use and their total (PFL-050) |
 
 ### Account Performance
 
@@ -70,12 +70,12 @@
 ### Global Performance
 
 > `get_global_performance` is implemented in `use_cases/global_performance/`. With an `account_id` it is the
-> single-account series of `get_account_performance`; without one, every account — or every position of the
+> single-account series of `get_account_performance`; without one, every account of the profile in use (PFL-050) — or every position of the
 > scoped asset — is aggregated in the reference currency (GPF-011–041). Nothing is persisted.
 
-| Command                  | Args                                                   | Return                       | Errors                                                                                                |
-| ------------------------ | ------------------------------------------------------ | ---------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `get_global_performance` | `account_id: Option<String>, asset_id: Option<String>` | `AccountPerformanceResponse` | `AccountNotFound { account_id }` (GPF-010 — an `account_id` that matches no account), `DatabaseError` |
+| Command                  | Args                                                   | Return                       | Errors                                                                                                                                                                      |
+| ------------------------ | ------------------------------------------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_global_performance` | `account_id: Option<String>, asset_id: Option<String>` | `AccountPerformanceResponse` | `AccountNotFound { account_id }` (GPF-010 — an `account_id` that matches no account), `DatabaseError` _(without `account_id`, the accounts of the profile in use, PFL-050)_ |
 
 ### Holdings & Transactions
 
@@ -670,13 +670,13 @@ struct AccountSummaries {
     total: PortfolioTotal,
 }
 
-// Portfolio total over every account (ACC-027/028/029)
+// Portfolio total over every account of the profile in use (ACC-027/028/029, PFL-050)
 struct PortfolioTotal {
     total_global_value: i64,                   // micros, reference currency: Σ account Global Value converted at the read date's rate
     total_unrealized_pnl: Option<i64>,         // micros, reference currency: Σ account Unrealized P&L converted; None when no convertible account carries one (ACC-029)
     currency: String,                          // the reference currency (GPF-011)
     incomplete: bool,                          // an account with no usable rate to the reference currency (FXR-034) held a non-zero Global Value or Unrealized P&L, which the total leaves out (ACC-028)
-    outdated_price_count: i64,                 // active holdings whose price is outdated, over every account (MKT-206)
+    outdated_price_count: i64,                 // active holdings whose price is outdated, over every account of the profile in use (MKT-206, PFL-050)
 }
 ```
 
@@ -918,6 +918,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-11-08 — #766 (PFL-050, PFL-051): `get_accounts`, `get_account_summaries` (and its total) and `get_global_performance` without an account read the accounts of the profile in use. No signature changed. `AccountError` gains `AccountOutsideProfileInUse { account_id }` (PFL-051A, returned by the import commands).
 - 2026-11-08 — #766 (PFL-012, PFL-014, PFL-021, PFL-032): `list_profiles` returns `ProfileList` (the profiles and the profile in use); new `set_profile_in_use`; `CreateAccountDTO` gains `profile_id: Option<String>` (none: the profile in use) and `add_account` returns `ProfileNotFound`; `ProfileUpdated` also signals a new profile in use (PFL-034).
 - 2026-11-08 — #766 (PFL): `Account` gains `profile_id`; new `list_profiles`, `create_profile`, `rename_profile`, `remove_profile`, `move_account_to_profile` and the `Profile` / `ProfileSummary` types; `AccountError` gains `ProfileNameEmpty`, `ProfileNameAlreadyExists`, `ProfileNotFound`, `ProfileNotEmpty`, `DefaultProfileKept`, `TransferAcrossProfiles`; `NameAlreadyExists` binds within one profile (PFL-022); transfer commands refuse two profiles (PFL-033); the event `ProfileUpdated` (PFL-034).
 - 2026-11-08 — #515 (CBM-011A, CBM-014, CBM-034): `CreateAccountDTO` gains `cost_basis_method: Option<CostBasisMethod>` (none: the country's); new `get_implied_cost_basis` and `get_holding_lots`, with `ImpliedCostBasis`, `HoldingLots` and `HoldingLot`.

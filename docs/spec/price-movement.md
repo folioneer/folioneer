@@ -28,7 +28,7 @@ The outcome of one Global refresh, expressed as what the fetch did to the portfo
 | `observed_to`           | The observation date this fetch produced; absent only when it produced none later than `observed_from` — carried even when `observed_from` is absent (PMV-051, PMV-052). |
 | `incomplete`            | Whether any entry's reading is incomplete (PMV-043).                                                                                                                     |
 
-> Asset counts are not carried here — the completion signal's own updated / skipped counts (MKT-119) already state them for the same scope.
+> Asset counts are not carried here — the completion signal's own updated / skipped counts (MKT-119) state them for the refresh, over every profile (PMV-030).
 
 ### PriceMovementRow
 
@@ -93,7 +93,7 @@ One account's share of the report.
 
 ### Per-account entries (030–039)
 
-**PMV-030 — Every account is listed (backend)**: The report carries one entry per account, including accounts whose value did not move and accounts holding no priced asset. The user can therefore tell "did not move" apart from "was not looked at".
+**PMV-030 — Every account is listed (backend)**: The report carries one entry per account, including accounts whose value did not move and accounts holding no priced asset. The user can therefore tell "did not move" apart from "was not looked at". The accounts are those of the profile in use when the refresh starts (PFL-050). The dates of PMV-050 to PMV-052 read the holdings in scope of those accounts; the completion counts (MKT-119) stay the refresh's, over every profile.
 
 **PMV-031 — An unmoved account carries no movement figure (frontend + backend)**: When an account's two values are equal, neither a proportion nor an amount is reported for it, and the entry is presented without movement figures rather than as a zero movement. Both values are still carried, so an unmoved entry stays distinguishable from one whose proportion is undefined (PMV-025).
 
@@ -105,7 +105,7 @@ One account's share of the report.
 
 ### Portfolio total (040–049)
 
-**PMV-040 — The report carries a portfolio total in the reference currency (backend)**: Both readings are also reported for the portfolio as a whole, converted to the cross-account reference currency the application already uses for aggregation (GPF-011). The report states that currency rather than leaving it to be assumed.
+**PMV-040 — The report carries a portfolio total in the reference currency (backend)**: Both readings are also reported for the accounts of the report as a whole, converted to the cross-account reference currency the application already uses for aggregation (GPF-011). The report states that currency rather than leaving it to be assumed. The accounts are those of the profile in use when the refresh starts (PFL-050).
 
 **PMV-041 — The total's movement is computed from the totals (backend)**: The portfolio movement is derived from the two converted totals, never by combining the per-account proportions.
 

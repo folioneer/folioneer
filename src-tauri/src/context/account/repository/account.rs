@@ -1437,6 +1437,10 @@ impl AccountRepository for SqliteAccountRepository {
         Ok(())
     }
 
+    async fn profile_in_use(&self) -> Result<String> {
+        super::profile::profile_in_use(&self.pool).await
+    }
+
     async fn profile_for_new_account(&self, given: Option<String>) -> Result<Option<String>> {
         let row = match given {
             Some(id) => sqlx::query!(r#"SELECT id AS "id!" FROM profiles WHERE id = ?"#, id)
@@ -1444,7 +1448,7 @@ impl AccountRepository for SqliteAccountRepository {
                 .await
                 .context("Failed to read the profile given")?
                 .map(|row| row.id),
-            None => Some(super::profile::profile_in_use(&self.pool).await?),
+            None => Some(self.profile_in_use().await?),
         };
         Ok(row)
     }

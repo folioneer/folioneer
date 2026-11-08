@@ -57,7 +57,8 @@ pub struct AccountSummary {
     pub created_by: Option<AgentRecording>,
 }
 
-/// ACC-027/028 — the portfolio total over every account, in the reference currency.
+/// ACC-027/028 — the portfolio total over the accounts of the profile in use (PFL-050), in the
+/// reference currency.
 #[derive(Debug, Serialize, Clone, Type)]
 pub struct PortfolioTotal {
     /// Σ every account's Global Value, converted at the read date's rate, in
@@ -72,7 +73,8 @@ pub struct PortfolioTotal {
     /// (FXR-034) held a non-zero Global Value or Unrealized P&L, which the total
     /// therefore leaves out (ACC-028).
     pub incomplete: bool,
-    /// MKT-206 — how many holdings have an outdated price, over every account.
+    /// MKT-206 — how many holdings have an outdated price, over the accounts of the profile in
+    /// use (PFL-050).
     pub outdated_price_count: i64,
 }
 
@@ -109,9 +111,9 @@ impl AccountSummaryUseCase {
         }
     }
 
-    /// Builds a summary row for every non-deleted account.
+    /// Builds a summary row for every account of the profile in use (PFL-050).
     pub async fn get_account_summaries(&self) -> StdResult<AccountSummaries, AccountError> {
-        let accounts = self.account_service.get_all().await?;
+        let accounts = self.account_service.accounts_in_use().await?;
         let mut creators = self.account_service.agent_creations().await?;
         let mut summaries = Vec::with_capacity(accounts.len());
         let today = chrono::Local::now().date_naive();

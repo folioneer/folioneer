@@ -20,8 +20,12 @@ use folioneer_lib::core::SideEffectEventBus;
 use folioneer_lib::shared::domain::quantity::from_surface;
 use folioneer_lib::shared::infrastructure::uow::SqliteTransactionManager;
 use folioneer_lib::use_cases::account_creation::AccountCreationUseCase;
+use folioneer_lib::use_cases::account_summary::AccountSummaryUseCase;
+use folioneer_lib::use_cases::global_performance::GlobalPerformanceUseCase;
 use folioneer_lib::use_cases::holding_transaction::HoldingTransactionUseCase;
+use folioneer_lib::use_cases::price_freshness::PriceFreshnessUseCase;
 use folioneer_lib::use_cases::profile_move::ProfileMoveUseCase;
+use folioneer_lib::use_cases::shared::price_fetch_log::SqlitePriceFetchLogRepository;
 use folioneer_lib::use_cases::transfer::{TransferFigures, TransferUseCase};
 use std::sync::Arc;
 
@@ -30,6 +34,8 @@ fn micro(v: i64) -> i64 {
 }
 
 struct Ctx {
+    pool: sqlx::SqlitePool,
+    currencies: Arc<CurrencyService>,
     creation: AccountCreationUseCase,
     accounts: Arc<AccountService>,
     profiles: Arc<ProfileService>,
@@ -82,7 +88,9 @@ async fn ctx() -> Ctx {
         profiles: profiles.clone(),
         moving: ProfileMoveUseCase::new(profiles, accounts.clone()),
         recording: HoldingTransactionUseCase::new(accounts.clone(), assets.clone()),
-        transfer: TransferUseCase::new(accounts.clone(), assets.clone(), currencies),
+        transfer: TransferUseCase::new(accounts.clone(), assets.clone(), currencies.clone()),
+        currencies,
+        pool,
         accounts,
         assets,
     }
@@ -347,4 +355,151 @@ async fn pfl_021_a_new_account_goes_into_the_profile_in_use() {
         Err(AccountError::ProfileNotFound { .. })
     ));
     assert_eq!(ctx.accounts.get_all().await.expect("read").len(), 2);
+}
+
+/// Two accounts named "PEA", the default profile's holding 1 000 and Parent's 300, with
+/// Parent the profile in use; returns Parent's account.
+async fn two_profiles_parent_in_use(ctx: &Ctx) -> String {
+    let parent = ctx.profiles.create("Parent").await.expect("created").id;
+    let mine = account(ctx, "PEA").await;
+    ctx.recording
+        .record_deposit(&mine, "2024-01-02".into(), micro(1_000), None)
+        .await
+        .expect("deposit");
+    ctx.profiles.choose(&parent).await.expect("chosen");
+    let theirs = ctx
+        .creation
+        .create("PEA".into(), String::new(), "EUR".into(), false)
+        .await
+        .expect("created in the profile in use")
+        .id;
+    ctx.recording
+        .record_deposit(&theirs, "2024-01-02".into(), micro(300), None)
+        .await
+        .expect("deposit");
+    theirs
+}
+
+// PFL-050 — the account summaries, their total and the global performance read the profile
+// in use's accounts only.
+#[tokio::test]
+async fn pfl_050_figures_read_the_profile_in_use() {
+    let ctx = ctx().await;
+    let theirs = two_profiles_parent_in_use(&ctx).await;
+    let summaries = AccountSummaryUseCase::new(
+        ctx.accounts.clone(),
+        ctx.assets.clone(),
+        ctx.currencies.clone(),
+    )
+    .get_account_summaries()
+    .await
+    .expect("summaries");
+    let ids: Vec<&str> = summaries.summaries.iter().map(|s| s.id.as_str()).collect();
+    assert_eq!(ids, [theirs.as_str()]);
+    assert_eq!(summaries.total.total_global_value, micro(300));
+
+    let performance = GlobalPerformanceUseCase::new(
+        ctx.accounts.clone(),
+        ctx.assets.clone(),
+        ctx.currencies.clone(),
+    )
+    .get_global_performance(None, None)
+    .await
+    .expect("performance");
+    assert_eq!(
+        performance.yearly.last().map(|period| period.end_value),
+        Some(micro(300))
+    );
+}
+
+// PFL-051 / PFL-022 — the account list and a lookup by name read the profile in use's
+// accounts: one name in two profiles is not ambiguous.
+#[tokio::test]
+async fn pfl_051_lists_and_lookups_read_the_profile_in_use() {
+    let ctx = ctx().await;
+    let theirs = two_profiles_parent_in_use(&ctx).await;
+    let listed: Vec<String> = ctx
+        .accounts
+        .get_all_by_name()
+        .await
+        .expect("listed")
+        .into_iter()
+        .map(|a| a.id)
+        .collect();
+    assert_eq!(listed, std::slice::from_ref(&theirs));
+    let found = ctx
+        .recording
+        .find_account_by_name("pea")
+        .await
+        .expect("found in the profile in use");
+    assert_eq!(found.id, theirs);
+    assert_eq!(
+        ctx.accounts.get_all().await.expect("every account").len(),
+        2
+    );
+}
+
+async fn stock(ctx: &Ctx, name: &str) -> String {
+    ctx.assets
+        .create_asset(CreateAssetDTO {
+            kind: None,
+            name: name.into(),
+            reference: name.to_uppercase(),
+            isin: None,
+            class: AssetClass::Stocks,
+            currency: "EUR".into(),
+            risk_level: 3,
+            category_id: SYSTEM_CATEGORY_ID.into(),
+            exchange: None,
+            interest_bearing: false,
+        })
+        .await
+        .expect("asset")
+        .id
+}
+
+// PFL-050 / MKT-200 — the newest price date is that of the assets the profile in use's
+// accounts hold.
+#[tokio::test]
+async fn pfl_050_the_newest_price_date_reads_the_profile_in_use() {
+    let ctx = ctx().await;
+    let parent = ctx.profiles.create("Parent").await.expect("created").id;
+    let mine = account(&ctx, "Depot").await;
+    let theirs = account(&ctx, "Their depot").await;
+    ctx.moving
+        .move_account(&theirs, &parent)
+        .await
+        .expect("moved");
+    for (account_id, name, date) in [
+        (&mine, "Acme", "2025-06-01"),
+        (&theirs, "Bolt", "2025-03-01"),
+    ] {
+        let asset = stock(&ctx, name).await;
+        ctx.recording
+            .open_holding(
+                account_id,
+                asset.clone(),
+                "2024-01-02".into(),
+                from_surface(micro(1)),
+                micro(10),
+            )
+            .await
+            .expect("opening balance");
+        ctx.assets
+            .record_asset_price_in_micros(&asset, date, micro(12))
+            .await
+            .expect("price");
+    }
+    let freshness = PriceFreshnessUseCase::new(
+        ctx.accounts.clone(),
+        ctx.assets.clone(),
+        Arc::new(SqlitePriceFetchLogRepository::new(ctx.pool.clone())),
+    );
+    let read = |label: &'static str| {
+        let freshness = &freshness;
+        async move { freshness.read().await.expect(label).newest_price_date }
+    };
+    assert_eq!(read("default in use").await.as_deref(), Some("2025-06-01"));
+    ctx.profiles.choose(&parent).await.expect("chosen");
+    assert_eq!(read("parent in use").await.as_deref(), Some("2025-03-01"));
 }

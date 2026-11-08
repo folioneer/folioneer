@@ -55,7 +55,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 ### Reading the file (010–019)
 
-**IMP-010 — A file is read for one account (backend)**: An account import reads one file for one account the user picks; only the file the user last picked is read. It is rejected with a specific error when the account is unknown, when the file is not the one last picked, and when the file cannot be read, is empty, holds a header and no row — blank lines (IMP-016) are no row —, or is larger than 10 MB.
+**IMP-010 — A file is read for one account (backend)**: An account import reads one file for one account the user picks; only the file the user last picked is read. It is rejected with a specific error when the account is unknown or not in the profile in use (PFL-051A), when the file is not the one last picked, and when the file cannot be read, is empty, holds a header and no row — blank lines (IMP-016) are no row —, or is larger than 10 MB.
 
 **IMP-011 — The encoding is detected (backend)**: A file whose bytes read as UTF-8 is read as UTF-8, its byte order mark dropped; any other file is read as Windows-1252, which reads every byte and reads an ISO-8859-1 file as written. A file read as UTF-8 by the user's choice or a saved mapper's (IMP-018, IMP-020E) whose bytes are not UTF-8 is rejected with a specific error.
 

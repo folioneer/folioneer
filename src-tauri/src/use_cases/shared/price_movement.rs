@@ -65,13 +65,22 @@ pub fn build_report(
     // replaced that very row (MKT-025).
     let mut after_prices = snapshot.prices.clone();
     let mut applied_dates: Vec<&str> = Vec::new();
+    // PMV-030 / PFL-050 — the later date reads the assets the report's accounts hold; a
+    // refresh also prices other profiles' assets (MKT-122), whose dates are not this report's.
+    let held: HashSet<&str> = holdings_by_account
+        .values()
+        .flatten()
+        .map(|holding| holding.asset_id.as_str())
+        .collect();
     for (asset_id, fetched_price) in fetched {
         let supersedes = match snapshot.prices.get(asset_id) {
             None => true,
             Some(baseline_price) => fetched_price.date >= baseline_price.date,
         };
         if supersedes {
-            applied_dates.push(&fetched_price.date);
+            if held.contains(asset_id.as_str()) {
+                applied_dates.push(&fetched_price.date);
+            }
             after_prices.insert(asset_id.clone(), fetched_price.clone());
         }
     }
@@ -1112,6 +1121,27 @@ mod tests {
 
     // ── PMV-050 / PMV-051 / PMV-052 — observation dates ─────────────────────
 
+    // PMV-030 / PFL-050 — a price this refresh wrote for an asset no account of the report
+    // holds (another profile's) gives the report no later date.
+    #[test]
+    fn a_price_of_an_asset_the_report_does_not_hold_gives_no_later_date() {
+        let baseline = PriceMovementBaseline {
+            accounts: vec![account("acc-1", "Alpha", "EUR")],
+            holdings_by_account: HashMap::from([("acc-1".to_string(), vec![])]),
+            snapshot: empty_snapshot(),
+            before_by_account: HashMap::from([("acc-1".to_string(), 0)]),
+            observed_from: Some("2026-09-05".to_string()),
+            rate_missing_accounts: HashSet::new(),
+            reference_currency: "EUR".to_string(),
+        };
+        let fetched = HashMap::from([(
+            "asset-9".to_string(),
+            price("asset-9", "2026-09-11", 100_000_000),
+        )]);
+        let report = build_report(baseline, &fetched, &HashSet::new());
+        assert_eq!(report.observed_to, None);
+    }
+
     // PMV-050 — both dates present when the fetch produced a date strictly
     // later than what the portfolio carried before.
     #[test]
@@ -1126,7 +1156,10 @@ mod tests {
         );
         let baseline = PriceMovementBaseline {
             accounts: vec![account("acc-1", "Alpha", "EUR")],
-            holdings_by_account: HashMap::from([("acc-1".to_string(), vec![])]),
+            holdings_by_account: HashMap::from([(
+                "acc-1".to_string(),
+                vec![holding("asset-1", 1_000_000)],
+            )]),
             snapshot,
             before_by_account: HashMap::from([("acc-1".to_string(), 0)]),
             observed_from: Some("2026-09-05".to_string()),
@@ -1195,7 +1228,10 @@ mod tests {
         );
         let baseline = PriceMovementBaseline {
             accounts: vec![account("acc-1", "Alpha", "EUR")],
-            holdings_by_account: HashMap::from([("acc-1".to_string(), vec![])]),
+            holdings_by_account: HashMap::from([(
+                "acc-1".to_string(),
+                vec![holding("asset-1", 1_000_000)],
+            )]),
             snapshot,
             observed_from: None,
             before_by_account: HashMap::from([("acc-1".to_string(), 0)]),

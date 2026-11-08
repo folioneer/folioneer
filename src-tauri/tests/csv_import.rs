@@ -2111,3 +2111,22 @@ async fn imp_051a_a_corrected_added_deposit_stays_added() {
     assert!(corrected.added_deposit);
     assert_eq!(corrected.total_amount, micro(800));
 }
+
+// PFL-051A — an import into an account outside the profile in use is refused.
+#[tokio::test]
+async fn pfl_051a_an_import_outside_the_profile_in_use_is_refused() {
+    use folioneer_lib::context::account::{ProfileService, SqliteProfileRepository};
+    let ctx = build_ctx().await;
+    let account_id = account(&ctx, 0).await;
+    let profiles = ProfileService::new(Box::new(SqliteProfileRepository::new(ctx.pool.clone())));
+    let parent = profiles.create("Parent").await.expect("created").id;
+    profiles.choose(&parent).await.expect("chosen");
+    let file = picked(&ctx, &fixture("english_broker.csv"), false).await;
+    let refused = ctx
+        .import
+        .read_import_file(&account_id, path(&file), &ReadingChoices::default())
+        .await;
+    assert!(
+        matches!(refused, Err(CsvImportError::Account(AccountError::AccountOutsideProfileInUse { account_id: refused_id })) if refused_id == account_id)
+    );
+}
