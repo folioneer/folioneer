@@ -44,6 +44,8 @@ pub mod price_freshness;
 pub mod price_history_backfill;
 /// The External provider chosen on this computer (MKT-214).
 pub mod price_provider_choice;
+/// An account moved into another profile, checked against the profiles (PFL-031).
+pub mod profile_move;
 /// Historical exchange-rate backfill for every persisted pair (FXR-110–114).
 pub mod rate_history_backfill;
 /// Launch rate refresh for every persisted pair, in every build (FXR-075).

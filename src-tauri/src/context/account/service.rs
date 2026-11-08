@@ -7,6 +7,7 @@ use super::domain::{
     TransactionType, TransferView, WriteOffReason,
 };
 use super::error::AccountError;
+use crate::context::account::domain::{default_profile_id, Profile};
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
 use crate::shared::infrastructure::change_recorder::LocalWriteOutranked;
@@ -334,7 +335,7 @@ impl AccountService {
 
     /// ACC-003 — stores a valid new account whose name no other account has.
     async fn create_account(&self, account: Account) -> Result<Account, AccountError> {
-        if find_account_by_name(&*self.account_repo, &account.name)
+        if find_account_by_name(&*self.account_repo, &account.name, &account.profile_id)
             .await?
             .is_some()
         {
@@ -361,7 +362,7 @@ impl AccountService {
     ) -> Result<Account, AccountError> {
         let clashing = self
             .account_repo
-            .find_by_name_in(unit, &account.name)
+            .find_by_name_in(unit, &account.name, &account.profile_id)
             .await
             .map_err(|e| {
                 tracing::error!(target: BACKEND, name = %account.name, err = ?e, "find_by_name: repository failure");
@@ -433,7 +434,8 @@ impl AccountService {
         let account = match self.get_by_id(&account.id).await? {
             Some(current) => account
                 .with_stored_classification(current.country, current.wrapper)
-                .with_cost_basis_method(current.cost_basis_method),
+                .with_cost_basis_method(current.cost_basis_method)
+                .with_profile(current.profile_id),
             None => account,
         };
         self.update_account(account).await
@@ -447,6 +449,64 @@ impl AccountService {
         wrapper: Option<&str>,
     ) -> ImpliedCostBasis {
         implied_cost_basis(country, wrapper)
+    }
+
+    /// PFL-031 / PFL-033 — moves the account into `profile_id` with its whole history: the
+    /// destination must not hold an account of its name (PFL-022), nor may a transfer link it
+    /// to an account left in another profile. The profile's existence is the caller's check.
+    pub async fn move_to_profile(
+        &self,
+        account_id: &str,
+        profile_id: &str,
+    ) -> Result<Account, AccountError> {
+        let account = load_account(&*self.account_repo, account_id).await?;
+        if account.profile_id == profile_id {
+            return Ok(account);
+        }
+        if let Some(existing) =
+            find_account_by_name(&*self.account_repo, &account.name, profile_id).await?
+        {
+            if existing.id != account.id {
+                return Err(AccountError::NameAlreadyExists);
+            }
+        }
+        let transfers: std::collections::BTreeSet<&str> = account
+            .transactions
+            .iter()
+            .filter_map(|t| t.transfer_id.as_deref())
+            .collect();
+        for transfer_id in transfers {
+            let holders = self
+                .account_repo
+                .transfer_accounts(transfer_id)
+                .await
+                .map_err(|e| {
+                    tracing::error!(target: BACKEND, transfer_id = %transfer_id, err = ?e, "move_to_profile: repository failure");
+                    AccountError::DatabaseError
+                })?;
+            for holder in holders.iter().filter(|holder| **holder != account.id) {
+                let other = self.get_by_id(holder).await?;
+                if other.is_some_and(|other| other.profile_id != profile_id) {
+                    return Err(AccountError::TransferAcrossProfiles);
+                }
+            }
+        }
+        let moved = Account::restore(
+            account.id.clone(),
+            account.name.clone(),
+            account.bank_name.clone(),
+            account.currency.clone(),
+            account.management_fees_enabled,
+        )
+        .with_stored_classification(account.country.clone(), account.wrapper.clone())
+        .with_cost_basis_method(account.cost_basis_method)
+        .with_profile(profile_id.to_string());
+        let updated = self.account_repo.update(moved).await.map_err(|e| {
+            tracing::error!(target: BACKEND, account_id = %account_id, err = ?e, "move_to_profile: repository failure");
+            AccountError::DatabaseError
+        })?;
+        self.emit_account_updated();
+        Ok(updated)
     }
 
     /// CBM-034 — the lots of the account's holding of `asset_id`, with the account's method;
@@ -502,13 +562,14 @@ impl AccountService {
         // whose worst case keeps a wrapper another device set, which ACC-040 allows anyway.
         let stored = self.get_by_id(&id).await?;
         let stored_wrapper = stored.as_ref().and_then(|stored| stored.wrapper.clone());
-        // CBM-030 — the method changes only through its own action.
-        let method = stored
-            .map(|stored| stored.cost_basis_method)
-            .unwrap_or_default();
+        // CBM-030 / PFL-031 — the method and the profile change only through their own actions.
+        let (method, profile_id) = stored
+            .map(|stored| (stored.cost_basis_method, stored.profile_id))
+            .unwrap_or_else(|| (CostBasisMethod::default(), default_profile_id()));
         let account = Account::with_id(id, name, bank_name, currency, management_fees_enabled)?
             .classified(country, wrapper, stored_wrapper.as_deref())?
-            .with_cost_basis_method(method);
+            .with_cost_basis_method(method)
+            .with_profile(profile_id);
         self.update_account(account).await
     }
 
@@ -523,7 +584,9 @@ impl AccountService {
             .await?
             .is_none_or(|current| !current.name.eq_ignore_ascii_case(&account.name));
         if name_changes {
-            if let Some(existing) = find_account_by_name(&*self.account_repo, &account.name).await?
+            if let Some(existing) =
+                find_account_by_name(&*self.account_repo, &account.name, &account.profile_id)
+                    .await?
             {
                 if existing.id != account.id {
                     return Err(AccountError::NameAlreadyExists);
@@ -1796,6 +1859,10 @@ fn stage_on(
     mut receiving: Account,
     figures: TransferFigures,
 ) -> Result<StagedTransfer, AccountError> {
+    // PFL-033 — a transfer links two accounts of one profile.
+    if sending.profile_id != receiving.profile_id {
+        return Err(AccountError::TransferAcrossProfiles);
+    }
     let (from_account_id, to_account_id) = (sending.id.clone(), receiving.id.clone());
     let (from_account_id, to_account_id) = (from_account_id.as_str(), to_account_id.as_str());
     let sending_before = sending.transactions.clone();
@@ -2673,6 +2740,34 @@ impl AccountService {
         Ok(())
     }
 
+    /// PFL-060 / PFL-064 — the profiles a first publish carries: every one but the default
+    /// profile while it has no name, which every device holds without a change.
+    pub async fn profiles_to_publish(&self) -> StdResult<Vec<Profile>, AccountError> {
+        let profiles = self.account_repo.all_profiles().await.map_err(|e| {
+            tracing::error!(target: BACKEND, err = ?e, "profiles_to_publish: repository failure");
+            AccountError::DatabaseError
+        })?;
+        Ok(profiles
+            .into_iter()
+            .filter(|profile| !(profile.is_default() && profile.name.is_none()))
+            .collect())
+    }
+
+    /// PFL-060 — applies an incoming profile verbatim (CFR-017).
+    pub async fn apply_profile(
+        &self,
+        conn: &mut SqliteConnection,
+        content: &str,
+        rank: Rank,
+    ) -> StdResult<(), AccountError> {
+        let profile: Profile = synced_content(content)?;
+        self.account_repo
+            .apply_profile(conn, &profile, &rank)
+            .await
+            .map_err(|e| applied_write_error("apply_profile", e))?;
+        Ok(())
+    }
+
     /// Applies an incoming holding note verbatim (CFR-017).
     pub async fn apply_holding_note(
         &self,
@@ -2769,6 +2864,12 @@ impl AccountService {
                 let (account_id, asset_id) = holding_keys(identity)?;
                 self.account_repo
                     .remove_catch_up_position(conn, account_id, asset_id)
+                    .await
+                    .map_err(|e| applied_write_error("apply_removal", e))?;
+            }
+            RecordKind::Profile => {
+                self.account_repo
+                    .remove_profile(conn, identity)
                     .await
                     .map_err(|e| applied_write_error("apply_removal", e))?;
             }
@@ -2927,6 +3028,12 @@ pub trait AccountServiceContract: Send + Sync {
         asset_id: &str,
         date: &str,
     ) -> StdResult<HoldingSnapshot, AccountError>;
+    /// PFL-031 — moves the account into `profile_id`, an existing profile.
+    async fn move_to_profile(
+        &self,
+        account_id: &str,
+        profile_id: &str,
+    ) -> StdResult<Account, AccountError>;
     /// The account's cost basis method (CBM-010, CBM-032).
     async fn cost_basis_method(&self, account_id: &str)
         -> StdResult<CostBasisMethod, AccountError>;
@@ -3422,6 +3529,14 @@ impl AccountServiceContract for AccountService {
         date: &str,
     ) -> StdResult<HoldingSnapshot, AccountError> {
         AccountService::holding_snapshot_as_of(self, account_id, asset_id, date).await
+    }
+
+    async fn move_to_profile(
+        &self,
+        account_id: &str,
+        profile_id: &str,
+    ) -> StdResult<Account, AccountError> {
+        AccountService::move_to_profile(self, account_id, profile_id).await
     }
 
     async fn cost_basis_method(
@@ -4236,8 +4351,9 @@ fn save_error(op: &'static str, e: anyhow::Error) -> AccountError {
 async fn find_account_by_name(
     repo: &dyn AccountRepository,
     name: &str,
+    profile_id: &str,
 ) -> Result<Option<Account>, AccountError> {
-    repo.find_by_name(name).await.map_err(|e| {
+    repo.find_by_name(name, profile_id).await.map_err(|e| {
         tracing::error!(target: BACKEND, name = %name, err = ?e, "find_by_name: repository failure");
         AccountError::DatabaseError
     })
@@ -6230,7 +6346,7 @@ mod tests {
         mock_ar
             .expect_find_by_name()
             .once()
-            .returning(|_| Err(SimulatedSaveError.into()));
+            .returning(|_, _| Err(SimulatedSaveError.into()));
         let svc = AccountService::new(
             Box::new(mock_ar),
             Box::new(MockHoldingRepository::new()),
@@ -6248,7 +6364,10 @@ mod tests {
     #[tokio::test]
     async fn test_create_returns_database_error_when_repo_create_fails() {
         let mut mock_ar = MockAccountRepository::new();
-        mock_ar.expect_find_by_name().once().returning(|_| Ok(None));
+        mock_ar
+            .expect_find_by_name()
+            .once()
+            .returning(|_, _| Ok(None));
         mock_ar
             .expect_create()
             .once()
@@ -8429,7 +8548,7 @@ mod tests {
         });
         // Post-merge state: another account ("account-clash") already holds this exact
         // name. The name being submitted is unchanged from the edited account's own name.
-        mock_repo.expect_find_by_name().returning(|_| {
+        mock_repo.expect_find_by_name().returning(|_, _| {
             Ok(Some(Account::restore(
                 "account-clash".into(),
                 "Livret A".into(),

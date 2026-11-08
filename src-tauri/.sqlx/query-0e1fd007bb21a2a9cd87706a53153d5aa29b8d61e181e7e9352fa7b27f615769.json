@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT p.id AS \"id!\", p.name, COUNT(a.id) AS \"account_count!: i64\"\n               FROM profiles p LEFT JOIN accounts a\n                 ON COALESCE((SELECT q.id FROM profiles q WHERE q.id = a.profile_id),\n                             'default-profile') = p.id\n               GROUP BY p.id, p.name",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_count!: i64",
+        "ordinal": 2,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "0e1fd007bb21a2a9cd87706a53153d5aa29b8d61e181e7e9352fa7b27f615769"
+}

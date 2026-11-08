@@ -88,6 +88,15 @@ impl PortfolioSnapshot for ServicePortfolioSnapshot {
             records.push(record(RecordKind::Asset, &[&asset.id], asset)?);
         }
 
+        // PFL-060 — the profiles before the accounts that belong to them.
+        let profiles = self
+            .account_service
+            .profiles_to_publish()
+            .await
+            .map_err(|error| SyncError::database("snapshot: profiles", error))?;
+        for profile in &profiles {
+            records.push(record(RecordKind::Profile, &[&profile.id], profile)?);
+        }
         let accounts = self
             .account_service
             .get_all()

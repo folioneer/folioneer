@@ -53,6 +53,8 @@ pub enum Event {
     CurrencyPairUpdated,
     /// The reference currency was chosen (FXR-126): every total re-reads in it.
     ReferenceCurrencyUpdated,
+    /// PFL-034 — a profile was created, renamed or removed, or the profile in use changed.
+    ProfileUpdated,
     /// A holding note was written or deleted — by this device (HNO-020/021) or applied from
     /// another one (SYN-064).
     HoldingNoteUpdated,

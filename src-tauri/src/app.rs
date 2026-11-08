@@ -214,6 +214,25 @@ pub fn run() {
                     Arc::clone(&change_recorder) as Arc<dyn ChangeRecorder>,
                 );
 
+                // PFL — the profiles, their changes recorded for the sync (PFL-060), and the move
+                // of an account between them (PFL-031).
+                let profile_service = Arc::new(
+                    crate::context::account::ProfileService::new(Box::new(
+                        crate::context::account::SqliteProfileRepository::new(db.pool.clone())
+                            .with_change_recorder(
+                                Arc::clone(&change_recorder) as Arc<dyn ChangeRecorder>
+                            ),
+                    ))
+                    .with_event_bus(Arc::clone(&event_bus)),
+                );
+                app_handle.manage(Arc::new(
+                    crate::use_cases::profile_move::ProfileMoveUseCase::new(
+                        Arc::clone(&profile_service),
+                        account_service.clone(),
+                    ),
+                ));
+                app_handle.manage(profile_service);
+
                 let account_details_uc = AccountDetailsUseCase::new(
                     account_service.clone(),
                     asset_service.clone(),

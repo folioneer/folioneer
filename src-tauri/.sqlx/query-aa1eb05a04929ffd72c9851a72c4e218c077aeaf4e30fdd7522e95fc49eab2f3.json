@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method FROM accounts WHERE id = ?",
+  "query": "SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS \"profile_id!: String\" FROM accounts WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -42,6 +42,11 @@
         "name": "cost_basis_method",
         "ordinal": 7,
         "type_info": "Text"
+      },
+      {
+        "name": "profile_id!: String",
+        "ordinal": 8,
+        "type_info": "Null"
       }
     ],
     "parameters": {
@@ -55,8 +60,9 @@
       false,
       true,
       true,
-      false
+      false,
+      null
     ]
   },
-  "hash": "927e5c9d72cabfdab323d41aba1b9cbf411a8ee9622fee73b880d49d8b72e2f6"
+  "hash": "aa1eb05a04929ffd72c9851a72c4e218c077aeaf4e30fdd7522e95fc49eab2f3"
 }

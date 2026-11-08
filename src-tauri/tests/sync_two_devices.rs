@@ -1040,6 +1040,112 @@ async fn imp_051a_an_added_deposits_mark_is_the_other_devices() {
     assert_eq!(added[0].date, "2026-02-01");
 }
 
+// PFL-060 — a profile created and an account moved into it on one device are the other's;
+// the default profile, never published unnamed, is on both.
+#[tokio::test]
+async fn pfl_060_profiles_are_the_other_devices() {
+    use folioneer_lib::context::account::DEFAULT_PROFILE_ID;
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop, account_id, _) = two_devices_sharing(dir.path()).await;
+    let profiles = profile_service;
+    let parent = profiles(&desktop).create("Parent").await.unwrap().id;
+    desktop
+        .account_service
+        .move_to_profile(&account_id, &parent)
+        .await
+        .unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+
+    let listed = profiles(&laptop).list().await.unwrap();
+    let names: Vec<Option<String>> = listed.iter().map(|s| s.profile.name.clone()).collect();
+    assert_eq!(names, [None, Some("Parent".into())]);
+    assert_eq!(listed[0].profile.id, DEFAULT_PROFILE_ID);
+    let moved = laptop
+        .account_service
+        .get_by_id(&account_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(moved.profile_id, parent);
+}
+
+fn profile_service(ctx: &Ctx) -> folioneer_lib::context::account::ProfileService {
+    folioneer_lib::context::account::ProfileService::new(Box::new(
+        folioneer_lib::context::account::SqliteProfileRepository::new(ctx.pool.clone())
+            .with_change_recorder(Arc::new(SqliteChangeRecorder::new(ctx.pool.clone()))),
+    ))
+}
+
+// PFL-061 — a profile removed on one device while the other moved an account into it: the
+// account reads as the default profile's on both, and nothing is written for it.
+#[tokio::test]
+async fn pfl_061_an_account_whose_profile_is_removed_reads_as_the_default() {
+    use folioneer_lib::context::account::DEFAULT_PROFILE_ID;
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop, account_id, _) = two_devices_sharing(dir.path()).await;
+    let parent = profile_service(&desktop).create("Parent").await.unwrap().id;
+    desktop.orchestrator.sync_now().await.unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+
+    laptop
+        .account_service
+        .move_to_profile(&account_id, &parent)
+        .await
+        .unwrap();
+    profile_service(&desktop).remove(&parent).await.unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+
+    for ctx in [&desktop, &laptop] {
+        let account = ctx
+            .account_service
+            .get_by_id(&account_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(account.profile_id, DEFAULT_PROFILE_ID);
+        let listed = profile_service(ctx).list().await.unwrap();
+        assert_eq!(listed.len(), 1, "the removed profile is gone");
+        assert_eq!(
+            listed[0].account_count, 1,
+            "its account counts in the default"
+        );
+    }
+}
+
+// PFL-022 / PFL-062 — two accounts of one name in two profiles are no clash after a merge:
+// no notice is raised (CFR-035 reports a name shared within one profile only).
+#[tokio::test]
+async fn pfl_062_one_name_in_two_profiles_is_not_reported() {
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop, _, _) = two_devices_sharing(dir.path()).await;
+    let parent = profile_service(&desktop).create("Parent").await.unwrap().id;
+    let savings = desktop
+        .account_service
+        .create("Savings".into(), String::new(), "EUR".into(), false)
+        .await
+        .unwrap()
+        .id;
+    desktop
+        .account_service
+        .move_to_profile(&savings, &parent)
+        .await
+        .unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+
+    laptop
+        .account_service
+        .create("Savings".into(), String::new(), "EUR".into(), false)
+        .await
+        .expect("PFL-022: the default profile holds its own Savings");
+    laptop.orchestrator.sync_now().await.unwrap();
+    let report = desktop.orchestrator.sync_now().await.unwrap();
+    assert_eq!(report.notices_raised, 0);
+}
+
 // CBM-033 — a change of method on one device is the other's, which replays the account:
 // its sales re-realized and its holding at the new method's average price.
 #[tokio::test]
@@ -1877,6 +1983,14 @@ async fn written_form_of_every_record_kind() -> serde_json::Value {
         })
         .await
         .unwrap();
+    // PFL-060 — a profile, written once so its form is pinned.
+    folioneer_lib::context::account::ProfileService::new(Box::new(
+        folioneer_lib::context::account::SqliteProfileRepository::new(ctx.pool.clone())
+            .with_change_recorder(Arc::new(SqliteChangeRecorder::new(ctx.pool.clone()))),
+    ))
+    .create("Parent")
+    .await
+    .unwrap();
     let account = ctx
         .account_service
         .create_classified(
@@ -1989,6 +2103,7 @@ fn written_values_of_every_synced_enum() -> serde_json::Value {
             RecordKind::Transaction, RecordKind::FeeSchedule, RecordKind::FeeCatchUpPosition,
             RecordKind::AssetPrice, RecordKind::CurrencyPair, RecordKind::CurrencyRate,
             RecordKind::HoldingNote, RecordKind::PortfolioSetting, RecordKind::ReportedSplit,
+            RecordKind::Profile,
         ]),
         "Operation": written_values!(Operation, [
             Operation::Created, Operation::Updated, Operation::Removed,

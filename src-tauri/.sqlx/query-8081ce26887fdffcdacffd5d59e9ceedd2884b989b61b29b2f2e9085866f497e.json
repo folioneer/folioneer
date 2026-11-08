@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE profiles\n                   SET sync_logical_timestamp = ?, sync_origin = ?, sync_device_id = ?\n                   WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "8081ce26887fdffcdacffd5d59e9ceedd2884b989b61b29b2f2e9085866f497e"
+}

@@ -5,6 +5,7 @@ mod api;
 mod domain;
 /// Flat BC error enum (`AccountError`).
 mod error;
+mod profile_service;
 /// Account repository implementations.
 mod repository;
 /// Account business logic service.
@@ -14,5 +15,6 @@ mod service;
 pub use api::*;
 pub use domain::*;
 pub use error::AccountError;
+pub use profile_service::ProfileService;
 pub use repository::*;
 pub use service::*;

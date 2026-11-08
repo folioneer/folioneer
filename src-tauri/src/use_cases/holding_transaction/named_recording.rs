@@ -2168,7 +2168,15 @@ pub fn refusal_from_account(error: &AccountError) -> Refusal {
         | AccountError::NoteOnCashAsset
         | AccountError::TradeOnCashAsset
         | AccountError::NoteOnUnheldAsset
-        | AccountError::NameAlreadyExists => format!("refused by the rules ({})", code_of(error)),
+        | AccountError::NameAlreadyExists
+        | AccountError::ProfileNameEmpty
+        | AccountError::ProfileNameAlreadyExists
+        | AccountError::ProfileNotFound { .. }
+        | AccountError::ProfileNotEmpty
+        | AccountError::DefaultProfileKept
+        | AccountError::TransferAcrossProfiles => {
+            format!("refused by the rules ({})", code_of(error))
+        }
     };
     Refusal {
         code: code_of(error),

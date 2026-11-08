@@ -4,6 +4,7 @@ use super::fee_schedule::{FeeCatchUpPosition, FeeSchedule};
 use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot, StockSplitPosition};
 use super::holding_note::HoldingNote;
 use super::journal::CashEffect;
+use super::profile::{default_profile_id, Profile};
 use super::transaction::{
     AgentRecording, EnteredAmount, Transaction, TransactionType, WriteOffReason,
 };
@@ -205,6 +206,10 @@ pub struct Account {
     /// weighted average from a change written before it existed (CBM-012).
     #[serde(default)]
     pub cost_basis_method: CostBasisMethod,
+    /// PFL-010 — the profile the account belongs to; read as the default profile from a
+    /// change written before profiles existed (PFL-060).
+    #[serde(default = "default_profile_id")]
+    pub profile_id: String,
     /// Holdings owned by this account. Populated only in aggregate load — excluded from bindings.
     #[serde(skip)]
     #[specta(skip)]
@@ -245,6 +250,7 @@ impl Account {
             country: None,
             wrapper: None,
             cost_basis_method: CostBasisMethod::default(),
+            profile_id: default_profile_id(),
             holdings: Vec::new(),
             transactions: Vec::new(),
             pending_changes: Vec::new(),
@@ -274,6 +280,7 @@ impl Account {
             country: None,
             wrapper: None,
             cost_basis_method: CostBasisMethod::default(),
+            profile_id: default_profile_id(),
             holdings: Vec::new(),
             transactions: Vec::new(),
             pending_changes: Vec::new(),
@@ -297,6 +304,7 @@ impl Account {
             country: None,
             wrapper: None,
             cost_basis_method: CostBasisMethod::default(),
+            profile_id: default_profile_id(),
             holdings: Vec::new(),
             transactions: Vec::new(),
             pending_changes: Vec::new(),
@@ -324,6 +332,7 @@ impl Account {
             country: None,
             wrapper: None,
             cost_basis_method: CostBasisMethod::default(),
+            profile_id: default_profile_id(),
             holdings,
             transactions,
             pending_changes: Vec::new(),
@@ -374,6 +383,12 @@ impl Account {
     /// CBM-011 — a new account on the method its country implies.
     pub fn with_implied_cost_basis(mut self) -> Self {
         self.cost_basis_method = self.implied_cost_basis();
+        self
+    }
+
+    /// PFL-010 — the account in `profile_id`.
+    pub fn with_profile(mut self, profile_id: String) -> Self {
+        self.profile_id = profile_id;
         self
     }
 
@@ -2687,9 +2702,14 @@ pub trait AccountRepository: Send + Sync {
     /// Fetches an account by its ID.
     async fn get_by_id(&self, id: &str) -> Result<Option<Account>>;
     /// Finds an account by name (case-insensitive, R3).
-    async fn find_by_name(&self, name: &str) -> Result<Option<Account>>;
+    async fn find_by_name(&self, name: &str, profile_id: &str) -> Result<Option<Account>>;
     /// `find_by_name` inside `unit`, seeing what it wrote (ADR-006).
-    async fn find_by_name_in(&self, unit: &mut UnitOfWork, name: &str) -> Result<Option<Account>>;
+    async fn find_by_name_in(
+        &self,
+        unit: &mut UnitOfWork,
+        name: &str,
+        profile_id: &str,
+    ) -> Result<Option<Account>>;
     /// Persists a new account.
     async fn create(&self, account: Account) -> Result<Account>;
     /// ACC-025 — persists a new account with its pending changes (its cash line) and, when an
@@ -2753,9 +2773,9 @@ pub trait AccountRepository: Send + Sync {
         conn: &mut SqliteConnection,
         account_id: &str,
     ) -> Result<Vec<SyncedChild>>;
-    /// The rank of another account carrying `name` (case-insensitive, CFR-035), on `conn`
-    /// — the lowest-ranked one, then by id, when several do; `None` when no other account
-    /// does or that account has never been ranked.
+    /// The rank of another account of its profile carrying `name` (case-insensitive,
+    /// CFR-035, PFL-062), on `conn` — the lowest-ranked one, then by id, when several do;
+    /// `None` when no other account does or that account has never been ranked.
     async fn clashing_name_rank(
         &self,
         conn: &mut SqliteConnection,
@@ -2793,6 +2813,17 @@ pub trait AccountRepository: Send + Sync {
         conn: &mut SqliteConnection,
         transaction_id: &str,
     ) -> Result<Option<String>>;
+    /// PFL-060 — writes a profile verbatim, stamped with `rank`, on `conn` (CFR-017).
+    async fn apply_profile(
+        &self,
+        conn: &mut SqliteConnection,
+        profile: &Profile,
+        rank: &Rank,
+    ) -> Result<()>;
+    /// PFL-060 — every profile, for the first publish of a portfolio (SYN-013).
+    async fn all_profiles(&self) -> Result<Vec<Profile>>;
+    /// PFL-060 — removes a profile, on `conn`; never the default one. A no-op when absent.
+    async fn remove_profile(&self, conn: &mut SqliteConnection, id: &str) -> Result<()>;
     /// Writes a holding note verbatim, stamped with `rank`, on `conn` (CFR-017).
     async fn apply_holding_note(
         &self,

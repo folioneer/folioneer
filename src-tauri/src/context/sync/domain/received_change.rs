@@ -56,7 +56,8 @@ fn identity_fields(kind: RecordKind) -> &'static [&'static str] {
         RecordKind::Account
         | RecordKind::Category
         | RecordKind::Asset
-        | RecordKind::Transaction => &["id"],
+        | RecordKind::Transaction
+        | RecordKind::Profile => &["id"],
         RecordKind::FeeSchedule | RecordKind::FeeCatchUpPosition | RecordKind::HoldingNote => {
             &["account_id", "asset_id"]
         }

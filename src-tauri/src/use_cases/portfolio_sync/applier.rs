@@ -74,7 +74,8 @@ impl ChangeApplier for ServiceChangeApplier {
             | RecordKind::Transaction
             | RecordKind::HoldingNote
             | RecordKind::FeeSchedule
-            | RecordKind::FeeCatchUpPosition => self
+            | RecordKind::FeeCatchUpPosition
+            | RecordKind::Profile => self
                 .account_service
                 .synced_record(conn, kind, identity)
                 .await
@@ -140,7 +141,8 @@ impl ChangeApplier for ServiceChangeApplier {
                 | RecordKind::Transaction
                 | RecordKind::HoldingNote
                 | RecordKind::FeeSchedule
-                | RecordKind::FeeCatchUpPosition => self
+                | RecordKind::FeeCatchUpPosition
+                | RecordKind::Profile => self
                     .account_service
                     .apply_removal(conn, kind, identity)
                     .await
@@ -193,6 +195,11 @@ impl ChangeApplier for ServiceChangeApplier {
             RecordKind::HoldingNote => {
                 self.account_service
                     .apply_holding_note(conn, content, rank)
+                    .await
+            }
+            RecordKind::Profile => {
+                self.account_service
+                    .apply_profile(conn, content, rank)
                     .await
             }
             RecordKind::FeeSchedule => {
