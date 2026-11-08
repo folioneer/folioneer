@@ -2820,6 +2820,8 @@ pub trait AccountRepository: Send + Sync {
         profile: &Profile,
         rank: &Rank,
     ) -> Result<()>;
+    /// PFL-012 / PFL-014 — the identifier of the profile in use.
+    async fn profile_in_use(&self) -> Result<String>;
     /// PFL-021 — the profile a new account goes into: `given` when it exists, the profile in use
     /// when none is given (PFL-012, PFL-014); `None` for an unknown `given`.
     async fn profile_for_new_account(&self, given: Option<String>) -> Result<Option<String>>;

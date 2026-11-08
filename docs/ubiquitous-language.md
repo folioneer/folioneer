@@ -406,7 +406,7 @@ The currency an account is kept in, chosen when the account is created: its hold
 
 ### Portfolio total
 
-The total row of the accounts list: every account's global value and unrealized P&L converted to the reference currency and summed (ACC-027 to ACC-030), marked incomplete — shown as "partial" — when an account cannot be converted (ACC-028). In French: "total du portefeuille" (owner, 2026-10-18).
+The total row of the accounts list: the global value and unrealized P&L of every account of the profile in use (PFL-050) converted to the reference currency and summed (ACC-027 to ACC-030), marked incomplete — shown as "partial" — when an account cannot be converted (ACC-028). In French: "total du portefeuille" (owner, 2026-10-18).
 
 > Status: confirmed
 

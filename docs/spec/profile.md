@@ -2,7 +2,7 @@
 
 ## Context
 
-The owner follows portfolios that are not all theirs: their household's and a relative's (#278). A profile is a set of accounts, each account in exactly one, so that a relative's accounts are never summed into the owner's figures. A profile is the closest thing to a login shared on one installation, isolated from the others (owner, 2026-11-08): every figure computed across accounts is to stay within one profile (Open Questions); the asset base and the prices are shared (PFL-052), and the sync carries every profile (owner, 2026-10-17). Profiles belong to the account context. This spec is the core's; the window (#767), the overview (#768), an account's holder (#769) and an AI agent bound to one profile (#770) build on it.
+The owner follows portfolios that are not all theirs: their household's and a relative's (#278). A profile is a set of accounts, each account in exactly one, so a relative's accounts are never summed into the owner's figures. A profile is the closest thing to a login shared on one installation, isolated from the others (owner, 2026-11-08): every figure computed across accounts is computed within one profile (PFL-050); the asset base and the prices are shared (PFL-052), and the sync carries every profile (owner, 2026-10-17). Profiles belong to the account context. This spec is the core's; the window (#767), the overview (#768), an account's holder (#769) and an AI agent bound to one profile (#770) build on it.
 
 ---
 
@@ -22,6 +22,14 @@ A set of accounts the owner follows apart from the others, named or, for the def
 | Field        | Business meaning                    |
 | ------------ | ----------------------------------- |
 | `profile_id` | The profile the account belongs to. |
+
+### Profile in use
+
+The profile this installation works in, kept on this device only (PFL-012).
+
+| Field        | Business meaning                                                                                                     |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `profile_id` | The profile this installation works in; the default profile's when none was chosen or it is gone (PFL-012, PFL-014). |
 
 ---
 
@@ -55,21 +63,29 @@ A set of accounts the owner follows apart from the others, named or, for the def
 
 **PFL-031 — Moving an account (backend)**: An account moves to another profile with its whole history; nothing of it is rewritten, and every figure of both profiles follows on its next read. Moving it to the profile it is in, or reads as in (PFL-061), changes nothing. An unknown account or profile is rejected with a specific error, and so is a move that would give the destination profile two accounts of one name (PFL-022). Editing an account never changes its profile; only a move does.
 
-**PFL-032 — Choosing the profile in use (backend)**: Choosing an existing profile makes it the profile in use (PFL-012); an unknown one is rejected with a specific error; choosing the profile in use changes nothing and signals nothing.
+**PFL-032 — Choosing the profile in use (backend)**: Choosing an existing profile makes it the profile in use (PFL-012); an unknown one is rejected with a specific error.
 
-**PFL-033 — No transfer across profiles (backend)**: A transfer links two accounts of one profile (owner, 2026-11-08): moving an account a transfer links to an account that would then be in another profile is rejected with a specific error — recording such a transfer is TRF-010's refusal: the account moves only once the transfer is cancelled, a profile being isolated (PFL-052).
+**PFL-032A — Choosing it again (backend)**: Choosing the profile already in use changes nothing and signals nothing.
 
-**PFL-034 — Signaled (backend)**: Creating, renaming or removing a profile and choosing the profile in use are signaled by `ProfileUpdated`; moving an account by `AccountUpdated` (ACC-022), which the counts of PFL-023 follow too.
+**PFL-033 — No transfer across profiles (backend)**: A transfer links two accounts of one profile (owner, 2026-11-08): moving an account a transfer links to an account that would then be in another profile is rejected with a specific error — recording such a transfer is TRF-010's refusal: the account moves only once the transfer is cancelled.
+
+**PFL-034 — Signaled (backend)**: Creating, renaming or removing a profile and choosing the profile in use, except as PFL-032A says, are signaled by `ProfileUpdated`; moving an account by `AccountUpdated` (ACC-022), which the counts of PFL-023 follow too.
 
 ### Removal (040–049)
 
 **PFL-040 — Removing a profile (backend)**: Only a profile holding no account is removed; one holding an account, the default profile and an unknown one are each rejected with a specific error.
 
-### Shared across profiles (050–059)
+### Within a profile, and what is shared (050–059)
 
-**PFL-052 — What stays shared (backend)**: The asset base — assets and their categories — and the prices — asset prices and currency rates — are shared by every profile (owner, 2026-11-08), and so are, until the per-profile setting lands (Open Questions), the one reference currency (GPF-011) and the one portfolio country (ACC-041).
+**PFL-050 — Figures within one profile (backend)**: Every figure computed across accounts reads the accounts of the profile in use only: the account summaries and their total (ACC-021, ACC-027), the global performance (GPF-012), the price movement report (PMV-030, PMV-040), the newest price date (MKT-200) and the count of outdated prices (MKT-206). An account's own figures are its own, whatever the profile.
 
-**PFL-054 — This installation's settings (backend)**: This installation's own settings (SYN-023) — among them the import mappers (IMP-020), the price provider (MKT-214), the scheduled fetch (SPF) and the agent connection (AGT-022) — are one per installation and stay the same whatever the profile in use (owner, 2026-11-08).
+**PFL-051 — Accounts within one profile (backend)**: Listing the accounts and finding one by its name read the accounts of the profile in use only: the list of the accounts the window reads, the command line's (CLI-018) and an AI agent's (AGT-040, ACC-042), and an account named on the command line or by an agent, to read or to record (CLI-011, AGT-043, AGT-048); two accounts of one name in two profiles are therefore never ambiguous (PFL-022).
+
+**PFL-051A — An import within the profile in use (backend)**: An import goes into an account of the profile in use only: one of another profile is rejected with a specific error (owner, 2026-11-08), whatever surface names the account.
+
+**PFL-052 — What stays shared (backend)**: The asset base — assets and their categories — and the prices — asset prices and currency rates — are shared by every profile (owner, 2026-11-08) — a refresh of every price covers every profile's holdings (MKT-122, MKT-130, SPF-040) — and so are the one reference currency (GPF-011) and the one portfolio country (ACC-041) (owner, 2026-11-08).
+
+**PFL-054 — This installation's settings (backend)**: This installation's own settings (SYN-023) — among them the import mappers (IMP-020), the price provider (MKT-214), the scheduled fetch (SPF-011) and the agent connection (AGT-022) — are one per installation and stay the same whatever the profile in use (owner, 2026-11-08).
 
 ### Sync (060–069)
 
@@ -100,7 +116,7 @@ A set of accounts the owner follows apart from the others, named or, for the def
 - [x] Account names unique across profiles? — Within a profile only (owner, 2026-11-08).
 - [ ] An export holds every profile's accounts; whether it records each account's profile is #793's or a follow-up's to settle.
 - [x] What do profiles share? — Each is isolated, the closest thing to a login shared on one installation; the asset base and the prices are shared (owner, 2026-11-08).
-- [ ] A reference currency and a country per profile, a new profile starting with the default profile's (owner, 2026-11-08): the rule and its amendments land with its implementation — the portfolio setting keyed by profile (FXR-015, FXR-120 to FXR-126, CFR-012, SYN-021, a SYN-038 version), GPF-011, ACC-041, ACC-042, CBM-014, EXP-021, the GPF context and the glossary's "Reference currency" and "Portfolio's country".
-- [x] This computer's own settings — the import mappers (IMP-020), the price provider (MKT-214), the scheduled fetch (SPF), the agent connection (AGT-022)? — One per installation, shared by every profile (owner, 2026-11-08).
+- [x] A reference currency and a country per profile? — No: one for the portfolio, shared by every profile, as today (owner, 2026-11-08, superseding an earlier choice); per profile can come later.
+- [x] This installation's own settings — the import mappers (IMP-020), the price provider (MKT-214), the scheduled fetch (SPF-011), the agent connection (AGT-022)? — One per installation, shared by every profile (owner, 2026-11-08).
 - [x] Move two accounts a transfer links together? — No: a profile is isolated; the transfer is cancelled first (owner, 2026-11-08).
-- [ ] Every figure and list across accounts read within one profile — the profile in use unless another is given (owner, 2026-10-17 and 2026-11-08): the rules land with their implementation (#766 slice B), with the account lookups by name of the command line (CLI-011) and the agent (AGT-043) and whether an import into an account of another profile is refused (IMP-010).
+- [x] Figures and lists within one profile? — Those of the profile in use (owner, 2026-10-17 and 2026-11-08; PFL-050, PFL-051); another profile given, and an agent's correction or cancellation of a transaction of an account outside the profile in use (AGT-050, AGT-051), are #770's.

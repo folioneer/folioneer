@@ -16,16 +16,16 @@ This is a **feature spec** spanning the `account`, `asset`, and `currency` bound
 
 **GPF-010 — Scope matrix (backend)**: `get_global_performance` accepts an optional `account_id` and an optional `asset_id`:
 
-| `account_id` | `asset_id` | Read                                                                                                                                                           |
-| ------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| present      | absent     | The single-account read of `get_account_performance` (PRF-010–074) — response identical.                                                                       |
-| present      | present    | The single-account asset-scoped read of `get_account_performance` (PRF-080–084) — response identical.                                                          |
-| absent       | absent     | All accounts aggregated in the reference currency (GPF-011–041).                                                                                               |
-| absent       | present    | The asset's positions across all accounts holding it, aggregated in the reference currency (GPF-011–041, with the PRF-080–084 position semantics per account). |
+| `account_id` | `asset_id` | Read                                                                                                                                                                                           |
+| ------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| present      | absent     | The single-account read of `get_account_performance` (PRF-010–074) — response identical.                                                                                                       |
+| present      | present    | The single-account asset-scoped read of `get_account_performance` (PRF-080–084) — response identical.                                                                                          |
+| absent       | absent     | The accounts of the profile in use aggregated in the reference currency (GPF-011–041).                                                                                                         |
+| absent       | present    | The asset's positions across the accounts of the profile in use holding it (GPF-012), aggregated in the reference currency (GPF-011–041, with the PRF-080–084 position semantics per account). |
 
 **GPF-011 — Reference currency and label (backend + frontend)**: Every cross-account aggregation is reported in the portfolio's **reference currency**: a setting of the portfolio, the same on every device (SYN-021), resolved as FXR-120 to FXR-125 say — EUR when none was chosen. The response reuses the `get_account_performance` shape with `currency` set to it and an empty `account_name`; the backend carries no display label (no i18n in the backend) — the frontend resolves the aggregation's label (e.g. "All accounts").
 
-**GPF-012 — Included accounts (backend)**: An account participates in an aggregation only when it has at least one dated in-scope transaction — any transaction for the all-accounts read, a transaction of the scoped asset for the asset-scoped read. Accounts with no in-scope transactions are excluded from the aggregation.
+**GPF-012 — Included accounts (backend)**: An account participates in an aggregation only when it has at least one dated in-scope transaction — any transaction for the all-accounts read, a transaction of the scoped asset for the asset-scoped read. Accounts with no in-scope transactions are excluded from the aggregation. Both reads take the accounts of the profile in use only (PFL-050).
 
 **GPF-013 — Data span (backend)**: Rows span from the period containing the earliest in-scope transaction across the included accounts through the current period (PRF-040 applied to the union). An account whose own history starts later contributes `0` end values before its first transaction.
 

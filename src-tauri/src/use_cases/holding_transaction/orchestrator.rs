@@ -475,7 +475,7 @@ impl HoldingTransactionUseCase {
         account: &str,
         asset: &str,
     ) -> Result<NamedTarget, NameLookupError> {
-        let accounts = self.account_service.get_all().await.map_err(|error| {
+        let accounts = self.account_service.accounts_in_use().await.map_err(|error| {
             tracing::error!(target: BACKEND, err = ?error, "find_by_name: account lookup failed");
             NameLookupError::DatabaseError
         })?;
@@ -513,7 +513,7 @@ impl HoldingTransactionUseCase {
 
     /// CLI-011 — the one account with this name, for a recording that names no asset.
     pub async fn find_account_by_name(&self, typed: &str) -> Result<Account, NameLookupError> {
-        let accounts = self.account_service.get_all().await.map_err(|error| {
+        let accounts = self.account_service.accounts_in_use().await.map_err(|error| {
             tracing::error!(target: BACKEND, err = ?error, "find_account_by_name: account lookup failed");
             NameLookupError::DatabaseError
         })?;

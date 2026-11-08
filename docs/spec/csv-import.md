@@ -55,7 +55,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 ### Reading the file (010–019)
 
-**IMP-010 — A file is read for one account (backend)**: An account import reads one file for one account the user picks; only the file the user last picked is read. It is rejected with a specific error when the account is unknown, when the file is not the one last picked, and when the file cannot be read, is empty, holds a header and no row — blank lines (IMP-016) are no row —, or is larger than 10 MB.
+**IMP-010 — A file is read for one account (backend)**: An account import reads one file for one account the user picks; only the file the user last picked is read. It is rejected with a specific error when the account is unknown or not in the profile in use (PFL-051A), when the file is not the one last picked, and when the file cannot be read, is empty, holds a header and no row — blank lines (IMP-016) are no row —, or is larger than 10 MB.
 
 **IMP-011 — The encoding is detected (backend)**: A file whose bytes read as UTF-8 is read as UTF-8, its byte order mark dropped; any other file is read as Windows-1252, which reads every byte and reads an ISO-8859-1 file as written. A file read as UTF-8 by the user's choice or a saved mapper's (IMP-018, IMP-020E) whose bytes are not UTF-8 is rejected with a specific error.
 
@@ -137,7 +137,7 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 ### Confirmation (050–059)
 
-**IMP-050 — The confirmed account import records every ready row at once (backend)**: On confirmation the file is read and its rows judged again, as the preview judges them (IMP-030 to IMP-038), against the account as it is then. Every ready row is recorded, in the order IMP-035A gives them, in one write with the added deposits (IMP-051) and the Cash Asset (IMP-050A): all of them or, when the write fails, none. The rows rejected, of an unknown asset, already recorded or not imported are left out. The confirmation reports the rows as judged then; the ready ones are those recorded.
+**IMP-050 — The confirmed account import records every ready row at once (backend)**: On confirmation the file is read and its rows judged again, as the preview judges them (IMP-030 to IMP-038), against the account as it is then — refused as IMP-010 says when it is no longer in the profile in use (PFL-051A). Every ready row is recorded, in the order IMP-035A gives them, in one write with the added deposits (IMP-051) and the Cash Asset (IMP-050A): all of them or, when the write fails, none. The rows rejected, of an unknown asset, already recorded or not imported are left out. The confirmation reports the rows as judged then; the ready ones are those recorded.
 
 **IMP-050A — What a confirmation announces (backend)**: The account import raises one `TransactionUpdated`, none when nothing is recorded, and `AssetUpdated` when it creates the Cash Asset of the account's currency, ensured whenever a row is recorded (CSH-010). A write that fails announces nothing.
 

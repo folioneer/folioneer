@@ -82,7 +82,7 @@ impl GlobalPerformanceUseCase {
         &self,
         asset_scope: Option<&str>,
     ) -> StdResult<AccountPerformanceResponse, AccountError> {
-        let accounts = self.account_service.get_all().await?;
+        let accounts = self.account_service.accounts_in_use().await?;
         let today = Local::now().date_naive();
         let reference = self.currency_service.reference_currency().await.map_err(|e| {
             tracing::error!(target: BACKEND, err = ?e, "aggregate_across_accounts: reference currency not read");

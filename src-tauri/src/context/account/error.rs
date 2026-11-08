@@ -276,6 +276,12 @@ pub enum AccountError {
     /// PFL-033 — a transfer links two accounts of one profile.
     #[error("A transfer cannot link two profiles")]
     TransferAcrossProfiles,
+    /// PFL-051A — an import goes into an account of the profile in use only.
+    #[error("Account {account_id} is not in the profile in use")]
+    AccountOutsideProfileInUse {
+        /// The account the import named.
+        account_id: String,
+    },
     /// The application's own write (a generated fee deduction) was refused: the user's
     /// removal of the record outranks it (CFR-016). Never user-facing — the generation
     /// path treats it as a skipped period (FEE-047).

@@ -65,11 +65,11 @@ pub struct CountryWrappers {
 
 // --- Commands ---
 
-/// Retrieves all accounts.
+/// PFL-051 — the accounts of the profile in use.
 #[tauri::command]
 #[specta::specta]
 pub async fn get_accounts(state: State<'_, AppState>) -> Result<Vec<Account>, AccountError> {
-    state.account_service.get_all().await
+    state.account_service.accounts_in_use().await
 }
 
 /// Updates an existing account.

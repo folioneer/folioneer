@@ -2174,7 +2174,8 @@ pub fn refusal_from_account(error: &AccountError) -> Refusal {
         | AccountError::ProfileNotFound { .. }
         | AccountError::ProfileNotEmpty
         | AccountError::DefaultProfileKept
-        | AccountError::TransferAcrossProfiles => {
+        | AccountError::TransferAcrossProfiles
+        | AccountError::AccountOutsideProfileInUse { .. } => {
             format!("refused by the rules ({})", code_of(error))
         }
     };

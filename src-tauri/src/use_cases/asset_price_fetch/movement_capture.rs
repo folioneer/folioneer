@@ -63,7 +63,7 @@ impl PriceMovementCapture {
                 return None;
             }
         };
-        let accounts = match self.account_service.get_all().await {
+        let accounts = match self.account_service.accounts_in_use().await {
             Ok(accounts) => accounts,
             Err(error) => {
                 tracing::warn!(target: BACKEND, err = ?error, "price_movement: account load failed; no report (PMV-014)");
@@ -233,7 +233,7 @@ mod tests {
             ("asset-locked", "2026-09-11"),
         ];
         let mut account_service = MockAccountServiceContract::new();
-        account_service.expect_get_all().returning(|| {
+        account_service.expect_accounts_in_use().returning(|| {
             Ok(vec![crate::context::account::Account::restore(
                 "acc-1".to_string(),
                 "Alpha".to_string(),
@@ -322,7 +322,7 @@ mod tests {
     async fn capture_returns_none_when_the_account_load_fails() {
         let mut account_service = MockAccountServiceContract::new();
         account_service
-            .expect_get_all()
+            .expect_accounts_in_use()
             .returning(|| Err(crate::context::account::AccountError::DatabaseError));
         let asset_service = MockAssetServiceContract::new();
 
@@ -346,7 +346,7 @@ mod tests {
     #[tokio::test]
     async fn capture_returns_none_when_a_holding_references_a_missing_asset() {
         let mut account_service = MockAccountServiceContract::new();
-        account_service.expect_get_all().returning(|| {
+        account_service.expect_accounts_in_use().returning(|| {
             Ok(vec![crate::context::account::Account::restore(
                 "acc-1".to_string(),
                 "Alpha".to_string(),
@@ -389,7 +389,7 @@ mod tests {
     #[tokio::test]
     async fn capture_returns_none_when_the_holdings_load_fails() {
         let mut account_service = MockAccountServiceContract::new();
-        account_service.expect_get_all().returning(|| {
+        account_service.expect_accounts_in_use().returning(|| {
             Ok(vec![crate::context::account::Account::restore(
                 "acc-1".to_string(),
                 "Alpha".to_string(),
@@ -422,7 +422,7 @@ mod tests {
     #[tokio::test]
     async fn capture_returns_none_when_the_asset_load_errors() {
         let mut account_service = MockAccountServiceContract::new();
-        account_service.expect_get_all().returning(|| {
+        account_service.expect_accounts_in_use().returning(|| {
             Ok(vec![crate::context::account::Account::restore(
                 "acc-1".to_string(),
                 "Alpha".to_string(),
@@ -469,7 +469,7 @@ mod tests {
     #[tokio::test]
     async fn capture_returns_none_when_the_reference_rate_lookup_errors() {
         let mut account_service = MockAccountServiceContract::new();
-        account_service.expect_get_all().returning(|| {
+        account_service.expect_accounts_in_use().returning(|| {
             Ok(vec![crate::context::account::Account::restore(
                 "acc-1".to_string(),
                 "Alpha".to_string(),
@@ -512,7 +512,7 @@ mod tests {
     #[tokio::test]
     async fn capture_returns_none_when_the_holding_rate_lookup_errors() {
         let mut account_service = MockAccountServiceContract::new();
-        account_service.expect_get_all().returning(|| {
+        account_service.expect_accounts_in_use().returning(|| {
             Ok(vec![crate::context::account::Account::restore(
                 "acc-1".to_string(),
                 "Alpha".to_string(),

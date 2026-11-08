@@ -54,9 +54,9 @@ impl PriceFreshnessUseCase {
         })
     }
 
-    /// MKT-200 — the newest price date among the assets held in any account.
+    /// MKT-200 — the newest price date among the assets held in any account of the profile in use.
     async fn newest_price_date(&self) -> Result<Option<String>, PriceFreshnessError> {
-        let accounts = self.account_service.get_all().await.map_err(|e| {
+        let accounts = self.account_service.accounts_in_use().await.map_err(|e| {
             tracing::error!(target: BACKEND, err = ?e, "price_freshness: listing accounts failed");
             PriceFreshnessError::DatabaseError
         })?;
@@ -113,7 +113,7 @@ mod tests {
         last_fetch: Option<&'static str>,
     ) -> PriceFreshnessUseCase {
         let mut account_service = MockAccountServiceContract::new();
-        account_service.expect_get_all().returning(|| {
+        account_service.expect_accounts_in_use().returning(|| {
             Ok(vec![Account::restore(
                 "acc-1".to_string(),
                 "Alpha".to_string(),
@@ -218,7 +218,7 @@ mod tests {
 
     fn one_account() -> MockAccountServiceContract {
         let mut account_service = MockAccountServiceContract::new();
-        account_service.expect_get_all().returning(|| {
+        account_service.expect_accounts_in_use().returning(|| {
             Ok(vec![Account::restore(
                 "acc-1".to_string(),
                 "Alpha".to_string(),
@@ -258,7 +258,7 @@ mod tests {
     async fn a_failure_listing_accounts_is_a_database_error() {
         let mut account_service = MockAccountServiceContract::new();
         account_service
-            .expect_get_all()
+            .expect_accounts_in_use()
             .returning(|| Err(crate::context::account::AccountError::DatabaseError));
         let use_case = PriceFreshnessUseCase::new(
             Arc::new(account_service),
@@ -308,7 +308,9 @@ mod tests {
     #[tokio::test]
     async fn a_failure_reading_the_fetch_log_is_a_database_error() {
         let mut account_service = MockAccountServiceContract::new();
-        account_service.expect_get_all().returning(|| Ok(vec![]));
+        account_service
+            .expect_accounts_in_use()
+            .returning(|| Ok(vec![]));
         let mut fetch_log = MockPriceFetchLogRepository::new();
         fetch_log
             .expect_last_completed_at()
