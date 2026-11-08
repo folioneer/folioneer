@@ -536,7 +536,7 @@ async fn exp_031_each_type_writes_its_own_figures() {
     };
     assert_eq!(
         header("accounts.csv"),
-        "id,name,bank,currency,country,wrapper,management_fees_enabled"
+        "id,name,bank,currency,country,wrapper,management_fees_enabled,cost_basis_method"
     );
     assert_eq!(
         header("prices.csv"),
