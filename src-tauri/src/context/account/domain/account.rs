@@ -1,4 +1,4 @@
-use super::cost_basis::{CostBasis, MICRO};
+use super::cost_basis::{CostBasis, LotTake, MICRO};
 use super::country::CostBasisMethod;
 use super::fee_schedule::{FeeCatchUpPosition, FeeSchedule};
 use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot, StockSplitPosition};
@@ -142,6 +142,24 @@ pub struct HoldingLot {
     pub free: bool,
 }
 
+/// EXP-026 — one lot a removal took: the removal, the lot's acquisition date, the units taken
+/// and their cost, and whether the lot came at no cost.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemovalLot {
+    /// The sale, write-off or transfer out.
+    pub transaction_id: String,
+    /// Its asset.
+    pub asset_id: String,
+    /// The lot's acquisition date (`YYYY-MM-DD`).
+    pub acquired_on: String,
+    /// The units taken from the lot, in stored quantity units (TRX-024).
+    pub quantity: i64,
+    /// Their cost, in the account's currency (micro-units).
+    pub cost: i64,
+    /// Whether the lot came from free shares or interest (CBM-020).
+    pub free: bool,
+}
+
 /// What `Account::replay_pair` gives for one (account, asset) pair.
 struct ReplayedPair {
     quantity: i128,
@@ -152,6 +170,9 @@ struct ReplayedPair {
     pnl_map: std::collections::HashMap<String, i64>,
     /// The cost basis as the replay left it: its lots are read only when shown (CBM-034).
     basis: CostBasis,
+    /// EXP-026 — what each removal took, lot by lot, by transaction id; none under the
+    /// weighted average.
+    takes: std::collections::HashMap<String, Vec<LotTake>>,
 }
 
 /// Represents a financial account — the Aggregate Root of the Account bounded context.
@@ -2003,6 +2024,8 @@ impl Account {
         let mut basis = CostBasis::new(method);
         let mut last_vwap: i64 = 0;
         let mut pnl_map = std::collections::HashMap::new();
+        // EXP-026 — what each removal took, lot by lot, under FIFO.
+        let mut takes = std::collections::HashMap::new();
         let mut total_realized_pnl: i64 = 0;
         let mut last_sold_date: Option<String> = None;
         let beyond =
@@ -2021,6 +2044,9 @@ impl Account {
                         return Err(AccountError::CascadingOversell.into());
                     }
                     let taken = basis.take(t.quantity);
+                    if !basis.last_takes().is_empty() {
+                        takes.insert(t.id.clone(), basis.last_takes().to_vec());
+                    }
                     last_vwap = taken.average_before;
                     pnl_map.insert(t.id.clone(), taken.cost);
                     last_sold_date = Some(t.date.clone());
@@ -2032,6 +2058,9 @@ impl Account {
                         return Err(AccountError::CascadingOversell.into());
                     }
                     let taken = basis.take(t.quantity);
+                    if !basis.last_takes().is_empty() {
+                        takes.insert(t.id.clone(), basis.last_takes().to_vec());
+                    }
                     last_vwap = taken.average_before;
                     let pnl = t.total_amount - taken.cost;
                     pnl_map.insert(t.id.clone(), pnl);
@@ -2077,6 +2106,7 @@ impl Account {
             last_sold_date,
             pnl_map,
             basis,
+            takes,
         })
     }
 
@@ -2215,6 +2245,49 @@ impl Account {
                 free: lot.free,
             })
             .collect()
+    }
+
+    /// EXP-026 — for every sale, write-off and transfer out among an account's `transactions`,
+    /// under its `method`, the lots it took,
+    /// oldest first; none under the weighted average. Read over a history a merge may have
+    /// left inconsistent (CFR-042): nothing is refused.
+    pub fn removal_lots_in(
+        transactions: &[Transaction],
+        method: CostBasisMethod,
+    ) -> Vec<RemovalLot> {
+        let assets: std::collections::BTreeSet<&str> = transactions
+            .iter()
+            .filter(|t| !crate::core::cash::is_cash_asset(&t.asset_id))
+            .map(|t| t.asset_id.as_str())
+            .collect();
+        let mut rows = Vec::new();
+        for asset_id in assets {
+            let pair: Vec<&Transaction> = transactions
+                .iter()
+                .filter(|t| t.asset_id == asset_id)
+                .collect();
+            let replayed = match Self::replay_pair(&pair, method, false) {
+                Ok(replayed) => replayed,
+                // Tolerated, the replay refuses nothing; logged should a guard ever reach it.
+                Err(e) => {
+                    tracing::debug!(target: crate::core::logger::BACKEND, err = ?e, "removal_lots_in: the replay refused");
+                    continue;
+                }
+            };
+            for transaction in &pair {
+                for take in replayed.takes.get(&transaction.id).into_iter().flatten() {
+                    rows.push(RemovalLot {
+                        transaction_id: transaction.id.clone(),
+                        asset_id: asset_id.to_string(),
+                        acquired_on: take.acquired_on.clone(),
+                        quantity: take.quantity.clamp(0, i64::MAX as i128) as i64,
+                        cost: (take.cost / QUANTITY_UNIT) as i64,
+                        free: take.free,
+                    });
+                }
+            }
+        }
+        rows
     }
 
     /// CBM-026 — the quantity of `asset_id` held as of `as_of`, which no method changes.

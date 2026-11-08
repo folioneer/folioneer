@@ -15,6 +15,9 @@ use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
     SqliteAssetPriceRepository, SqliteAssetRepository, SYSTEM_CATEGORY_ID,
 };
+use folioneer_lib::context::currency::{
+    CurrencyService, SqliteCurrencyPairRepository, SqliteCurrencyRateRepository,
+};
 use folioneer_lib::core::cash::is_cash_asset;
 use folioneer_lib::core::SideEffectEventBus;
 use folioneer_lib::shared::domain::quantity::from_surface;
@@ -36,6 +39,7 @@ struct Portfolio {
     recording: HoldingTransactionUseCase,
     import: CsvImportUseCase,
     export: DataExportUseCase,
+    currencies: Arc<CurrencyService>,
     _mappers: tempfile::TempDir,
 }
 
@@ -71,6 +75,10 @@ async fn portfolio() -> Portfolio {
         Box::new(FsImportMapperStore::new(mappers_dir.path().join("m"))),
         Box::new(SqliteMapperChoiceRepository::new(pool.clone())),
     ));
+    let currencies = Arc::new(CurrencyService::new(
+        Box::new(SqliteCurrencyPairRepository::new(pool.clone())),
+        Box::new(SqliteCurrencyRateRepository::new(pool.clone())),
+    ));
     Portfolio {
         recording: HoldingTransactionUseCase::new(accounts.clone(), assets.clone()),
         import: CsvImportUseCase::new(
@@ -79,7 +87,8 @@ async fn portfolio() -> Portfolio {
             assets.clone(),
             Arc::new(SqliteTransactionManager::new(pool.clone())),
         ),
-        export: DataExportUseCase::new(accounts.clone(), assets.clone()),
+        export: DataExportUseCase::new(accounts.clone(), assets.clone(), currencies.clone()),
+        currencies,
         accounts,
         assets,
         _mappers: mappers_dir,
@@ -303,7 +312,7 @@ async fn exp_032_the_json_file_holds_every_table() {
     let value: serde_json::Value =
         serde_json::from_str(&read(Path::new(&report.written_to))).expect("JSON");
     assert_eq!(value["format"], "folioneer-export");
-    assert_eq!(value["version"], 1);
+    assert_eq!(value["version"], 2);
     assert_eq!(value["accounts"].as_array().map(Vec::len), Some(2));
     assert_eq!(value["transactions"].as_array().map(Vec::len), Some(8));
     let deposit = &value["transactions"][0];
@@ -544,4 +553,184 @@ async fn exp_031_each_type_writes_its_own_figures() {
     );
     assert!(header("transactions.csv")
         .starts_with("id,account_id,account_name,account_currency,date,type,"));
+}
+
+// EXP-027 / EXP-033 — every recorded exchange rate is in the export, by its currencies then
+// date, with its source; the format is version 2.
+#[tokio::test]
+async fn exp_027_the_exchange_rates_are_exported() {
+    let p = portfolio().await;
+    for (from, date, rate) in [
+        ("USD", "2024-02-01", 900_000),
+        ("USD", "2024-01-01", 910_000),
+        ("GBP", "2024-01-01", 1_150_000),
+    ] {
+        p.currencies
+            .record_currency_rate(from.into(), "EUR".into(), date.into(), rate)
+            .await
+            .expect("rate");
+    }
+    let out = tempfile::tempdir().expect("folder");
+    let report = p
+        .export
+        .export(ExportFormat::Json, out.path())
+        .await
+        .expect("exported");
+    let value: serde_json::Value =
+        serde_json::from_str(&read(Path::new(&report.written_to))).expect("JSON");
+    assert_eq!(value["version"], 2);
+    let rates: Vec<(String, String, String, String)> = value["rates"]
+        .as_array()
+        .expect("rates")
+        .iter()
+        .map(|r| {
+            (
+                r["from_currency"].as_str().unwrap_or_default().to_string(),
+                r["date"].as_str().unwrap_or_default().to_string(),
+                r["rate"].as_str().unwrap_or_default().to_string(),
+                r["source"].as_str().unwrap_or_default().to_string(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        rates,
+        [
+            (
+                "GBP".into(),
+                "2024-01-01".into(),
+                "1.15".into(),
+                "Manual".into()
+            ),
+            (
+                "USD".into(),
+                "2024-01-01".into(),
+                "0.91".into(),
+                "Manual".into()
+            ),
+            (
+                "USD".into(),
+                "2024-02-01".into(),
+                "0.9".into(),
+                "Manual".into()
+            ),
+        ]
+    );
+    let csv = p
+        .export
+        .export(ExportFormat::Csv, out.path())
+        .await
+        .expect("exported");
+    let header = read(&Path::new(&csv.written_to).join("rates.csv"))
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .to_string();
+    assert_eq!(header, "from_currency,to_currency,date,rate,source");
+}
+
+// EXP-026 / EXP-033 — a sale of an account under FIFO names the lots it took, oldest first:
+// one taken whole, one in part; an account under the weighted average has none.
+#[tokio::test]
+async fn exp_026_the_lots_each_sale_took_are_exported() {
+    let p = portfolio().await;
+    let acme = asset(&p, "Acme World", "ACM", "FR0000000010").await;
+    let fifo = p
+        .accounts
+        .create_classified(
+            "Depot".into(),
+            String::new(),
+            "EUR".into(),
+            false,
+            Some("DE".into()),
+            None,
+        )
+        .await
+        .expect("account")
+        .id;
+    let average = account(&p, "Compte").await;
+    let r = &p.recording;
+    for id in [&fifo, &average] {
+        r.record_deposit(id, "2024-01-02".into(), micro(100_000), None)
+            .await
+            .expect("deposit");
+        for (date, price) in [("2024-02-01", 100), ("2024-03-01", 200)] {
+            r.buy_holding(
+                id,
+                acme.clone(),
+                date.into(),
+                from_surface(micro(10)),
+                micro(price),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .expect("buy");
+        }
+        r.sell_holding(
+            id,
+            acme.clone(),
+            "2024-04-01".into(),
+            from_surface(micro(15)),
+            micro(200),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .expect("sale");
+    }
+    let out = tempfile::tempdir().expect("folder");
+    let report = p
+        .export
+        .export(ExportFormat::Json, out.path())
+        .await
+        .expect("exported");
+    let value: serde_json::Value =
+        serde_json::from_str(&read(Path::new(&report.written_to))).expect("JSON");
+    let lots: Vec<(String, String, String, String, bool)> = value["lots"]
+        .as_array()
+        .expect("lots")
+        .iter()
+        .map(|lot| {
+            (
+                lot["account_id"].as_str().unwrap_or_default().to_string(),
+                lot["acquired_on"].as_str().unwrap_or_default().to_string(),
+                lot["quantity_taken"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                lot["cost_taken"].as_str().unwrap_or_default().to_string(),
+                lot["free"].as_bool().unwrap_or(true),
+            )
+        })
+        .collect();
+    assert_eq!(
+        lots,
+        [
+            (
+                fifo.clone(),
+                "2024-02-01".into(),
+                "10".into(),
+                "1000".into(),
+                false
+            ),
+            (
+                fifo.clone(),
+                "2024-03-01".into(),
+                "5".into(),
+                "1000".into(),
+                false
+            ),
+        ]
+    );
+    let sale = value["transactions"]
+        .as_array()
+        .expect("transactions")
+        .iter()
+        .find(|t| t["type"] == "Sell" && t["account_id"] == fifo.as_str())
+        .expect("sale");
+    assert_eq!(value["lots"][0]["transaction_id"], sale["id"]);
 }
