@@ -97,7 +97,8 @@ async fn profile_of(ctx: &Ctx, account_id: &str) -> String {
         .profile_id
 }
 
-// PFL-011 / PFL-013 / PFL-023 — the default profile exists unnamed and holds the accounts;
+// PFL-011 / PFL-013 / PFL-021 / PFL-023 — the default profile exists unnamed and holds the
+// accounts, a new one included;
 // it is listed first, with its count.
 #[tokio::test]
 async fn pfl_011_the_default_profile_holds_the_accounts() {

@@ -22,15 +22,15 @@ A financial account owned by the user.
 
 ### PortfolioTotal
 
-The total of every account of one profile (PFL-050), read together with the account summaries (ACC-027). A derived value: recomputed on every read, never stored (ADR-013).
+The total of every account, read together with the account summaries (ACC-027). A derived value: recomputed on every read, never stored (ADR-013).
 
-| Field                  | Business meaning                                                                                                                      |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `total_global_value`   | The Global Value of every account of one profile, converted to the cross-account reference currency.                                  |
-| `total_unrealized_pnl` | The Unrealized P&L of every account of one profile, converted the same way; absent when no convertible account carries one (ACC-029). |
-| `currency`             | The cross-account reference currency both figures are stated in (GPF-011).                                                            |
-| `incomplete`           | Whether an account with no usable rate hid a non-zero figure from the total (ACC-028).                                                |
-| `outdated_price_count` | How many active holdings have an outdated price, over every account of one profile (MKT-205, MKT-206).                                |
+| Field                  | Business meaning                                                                                                  |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `total_global_value`   | Every account's Global Value, converted to the cross-account reference currency.                                  |
+| `total_unrealized_pnl` | Every account's Unrealized P&L, converted the same way; absent when no convertible account carries one (ACC-029). |
+| `currency`             | The cross-account reference currency both figures are stated in (GPF-011).                                        |
+| `incomplete`           | Whether an account with no usable rate hid a non-zero figure from the total (ACC-028).                            |
+| `outdated_price_count` | How many active holdings have an outdated price, over every account (MKT-205, MKT-206).                           |
 
 ---
 
@@ -102,7 +102,7 @@ The account section title is displayed in the application shell header, not in t
 
 **ACC-020 — Pre-deletion count query (backend)** _(new)_: A backend command `get_account_deletion_summary(account_id)` returns the number of active holdings and the number of transactions associated with the account. Because this read spans `context/account/` (holdings) and `context/transaction/` (transactions), it must be implemented as a use case in `use_cases/` — not as a bounded-context command — per B18 and B24.
 
-**ACC-021 — Account summaries with global value (backend)** _(new)_: The account summaries are read: each account with its global value, in the account's own currency (CSH-094) — its cash plus, over its priced active non-cash holdings in its currency, each one's quantity times its latest price; an unpriced non-cash holding, and a foreign one with no usable rate (FXR-041), contributes 0; an empty account's value is 0. Each summary also carries the mark of an account an AI agent created on this computer, or none (AGT-069). The summaries are those of the accounts of one profile (PFL-050).
+**ACC-021 — Account summaries with global value (backend + frontend)** _(new)_: A backend command `get_account_summaries()` returns a list of `AccountSummary` records — each `Account` enriched with its `total_global_value` (micros, computed in the account's own currency per CSH-094: `cash_holding.quantity + Σ_h (h.quantity × latest_price(h))` over same-currency priced active non-cash holdings; unpriced non-cash holdings, and foreign ones with no usable rate (FXR-041), contribute 0; empty accounts return 0). This read spans `context/account/` and `context/asset/`, so it lives as a use case in `use_cases/` per B18 and B24. The Accounts table (ACC-008) renders the value in a Global Value column formatted in the account's own currency. Each record also carries the mark of an account an AI agent created on this computer, or none (AGT-069).
 
 **ACC-023 — Account-wide unrealized P&L on the summary (backend + frontend)** _(new)_: `AccountSummary` carries `total_unrealized_pnl` — the account-wide unrealized gain/loss in the account's own currency (micros), computed identically to `AccountDetailsResponse.total_unrealized_pnl` (MKT-040 as amended by FXR-040): the sum of per-holding unrealized P&L over active non-cash holdings for which the value is computable (same-currency, or foreign with a usable rate, and a recorded price), with the others excluded. It is `None` when no holding qualifies (empty account, or no priced/valuable holding). The Accounts table renders it in an "Unrealized P&L" column (ACC-008), formatted in the account's own currency, showing "—" when `None`.
 
@@ -116,7 +116,7 @@ The account section title is displayed in the application shell header, not in t
 
 ### Portfolio total
 
-**ACC-027 — The account summaries carry a portfolio total (backend)**: The account summaries also carry a portfolio total: the sum of the Global Value and the sum of the Unrealized P&L of every account of one profile (PFL-050), each converted from the account's currency to the cross-account reference currency (GPF-011) with the latest rate on or before the read date (FXR-035), or a rate of 1 when the account is already in that currency (FXR-011), together with the currency they are stated in.
+**ACC-027 — The account summaries carry a portfolio total (backend + frontend)**: The account summaries also carry a portfolio total: the sum of every account's Global Value and the sum of every account's Unrealized P&L, each converted from the account's currency to the cross-account reference currency (GPF-011) with the latest rate on or before the read date (FXR-035), or a rate of 1 when the account is already in that currency (FXR-011), together with the currency they are stated in. The application computes the total; the account table never computes any part of it.
 
 **ACC-028 — An unconvertible account leaves the total incomplete when it hides a figure (backend)**: An account whose currency has no usable rate to the cross-account reference currency on the read date (FXR-034) contributes zero to both sums. The total is marked incomplete when that account holds a non-zero Global Value or a non-zero Unrealized P&L; an account that holds neither leaves it complete. The account's own summary is unaffected. Only the conversion of an account to the cross-account reference currency counts here: a holding with no usable rate to its account's currency already counts as zero within that account's Global Value (FXR-041) and does not mark the total incomplete. This differs on purpose from the price movement report, whose total is incomplete for any entry not read at its current price (PMV-032, PMV-043): the report judges one refresh's readings, while this total is a live valuation whose only gap is converting a whole account, each row already showing its own Global Value.
 
@@ -154,7 +154,7 @@ The tax wrapper an account sits in — a PEA, an assurance vie, a Depot — is a
 
 ### Events
 
-**ACC-022 — AccountUpdated event (backend)** _(new)_: After any successful account mutation (create per ACC-001/002/003, update per ACC-001/002/003, delete per ACC-005/006), the `AccountService` (owned by the `account/` bounded context) publishes an `AccountUpdated` event on the event bus. The service owns the event publication (B8 compliance). This event is distinct from `TransactionUpdated`: `AccountUpdated` signals structural account changes; `TransactionUpdated` signals position-data changes.
+**ACC-022 — AccountUpdated event (backend)** _(new)_: After any successful account mutation (create per ACC-001/002/003, update per ACC-001/002/003, a move to another profile per PFL-031, delete per ACC-005/006), the `AccountService` (owned by the `account/` bounded context) publishes an `AccountUpdated` event on the event bus. The service owns the event publication (B8 compliance). This event is distinct from `TransactionUpdated`: `AccountUpdated` signals structural account changes; `TransactionUpdated` signals position-data changes.
 
 ---
 

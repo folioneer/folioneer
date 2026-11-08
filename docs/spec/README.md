@@ -71,7 +71,7 @@ Once assigned, a rule number never changes; a removed rule leaves its number vac
 | TRF     | Transfer                    | A holding moved between two accounts at its cost — no cash, no realized result, a fee in kind, the rate between currencies recorded                                                              | active  |
 | IMP     | Account import              | A broker's CSV file read through an import mapper, previewed row by row, then confirmed into one account                                                                                         | active  |
 | CBM     | Cost Basis Method           | Each account's cost basis method — the weighted average or FIFO, preselected from its country — and the lots FIFO takes the oldest first                                                         | active  |
-| PFL     | Profile                     | A set of accounts, each account in one; every figure across accounts computed within one profile; assets and prices shared                                                                       | active  |
+| PFL     | Profile                     | A set of accounts, each account in one, isolated like a shared login; assets and prices shared                                                                                                   | active  |
 | EXP     | Data export                 | Every account, asset, transaction and price written as CSV or JSON, a documented format the account import reads back                                                                            | active  |
 
 ---

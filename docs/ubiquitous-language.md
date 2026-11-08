@@ -48,8 +48,8 @@ an account — quantity held, average price (VWAP, or of its lots under FIFO —
 A set of accounts — the owner's household, a relative's — each account in exactly one, so
 that every figure computed across accounts stays within one profile. It is the closest thing
 to a login shared on one installation (owner, 2026-11-08): isolated from the others; the
-assets, their categories and the prices and currency rates are shared (PFL-052). The **profile in use** is the one this computer works in (PFL-012); the
-**default profile** is the one every account from before profiles belongs to (PFL-013), and the one the profile in use falls back to (PFL-014) and an account whose profile was removed reads as (PFL-061). In
+assets, their categories and the prices and currency rates are shared (PFL-052). The **profile in use** is the one this computer works in; the
+**default profile** is the one every account from before profiles belongs to (PFL-013), and the one an account whose profile was removed reads as (PFL-061). In
 French: "Profil"; in German: "Profil" (owner, 2026-11-07, #278).
 
 > Status: confirmed
@@ -406,7 +406,7 @@ The currency an account is kept in, chosen when the account is created: its hold
 
 ### Portfolio total
 
-The total row of the accounts list: the global value and unrealized P&L of every account of one profile (PFL-050) converted to the reference currency and summed (ACC-027 to ACC-030), marked incomplete — shown as "partial" — when an account cannot be converted (ACC-028). In French: "total du portefeuille" (owner, 2026-10-18).
+The total row of the accounts list: every account's global value and unrealized P&L converted to the reference currency and summed (ACC-027 to ACC-030), marked incomplete — shown as "partial" — when an account cannot be converted (ACC-028). In French: "total du portefeuille" (owner, 2026-10-18).
 
 > Status: confirmed
 
