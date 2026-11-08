@@ -1,4 +1,4 @@
-//! Data export orchestrator (EXP): reads the portfolio, builds the four tables and writes
+//! Data export orchestrator (EXP): reads the portfolio, builds the six tables and writes
 //! them as CSV or JSON in the chosen folder, complete or not at all.
 
 use std::collections::{HashMap, HashSet};
@@ -13,8 +13,11 @@ use super::format::{
     account_file_names, csv, fills, format_file, free_name, import_mapper_file, json, money,
     quantity, Cell, Table,
 };
-use crate::context::account::{Account, AccountServiceContract, Transaction, TransactionType};
+use crate::context::account::{
+    Account, AccountServiceContract, RemovalLot, Transaction, TransactionType,
+};
 use crate::context::asset::{Asset, AssetPrice, AssetServiceContract};
+use crate::context::currency::{CurrencyRate, CurrencyService};
 use crate::core::cash::is_cash_asset;
 use crate::core::logger::BACKEND;
 
@@ -102,6 +105,20 @@ const PRICE_COLUMNS: &[&str] = &[
     "source",
 ];
 
+/// EXP-026 — the lots' columns.
+const LOT_COLUMNS: &[&str] = &[
+    "transaction_id",
+    "account_id",
+    "asset_id",
+    "acquired_on",
+    "quantity_taken",
+    "cost_taken",
+    "free",
+];
+
+/// EXP-027 — the exchange rates' columns.
+const RATE_COLUMNS: &[&str] = &["from_currency", "to_currency", "date", "rate", "source"];
+
 /// The moment a transaction entered before that moment was kept holds (TRX-036).
 const UNKNOWN_MOMENT: &str = "1970-01-01T00:00:00Z";
 /// A rate of one, in micro-units: between two currencies, a dividend entered in the account's
@@ -114,23 +131,30 @@ struct Snapshot {
     assets: Vec<Asset>,
     transactions: Vec<Transaction>,
     prices: Vec<AssetPrice>,
+    /// EXP-027 — every recorded exchange rate.
+    rates: Vec<CurrencyRate>,
+    /// EXP-026 — the lots each removal took, with its account's identifier.
+    lots: Vec<(String, RemovalLot)>,
 }
 
-/// EXP — reads every account, asset, transaction and price, and writes them.
+/// EXP — reads every account, asset, transaction, price and currency rate, and writes them.
 pub struct DataExportUseCase {
     account_service: Arc<dyn AccountServiceContract>,
     asset_service: Arc<dyn AssetServiceContract>,
+    currency_service: Arc<CurrencyService>,
 }
 
 impl DataExportUseCase {
-    /// The use case over the account and asset services.
+    /// The use case over the account, asset and currency services.
     pub fn new(
         account_service: Arc<dyn AccountServiceContract>,
         asset_service: Arc<dyn AssetServiceContract>,
+        currency_service: Arc<CurrencyService>,
     ) -> Self {
         Self {
             account_service,
             asset_service,
+            currency_service,
         }
     }
 
@@ -192,13 +216,20 @@ impl DataExportUseCase {
             .await
             .map_err(|e| database(&e, "accounts"))?;
         let mut transactions = Vec::new();
+        let mut lots = Vec::new();
         for account in &accounts {
-            transactions.extend(
-                self.account_service
-                    .get_all_transactions_for_account(&account.id)
-                    .await
-                    .map_err(|e| database(&e, "transactions"))?,
+            let own = self
+                .account_service
+                .get_all_transactions_for_account(&account.id)
+                .await
+                .map_err(|e| database(&e, "transactions"))?;
+            // EXP-026 — the lots each removal took, replayed over the account's whole history.
+            lots.extend(
+                Account::removal_lots_in(&own, account.cost_basis_method)
+                    .into_iter()
+                    .map(|lot| (account.id.clone(), lot)),
             );
+            transactions.extend(own);
         }
         let assets = self
             .asset_service
@@ -214,12 +245,34 @@ impl DataExportUseCase {
                     .map_err(|e| database(&e, "prices"))?,
             );
         }
+        let mut rates = Vec::new();
+        let pairs = self
+            .currency_service
+            .list_currency_pairs()
+            .await
+            .map_err(|e| database(&e, "currency pairs"))?;
+        for pair in pairs {
+            rates.extend(
+                self.currency_service
+                    .list_currency_rates(pair.from_currency, pair.to_currency)
+                    .await
+                    .map_err(|e| database(&e, "rates"))?,
+            );
+        }
         let transactions = whole_links(transactions, &assets, &started);
+        // EXP-022 — only the lots of a removal the export holds.
+        let kept: HashSet<&str> = transactions.iter().map(|t| t.id.as_str()).collect();
+        let lots: Vec<(String, RemovalLot)> = lots
+            .into_iter()
+            .filter(|(_, lot)| kept.contains(lot.transaction_id.as_str()))
+            .collect();
         Ok(Snapshot {
             accounts,
             assets,
             transactions,
             prices,
+            rates,
+            lots,
         })
     }
 }
@@ -283,6 +336,7 @@ fn tables(snapshot: &Snapshot) -> Vec<Table> {
     accounts.sort_by(|a, b| (&a.name, &a.id).cmp(&(&b.name, &b.id)));
     let mut assets: Vec<&Asset> = snapshot.assets.iter().collect();
     assets.sort_by(|a, b| (&a.name, &a.id).cmp(&(&b.name, &b.id)));
+    let ordered = ordered_transactions(snapshot);
     vec![
         Table {
             name: "accounts",
@@ -306,8 +360,8 @@ fn tables(snapshot: &Snapshot) -> Vec<Table> {
                     .iter()
                     .map(|asset| (asset.id.as_str(), asset))
                     .collect();
-                ordered_transactions(snapshot)
-                    .into_iter()
+                ordered
+                    .iter()
                     .map(|(account, transaction)| {
                         transaction_row(
                             account,
@@ -326,6 +380,68 @@ fn tables(snapshot: &Snapshot) -> Vec<Table> {
                 .map(|(asset, price)| price_row(asset, price))
                 .collect(),
         },
+        Table {
+            name: "lots",
+            columns: LOT_COLUMNS,
+            rows: {
+                // EXP-033 — in the order of their transactions, then oldest lot first.
+                let order: HashMap<&str, usize> = ordered
+                    .iter()
+                    .enumerate()
+                    .map(|(index, (_, transaction))| (transaction.id.as_str(), index))
+                    .collect();
+                let mut lots: Vec<&(String, RemovalLot)> = snapshot.lots.iter().collect();
+                lots.sort_by_key(|(_, lot)| {
+                    order
+                        .get(lot.transaction_id.as_str())
+                        .copied()
+                        .unwrap_or(usize::MAX)
+                });
+                lots.into_iter()
+                    .map(|(account_id, lot)| lot_row(account_id, lot))
+                    .collect()
+            },
+        },
+        Table {
+            name: "rates",
+            columns: RATE_COLUMNS,
+            rows: {
+                // EXP-033 — by their two currencies, then date.
+                let mut rates: Vec<&CurrencyRate> = snapshot.rates.iter().collect();
+                rates.sort_by(|a, b| {
+                    (&a.from_currency, &a.to_currency, &a.date).cmp(&(
+                        &b.from_currency,
+                        &b.to_currency,
+                        &b.date,
+                    ))
+                });
+                rates.into_iter().map(rate_row).collect()
+            },
+        },
+    ]
+}
+
+/// EXP-026 — one lot a removal took.
+fn lot_row(account_id: &str, lot: &RemovalLot) -> Vec<Cell> {
+    vec![
+        text(&lot.transaction_id),
+        text(account_id),
+        text(&lot.asset_id),
+        text(&lot.acquired_on),
+        figure(Some(quantity(&lot.asset_id, lot.quantity))),
+        figure(Some(money(lot.cost))),
+        Cell::Flag(lot.free),
+    ]
+}
+
+/// EXP-027 — one recorded exchange rate.
+fn rate_row(rate: &CurrencyRate) -> Vec<Cell> {
+    vec![
+        text(&rate.from_currency),
+        text(&rate.to_currency),
+        text(&rate.date),
+        figure(Some(money(rate.rate))),
+        text(rate.source.to_string()),
     ]
 }
 
@@ -683,6 +799,10 @@ mod tests {
         let export = DataExportUseCase::new(
             Arc::new(accounts),
             Arc::new(MockAssetServiceContract::new()),
+            Arc::new(crate::context::currency::CurrencyService::new(
+                Box::new(crate::context::currency::MockCurrencyPairRepository::new()),
+                Box::new(crate::context::currency::MockCurrencyRateRepository::new()),
+            )),
         );
         let out = tempfile::tempdir().expect("folder");
         let refused = export.export(ExportFormat::Json, out.path()).await;
@@ -797,6 +917,8 @@ mod tests {
             assets: Vec::new(),
             transactions: vec![recent, older],
             prices: Vec::new(),
+            rates: Vec::new(),
+            lots: Vec::new(),
         };
         let table = &tables(&snapshot)[2];
         let total = |row: &Vec<Cell>| row[14].clone();

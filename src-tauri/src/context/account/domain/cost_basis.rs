@@ -33,6 +33,20 @@ pub(crate) struct Lot {
     pub(crate) free: bool,
 }
 
+/// EXP-026 — what one removal took from one lot: the lot's acquisition date, the units taken
+/// and their cost, and whether the lot came at no cost.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct LotTake {
+    /// The lot's acquisition date.
+    pub(crate) acquired_on: String,
+    /// The units taken from it, in quantity units.
+    pub(crate) quantity: i128,
+    /// Their cost, in money micro-units × `QUANTITY_UNIT`.
+    pub(crate) cost: i128,
+    /// Whether the lot came from free shares or interest (CBM-020).
+    pub(crate) free: bool,
+}
+
 /// What a removal took: the average price just before it, and the cost of what left.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Taken {
@@ -53,6 +67,8 @@ pub(crate) struct CostBasis {
     lots: Vec<Lot>,
     /// CBM-034 — the lots taken whole, oldest first, kept to be shown.
     spent: Vec<Lot>,
+    /// EXP-026 — what the last removal took, lot by lot; empty under the weighted average.
+    last_takes: Vec<LotTake>,
 }
 
 impl CostBasis {
@@ -63,6 +79,7 @@ impl CostBasis {
             cost: 0,
             lots: Vec::new(),
             spent: Vec::new(),
+            last_takes: Vec::new(),
         }
     }
 
@@ -136,10 +153,17 @@ impl CostBasis {
     /// lot with no units left gives up its cost to the first units taken after it.
     fn take_oldest(&mut self, mut wanted: i128) -> i128 {
         let mut taken = 0;
+        self.last_takes.clear();
         while let Some(lot) = self.lots.first_mut() {
             if lot.quantity <= wanted {
                 wanted -= lot.quantity;
                 taken += lot.cost;
+                self.last_takes.push(LotTake {
+                    acquired_on: lot.acquired_on.clone(),
+                    quantity: lot.quantity,
+                    cost: lot.cost,
+                    free: lot.free,
+                });
                 let mut spent = self.lots.remove(0);
                 spent.quantity = 0;
                 spent.cost = 0;
@@ -149,6 +173,12 @@ impl CostBasis {
                 }
             } else {
                 let part = share_of(lot.cost, wanted, lot.quantity);
+                self.last_takes.push(LotTake {
+                    acquired_on: lot.acquired_on.clone(),
+                    quantity: wanted,
+                    cost: part,
+                    free: lot.free,
+                });
                 lot.cost -= part;
                 lot.quantity -= wanted;
                 taken += part;
@@ -199,6 +229,12 @@ impl CostBasis {
     #[cfg(test)]
     pub(crate) fn lots(&self) -> &[Lot] {
         &self.lots
+    }
+
+    /// EXP-026 — what the last removal took, lot by lot, oldest first; empty under the
+    /// weighted average.
+    pub(crate) fn last_takes(&self) -> &[LotTake] {
+        &self.last_takes
     }
 
     /// CBM-034 — every lot, those taken whole included, oldest first; none under the
@@ -369,6 +405,28 @@ mod tests {
             ]
         );
         assert!(CostBasis::new(WeightedAverage).history().is_empty());
+    }
+
+    // EXP-026 — a removal names the lots it took: one taken whole, then one in part.
+    #[test]
+    fn a_removal_names_the_lots_it_took() {
+        let mut basis = two_lots(Fifo);
+        basis.take(units(15));
+        let takes: Vec<(&str, i128, i128)> = basis
+            .last_takes()
+            .iter()
+            .map(|t| (t.acquired_on.as_str(), t.quantity, t.cost / QUANTITY_UNIT))
+            .collect();
+        assert_eq!(
+            takes,
+            [
+                ("2024-01-01", units(10) as i128, money(1_000) as i128),
+                ("2024-02-01", units(5) as i128, money(1_000) as i128),
+            ]
+        );
+        let mut average = two_lots(WeightedAverage);
+        average.take(units(15));
+        assert!(average.last_takes().is_empty());
     }
 
     // CBM-026 — the quantity is the same under either method.

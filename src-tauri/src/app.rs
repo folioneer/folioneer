@@ -343,10 +343,11 @@ pub fn run() {
                 // MKT-201 — this installation's fetch log, written by both fetch paths.
                 let price_fetch_log: Arc<dyn PriceFetchLogRepository> =
                     Arc::new(SqlitePriceFetchLogRepository::new(db.pool.clone()));
-                // EXP — the data export reads every account, asset, transaction and price.
+                // EXP — the data export reads every account, asset, transaction, price and rate.
                 app_handle.manage(Arc::new(DataExportUseCase::new(
                     account_service.clone(),
                     asset_service.clone(),
+                    Arc::clone(&currency_service),
                 )));
                 // MKT-200/201 — the header's price item. It reads prices already
                 // recorded and this device's fetch log, so it is built whether or not

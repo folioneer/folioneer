@@ -14,7 +14,7 @@ use crate::shared::domain::quantity::{quantity_text, scaled_text};
 /// EXP-032 — the format's name and version, in the JSON file and in `format.json`.
 pub const FORMAT_NAME: &str = "folioneer-export";
 /// EXP-032 — raised by any change to the format.
-pub const FORMAT_VERSION: u32 = 1;
+pub const FORMAT_VERSION: u32 = 2;
 /// EXP-011C — the characters of an account's name kept in its file name.
 const FILE_NAME_LENGTH: usize = 64;
 
@@ -34,7 +34,7 @@ pub enum Cell {
 /// One table: its name, its columns in order (EXP-031) and its rows.
 #[derive(Debug, Clone)]
 pub struct Table {
-    /// `accounts`, `assets`, `transactions` or `prices`.
+    /// `accounts`, `assets`, `transactions`, `prices`, `lots` or `rates`.
     pub name: &'static str,
     /// The columns, in EXP-031's order.
     pub columns: &'static [&'static str],
@@ -387,7 +387,7 @@ mod tests {
         );
         let value: serde_json::Value = serde_json::from_str(&written).expect("JSON");
         assert_eq!(value["format"], "folioneer-export");
-        assert_eq!(value["version"], 1);
+        assert_eq!(value["version"], 2);
         assert_eq!(value["exported_at"], "2026-11-07T10:00:00Z");
         assert_eq!(
             value["t"][0],
