@@ -28,7 +28,7 @@ The outcome of one Global refresh, expressed as what the fetch did to the portfo
 | `observed_to`           | The observation date this fetch produced; absent only when it produced none later than `observed_from` — carried even when `observed_from` is absent (PMV-051, PMV-052). |
 | `incomplete`            | Whether any entry's reading is incomplete (PMV-043).                                                                                                                     |
 
-> Asset counts are not carried here — the completion signal's own updated / skipped counts (MKT-119) state them for the refresh, over every profile (PMV-030).
+> Asset counts are not carried here — the completion signal's own updated / skipped counts (MKT-119) state them for the refresh, over every profile (PFL-052).
 
 ### PriceMovementRow
 
