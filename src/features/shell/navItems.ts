@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Palette, PieChart, Tag, Wallet } from "lucide-react";
+import { ArrowLeftRight, Palette, PieChart, Tag, Users, Wallet } from "lucide-react";
 import type { ElementType } from "react";
 
 export interface NavItem {
@@ -19,3 +19,10 @@ const DEV_NAV_ITEMS: NavItem[] = import.meta.env.DEV
   : [];
 
 export const NAV_ITEMS: NavItem[] = [...BASE_NAV_ITEMS, ...DEV_NAV_ITEMS];
+
+/** #768 (the validated mock) — the profiles overview, first, shown from two profiles on. */
+export const PROFILES_NAV_ITEM: NavItem = {
+  labelKey: "nav.profiles",
+  path: "/profiles",
+  icon: Users,
+};

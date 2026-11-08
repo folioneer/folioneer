@@ -71,8 +71,20 @@ impl GlobalPerformanceUseCase {
                 )
                 .await
             }
-            None => self.aggregate_across_accounts(asset_id).await,
+            None => {
+                let accounts = self.account_service.accounts_in_use().await?;
+                self.aggregate_across_accounts(accounts, asset_id).await
+            }
         }
+    }
+
+    /// PFL-055 — the cross-account aggregation over the accounts of one profile.
+    pub async fn get_performance_in(
+        &self,
+        profile_id: &str,
+    ) -> StdResult<AccountPerformanceResponse, AccountError> {
+        let accounts = self.account_service.accounts_in_profile(profile_id).await?;
+        self.aggregate_across_accounts(accounts, None).await
     }
 
     /// GPF-012–041 — the cross-account aggregation: every included account's
@@ -80,9 +92,9 @@ impl GlobalPerformanceUseCase {
     /// converted to the reference currency before summation.
     async fn aggregate_across_accounts(
         &self,
+        accounts: Vec<Account>,
         asset_scope: Option<&str>,
     ) -> StdResult<AccountPerformanceResponse, AccountError> {
-        let accounts = self.account_service.accounts_in_use().await?;
         let today = Local::now().date_naive();
         let reference = self.currency_service.reference_currency().await.map_err(|e| {
             tracing::error!(target: BACKEND, err = ?e, "aggregate_across_accounts: reference currency not read");

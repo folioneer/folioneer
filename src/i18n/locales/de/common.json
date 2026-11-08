@@ -229,7 +229,8 @@
     "about": "Über",
     "settings": "Einstellungen",
     "design_system": "Designsystem",
-    "currency_rates": "Wechselkurse"
+    "currency_rates": "Wechselkurse",
+    "profiles": "Profile"
   },
   "settings": {
     "title": "Einstellungen",
@@ -1453,6 +1454,17 @@
       "add_title": "Profil hinzufügen",
       "rename_title": "Profil umbenennen",
       "label": "Name"
+    },
+    "overview": {
+      "intro": "Die Zahlen jedes Profils, in {{currency}}. Sie gehören verschiedenen Personen und werden nie zusammengezählt. Klicken Sie auf ein Profil, um seine Konten zu öffnen.",
+      "loading": "Profile werden gelesen…",
+      "profile": "Profil",
+      "accounts": "Konten",
+      "value": "Wert",
+      "ytd": "Performance seit Jahresbeginn",
+      "active": "aktiv",
+      "partial": "unvollständig",
+      "partial_hint": "Ein Konto dieses Profils ließ sich nicht in die Referenzwährung umrechnen; der Wert lässt es aus."
     }
   }
 }

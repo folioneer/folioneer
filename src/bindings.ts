@@ -378,6 +378,17 @@ async moveAccountToProfile(accountId: string, profileId: string) : Promise<Resul
 }
 },
 /**
+ * PFL-055 — every profile with its own figures, never added across profiles.
+ */
+async getProfileOverview() : Promise<Result<ProfileOverview, AccountError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_profile_overview") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Returns the distinct asset IDs that have transactions for the given account (TXL-013).
  */
 async getAssetIdsForAccount(accountId: string) : Promise<Result<string[], AccountError>> {
@@ -1503,8 +1514,8 @@ event: "event"
 /** user-defined constants **/
 
 export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
-export const DEFAULT_PROFILE_ID = "default-profile" as const;
 export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
+export const DEFAULT_PROFILE_ID = "default-profile" as const;
 
 /** user-defined types **/
 
@@ -5488,6 +5499,47 @@ profiles: ProfileSummary[];
  * The identifier of the profile in use, the default profile's when it is gone (PFL-014).
  */
 in_use: string }
+/**
+ * PFL-055 — every profile with its own figures, in the order of PFL-023.
+ */
+export type ProfileOverview = { 
+/**
+ * One row per profile; no row adds profiles together.
+ */
+rows: ProfileOverviewRow[]; 
+/**
+ * The reference currency every value is stated in (GPF-011).
+ */
+currency: string; 
+/**
+ * The identifier of the profile in use (PFL-012).
+ */
+in_use: string }
+/**
+ * PFL-055 — one profile's own figures.
+ */
+export type ProfileOverviewRow = { 
+/**
+ * The profile.
+ */
+profile: Profile; 
+/**
+ * How many accounts it holds (PFL-023).
+ */
+account_count: number; 
+/**
+ * Its total value in the reference currency, reference-currency micros (ACC-027, ADR-001).
+ */
+value: number; 
+/**
+ * An account of it could not be converted, so the value leaves it out (ACC-028).
+ */
+value_incomplete: boolean; 
+/**
+ * Its performance since the start of the year as micro-percent (GPF-031); none without
+ * an account, or when it cannot be computed.
+ */
+ytd_performance_pct: number | null }
 /**
  * PFL-023 — a profile with the number of its accounts.
  */

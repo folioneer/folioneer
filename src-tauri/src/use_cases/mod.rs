@@ -46,6 +46,8 @@ pub mod price_history_backfill;
 pub mod price_provider_choice;
 /// An account moved into another profile, checked against the profiles (PFL-031).
 pub mod profile_move;
+/// Every profile with its own figures, never added across profiles (PFL-055).
+pub mod profile_overview;
 /// Historical exchange-rate backfill for every persisted pair (FXR-110–114).
 pub mod rate_history_backfill;
 /// Launch rate refresh for every persisted pair, in every build (FXR-075).

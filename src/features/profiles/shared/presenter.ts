@@ -1,4 +1,5 @@
 import type { AccountError, Profile } from "@/bindings";
+import { microToFormatted } from "@/lib/microUnits";
 import type { I18nMessage } from "@/ui/format/i18n";
 
 /**
@@ -31,4 +32,21 @@ export function profileErrorToI18n(err: AccountError): I18nMessage {
     default:
       return { key: "error.Unknown" };
   }
+}
+
+/** PFL-055 — a profile's value (reference-currency micros) to 2 decimals. */
+export function overviewValueText(micros: number): string {
+  return microToFormatted(micros, 2);
+}
+
+/** PFL-055 — a profile's performance this year as a signed percentage; "—" without one. */
+export function overviewYtdText(pct: number | null): string {
+  if (pct === null) return "—";
+  return `${pct >= 0 ? "+" : ""}${microToFormatted(pct, 2)}%`;
+}
+
+/** PFL-055 — the tone of a performance: none, a loss or a gain. */
+export function overviewYtdTone(pct: number | null): "neutral" | "loss" | "gain" {
+  if (pct === null || pct === 0) return "neutral";
+  return pct < 0 ? "loss" : "gain";
 }

@@ -229,7 +229,8 @@
     "about": "About",
     "settings": "Settings",
     "design_system": "Design System",
-    "currency_rates": "Currency Rates"
+    "currency_rates": "Currency Rates",
+    "profiles": "Profiles"
   },
   "settings": {
     "title": "Settings",
@@ -1453,6 +1454,17 @@
       "add_title": "Add a profile",
       "rename_title": "Rename the profile",
       "label": "Name"
+    },
+    "overview": {
+      "intro": "Each profile's figures, in {{currency}}. They belong to different people and are never added together. Click a profile to open its accounts.",
+      "loading": "Reading the profiles…",
+      "profile": "Profile",
+      "accounts": "Accounts",
+      "value": "Value",
+      "ytd": "YTD performance",
+      "active": "active",
+      "partial": "partial",
+      "partial_hint": "An account of this profile could not be converted to the reference currency, so the value leaves it out."
     }
   }
 }

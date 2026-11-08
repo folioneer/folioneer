@@ -114,6 +114,23 @@ impl AccountSummaryUseCase {
     /// Builds a summary row for every account of the profile in use (PFL-050).
     pub async fn get_account_summaries(&self) -> StdResult<AccountSummaries, AccountError> {
         let accounts = self.account_service.accounts_in_use().await?;
+        self.summaries_of(accounts).await
+    }
+
+    /// PFL-055 — the summaries and their total for the accounts of one profile.
+    pub async fn get_account_summaries_in(
+        &self,
+        profile_id: &str,
+    ) -> StdResult<AccountSummaries, AccountError> {
+        let accounts = self.account_service.accounts_in_profile(profile_id).await?;
+        self.summaries_of(accounts).await
+    }
+
+    /// ACC-021 / ACC-027 — a summary row for each of `accounts`, and their total.
+    async fn summaries_of(
+        &self,
+        accounts: Vec<Account>,
+    ) -> StdResult<AccountSummaries, AccountError> {
         let mut creators = self.account_service.agent_creations().await?;
         let mut summaries = Vec::with_capacity(accounts.len());
         let today = chrono::Local::now().date_naive();

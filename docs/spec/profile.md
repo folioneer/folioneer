@@ -23,6 +23,18 @@ A set of accounts the owner follows apart from the others, named or, for the def
 | ------------ | ----------------------------------- |
 | `profile_id` | The profile the account belongs to. |
 
+### Profile figures (computed, PFL-055)
+
+One profile's own figures, recomputed on every read (ADR-013).
+
+| Field                 | Business meaning                                                                                                |
+| --------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `profile`             | The profile.                                                                                                    |
+| `account_count`       | How many accounts it holds (PFL-023).                                                                           |
+| `value`               | The Global Value of its accounts in the reference currency (ACC-027); 0 without an account.                     |
+| `value_incomplete`    | ACC-028's mark: an account of it with no usable rate hid a non-zero figure.                                     |
+| `ytd_performance_pct` | Its year-to-date percentage as of the read date, the current month row's (PRF-034, GPF-031); none per PFL-055A. |
+
 ### Profile in use
 
 The profile this installation works in, kept on this device only (PFL-012).
@@ -75,9 +87,9 @@ The profile this installation works in, kept on this device only (PFL-012).
 
 **PFL-040 — Removing a profile (backend)**: Only a profile holding no account is removed; one holding an account, the default profile and an unknown one are each rejected with a specific error.
 
-### Within a profile, and what is shared (050–059)
+### Within a profile, across profiles, and what is shared (050–059)
 
-**PFL-050 — Figures within one profile (backend)**: Every figure computed across accounts reads the accounts of the profile in use only: the account summaries and their total (ACC-021, ACC-027), the global performance (GPF-012), the price movement report (PMV-030, PMV-040), the newest price date (MKT-200) and the count of outdated prices (MKT-206). An account's own figures are its own, whatever the profile.
+**PFL-050 — Figures within one profile (backend)**: Every figure computed across accounts reads the accounts of the profile in use only: the account summaries and their total (ACC-021, ACC-027), the global performance (GPF-012), the price movement report (PMV-030, PMV-040), the newest price date (MKT-200) and the count of outdated prices (MKT-206). An account's own figures are its own, whatever the profile. PFL-055 alone computes figures over every profile, each profile's over its own accounts.
 
 **PFL-051 — Accounts within one profile (backend)**: Listing the accounts and finding one by its name read the accounts of the profile in use only: the list of the accounts the window reads, the command line's (CLI-018) and an AI agent's (AGT-040, ACC-042), and an account named on the command line or by an agent, to read or to record (CLI-011, AGT-043, AGT-048); two accounts of one name in two profiles are therefore never ambiguous (PFL-022).
 
@@ -86,6 +98,10 @@ The profile this installation works in, kept on this device only (PFL-012).
 **PFL-052 — What stays shared (backend)**: The asset base — assets and their categories — and the prices — asset prices and currency rates — are shared by every profile (owner, 2026-11-08) — a refresh of every price covers every profile's holdings (MKT-122, MKT-130, SPF-040) — and so are the one reference currency (GPF-011) and the one portfolio country (ACC-041) (owner, 2026-11-08).
 
 **PFL-054 — This installation's settings (backend)**: This installation's own settings (SYN-023) — among them the import mappers (IMP-020), the price provider (MKT-214), the scheduled fetch (SPF-011) and the agent connection (AGT-022) — are one per installation and stay the same whatever the profile in use (owner, 2026-11-08).
+
+**PFL-055 — Every profile's figures (backend)**: The profiles are read in the order of PFL-023, the profile in use given with them, each with its number of accounts, its Global Value (ACC-027) with ACC-028's incomplete mark on that total (set by a hidden Global Value or Unrealized P&L alike), and its year-to-date percentage as of the read date — the current month row's (PRF-034, GPF-031), present in a profile's first year as an account's is (ACC-024) — each computed over that profile's accounts alone, in the reference currency (GPF-011), given with them; no figure is ever added across profiles.
+
+**PFL-055A — A profile with no figure (backend)**: A profile holding no account has a Global Value of 0 and no year-to-date percentage; a profile none of whose accounts has a dated transaction (GPF-012), or whose percentage has no positive denominator (PRF-032), has no year-to-date percentage either.
 
 ### Sync (060–069)
 

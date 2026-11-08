@@ -280,8 +280,17 @@ impl AccountService {
     /// when it is gone (PFL-014).
     pub async fn accounts_in_use(&self) -> StdResult<Vec<Account>, AccountError> {
         let in_use = self.profile_in_use().await?;
+        self.accounts_in_profile(&in_use).await
+    }
+
+    /// PFL-050 / PFL-055 — the accounts of one profile; an account whose profile was removed
+    /// elsewhere reads as the default profile's (PFL-061).
+    pub async fn accounts_in_profile(
+        &self,
+        profile_id: &str,
+    ) -> StdResult<Vec<Account>, AccountError> {
         let mut accounts = self.get_all().await?;
-        accounts.retain(|account| account.profile_id == in_use);
+        accounts.retain(|account| account.profile_id == profile_id);
         Ok(accounts)
     }
 
@@ -3106,6 +3115,8 @@ pub trait AccountServiceContract: Send + Sync {
     ) -> StdResult<HoldingSnapshot, AccountError>;
     /// PFL-050 / PFL-051 — the accounts of the profile in use.
     async fn accounts_in_use(&self) -> StdResult<Vec<Account>, AccountError>;
+    /// PFL-055 — the accounts of one profile.
+    async fn accounts_in_profile(&self, profile_id: &str) -> StdResult<Vec<Account>, AccountError>;
     /// PFL-051A — the account, refused when unknown or outside the profile in use.
     async fn account_in_profile_in_use(&self, account_id: &str)
         -> StdResult<Account, AccountError>;
@@ -3619,6 +3630,10 @@ impl AccountServiceContract for AccountService {
 
     async fn accounts_in_use(&self) -> StdResult<Vec<Account>, AccountError> {
         AccountService::accounts_in_use(self).await
+    }
+
+    async fn accounts_in_profile(&self, profile_id: &str) -> StdResult<Vec<Account>, AccountError> {
+        AccountService::accounts_in_profile(self, profile_id).await
     }
 
     async fn account_in_profile_in_use(
