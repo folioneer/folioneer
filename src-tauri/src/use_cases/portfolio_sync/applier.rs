@@ -126,6 +126,11 @@ impl ChangeApplier for ServiceChangeApplier {
                 .clashing_category_name(conn, identity, name)
                 .await
                 .map_err(|error| SyncError::database("apply: category names not read", error)),
+            RecordKind::Profile => self
+                .account_service
+                .clashing_profile_name(conn, identity, name)
+                .await
+                .map_err(|error| SyncError::database("apply: profile names not read", error)),
             _ => Ok(None),
         }
     }

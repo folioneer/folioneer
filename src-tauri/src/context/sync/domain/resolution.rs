@@ -548,10 +548,13 @@ pub fn account_parent(change: &Change) -> Option<String> {
     }
 }
 
-/// CFR-035 — the display name an account or category change carries, when any.
+/// CFR-035 / PFL-062A — the display name an account, category or profile change carries,
+/// when any.
 pub fn display_name(change: &Change) -> Option<String> {
     match change.record_kind {
-        RecordKind::Account | RecordKind::Category => change.content_field("name"),
+        RecordKind::Account | RecordKind::Category | RecordKind::Profile => {
+            change.content_field("name")
+        }
         _ => None,
     }
 }

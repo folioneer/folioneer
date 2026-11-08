@@ -2822,6 +2822,15 @@ pub trait AccountRepository: Send + Sync {
     ) -> Result<()>;
     /// PFL-012 / PFL-014 — the identifier of the profile in use.
     async fn profile_in_use(&self) -> Result<String>;
+    /// PFL-062A / CFR-035 — the rank of another profile carrying `name` (case ignored), on
+    /// `conn` — the lowest-ranked one, then by id; `None` when no other profile does or it
+    /// has never been ranked.
+    async fn clashing_profile_name_rank(
+        &self,
+        conn: &mut SqliteConnection,
+        profile_id: &str,
+        name: &str,
+    ) -> Result<Option<Rank>>;
     /// PFL-021 — the profile a new account goes into: `given` when it exists, the profile in use
     /// when none is given (PFL-012, PFL-014); `None` for an unknown `given`.
     async fn profile_for_new_account(&self, given: Option<String>) -> Result<Option<String>>;

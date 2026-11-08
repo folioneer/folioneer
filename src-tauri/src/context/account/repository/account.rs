@@ -1437,6 +1437,27 @@ impl AccountRepository for SqliteAccountRepository {
         Ok(())
     }
 
+    async fn clashing_profile_name_rank(
+        &self,
+        conn: &mut SqliteConnection,
+        profile_id: &str,
+        name: &str,
+    ) -> Result<Option<Rank>> {
+        let row = sqlx::query_as!(
+            RankRow,
+            r#"SELECT id AS identity, sync_logical_timestamp, sync_origin, sync_device_id
+               FROM profiles WHERE LOWER(name) = LOWER(?) AND id <> ?
+               ORDER BY sync_origin, sync_logical_timestamp, sync_device_id, id
+               LIMIT 1"#,
+            name,
+            profile_id
+        )
+        .fetch_optional(conn)
+        .await
+        .with_context(|| format!("Failed to look up profiles named {}", name))?;
+        Ok(row.and_then(RankRow::rank))
+    }
+
     async fn profile_in_use(&self) -> Result<String> {
         super::profile::profile_in_use(&self.pool).await
     }
