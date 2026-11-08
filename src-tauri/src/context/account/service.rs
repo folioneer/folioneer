@@ -2712,6 +2712,22 @@ impl AccountService {
             })
     }
 
+    /// PFL-062A / CFR-035 — the rank of another profile carrying `name`, on `conn`.
+    pub async fn clashing_profile_name(
+        &self,
+        conn: &mut SqliteConnection,
+        profile_id: &str,
+        name: &str,
+    ) -> StdResult<Option<Rank>, AccountError> {
+        self.account_repo
+            .clashing_profile_name_rank(conn, profile_id, name)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, name = %name, err = ?e, "clashing_profile_name: repository failure");
+                AccountError::DatabaseError
+            })
+    }
+
     /// The rank of another account named `name` (CFR-035), on the apply transaction's
     /// connection; `None` when none clashes.
     pub async fn clashing_account_name(

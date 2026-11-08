@@ -26,7 +26,7 @@ use folioneer_lib::use_cases::holding_transaction::HoldingTransactionUseCase;
 use folioneer_lib::use_cases::price_freshness::PriceFreshnessUseCase;
 use folioneer_lib::use_cases::profile_move::ProfileMoveUseCase;
 use folioneer_lib::use_cases::shared::price_fetch_log::SqlitePriceFetchLogRepository;
-use folioneer_lib::use_cases::transfer::{TransferFigures, TransferUseCase};
+use folioneer_lib::use_cases::transfer::{TransferError, TransferFigures, TransferUseCase};
 use std::sync::Arc;
 
 fn micro(v: i64) -> i64 {
@@ -34,6 +34,7 @@ fn micro(v: i64) -> i64 {
 }
 
 struct Ctx {
+    bus: Arc<SideEffectEventBus>,
     pool: sqlx::SqlitePool,
     currencies: Arc<CurrencyService>,
     creation: AccountCreationUseCase,
@@ -76,9 +77,10 @@ async fn ctx() -> Ctx {
         Box::new(SqliteCurrencyPairRepository::new(pool.clone())),
         Box::new(SqliteCurrencyRateRepository::new(pool.clone())),
     ));
-    let profiles = Arc::new(ProfileService::new(Box::new(SqliteProfileRepository::new(
-        pool.clone(),
-    ))));
+    let profiles = Arc::new(
+        ProfileService::new(Box::new(SqliteProfileRepository::new(pool.clone())))
+            .with_event_bus(Arc::clone(&bus)),
+    );
     Ctx {
         creation: AccountCreationUseCase::new(
             accounts.clone(),
@@ -91,6 +93,7 @@ async fn ctx() -> Ctx {
         transfer: TransferUseCase::new(accounts.clone(), assets.clone(), currencies.clone()),
         currencies,
         pool,
+        bus,
         accounts,
         assets,
     }
@@ -258,11 +261,12 @@ async fn pfl_033_no_transfer_across_profiles() {
         .move_account(&elsewhere, &parent)
         .await
         .expect("moved");
-    assert!(ctx
-        .transfer
-        .record_transfer(&from, &elsewhere, acme, figures())
-        .await
-        .is_err());
+    assert!(matches!(
+        ctx.transfer
+            .record_transfer(&from, &elsewhere, acme, figures())
+            .await,
+        Err(TransferError::Account(AccountError::TransferAcrossProfiles))
+    ));
 }
 
 // PFL-040 — only an empty profile is removed; never the default one; an unknown one is
@@ -502,4 +506,29 @@ async fn pfl_050_the_newest_price_date_reads_the_profile_in_use() {
     assert_eq!(read("default in use").await.as_deref(), Some("2025-06-01"));
     ctx.profiles.choose(&parent).await.expect("chosen");
     assert_eq!(read("parent in use").await.as_deref(), Some("2025-03-01"));
+}
+
+// PFL-034 / PFL-032A — creating, renaming, choosing and removing a profile are signalled by
+// `ProfileUpdated`, choosing the profile in use again by nothing; a move by `AccountUpdated`.
+#[tokio::test]
+async fn pfl_034_profile_changes_are_signalled() {
+    use folioneer_lib::core::Event;
+    let ctx = ctx().await;
+    let mut rx = ctx.bus.subscribe();
+    let parent = ctx.profiles.create("Parent").await.expect("created").id;
+    assert_eq!(rx.drain(), [Event::ProfileUpdated]);
+    ctx.profiles.rename(&parent, "Mum").await.expect("renamed");
+    assert_eq!(rx.drain(), [Event::ProfileUpdated]);
+    ctx.profiles.choose(&parent).await.expect("chosen");
+    assert_eq!(rx.drain(), [Event::ProfileUpdated]);
+    ctx.profiles.choose(&parent).await.expect("chosen again");
+    assert_eq!(rx.drain(), []);
+    let id = account(&ctx, "PEA").await;
+    rx.drain();
+    ctx.moving.move_account(&id, &parent).await.expect("moved");
+    assert!(rx.drain().contains(&Event::AccountUpdated));
+    let other = ctx.profiles.create("Other").await.expect("created").id;
+    rx.drain();
+    ctx.profiles.remove(&other).await.expect("removed");
+    assert_eq!(rx.drain(), [Event::ProfileUpdated]);
 }

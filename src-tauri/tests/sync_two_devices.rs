@@ -1119,6 +1119,53 @@ async fn pfl_061_an_account_whose_profile_is_removed_reads_as_the_default() {
     }
 }
 
+// PFL-064 — the default profile, held on every device with no change, has its rename synced.
+#[tokio::test]
+async fn pfl_064_a_rename_of_the_default_profile_is_synced() {
+    use folioneer_lib::context::account::DEFAULT_PROFILE_ID;
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop, _, _) = two_devices_sharing(dir.path()).await;
+    profile_service(&desktop)
+        .rename(DEFAULT_PROFILE_ID, "Me")
+        .await
+        .unwrap();
+    desktop.orchestrator.sync_now().await.unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+    let default = profile_service(&laptop)
+        .existing(DEFAULT_PROFILE_ID)
+        .await
+        .unwrap();
+    assert_eq!(default.name.as_deref(), Some("Me"));
+}
+
+// PFL-062A / CFR-035 — two profiles given one name on two devices at once both keep it and
+// the clash is reported.
+#[tokio::test]
+async fn pfl_062a_one_profile_name_given_twice_at_once_is_reported() {
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop, _, _) = two_devices_sharing(dir.path()).await;
+    profile_service(&desktop).create("Parent").await.unwrap();
+    profile_service(&laptop).create("parent").await.unwrap();
+    let first = desktop.orchestrator.sync_now().await.unwrap();
+    let second = laptop.orchestrator.sync_now().await.unwrap();
+    let third = desktop.orchestrator.sync_now().await.unwrap();
+    assert!(
+        first.notices_raised + second.notices_raised + third.notices_raised > 0,
+        "a profile name given on both devices at once is reported"
+    );
+    for ctx in [&desktop, &laptop] {
+        let names: Vec<Option<String>> = profile_service(ctx)
+            .list()
+            .await
+            .unwrap()
+            .profiles
+            .into_iter()
+            .map(|s| s.profile.name)
+            .collect();
+        assert_eq!(names.len(), 3, "both profiles keep the name");
+    }
+}
+
 // PFL-022 / PFL-062 — two accounts of one name in two profiles are no clash after a merge:
 // no notice is raised (CFR-035 reports a name shared within one profile only).
 #[tokio::test]
