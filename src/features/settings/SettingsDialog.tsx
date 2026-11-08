@@ -13,10 +13,11 @@ import { ReferenceCurrencySection } from "./reference_currency/ReferenceCurrency
 import { ScheduledFetchSection } from "./scheduled_fetch/ScheduledFetchSection";
 import { SyncSection } from "./sync/SyncSection";
 import { type LanguageChoice, useSettings } from "./useSettings";
+import { YourDataSection } from "./your_data/YourDataSection";
 
-type SettingsSection = "general" | "prices" | "sync" | "agents";
+type SettingsSection = "general" | "prices" | "sync" | "agents" | "your_data";
 
-const SECTIONS: SettingsSection[] = ["general", "prices", "sync", "agents"];
+const SECTIONS: SettingsSection[] = ["general", "prices", "sync", "agents", "your_data"];
 
 const LANGUAGE_OPTIONS: { value: LanguageChoice; labelKey: string }[] = [
   { value: "auto", labelKey: "settings.language_auto" },
@@ -125,6 +126,7 @@ function SettingsContent({ titleId, onClose }: { titleId: string; onClose: () =>
           {section === "prices" && <PricesSection />}
           {section === "sync" && <SyncSection />}
           {section === "agents" && <AgentsAllowedSetting />}
+          {section === "your_data" && <YourDataSection />}
         </div>
       </div>
     </div>

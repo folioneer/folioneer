@@ -33,6 +33,7 @@ Represents a single purchase (or sale) event for an asset in an account.
 | `fees`             | Transaction fees in the account's currency (stored in micros).                                                                                                                                                                                               |
 | `total_amount`     | Total cost in account's currency (incl. fees, stored in micros).                                                                                                                                                                                             |
 | `note`             | Optional user comment.                                                                                                                                                                                                                                       |
+| `created_at`       | The moment the transaction was entered (ISO 8601, UTC): the order of transactions sharing a date, unknown for one entered before it was kept (TRX-036).                                                                                                      |
 
 ### Holding
 
@@ -114,7 +115,7 @@ Represents the current state of a position (asset held within an account). Compu
 
 **TRX-035 — Deletion confirmation (frontend)**: Deleting a transaction requires a user confirmation dialog to prevent accidental data loss.
 
-**TRX-036 — Chronological integrity (backend)**: Recalculations of `Holding` state following a transaction mutation must process all associated transactions for the specific `(account_id, asset_id)` pair in chronological order (`date ASC, created_at ASC`) to ensure the cost basis and quantity remain accurate. When two transactions share the same date, the one with the earlier `created_at` timestamp is processed first. The `transactions` table must include a `created_at TEXT NOT NULL` column (ISO 8601, default `datetime('now')`) to guarantee this ordering.
+**TRX-036 — Chronological integrity (backend)**: Recalculations of `Holding` state following a transaction mutation must process all associated transactions for the specific `(account_id, asset_id)` pair in chronological order (`date ASC, created_at ASC`) to ensure the cost basis and quantity remain accurate. When two transactions share the same date, the one with the earlier `created_at` timestamp is processed first. Every transaction carries the moment it was entered (`created_at`, ISO 8601 in UTC), set when it is recorded, to guarantee this ordering. A transaction recorded before that moment was kept holds `1970-01-01T00:00:00Z`, the moment it was entered being unknown, so it is processed first on its date.
 
 **TRX-037 — TransactionUpdated event (backend)**: After any successful transaction mutation (create, update, or delete), the `TransactionService` (owned by the `transaction/` bounded context) publishes a `TransactionUpdated` event on the event bus. The use case delegates to the service; the service owns the event publication (B8 compliance). This event is distinct from `AccountUpdated`: `AccountUpdated` signals structural account changes; `TransactionUpdated` signals position-data changes.
 

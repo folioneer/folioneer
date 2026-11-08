@@ -228,6 +228,7 @@
     "section_prices": "Kurse",
     "section_sync": "Synchronisierung",
     "section_agents": "KI-Agenten",
+    "section_your_data": "Ihre Daten",
     "language_label": "Sprache",
     "language_auto": "Systemstandard",
     "language_en": "English",
@@ -269,7 +270,21 @@
     "agents_unavailable_description": "Auf diesem System noch nicht verfügbar. Nichts kann sich verbinden.",
     "reference_currency_label": "Referenzwährung",
     "reference_currency_help": "Die Summen, die Performance und die Kursbewegungen des Portfolios werden in dieser Währung angegeben, auf jedem Computer der Synchronisierung.",
-    "reference_currency_fetching": "Die Kursverläufe werden abgerufen…"
+    "reference_currency_fetching": "Die Kursverläufe werden abgerufen…",
+    "your_data": {
+      "description": "Jedes Konto, jede Anlage, jede Transaktion und jeder Kurs, geschrieben dorthin, wo Sie es auf diesem Computer wählen. Nichts wird irgendwohin gesendet.",
+      "format_label": "Format",
+      "format_csv": "CSV — eine Datei je Tabelle, in einem Ordner",
+      "format_json": "JSON — eine Datei",
+      "action_export": "Exportieren…",
+      "working": "Export läuft…",
+      "done": "Exportiert nach {{name}} — Konten: {{accounts}}, Anlagen: {{assets}}, Transaktionen: {{transactions}}, Kurse: {{prices}}.",
+      "failed": {
+        "folder_unavailable": "Nichts wurde geschrieben: Der Ordner ist nicht verfügbar.",
+        "write_failed": "Nichts wurde geschrieben: In den Ordner konnte nicht geschrieben werden.",
+        "database_error": "Nichts wurde geschrieben: Das Portfolio konnte nicht gelesen werden."
+      }
+    }
   },
   "agent": {
     "connection_title": "Ein KI-Agent bittet um Verbindung",

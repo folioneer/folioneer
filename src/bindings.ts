@@ -1260,6 +1260,18 @@ async getPriceFreshness() : Promise<Result<PriceFreshness, PriceFreshnessError>>
 }
 },
 /**
+ * EXP-010 to EXP-016 — writes every account, asset, transaction and price into `folder`,
+ * as CSV or JSON, and says where and how much.
+ */
+async exportPortfolio(format: ExportFormat, folder: string) : Promise<Result<ExportReport, DataExportError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_portfolio", { format, folder }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Fills the price history of one holding over the held period, on the dates that
  * carry no price (MKT-190–199). Returns the closes written and the ones whose
  * date already had a price.
@@ -1405,8 +1417,8 @@ event: "event"
 
 /** user-defined constants **/
 
-export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
+export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 
 /** user-defined types **/
 
@@ -3214,6 +3226,23 @@ export type CurrencyRateSource =
  */
 "Ecb"
 /**
+ * Flat error enum for `export_portfolio`; serializes as `{ "code": "..." }`.
+ */
+export type DataExportError = 
+/**
+ * EXP-015 — the chosen folder does not exist or is not a folder.
+ */
+{ code: "FolderUnavailable" } | 
+/**
+ * EXP-015 — writing failed (a folder that cannot be written, a full disk); nothing of
+ * the export is left behind.
+ */
+{ code: "WriteFailed" } | 
+/**
+ * A read failed; the cause is logged server-side.
+ */
+{ code: "DatabaseError" }
+/**
  * The order a date is written in (IMP-014).
  */
 export type DateFormat = 
@@ -3550,6 +3579,42 @@ code: string;
  * Human-readable display name (e.g. "Euronext Paris").
  */
 label: string }
+/**
+ * EXP-010 — the export's form.
+ */
+export type ExportFormat = 
+/**
+ * A folder of CSV files (EXP-011).
+ */
+"Csv" | 
+/**
+ * One JSON file (EXP-012).
+ */
+"Json"
+/**
+ * EXP-016 — where the export went and what it holds.
+ */
+export type ExportReport = { 
+/**
+ * The folder or the file written.
+ */
+written_to: string; 
+/**
+ * How many accounts it holds.
+ */
+accounts: number; 
+/**
+ * How many assets it holds.
+ */
+assets: number; 
+/**
+ * How many transactions it holds.
+ */
+transactions: number; 
+/**
+ * How many prices it holds.
+ */
+prices: number }
 /**
  * Recurrence frequency for a management fee schedule (FEE-030).
  */
