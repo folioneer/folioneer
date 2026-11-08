@@ -67,7 +67,7 @@ The profile this installation works in, kept on this device only (PFL-012).
 
 **PFL-032A — Choosing it again (backend)**: Choosing the profile already in use changes nothing and signals nothing.
 
-**PFL-033 — No transfer across profiles (backend)**: A transfer links two accounts of one profile (owner, 2026-11-08): moving an account a transfer links to an account that would then be in another profile is rejected with a specific error — recording such a transfer is TRF-010's refusal: the account moves only once the transfer is cancelled, a profile being isolated (Context).
+**PFL-033 — No transfer across profiles (backend)**: A transfer links two accounts of one profile (owner, 2026-11-08): moving an account a transfer links to an account that would then be in another profile is rejected with a specific error — recording such a transfer is TRF-010's refusal: the account moves only once the transfer is cancelled.
 
 **PFL-034 — Signaled (backend)**: Creating, renaming or removing a profile and choosing the profile in use, except as PFL-032A says, are signaled by `ProfileUpdated`; moving an account by `AccountUpdated` (ACC-022), which the counts of PFL-023 follow too.
 
@@ -81,9 +81,9 @@ The profile this installation works in, kept on this device only (PFL-012).
 
 **PFL-051 — Accounts within one profile (backend)**: Listing the accounts and finding one by its name read the accounts of the profile in use only: the list of the accounts the window reads, the command line's (CLI-018) and an AI agent's (AGT-040, ACC-042), and an account named on the command line or by an agent, to read or to record (CLI-011, AGT-043, AGT-048); two accounts of one name in two profiles are therefore never ambiguous (PFL-022).
 
-**PFL-051A — An import within the profile in use (backend)**: An import goes into an account of the profile in use only: one of another profile is rejected with a specific error (owner, 2026-11-08), whichever surface names it — the window, the command line or an AI agent.
+**PFL-051A — An import within the profile in use (backend)**: An import goes into an account of the profile in use only: one of another profile is rejected with a specific error (owner, 2026-11-08), whatever surface names the account.
 
-**PFL-052 — What stays shared (backend)**: The asset base — assets and their categories — and the prices — asset prices and currency rates — are shared by every profile (owner, 2026-11-08) — a price refresh covers every profile's holdings (MKT-122) — and so are the one reference currency (GPF-011) and the one portfolio country (ACC-041) (owner, 2026-11-08).
+**PFL-052 — What stays shared (backend)**: The asset base — assets and their categories — and the prices — asset prices and currency rates — are shared by every profile (owner, 2026-11-08) — a refresh of every price covers every profile's holdings (MKT-122, MKT-130, SPF-040) — and so are the one reference currency (GPF-011) and the one portfolio country (ACC-041) (owner, 2026-11-08).
 
 **PFL-054 — This installation's settings (backend)**: This installation's own settings (SYN-023) — among them the import mappers (IMP-020), the price provider (MKT-214), the scheduled fetch (SPF-011) and the agent connection (AGT-022) — are one per installation and stay the same whatever the profile in use (owner, 2026-11-08).
 

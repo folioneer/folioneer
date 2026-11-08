@@ -93,7 +93,7 @@ One account's share of the report.
 
 ### Per-account entries (030–039)
 
-**PMV-030 — Every account is listed (backend)**: The report carries one entry per account, including accounts whose value did not move and accounts holding no priced asset. The user can therefore tell "did not move" apart from "was not looked at". The accounts are those of the profile in use when the refresh starts (PFL-050). The dates of PMV-050 to PMV-052 read the holdings in scope of those accounts; the completion counts (MKT-119) stay the refresh's, over every profile.
+**PMV-030 — Every account is listed (backend)**: The report carries one entry per account, including accounts whose value did not move and accounts holding no priced asset. The user can therefore tell "did not move" apart from "was not looked at". The accounts are those of the profile in use when the refresh starts (PFL-050).
 
 **PMV-031 — An unmoved account carries no movement figure (frontend + backend)**: When an account's two values are equal, neither a proportion nor an amount is reported for it, and the entry is presented without movement figures rather than as a zero movement. Both values are still carried, so an unmoved entry stays distinguishable from one whose proportion is undefined (PMV-025).
 
@@ -105,7 +105,7 @@ One account's share of the report.
 
 ### Portfolio total (040–049)
 
-**PMV-040 — The report carries a portfolio total in the reference currency (backend)**: Both readings are also reported for the accounts of the report as a whole, converted to the cross-account reference currency the application already uses for aggregation (GPF-011). The report states that currency rather than leaving it to be assumed. The accounts are those of the profile in use when the refresh starts (PFL-050).
+**PMV-040 — The report carries a portfolio total in the reference currency (backend)**: Both readings are also reported as a total over the accounts of PMV-030, converted to the cross-account reference currency the application already uses for aggregation (GPF-011). The report states that currency rather than leaving it to be assumed.
 
 **PMV-041 — The total's movement is computed from the totals (backend)**: The portfolio movement is derived from the two converted totals, never by combining the per-account proportions.
 
@@ -121,7 +121,7 @@ One account's share of the report.
 
 ### Observation dates (050–059)
 
-**PMV-050 — The report states the two observation dates (frontend + backend)**: The report carries the observation date the portfolio carried before the refresh and the one the refresh produced, so the user reads the movement as being between two dated points. Holdings do not all carry the same observation date — a venue closed on Friday and one closed on Tuesday disagree — so each date is the most recent observation date across every holding in scope at that moment, read as "since prices last moved" rather than as a date every holding shares.
+**PMV-050 — The report states the two observation dates (frontend + backend)**: The report carries the observation date the portfolio carried before the refresh and the one the refresh produced, so the user reads the movement as being between two dated points. Holdings do not all carry the same observation date — a venue closed on Friday and one closed on Tuesday disagree — so each date is the most recent observation date across every holding in scope at that moment, read as "since prices last moved" rather than as a date every holding shares. The holdings it reads are those of the report's accounts (PMV-030).
 
 **PMV-051 — A refresh that produced no later date shows one date (frontend + backend)**: When the refresh obtained no observation date later than the one the portfolio already carried, the report presents that single date instead of two identical ones. This says nothing about whether values moved: a refresh can overwrite a price at the same observation date (MKT-025), so prices may well have changed. Whether anything moved is decided by the values alone (PMV-060).
 
