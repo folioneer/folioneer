@@ -43,6 +43,17 @@ an account — quantity held, average price (VWAP, or of its lots under FIFO —
 
 > Status: confirmed
 
+### Profile
+
+A set of accounts — the owner's household, a relative's — each account in exactly one, so
+that every figure computed across accounts stays within one profile. It is the closest thing
+to a login shared on one installation (owner, 2026-11-08): isolated from the others; the
+assets, their categories and the prices and currency rates are shared (PFL-052). The **profile in use** is the one this computer works in; the
+**default profile** is the one every account from before profiles belongs to (PFL-013), and the one an account whose profile was removed reads as (PFL-061). In
+French: "Profil"; in German: "Profil" (owner, 2026-11-07, #278).
+
+> Status: confirmed
+
 ### Cost basis method
 
 How an account sets the cost of the units that leave it: the weighted average (every unit

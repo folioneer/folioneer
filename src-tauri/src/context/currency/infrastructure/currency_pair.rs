@@ -219,6 +219,7 @@ impl CurrencyPairRepository for SqliteCurrencyPairRepository {
             | RecordKind::AssetPrice
             | RecordKind::ReportedSplit
             | RecordKind::HoldingNote
+            | RecordKind::Profile
             | RecordKind::PortfolioSetting => Ok(None),
         }
     }
@@ -323,6 +324,7 @@ impl CurrencyPairRepository for SqliteCurrencyPairRepository {
             | RecordKind::AssetPrice
             | RecordKind::ReportedSplit
             | RecordKind::HoldingNote
+            | RecordKind::Profile
             | RecordKind::PortfolioSetting => {}
         }
         Ok(())

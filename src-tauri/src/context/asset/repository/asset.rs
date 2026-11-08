@@ -624,6 +624,7 @@ impl AssetRepository for SqliteAssetRepository {
             | RecordKind::CurrencyPair
             | RecordKind::CurrencyRate
             | RecordKind::HoldingNote
+            | RecordKind::Profile
             | RecordKind::PortfolioSetting => Ok(None),
         }
     }
@@ -814,6 +815,7 @@ impl AssetRepository for SqliteAssetRepository {
             | RecordKind::CurrencyPair
             | RecordKind::CurrencyRate
             | RecordKind::HoldingNote
+            | RecordKind::Profile
             | RecordKind::PortfolioSetting => {}
         }
         Ok(())

@@ -5,6 +5,8 @@ use super::domain::{
     all_wrappers, country_offers, generic_wrapper_ids, offered_countries, Account, CostBasisMethod,
     FeeFrequency, FeeSchedule, HoldingNote, ThresholdDirection, Wrapper, PORTFOLIO_COUNTRY,
 };
+use super::domain::{Profile, ProfileSummary};
+use super::ProfileService;
 use crate::context::account::{
     AccountError, AccountJournal, HoldingLots, HoldingSnapshotView, ImpliedCostBasis,
     JournalFilter, TransactionView,
@@ -12,6 +14,7 @@ use crate::context::account::{
 use crate::AppState;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use std::sync::Arc;
 use tauri::State;
 
 // --- DTOs ---
@@ -382,4 +385,44 @@ pub async fn delete_holding_note(
         .account_service
         .delete_holding_note(&dto.account_id, &dto.asset_id)
         .await
+}
+
+/// PFL-023 — every profile with its account count, the default one first.
+#[tauri::command]
+#[specta::specta]
+pub async fn list_profiles(
+    profiles: State<'_, Arc<ProfileService>>,
+) -> Result<Vec<ProfileSummary>, AccountError> {
+    profiles.list().await
+}
+
+/// PFL-020 — creates a profile.
+#[tauri::command]
+#[specta::specta]
+pub async fn create_profile(
+    profiles: State<'_, Arc<ProfileService>>,
+    name: String,
+) -> Result<Profile, AccountError> {
+    profiles.create(&name).await
+}
+
+/// PFL-030 — renames a profile, the default one included.
+#[tauri::command]
+#[specta::specta]
+pub async fn rename_profile(
+    profiles: State<'_, Arc<ProfileService>>,
+    profile_id: String,
+    name: String,
+) -> Result<Profile, AccountError> {
+    profiles.rename(&profile_id, &name).await
+}
+
+/// PFL-040 — removes a profile holding no account.
+#[tauri::command]
+#[specta::specta]
+pub async fn remove_profile(
+    profiles: State<'_, Arc<ProfileService>>,
+    profile_id: String,
+) -> Result<(), AccountError> {
+    profiles.remove(&profile_id).await
 }

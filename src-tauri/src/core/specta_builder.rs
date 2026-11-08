@@ -20,6 +20,8 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             asset::AssetCreationDefaults::current(),
         )
         .constant("SYSTEM_CATEGORY_IDS", asset::SYSTEM_CATEGORY_IDS)
+        // PFL-011 — the default profile, told apart once named.
+        .constant("DEFAULT_PROFILE_ID", account::DEFAULT_PROFILE_ID)
         .typ::<asset::Asset>()
         .typ::<asset::AssetCategory>()
         .typ::<asset::AssetClass>()
@@ -175,6 +177,11 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             account::set_account_cost_basis_method,
             account::get_implied_cost_basis,
             account::get_holding_lots,
+            account::list_profiles,
+            account::create_profile,
+            account::rename_profile,
+            account::remove_profile,
+            crate::use_cases::profile_move::move_account_to_profile,
             account::get_asset_ids_for_account,
             account::get_transactions,
             account::get_account_journal,

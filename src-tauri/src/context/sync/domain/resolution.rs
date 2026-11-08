@@ -520,10 +520,12 @@ pub fn parent_references(change: &Change) -> Vec<(RecordKind, String)> {
                 _ => None,
             },
         ),
+        // PFL-061 — an account's profile is no reference: a removed one reads as the default.
         RecordKind::Account
         | RecordKind::Category
         | RecordKind::CurrencyPair
-        | RecordKind::PortfolioSetting => {}
+        | RecordKind::PortfolioSetting
+        | RecordKind::Profile => {}
     }
     references
 }

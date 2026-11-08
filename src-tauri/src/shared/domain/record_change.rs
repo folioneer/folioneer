@@ -48,6 +48,8 @@ pub enum RecordKind {
     PortfolioSetting,
     /// A split a price provider reports for an asset, identified by (asset_id, date) (MKT-230).
     ReportedSplit,
+    /// A profile, identified by its own id (PFL-060).
+    Profile,
 }
 
 /// Whether the user made the change or the application generated it on its own (CFR-016).
@@ -279,12 +281,13 @@ mod tests {
             RecordKind::HoldingNote,
             RecordKind::PortfolioSetting,
             RecordKind::ReportedSplit,
+            RecordKind::Profile,
         ];
         let unique: std::collections::HashSet<_> = kinds.iter().collect();
         assert_eq!(
             unique.len(),
-            12,
-            "SYN-021 lists exactly twelve synced record kinds"
+            13,
+            "SYN-021 lists exactly thirteen synced record kinds"
         );
     }
 

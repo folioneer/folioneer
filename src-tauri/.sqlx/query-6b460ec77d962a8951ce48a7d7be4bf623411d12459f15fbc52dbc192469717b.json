@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM profiles\n               WHERE id = ? AND id != 'default-profile'\n                 AND NOT EXISTS (SELECT 1 FROM accounts WHERE accounts.profile_id = profiles.id)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "6b460ec77d962a8951ce48a7d7be4bf623411d12459f15fbc52dbc192469717b"
+}

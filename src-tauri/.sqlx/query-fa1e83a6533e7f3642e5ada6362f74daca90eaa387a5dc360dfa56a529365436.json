@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method FROM accounts",
+  "query": "SELECT id, name, bank_name, currency, management_fees_enabled,\n                              country, wrapper, cost_basis_method, profile_id,\n                              sync_logical_timestamp, sync_origin, sync_device_id\n                       FROM accounts WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -42,10 +42,30 @@
         "name": "cost_basis_method",
         "ordinal": 7,
         "type_info": "Text"
+      },
+      {
+        "name": "profile_id",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 11,
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false,
@@ -55,8 +75,12 @@
       false,
       true,
       true,
-      false
+      false,
+      false,
+      true,
+      true,
+      true
     ]
   },
-  "hash": "0b12cd78f8257a2b25e8263bdb72b55dbe0cf45db86043099718e76fb5809989"
+  "hash": "fa1e83a6533e7f3642e5ada6362f74daca90eaa387a5dc360dfa56a529365436"
 }

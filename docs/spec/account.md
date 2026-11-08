@@ -16,7 +16,7 @@ A financial account owned by the user.
 
 | Field     | Business meaning                                                                                                                         |
 | --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`    | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among all accounts (case-insensitive).                             |
+| `name`    | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among the accounts of its profile (case-insensitive, ACC-003).     |
 | `country` | The account's own country (two upper-case letters), when one is set; absent otherwise (ACC-041).                                         |
 | `wrapper` | The identifier of the tax wrapper the account sits in, normally one of the lists of ACC-040; absent when none is set (ACC-043, ACC-044). |
 
@@ -42,7 +42,7 @@ The total of every account, read together with the account summaries (ACC-027). 
 
 **ACC-002 — Account validation (backend)** _(formerly R2)_: An `Account` is valid if and only if its `name` (after ACC-001 normalisation) is non-empty. Any violation is rejected with an explicit error.
 
-**ACC-003 — Name uniqueness (backend + frontend)** _(formerly R3)_: No two accounts may share the same name (comparison is performed on the normalised name per ACC-001, case-insensitive). Any create or edit operation resulting in a duplicate is rejected by the backend with an explicit error. ACC-001, ACC-002, and ACC-003 apply to both creation and modification.
+**ACC-003 — Name uniqueness (backend)** _(formerly R3)_: No two accounts of one profile share a name (PFL-022; comparison is performed on the normalised name per ACC-001, case-insensitive). Any create or edit operation resulting in a duplicate is rejected with a specific error. ACC-001, ACC-002, and ACC-003 apply to both creation and modification.
 
 **ACC-004 — No update frequency (backend + frontend)** _(formerly R4)_: An account carries no update frequency: nothing in the application depends on how often its figures are updated, so the account form asks for none and the account table shows none (ACC-008, ACC-016, ACC-017). An account change written before data format version 8 carries one, which is ignored (SYN-038).
 
@@ -154,7 +154,7 @@ The tax wrapper an account sits in — a PEA, an assurance vie, a Depot — is a
 
 ### Events
 
-**ACC-022 — AccountUpdated event (backend)** _(new)_: After any successful account mutation (create per ACC-001/002/003, update per ACC-001/002/003, delete per ACC-005/006), the `AccountService` (owned by the `account/` bounded context) publishes an `AccountUpdated` event on the event bus. The service owns the event publication (B8 compliance). This event is distinct from `TransactionUpdated`: `AccountUpdated` signals structural account changes; `TransactionUpdated` signals position-data changes.
+**ACC-022 — AccountUpdated event (backend)** _(new)_: After any successful account mutation (create per ACC-001/002/003, update per ACC-001/002/003, a move to another profile per PFL-031, delete per ACC-005/006), the `AccountService` (owned by the `account/` bounded context) publishes an `AccountUpdated` event on the event bus. The service owns the event publication (B8 compliance). This event is distinct from `TransactionUpdated`: `AccountUpdated` signals structural account changes; `TransactionUpdated` signals position-data changes.
 
 ---
 

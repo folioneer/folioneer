@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) AS \"count!: i64\" FROM profiles\n               WHERE name IS NOT NULL AND LOWER(name) = LOWER(?) AND id != ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1071e75d0b82d521f9ee0aed16fab13eab56713cf8e042352178bfd8a068f2e8"
+}

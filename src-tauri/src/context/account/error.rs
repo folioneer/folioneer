@@ -252,9 +252,30 @@ pub enum AccountError {
         /// The ID the caller asked for.
         account_id: String,
     },
-    /// Account name (case-insensitive) collides with an existing one.
+    /// Account name (case-insensitive) collides with an existing one of its profile (PFL-022).
     #[error("Account name already exists")]
     NameAlreadyExists,
+    /// PFL-020 — a profile's name is empty or whitespace-only.
+    #[error("Profile name cannot be empty")]
+    ProfileNameEmpty,
+    /// PFL-020 / PFL-030 — another profile has this name (case-insensitive).
+    #[error("Profile name already exists")]
+    ProfileNameAlreadyExists,
+    /// PFL-030 / PFL-031 / PFL-040 — no profile has this identifier.
+    #[error("Profile not found: {profile_id}")]
+    ProfileNotFound {
+        /// The ID the caller asked for.
+        profile_id: String,
+    },
+    /// PFL-040 — a profile that holds an account is not removed.
+    #[error("The profile holds accounts")]
+    ProfileNotEmpty,
+    /// PFL-011 / PFL-040 — the default profile is never removed.
+    #[error("The default profile cannot be removed")]
+    DefaultProfileKept,
+    /// PFL-033 — a transfer links two accounts of one profile.
+    #[error("A transfer cannot link two profiles")]
+    TransferAcrossProfiles,
     /// The application's own write (a generated fee deduction) was refused: the user's
     /// removal of the record outranks it (CFR-016). Never user-facing — the generation
     /// path treats it as a skipped period (FEE-047).
