@@ -83,7 +83,7 @@ The profile this installation works in, kept on this device only (PFL-012).
 
 **PFL-051A — An import within the profile in use (backend)**: An import goes into an account of the profile in use only: one of another profile is rejected with a specific error (owner, 2026-11-08), whichever surface names it — the window, the command line or an AI agent.
 
-**PFL-052 — What stays shared (backend)**: The asset base — assets and their categories — and the prices — asset prices and currency rates — are shared by every profile (owner, 2026-11-08) — a price refresh covers every profile's holdings (MKT-122) — and so are, until the per-profile setting lands (Open Questions), the one reference currency (GPF-011) and the one portfolio country (ACC-041).
+**PFL-052 — What stays shared (backend)**: The asset base — assets and their categories — and the prices — asset prices and currency rates — are shared by every profile (owner, 2026-11-08) — a price refresh covers every profile's holdings (MKT-122) — and so are the one reference currency (GPF-011) and the one portfolio country (ACC-041) (owner, 2026-11-08).
 
 **PFL-054 — This installation's settings (backend)**: This installation's own settings (SYN-023) — among them the import mappers (IMP-020), the price provider (MKT-214), the scheduled fetch (SPF-011) and the agent connection (AGT-022) — are one per installation and stay the same whatever the profile in use (owner, 2026-11-08).
 
@@ -116,7 +116,7 @@ The profile this installation works in, kept on this device only (PFL-012).
 - [x] Account names unique across profiles? — Within a profile only (owner, 2026-11-08).
 - [ ] An export holds every profile's accounts; whether it records each account's profile is #793's or a follow-up's to settle.
 - [x] What do profiles share? — Each is isolated, the closest thing to a login shared on one installation; the asset base and the prices are shared (owner, 2026-11-08).
-- [ ] A reference currency and a country per profile, a new profile starting with the default profile's (owner, 2026-11-08): the rule and its amendments land with its implementation — the portfolio setting keyed by profile (FXR-015, FXR-120 to FXR-126, CFR-012, SYN-021, a SYN-038 version), GPF-011, ACC-041, ACC-042, CBM-014, EXP-021, the GPF context and the glossary's "Reference currency" and "Portfolio's country".
+- [x] A reference currency and a country per profile? — No: one for the portfolio, shared by every profile, as today (owner, 2026-11-08, superseding an earlier choice); per profile can come later.
 - [x] This installation's own settings — the import mappers (IMP-020), the price provider (MKT-214), the scheduled fetch (SPF-011), the agent connection (AGT-022)? — One per installation, shared by every profile (owner, 2026-11-08).
 - [x] Move two accounts a transfer links together? — No: a profile is isolated; the transfer is cancelled first (owner, 2026-11-08).
 - [x] Figures and lists within one profile? — Those of the profile in use (owner, 2026-10-17 and 2026-11-08; PFL-050, PFL-051); another profile given, and an agent's correction or cancellation of a transaction of an account outside the profile in use (AGT-050, AGT-051), are #770's.
