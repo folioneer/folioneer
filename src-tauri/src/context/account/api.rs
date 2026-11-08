@@ -5,7 +5,7 @@ use super::domain::{
     all_wrappers, country_offers, generic_wrapper_ids, offered_countries, Account, CostBasisMethod,
     FeeFrequency, FeeSchedule, HoldingNote, ThresholdDirection, Wrapper, PORTFOLIO_COUNTRY,
 };
-use super::domain::{Profile, ProfileSummary};
+use super::domain::{Profile, ProfileList};
 use super::ProfileService;
 use crate::context::account::{
     AccountError, AccountJournal, HoldingLots, HoldingSnapshotView, ImpliedCostBasis,
@@ -387,13 +387,24 @@ pub async fn delete_holding_note(
         .await
 }
 
-/// PFL-023 — every profile with its account count, the default one first.
+/// PFL-023 — every profile with its account count, the default one first, and the profile
+/// in use (PFL-012).
 #[tauri::command]
 #[specta::specta]
 pub async fn list_profiles(
     profiles: State<'_, Arc<ProfileService>>,
-) -> Result<Vec<ProfileSummary>, AccountError> {
+) -> Result<ProfileList, AccountError> {
     profiles.list().await
+}
+
+/// PFL-032 — makes an existing profile the profile in use.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_profile_in_use(
+    profiles: State<'_, Arc<ProfileService>>,
+    profile_id: String,
+) -> Result<(), AccountError> {
+    profiles.choose(&profile_id).await
 }
 
 /// PFL-020 — creates a profile.

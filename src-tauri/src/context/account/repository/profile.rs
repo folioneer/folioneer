@@ -5,7 +5,9 @@ use async_trait::async_trait;
 use sqlx::{Pool, Sqlite, SqliteConnection};
 use std::sync::Arc;
 
-use crate::context::account::domain::{Profile, ProfileRepository, ProfileSummary};
+use crate::context::account::domain::{
+    Profile, ProfileRepository, ProfileSummary, DEFAULT_PROFILE_ID,
+};
 use crate::shared::domain::{
     ChangeDraft, LogicalTimestamp, Operation, Origin, RecordIdentity, RecordKind,
 };
@@ -54,6 +56,21 @@ async fn current_timestamp(
     Ok(stored
         .flatten()
         .and_then(|timestamp| LogicalTimestamp::from_wire(&timestamp)))
+}
+
+/// PFL-012 / PFL-014 — the profile in use, read on `pool`: the chosen one while it exists,
+/// the default profile otherwise. The one query both repositories of the context use.
+pub(super) async fn profile_in_use(pool: &Pool<Sqlite>) -> Result<String> {
+    let row = sqlx::query!(
+        r#"SELECT COALESCE(
+               (SELECT p.id FROM profiles p JOIN profile_in_use u ON u.profile_id = p.id),
+               ?) AS "id!: String""#,
+        DEFAULT_PROFILE_ID
+    )
+    .fetch_one(pool)
+    .await
+    .context("read the profile in use")?;
+    Ok(row.id)
 }
 
 #[async_trait]
@@ -147,6 +164,22 @@ impl ProfileRepository for SqliteProfileRepository {
             .context("stamp profile rank")?;
         }
         tx.commit().await.context("commit save profile")?;
+        Ok(())
+    }
+
+    async fn in_use(&self) -> Result<String> {
+        profile_in_use(&self.pool).await
+    }
+
+    async fn set_in_use(&self, id: &str) -> Result<()> {
+        sqlx::query!(
+            "INSERT INTO profile_in_use (id, profile_id) VALUES (1, ?)
+             ON CONFLICT(id) DO UPDATE SET profile_id = excluded.profile_id",
+            id
+        )
+        .execute(&self.pool)
+        .await
+        .context("choose the profile in use")?;
         Ok(())
     }
 

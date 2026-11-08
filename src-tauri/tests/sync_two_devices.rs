@@ -1058,9 +1058,13 @@ async fn pfl_060_profiles_are_the_other_devices() {
     laptop.orchestrator.sync_now().await.unwrap();
 
     let listed = profiles(&laptop).list().await.unwrap();
-    let names: Vec<Option<String>> = listed.iter().map(|s| s.profile.name.clone()).collect();
+    let names: Vec<Option<String>> = listed
+        .profiles
+        .iter()
+        .map(|s| s.profile.name.clone())
+        .collect();
     assert_eq!(names, [None, Some("Parent".into())]);
-    assert_eq!(listed[0].profile.id, DEFAULT_PROFILE_ID);
+    assert_eq!(listed.profiles[0].profile.id, DEFAULT_PROFILE_ID);
     let moved = laptop
         .account_service
         .get_by_id(&account_id)
@@ -1107,9 +1111,9 @@ async fn pfl_061_an_account_whose_profile_is_removed_reads_as_the_default() {
             .unwrap();
         assert_eq!(account.profile_id, DEFAULT_PROFILE_ID);
         let listed = profile_service(ctx).list().await.unwrap();
-        assert_eq!(listed.len(), 1, "the removed profile is gone");
+        assert_eq!(listed.profiles.len(), 1, "the removed profile is gone");
         assert_eq!(
-            listed[0].account_count, 1,
+            listed.profiles[0].account_count, 1,
             "its account counts in the default"
         );
     }

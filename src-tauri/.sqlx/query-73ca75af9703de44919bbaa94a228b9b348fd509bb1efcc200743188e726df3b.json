@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COALESCE(\n               (SELECT p.id FROM profiles p JOIN profile_in_use u ON u.profile_id = p.id),\n               ?) AS \"id!: String\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "73ca75af9703de44919bbaa94a228b9b348fd509bb1efcc200743188e726df3b"
+}

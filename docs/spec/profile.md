@@ -33,17 +33,21 @@ A set of accounts the owner follows apart from the others, named or, for the def
 
 **PFL-011 — The default profile (backend)**: A portfolio always has its default profile, created without a name; it is one and the same profile on every device of the sync.
 
+**PFL-012 — The profile in use (backend)**: The profile in use is this installation's: kept across restarts and never synced. It is the default profile until another is chosen.
+
 **PFL-013 — Accounts from before profiles (backend)**: Every account that existed before profiles belongs to the default profile.
+
+**PFL-014 — The profile in use is gone (backend)**: A profile in use that no longer exists — removed here or on another device — gives way to the default profile.
 
 ### Creation (020–029)
 
 **PFL-020 — A new profile (backend)**: A profile is created with a name, trimmed: an empty name is rejected with a specific error, and so is a name another profile has, case ignored.
 
-**PFL-021 — A new account's profile (backend)**: A new account belongs to the default profile.
+**PFL-021 — A new account's profile (backend)**: A new account belongs to the profile it is created in: the profile in use, unless another is given; an unknown profile is rejected with a specific error.
 
 **PFL-022 — Account names within a profile (backend)**: Two accounts of one profile never share a name (ACC-003); two accounts of different profiles can (owner, 2026-11-08).
 
-**PFL-023 — Reading the profiles (backend)**: The profiles are read, each with the number of its accounts: the default profile first, named or not, then the others by name, case ignored, then by identifier.
+**PFL-023 — Reading the profiles (backend)**: The profiles are read, each with the number of its accounts: the default profile first, named or not, then the others by name, case ignored, then by identifier; the profile in use is given with them.
 
 ### Updates and Status Changes (030–039)
 
@@ -51,9 +55,11 @@ A set of accounts the owner follows apart from the others, named or, for the def
 
 **PFL-031 — Moving an account (backend)**: An account moves to another profile with its whole history; nothing of it is rewritten, and every figure of both profiles follows on its next read. Moving it to the profile it is in, or reads as in (PFL-061), changes nothing. An unknown account or profile is rejected with a specific error, and so is a move that would give the destination profile two accounts of one name (PFL-022). Editing an account never changes its profile; only a move does.
 
+**PFL-032 — Choosing the profile in use (backend)**: Choosing an existing profile makes it the profile in use (PFL-012); an unknown one is rejected with a specific error; choosing the profile in use changes nothing and signals nothing.
+
 **PFL-033 — No transfer across profiles (backend)**: A transfer links two accounts of one profile (owner, 2026-11-08): moving an account a transfer links to an account that would then be in another profile is rejected with a specific error — recording such a transfer is TRF-010's refusal: the account moves only once the transfer is cancelled, a profile being isolated (PFL-052).
 
-**PFL-034 — Signaled (backend)**: Creating, renaming or removing a profile is signaled by `ProfileUpdated`; moving an account by `AccountUpdated` (ACC-022), which the counts of PFL-023 follow too.
+**PFL-034 — Signaled (backend)**: Creating, renaming or removing a profile and choosing the profile in use are signaled by `ProfileUpdated`; moving an account by `AccountUpdated` (ACC-022), which the counts of PFL-023 follow too.
 
 ### Removal (040–049)
 
@@ -62,6 +68,8 @@ A set of accounts the owner follows apart from the others, named or, for the def
 ### Shared across profiles (050–059)
 
 **PFL-052 — What stays shared (backend)**: The asset base — assets and their categories — and the prices — asset prices and currency rates — are shared by every profile (owner, 2026-11-08), and so are, until the per-profile setting lands (Open Questions), the one reference currency (GPF-011) and the one portfolio country (ACC-041).
+
+**PFL-054 — This installation's settings (backend)**: This installation's own settings (SYN-023) — among them the import mappers (IMP-020), the price provider (MKT-214), the scheduled fetch (SPF) and the agent connection (AGT-022) — are one per installation and stay the same whatever the profile in use (owner, 2026-11-08).
 
 ### Sync (060–069)
 
@@ -95,4 +103,4 @@ A set of accounts the owner follows apart from the others, named or, for the def
 - [ ] A reference currency and a country per profile, a new profile starting with the default profile's (owner, 2026-11-08): the rule and its amendments land with its implementation — the portfolio setting keyed by profile (FXR-015, FXR-120 to FXR-126, CFR-012, SYN-021, a SYN-038 version), GPF-011, ACC-041, ACC-042, CBM-014, EXP-021, the GPF context and the glossary's "Reference currency" and "Portfolio's country".
 - [x] This computer's own settings — the import mappers (IMP-020), the price provider (MKT-214), the scheduled fetch (SPF), the agent connection (AGT-022)? — One per installation, shared by every profile (owner, 2026-11-08).
 - [x] Move two accounts a transfer links together? — No: a profile is isolated; the transfer is cancelled first (owner, 2026-11-08).
-- [ ] The profile in use, this computer's and never synced, the default profile until another is chosen or when it is gone; every figure and list across accounts read within one profile — the profile in use unless another is given — and a new account created in it (owner, 2026-10-17 and 2026-11-08): the rules land with their implementation (#766 slice B), with the account lookups by name of the command line (CLI-011) and the agent (AGT-043) and whether an import into an account of another profile is refused (IMP-010).
+- [ ] Every figure and list across accounts read within one profile — the profile in use unless another is given (owner, 2026-10-17 and 2026-11-08): the rules land with their implementation (#766 slice B), with the account lookups by name of the command line (CLI-011) and the agent (AGT-043) and whether an import into an account of another profile is refused (IMP-010).

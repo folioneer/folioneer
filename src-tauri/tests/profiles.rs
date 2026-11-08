@@ -18,6 +18,8 @@ use folioneer_lib::context::currency::{
 };
 use folioneer_lib::core::SideEffectEventBus;
 use folioneer_lib::shared::domain::quantity::from_surface;
+use folioneer_lib::shared::infrastructure::uow::SqliteTransactionManager;
+use folioneer_lib::use_cases::account_creation::AccountCreationUseCase;
 use folioneer_lib::use_cases::holding_transaction::HoldingTransactionUseCase;
 use folioneer_lib::use_cases::profile_move::ProfileMoveUseCase;
 use folioneer_lib::use_cases::transfer::{TransferFigures, TransferUseCase};
@@ -28,6 +30,7 @@ fn micro(v: i64) -> i64 {
 }
 
 struct Ctx {
+    creation: AccountCreationUseCase,
     accounts: Arc<AccountService>,
     profiles: Arc<ProfileService>,
     moving: ProfileMoveUseCase,
@@ -71,6 +74,11 @@ async fn ctx() -> Ctx {
         pool.clone(),
     ))));
     Ctx {
+        creation: AccountCreationUseCase::new(
+            accounts.clone(),
+            assets.clone(),
+            Arc::new(SqliteTransactionManager::new(pool.clone())),
+        ),
         profiles: profiles.clone(),
         moving: ProfileMoveUseCase::new(profiles, accounts.clone()),
         recording: HoldingTransactionUseCase::new(accounts.clone(), assets.clone()),
@@ -107,7 +115,9 @@ async fn pfl_011_the_default_profile_holds_the_accounts() {
     assert_eq!(profile_of(&ctx, &id).await, DEFAULT_PROFILE_ID);
     ctx.profiles.create("Parent").await.expect("created");
     let listed = ctx.profiles.list().await.expect("listed");
+    assert_eq!(listed.in_use, DEFAULT_PROFILE_ID);
     let seen: Vec<(Option<String>, u32)> = listed
+        .profiles
         .iter()
         .map(|s| (s.profile.name.clone(), s.account_count))
         .collect();
@@ -272,4 +282,69 @@ async fn pfl_040_only_an_empty_profile_is_removed() {
         ctx.profiles.remove(&parent).await,
         Err(AccountError::ProfileNotFound { .. })
     ));
+}
+
+// PFL-012 / PFL-032 — the profile in use is the default one until another is chosen;
+// choosing an unknown one is rejected, choosing the one in use changes nothing.
+#[tokio::test]
+async fn pfl_032_the_profile_in_use_is_chosen() {
+    let ctx = ctx().await;
+    assert_eq!(
+        ctx.profiles.in_use().await.expect("read"),
+        DEFAULT_PROFILE_ID
+    );
+    let parent = ctx.profiles.create("Parent").await.expect("created").id;
+    ctx.profiles.choose(&parent).await.expect("chosen");
+    ctx.profiles.choose(&parent).await.expect("chosen again");
+    assert_eq!(ctx.profiles.list().await.expect("listed").in_use, parent);
+    assert!(matches!(
+        ctx.profiles.choose("nope").await,
+        Err(AccountError::ProfileNotFound { .. })
+    ));
+    assert_eq!(ctx.profiles.in_use().await.expect("read"), parent);
+}
+
+// PFL-014 — a profile in use that is removed gives way to the default profile.
+#[tokio::test]
+async fn pfl_014_a_profile_in_use_removed_gives_way_to_the_default() {
+    let ctx = ctx().await;
+    let parent = ctx.profiles.create("Parent").await.expect("created").id;
+    ctx.profiles.choose(&parent).await.expect("chosen");
+    ctx.profiles.remove(&parent).await.expect("removed");
+    assert_eq!(
+        ctx.profiles.in_use().await.expect("read"),
+        DEFAULT_PROFILE_ID
+    );
+}
+
+// PFL-021 — a new account goes into the profile in use, or the one given; an unknown one
+// given is rejected and creates nothing.
+#[tokio::test]
+async fn pfl_021_a_new_account_goes_into_the_profile_in_use() {
+    let ctx = ctx().await;
+    let parent = ctx.profiles.create("Parent").await.expect("created").id;
+    ctx.profiles.choose(&parent).await.expect("chosen");
+    let create = |name: &'static str, profile: Option<String>| {
+        ctx.creation.create_with_method(
+            name.into(),
+            String::new(),
+            "EUR".into(),
+            false,
+            None,
+            None,
+            None,
+            profile,
+        )
+    };
+    let in_use = create("PEA", None).await.expect("created");
+    assert_eq!(in_use.profile_id, parent);
+    let given = create("PEA", Some(DEFAULT_PROFILE_ID.into()))
+        .await
+        .expect("PFL-022: the same name in another profile");
+    assert_eq!(given.profile_id, DEFAULT_PROFILE_ID);
+    assert!(matches!(
+        create("Other", Some("nope".into())).await,
+        Err(AccountError::ProfileNotFound { .. })
+    ));
+    assert_eq!(ctx.accounts.get_all().await.expect("read").len(), 2);
 }

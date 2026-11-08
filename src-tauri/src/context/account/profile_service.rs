@@ -1,8 +1,8 @@
-//! PFL — profiles: created, renamed, removed and listed.
+//! PFL — profiles: created, renamed, removed and listed, and the profile in use chosen.
 
 use std::sync::Arc;
 
-use super::domain::{Profile, ProfileRepository, ProfileSummary};
+use super::domain::{Profile, ProfileList, ProfileRepository, ProfileSummary};
 use super::error::AccountError;
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
 
@@ -39,7 +39,7 @@ impl ProfileService {
     }
 
     /// PFL-023 — every profile with its account count: the default one first, then by name.
-    pub async fn list(&self) -> Result<Vec<ProfileSummary>, AccountError> {
+    async fn summaries(&self) -> Result<Vec<ProfileSummary>, AccountError> {
         let mut profiles = self
             .profiles
             .list()
@@ -76,6 +76,38 @@ impl ProfileService {
         {
             return Err(AccountError::ProfileNameAlreadyExists);
         }
+        Ok(())
+    }
+
+    /// PFL-023 — every profile with its account count, the default one first, then by
+    /// name, with the profile in use (PFL-012).
+    pub async fn list(&self) -> Result<ProfileList, AccountError> {
+        Ok(ProfileList {
+            profiles: self.summaries().await?,
+            in_use: self.in_use().await?,
+        })
+    }
+
+    /// PFL-012 / PFL-014 — the identifier of the profile in use.
+    pub async fn in_use(&self) -> Result<String, AccountError> {
+        self.profiles
+            .in_use()
+            .await
+            .map_err(|e| database("profile_in_use", e))
+    }
+
+    /// PFL-032 — makes an existing profile the profile in use; an unknown one is rejected, and
+    /// choosing the one in use changes nothing.
+    pub async fn choose(&self, id: &str) -> Result<(), AccountError> {
+        self.existing(id).await?;
+        if self.in_use().await? == id {
+            return Ok(());
+        }
+        self.profiles
+            .set_in_use(id)
+            .await
+            .map_err(|e| database("choose_profile", e))?;
+        self.signal();
         Ok(())
     }
 

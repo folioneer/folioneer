@@ -71,6 +71,15 @@ pub struct ProfileSummary {
     pub account_count: u32,
 }
 
+/// PFL-023 — the profiles, with the profile in use (PFL-012).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct ProfileList {
+    /// Every profile, the default one first.
+    pub profiles: Vec<ProfileSummary>,
+    /// The identifier of the profile in use, the default profile's when it is gone (PFL-014).
+    pub in_use: String,
+}
+
 /// PFL — where profiles are kept; each write records its change for the sync (PFL-060).
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -87,6 +96,11 @@ pub trait ProfileRepository: Send + Sync {
     /// PFL-040 — removes the profile when it holds no account and is not the default one, in
     /// one statement; whether it was removed.
     async fn delete_if_empty(&self, id: &str) -> Result<bool>;
+    /// PFL-012 / PFL-014 — the profile in use: the default profile until another is chosen,
+    /// or when the chosen one no longer exists.
+    async fn in_use(&self) -> Result<String>;
+    /// PFL-032 — makes `id` the profile in use; nothing is recorded for the sync (SYN-023).
+    async fn set_in_use(&self, id: &str) -> Result<()>;
 }
 
 #[cfg(test)]

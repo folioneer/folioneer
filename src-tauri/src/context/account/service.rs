@@ -2739,6 +2739,28 @@ impl AccountService {
         Ok(())
     }
 
+    /// PFL-021 — the profile a new account goes into: `given` when it exists, the profile in
+    /// use otherwise; an unknown `given` is rejected.
+    pub async fn profile_for_new_account(
+        &self,
+        given: Option<String>,
+    ) -> StdResult<String, AccountError> {
+        let found = self
+            .account_repo
+            .profile_for_new_account(given.clone())
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, err = ?e, "profile_for_new_account: repository failure");
+                AccountError::DatabaseError
+            })?;
+        match (found, given) {
+            (Some(profile_id), _) => Ok(profile_id),
+            (None, profile_id) => Err(AccountError::ProfileNotFound {
+                profile_id: profile_id.unwrap_or_default(),
+            }),
+        }
+    }
+
     /// PFL-060 / PFL-064 — the profiles a first publish carries: every one but the default
     /// profile while it has no name, which every device holds without a change.
     pub async fn profiles_to_publish(&self) -> StdResult<Vec<Profile>, AccountError> {
@@ -3027,6 +3049,11 @@ pub trait AccountServiceContract: Send + Sync {
         asset_id: &str,
         date: &str,
     ) -> StdResult<HoldingSnapshot, AccountError>;
+    /// PFL-021 — the profile a new account goes into: `given`, or the profile in use.
+    async fn profile_for_new_account(
+        &self,
+        given: Option<String>,
+    ) -> StdResult<String, AccountError>;
     /// PFL-031 — moves the account into `profile_id`, an existing profile.
     async fn move_to_profile(
         &self,
@@ -3528,6 +3555,13 @@ impl AccountServiceContract for AccountService {
         date: &str,
     ) -> StdResult<HoldingSnapshot, AccountError> {
         AccountService::holding_snapshot_as_of(self, account_id, asset_id, date).await
+    }
+
+    async fn profile_for_new_account(
+        &self,
+        given: Option<String>,
+    ) -> StdResult<String, AccountError> {
+        AccountService::profile_for_new_account(self, given).await
     }
 
     async fn move_to_profile(
