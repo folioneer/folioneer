@@ -372,19 +372,11 @@ impl CsvImportUseCase {
     /// The account's currency, refused when the account is unknown (IMP-010) or not in the
     /// profile in use (PFL-051A).
     async fn account_currency(&self, account_id: &str) -> Result<String, AccountError> {
-        let account = self
+        Ok(self
             .account_service
-            .get_by_id(account_id)
+            .account_in_profile_in_use(account_id)
             .await?
-            .ok_or_else(|| AccountError::AccountNotFound {
-                account_id: account_id.to_string(),
-            })?;
-        if account.profile_id != self.account_service.profile_in_use().await? {
-            return Err(AccountError::AccountOutsideProfileInUse {
-                account_id: account_id.to_string(),
-            });
-        }
-        Ok(account.currency)
+            .currency)
     }
 
     /// IMP-050 — the Cash Asset of the account's currency (CSH-010), which a deposit needs,

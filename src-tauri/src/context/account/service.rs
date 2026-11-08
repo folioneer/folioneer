@@ -293,6 +293,26 @@ impl AccountService {
         })
     }
 
+    /// PFL-051A — the account with this id, refused when unknown (`AccountNotFound`) or not
+    /// in the profile in use (`AccountOutsideProfileInUse`).
+    pub async fn account_in_profile_in_use(
+        &self,
+        account_id: &str,
+    ) -> StdResult<Account, AccountError> {
+        let account =
+            self.get_by_id(account_id)
+                .await?
+                .ok_or_else(|| AccountError::AccountNotFound {
+                    account_id: account_id.to_string(),
+                })?;
+        if account.profile_id != self.profile_in_use().await? {
+            return Err(AccountError::AccountOutsideProfileInUse {
+                account_id: account_id.to_string(),
+            });
+        }
+        Ok(account)
+    }
+
     /// CLI-018 / PFL-051 — the accounts of the profile in use, ordered by name with case
     /// ignored.
     pub async fn get_all_by_name(&self) -> StdResult<Vec<Account>, AccountError> {
@@ -3070,8 +3090,9 @@ pub trait AccountServiceContract: Send + Sync {
     ) -> StdResult<HoldingSnapshot, AccountError>;
     /// PFL-050 / PFL-051 — the accounts of the profile in use.
     async fn accounts_in_use(&self) -> StdResult<Vec<Account>, AccountError>;
-    /// PFL-012 / PFL-014 — the identifier of the profile in use.
-    async fn profile_in_use(&self) -> StdResult<String, AccountError>;
+    /// PFL-051A — the account, refused when unknown or outside the profile in use.
+    async fn account_in_profile_in_use(&self, account_id: &str)
+        -> StdResult<Account, AccountError>;
     /// PFL-021 — the profile a new account goes into: `given`, or the profile in use.
     async fn profile_for_new_account(
         &self,
@@ -3584,8 +3605,11 @@ impl AccountServiceContract for AccountService {
         AccountService::accounts_in_use(self).await
     }
 
-    async fn profile_in_use(&self) -> StdResult<String, AccountError> {
-        AccountService::profile_in_use(self).await
+    async fn account_in_profile_in_use(
+        &self,
+        account_id: &str,
+    ) -> StdResult<Account, AccountError> {
+        AccountService::account_in_profile_in_use(self, account_id).await
     }
 
     async fn profile_for_new_account(
