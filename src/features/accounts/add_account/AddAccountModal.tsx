@@ -27,6 +27,7 @@ export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
     setCountry,
     handleSubmit,
     impliedCostBasis,
+    profiles,
   } = useAddAccount({
     onSubmitSuccess: onClose,
   });
@@ -63,6 +64,7 @@ export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
           setCountry={setCountry}
           wrapperLists={wrapperLists}
           impliedCostBasis={impliedCostBasis}
+          profiles={profiles}
           idPrefix="add-account"
         />
         {/* R13 — inline error stays modal open */}

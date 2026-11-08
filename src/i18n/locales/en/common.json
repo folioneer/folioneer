@@ -169,7 +169,10 @@
     "group_by_label": "Group by",
     "group_by_none": "Nothing",
     "group_by_wrapper": "Wrapper",
-    "group_no_wrapper": "No wrapper"
+    "group_no_wrapper": "No wrapper",
+    "form_profile_label": "Profile",
+    "form_profile_hint": "The profile whose figures count this account.",
+    "form_profile_move_warning": "This account and its whole history move to {{to}}: {{from}}'s figures no longer count it."
   },
   "action": {
     "add": "Add",
@@ -1399,7 +1402,14 @@
     "ReplacementRequestGone": "This replacement request is no longer waiting.",
     "TransactionsNotReplaced": "The transactions could not be replaced: the transfer was refused.",
     "TransactionNotRemoved": "The transaction could not be removed: a later transaction depends on it.",
-    "SessionAlreadyEnded": "This AI agent was already disconnected."
+    "SessionAlreadyEnded": "This AI agent was already disconnected.",
+    "ProfileNameEmpty": "A profile needs a name.",
+    "ProfileNameAlreadyExists": "Another profile already has this name.",
+    "ProfileNotFound": "This profile no longer exists.",
+    "ProfileNotEmpty": "This profile still holds accounts.",
+    "DefaultProfileKept": "The default profile cannot be deleted.",
+    "TransferAcrossProfiles": "A transfer links this account to an account of another profile: cancel the transfer first.",
+    "AccountOutsideProfileInUse": "This account belongs to another profile."
   },
   "price_freshness": {
     "label": "Prices",
@@ -1419,5 +1429,28 @@
     "column_cost": "Cost ({{currency}})",
     "column_remaining": "Remaining",
     "free_shares": "Free shares"
+  },
+  "profile": {
+    "default_name": "Me",
+    "chip": {
+      "label": "Profile in use: {{name}}",
+      "add": "Add a profile…",
+      "manage": "Manage profiles…"
+    },
+    "manage": {
+      "title": "Profiles",
+      "account_count_one": "{{count}} account",
+      "account_count_other": "{{count}} accounts",
+      "no_account": "no account",
+      "rename": "Rename {{name}}",
+      "remove": "Delete {{name}}",
+      "remove_hint": "A profile is deleted once it holds no account.",
+      "add": "Add a profile"
+    },
+    "name_dialog": {
+      "add_title": "Add a profile",
+      "rename_title": "Rename the profile",
+      "label": "Name"
+    }
   }
 }

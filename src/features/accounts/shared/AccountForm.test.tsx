@@ -41,6 +41,7 @@ const formData = (overrides: Partial<AccountFormData> = {}): AccountFormData => 
   country: "",
   wrapper: "",
   cost_basis_method: "",
+  profile_id: "",
   ...overrides,
 });
 

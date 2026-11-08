@@ -69,6 +69,20 @@ pub struct ProfileSummary {
     pub profile: Profile,
     /// How many accounts belong to it.
     pub account_count: u32,
+    /// PFL-040 — whether it may be removed: it holds no account and is not the default one.
+    pub removable: bool,
+}
+
+impl ProfileSummary {
+    /// PFL-023 / PFL-040 — a profile with its account count, and whether it may be removed.
+    pub fn new(profile: Profile, account_count: u32) -> Self {
+        let removable = account_count == 0 && !profile.is_default();
+        Self {
+            profile,
+            account_count,
+            removable,
+        }
+    }
 }
 
 /// PFL-023 — the profiles, with the profile in use (PFL-012).
@@ -139,5 +153,15 @@ mod tests {
             default.renamed(" "),
             Err(AccountError::ProfileNameEmpty)
         ));
+    }
+
+    // PFL-040 — only a profile holding no account, never the default one, may be removed.
+    #[test]
+    fn a_profile_is_removable_when_empty_and_not_the_default() {
+        let parent = Profile::new("Parent").expect("named");
+        assert!(ProfileSummary::new(parent.clone(), 0).removable);
+        assert!(!ProfileSummary::new(parent, 2).removable);
+        let default = Profile::restore(default_profile_id(), None);
+        assert!(!ProfileSummary::new(default, 0).removable);
     }
 }

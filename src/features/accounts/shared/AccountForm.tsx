@@ -1,10 +1,11 @@
 import type { ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
-import type { CostBasisMethod, ImpliedCostBasis, WrapperLists } from "@/bindings";
+import type { CostBasisMethod, ImpliedCostBasis, ProfileSummary, WrapperLists } from "@/bindings";
 import { ComboboxField } from "@/ui/components/field/ComboboxField";
 import { SelectField } from "@/ui/components/field/SelectField";
 import { TextField } from "@/ui/components/field/TextField";
-import { countryOptions, impliedCostBasisHint, wrapperOptions } from "./presenter";
+import type { I18nMessage } from "@/ui/format/i18n";
+import { countryOptions, impliedCostBasisHint, profileOptions, wrapperOptions } from "./presenter";
 
 export interface AccountFormData {
   name: string;
@@ -19,6 +20,8 @@ export interface AccountFormData {
   wrapper: string;
   /** CBM-011A — the cost basis method chosen; "" follows the country's (CBM-014). */
   cost_basis_method: CostBasisMethod | "";
+  /** PFL-021 / PFL-031 — the profile it belongs to; "" until the profiles are read. */
+  profile_id: string;
 }
 
 interface AccountFormProps {
@@ -32,6 +35,10 @@ interface AccountFormProps {
   impliedCostBasis?: ImpliedCostBasis | null;
   /** #515 (the validated mock) — an edited account's method changed: its gains recompute. */
   costBasisChanged?: boolean;
+  /** PFL-021 / PFL-031 — the profiles to choose from; the field shows once they are read. */
+  profiles?: ProfileSummary[] | null;
+  /** #767 (the validated mock) — an edited account changes profile: it moves with its history. */
+  profileMoveWarning?: I18nMessage | null;
   idPrefix?: string;
 }
 
@@ -42,6 +49,8 @@ export function AccountForm({
   wrapperLists,
   impliedCostBasis = null,
   costBasisChanged = false,
+  profiles = null,
+  profileMoveWarning = null,
   idPrefix = "account",
 }: AccountFormProps) {
   const { t, i18n } = useTranslation();
@@ -61,6 +70,33 @@ export function AccountForm({
         value={formData.name}
         onChange={handleChange}
       />
+
+      {/* PFL-021 / PFL-031 (#767, the validated mock) — the profile the account belongs to */}
+      {profiles && (
+        <div className="flex flex-col gap-1.5">
+          <SelectField
+            label={t("account.form_profile_label")}
+            id={`${idPrefix}-profile`}
+            name="profile_id"
+            value={formData.profile_id}
+            onChange={handleChange}
+            options={profileOptions(profiles, t("profile.default_name"))}
+          />
+          {profileMoveWarning ? (
+            <span
+              id={`${idPrefix}-profile-warning`}
+              role="status"
+              className="text-xs text-m3-error"
+            >
+              {t(profileMoveWarning.key, profileMoveWarning.vars)}
+            </span>
+          ) : (
+            <span className="text-xs text-m3-on-surface-variant">
+              {t("account.form_profile_hint")}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* ACC-026 — optional bank name, free text */}
       <TextField

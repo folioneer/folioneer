@@ -55,7 +55,7 @@ The profile this installation works in, kept on this device only (PFL-012).
 
 **PFL-022 — Account names within a profile (backend)**: Two accounts of one profile never share a name (ACC-003); two accounts of different profiles can (owner, 2026-11-08).
 
-**PFL-023 — Reading the profiles (backend)**: The profiles are read, each with the number of its accounts: the default profile first, named or not, then the others by name, case ignored, then by identifier; the profile in use is given with them.
+**PFL-023 — Reading the profiles (backend)**: The profiles are read, each with the number of its accounts and whether it may be removed (PFL-040): the default profile first, named or not, then the others by name, case ignored, then by identifier; the profile in use is given with them.
 
 ### Updates and Status Changes (030–039)
 

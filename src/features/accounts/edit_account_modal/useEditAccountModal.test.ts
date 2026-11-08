@@ -11,6 +11,7 @@ const mockAccount: Account = {
   bank_name: "",
   currency: "EUR",
   management_fees_enabled: false,
+  profile_id: "default-profile",
 };
 
 vi.mock("../useAccounts", () => ({
@@ -26,11 +27,25 @@ vi.mock("../useAccounts", () => ({
 }));
 
 const mockSetMethod = vi.fn();
+const mockMove = vi.fn();
 
 vi.mock("../gateway", () => ({
   accountGateway: {
     setAccountCostBasisMethod: (...args: unknown[]) => mockSetMethod(...args),
+    moveAccountToProfile: (...args: unknown[]) => mockMove(...args),
   },
+}));
+
+// PFL-031 — the account's profile and another one.
+const mockProfiles = {
+  profiles: [
+    { profile: { id: "default-profile", name: null }, account_count: 1, removable: false },
+    { profile: { id: "p-parent", name: "Parent" }, account_count: 0, removable: true },
+  ],
+  in_use: "default-profile",
+};
+vi.mock("../shared/useProfileChoices", () => ({
+  useProfileChoices: () => mockProfiles,
 }));
 
 const fakeSubmit = { preventDefault: vi.fn() } as unknown as React.FormEvent;
@@ -234,5 +249,37 @@ describe("useEditAccountModal — country and wrapper (ACC-043, ACC-044)", () =>
     });
     expect(onClose).not.toHaveBeenCalled();
     expect(result.current.error).not.toBeNull();
+  });
+
+  // PFL-031 (#767, the validated mock) — another profile warns, then moves the account
+  // before its other changes are saved; a refused move saves nothing and keeps the modal open.
+  it("moves the account to the profile chosen, and keeps the modal open on a refusal", async () => {
+    mockUpdateAccount.mockResolvedValue({ data: mockAccount, error: null });
+    mockMove.mockResolvedValue({
+      status: "error",
+      error: { code: "TransferAcrossProfiles" },
+    });
+    const onClose = vi.fn();
+    const { result } = renderHook(() => useEditAccountModal({ account: mockAccount, onClose }));
+    expect(result.current.profileMove).toBeNull();
+    act(() => {
+      result.current.handleChange({
+        target: { name: "profile_id", value: "p-parent", type: "select-one" },
+      } as React.ChangeEvent<HTMLSelectElement>);
+    });
+    expect(result.current.profileMove?.to?.name).toBe("Parent");
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(mockMove).toHaveBeenCalledWith("account-1", "p-parent");
+    expect(mockUpdateAccount).not.toHaveBeenCalled();
+    expect(result.current.error).toEqual({ key: "error.TransferAcrossProfiles" });
+    expect(onClose).not.toHaveBeenCalled();
+
+    mockMove.mockResolvedValue({ status: "ok", data: mockAccount });
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(onClose).toHaveBeenCalled();
   });
 });

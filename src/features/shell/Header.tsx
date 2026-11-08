@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { ProfileChip } from "@/features/profiles";
 import { logger } from "@/lib/logger";
 import { IconButton } from "@/ui/components/button/IconButton";
 import { AgentIndicator } from "./agent_connection/AgentIndicator";
@@ -45,6 +46,8 @@ export function Header() {
       <SyncIndicator />
       <PriceFreshnessIndicator />
       <ThemeToggle />
+      {/* #767 — the profile in use, at the far right, where a later login would sit. */}
+      <ProfileChip />
     </header>
   );
 }

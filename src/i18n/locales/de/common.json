@@ -169,7 +169,10 @@
     "group_by_label": "Gruppieren nach",
     "group_by_none": "Nichts",
     "group_by_wrapper": "Steuerhülle",
-    "group_no_wrapper": "Ohne Steuerhülle"
+    "group_no_wrapper": "Ohne Steuerhülle",
+    "form_profile_label": "Profil",
+    "form_profile_hint": "Das Profil, dessen Zahlen dieses Konto zählen.",
+    "form_profile_move_warning": "Dieses Konto zieht mit seiner ganzen Historie nach {{to}} um: Die Zahlen von {{from}} zählen es nicht mehr."
   },
   "action": {
     "add": "Hinzufügen",
@@ -1399,7 +1402,14 @@
     "ReplacementRequestGone": "Diese Anfrage zum Ersetzen wartet nicht mehr.",
     "TransactionsNotReplaced": "Die Transaktionen konnten nicht ersetzt werden: Der Übertrag wurde abgelehnt.",
     "TransactionNotRemoved": "Die Transaktion konnte nicht entfernt werden: Eine spätere Transaktion hängt davon ab.",
-    "SessionAlreadyEnded": "Dieser KI-Agent war bereits getrennt."
+    "SessionAlreadyEnded": "Dieser KI-Agent war bereits getrennt.",
+    "ProfileNameEmpty": "Ein Profil braucht einen Namen.",
+    "ProfileNameAlreadyExists": "Ein anderes Profil trägt diesen Namen bereits.",
+    "ProfileNotFound": "Dieses Profil existiert nicht mehr.",
+    "ProfileNotEmpty": "Dieses Profil enthält noch Konten.",
+    "DefaultProfileKept": "Das Standardprofil kann nicht gelöscht werden.",
+    "TransferAcrossProfiles": "Eine Übertragung verbindet dieses Konto mit einem Konto eines anderen Profils: Stornieren Sie zuerst die Übertragung.",
+    "AccountOutsideProfileInUse": "Dieses Konto gehört zu einem anderen Profil."
   },
   "price_freshness": {
     "label": "Kurse",
@@ -1419,5 +1429,28 @@
     "column_cost": "Kosten ({{currency}})",
     "column_remaining": "Verbleibend",
     "free_shares": "Gratisaktien"
+  },
+  "profile": {
+    "default_name": "Ich",
+    "chip": {
+      "label": "Aktives Profil: {{name}}",
+      "add": "Profil hinzufügen…",
+      "manage": "Profile verwalten…"
+    },
+    "manage": {
+      "title": "Profile",
+      "account_count_one": "{{count}} Konto",
+      "account_count_other": "{{count}} Konten",
+      "no_account": "kein Konto",
+      "rename": "{{name}} umbenennen",
+      "remove": "{{name}} löschen",
+      "remove_hint": "Ein Profil lässt sich löschen, sobald es kein Konto mehr enthält.",
+      "add": "Profil hinzufügen"
+    },
+    "name_dialog": {
+      "add_title": "Profil hinzufügen",
+      "rename_title": "Profil umbenennen",
+      "label": "Name"
+    }
   }
 }

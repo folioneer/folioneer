@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { Button } from "@/ui/components/button/Button";
 import { Dialog } from "@/ui/components/modal/Dialog";
 import { AccountForm } from "../shared/AccountForm";
+import { profileMoveWarning } from "../shared/presenter";
 import { useWrapperLists } from "../useWrapperLists";
 import { useEditAccountModal } from "./useEditAccountModal";
 
@@ -29,6 +30,8 @@ export function EditAccountModal({ isOpen, onClose, account }: EditAccountModalP
     setCountry,
     handleSubmit,
     costBasisChanged,
+    profiles,
+    profileMove,
   } = useEditAccountModal({ account, onClose });
 
   const actions = (
@@ -65,6 +68,10 @@ export function EditAccountModal({ isOpen, onClose, account }: EditAccountModalP
           wrapperLists={wrapperLists}
           impliedCostBasis={null}
           costBasisChanged={costBasisChanged}
+          profiles={profiles}
+          profileMoveWarning={
+            profileMove ? profileMoveWarning(profileMove, t("profile.default_name")) : null
+          }
           idPrefix="edit-account"
         />
         {/* R13 — inline error, modal stays open */}

@@ -80,6 +80,8 @@ export function useAccountSummaries(): UseAccountSummariesResult {
         type === "AssetPriceUpdated" ||
         type === "AssetPriceFetchCompleted" ||
         type === "TransactionUpdated" ||
+        // PFL-050 — another profile in use: its accounts' figures are read.
+        type === "ProfileUpdated" ||
         type === "SyncCompleted"
       ) {
         fetchSummaries();

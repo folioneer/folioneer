@@ -11,6 +11,7 @@ import {
   type FetchAllAssetPricesError,
   type FetchTrigger,
   type ImpliedCostBasis,
+  type ProfileList,
   type Result,
   type UpdateAccountDTO,
   type WrapperLists,
@@ -56,6 +57,19 @@ export const accountGateway = {
     method: CostBasisMethod,
   ): Promise<Result<Account, AccountError>> {
     return await commands.setAccountCostBasisMethod(accountId, method);
+  },
+
+  // PFL-023 / PFL-012 — the profiles an account may belong to, and the profile in use.
+  async listProfiles(): Promise<Result<ProfileList, AccountError>> {
+    return await commands.listProfiles();
+  },
+
+  // PFL-031 — moves an account into another profile with its whole history.
+  async moveAccountToProfile(
+    accountId: string,
+    profileId: string,
+  ): Promise<Result<Account, AccountError>> {
+    return await commands.moveAccountToProfile(accountId, profileId);
   },
 
   async deleteAccount(id: string): Promise<Result<null, AccountError>> {

@@ -21,6 +21,18 @@ vi.mock("./bindings", async (importOriginal) => ({
     addAccountType: vi.fn(),
     deleteAccountType: vi.fn(),
     getAccounts: vi.fn(() => Promise.resolve({ status: "ok", data: [] })),
+    // #767 — the header's profile chip reads the profiles.
+    listProfiles: vi.fn(() =>
+      Promise.resolve({
+        status: "ok",
+        data: {
+          profiles: [
+            { profile: { id: "default-profile", name: null }, account_count: 0, removable: false },
+          ],
+          in_use: "default-profile",
+        },
+      }),
+    ),
     getCategories: vi.fn(() => Promise.resolve({ status: "ok", data: [] })),
     getReferenceCurrency: vi.fn(() =>
       Promise.resolve({ status: "ok", data: { currency: "EUR", choices: ["EUR"] } }),
