@@ -42,6 +42,8 @@ export function usePriceFreshness(): UsePriceFreshnessResult {
         type === "AssetPriceFetchCompleted" ||
         type === "AssetPriceUpdated" ||
         type === "TransactionUpdated" ||
+        // PFL-050 — another profile in use: its accounts' figures are read.
+        type === "ProfileUpdated" ||
         type === "SyncCompleted"
       ) {
         void refresh();

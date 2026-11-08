@@ -172,6 +172,8 @@ export function useGlobalPerformance(): UseGlobalPerformanceResult {
         type === "AssetPriceUpdated" ||
         type === "AssetPriceFetchCompleted" ||
         type === "AccountUpdated" ||
+        // PFL-050 — another profile in use: its accounts' figures are read.
+        type === "ProfileUpdated" ||
         type === "SyncCompleted"
       ) {
         fetchPerformance();

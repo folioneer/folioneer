@@ -169,7 +169,10 @@
     "group_by_label": "Grouper par",
     "group_by_none": "Rien",
     "group_by_wrapper": "Enveloppe",
-    "group_no_wrapper": "Sans enveloppe"
+    "group_no_wrapper": "Sans enveloppe",
+    "form_profile_label": "Profil",
+    "form_profile_hint": "Le profil dont les chiffres comptent ce compte.",
+    "form_profile_move_warning": "Ce compte et tout son historique passent dans {{to}} : les chiffres de {{from}} ne le comptent plus."
   },
   "action": {
     "add": "Ajouter",
@@ -1399,7 +1402,14 @@
     "ReplacementRequestGone": "Cette demande de remplacement n'attend plus.",
     "TransactionsNotReplaced": "Les transactions n'ont pas pu être remplacées : le transfert a été refusé.",
     "TransactionNotRemoved": "La transaction n'a pas pu être supprimée : une transaction plus récente en dépend.",
-    "SessionAlreadyEnded": "Cet agent IA était déjà déconnecté."
+    "SessionAlreadyEnded": "Cet agent IA était déjà déconnecté.",
+    "ProfileNameEmpty": "Un profil doit avoir un nom.",
+    "ProfileNameAlreadyExists": "Un autre profil porte déjà ce nom.",
+    "ProfileNotFound": "Ce profil n'existe plus.",
+    "ProfileNotEmpty": "Ce profil contient encore des comptes.",
+    "DefaultProfileKept": "Le profil par défaut ne peut pas être supprimé.",
+    "TransferAcrossProfiles": "Un transfert relie ce compte à un compte d'un autre profil : annulez d'abord le transfert.",
+    "AccountOutsideProfileInUse": "Ce compte appartient à un autre profil."
   },
   "price_freshness": {
     "label": "Prix",
@@ -1419,5 +1429,30 @@
     "column_cost": "Coût ({{currency}})",
     "column_remaining": "Restant",
     "free_shares": "Actions gratuites"
+  },
+  "profile": {
+    "default_name": "Moi",
+    "chip": {
+      "label": "Profil utilisé : {{name}}",
+      "add": "Ajouter un profil…",
+      "manage": "Gérer les profils…"
+    },
+    "manage": {
+      "title": "Profils",
+      "account_count_one": "{{count}} compte",
+      "account_count_other": "{{count}} comptes",
+      "no_account": "aucun compte",
+      "rename": "Renommer {{name}}",
+      "remove": "Supprimer {{name}}",
+      "remove_confirm_title": "Supprimer ce profil ?",
+      "remove_confirm_message": "« {{name}} » ne contient aucun compte. Il est supprimé sur tous les appareils.",
+      "remove_hint": "Un profil se supprime une fois qu'il ne contient plus aucun compte.",
+      "add": "Ajouter un profil"
+    },
+    "name_dialog": {
+      "add_title": "Ajouter un profil",
+      "rename_title": "Renommer le profil",
+      "label": "Nom"
+    }
   }
 }

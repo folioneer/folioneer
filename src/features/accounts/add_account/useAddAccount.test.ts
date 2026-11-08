@@ -21,6 +21,19 @@ const mockImplied = vi.fn((..._args: unknown[]) =>
   Promise.resolve({ method: "WeightedAverage", country: "FR" }),
 );
 
+// PFL-021 — two profiles, the second one in use.
+const mockProfiles = {
+  profiles: [
+    { profile: { id: "default-profile", name: null }, account_count: 1, removable: false },
+    { profile: { id: "p-parent", name: "Parent" }, account_count: 0, removable: true },
+  ],
+  in_use: "p-parent",
+};
+let mockChoicesError: { key: string } | null = null;
+vi.mock("../shared/useProfileChoices", () => ({
+  useProfileChoices: () => ({ list: mockProfiles, error: mockChoicesError }),
+}));
+
 vi.mock("../gateway", () => ({
   accountGateway: {
     getImpliedCostBasis: (...args: unknown[]) => mockImplied(...args),
@@ -292,5 +305,36 @@ describe("useAddAccount — reference currency (FXR-128)", () => {
     expect(mockAddAccount).toHaveBeenLastCalledWith(
       expect.objectContaining({ cost_basis_method: "WeightedAverage" }),
     );
+  });
+
+  // PFL-021 — a new account starts in the profile in use, and the profile chosen is sent.
+  it("starts in the profile in use and sends the profile chosen", async () => {
+    mockAddAccount.mockResolvedValue({ data: {}, error: null });
+    const { result } = renderHook(() => useAddAccount());
+    await waitFor(() => expect(result.current.formData.profile_id).toBe("p-parent"));
+    act(() => {
+      result.current.handleChange({
+        target: { name: "name", value: "PEA", type: "text" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    act(() => {
+      result.current.handleChange({
+        target: { name: "profile_id", value: "default-profile", type: "select-one" },
+      } as React.ChangeEvent<HTMLSelectElement>);
+    });
+    await act(async () => {
+      await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+    });
+    expect(mockAddAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "PEA", profile_id: "default-profile" }),
+    );
+  });
+
+  // F27 — the profiles that cannot be read show as the form's error.
+  it("shows that the profiles could not be read", () => {
+    mockChoicesError = { key: "error.DatabaseError" };
+    const { result } = renderHook(() => useAddAccount());
+    expect(result.current.error).toEqual({ key: "error.DatabaseError" });
+    mockChoicesError = null;
   });
 });

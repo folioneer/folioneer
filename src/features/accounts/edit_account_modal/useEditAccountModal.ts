@@ -4,6 +4,8 @@ import { logger } from "@/lib/logger";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountGateway } from "../gateway";
 import type { AccountFormData } from "../shared/AccountForm";
+import { accountMutationErrorToI18n } from "../shared/presenter";
+import { useProfileChoices } from "../shared/useProfileChoices";
 import { validateAccountCurrency, validateAccountName } from "../shared/validateAccount";
 import { useAccounts } from "../useAccounts";
 
@@ -23,6 +25,7 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
     country: "",
     wrapper: "",
     cost_basis_method: "",
+    profile_id: "",
   });
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,6 +34,16 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
     account !== null &&
     formData.cost_basis_method !== "" &&
     formData.cost_basis_method !== (account.cost_basis_method ?? "WeightedAverage");
+  // PFL-031 — the profiles to choose from; a different one moves the account with its history.
+  const { list: profiles, error: profilesError } = useProfileChoices();
+
+  const profileChanged =
+    account !== null && formData.profile_id !== "" && formData.profile_id !== account.profile_id;
+  const profileOf = (id: string | undefined) =>
+    profiles?.profiles.find((summary) => summary.profile.id === id)?.profile ?? null;
+  const profileMove = profileChanged
+    ? { from: profileOf(account?.profile_id), to: profileOf(formData.profile_id) }
+    : null;
 
   // Sync form data when account changes; reset error (R13)
   useEffect(() => {
@@ -43,6 +56,7 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
         country: account.country ?? "",
         wrapper: account.wrapper ?? "",
         cost_basis_method: account.cost_basis_method ?? "WeightedAverage",
+        profile_id: account.profile_id ?? "",
       });
       setError(null);
     }
@@ -71,6 +85,20 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
     }
 
     setError(null);
+
+    // PFL-031 — a move is its own action, made first: the account and its whole history go to the
+    // profile, and a refused move leaves every other field unsaved.
+    if (profileChanged) {
+      setIsSubmitting(true);
+      const moved = await accountGateway.moveAccountToProfile(account.id, formData.profile_id);
+      setIsSubmitting(false);
+      if (moved.status === "error") {
+        logger.warn("[useEditAccountModal] the account was not moved", { code: moved.error.code });
+        setError(accountMutationErrorToI18n(moved.error));
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     const result = await updateAccount({
@@ -121,11 +149,14 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
 
   return {
     formData,
-    error,
+    // F27 — the profiles that cannot be read show as the form's error.
+    error: error ?? profilesError,
     isSubmitting,
     handleChange,
     setCountry,
     handleSubmit,
     costBasisChanged,
+    profiles: profiles?.profiles ?? null,
+    profileMove,
   };
 }

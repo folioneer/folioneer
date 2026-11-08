@@ -265,6 +265,7 @@ struct Profile {
 struct ProfileSummary {
     profile: Profile,
     account_count: u32,                  // its accounts (PFL-023); the default one also counts those whose profile was removed elsewhere (PFL-061)
+    removable: bool,                     // PFL-040 — it holds no account and is not the default one
 }
 
 struct ProfileList {
@@ -918,6 +919,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-11-08 — #767 (PFL-040): `ProfileSummary` gains `removable`, so the window shows which profile may be removed without deciding it.
 - 2026-11-08 — #766 (PFL-050, PFL-051): `get_accounts`, `get_account_summaries` (and its total) and `get_global_performance` without an account read the accounts of the profile in use. No signature changed. `AccountError` gains `AccountOutsideProfileInUse { account_id }` (PFL-051A, returned by the import commands).
 - 2026-11-08 — #766 (PFL-012, PFL-014, PFL-021, PFL-032): `list_profiles` returns `ProfileList` (the profiles and the profile in use); new `set_profile_in_use`; `CreateAccountDTO` gains `profile_id: Option<String>` (none: the profile in use) and `add_account` returns `ProfileNotFound`; `ProfileUpdated` also signals a new profile in use (PFL-034).
 - 2026-11-08 — #766 (PFL): `Account` gains `profile_id`; new `list_profiles`, `create_profile`, `rename_profile`, `remove_profile`, `move_account_to_profile` and the `Profile` / `ProfileSummary` types; `AccountError` gains `ProfileNameEmpty`, `ProfileNameAlreadyExists`, `ProfileNotFound`, `ProfileNotEmpty`, `DefaultProfileKept`, `TransferAcrossProfiles`; `NameAlreadyExists` binds within one profile (PFL-022); transfer commands refuse two profiles (PFL-033); the event `ProfileUpdated` (PFL-034).

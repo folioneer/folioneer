@@ -213,6 +213,9 @@ export function accountImportErrorToI18n(error: CsvImportError | AccountImportEr
       return { key: "account_import.error.matched_asset_not_found" };
     case "AccountNotFound":
       return { key: "error.AccountNotFound" };
+    // PFL-051A — the account is not in the profile in use.
+    case "AccountOutsideProfileInUse":
+      return { key: "error.AccountOutsideProfileInUse" };
     case "DatabaseError":
       return { key: "error.DatabaseError" };
     default:

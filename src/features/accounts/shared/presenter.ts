@@ -3,6 +3,8 @@ import type {
   FetchAccountAssetPricesError,
   FetchAllAssetPricesError,
   ImpliedCostBasis,
+  Profile,
+  ProfileSummary,
   Wrapper,
   WrapperLists,
 } from "@/bindings";
@@ -82,6 +84,9 @@ export function accountMutationErrorToI18n(err: AccountError): I18nMessage {
     case "AccountNotFound":
     case "NameAlreadyExists":
     case "DatabaseError":
+    // PFL-021 / PFL-031 / PFL-033 — the profile given, or a move it cannot make.
+    case "ProfileNotFound":
+    case "TransferAcrossProfiles":
       return { key: `error.${err.code}` };
     default:
       return { key: "error.Unknown" };
@@ -226,4 +231,35 @@ export function impliedCostBasisHint(implied: ImpliedCostBasis, language: string
   return implied.method === "Fifo"
     ? { key: "account.form_cost_basis_implied_fifo", vars: { country } }
     : { key: "account.form_cost_basis_implied_weighted_average", vars: { country } };
+}
+
+/**
+ * PFL-011 / PFL-023 — the profiles as the account form's choices; the default profile, unnamed
+ * until renamed, reads as `defaultName` (the window's language).
+ */
+export function profileOptions(
+  profiles: ProfileSummary[],
+  defaultName: string,
+): { value: string; label: string }[] {
+  return profiles.map((summary) => ({
+    value: summary.profile.id,
+    label: summary.profile.name ?? defaultName,
+  }));
+}
+
+/**
+ * #767 (the validated mock) — an edited account changes profile: it moves with its whole
+ * history, and the profile it leaves no longer counts it (PFL-031).
+ */
+export function profileMoveWarning(
+  move: { from: Profile | null; to: Profile | null },
+  defaultName: string,
+): I18nMessage {
+  return {
+    key: "account.form_profile_move_warning",
+    vars: {
+      to: move.to?.name ?? defaultName,
+      from: move.from?.name ?? defaultName,
+    },
+  };
 }

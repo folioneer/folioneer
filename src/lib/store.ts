@@ -234,6 +234,8 @@ export const useAppStore = create<AppState>((set, get) => {
         CategoryUpdated: fetchCategories,
         AccountUpdated: fetchAccounts,
         ReferenceCurrencyUpdated: fetchReferenceCurrency,
+        // PFL-051 — another profile in use: its accounts are the ones listed.
+        ProfileUpdated: fetchAccounts,
         // SYN-064 — a bare marker: a run applied other devices' changes, so every
         // cached slice is re-read.
         SyncCompleted: () => {

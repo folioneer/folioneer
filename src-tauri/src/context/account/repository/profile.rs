@@ -90,9 +90,11 @@ impl ProfileRepository for SqliteProfileRepository {
         .context("list profiles")?;
         Ok(rows
             .into_iter()
-            .map(|row| ProfileSummary {
-                profile: Profile::restore(row.id, row.name),
-                account_count: u32::try_from(row.account_count).unwrap_or(u32::MAX),
+            .map(|row| {
+                ProfileSummary::new(
+                    Profile::restore(row.id, row.name),
+                    u32::try_from(row.account_count).unwrap_or(u32::MAX),
+                )
             })
             .collect())
     }

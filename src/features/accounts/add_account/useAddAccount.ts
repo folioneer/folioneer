@@ -5,6 +5,7 @@ import { useAppStore } from "@/lib/store";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountGateway } from "../gateway";
 import type { AccountFormData } from "../shared/AccountForm";
+import { useProfileChoices } from "../shared/useProfileChoices";
 import { validateAccountCurrency, validateAccountName } from "../shared/validateAccount";
 import { useAccounts } from "../useAccounts";
 
@@ -25,9 +26,17 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
     country: "",
     wrapper: "",
     cost_basis_method: "",
+    profile_id: "",
   });
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // PFL-021 — a new account starts in the profile in use, once the profiles are read.
+  const { list: profiles, error: profilesError } = useProfileChoices();
+
+  const inUse = profiles?.in_use ?? "";
+  useEffect(() => {
+    if (inUse) setFormData((prev) => (prev.profile_id ? prev : { ...prev, profile_id: inUse }));
+  }, [inUse]);
   // CBM-014 — the method the country and wrapper imply, read again when either changes.
   const [impliedCostBasis, setImpliedCostBasis] = useState<ImpliedCostBasis | null>(null);
   const { country, wrapper } = formData;
@@ -80,6 +89,7 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
       country: formData.country || null,
       wrapper: formData.wrapper || null,
       cost_basis_method: formData.cost_basis_method || null,
+      profile_id: formData.profile_id || null,
     });
 
     setIsSubmitting(false);
@@ -98,6 +108,7 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
       country: "",
       wrapper: "",
       cost_basis_method: "",
+      profile_id: profiles?.in_use ?? "",
     });
 
     if (onSubmitSuccess) {
@@ -107,11 +118,13 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
 
   return {
     formData,
-    error,
+    // F27 — the profiles that cannot be read show as the form's error.
+    error: error ?? profilesError,
     isSubmitting,
     handleChange,
     setCountry,
     handleSubmit,
     impliedCostBasis,
+    profiles: profiles?.profiles ?? null,
   };
 }

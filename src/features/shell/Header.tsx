@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { IconButton } from "@/ui/components/button/IconButton";
 import { AgentIndicator } from "./agent_connection/AgentIndicator";
 import { PriceFreshnessIndicator } from "./price_freshness/PriceFreshnessIndicator";
+import { ProfileChip } from "./profile_chip/ProfileChip";
 import { SyncIndicator } from "./sync_indicator/SyncIndicator";
 import { ThemeToggle } from "./theme_toggle/ThemeToggle";
 import { useHeaderConfig } from "./useHeaderConfig";
@@ -45,6 +46,8 @@ export function Header() {
       <SyncIndicator />
       <PriceFreshnessIndicator />
       <ThemeToggle />
+      {/* #767 — the profile in use, at the far right, where a later login would sit. */}
+      <ProfileChip />
     </header>
   );
 }
