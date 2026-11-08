@@ -251,7 +251,7 @@ struct Account {
     management_fees_enabled: bool,       // whether one-off fees and fee schedules are available on this account (FEE-075); a new account starts disabled
     country: Option<String>,             // the account's own country (ISO 3166-1 alpha-2) when one is set, kept even if it equals the portfolio's (ACC-041, ACC-045)
     wrapper: Option<String>,             // identifier of its tax wrapper (ACC-040/043); none when unset
-    profile_id: String,                  // the profile it belongs to (PFL-010); changed by `move_account_to_profile` alone (PFL-031) or a synced change
+    profile_id: String,                  // the profile it belongs to (PFL-010); changed by `move_account_to_profile` alone (PFL-031) or a synced change; read as "default-profile" when the profile it names was removed on another device (PFL-061)
     cost_basis_method: CostBasisMethod,  // how it sets the cost of the units that leave it (CBM-010); a new account takes its country's (CBM-011); changed by `set_account_cost_basis_method` alone (CBM-030), or by a synced change (CBM-033)
 }
 

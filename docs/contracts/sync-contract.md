@@ -197,6 +197,7 @@ Record identity per kind follows CFR-012: accounts, categories, assets, transact
 - `account-contract.md` — `HoldingDetail` gains `inconsistency: Option<HoldingInconsistency>` (SYN-040, CFR-042); `AccountSummary` gains `has_inconsistent_holding: bool` (SYN-040); both derived on read. `FeeSchedule.last_applied_period` is the derived read of the synced catch-up record (CFR-044, FEE-043). `apply_due_fee_deductions` runs the launch sync first (SYN-060). `Account.name` uniqueness and `update_account`'s `NameAlreadyExists` bind the name being set (CFR-035).
 - `account-contract.md`, `asset-contract.md`, `currency-contract.md` — applied changes raise no event of their own; their views subscribe to `SyncCompleted` (SYN-064).
 - `asset-contract.md` — `Asset.category` resolves to the default category when the stored category stands removed (CFR-030); `update_category`'s `DuplicateName` binds the name being set (CFR-035).
+- `account-contract.md` — `Account.profile_id` reads as the default profile when the stored profile stands removed (PFL-061); `rename_profile`'s `ProfileNameAlreadyExists` binds the name being set (PFL-062).
 
 ---
 

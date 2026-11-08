@@ -463,12 +463,11 @@ impl AccountService {
         if account.profile_id == profile_id {
             return Ok(account);
         }
-        if let Some(existing) =
-            find_account_by_name(&*self.account_repo, &account.name, profile_id).await?
+        if find_account_by_name(&*self.account_repo, &account.name, profile_id)
+            .await?
+            .is_some()
         {
-            if existing.id != account.id {
-                return Err(AccountError::NameAlreadyExists);
-            }
+            return Err(AccountError::NameAlreadyExists);
         }
         let transfers: std::collections::BTreeSet<&str> = account
             .transactions
@@ -491,13 +490,13 @@ impl AccountService {
                 }
             }
         }
-        let moved = Account::restore(
+        let moved = Account::with_id(
             account.id.clone(),
             account.name.clone(),
             account.bank_name.clone(),
             account.currency.clone(),
             account.management_fees_enabled,
-        )
+        )?
         .with_stored_classification(account.country.clone(), account.wrapper.clone())
         .with_cost_basis_method(account.cost_basis_method)
         .with_profile(profile_id.to_string());
