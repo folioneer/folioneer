@@ -2820,6 +2820,9 @@ pub trait AccountRepository: Send + Sync {
         profile: &Profile,
         rank: &Rank,
     ) -> Result<()>;
+    /// PFL-021 — the profile a new account goes into: `given` when it exists, the profile in use
+    /// when none is given (PFL-012, PFL-014); `None` for an unknown `given`.
+    async fn profile_for_new_account(&self, given: Option<String>) -> Result<Option<String>>;
     /// PFL-060 — every profile, for the first publish of a portfolio (SYN-013).
     async fn all_profiles(&self) -> Result<Vec<Profile>>;
     /// PFL-060 — removes a profile, on `conn`; never the default one. A no-op when absent.

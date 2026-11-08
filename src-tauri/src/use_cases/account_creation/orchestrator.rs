@@ -70,14 +70,16 @@ impl AccountCreationUseCase {
             country,
             wrapper,
             None,
+            None,
         )
         .await
     }
 
     /// CBM-011A — the account with its country and wrapper and the cost basis method chosen
-    /// for it, or the one its country implies when none is (CBM-011).
+    /// for it, or the one its country implies when none is (CBM-011), in the profile given or
+    /// the profile in use (PFL-021).
     // The account's own fields, one argument each as `create_classified` takes them, plus
-    // the method chosen.
+    // the method chosen and the profile.
     #[allow(clippy::too_many_arguments)]
     pub async fn create_with_method(
         &self,
@@ -88,6 +90,7 @@ impl AccountCreationUseCase {
         country: Option<String>,
         wrapper: Option<String>,
         method: Option<CostBasisMethod>,
+        profile_id: Option<String>,
     ) -> StdResult<Account, AccountError> {
         // ACC-002 / TRX-021 / ACC-041 — the account's own fields are checked before anything
         // is seeded for it: a value it refuses is answered with its own code.
@@ -98,7 +101,7 @@ impl AccountCreationUseCase {
             Some(method) => account.with_cost_basis_method(method),
             None => account,
         };
-        self.create_with_cash(account, None).await
+        self.create_with_cash(account, profile_id, None).await
     }
 
     /// AGT-068 — creates the account an agent asked for as the window creates one, its cash
@@ -115,16 +118,23 @@ impl AccountCreationUseCase {
         let account = Account::new(name, bank_name, currency, false)?
             .classified(country, wrapper, None)?
             .with_implied_cost_basis();
-        self.create_with_cash(account, Some(mark)).await
+        self.create_with_cash(account, None, Some(mark)).await
     }
 
     /// ACC-025 — the Cash Asset of the account's currency (CSH-010), the account and its
-    /// cash line, in one unit of work (ADR-006): all of them or none.
+    /// cash line, in one unit of work (ADR-006): all of them or none; the account in the
+    /// profile given or the profile in use (PFL-021).
     async fn create_with_cash(
         &self,
         account: Account,
+        profile_id: Option<String>,
         mark: Option<AgentRecording>,
     ) -> StdResult<Account, AccountError> {
+        let account = account.with_profile(
+            self.account_service
+                .profile_for_new_account(profile_id)
+                .await?,
+        );
         let currency = account.currency.clone();
         let mut unit = self.transactions.begin().await.map_err(|e| {
             tracing::error!(target: BACKEND, err = ?e, "create_account: unit of work not begun");

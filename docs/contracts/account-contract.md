@@ -18,7 +18,7 @@
 | Command                         | Args                                               | Return                   | Errors                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------------- | -------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `get_accounts`                  | —                                                  | `Vec<Account>`           | `DatabaseError`                                                                                                                                                                                                                                                                                                                                                                                          |
-| `add_account`                   | `CreateAccountDTO`                                 | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003, PFL-022 — within one profile; binds the name being set, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists), `DatabaseError`                                                                                                                 |
+| `add_account`                   | `CreateAccountDTO`                                 | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003, PFL-022 — within one profile; binds the name being set, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists), `ProfileNotFound { profile_id }` (PFL-021 — only for a `profile_id` given), `DatabaseError`                                     |
 | `update_account`                | `UpdateAccountDTO`                                 | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003, PFL-022 — within one profile; binds the name being set; editing other fields of an account whose name already clashes after a merge is accepted, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists, nor the account's own), `DatabaseError` |
 | `get_wrapper_lists`             | —                                                  | `WrapperLists`           | _(infallible — the lists are the application's own, ACC-040)_                                                                                                                                                                                                                                                                                                                                            |
 | `set_account_cost_basis_method` | `account_id: String, method: CostBasisMethod`      | `Account`                | `AccountNotFound { account_id }` (CBM-030), `DatabaseError` _(the method it already has: accepted, nothing recomputed, CBM-031)_                                                                                                                                                                                                                                                                         |
@@ -29,13 +29,14 @@
 
 ### Profiles
 
-| Command                   | Args                                     | Return                | Errors                                                                                                                                                                                                                             |
-| ------------------------- | ---------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_profiles`           | —                                        | `Vec<ProfileSummary>` | `DatabaseError`                                                                                                                                                                                                                    |
-| `create_profile`          | `name: String`                           | `Profile`             | `ProfileNameEmpty` (PFL-020), `ProfileNameAlreadyExists` (PFL-020), `DatabaseError`                                                                                                                                                |
-| `rename_profile`          | `profile_id: String, name: String`       | `Profile`             | `ProfileNotFound { profile_id }` (PFL-030), `ProfileNameEmpty`, `ProfileNameAlreadyExists` (PFL-062 — binds the name being set; renaming either of two profiles left with one name after a merge is accepted), `DatabaseError`     |
-| `remove_profile`          | `profile_id: String`                     | `()`                  | `ProfileNotFound { profile_id }`, `ProfileNotEmpty` (PFL-040), `DefaultProfileKept` (PFL-040), `DatabaseError`                                                                                                                     |
-| `move_account_to_profile` | `account_id: String, profile_id: String` | `Account`             | `AccountNotFound { account_id }`, `ProfileNotFound { profile_id }` (PFL-031), `NameAlreadyExists` (PFL-022), `TransferAcrossProfiles` (PFL-033), `DatabaseError` _(the profile it is in or reads as in, PFL-061: nothing changes)_ |
+| Command                   | Args                                     | Return        | Errors                                                                                                                                                                                                                             |
+| ------------------------- | ---------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_profiles`           | —                                        | `ProfileList` | `DatabaseError`                                                                                                                                                                                                                    |
+| `create_profile`          | `name: String`                           | `Profile`     | `ProfileNameEmpty` (PFL-020), `ProfileNameAlreadyExists` (PFL-020), `DatabaseError`                                                                                                                                                |
+| `rename_profile`          | `profile_id: String, name: String`       | `Profile`     | `ProfileNotFound { profile_id }` (PFL-030), `ProfileNameEmpty`, `ProfileNameAlreadyExists` (PFL-062 — binds the name being set; renaming either of two profiles left with one name after a merge is accepted), `DatabaseError`     |
+| `remove_profile`          | `profile_id: String`                     | `()`          | `ProfileNotFound { profile_id }`, `ProfileNotEmpty` (PFL-040), `DefaultProfileKept` (PFL-040), `DatabaseError`                                                                                                                     |
+| `move_account_to_profile` | `account_id: String, profile_id: String` | `Account`     | `AccountNotFound { account_id }`, `ProfileNotFound { profile_id }` (PFL-031), `NameAlreadyExists` (PFL-022), `TransferAcrossProfiles` (PFL-033), `DatabaseError` _(the profile it is in or reads as in, PFL-061: nothing changes)_ |
+| `set_profile_in_use`      | `profile_id: String`                     | `()`          | `ProfileNotFound { profile_id }` (PFL-032), `DatabaseError` _(the profile in use chosen again: nothing changes)_                                                                                                                   |
 
 ### Account Details
 
@@ -266,6 +267,11 @@ struct ProfileSummary {
     account_count: u32,                  // its accounts (PFL-023); the default one also counts those whose profile was removed elsewhere (PFL-061)
 }
 
+struct ProfileList {
+    profiles: Vec<ProfileSummary>,       // PFL-023 — the default one first, then by name, case ignored, then by id
+    in_use: String,                      // the identifier of the profile in use (PFL-012); the default profile's id when the chosen one is gone (PFL-014)
+}
+
 struct ImpliedCostBasis {
     method: CostBasisMethod,             // the method a new account would start with (CBM-011, CBM-014)
     country: String,                     // the country it comes from: the wrapper's, the account's or the portfolio's
@@ -297,6 +303,7 @@ struct CreateAccountDTO {
     country: Option<String>,             // ACC-041
     wrapper: Option<String>,             // ACC-043
     cost_basis_method: Option<CostBasisMethod>, // CBM-011A — the method chosen; none takes the country's (CBM-011)
+    profile_id: Option<String>,          // PFL-021 — the profile it goes into; none: the profile in use
 }
 
 struct UpdateAccountDTO {
@@ -911,6 +918,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-11-08 — #766 (PFL-012, PFL-014, PFL-021, PFL-032): `list_profiles` returns `ProfileList` (the profiles and the profile in use); new `set_profile_in_use`; `CreateAccountDTO` gains `profile_id: Option<String>` (none: the profile in use) and `add_account` returns `ProfileNotFound`; `ProfileUpdated` also signals a new profile in use (PFL-034).
 - 2026-11-08 — #766 (PFL): `Account` gains `profile_id`; new `list_profiles`, `create_profile`, `rename_profile`, `remove_profile`, `move_account_to_profile` and the `Profile` / `ProfileSummary` types; `AccountError` gains `ProfileNameEmpty`, `ProfileNameAlreadyExists`, `ProfileNotFound`, `ProfileNotEmpty`, `DefaultProfileKept`, `TransferAcrossProfiles`; `NameAlreadyExists` binds within one profile (PFL-022); transfer commands refuse two profiles (PFL-033); the event `ProfileUpdated` (PFL-034).
 - 2026-11-08 — #515 (CBM-011A, CBM-014, CBM-034): `CreateAccountDTO` gains `cost_basis_method: Option<CostBasisMethod>` (none: the country's); new `get_implied_cost_basis` and `get_holding_lots`, with `ImpliedCostBasis`, `HoldingLots` and `HoldingLot`.
 - 2026-11-07 — #514 (CBM-010–033): `Account` gains `cost_basis_method` and the `CostBasisMethod` type; new `set_account_cost_basis_method`, which recomputes the account's history and the transfers in it feeds (CBM-030). `add_account` / `update_account` are unchanged: a new account takes its country's method (CBM-011), an update keeps it.

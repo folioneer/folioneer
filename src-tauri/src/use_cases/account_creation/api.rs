@@ -27,6 +27,9 @@ pub struct CreateAccountDTO {
     /// CBM-011A — the cost basis method chosen for it; none takes its country's (CBM-011).
     #[serde(default)]
     pub cost_basis_method: Option<CostBasisMethod>,
+    /// PFL-021 — the profile it goes into; none puts it in the profile in use.
+    #[serde(default)]
+    pub profile_id: Option<String>,
 }
 
 /// Adds a new account, eagerly seeding its Cash Asset + 0-balance Cash Holding
@@ -45,6 +48,7 @@ pub async fn add_account(
         dto.country,
         dto.wrapper,
         dto.cost_basis_method,
+        dto.profile_id,
     )
     .await
 }
