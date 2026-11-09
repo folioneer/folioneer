@@ -123,7 +123,9 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
 
     // ACC-050 — a changed holder is its own action; no figure moves.
     if (formData.holder.trim() !== (account.holder ?? "")) {
+      setIsSubmitting(true);
       const named = await accountGateway.setAccountHolder(account.id, formData.holder || null);
+      setIsSubmitting(false);
       if (named.status === "error") {
         logger.warn("[useEditAccountModal] the holder was not set", { code: named.error.code });
         setError(accountMutationErrorToI18n(named.error));
