@@ -2054,6 +2054,12 @@ async fn written_form_of_every_record_kind() -> serde_json::Value {
         )
         .await
         .unwrap();
+    // ACC-050 — a holder, so its form is pinned.
+    let account = ctx
+        .account_service
+        .set_holder(&account.id, Some("Claire".into()))
+        .await
+        .unwrap();
     ctx.account_service
         .open_holding(
             &account.id,

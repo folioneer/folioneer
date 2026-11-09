@@ -172,7 +172,12 @@
     "group_no_wrapper": "No wrapper",
     "form_profile_label": "Profile",
     "form_profile_hint": "The profile whose figures count this account.",
-    "form_profile_move_warning": "This account and its whole history move to {{to}}: {{from}}'s figures no longer count it."
+    "form_profile_move_warning": "This account and its whole history move to {{to}}: {{from}}'s figures no longer count it.",
+    "form_holder_label": "Holder (optional)",
+    "form_holder_hint": "Whose name the account is in. Shown and filtered, never counted.",
+    "column_holder": "Holder",
+    "filter_holder": "Holder",
+    "filter_all": "All"
   },
   "action": {
     "add": "Add",

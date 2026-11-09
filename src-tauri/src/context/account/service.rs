@@ -483,7 +483,8 @@ impl AccountService {
             Some(current) => account
                 .with_stored_classification(current.country, current.wrapper)
                 .with_cost_basis_method(current.cost_basis_method)
-                .with_profile(current.profile_id),
+                .with_profile(current.profile_id)
+                .with_holder(current.holder),
             None => account,
         };
         self.update_account(account).await
@@ -547,7 +548,8 @@ impl AccountService {
         )?
         .with_stored_classification(account.country, account.wrapper)
         .with_cost_basis_method(account.cost_basis_method)
-        .with_profile(profile_id.to_string());
+        .with_profile(profile_id.to_string())
+        .with_holder(account.holder);
         let updated = self.account_repo.update(moved).await.map_err(|e| {
             tracing::error!(target: BACKEND, account_id = %account_id, err = ?e, "move_to_profile: repository failure");
             AccountError::DatabaseError
@@ -609,14 +611,16 @@ impl AccountService {
         // whose worst case keeps a wrapper another device set, which ACC-040 allows anyway.
         let stored = self.get_by_id(&id).await?;
         let stored_wrapper = stored.as_ref().and_then(|stored| stored.wrapper.clone());
-        // CBM-030 / PFL-031 — the method and the profile change only through their own actions.
-        let (method, profile_id) = stored
-            .map(|stored| (stored.cost_basis_method, stored.profile_id))
-            .unwrap_or_else(|| (CostBasisMethod::default(), default_profile_id()));
+        // CBM-030 / PFL-031 / ACC-050 — the method, the profile and the holder change only
+        // through their own actions.
+        let (method, profile_id, holder) = stored
+            .map(|stored| (stored.cost_basis_method, stored.profile_id, stored.holder))
+            .unwrap_or_else(|| (CostBasisMethod::default(), default_profile_id(), None));
         let account = Account::with_id(id, name, bank_name, currency, management_fees_enabled)?
             .classified(country, wrapper, stored_wrapper.as_deref())?
             .with_cost_basis_method(method)
-            .with_profile(profile_id);
+            .with_profile(profile_id)
+            .with_holder(holder);
         self.update_account(account).await
     }
 
@@ -2801,6 +2805,32 @@ impl AccountService {
             .await
             .map_err(|e| applied_write_error("apply_transaction", e))?;
         Ok(())
+    }
+
+    /// ACC-050 — puts the account in `holder`'s name, trimmed; an empty one clears it. The same
+    /// holder changes nothing; no figure moves (ACC-052).
+    pub async fn set_holder(
+        &self,
+        account_id: &str,
+        holder: Option<String>,
+    ) -> StdResult<Account, AccountError> {
+        let account =
+            self.get_by_id(account_id)
+                .await?
+                .ok_or_else(|| AccountError::AccountNotFound {
+                    account_id: account_id.to_string(),
+                })?;
+        let current = account.holder.clone();
+        let account = account.with_holder(holder);
+        if account.holder == current {
+            return Ok(account);
+        }
+        let updated = self.account_repo.update(account).await.map_err(|e| {
+            tracing::error!(target: BACKEND, account_id = %account_id, err = ?e, "set_holder: repository failure");
+            AccountError::DatabaseError
+        })?;
+        self.emit_account_updated();
+        Ok(updated)
     }
 
     /// PFL-021 — the profile a new account goes into: `given` when it exists, the profile in

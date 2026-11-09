@@ -71,6 +71,7 @@ impl AccountCreationUseCase {
             wrapper,
             None,
             None,
+            None,
         )
         .await
     }
@@ -79,7 +80,7 @@ impl AccountCreationUseCase {
     /// for it, or the one its country implies when none is (CBM-011), in the profile given or
     /// the profile in use (PFL-021).
     // The account's own fields, one argument each as `create_classified` takes them, plus
-    // the method chosen and the profile.
+    // the method chosen, the profile and the holder (ACC-050).
     #[allow(clippy::too_many_arguments)]
     pub async fn create_with_method(
         &self,
@@ -91,6 +92,7 @@ impl AccountCreationUseCase {
         wrapper: Option<String>,
         method: Option<CostBasisMethod>,
         profile_id: Option<String>,
+        holder: Option<String>,
     ) -> StdResult<Account, AccountError> {
         // ACC-002 / TRX-021 / ACC-041 — the account's own fields are checked before anything
         // is seeded for it: a value it refuses is answered with its own code.
@@ -100,7 +102,8 @@ impl AccountCreationUseCase {
         let account = match method {
             Some(method) => account.with_cost_basis_method(method),
             None => account,
-        };
+        }
+        .with_holder(holder);
         self.create_with_cash(account, profile_id, None).await
     }
 

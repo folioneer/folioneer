@@ -33,6 +33,8 @@ pub struct AccountSummary {
     /// ACC-046 — the identifier of the account's tax wrapper (ACC-043), for the list's column
     /// and grouping; none when unset.
     pub wrapper: Option<String>,
+    /// ACC-050 — whose name the account is in; none when unset.
+    pub holder: Option<String>,
     /// Total economic value in account-currency micros (CSH-094 / FXR-041): cash
     /// quantity plus the sum of `quantity × latest_price` over priced active non-cash
     /// holdings, with foreign holdings converted to account currency. Unpriced holdings,
@@ -87,8 +89,11 @@ pub struct PortfolioTotal {
 pub struct AccountSummaries {
     /// One row per non-deleted account.
     pub summaries: Vec<AccountSummary>,
-    /// The portfolio total over those rows.
+    /// The portfolio total over every account of the profile in use, whatever the holder
+    /// given (ACC-027, ACC-051A).
     pub total: PortfolioTotal,
+    /// ACC-051 — the holders the accounts name, each once, ordered by name with case ignored.
+    pub holders: Vec<String>,
 }
 
 /// ACC-021 / ACC-027 — reads the summaries of a set of accounts over the account, asset and
@@ -157,6 +162,7 @@ impl SummaryReader {
                 name: account.name,
                 currency: account.currency,
                 wrapper: account.wrapper,
+                holder: account.holder,
                 total_global_value,
                 total_unrealized_pnl,
                 ytd_performance_pct,
@@ -189,7 +195,28 @@ impl SummaryReader {
             rates.insert(summary.currency.clone(), rate);
         }
         let total = portfolio_total(&summaries, &rates, &reference);
-        Ok(AccountSummaries { summaries, total })
+        // ACC-051 — each holder once, case ignored, as the first account naming it writes it,
+        // the accounts taken by name with case ignored; ordered by name with case ignored.
+        let mut named: Vec<(&AccountSummary, &String)> = summaries
+            .iter()
+            .filter_map(|summary| summary.holder.as_ref().map(|holder| (summary, holder)))
+            .collect();
+        named.sort_by_cached_key(|(summary, _)| (summary.name.to_lowercase(), summary.id.clone()));
+        let mut holders: Vec<String> = Vec::new();
+        for (_, holder) in named {
+            if !holders
+                .iter()
+                .any(|known| known.to_lowercase() == holder.to_lowercase())
+            {
+                holders.push(holder.clone());
+            }
+        }
+        holders.sort_by_cached_key(|holder| holder.to_lowercase());
+        Ok(AccountSummaries {
+            summaries,
+            total,
+            holders,
+        })
     }
 
     /// ACC-023 / MKT-040 — account-wide unrealized P&L in account currency: the

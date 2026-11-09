@@ -1,7 +1,7 @@
 # Contract — Sync
 
 > Domain: `sync`
-> Last updated by: `multi-device-sync` + `sync-conflict-resolution` specs — `financial-asset-transaction` (TRX-024B), `cost-basis` (CBM-010, CBM-012A/B, CBM-033), `profile` (PFL-060)
+> Last updated by: `multi-device-sync` + `sync-conflict-resolution` specs — `financial-asset-transaction` (TRX-024B), `cost-basis` (CBM-010, CBM-012A/B, CBM-033), `profile` (PFL-060), `account` (ACC-050)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Per-command reachable codes are listed in the "Errors" column. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic chain preserved server-side via `tracing::error!`), consistent with the other contracts. Precondition guards not stated as rejections in the spec are marked _(precondition guard — inferred)_.
 >
@@ -203,6 +203,7 @@ Record identity per kind follows CFR-012: accounts, categories, assets, transact
 
 ## Changelog
 
+- 2026-11-09 — #769 (SYN-038, ACC-050): data format version 18: the account record gains `holder`.
 - 2026-11-08 — #766 (SYN-038, PFL-060): data format version 17: `RecordKind` gains `Profile`, and the account record `profile_id`.
 - 2026-11-07 — #514 (SYN-038, CBM-010): data format version 16 adds `cost_basis_method` to the account record.
 - 2026-11-07 — #748 (SYN-034, SYN-038): data format version 15 widens the bound on a figure of money to ±10¹⁸; the written form is version 14's.

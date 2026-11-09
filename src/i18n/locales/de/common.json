@@ -172,7 +172,12 @@
     "group_no_wrapper": "Ohne Steuerhülle",
     "form_profile_label": "Profil",
     "form_profile_hint": "Das Profil, dessen Zahlen dieses Konto zählen.",
-    "form_profile_move_warning": "Dieses Konto zieht mit seiner ganzen Historie nach {{to}} um: Die Zahlen von {{from}} zählen es nicht mehr."
+    "form_profile_move_warning": "Dieses Konto zieht mit seiner ganzen Historie nach {{to}} um: Die Zahlen von {{from}} zählen es nicht mehr.",
+    "form_holder_label": "Inhaber (optional)",
+    "form_holder_hint": "Auf wessen Namen das Konto läuft. Angezeigt und gefiltert, nie gezählt.",
+    "column_holder": "Inhaber",
+    "filter_holder": "Inhaber",
+    "filter_all": "Alle"
   },
   "action": {
     "add": "Hinzufügen",

@@ -22,6 +22,7 @@
 | `update_account`                | `UpdateAccountDTO`                                 | `Account`                | `NameEmpty` (ACC-002), `NameAlreadyExists` (ACC-003, PFL-022 — within one profile; binds the name being set; editing other fields of an account whose name already clashes after a merge is accepted, CFR-035), `InvalidCurrency { currency }` (TRX-021), `InvalidCountry { country }` (ACC-041), `WrapperNotAvailable { wrapper }` (ACC-043 — not in the lists, nor the account's own), `DatabaseError` |
 | `get_wrapper_lists`             | —                                                  | `WrapperLists`           | _(infallible — the lists are the application's own, ACC-040)_                                                                                                                                                                                                                                                                                                                                            |
 | `set_account_cost_basis_method` | `account_id: String, method: CostBasisMethod`      | `Account`                | `AccountNotFound { account_id }` (CBM-030), `DatabaseError` _(the method it already has: accepted, nothing recomputed, CBM-031)_                                                                                                                                                                                                                                                                         |
+| `set_account_holder`            | `account_id: String, holder: Option<String>`       | `Account`                | `AccountNotFound { account_id }` (ACC-050), `DatabaseError` _(trimmed; empty or none clears it; the same holder changes nothing, ACC-050A)_                                                                                                                                                                                                                                                              |
 | `get_implied_cost_basis`        | `country: Option<String>, wrapper: Option<String>` | `ImpliedCostBasis`       | _(infallible — CBM-014)_                                                                                                                                                                                                                                                                                                                                                                                 |
 | `get_holding_lots`              | `account_id: String, asset_id: String`             | `HoldingLots`            | `AccountNotFound { account_id }` (CBM-034), `DatabaseError` _(an unknown asset, or one never held: no lot, CBM-034A; a history a merge left inconsistent is read as it stands, no guard, CBM-034B)_                                                                                                                                                                                                      |
 | `delete_account`                | `id: String`                                       | `()`                     | `DatabaseError` _(ACC-005, ACC-006 — plain DELETE, silent on missing row)_                                                                                                                                                                                                                                                                                                                               |
@@ -53,9 +54,9 @@
 > `get_account_summaries` is implemented in `use_cases/account_summary/` — it reads from both the
 > account and asset BCs (price lookups for each account's holdings) but mutates neither.
 
-| Command                 | Args | Return             | Errors                                                                                                                                            |
-| ----------------------- | ---- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_account_summaries` | —    | `AccountSummaries` | `DatabaseError`; price lookup failures silently contribute 0 to the value (MKT-031); the accounts of the profile in use and their total (PFL-050) |
+| Command                 | Args                     | Return             | Errors                                                                                                                                                                                                                                                                                      |
+| ----------------------- | ------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_account_summaries` | `holder: Option<String>` | `AccountSummaries` | `DatabaseError`; price lookup failures silently contribute 0 to the value (MKT-031); the accounts of the profile in use and their total (PFL-050) _(with a holder, trimmed, only its accounts, the total and `holders` staying every account's, ACC-051A; a blank one reads every account)_ |
 
 ### Account Performance
 
@@ -253,6 +254,7 @@ struct Account {
     management_fees_enabled: bool,       // whether one-off fees and fee schedules are available on this account (FEE-075); a new account starts disabled
     country: Option<String>,             // the account's own country (ISO 3166-1 alpha-2) when one is set, kept even if it equals the portfolio's (ACC-041, ACC-045)
     wrapper: Option<String>,             // identifier of its tax wrapper (ACC-040/043); none when unset
+    holder: Option<String>,              // ACC-050 — whose name it is in; none when unset; changed by `set_account_holder` or a synced change (none from one written before format 18)
     profile_id: String,                  // the profile it belongs to (PFL-010); changed by `move_account_to_profile` alone (PFL-031) or a synced change; read as "default-profile" when the profile it names was removed on another device (PFL-061)
     cost_basis_method: CostBasisMethod,  // how it sets the cost of the units that leave it (CBM-010); a new account takes its country's (CBM-011); changed by `set_account_cost_basis_method` alone (CBM-030), or by a synced change (CBM-033)
 }
@@ -320,6 +322,7 @@ struct CreateAccountDTO {
     wrapper: Option<String>,             // ACC-043
     cost_basis_method: Option<CostBasisMethod>, // CBM-011A — the method chosen; none takes the country's (CBM-011)
     profile_id: Option<String>,          // PFL-021 — the profile it goes into; none: the profile in use
+    holder: Option<String>,              // ACC-050 — whose name it is in; none or empty: unset
 }
 
 struct UpdateAccountDTO {
@@ -672,6 +675,7 @@ struct AccountSummary {
     name: String,
     currency: String,                          // ISO 4217 currency code; same as Account.currency
     wrapper: Option<String>,                   // identifier of the account's tax wrapper, for the list's column and grouping (ACC-046, ACC-047)
+    holder: Option<String>,                    // whose name the account is in; None when unset (ACC-050, ACC-051)
     total_global_value: i64,                   // micros, account currency: same algorithm as AccountDetailsResponse.total_global_value (CSH-094)
     total_unrealized_pnl: Option<i64>,         // micros, account currency: account-wide unrealized P&L, same algorithm as AccountDetailsResponse.total_unrealized_pnl (MKT-040 / ACC-023); None when no holding qualifies
     ytd_performance_pct: Option<i64>,          // micro-percent: year-to-date net-of-flows performance since Jan 1, reusing PRF-034 (ACC-024); first-year accounts use an inception baseline (present, not None); None only when the Simple-Dietz denominator is 0 (PRF-032)
@@ -682,8 +686,9 @@ struct AccountSummary {
 
 // Response of get_account_summaries (ACC-021, ACC-027)
 struct AccountSummaries {
-    summaries: Vec<AccountSummary>,
-    total: PortfolioTotal,
+    summaries: Vec<AccountSummary>,            // with a holder given, only its accounts (ACC-051A)
+    total: PortfolioTotal,                     // every account's of the profile in use, whatever the holder (ACC-051A)
+    holders: Vec<String>,                      // the holders every account of the profile in use names, whatever the holder given: each once with case ignored, written as the first account naming it writes it, by name case ignored (ACC-051, ACC-051A)
 }
 
 // Portfolio total over every account of the profile in use (ACC-027/028/029, PFL-050)
@@ -910,7 +915,7 @@ struct AccountJournal {
 
 | Event                | Payload | Rule                                                                             |
 | -------------------- | ------- | -------------------------------------------------------------------------------- |
-| `AccountUpdated`     | —       | ACC-022, CBM-030, PFL-034                                                        |
+| `AccountUpdated`     | —       | ACC-022, CBM-030, PFL-034, ACC-050                                               |
 | `TransactionUpdated` | —       | TRX-037, DIV-026, FSD-026, FEE-026, AGT-044, AGT-045, TRF-029, IMP-050A, CBM-030 |
 | `FeeScheduleUpdated` | —       | FEE-064                                                                          |
 | `HoldingNoteUpdated` | —       | HNO-020, HNO-021                                                                 |
@@ -934,6 +939,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-11-09 — #769 (ACC-050, ACC-051): `Account`, `CreateAccountDTO` and `AccountSummary` gain `holder`; new `set_account_holder`; `get_account_summaries` takes `holder: Option<String>` and `AccountSummaries` gains `holders`.
 - 2026-11-08 — #768 (PFL-055): new `get_profile_overview` and the `ProfileOverview` / `ProfileOverviewRow` types.
 - 2026-11-08 — #767 (PFL-040): `ProfileSummary` gains `removable`, so the window shows which profile may be removed without deciding it.
 - 2026-11-08 — #766 (PFL-050, PFL-051): `get_accounts`, `get_account_summaries` (and its total) and `get_global_performance` without an account read the accounts of the profile in use. No signature changed. `AccountError` gains `AccountOutsideProfileInUse { account_id }` (PFL-051A, returned by the import commands).

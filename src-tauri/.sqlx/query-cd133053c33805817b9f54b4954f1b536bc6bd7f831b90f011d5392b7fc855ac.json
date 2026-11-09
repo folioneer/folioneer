@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS \"profile_id!: String\" FROM accounts WHERE LOWER(name) = LOWER(?) AND COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') = ?",
+  "query": "SELECT id, name, bank_name, currency, management_fees_enabled,\n                              country, wrapper, cost_basis_method, profile_id, holder,\n                              sync_logical_timestamp, sync_origin, sync_device_id\n                       FROM accounts WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -44,13 +44,33 @@
         "type_info": "Text"
       },
       {
-        "name": "profile_id!: String",
+        "name": "profile_id",
         "ordinal": 8,
-        "type_info": "Null"
+        "type_info": "Text"
+      },
+      {
+        "name": "holder",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 11,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 12,
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
       false,
@@ -61,8 +81,12 @@
       true,
       true,
       false,
-      null
+      false,
+      true,
+      true,
+      true,
+      true
     ]
   },
-  "hash": "3aeb0590d9609613ce38b064d891111e77e14deb1076b541a679ac4d5196ee13"
+  "hash": "cd133053c33805817b9f54b4954f1b536bc6bd7f831b90f011d5392b7fc855ac"
 }

@@ -39,6 +39,8 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
   // ACC-046/047 — the wrapper lists name each account's wrapper; the list groups on demand.
   const wrapperLists = useWrapperLists();
   const [groupBy, setGroupBy] = useState<"none" | "wrapper">("none");
+  // ACC-051 (#769, the validated mock) — the holder whose accounts are shown; none for all.
+  const [holder, setHolder] = useState<string | null>(null);
   const labelOf = (wrapperId: string | null) =>
     wrapperLabel(wrapperLists, wrapperId, i18n.language);
   // ACC-021 — list-page data comes from get_account_summaries (enriched with
@@ -46,12 +48,17 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
   // useAccounts hook since they don't need the per-account value.
   const {
     summaries,
+    holders,
     portfolioTotal,
     isLoading: loading,
     error: fetchError,
     refetch,
-  } = useAccountSummaries();
+  } = useAccountSummaries(holder);
   const { deleteAccount, getAccountDeletionSummary } = useAccounts();
+  // ACC-051 — a holder no account names any more gives way to all the accounts.
+  useEffect(() => {
+    if (holder !== null && !holders.includes(holder)) setHolder(null);
+  }, [holder, holders]);
 
   useEffect(() => {
     logger.info("[AccountTable] mounted");
@@ -156,6 +163,10 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
           <span className="text-m3-on-surface">{labelOf(account.wrapper)}</span>
         )}
       </td>
+      {/* ACC-050 — whose name the account is in; "—" without one */}
+      <td id={`account-holder-${account.id}`} className="m3-td">
+        {account.holder ?? <span className="text-m3-on-surface-variant">—</span>}
+      </td>
       <td className="m3-td text-right tabular-nums">
         <span className="font-medium text-m3-on-surface">
           {microToFormatted(account.total_global_value, 2)}
@@ -228,6 +239,28 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
           />
         </div>
       )}
+      {/* ACC-051 (#769, the validated mock) — show one holder's accounts */}
+      {(holders.length > 0 || holder !== null) && (
+        <div id="account-holder-filter" className="mb-3 flex items-center gap-2 px-2">
+          <span className="text-sm text-m3-on-surface-variant">{t("account.filter_holder")}</span>
+          {[null, ...holders].map((name, index) => (
+            <button
+              key={name ?? ""}
+              type="button"
+              id={name === null ? "account-holder-filter-all" : `account-holder-filter-${index}`}
+              aria-pressed={holder === name}
+              onClick={() => setHolder(name)}
+              className={`rounded-xl px-3 py-1 text-sm transition-colors ${
+                holder === name
+                  ? "bg-m3-primary-container text-m3-on-primary-container"
+                  : "bg-m3-surface-container text-m3-on-surface hover:bg-m3-on-surface/10"
+              }`}
+            >
+              {name ?? t("account.filter_all")}
+            </button>
+          ))}
+        </div>
+      )}
       {/* ACC-047 — group the list by wrapper */}
       {showGroupBy && (
         <div className="mb-3 w-48 px-2">
@@ -293,6 +326,9 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
             </th>
             <th className="m3-th" scope="col">
               {t("account.column_wrapper")}
+            </th>
+            <th className="m3-th" scope="col">
+              {t("account.column_holder")}
             </th>
             <th
               id="account-column-global-value"
@@ -371,7 +407,7 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
         <tbody>
           {loading ? (
             <tr>
-              <td colSpan={7} className="m3-td text-center py-12">
+              <td colSpan={8} className="m3-td text-center py-12">
                 <span className="text-m3-on-surface-variant animate-pulse">
                   {t("account.loading")}
                 </span>
@@ -380,14 +416,14 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
           ) : isEmpty ? (
             // R11 — empty state distinct from no-search-results
             <tr>
-              <td colSpan={7} className="m3-td text-center py-12 text-m3-on-surface-variant italic">
+              <td colSpan={8} className="m3-td text-center py-12 text-m3-on-surface-variant italic">
                 {t("account.empty")}
               </td>
             </tr>
           ) : fetchError ? (
             // R12 — error state with retry (only shown when accounts exist but failed to reload)
             <tr>
-              <td colSpan={7} className="m3-td text-center py-12">
+              <td colSpan={8} className="m3-td text-center py-12">
                 <div className="flex flex-col items-center gap-3">
                   <span className="text-m3-error text-sm">{t("account.error_load")}</span>
                   <Button variant="outline" size="sm" onClick={refetch}>
@@ -399,7 +435,7 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
           ) : hasNoSearchResults ? (
             // R10 — no search results (filter active, no match)
             <tr>
-              <td colSpan={7} className="m3-td text-center py-12 text-m3-on-surface-variant italic">
+              <td colSpan={8} className="m3-td text-center py-12 text-m3-on-surface-variant italic">
                 {t("account.no_search_results")}
               </td>
             </tr>
@@ -410,7 +446,7 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
                   id={`account-wrapper-group-${group.wrapper ?? "none"}`}
                   className="bg-m3-surface-container-high"
                 >
-                  <td colSpan={7} className="m3-td">
+                  <td colSpan={8} className="m3-td">
                     <span className="text-xs font-semibold uppercase tracking-wide text-m3-on-surface-variant">
                       {group.label ?? t("account.group_no_wrapper")}
                     </span>
@@ -430,7 +466,7 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
               id="account-portfolio-total"
               className="border-t-2 border-m3-outline/20 bg-m3-surface-container"
             >
-              <td className="m3-td" colSpan={3}>
+              <td className="m3-td" colSpan={4}>
                 <span className="font-semibold text-m3-on-surface">{t("account.total")}</span>
                 {/* ACC-028 — an unconvertible account hides a figure from the total */}
                 {portfolioTotal.incomplete && (

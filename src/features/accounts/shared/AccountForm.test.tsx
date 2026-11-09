@@ -42,6 +42,7 @@ const formData = (overrides: Partial<AccountFormData> = {}): AccountFormData => 
   wrapper: "",
   cost_basis_method: "",
   profile_id: "",
+  holder: "",
   ...overrides,
 });
 
@@ -155,5 +156,29 @@ describe("AccountForm — cost basis method (#515, the validated mock)", () => {
       "account.form_cost_basis_change_warning",
     );
     expect(screen.queryByText(/form_cost_basis_implied/)).toBeNull();
+  });
+
+  // ACC-050 / #767 — typing a holder reaches the form as the holder field; choosing a
+  // profile reaches it as the profile field, with the move warning shown when one is given.
+  it("passes the holder and the profile on, and shows a move's warning", async () => {
+    const handleChange = vi.fn();
+    render(
+      <AccountForm
+        formData={formData({ holder: "", profile_id: "default-profile" })}
+        handleChange={handleChange}
+        setCountry={vi.fn()}
+        wrapperLists={null}
+        profiles={[
+          { profile: { id: "default-profile", name: null }, account_count: 1, removable: false },
+          { profile: { id: "p-1", name: "Parent" }, account_count: 0, removable: true },
+        ]}
+        profileMoveWarning={{ key: "account.form_profile_move_warning" }}
+      />,
+    );
+    await userEvent.type(screen.getByLabelText("account.form_holder_label"), "C");
+    expect(handleChange.mock.calls.at(-1)?.[0].target.name).toBe("holder");
+    await userEvent.selectOptions(screen.getByLabelText("account.form_profile_label"), "p-1");
+    expect(handleChange.mock.calls.at(-1)?.[0].target.name).toBe("profile_id");
+    expect(screen.getByRole("status")).toHaveTextContent("account.form_profile_move_warning");
   });
 });

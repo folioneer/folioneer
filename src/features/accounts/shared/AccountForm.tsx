@@ -22,6 +22,8 @@ export interface AccountFormData {
   cost_basis_method: CostBasisMethod | "";
   /** PFL-021 / PFL-031 — the profile it belongs to; "" until the profiles are read. */
   profile_id: string;
+  /** ACC-050 — whose name the account is in; "" for none. */
+  holder: string;
 }
 
 interface AccountFormProps {
@@ -106,6 +108,18 @@ export function AccountForm({
         value={formData.bank_name}
         onChange={handleChange}
       />
+
+      {/* ACC-050 (#769, the validated mock) — whose name the account is in, never counted */}
+      <div className="flex flex-col gap-1.5">
+        <TextField
+          label={t("account.form_holder_label")}
+          id={`${idPrefix}-holder`}
+          name="holder"
+          value={formData.holder}
+          onChange={handleChange}
+        />
+        <span className="text-xs text-m3-on-surface-variant">{t("account.form_holder_hint")}</span>
+      </div>
 
       <TextField
         label={t("account.form_currency_label")}

@@ -26,8 +26,19 @@ export const accountGateway = {
     return await commands.getAccounts();
   },
 
-  async getAccountSummaries(): Promise<Result<AccountSummaries, AccountError>> {
-    return await commands.getAccountSummaries();
+  // ACC-021 / ACC-051 — the summaries, only one holder's accounts when one is given.
+  async getAccountSummaries(
+    holder: string | null,
+  ): Promise<Result<AccountSummaries, AccountError>> {
+    return await commands.getAccountSummaries(holder);
+  },
+
+  // ACC-050 — puts an account in a holder's name; none clears it.
+  async setAccountHolder(
+    accountId: string,
+    holder: string | null,
+  ): Promise<Result<Account, AccountError>> {
+    return await commands.setAccountHolder(accountId, holder);
   },
 
   async addAccount(dto: CreateAccountDTO): Promise<Result<Account, AccountError>> {

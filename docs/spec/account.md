@@ -19,6 +19,7 @@ A financial account owned by the user.
 | `name`    | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among the accounts of its profile (case-insensitive, ACC-003).     |
 | `country` | The account's own country (two upper-case letters), when one is set; absent otherwise (ACC-041).                                         |
 | `wrapper` | The identifier of the tax wrapper the account sits in, normally one of the lists of ACC-040; absent when none is set (ACC-043, ACC-044). |
+| `holder`  | Whose name the account is in, free text; absent when none is set (ACC-050). Read by no figure (ACC-052).                                 |
 
 ### PortfolioTotal
 
@@ -152,9 +153,23 @@ The tax wrapper an account sits in — a PEA, an assurance vie, a Depot — is a
 
 **ACC-047 — Grouping by wrapper (frontend)**: Once the lists are read and accounts are listed — not while the accounts load, fail to load or none exists; a search matching nothing keeps it — a "Group by" choice above the account table offers Nothing or Wrapper; it is kept while the page stays open, not between visits. Grouped, the accounts sit under one heading per wrapper — its label in the window's language, or the identifier of one the lists do not know — in a fixed order: the generic wrappers, then France's, then Germany's, each list in the order ACC-040 names its wrappers; the wrappers they do not know after them in the order the accounts meet them, the accounts without one last under "No wrapper". A heading is not an account row: it cannot be focused, clicked or collapsed. Sorting (ACC-009) orders the accounts within each heading, the headings keeping their order; a search (ACC-011) hides a heading left with no account; the total row stays below every heading (ACC-031). Grouping changes only how this table shows the accounts.
 
+### Holder (050–059)
+
+Within a profile, an account names whose name it is in; nothing is computed from it (owner, 2026-11-07, #769).
+
+**ACC-050 — An account's holder (backend)**: An account names a holder, free text, trimmed, or none; an empty one is none. It is set when the account is created or by its own action, which changes nothing else of the account and is signaled by `AccountUpdated` (ACC-022); editing the account leaves its holder as it is. An unknown account is rejected with a specific error.
+
+**ACC-050A — The same holder again (backend)**: Setting the holder an account already has changes nothing and signals nothing.
+
+**ACC-051 — The holders read with the summaries (backend)**: The account summaries (ACC-021) give each account's holder and the holders their accounts name: each once with case ignored for every letter, accented ones included, written as the first account naming it writes it, the accounts taken by name with case ignored, then by identifier; ordered by name with case ignored; over every account of the profile in use (PFL-050).
+
+**ACC-051A — The summaries of one holder (backend)**: Read for one holder, trimmed, the account summaries give only the accounts in that name, case ignored for every letter, accented ones included; the portfolio total (ACC-027) and the holders stay those of every account of the profile in use. A blank holder reads every account.
+
+**ACC-052 — No figure reads the holder (backend)**: No figure, total, performance or count reads an account's holder.
+
 ### Events
 
-**ACC-022 — AccountUpdated event (backend)** _(new)_: After any successful account mutation (create per ACC-001/002/003, update per ACC-001/002/003, a move to another profile per PFL-031, delete per ACC-005/006), the `AccountService` (owned by the `account/` bounded context) publishes an `AccountUpdated` event on the event bus. The service owns the event publication (B8 compliance). This event is distinct from `TransactionUpdated`: `AccountUpdated` signals structural account changes; `TransactionUpdated` signals position-data changes.
+**ACC-022 — AccountUpdated event (backend)** _(new)_: After any successful account mutation (create per ACC-001/002/003, update per ACC-001/002/003, a move to another profile per PFL-031, a change of holder per ACC-050, delete per ACC-005/006), the `AccountService` (owned by the `account/` bounded context) publishes an `AccountUpdated` event on the event bus. The service owns the event publication (B8 compliance). This event is distinct from `TransactionUpdated`: `AccountUpdated` signals structural account changes; `TransactionUpdated` signals position-data changes.
 
 ---
 

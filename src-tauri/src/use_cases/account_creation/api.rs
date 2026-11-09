@@ -30,6 +30,9 @@ pub struct CreateAccountDTO {
     /// PFL-021 — the profile it goes into; none puts it in the profile in use.
     #[serde(default)]
     pub profile_id: Option<String>,
+    /// ACC-050 — whose name it is in; none, or an empty one, leaves it unset.
+    #[serde(default)]
+    pub holder: Option<String>,
 }
 
 /// Adds a new account, eagerly seeding its Cash Asset + 0-balance Cash Holding
@@ -49,6 +52,7 @@ pub async fn add_account(
         dto.wrapper,
         dto.cost_basis_method,
         dto.profile_id,
+        dto.holder,
     )
     .await
 }

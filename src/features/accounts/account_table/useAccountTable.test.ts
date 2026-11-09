@@ -16,6 +16,7 @@ function makeAccount(
     name,
     currency: "EUR",
     wrapper: null,
+    holder: null,
     total_global_value,
     total_unrealized_pnl,
     ytd_performance_pct,
@@ -194,6 +195,7 @@ describe("useAccountTable", () => {
       management_fees_enabled: false,
       country: null,
       wrapper: null,
+      holder: null,
     });
   });
 
@@ -369,6 +371,7 @@ describe("useAccountTable — bank name column (ACC-026, ACC-008)", () => {
       bank_name,
       currency: "EUR",
       wrapper: null,
+      holder: null,
       management_fees_enabled: false,
     };
   }

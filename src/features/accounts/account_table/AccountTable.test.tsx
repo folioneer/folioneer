@@ -24,14 +24,20 @@ const mockError = vi.fn<() => unknown>(() => null);
 const mockRefetch = vi.fn();
 const mockTotal = vi.fn<() => PortfolioTotal | null>(() => null);
 
+let mockHolders: string[] = [];
+let lastHolder: string | null = null;
 vi.mock("../useAccountSummaries", () => ({
-  useAccountSummaries: () => ({
-    summaries: mockSummaries(),
-    portfolioTotal: mockTotal(),
-    isLoading: mockIsLoading(),
-    error: mockError(),
-    refetch: mockRefetch,
-  }),
+  useAccountSummaries: (holder: string | null) => {
+    lastHolder = holder;
+    return {
+      summaries: mockSummaries(),
+      holders: mockHolders,
+      portfolioTotal: mockTotal(),
+      isLoading: mockIsLoading(),
+      error: mockError(),
+      refetch: mockRefetch,
+    };
+  },
 }));
 
 vi.mock("../useAccounts", () => ({
@@ -79,6 +85,7 @@ vi.mock("../useWrapperLists", () => ({
 }));
 
 const makeSummary = (overrides: Partial<AccountSummary> = {}): AccountSummary => ({
+  holder: null,
   id: "acc-1",
   name: "Main EUR",
   currency: "EUR",
@@ -135,7 +142,7 @@ describe("AccountTable — Global Value column (ACC-021)", () => {
     mockSummaries.mockReturnValue([makeSummary()]);
     render(<AccountTable searchTerm="" onAccountClick={vi.fn()} />);
     const headers = screen.getAllByRole("columnheader").map((header) => header.textContent ?? "");
-    expect(headers).toHaveLength(7);
+    expect(headers).toHaveLength(8);
     expect(headers.some((header) => /frequency/i.test(header))).toBe(false);
   });
 
@@ -482,5 +489,18 @@ describe("AccountTable — wrapper (ACC-046, ACC-047)", () => {
       (row) => row.textContent,
     );
     expect(headings).toEqual(["Brokerage", "PEA", "account.group_no_wrapper"]);
+  });
+
+  // ACC-051 (#769) — a holder chip shows one holder's accounts; "All" shows them all.
+  it("filters the accounts by holder from the chips", () => {
+    mockHolders = ["Claire", "Marc"];
+    render(<AccountTable searchTerm="" onAccountClick={vi.fn()} />);
+    const claire = document.getElementById("account-holder-filter-1") as HTMLElement;
+    fireEvent.click(claire);
+    expect(claire.getAttribute("aria-pressed")).toBe("true");
+    expect(lastHolder).toBe("Claire");
+    fireEvent.click(document.getElementById("account-holder-filter-all") as HTMLElement);
+    expect(lastHolder).toBeNull();
+    mockHolders = [];
   });
 });

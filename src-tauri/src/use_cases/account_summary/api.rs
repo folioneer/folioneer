@@ -11,6 +11,9 @@ use tauri::State;
 #[specta::specta]
 pub async fn get_account_summaries(
     state: State<'_, AccountSummaryUseCase>,
+    holder: Option<String>,
 ) -> Result<AccountSummaries, AccountError> {
-    state.get_account_summaries().await
+    // ACC-021 / ACC-051 — the rows of one holder when one is given; the total stays every
+    // account's of the profile in use.
+    state.get_account_summaries_for_holder(holder).await
 }

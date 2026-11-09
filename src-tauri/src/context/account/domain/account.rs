@@ -210,6 +210,10 @@ pub struct Account {
     /// change written before profiles existed (PFL-060).
     #[serde(default = "default_profile_id")]
     pub profile_id: String,
+    /// ACC-050 — whose name the account is in: free text, none when unset; read as none from a
+    /// change written before it existed (SYN-035). No figure reads it (ACC-052).
+    #[serde(default)]
+    pub holder: Option<String>,
     /// Holdings owned by this account. Populated only in aggregate load — excluded from bindings.
     #[serde(skip)]
     #[specta(skip)]
@@ -251,6 +255,7 @@ impl Account {
             wrapper: None,
             cost_basis_method: CostBasisMethod::default(),
             profile_id: default_profile_id(),
+            holder: None,
             holdings: Vec::new(),
             transactions: Vec::new(),
             pending_changes: Vec::new(),
@@ -281,6 +286,7 @@ impl Account {
             wrapper: None,
             cost_basis_method: CostBasisMethod::default(),
             profile_id: default_profile_id(),
+            holder: None,
             holdings: Vec::new(),
             transactions: Vec::new(),
             pending_changes: Vec::new(),
@@ -305,6 +311,7 @@ impl Account {
             wrapper: None,
             cost_basis_method: CostBasisMethod::default(),
             profile_id: default_profile_id(),
+            holder: None,
             holdings: Vec::new(),
             transactions: Vec::new(),
             pending_changes: Vec::new(),
@@ -333,6 +340,7 @@ impl Account {
             wrapper: None,
             cost_basis_method: CostBasisMethod::default(),
             profile_id: default_profile_id(),
+            holder: None,
             holdings,
             transactions,
             pending_changes: Vec::new(),
@@ -389,6 +397,14 @@ impl Account {
     /// PFL-010 — the account in `profile_id`.
     pub fn with_profile(mut self, profile_id: String) -> Self {
         self.profile_id = profile_id;
+        self
+    }
+
+    /// ACC-050 — the account in `holder`'s name, trimmed; an empty one is none.
+    pub fn with_holder(mut self, holder: Option<String>) -> Self {
+        self.holder = holder
+            .map(|holder| holder.trim().to_string())
+            .filter(|holder| !holder.is_empty());
         self
     }
 

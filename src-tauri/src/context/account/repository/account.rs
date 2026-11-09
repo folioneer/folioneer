@@ -33,6 +33,7 @@ struct AccountRow {
     /// PFL-061 — read as the default profile ('default-profile', DEFAULT_PROFILE_ID) when the
     /// profile it names was removed on another device; the stored value is left as it is.
     profile_id: String,
+    holder: Option<String>,
 }
 
 impl From<AccountRow> for Account {
@@ -47,6 +48,7 @@ impl From<AccountRow> for Account {
         .with_stored_classification(row.country, row.wrapper)
         .with_cost_basis_method(CostBasisMethod::from_stored(&row.cost_basis_method))
         .with_profile(row.profile_id)
+        .with_holder(row.holder)
     }
 }
 
@@ -189,8 +191,8 @@ impl SqliteAccountRepository {
         let cost_basis_method = account.cost_basis_method.as_str();
         sqlx::query!(
             r#"INSERT INTO accounts (id, name, bank_name, currency, management_fees_enabled,
-                                     country, wrapper, cost_basis_method, profile_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+                                     country, wrapper, cost_basis_method, profile_id, holder)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
             account.id,
             account.name,
             account.bank_name,
@@ -199,7 +201,8 @@ impl SqliteAccountRepository {
             account.country,
             account.wrapper,
             cost_basis_method,
-            account.profile_id
+            account.profile_id,
+            account.holder
         )
         .execute(&mut *db_tx)
         .await
@@ -620,7 +623,7 @@ async fn insert_transaction(conn: &mut SqliteConnection, tx: &Transaction) -> Re
 async fn load_aggregate_on(conn: &mut SqliteConnection, id: &str) -> Result<Option<Account>> {
     let account_row = sqlx::query_as!(
         AccountRow,
-        r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS "profile_id!: String" FROM accounts WHERE id = ?"#,
+        r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS "profile_id!: String", holder FROM accounts WHERE id = ?"#,
         id
     )
     .fetch_optional(&mut *conn)
@@ -675,7 +678,8 @@ async fn load_aggregate_on(conn: &mut SqliteConnection, id: &str) -> Result<Opti
         )
         .with_stored_classification(base.country, base.wrapper)
         .with_cost_basis_method(base.cost_basis_method)
-        .with_profile(base.profile_id),
+        .with_profile(base.profile_id)
+        .with_holder(base.holder),
     ))
 }
 
@@ -688,7 +692,7 @@ async fn account_by_name<'e>(
     // PFL-022 — a name is unique within its profile.
     let row = sqlx::query_as!(
         AccountRow,
-        r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS "profile_id!: String" FROM accounts WHERE LOWER(name) = LOWER(?) AND COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') = ?"#,
+        r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS "profile_id!: String", holder FROM accounts WHERE LOWER(name) = LOWER(?) AND COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') = ?"#,
         name,
         profile_id
     )
@@ -770,7 +774,7 @@ impl AccountRepository for SqliteAccountRepository {
     async fn get_all(&self) -> Result<Vec<Account>> {
         let rows = sqlx::query_as!(
             AccountRow,
-            r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS "profile_id!: String" FROM accounts"#
+            r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS "profile_id!: String", holder FROM accounts"#
         )
         .fetch_all(&self.pool)
         .await
@@ -782,7 +786,7 @@ impl AccountRepository for SqliteAccountRepository {
     async fn get_by_id(&self, id: &str) -> Result<Option<Account>> {
         let row = sqlx::query_as!(
             AccountRow,
-            r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS "profile_id!: String" FROM accounts WHERE id = ?"#,
+            r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS "profile_id!: String", holder FROM accounts WHERE id = ?"#,
             id
         )
         .fetch_optional(&self.pool)
@@ -857,7 +861,7 @@ impl AccountRepository for SqliteAccountRepository {
         let written = sqlx::query!(
             r#"UPDATE accounts
                SET name = ?, bank_name = ?, currency = ?, management_fees_enabled = ?,
-                   country = ?, wrapper = ?, cost_basis_method = ?, profile_id = ?
+                   country = ?, wrapper = ?, cost_basis_method = ?, profile_id = ?, holder = ?
                WHERE id = ?"#,
             account.name,
             account.bank_name,
@@ -867,6 +871,7 @@ impl AccountRepository for SqliteAccountRepository {
             account.wrapper,
             cost_basis_method,
             account.profile_id,
+            account.holder,
             account.id
         )
         .execute(&mut *db_tx)
@@ -994,7 +999,7 @@ impl AccountRepository for SqliteAccountRepository {
             RecordKind::Account => {
                 let row = sqlx::query!(
                     r#"SELECT id, name, bank_name, currency, management_fees_enabled,
-                              country, wrapper, cost_basis_method, profile_id,
+                              country, wrapper, cost_basis_method, profile_id, holder,
                               sync_logical_timestamp, sync_origin, sync_device_id
                        FROM accounts WHERE id = ?"#,
                     identity
@@ -1013,6 +1018,7 @@ impl AccountRepository for SqliteAccountRepository {
                         wrapper: row.wrapper,
                         cost_basis_method: row.cost_basis_method,
                         profile_id: row.profile_id,
+                        holder: row.holder,
                     });
                     Ok(SyncedRecord {
                         rank: rank_from_columns(
@@ -1319,9 +1325,9 @@ impl AccountRepository for SqliteAccountRepository {
         let columns = RankColumns::from(rank.clone());
         sqlx::query!(
             r#"INSERT INTO accounts (id, name, bank_name, currency, management_fees_enabled,
-                                     country, wrapper, cost_basis_method, profile_id,
+                                     country, wrapper, cost_basis_method, profile_id, holder,
                                      sync_logical_timestamp, sync_origin, sync_device_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(id) DO UPDATE SET
                    name = excluded.name,
                    bank_name = excluded.bank_name,
@@ -1333,6 +1339,7 @@ impl AccountRepository for SqliteAccountRepository {
                    -- SYN-035's upgrade before this write (upgraded_content) — see PR #791.
                    cost_basis_method = excluded.cost_basis_method,
                    profile_id = excluded.profile_id,
+                   holder = excluded.holder,
                    sync_logical_timestamp = excluded.sync_logical_timestamp,
                    sync_origin = excluded.sync_origin,
                    sync_device_id = excluded.sync_device_id"#,
@@ -1345,6 +1352,7 @@ impl AccountRepository for SqliteAccountRepository {
             account.wrapper,
             cost_basis_method,
             account.profile_id,
+            account.holder,
             columns.logical_timestamp,
             columns.origin,
             columns.device_id

@@ -131,6 +131,8 @@ export function useAccountTable(
         management_fees_enabled,
         country: catalogAccount?.country ?? null,
         wrapper: catalogAccount?.wrapper ?? null,
+        // ACC-050 — the edit form starts from the account's holder.
+        holder: catalogAccount?.holder ?? null,
       });
     },
     [storeAccounts],

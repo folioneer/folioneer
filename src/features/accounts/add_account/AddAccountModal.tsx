@@ -29,6 +29,7 @@ export function AddAccountModal({ isOpen, onClose }: AddAccountModalProps) {
     impliedCostBasis,
     profiles,
   } = useAddAccount({
+    defaultProfileName: t("profile.default_name"),
     onSubmitSuccess: onClose,
   });
 
