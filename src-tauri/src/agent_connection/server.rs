@@ -22,6 +22,9 @@ pub trait ToolRunner: Send + Sync {
     /// Runs `tool` with `arguments` for the session `granted`.
     async fn run(&self, granted: &Granted, tool: &str, arguments: &Value)
         -> Result<Value, Refusal>;
+
+    /// AGT-100 — the profile a session allowed now works in; none when it cannot be read.
+    async fn profile_in_use(&self) -> Option<String>;
 }
 
 #[async_trait::async_trait]
@@ -33,6 +36,10 @@ impl ToolRunner for AgentTools {
         arguments: &Value,
     ) -> Result<Value, Refusal> {
         self.call(granted, tool, arguments).await
+    }
+
+    async fn profile_in_use(&self) -> Option<String> {
+        AgentTools::profile_in_use(self).await
     }
 }
 
@@ -80,7 +87,7 @@ pub async fn serve_connection<S>(
                 // channel without the bridge.
                 let client = shown_name(&client);
                 let granted = tokio::select! {
-                    granted = connections.ask(&client) => granted,
+                    granted = connections.ask_in_profile(&client, tools.profile_in_use()) => granted,
                     // The bridge left, or spoke out of turn, while the owner was asked.
                     _ = reading.fill_buf() => break,
                 };
@@ -172,6 +179,10 @@ mod tests {
                     message: "no such tool".to_string(),
                 })
             }
+        }
+
+        async fn profile_in_use(&self) -> Option<String> {
+            Some(crate::context::account::default_profile_id())
         }
     }
 

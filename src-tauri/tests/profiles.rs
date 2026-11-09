@@ -689,3 +689,82 @@ async fn acc_051_the_holders_read_with_the_summaries() {
         .expect("blank");
     assert_eq!(blank.summaries.len(), 2);
 }
+
+// AGT-100 — work scoped to a profile (an AI agent's session) reads that profile as the one in
+// use, whatever the window chose: its accounts, its lookups, and where it creates one.
+#[tokio::test]
+async fn agt_100_scoped_work_reads_its_profile_not_the_windows() {
+    use folioneer_lib::context::account::within_profile;
+    let ctx = ctx().await;
+    let parent = ctx.profiles.create("Parent").await.expect("created").id;
+    let mine = account(&ctx, "PEA").await;
+    let theirs = account(&ctx, "Livret A").await;
+    ctx.moving
+        .move_account(&theirs, &parent)
+        .await
+        .expect("moved");
+    assert_eq!(
+        ctx.profiles.in_use().await.expect("read"),
+        DEFAULT_PROFILE_ID
+    );
+
+    let (listed, found, created) = within_profile(parent.clone(), async {
+        let listed: Vec<String> = ctx
+            .accounts
+            .accounts_in_use()
+            .await
+            .expect("listed")
+            .into_iter()
+            .map(|a| a.id)
+            .collect();
+        let found = ctx.recording.find_account_by_name("PEA").await.is_ok();
+        let created = ctx
+            .creation
+            .create("CTO".into(), String::new(), "EUR".into(), false)
+            .await
+            .expect("created");
+        (listed, found, created)
+    })
+    .await;
+    assert_eq!(listed, [theirs]);
+    assert!(
+        !found,
+        "the window's profile's account is not found in the scope"
+    );
+    assert_eq!(created.profile_id, parent);
+    let outside: Vec<String> = ctx
+        .accounts
+        .accounts_in_use()
+        .await
+        .expect("listed")
+        .into_iter()
+        .map(|a| a.id)
+        .collect();
+    assert_eq!(outside, [mine]);
+}
+
+// AGT-100B — a session whose profile was removed meanwhile lists no account, and an account
+// it creates is refused as one given an unknown profile.
+#[tokio::test]
+async fn agt_100b_a_removed_profile_lists_nothing_and_creates_nothing() {
+    use folioneer_lib::context::account::within_profile;
+    let ctx = ctx().await;
+    account(&ctx, "PEA").await;
+    let gone = ctx.profiles.create("Gone").await.expect("created").id;
+    ctx.profiles.remove(&gone).await.expect("removed");
+
+    let (listed, created) = within_profile(gone, async {
+        let listed = ctx.accounts.accounts_in_use().await.expect("listed");
+        let created = ctx
+            .creation
+            .create("CTO".into(), String::new(), "EUR".into(), false)
+            .await;
+        (listed, created)
+    })
+    .await;
+    assert!(listed.is_empty());
+    assert!(
+        created.is_err(),
+        "an account in a removed profile is refused"
+    );
+}

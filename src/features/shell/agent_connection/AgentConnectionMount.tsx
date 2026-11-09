@@ -1,3 +1,4 @@
+import { useProfileList } from "../useProfileList";
 import { AgentConnectionDialog } from "./AgentConnectionDialog";
 import { ChangeRequestDialog } from "./ChangeRequestDialog";
 import { RemovalRequestDialog } from "./RemovalRequestDialog";
@@ -25,10 +26,17 @@ export function AgentConnectionMount() {
     answerReplacement,
   } = useAgentConnections();
   useAgentRecordingNotice(sessions);
+  const profiles = useProfileList();
 
   if (request) {
     return (
-      <AgentConnectionDialog key={request.id} request={request} user={user} onAnswer={answer} />
+      <AgentConnectionDialog
+        key={request.id}
+        request={request}
+        user={user}
+        profiles={profiles}
+        onAnswer={answer}
+      />
     );
   }
   if (removal) {

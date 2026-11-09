@@ -117,7 +117,7 @@ impl AgentTools {
         let transfer = Arc::clone(&self.transfer);
         // AGT-049 — once started, the replacement runs to its end, whatever becomes of the
         // connection that asked.
-        let parts = tokio::spawn(async move {
+        let parts = crate::context::account::spawn_within_profile(async move {
             let parts = transfer.replace(&asked, Some(&mark)).await?;
             let Some(parts) = parts else {
                 return Ok(None);

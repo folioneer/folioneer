@@ -7,8 +7,8 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use crate::context::account::{
-    AccountError, AccountServiceContract, AgentRecording, Transaction, TransactionType,
-    TransactionView, WriteOffReason,
+    spawn_within_profile, within_profile, AccountError, AccountServiceContract, AgentRecording,
+    Transaction, TransactionType, TransactionView, WriteOffReason,
 };
 use crate::context::asset::{
     Asset, AssetClass, AssetCreationDefaults, AssetError, AssetKind, AssetServiceContract,
@@ -59,6 +59,8 @@ struct AccountRow {
     country: String,
     /// ACC-042 — its wrapper's identifier, or none.
     wrapper: Option<String>,
+    /// AGT-102 — whose name it is in, or none (ACC-050).
+    holder: Option<String>,
 }
 
 /// An asset as a tool names it.
@@ -153,9 +155,36 @@ impl AgentTools {
         }
     }
 
+    /// AGT-100 — the profile in use as the owner allows a session: the one it works in; none
+    /// when it cannot be read (AGT-100A).
+    pub async fn profile_in_use(&self) -> Option<String> {
+        match self.account_service.profile_in_use().await {
+            Ok(profile_id) => Some(profile_id),
+            Err(error) => {
+                tracing::error!(target: BACKEND, err = ?error, "the profile in use of an allowed session could not be read");
+                None
+            }
+        }
+    }
+
     /// AGT-040 / AGT-044 — runs `tool` for the session `granted` and returns its result, or
     /// why it is refused. A refusal names only what the agent sent (AGT-042).
     pub async fn call(
+        &self,
+        granted: &Granted,
+        tool: &str,
+        arguments: &Value,
+    ) -> Result<Value, Refusal> {
+        // AGT-100 — every tool runs in the profile the session was allowed in.
+        within_profile(
+            granted.profile_id.clone(),
+            self.call_in_profile(granted, tool, arguments),
+        )
+        .await
+    }
+
+    /// AGT-100 — `call`, within the session's profile.
+    async fn call_in_profile(
         &self,
         granted: &Granted,
         tool: &str,
@@ -229,6 +258,7 @@ impl AgentTools {
                         name: account.name,
                         currency: account.currency,
                         wrapper: account.wrapper,
+                        holder: account.holder,
                     })
                     .collect();
                 as_json(&rows)
@@ -292,7 +322,7 @@ impl AgentTools {
         // becomes of the connection that asked: a disconnect or a closing application
         // never leaves a transaction between its two writes.
         let recorder = Arc::clone(&self.recorder);
-        let outcome = tokio::spawn(async move {
+        let outcome = spawn_within_profile(async move {
             recorder
                 .record_named_by_agent(recording, &today, &mark)
                 .await
@@ -335,19 +365,18 @@ impl AgentTools {
         }
         // As a recording (AGT-049, AGT-086): once started, the write runs to its end.
         let recorder = Arc::clone(&self.recorder);
-        let recorded =
-            tokio::spawn(
-                async move { recorder.record_price_named_by_agent(typed, &today()).await },
-            )
-            .await
-            .map_err(|error| {
-                tracing::error!(target: BACKEND, err = ?error, "agent price: the task ended early");
-                portfolio_unreadable()
-            })?
-            .map_err(|refusal| Refusal {
-                code: refusal.code,
-                message: refusal.message,
-            })?;
+        let recorded = spawn_within_profile(async move {
+            recorder.record_price_named_by_agent(typed, &today()).await
+        })
+        .await
+        .map_err(|error| {
+            tracing::error!(target: BACKEND, err = ?error, "agent price: the task ended early");
+            portfolio_unreadable()
+        })?
+        .map_err(|refusal| Refusal {
+            code: refusal.code,
+            message: refusal.message,
+        })?;
         granted.count_recording();
         tracing::info!(target: BACKEND, session = granted.session_id, asset = %recorded.price.asset_id, date = %recorded.price.date, "agent recorded a price");
         as_json(&serde_json::json!({
@@ -533,7 +562,7 @@ impl AgentTools {
         }
         // As a recording (AGT-049, AGT-086): once started, the addition runs to its end.
         let assets = Arc::clone(&self.asset_service);
-        let added = tokio::spawn(async move { assets.add_named_asset(named).await })
+        let added = spawn_within_profile(async move { assets.add_named_asset(named).await })
             .await
             .map_err(|error| {
                 tracing::error!(target: BACKEND, err = ?error, "agent adding an asset: the task ended early");
@@ -586,7 +615,7 @@ impl AgentTools {
         };
         // As a recording (AGT-049, AGT-086): once started, the creation runs to its end.
         let creation = Arc::clone(&self.creation);
-        let created = tokio::spawn(async move {
+        let created = spawn_within_profile(async move {
             creation
                 .create_by_agent(
                     name,
@@ -631,6 +660,7 @@ impl AgentTools {
                 name: created.name,
                 currency: created.currency,
                 wrapper: created.wrapper,
+                holder: created.holder,
             },
         }))
     }
@@ -653,7 +683,7 @@ impl AgentTools {
         let transaction_id = text(arguments, "transaction")?.to_string();
         let recorder = Arc::clone(&self.recorder);
         // As a recording (AGT-049): once started, the cancelling runs to its end.
-        let cancelled = tokio::spawn(async move {
+        let cancelled = spawn_within_profile(async move {
             recorder
                 .cancel_recorded_by_agent(&transaction_id)
                 .await
@@ -814,7 +844,7 @@ impl AgentTools {
     async fn correct(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
         let (transaction_id, change, reason) = correction_of(arguments)?;
         let recorder = Arc::clone(&self.recorder);
-        let corrected = tokio::spawn(async move {
+        let corrected = spawn_within_profile(async move {
             recorder
                 .correct_recorded_by_agent(&transaction_id, change, reason)
                 .await

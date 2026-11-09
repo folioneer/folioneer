@@ -1,5 +1,5 @@
-import { useTranslation } from "react-i18next";
-import type { AgentConnectionRequest } from "@/bindings";
+import { Trans, useTranslation } from "react-i18next";
+import type { AgentConnectionRequest, ProfileList } from "@/bindings";
 import { Button } from "@/ui/components/button/Button";
 import { Dialog } from "@/ui/components/modal/Dialog";
 import { formatIsoTime } from "@/ui/format/date";
@@ -10,23 +10,35 @@ interface AgentConnectionDialogProps {
   request: AgentConnectionRequest;
   /** The user whose program asks; null when the system does not say. */
   user: string | null;
+  /** The profiles and the one in use (AGT-100); null until read. */
+  profiles: ProfileList | null;
   onAnswer: (requestId: number, allow: boolean) => void;
 }
 
 const DIALOG_ID = "agent-connection-dialog";
 
 /**
- * AGT-032 — an agent asks to connect. The dialog names it and says what a yes covers;
- * refusing is the filled action, and the dialog closes only by an answer: neither its
- * corner nor its backdrop dismisses it. It is hard to approve blindly: "Allow" is
- * inactive for a moment after the dialog appears, so a click aimed at what was there
+ * AGT-032 — an agent asks to connect; the dialog is the validated mock of #770. It names
+ * the agent and says what a yes covers in one paragraph: the profile in use, which the
+ * session works in (AGT-100), and with several, that the others are out of its reach
+ * (AGT-101). Refusing is the filled action, and the dialog closes only by an answer:
+ * neither its corner nor its backdrop dismisses it. It is hard to approve blindly: "Allow"
+ * is inactive for a moment after the dialog appears, so a click aimed at what was there
  * before allows nothing, and the keyboard's focus stays on its two actions.
  */
-export function AgentConnectionDialog({ request, user, onAnswer }: AgentConnectionDialogProps) {
+export function AgentConnectionDialog({
+  request,
+  user,
+  profiles,
+  onAnswer,
+}: AgentConnectionDialogProps) {
   const { t, i18n } = useTranslation();
   const canAllow = useActiveAfterAMoment();
 
   useKeepFocusOnActions(DIALOG_ID);
+
+  const inUse = profiles?.profiles.find((summary) => summary.profile.id === profiles.in_use);
+  const severalProfiles = (profiles?.profiles.length ?? 0) > 1;
 
   const rows: [string, string][] = [
     [t("agent.connection_agent"), request.client],
@@ -79,15 +91,19 @@ export function AgentConnectionDialog({ request, user, onAnswer }: AgentConnecti
             </div>
           ))}
         </dl>
-        <div>
-          <p>{t("agent.connection_covers")}</p>
-          <ul className="list-disc pl-5">
-            <li>{t("agent.connection_covers_read")}</li>
-            <li>{t("agent.connection_covers_add")}</li>
-            <li>{t("agent.connection_covers_record")}</li>
-          </ul>
-        </div>
-        <p>{t("agent.connection_never")}</p>
+        <p id="agent-connection-covers">
+          {inUse ? (
+            <Trans
+              i18nKey="agent.connection_reach"
+              values={{ profile: inUse.profile.name ?? t("profile.default_name") }}
+              components={{ b: <strong /> }}
+            />
+          ) : (
+            t("agent.connection_reach_unread")
+          )}
+          {severalProfiles && ` ${t("agent.connection_other_profiles")}`}
+          {` ${t("agent.connection_asks")}`}
+        </p>
       </div>
     </Dialog>
   );

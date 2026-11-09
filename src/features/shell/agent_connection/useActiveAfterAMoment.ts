@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 export const ALLOW_AFTER_MS = 800;
 
 /**
- * AGT-032 / AGT-083 / AGT-089 — whether a dialog's approving action may be used yet: not for
+ * #770 mock / AGT-083 / AGT-089 — whether a dialog's approving action may be used yet: not for
  * a moment after the dialog appears, so a click aimed at what was there before approves
  * nothing.
  */

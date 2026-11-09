@@ -161,7 +161,7 @@ Within a profile, an account names whose name it is in; nothing is computed from
 
 **ACC-050A — The same holder again (backend)**: Setting the holder an account already has changes nothing and signals nothing.
 
-**ACC-051 — The holders read with the summaries (backend)**: The account summaries (ACC-021) give each account's holder and the holders their accounts name: each once with case ignored for every letter, accented ones included, written as the first account naming it writes it, the accounts taken by name with case ignored, then by identifier; ordered by name with case ignored; over every account of the profile in use (PFL-050).
+**ACC-051 — The holders read with the summaries (backend)**: The account summaries (ACC-021) give each account's holder and the holders their accounts name: each once with case ignored for every letter, accented ones included, written as the first account naming it writes it, the accounts taken by name with case ignored, then by identifier; the holders ordered by their own name with case ignored; over every account of the profile in use (PFL-050).
 
 **ACC-051A — The summaries of one holder (backend)**: Read for one holder, trimmed, the account summaries give only the accounts in that name, case ignored for every letter, accented ones included; the portfolio total (ACC-027) and the holders stay those of every account of the profile in use. A blank holder reads every account.
 

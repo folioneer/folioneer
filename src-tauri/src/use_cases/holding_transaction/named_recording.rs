@@ -651,11 +651,35 @@ impl HoldingTransactionUseCase {
         if mark.is_none() {
             return Err(not_its_recording());
         }
-        self.account_service
+        let transaction = self
+            .account_service
             .get_transaction_by_id(transaction_id)
             .await
             .map_err(|error| refusal_from_account(&error))?
-            .ok_or_else(not_its_recording)
+            .ok_or_else(not_its_recording)?;
+        // AGT-101 — a transaction of another profile's account is one the session cannot see.
+        self.in_profile_in_use(transaction, not_its_recording).await
+    }
+
+    /// AGT-101 — `transaction` when its account belongs to the profile in use (the session's,
+    /// AGT-100); the refusal `not_found` gives otherwise.
+    async fn in_profile_in_use(
+        &self,
+        transaction: Transaction,
+        not_found: impl Fn() -> Refusal,
+    ) -> Result<Transaction, Refusal> {
+        match self
+            .account_service
+            .account_in_profile_in_use(&transaction.account_id)
+            .await
+        {
+            Ok(_) => Ok(transaction),
+            Err(
+                AccountError::AccountOutsideProfileInUse { .. }
+                | AccountError::AccountNotFound { .. },
+            ) => Err(not_found()),
+            Err(error) => Err(refusal_from_account(&error)),
+        }
     }
 
     /// AGT-050 — an agent cancels a transaction an agent recorded, through the rules of the
@@ -688,6 +712,8 @@ impl HoldingTransactionUseCase {
             .await
             .map_err(|error| refusal_from_account(&error))?
             .ok_or_else(not_found)?;
+        // AGT-101 — a transaction of another profile's account is one the session cannot see.
+        let transaction = self.in_profile_in_use(transaction, not_found).await?;
         let mark = self
             .account_service
             .agent_recording_of(transaction_id)

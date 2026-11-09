@@ -7,10 +7,28 @@ vi.mock("react-i18next", () => ({
       vars ? `${key}(${Object.values(vars).join(",")})` : key,
     i18n: { language: "fr" },
   }),
+  Trans: ({ i18nKey, values }: { i18nKey: string; values: Record<string, string> }) =>
+    `${i18nKey}(${Object.values(values).join(",")})`,
 }));
 
 const hook = vi.fn();
 vi.mock("./useAgentConnections", () => ({ useAgentConnections: () => hook() }));
+const profileList = vi.fn();
+vi.mock("../useProfileList", () => ({ useProfileList: () => profileList() }));
+const one = {
+  profiles: [
+    { profile: { id: "default-profile", name: null }, account_count: 2, removable: false },
+  ],
+  in_use: "default-profile",
+};
+const several = {
+  profiles: [
+    ...one.profiles,
+    { profile: { id: "p-1", name: "Mother" }, account_count: 1, removable: false },
+  ],
+  in_use: "p-1",
+};
+profileList.mockReturnValue(one);
 
 import { AgentConnectionMount } from "./AgentConnectionMount";
 import { AgentIndicator } from "./AgentIndicator";
@@ -128,6 +146,7 @@ const replacement = (overrides = {}) => ({
 describe("AgentConnectionMount", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    profileList.mockReturnValue(one);
     vi.useFakeTimers();
   });
   afterEach(() => vi.useRealTimers());
@@ -138,8 +157,8 @@ describe("AgentConnectionMount", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  // AGT-032 — the dialog names the agent, who started it and when, and says what a yes
-  // covers; refusing is the action in focus.
+  // AGT-032 / #770 mock — the dialog names the agent, who started it and when, and says
+  // what a yes covers; refusing is the action in focus.
   it("names the agent and what a yes covers, with refusing in focus", () => {
     hook.mockReturnValue(state({ request }));
     render(<AgentConnectionMount />);
@@ -149,18 +168,31 @@ describe("AgentConnectionMount", () => {
     expect(dialog).toHaveTextContent("Claude Code");
     expect(dialog).toHaveTextContent("agent.connection_started_by_user(phil)");
     expect(dialog).toHaveTextContent("14:32");
-    expect(dialog).toHaveTextContent("agent.connection_covers_read");
-    // AGT-064 — adding assets has a line of its own, between reading and recording.
-    expect(Array.from(dialog.querySelectorAll("li")).map((line) => line.textContent)).toEqual([
-      "agent.connection_covers_read",
-      "agent.connection_covers_add",
-      "agent.connection_covers_record",
-    ]);
-    expect(dialog).toHaveTextContent("agent.connection_never");
+    // AGT-100 — with one profile, the paragraph names it and leaves the others out.
+    expect(document.getElementById("agent-connection-covers")).toHaveTextContent(
+      "agent.connection_reach(profile.default_name) agent.connection_asks",
+    );
     expect(document.getElementById("agent-connection-refuse")).toHaveFocus();
   });
 
-  // AGT-032 — the dialog closes only by an answer: no corner button, and each action sends
+  // AGT-100 / AGT-101 — with several profiles, the paragraph names the one in use and says
+  // the others are out of reach; before the profiles are read, it names none.
+  it("names the profile in use, and with several says the others are out of reach", () => {
+    hook.mockReturnValue(state({ request }));
+    profileList.mockReturnValue(several);
+    const { unmount } = render(<AgentConnectionMount />);
+    expect(document.getElementById("agent-connection-covers")).toHaveTextContent(
+      "agent.connection_reach(Mother) agent.connection_other_profiles agent.connection_asks",
+    );
+    unmount();
+    profileList.mockReturnValue(null);
+    render(<AgentConnectionMount />);
+    expect(document.getElementById("agent-connection-covers")).toHaveTextContent(
+      "agent.connection_reach_unread agent.connection_asks",
+    );
+  });
+
+  // #770 mock — the dialog closes only by an answer: no corner button, and each action sends
   // its answer for this request.
   it("closes only by an answer", () => {
     hook.mockReturnValue(state({ request, user: null }));
@@ -176,7 +208,7 @@ describe("AgentConnectionMount", () => {
     expect(answer).toHaveBeenLastCalledWith(4, true);
   });
 
-  // AGT-032 — neither the corner nor the backdrop dismisses the dialog.
+  // #770 mock — neither the corner nor the backdrop dismisses the dialog.
   it("is not dismissed by its backdrop", () => {
     hook.mockReturnValue(state({ request }));
     render(<AgentConnectionMount />);
@@ -188,7 +220,7 @@ describe("AgentConnectionMount", () => {
     expect(screen.getByRole("dialog")).toHaveAttribute("id", "agent-connection-dialog");
   });
 
-  // AGT-032 — hard to approve blindly: a dialog that just appeared allows nothing, also
+  // #770 mock — hard to approve blindly: a dialog that just appeared allows nothing, also
   // when it replaces another one under the pointer.
   it("keeps Allow inactive for a moment after it appears, for each request anew", () => {
     hook.mockReturnValue(state({ request }));
@@ -207,7 +239,7 @@ describe("AgentConnectionMount", () => {
     expect(document.getElementById("agent-connection-refuse")).toHaveFocus();
   });
 
-  // AGT-032 — the keyboard stays on the dialog's actions: Tab never reaches what lies
+  // #770 mock — the keyboard stays on the dialog's actions: Tab never reaches what lies
   // behind it.
   it("keeps Tab on the dialog's actions", () => {
     hook.mockReturnValue(state({ request }));

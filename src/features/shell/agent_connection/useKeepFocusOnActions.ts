@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 /**
- * AGT-032 / AGT-083 — while the dialog `dialogId` is open, Tab moves between its actions
+ * #770 mock / AGT-083 — while the dialog `dialogId` is open, Tab moves between its actions
  * and never to what lies behind it.
  */
 export function useKeepFocusOnActions(dialogId: string): void {

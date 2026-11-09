@@ -254,7 +254,9 @@
     "auto_record_price_description": "Wenn aktiviert, ist das Kontrollkästchen zur automatischen Erfassung in neuen Transaktionsformularen vorausgewählt.",
     "price_provider_label": "Kursquelle auf diesem Computer",
     "price_provider_off": "Aus",
-    "price_provider_option": { "yahoo_finance": "Yahoo Finance — private Nutzung" },
+    "price_provider_option": {
+      "yahoo_finance": "Yahoo Finance — private Nutzung"
+    },
     "price_provider_notice": {
       "yahoo_finance": "Yahoo Finance ist eine inoffizielle Quelle. Die Kurse werden von diesem Computer aus, gemäß den Bedingungen von Yahoo, für Ihre private Nutzung abgerufen, und die Quelle kann jederzeit wegfallen."
     },
@@ -307,10 +309,10 @@
     "connection_started_by_user": "{{user}}, auf diesem Computer",
     "connection_started_by_unknown": "einem Ihrer Programme, auf diesem Computer",
     "connection_asked_at": "Angefragt um",
-    "connection_covers": "Wenn Sie es erlauben, darf er, bis Sie die Verbindung trennen oder Folioneer schließen:",
-    "connection_covers_read": "Ihre Konten, Anlagen, Positionen, Transaktionen, Kurse und Summen lesen;",
-    "connection_covers_add": "hinzufügen, was Ihr Portfolio noch nicht hat — mitgezählt in denselben 500;",
-    "connection_never": "Ihre Antwort gilt für die ganze Sitzung. Er kann korrigieren oder stornieren, was ein KI-Agent erfasst hat, in dieser oder einer früheren Sitzung; bei einer von Ihnen eingegebenen Transaktion kann er Sie nur fragen, eine nach der anderen — und er liest nie eine Datei, eine Einstellung oder Ihren Synchronisierungsordner.",
+    "connection_reach": "Wenn Sie es erlauben, kann er, bis Sie die Verbindung trennen oder Folioneer schließen, alles in <b>{{profile}}</b> lesen und ändern.",
+    "connection_reach_unread": "Wenn Sie es erlauben, kann er, bis Sie die Verbindung trennen oder Folioneer schließen, alles im verwendeten Profil lesen und ändern.",
+    "connection_other_profiles": "Ihre anderen Profile erreicht er nicht.",
+    "connection_asks": "Bevor er eine Transaktion ändert, die Sie eingegeben haben, fragt er Sie.",
     "connection_allow": "Für diese Sitzung erlauben",
     "connection_refuse": "Ablehnen",
     "connected": "{{client}} ist verbunden",
@@ -345,7 +347,6 @@
     "session_removed_other": "{{count}} Transaktionen entfernt.",
     "session_kept_one": "{{count}} behalten: Eine seitdem erfasste Transaktion hängt davon ab.",
     "session_kept_other": "{{count}} behalten: Eine seitdem erfasste Transaktion hängt davon ab.",
-    "connection_covers_record": "Transaktionen und Kurse erfassen — bis zu 500 in einer Sitzung —, jeweils als von ihm erfasst gekennzeichnet.",
     "removal_title": "{{client}} bittet darum, eine von Ihnen eingegebene Transaktion zu entfernen",
     "transaction_date": "Datum",
     "transaction_account": "Konto",

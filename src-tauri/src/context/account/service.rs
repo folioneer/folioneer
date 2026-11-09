@@ -296,6 +296,10 @@ impl AccountService {
 
     /// PFL-012 / PFL-014 — the identifier of the profile in use.
     pub async fn profile_in_use(&self) -> StdResult<String, AccountError> {
+        // AGT-100 — work scoped to a profile (an AI agent's session) reads it as the one in use.
+        if let Some(profile_id) = super::profile_scope::scoped_profile() {
+            return Ok(profile_id);
+        }
         self.account_repo.profile_in_use().await.map_err(|e| {
             tracing::error!(target: BACKEND, err = ?e, "profile_in_use: repository failure");
             AccountError::DatabaseError
@@ -2839,6 +2843,8 @@ impl AccountService {
         &self,
         given: Option<String>,
     ) -> StdResult<String, AccountError> {
+        // AGT-100 — work scoped to a profile creates its accounts there.
+        let given = given.or_else(super::profile_scope::scoped_profile);
         let found = self
             .account_repo
             .profile_for_new_account(given.clone())
@@ -3147,6 +3153,9 @@ pub trait AccountServiceContract: Send + Sync {
     async fn accounts_in_use(&self) -> StdResult<Vec<Account>, AccountError>;
     /// PFL-055 — the accounts of one profile.
     async fn accounts_in_profile(&self, profile_id: &str) -> StdResult<Vec<Account>, AccountError>;
+    /// PFL-012 / AGT-100 — the identifier of the profile in use, or the one the current work
+    /// is scoped to.
+    async fn profile_in_use(&self) -> StdResult<String, AccountError>;
     /// PFL-051A — the account, refused when unknown or outside the profile in use.
     async fn account_in_profile_in_use(&self, account_id: &str)
         -> StdResult<Account, AccountError>;
@@ -3664,6 +3673,10 @@ impl AccountServiceContract for AccountService {
 
     async fn accounts_in_profile(&self, profile_id: &str) -> StdResult<Vec<Account>, AccountError> {
         AccountService::accounts_in_profile(self, profile_id).await
+    }
+
+    async fn profile_in_use(&self) -> StdResult<String, AccountError> {
+        AccountService::profile_in_use(self).await
     }
 
     async fn account_in_profile_in_use(
