@@ -390,6 +390,82 @@ async fn agt_100_a_session_works_in_the_profile_in_use_when_allowed() {
     assert_eq!(created.profile_id, parent);
 }
 
+// AGT-101 — by its id, a transaction of another profile's account is not found: one an AI
+// agent recorded cannot be cancelled or corrected, one the owner typed cannot be asked about.
+#[tokio::test]
+async fn agt_101_a_transaction_of_another_profile_is_not_found() {
+    use crate::context::account::{JournalFilter, ProfileService, SqliteProfileRepository};
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let in_default = session(&bench.connections).await;
+    let recorded = recorded_id(
+        &bench
+            .tools
+            .call(
+                &in_default,
+                "record_purchase",
+                &json!({ "account": "PEA", "asset": "CW8", "quantity": 2, "price": 100, "date": "2026-02-01" }),
+            )
+            .await
+            .expect("recorded"),
+    );
+    let account = bench.accounts.get_all().await.expect("accounts").remove(0);
+    let typed = bench
+        .accounts
+        .get_account_journal(&account.id, &JournalFilter::default())
+        .await
+        .expect("journal")
+        .rows
+        .iter()
+        .find(|row| row.recorded_by.is_none())
+        .expect("the owner's deposit")
+        .transaction
+        .id
+        .clone();
+    let parent = ProfileService::new(Box::new(SqliteProfileRepository::new(bench.pool.clone())))
+        .create("Parent")
+        .await
+        .expect("profile")
+        .id;
+    let mut elsewhere = session(&bench.connections).await;
+    elsewhere.profile_id = parent;
+
+    for (tool, arguments, code) in [
+        (
+            "cancel_recording",
+            json!({ "transaction": recorded }),
+            "NotYourRecording",
+        ),
+        (
+            "correct_recording",
+            json!({ "transaction": recorded, "quantity": 1 }),
+            "NotYourRecording",
+        ),
+        (
+            "request_removal",
+            json!({ "transaction": typed }),
+            "TransactionNotFound",
+        ),
+    ] {
+        let refused = bench
+            .tools
+            .call(&elsewhere, tool, &arguments)
+            .await
+            .expect_err("refused");
+        assert_eq!(refused.code, code, "{tool}");
+    }
+    // In its own profile, the same recording is still the session's to cancel.
+    bench
+        .tools
+        .call(
+            &in_default,
+            "cancel_recording",
+            &json!({ "transaction": recorded }),
+        )
+        .await
+        .expect("cancelled");
+}
+
 // AGT-044 / AGT-045 — the three recordings go through the window's rules, and each is
 // marked with the agent and its session; a transaction the owner typed carries no mark.
 #[tokio::test]

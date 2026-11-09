@@ -4,7 +4,7 @@ import type { ProfileList } from "@/bindings";
 import { logger } from "@/lib/logger";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { listProfiles, onProfilesChanged, setProfileInUse } from "../gateway";
-import { profileChipErrorToI18n } from "./presenter";
+import { profileErrorToI18n } from "../shared/presenter";
 
 /** Which dialog the chip opened, if any. */
 type ProfileDialog = "add" | "manage" | null;
@@ -25,7 +25,7 @@ export function useProfileChip() {
     const result = await listProfiles();
     if (result.status === "error") {
       logger.error("[useProfileChip] the profiles could not be read", { code: result.error.code });
-      setError(profileChipErrorToI18n(result.error));
+      setError(profileErrorToI18n(result.error));
       return;
     }
     setList(result.data);
@@ -51,7 +51,7 @@ export function useProfileChip() {
     const result = await setProfileInUse(profileId);
     if (result.status === "error") {
       logger.warn("[useProfileChip] the profile was not chosen", { code: result.error.code });
-      setError(profileChipErrorToI18n(result.error));
+      setError(profileErrorToI18n(result.error));
       return;
     }
     void navigate({ to: "/accounts" });

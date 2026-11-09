@@ -3,7 +3,7 @@ import type { ProfileList } from "@/bindings";
 import { logger } from "@/lib/logger";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { listProfiles, onProfilesChanged } from "./gateway";
-import { profileChipErrorToI18n } from "./profile_chip/presenter";
+import { profileErrorToI18n } from "./shared/presenter";
 
 /**
  * #768 / #770 — the profiles and the one in use, for the sidebar's "Profiles" entry and the
@@ -23,7 +23,7 @@ export function useProfileList(): { list: ProfileList | null; error: I18nMessage
         logger.error("[useProfileList] the profiles could not be read", {
           code: result.error.code,
         });
-        setError(profileChipErrorToI18n(result.error));
+        setError(profileErrorToI18n(result.error));
         return;
       }
       setError(null);
