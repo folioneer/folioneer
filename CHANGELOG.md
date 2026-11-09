@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-11-09
+
+### Added
+
+- [agent] an AI agent works in the profile in use when it is allowed, and never reaches another
+- [account] an account names its holder, shown and filtered in the list, never counted
+- [account] an overview lists every profile with its value and performance, and no total
+- [account] the window works inside one profile, switched from the header
+- [account] figures and account lists read the profile in use, and an import stays within it
+- [account] each device works in one profile, and a new account goes into it
+- [account] accounts belong to profiles that sync across devices, and a transfer stays within one
+- the data export carries the lots each sale took and the currency rates
+- [account] the account form chooses the cost basis method and a holding shows its lots
+- every account, asset, transaction and price exports as CSV or JSON, from Settings
+- [account] an account in Germany, Spain or Poland realizes its gains first in, first out
+- the window speaks German
+
+### Fixed
+
+- [sync] two profiles given one name on two devices at once are reported as a clash
+- an amount above a trillion is refused when recorded, so every device can read it
+- [price): on Windows the daily price download catches up a missed run and runs on battery
+  The task is registered from its XML definition (`schtasks /Create /XML`] a
+- [dividend] a dividend counts what was held on its date, so one on a share sold since records
+- [performance] free shares and interest count as a gain in the yearly table, not as money in
+- [performance] a holding's period it was not held at the start of shows a dash, as account details do
+- a dialog's title reads clearly in dark mode, its dividers no brighter than the rest
+
 ## [0.18.0] - 2026-11-02
 
 ### Added
