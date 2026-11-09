@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { useProfileCount } from "./useProfileCount";
+import { useProfileList } from "./useProfileList";
 
 const mockList = vi.fn();
 vi.mock("./gateway", () => ({
@@ -8,9 +8,9 @@ vi.mock("./gateway", () => ({
   onProfilesChanged: () => Promise.resolve(() => {}),
 }));
 
-describe("useProfileCount", () => {
-  // #768 — how many profiles there are; 0 when they cannot be read.
-  it("counts the profiles, 0 when they cannot be read", async () => {
+describe("useProfileList", () => {
+  // #768 — the profiles and the one in use; null when they cannot be read.
+  it("reads the profiles, null when they cannot be", async () => {
     mockList.mockResolvedValueOnce({
       status: "ok",
       data: {
@@ -21,12 +21,15 @@ describe("useProfileCount", () => {
         in_use: "default-profile",
       },
     });
-    const { result } = renderHook(() => useProfileCount());
-    await waitFor(() => expect(result.current).toBe(2));
+    const { result } = renderHook(() => useProfileList());
+    await waitFor(() => expect(result.current.list?.profiles).toHaveLength(2));
+    expect(result.current.list?.in_use).toBe("default-profile");
+    expect(result.current.error).toBeNull();
 
     mockList.mockResolvedValueOnce({ status: "error", error: { code: "DatabaseError" } });
-    const { result: failed } = renderHook(() => useProfileCount());
+    const { result: failed } = renderHook(() => useProfileList());
     await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
-    expect(failed.current).toBe(0);
+    expect(failed.current.list).toBeNull();
+    await waitFor(() => expect(failed.current.error).toEqual({ key: "error.DatabaseError" }));
   });
 });

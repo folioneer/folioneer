@@ -254,7 +254,9 @@
     "auto_record_price_description": "When enabled, new transaction forms will have the auto-record checkbox pre-checked.",
     "price_provider_label": "Price source, on this computer",
     "price_provider_off": "Off",
-    "price_provider_option": { "yahoo_finance": "Yahoo Finance — personal use" },
+    "price_provider_option": {
+      "yahoo_finance": "Yahoo Finance — personal use"
+    },
     "price_provider_notice": {
       "yahoo_finance": "Yahoo Finance is an unofficial source. Prices are fetched from this computer, under Yahoo's terms, for your personal use, and it may stop at any time."
     },
@@ -307,10 +309,10 @@
     "connection_started_by_user": "{{user}}, on this computer",
     "connection_started_by_unknown": "a program of yours, on this computer",
     "connection_asked_at": "Asked at",
-    "connection_covers": "If you allow, until you disconnect or close Folioneer, it may:",
-    "connection_covers_read": "read your accounts, assets, holdings, transactions, prices and totals;",
-    "connection_covers_add": "add what your portfolio does not have yet — counted in the same 500;",
-    "connection_never": "Your answer covers the whole session. It can correct or cancel what an AI agent recorded, in this session or an earlier one; for a transaction you typed it can only ask you, one at a time — and it never reads a file, a setting or your sync folder.",
+    "connection_reach": "If you allow, until you disconnect or close Folioneer, it can read and change anything in <b>{{profile}}</b>.",
+    "connection_reach_unread": "If you allow, until you disconnect or close Folioneer, it can read and change anything in the profile in use.",
+    "connection_other_profiles": "It cannot reach your other profiles.",
+    "connection_asks": "Before changing a transaction you typed, it asks you.",
     "connection_allow": "Allow for this session",
     "connection_refuse": "Refuse",
     "connected": "{{client}} is connected",
@@ -345,7 +347,6 @@
     "session_removed_other": "{{count}} transactions removed.",
     "session_kept_one": "{{count}} kept: a transaction recorded since depends on it.",
     "session_kept_other": "{{count}} kept: a transaction recorded since depends on them.",
-    "connection_covers_record": "record transactions and prices — up to 500 in a session — each marked as recorded by it.",
     "removal_title": "{{client}} asks to remove a transaction you typed",
     "transaction_date": "Date",
     "transaction_account": "Account",

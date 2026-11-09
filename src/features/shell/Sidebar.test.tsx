@@ -19,7 +19,15 @@ vi.mock("@/features/settings", () => ({
 }));
 vi.mock("./SidebarVersion", () => ({ SidebarVersion: () => null }));
 let mockProfileCount = 1;
-vi.mock("./useProfileCount", () => ({ useProfileCount: () => mockProfileCount }));
+vi.mock("./useProfileList", () => ({
+  useProfileList: () => ({
+    list: {
+      profiles: Array.from({ length: mockProfileCount }, () => ({})),
+      in_use: "default-profile",
+    },
+    error: null,
+  }),
+}));
 
 describe("Sidebar", () => {
   // The header stacks over anything inside the drawer.

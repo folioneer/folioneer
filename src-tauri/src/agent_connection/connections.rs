@@ -376,6 +376,8 @@ pub struct Granted {
     pub key: String,
     /// When the owner allowed it, as an RFC 3339 timestamp in this computer's time.
     pub started_at: String,
+    /// AGT-100 — the profile it works in: the one in use when the owner allowed it.
+    pub profile_id: String,
     /// How many transactions it recorded (AGT-047).
     recorded: Arc<AtomicU32>,
     /// What it did, as the window is told (AGT-052).
@@ -584,8 +586,12 @@ impl AgentConnections {
     /// AGT-030 — asks the owner whether `client` may connect and waits for the answer:
     /// the session when allowed, `None` when refused, when agents are not admitted, or
     /// when too many already wait (AGT-038). A caller that stops waiting withdraws its
-    /// request.
-    pub async fn ask(&self, client: &str) -> Option<Granted> {
+    /// request. The session works in the profile `profile_in_use` reads right after the
+    /// owner's yes (AGT-100); unreadable, no session opens (AGT-100A).
+    pub async fn ask_in_profile<P>(&self, client: &str, profile_in_use: P) -> Option<Granted>
+    where
+        P: std::future::Future<Output = Option<String>>,
+    {
         let (answer, answered) = oneshot::channel();
         let request_id = {
             let mut state = self.state();
@@ -611,6 +617,7 @@ impl AgentConnections {
         if !allowed {
             return None;
         }
+        let profile_id = profile_in_use.await?;
         let ended = Arc::new(Notify::new());
         let key = uuid::Uuid::new_v4().to_string();
         let started_at = chrono::Local::now().to_rfc3339();
@@ -647,10 +654,20 @@ impl AgentConnections {
             client: client.to_string(),
             key,
             started_at,
+            profile_id,
             recorded: Arc::new(AtomicU32::new(0)),
             facts,
             ended,
         })
+    }
+
+    /// `ask_in_profile`, in the default profile.
+    #[cfg(test)]
+    pub async fn ask(&self, client: &str) -> Option<Granted> {
+        self.ask_in_profile(client, async {
+            Some(crate::context::account::default_profile_id())
+        })
+        .await
     }
 
     /// AGT-032 — the owner's answer to a request; `false` when no such request waits.
@@ -1019,6 +1036,33 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
         panic!("no request arrived");
+    }
+
+    // AGT-100 / AGT-100A — the session keeps the profile read right after the yes; a profile
+    // that cannot be read opens no session.
+    #[tokio::test]
+    async fn agt_100a_an_unreadable_profile_opens_no_session() {
+        let (connections, _) = counted();
+        let asking = Arc::clone(&connections);
+        let asked = tokio::spawn(async move {
+            asking
+                .ask_in_profile("claude-code", async { Some("p-1".to_string()) })
+                .await
+        });
+        let request = waiting(&connections).await;
+        connections.answer(request.id, true);
+        assert_eq!(
+            asked.await.expect("asked").expect("granted").profile_id,
+            "p-1"
+        );
+
+        let asking = Arc::clone(&connections);
+        let asked =
+            tokio::spawn(async move { asking.ask_in_profile("other", async { None }).await });
+        let request = waiting(&connections).await;
+        connections.answer(request.id, true);
+        assert!(asked.await.expect("asked").is_none());
+        assert_eq!(connections.sessions().len(), 1);
     }
 
     // AGT-030 / AGT-032 — a connection waits for the owner's answer: allowed, it opens a

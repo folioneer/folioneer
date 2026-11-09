@@ -68,7 +68,7 @@ impl AgentTools {
         );
         // AGT-049 — once started, the transfer and its marks run to their end, whatever
         // becomes of the connection that asked.
-        let outcome = tokio::spawn(async move {
+        let outcome = crate::context::account::spawn_within_profile(async move {
             let parts = transfer
                 .record_transfer_by_agent(&from_id, &to_id, asset_id, figures, &mark)
                 .await

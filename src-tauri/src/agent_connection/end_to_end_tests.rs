@@ -288,7 +288,7 @@ async fn agt_040_the_read_tools_answer_from_the_running_application() {
     assert_eq!(owner.await.expect("owner"), "claude-code");
     assert_eq!(
         result(&answered[1]),
-        json!([{ "name": "PEA", "currency": "EUR", "country": "FR", "wrapper": null }])
+        json!([{ "name": "PEA", "currency": "EUR", "country": "FR", "wrapper": null, "holder": null }])
     );
     assert_eq!(
         result(&answered[2]),
@@ -314,6 +314,156 @@ async fn agt_040_the_read_tools_answer_from_the_running_application() {
         .all(|holding| holding["price_outdated"] == false));
     let before_the_deposit = result(&answered[5]);
     assert_eq!(before_the_deposit["total_global_value"], "0");
+}
+
+// AGT-100 / AGT-101 / AGT-102 — a session works in the profile in use when it is allowed:
+// it lists that profile's accounts only, with their holder; another profile's account is
+// not found; an account it creates goes into that profile.
+#[tokio::test]
+async fn agt_100_a_session_works_in_the_profile_in_use_when_allowed() {
+    use crate::context::account::{ProfileService, SqliteProfileRepository};
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let (gate, accounts, pool) = application_with_database(data_dir.path()).await;
+    let profiles = ProfileService::new(Box::new(SqliteProfileRepository::new(pool)));
+    let parent = profiles.create("Parent").await.expect("profile").id;
+    let mum = accounts
+        .create(
+            "Livret A".to_string(),
+            String::new(),
+            "EUR".to_string(),
+            false,
+        )
+        .await
+        .expect("account");
+    accounts
+        .move_to_profile(&mum.id, &parent)
+        .await
+        .expect("moved");
+    accounts
+        .set_holder(&mum.id, Some("Mum".to_string()))
+        .await
+        .expect("holder");
+    profiles.choose(&parent).await.expect("chosen");
+    gate.allow(true).expect("allowed");
+    let owner = owner_answers(&gate, true);
+
+    let answered = answers(
+        data_dir.path(),
+        &[
+            json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize",
+                "params": { "clientInfo": { "name": "claude-code" } } })
+            .to_string(),
+            call(1, "list_accounts", json!({})),
+            call(2, "list_holdings", json!({ "account": "PEA" })),
+            call(
+                3,
+                "add_account",
+                json!({ "name": "Mum's CTO", "currency": "EUR" }),
+            ),
+            call(4, "portfolio_summary", json!({})),
+        ],
+    )
+    .await;
+
+    owner.await.expect("owner");
+    assert_eq!(
+        result(&answered[1]),
+        json!([{ "name": "Livret A", "currency": "EUR", "country": "FR", "wrapper": null, "holder": "Mum" }])
+    );
+    // AGT-102 — the summaries give the holder too, of the session's profile only.
+    let summary = result(&answered[4]);
+    assert_eq!(summary["summaries"][0]["holder"], "Mum");
+    assert_eq!(summary["holders"], json!(["Mum"]));
+    assert_eq!(answered[2]["result"]["isError"], true, "{}", answered[2]);
+    assert!(
+        text(&answered[2]).contains("no account named"),
+        "{}",
+        answered[2]
+    );
+    let created = accounts
+        .get_all()
+        .await
+        .expect("accounts")
+        .into_iter()
+        .find(|account| account.name == "Mum's CTO")
+        .expect("created");
+    assert_eq!(created.profile_id, parent);
+}
+
+// AGT-101 — by its id, a transaction of another profile's account is not found: one an AI
+// agent recorded cannot be cancelled or corrected, one the owner typed cannot be asked about.
+#[tokio::test]
+async fn agt_101_a_transaction_of_another_profile_is_not_found() {
+    use crate::context::account::{JournalFilter, ProfileService, SqliteProfileRepository};
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let in_default = session(&bench.connections).await;
+    let recorded = recorded_id(
+        &bench
+            .tools
+            .call(
+                &in_default,
+                "record_purchase",
+                &json!({ "account": "PEA", "asset": "CW8", "quantity": 2, "price": 100, "date": "2026-02-01" }),
+            )
+            .await
+            .expect("recorded"),
+    );
+    let account = bench.accounts.get_all().await.expect("accounts").remove(0);
+    let typed = bench
+        .accounts
+        .get_account_journal(&account.id, &JournalFilter::default())
+        .await
+        .expect("journal")
+        .rows
+        .iter()
+        .find(|row| row.recorded_by.is_none())
+        .expect("the owner's deposit")
+        .transaction
+        .id
+        .clone();
+    let parent = ProfileService::new(Box::new(SqliteProfileRepository::new(bench.pool.clone())))
+        .create("Parent")
+        .await
+        .expect("profile")
+        .id;
+    let mut elsewhere = session(&bench.connections).await;
+    elsewhere.profile_id = parent;
+
+    for (tool, arguments, code) in [
+        (
+            "cancel_recording",
+            json!({ "transaction": recorded }),
+            "NotYourRecording",
+        ),
+        (
+            "correct_recording",
+            json!({ "transaction": recorded, "quantity": 1 }),
+            "NotYourRecording",
+        ),
+        (
+            "request_removal",
+            json!({ "transaction": typed }),
+            "TransactionNotFound",
+        ),
+    ] {
+        let refused = bench
+            .tools
+            .call(&elsewhere, tool, &arguments)
+            .await
+            .expect_err("refused");
+        assert_eq!(refused.code, code, "{tool}");
+    }
+    // In its own profile, the same recording is still the session's to cancel.
+    bench
+        .tools
+        .call(
+            &in_default,
+            "cancel_recording",
+            &json!({ "transaction": recorded }),
+        )
+        .await
+        .expect("cancelled");
 }
 
 // AGT-044 / AGT-045 — the three recordings go through the window's rules, and each is
@@ -2619,7 +2769,7 @@ async fn agt_068_a_session_creates_an_account() {
     assert_eq!(created["status"], "created");
     assert_eq!(
         created["account"],
-        json!({ "name": "Hardware wallet", "currency": "EUR", "country": "DE", "wrapper": "brokerage" })
+        json!({ "name": "Hardware wallet", "currency": "EUR", "country": "DE", "wrapper": "brokerage", "holder": null })
     );
     let plain = call(
         "add_account",
