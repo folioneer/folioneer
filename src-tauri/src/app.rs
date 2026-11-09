@@ -348,16 +348,9 @@ pub fn run() {
                 app_handle.manage(Arc::new(
                     crate::use_cases::profile_overview::ProfileOverviewUseCase::new(
                         Arc::clone(&profile_service),
-                        AccountSummaryUseCase::new(
-                            account_service.clone(),
-                            asset_service.clone(),
-                            Arc::clone(&currency_service),
-                        ),
-                        GlobalPerformanceUseCase::new(
-                            account_service.clone(),
-                            asset_service.clone(),
-                            Arc::clone(&currency_service),
-                        ),
+                        account_service.clone(),
+                        asset_service.clone(),
+                        Arc::clone(&currency_service),
                     ),
                 ));
                 app_handle.manage(account_summary_uc);

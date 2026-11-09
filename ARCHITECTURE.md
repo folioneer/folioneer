@@ -21,7 +21,7 @@ context/{bc}/        bounded contexts: account/, asset/ (older layout: domain/, 
                      api.rs (its Tauri commands), error.rs, mod.rs (its public surface)
 context/account/domain/country/  what differs by country (ADR-025): one file per country behind `CountryRules`
 use_cases/{name}/    cross-context orchestrators: orchestrator.rs, api.rs, error.rs, mod.rs
-use_cases/shared/    what use cases share (Global Value, price movement, fetch scope, the chosen External provider)
+use_cases/shared/    what use cases share (Global Value, the account summaries, the cross-account performance, price movement, fetch scope, the chosen External provider)
 core/                legacy shared bucket: db.rs, event_bus/ (Event enum), logger.rs,
                      specta_builder.rs (the command registry), cash.rs
 shared/              gold shared code: domain/record_change.rs (change-log vocabulary),

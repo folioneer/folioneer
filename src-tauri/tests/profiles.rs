@@ -544,16 +544,9 @@ async fn pfl_055_every_profile_has_its_own_figures() {
     let son = ctx.profiles.create("Son").await.expect("created").id;
     let overview = ProfileOverviewUseCase::new(
         ctx.profiles.clone(),
-        AccountSummaryUseCase::new(
-            ctx.accounts.clone(),
-            ctx.assets.clone(),
-            ctx.currencies.clone(),
-        ),
-        GlobalPerformanceUseCase::new(
-            ctx.accounts.clone(),
-            ctx.assets.clone(),
-            ctx.currencies.clone(),
-        ),
+        ctx.accounts.clone(),
+        ctx.assets.clone(),
+        ctx.currencies.clone(),
     )
     .read()
     .await
@@ -602,16 +595,9 @@ async fn pfl_055_a_profile_started_this_year_has_a_year_to_date_percentage() {
         .expect("deposit");
     let overview = ProfileOverviewUseCase::new(
         ctx.profiles.clone(),
-        AccountSummaryUseCase::new(
-            ctx.accounts.clone(),
-            ctx.assets.clone(),
-            ctx.currencies.clone(),
-        ),
-        GlobalPerformanceUseCase::new(
-            ctx.accounts.clone(),
-            ctx.assets.clone(),
-            ctx.currencies.clone(),
-        ),
+        ctx.accounts.clone(),
+        ctx.assets.clone(),
+        ctx.currencies.clone(),
     )
     .read()
     .await
