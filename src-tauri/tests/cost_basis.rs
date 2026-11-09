@@ -473,6 +473,7 @@ async fn cbm_011a_a_chosen_method_is_kept() {
             None,
             Some(CostBasisMethod::WeightedAverage),
             None,
+            None,
         )
         .await
         .expect("created");
@@ -487,6 +488,7 @@ async fn cbm_011a_a_chosen_method_is_kept() {
             "EUR".into(),
             false,
             Some("DE".into()),
+            None,
             None,
             None,
             None,

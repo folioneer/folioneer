@@ -1,10 +1,12 @@
 {
   "account_summaries": {
+    "holders": [],
     "summaries": [
       {
         "created_by": null,
         "currency": "EUR",
         "has_inconsistent_holding": false,
+        "holder": null,
         "name": "Main EUR",
         "outdated_price_count": 0,
         "total_global_value": 24136700000,
@@ -15,6 +17,7 @@
         "created_by": null,
         "currency": "USD",
         "has_inconsistent_holding": false,
+        "holder": null,
         "name": "Growth USD",
         "outdated_price_count": 0,
         "total_global_value": 7898737868,

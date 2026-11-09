@@ -337,4 +337,21 @@ describe("useAddAccount — reference currency (FXR-128)", () => {
     expect(result.current.error).toEqual({ key: "error.DatabaseError" });
     mockChoicesError = null;
   });
+
+  // #769 (the validated mock) — a new account's holder starts as the profile in use's name,
+  // and the holder kept is sent.
+  it("prefills the holder with the profile in use's name and sends it", async () => {
+    mockAddAccount.mockResolvedValue({ data: {}, error: null });
+    const { result } = renderHook(() => useAddAccount({ defaultProfileName: "Me" }));
+    await waitFor(() => expect(result.current.formData.holder).toBe("Parent"));
+    act(() => {
+      result.current.handleChange({
+        target: { name: "name", value: "PEA", type: "text" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+    });
+    expect(mockAddAccount).toHaveBeenCalledWith(expect.objectContaining({ holder: "Parent" }));
+  });
 });

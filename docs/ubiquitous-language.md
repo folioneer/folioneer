@@ -36,6 +36,12 @@ The tax wrapper an account sits in — a PEA, an assurance vie, a Depot: a label
 
 > Status: confirmed
 
+### Holder
+
+Whose name an account is in — free text on the account, shown and filtered in the accounts list, never read by any figure (ACC-050 to ACC-052). Distinct from a Holding, a position in an asset. In French: "titulaire"; in German: "Inhaber" (owner, 2026-11-09, #769).
+
+> Status: confirmed
+
 ### Holding
 
 An internal entity of `Account`. Represents the current position in a given asset within

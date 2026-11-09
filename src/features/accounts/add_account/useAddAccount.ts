@@ -11,9 +11,14 @@ import { useAccounts } from "../useAccounts";
 
 interface UseAddAccountProps {
   onSubmitSuccess?: () => void;
+  /** PFL-011 — the default profile's name in the window's language, for the holder's prefill. */
+  defaultProfileName?: string;
 }
 
-export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
+export function useAddAccount({
+  onSubmitSuccess,
+  defaultProfileName = "",
+}: UseAddAccountProps = {}) {
   const { addAccount } = useAccounts();
   // FXR-128 — a new account's currency starts as the reference currency.
   const referenceCurrency = useAppStore((s) => s.referenceCurrency);
@@ -27,6 +32,7 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
     wrapper: "",
     cost_basis_method: "",
     profile_id: "",
+    holder: "",
   });
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,9 +40,16 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
   const { list: profiles, error: profilesError } = useProfileChoices();
 
   const inUse = profiles?.in_use ?? "";
+  // #769 (the validated mock) — a new account's holder starts as the profile in use's name.
+  const inUseName =
+    profiles?.profiles.find((summary) => summary.profile.id === inUse)?.profile.name ??
+    defaultProfileName;
   useEffect(() => {
-    if (inUse) setFormData((prev) => (prev.profile_id ? prev : { ...prev, profile_id: inUse }));
-  }, [inUse]);
+    if (inUse)
+      setFormData((prev) =>
+        prev.profile_id ? prev : { ...prev, profile_id: inUse, holder: prev.holder || inUseName },
+      );
+  }, [inUse, inUseName]);
   // CBM-014 — the method the country and wrapper imply, read again when either changes.
   const [impliedCostBasis, setImpliedCostBasis] = useState<ImpliedCostBasis | null>(null);
   const { country, wrapper } = formData;
@@ -90,6 +103,7 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
       wrapper: formData.wrapper || null,
       cost_basis_method: formData.cost_basis_method || null,
       profile_id: formData.profile_id || null,
+      holder: formData.holder || null,
     });
 
     setIsSubmitting(false);
@@ -109,6 +123,7 @@ export function useAddAccount({ onSubmitSuccess }: UseAddAccountProps = {}) {
       wrapper: "",
       cost_basis_method: "",
       profile_id: profiles?.in_use ?? "",
+      holder: inUseName,
     });
 
     if (onSubmitSuccess) {

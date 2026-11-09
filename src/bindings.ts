@@ -311,6 +311,17 @@ async getHoldingLots(accountId: string, assetId: string) : Promise<Result<Holdin
 }
 },
 /**
+ * ACC-050 — puts an account in a holder's name; none, or an empty one, clears it.
+ */
+async setAccountHolder(accountId: string, holder: string | null) : Promise<Result<Account, AccountError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_account_holder", { accountId, holder }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * PFL-023 — every profile with its account count, the default one first, and the profile
  * in use (PFL-012).
  */
@@ -1140,9 +1151,9 @@ async getAccountDetails(accountId: string, asOfDate: string | null) : Promise<Re
  * Returns one `AccountSummary` per non-deleted account and their portfolio total
  * in the reference currency (ACC-021, ACC-027).
  */
-async getAccountSummaries() : Promise<Result<AccountSummaries, AccountError>> {
+async getAccountSummaries(holder: string | null) : Promise<Result<AccountSummaries, AccountError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("get_account_summaries") };
+    return { status: "ok", data: await TAURI_INVOKE("get_account_summaries", { holder }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1514,8 +1525,8 @@ event: "event"
 /** user-defined constants **/
 
 export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
-export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 export const DEFAULT_PROFILE_ID = "default-profile" as const;
+export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 
 /** user-defined types **/
 
@@ -1567,7 +1578,12 @@ cost_basis_method?: CostBasisMethod;
  * PFL-010 — the profile the account belongs to; read as the default profile from a
  * change written before profiles existed (PFL-060).
  */
-profile_id?: string }
+profile_id?: string; 
+/**
+ * ACC-050 — whose name the account is in: free text, none when unset; read as none from a
+ * change written before it existed (SYN-035). No figure reads it (ACC-052).
+ */
+holder?: string | null }
 /**
  * Pre-deletion counts for an account (ACC-020).
  */
@@ -2080,9 +2096,14 @@ export type AccountSummaries = {
  */
 summaries: AccountSummary[]; 
 /**
- * The portfolio total over those rows.
+ * The portfolio total over every account of the profile in use, whatever the holder
+ * given (ACC-027, ACC-051A).
  */
-total: PortfolioTotal }
+total: PortfolioTotal; 
+/**
+ * ACC-051 — the holders the accounts name, each once, ordered by name with case ignored.
+ */
+holders: string[] }
 /**
  * Row returned by `get_account_summaries` (ACC-021). Pairs each `Account` with its
  * computed `total_global_value` so the Accounts list can render the value column
@@ -2106,6 +2127,10 @@ currency: string;
  * and grouping; none when unset.
  */
 wrapper: string | null; 
+/**
+ * ACC-050 — whose name the account is in; none when unset.
+ */
+holder: string | null; 
 /**
  * Total economic value in account-currency micros (CSH-094 / FXR-041): cash
  * quantity plus the sum of `quantity × latest_price` over priced active non-cash
@@ -3112,7 +3137,11 @@ cost_basis_method?: CostBasisMethod | null;
 /**
  * PFL-021 — the profile it goes into; none puts it in the profile in use.
  */
-profile_id?: string | null }
+profile_id?: string | null; 
+/**
+ * ACC-050 — whose name it is in; none, or an empty one, leaves it unset.
+ */
+holder?: string | null }
 /**
  * Parameters for creating a new asset.
  */
@@ -5536,8 +5565,8 @@ value: number;
  */
 value_incomplete: boolean; 
 /**
- * Its performance since the start of the year as micro-percent (GPF-031); none without
- * an account, or when it cannot be computed.
+ * Its year-to-date percentage as of the read date, micro-percent: the current month row's
+ * (PRF-034, GPF-031); none per PFL-055A.
  */
 ytd_performance_pct: number | null }
 /**

@@ -36,6 +36,7 @@ const makeAccount = (): Account => ({
   bank_name: "",
   currency: "EUR",
   wrapper: null,
+  holder: null,
   management_fees_enabled: false,
 });
 
@@ -69,6 +70,7 @@ describe("accountGateway", () => {
       management_fees_enabled: false,
       country: null,
       wrapper: null,
+      holder: null,
     };
     const account = makeAccount();
     mockInvoke.mockResolvedValue(account);
@@ -85,6 +87,7 @@ describe("accountGateway", () => {
       management_fees_enabled: false,
       country: null,
       wrapper: null,
+      holder: null,
     };
     const err: AccountError = { code: "NameAlreadyExists" };
     mockInvoke.mockRejectedValue(err);
@@ -100,6 +103,7 @@ describe("accountGateway", () => {
       management_fees_enabled: false,
       country: null,
       wrapper: null,
+      holder: null,
     };
     const err: AccountError = { code: "InvalidCurrency", currency: "XYZ" };
     mockInvoke.mockRejectedValue(err);
@@ -115,6 +119,7 @@ describe("accountGateway", () => {
       management_fees_enabled: false,
       country: null,
       wrapper: null,
+      holder: null,
     };
     const err: AccountError = { code: "NameEmpty" };
     mockInvoke.mockRejectedValue(err);
@@ -130,6 +135,7 @@ describe("accountGateway", () => {
       management_fees_enabled: false,
       country: null,
       wrapper: null,
+      holder: null,
     };
     const err: AccountError = { code: "DatabaseError" };
     mockInvoke.mockRejectedValue(err);
@@ -282,6 +288,7 @@ describe("accountGateway — fetchAllAssetPrices (MKT-130)", () => {
         name: "Main",
         currency: "EUR",
         wrapper: null,
+        holder: null,
         total_global_value: 470_000_000,
         total_unrealized_pnl: null,
         ytd_performance_pct: null,
@@ -300,15 +307,15 @@ describe("accountGateway — fetchAllAssetPrices (MKT-130)", () => {
       },
     };
     mockInvoke.mockResolvedValue(response);
-    const result = await accountGateway.getAccountSummaries();
+    const result = await accountGateway.getAccountSummaries(null);
     expect(result).toEqual({ status: "ok", data: response });
-    expect(mockInvoke).toHaveBeenCalledWith("get_account_summaries");
+    expect(mockInvoke).toHaveBeenCalledWith("get_account_summaries", { holder: null });
   });
 
   it("getAccountSummaries surfaces DatabaseError when the use case fails", async () => {
     const err: AccountError = { code: "DatabaseError" };
     mockInvoke.mockRejectedValue(err);
-    const result = await accountGateway.getAccountSummaries();
+    const result = await accountGateway.getAccountSummaries(null);
     expect(result).toEqual({ status: "error", error: err });
   });
 

@@ -177,6 +177,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             account::set_account_cost_basis_method,
             account::get_implied_cost_basis,
             account::get_holding_lots,
+            account::set_account_holder,
             account::list_profiles,
             account::set_profile_in_use,
             account::create_profile,

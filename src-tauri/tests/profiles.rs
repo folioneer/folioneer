@@ -348,6 +348,7 @@ async fn pfl_021_a_new_account_goes_into_the_profile_in_use() {
             None,
             None,
             profile,
+            None,
         )
     };
     let in_use = create("PEA", None).await.expect("created");
@@ -603,4 +604,88 @@ async fn pfl_055_a_profile_started_this_year_has_a_year_to_date_percentage() {
     .await
     .expect("overview");
     assert_eq!(overview.rows[0].ytd_performance_pct, Some(0));
+}
+
+// ACC-050 — a holder is trimmed, an empty one clears it, the same one signals nothing; an
+// unknown account is rejected.
+#[tokio::test]
+async fn acc_050_an_account_names_its_holder() {
+    use folioneer_lib::core::Event;
+    let ctx = ctx().await;
+    let id = account(&ctx, "PEA").await;
+    let mut rx = ctx.bus.subscribe();
+    let named = ctx
+        .accounts
+        .set_holder(&id, Some("  Claire ".into()))
+        .await
+        .expect("named");
+    assert_eq!(named.holder.as_deref(), Some("Claire"));
+    assert!(rx.drain().contains(&Event::AccountUpdated));
+    ctx.accounts
+        .set_holder(&id, Some("Claire".into()))
+        .await
+        .expect("the same");
+    assert_eq!(rx.drain(), []);
+    let cleared = ctx
+        .accounts
+        .set_holder(&id, Some(" ".into()))
+        .await
+        .expect("cleared");
+    assert_eq!(cleared.holder, None);
+    assert!(matches!(
+        ctx.accounts.set_holder("nope", None).await,
+        Err(AccountError::AccountNotFound { .. })
+    ));
+}
+
+// ACC-051 / ACC-052 — the summaries give the holders once, case ignored, and one holder's
+// accounts on request, the total staying every account's; no figure reads the holder.
+#[tokio::test]
+async fn acc_051_the_holders_read_with_the_summaries() {
+    let ctx = ctx().await;
+    let claire = account(&ctx, "PEA").await;
+    let marc = account(&ctx, "CTO").await;
+    for (id, amount) in [(&claire, 1_000), (&marc, 300)] {
+        ctx.recording
+            .record_deposit(id, "2024-01-02".into(), micro(amount), None)
+            .await
+            .expect("deposit");
+    }
+    let summaries = AccountSummaryUseCase::new(
+        ctx.accounts.clone(),
+        ctx.assets.clone(),
+        ctx.currencies.clone(),
+    );
+    let before = summaries.get_account_summaries().await.expect("before");
+    ctx.accounts
+        .set_holder(&claire, Some("Claire".into()))
+        .await
+        .expect("named");
+    ctx.accounts
+        .set_holder(&marc, Some("marc".into()))
+        .await
+        .expect("named");
+    let all = summaries
+        .get_account_summaries_for_holder(None)
+        .await
+        .expect("all");
+    assert_eq!(all.holders, ["Claire", "marc"]);
+    assert_eq!(
+        all.total.total_global_value,
+        before.total.total_global_value
+    );
+    let one = summaries
+        .get_account_summaries_for_holder(Some("CLAIRE".into()))
+        .await
+        .expect("one holder");
+    let ids: Vec<&str> = one.summaries.iter().map(|s| s.id.as_str()).collect();
+    assert_eq!(ids, [claire.as_str()]);
+    assert_eq!(one.total.total_global_value, micro(1_300));
+    assert_eq!(one.holders, ["Claire", "marc"]);
+    // ACC-051A — a blank holder reads every account.
+    let blank = summaries
+        .get_account_summaries_for_holder(Some("  ".into()))
+        .await
+        .expect("blank");
+    assert_eq!(blank.summaries.len(), 2);
 }

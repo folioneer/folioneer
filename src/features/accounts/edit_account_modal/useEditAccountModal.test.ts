@@ -28,11 +28,13 @@ vi.mock("../useAccounts", () => ({
 
 const mockSetMethod = vi.fn();
 const mockMove = vi.fn();
+const mockSetHolder = vi.fn();
 
 vi.mock("../gateway", () => ({
   accountGateway: {
     setAccountCostBasisMethod: (...args: unknown[]) => mockSetMethod(...args),
     moveAccountToProfile: (...args: unknown[]) => mockMove(...args),
+    setAccountHolder: (...args: unknown[]) => mockSetHolder(...args),
   },
 }));
 
@@ -281,5 +283,27 @@ describe("useEditAccountModal — country and wrapper (ACC-043, ACC-044)", () =>
       await result.current.handleSubmit(fakeSubmit);
     });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  // ACC-050 — a changed holder is its own action after the account is saved; an unchanged one
+  // calls nothing.
+  it("sets a changed holder, and leaves an unchanged one alone", async () => {
+    mockUpdateAccount.mockResolvedValue({ data: mockAccount, error: null });
+    mockSetHolder.mockResolvedValue({ status: "ok", data: mockAccount });
+    const onClose = vi.fn();
+    const { result } = renderHook(() => useEditAccountModal({ account: mockAccount, onClose }));
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(mockSetHolder).not.toHaveBeenCalled();
+    act(() => {
+      result.current.handleChange({
+        target: { name: "holder", value: "Claire", type: "text" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+    expect(mockSetHolder).toHaveBeenCalledWith("account-1", "Claire");
   });
 });

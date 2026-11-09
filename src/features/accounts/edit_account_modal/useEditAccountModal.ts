@@ -26,6 +26,7 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
     wrapper: "",
     cost_basis_method: "",
     profile_id: "",
+    holder: "",
   });
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,6 +58,7 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
         wrapper: account.wrapper ?? "",
         cost_basis_method: account.cost_basis_method ?? "WeightedAverage",
         profile_id: account.profile_id ?? "",
+        holder: account.holder ?? "",
       });
       setError(null);
     }
@@ -115,9 +117,18 @@ export function useEditAccountModal({ account, onClose }: UseEditAccountModalPro
 
     // R13, R15 — keep modal open on error
     if (result.error) {
-      setIsSubmitting(false);
       setError(result.error);
       return;
+    }
+
+    // ACC-050 — a changed holder is its own action; no figure moves.
+    if (formData.holder.trim() !== (account.holder ?? "")) {
+      const named = await accountGateway.setAccountHolder(account.id, formData.holder || null);
+      if (named.status === "error") {
+        logger.warn("[useEditAccountModal] the holder was not set", { code: named.error.code });
+        setError(accountMutationErrorToI18n(named.error));
+        return;
+      }
     }
 
     // CBM-030 — a changed method is its own action: the account's history recomputes.

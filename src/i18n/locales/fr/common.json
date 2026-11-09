@@ -172,7 +172,12 @@
     "group_no_wrapper": "Sans enveloppe",
     "form_profile_label": "Profil",
     "form_profile_hint": "Le profil dont les chiffres comptent ce compte.",
-    "form_profile_move_warning": "Ce compte et tout son historique passent dans {{to}} : les chiffres de {{from}} ne le comptent plus."
+    "form_profile_move_warning": "Ce compte et tout son historique passent dans {{to}} : les chiffres de {{from}} ne le comptent plus.",
+    "form_holder_label": "Titulaire (facultatif)",
+    "form_holder_hint": "Au nom de qui est le compte. Affiché et filtré, jamais compté.",
+    "column_holder": "Titulaire",
+    "filter_holder": "Titulaire",
+    "filter_all": "Tous"
   },
   "action": {
     "add": "Ajouter",

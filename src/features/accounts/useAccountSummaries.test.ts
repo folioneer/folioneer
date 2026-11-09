@@ -11,7 +11,7 @@ const mockSubscribeToEvents = vi.fn<(cb: (type: string) => void) => Promise<() =
 
 vi.mock("./gateway", () => ({
   accountGateway: {
-    getAccountSummaries: () => mockGetAccountSummaries(),
+    getAccountSummaries: (...args: unknown[]) => mockGetAccountSummaries(...args),
     subscribeToEvents: (cb: (type: string) => void) => mockSubscribeToEvents(cb),
   },
 }));
@@ -21,6 +21,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 const makeSummary = (overrides: Partial<AccountSummary> = {}): AccountSummary => ({
+  holder: null,
   id: "acc-1",
   name: "Main",
   currency: "EUR",
@@ -381,5 +382,17 @@ describe("useAccountSummaries — bulk-fetch coalescing (MKT-181)", () => {
     });
 
     expect(result.current.summaries.map((summary) => summary.id)).toEqual(["acc-new"]);
+  });
+
+  // ACC-051 — the holder chosen is sent to the core, and the holders it gives are kept.
+  it("reads one holder's accounts and keeps the holders", async () => {
+    mockGetAccountSummaries.mockResolvedValue({
+      status: "ok",
+      data: { summaries: [], total: null, holders: ["Claire", "Marc"] },
+    });
+    const { result } = renderHook(() => useAccountSummaries("Claire"));
+    await act(async () => {});
+    expect(mockGetAccountSummaries).toHaveBeenCalledWith("Claire");
+    expect(result.current.holders).toEqual(["Claire", "Marc"]);
   });
 });

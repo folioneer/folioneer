@@ -10,6 +10,8 @@ const UNKNOWN_ERROR: I18nMessage = { key: "error.Unknown" };
 
 interface UseAccountSummariesResult {
   summaries: AccountSummary[];
+  /** ACC-051 — the holders the accounts name, for the filter. */
+  holders: string[];
   /** ACC-027 — the backend's portfolio total; null until the first successful read. */
   portfolioTotal: PortfolioTotal | null;
   isLoading: boolean;
@@ -21,8 +23,9 @@ interface UseAccountSummariesResult {
  * Fetches the per-account global-value view (ACC-021). Listens to backend
  * events so the Accounts list refreshes when account state or prices change.
  */
-export function useAccountSummaries(): UseAccountSummariesResult {
+export function useAccountSummaries(holder: string | null = null): UseAccountSummariesResult {
   const [summaries, setSummaries] = useState<AccountSummary[]>([]);
+  const [holders, setHolders] = useState<string[]>([]);
   const [portfolioTotal, setPortfolioTotal] = useState<PortfolioTotal | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<I18nMessage | null>(null);
@@ -34,11 +37,12 @@ export function useAccountSummaries(): UseAccountSummariesResult {
     const request = ++latestRequest.current;
     setError(null);
     try {
-      const result = await accountGateway.getAccountSummaries();
+      const result = await accountGateway.getAccountSummaries(holder);
       if (request !== latestRequest.current) return;
       if (result.status === "ok") {
         setSummaries(result.data.summaries);
         setPortfolioTotal(result.data.total);
+        setHolders(result.data.holders);
       } else {
         logger.error("[useAccountSummaries] fetch failed", { error: result.error });
         setError(accountMutationErrorToI18n(result.error));
@@ -50,7 +54,7 @@ export function useAccountSummaries(): UseAccountSummariesResult {
     } finally {
       if (request === latestRequest.current) setIsLoading(false);
     }
-  }, []);
+  }, [holder]);
 
   useEffect(() => {
     // F29 — the loading state shows for the first load and a change of key only;
@@ -98,5 +102,5 @@ export function useAccountSummaries(): UseAccountSummariesResult {
     return fetchSummaries();
   }, [fetchSummaries]);
 
-  return { summaries, portfolioTotal, isLoading, error, refetch: reloadSummaries };
+  return { summaries, holders, portfolioTotal, isLoading, error, refetch: reloadSummaries };
 }

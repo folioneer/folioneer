@@ -29,6 +29,28 @@ impl AccountSummaryUseCase {
         }
     }
 
+    /// ACC-051A — the summaries of the profile in use, only the accounts in `holder`'s name
+    /// (case ignored) when one is given; the total and the holders stay every account's.
+    pub async fn get_account_summaries_for_holder(
+        &self,
+        holder: Option<String>,
+    ) -> StdResult<AccountSummaries, AccountError> {
+        let mut read = self.get_account_summaries().await?;
+        // ACC-051A — a blank holder reads every account.
+        let wanted = holder
+            .map(|holder| holder.trim().to_lowercase())
+            .filter(|holder| !holder.is_empty());
+        if let Some(wanted) = wanted {
+            read.summaries.retain(|summary| {
+                summary
+                    .holder
+                    .as_ref()
+                    .is_some_and(|named| named.to_lowercase() == wanted)
+            });
+        }
+        Ok(read)
+    }
+
     /// Builds a summary row for every account of the profile in use (PFL-050).
     pub async fn get_account_summaries(&self) -> StdResult<AccountSummaries, AccountError> {
         let accounts = self.account_service.accounts_in_use().await?;
@@ -1176,6 +1198,7 @@ mod tests {
             name: "Account".to_string(),
             currency: currency.to_string(),
             wrapper: None,
+            holder: None,
             total_global_value: global_value,
             total_unrealized_pnl: unrealized_pnl,
             ytd_performance_pct: None,

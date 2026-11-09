@@ -437,3 +437,14 @@ pub async fn remove_profile(
 ) -> Result<(), AccountError> {
     profiles.remove(&profile_id).await
 }
+
+/// ACC-050 — puts an account in a holder's name; none, or an empty one, clears it.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_account_holder(
+    state: State<'_, AppState>,
+    account_id: String,
+    holder: Option<String>,
+) -> Result<Account, AccountError> {
+    state.account_service.set_holder(&account_id, holder).await
+}
