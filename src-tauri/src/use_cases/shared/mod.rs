@@ -7,9 +7,15 @@
 //! `account_summary` and `global_performance` compose, so no use case has to
 //! import from another (B18).
 
+/// The account summaries and their portfolio total over a set of accounts (ACC-021, ACC-027),
+/// read by `account_summary` and `profile_overview`.
+pub mod account_summaries;
 /// The External provider this computer chose (MKT-214), which every fetching use case goes
 /// through and whose choice `price_provider_choice` changes.
 pub mod chosen_price_provider;
+/// The cross-account performance aggregation in the reference currency (GPF-012–041), read by
+/// `global_performance` and `profile_overview`.
+pub mod global_performance;
 /// Global Value arithmetic (PMV-023) shared by `account_summary` and the Price
 /// Movement report so the two never diverge into separate valuation paths.
 pub mod global_value;

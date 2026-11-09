@@ -1,7 +1,7 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "@/lib/store";
-import { NAV_ITEMS } from "./navItems";
+import { NAV_ITEMS, PROFILES_NAV_ITEM } from "./navItems";
 
 interface HeaderConfig {
   title: string;
@@ -56,6 +56,9 @@ export function useHeaderConfig(): HeaderConfig {
       },
     };
   }
+
+  // #768 — the profiles overview
+  if (pathname === PROFILES_NAV_ITEM.path) return { title: t(PROFILES_NAV_ITEM.labelKey) };
 
   // Top-level nav items
   const exact = NAV_ITEMS.find((item) => item.path === pathname);

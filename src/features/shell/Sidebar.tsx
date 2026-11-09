@@ -8,8 +8,9 @@ import { SettingsDialog } from "@/features/settings";
 import { logger } from "@/lib/logger";
 import { useAppStore } from "@/lib/store";
 import { IconButton } from "@/ui/components";
-import { NAV_ITEMS } from "./navItems";
+import { NAV_ITEMS, PROFILES_NAV_ITEM } from "./navItems";
 import { SidebarVersion } from "./SidebarVersion";
+import { useProfileCount } from "./useProfileCount";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -24,6 +25,8 @@ export function Sidebar({ isOpen, toggleDrawer }: SidebarProps) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [aboutOpen, setAboutOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // #768 (the validated mock) — the "Profiles" entry, first, from two profiles on.
+  const navItems = useProfileCount() > 1 ? [PROFILES_NAV_ITEM, ...NAV_ITEMS] : NAV_ITEMS;
 
   useEffect(() => {
     logger.info("[Sidebar] mounted");
@@ -59,7 +62,7 @@ export function Sidebar({ isOpen, toggleDrawer }: SidebarProps) {
       </div>
 
       <nav className="flex-1 px-3 mt-2 space-y-1">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const isActive = pathname === item.path || pathname.startsWith(`${item.path}/`);
           const label = t(item.labelKey);
           return (

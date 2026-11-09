@@ -29,14 +29,15 @@
 
 ### Profiles
 
-| Command                   | Args                                     | Return        | Errors                                                                                                                                                                                                                             |
-| ------------------------- | ---------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_profiles`           | —                                        | `ProfileList` | `DatabaseError`                                                                                                                                                                                                                    |
-| `create_profile`          | `name: String`                           | `Profile`     | `ProfileNameEmpty` (PFL-020), `ProfileNameAlreadyExists` (PFL-020), `DatabaseError`                                                                                                                                                |
-| `rename_profile`          | `profile_id: String, name: String`       | `Profile`     | `ProfileNotFound { profile_id }` (PFL-030), `ProfileNameEmpty`, `ProfileNameAlreadyExists` (PFL-062 — binds the name being set; renaming either of two profiles left with one name after a merge is accepted), `DatabaseError`     |
-| `remove_profile`          | `profile_id: String`                     | `()`          | `ProfileNotFound { profile_id }`, `ProfileNotEmpty` (PFL-040), `DefaultProfileKept` (PFL-040), `DatabaseError`                                                                                                                     |
-| `move_account_to_profile` | `account_id: String, profile_id: String` | `Account`     | `AccountNotFound { account_id }`, `ProfileNotFound { profile_id }` (PFL-031), `NameAlreadyExists` (PFL-022), `TransferAcrossProfiles` (PFL-033), `DatabaseError` _(the profile it is in or reads as in, PFL-061: nothing changes)_ |
-| `set_profile_in_use`      | `profile_id: String`                     | `()`          | `ProfileNotFound { profile_id }` (PFL-032), `DatabaseError` _(the profile in use chosen again: nothing changes)_                                                                                                                   |
+| Command                   | Args                                     | Return            | Errors                                                                                                                                                                                                                             |
+| ------------------------- | ---------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_profiles`           | —                                        | `ProfileList`     | `DatabaseError`                                                                                                                                                                                                                    |
+| `create_profile`          | `name: String`                           | `Profile`         | `ProfileNameEmpty` (PFL-020), `ProfileNameAlreadyExists` (PFL-020), `DatabaseError`                                                                                                                                                |
+| `rename_profile`          | `profile_id: String, name: String`       | `Profile`         | `ProfileNotFound { profile_id }` (PFL-030), `ProfileNameEmpty`, `ProfileNameAlreadyExists` (PFL-062 — binds the name being set; renaming either of two profiles left with one name after a merge is accepted), `DatabaseError`     |
+| `remove_profile`          | `profile_id: String`                     | `()`              | `ProfileNotFound { profile_id }`, `ProfileNotEmpty` (PFL-040), `DefaultProfileKept` (PFL-040), `DatabaseError`                                                                                                                     |
+| `move_account_to_profile` | `account_id: String, profile_id: String` | `Account`         | `AccountNotFound { account_id }`, `ProfileNotFound { profile_id }` (PFL-031), `NameAlreadyExists` (PFL-022), `TransferAcrossProfiles` (PFL-033), `DatabaseError` _(the profile it is in or reads as in, PFL-061: nothing changes)_ |
+| `set_profile_in_use`      | `profile_id: String`                     | `()`              | `ProfileNotFound { profile_id }` (PFL-032), `DatabaseError` _(the profile in use chosen again: nothing changes)_                                                                                                                   |
+| `get_profile_overview`    | —                                        | `ProfileOverview` | `DatabaseError` _(PFL-055 — implemented in `use_cases/profile_overview/`: reads the account summaries and the global performance per profile, none added across profiles; mutates nothing)_                                        |
 
 ### Account Details
 
@@ -271,6 +272,20 @@ struct ProfileSummary {
 struct ProfileList {
     profiles: Vec<ProfileSummary>,       // PFL-023 — the default one first, then by name, case ignored, then by id
     in_use: String,                      // the identifier of the profile in use (PFL-012); the default profile's id when the chosen one is gone (PFL-014)
+}
+
+struct ProfileOverview {
+    rows: Vec<ProfileOverviewRow>,       // PFL-055 — one per profile, in the order of PFL-023; no row adds profiles together
+    currency: String,                    // the reference currency every value is in (GPF-011)
+    in_use: String,                      // the identifier of the profile in use (PFL-012); the default profile's id when the chosen one is gone (PFL-014)
+}
+
+struct ProfileOverviewRow {
+    profile: Profile,
+    account_count: u32,                  // PFL-023
+    value: i64,                          // its accounts' total value, reference-currency micros (ACC-027, ADR-001); 0 without an account
+    value_incomplete: bool,              // an account of it with no usable rate hid a non-zero figure (ACC-028)
+    ytd_performance_pct: Option<i64>,    // its performance since the start of the year, micro-percent (GPF-031); none without an account or when not computable
 }
 
 struct ImpliedCostBasis {
@@ -919,6 +934,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-11-08 — #768 (PFL-055): new `get_profile_overview` and the `ProfileOverview` / `ProfileOverviewRow` types.
 - 2026-11-08 — #767 (PFL-040): `ProfileSummary` gains `removable`, so the window shows which profile may be removed without deciding it.
 - 2026-11-08 — #766 (PFL-050, PFL-051): `get_accounts`, `get_account_summaries` (and its total) and `get_global_performance` without an account read the accounts of the profile in use. No signature changed. `AccountError` gains `AccountOutsideProfileInUse { account_id }` (PFL-051A, returned by the import commands).
 - 2026-11-08 — #766 (PFL-012, PFL-014, PFL-021, PFL-032): `list_profiles` returns `ProfileList` (the profiles and the profile in use); new `set_profile_in_use`; `CreateAccountDTO` gains `profile_id: Option<String>` (none: the profile in use) and `add_account` returns `ProfileNotFound`; `ProfileUpdated` also signals a new profile in use (PFL-034).

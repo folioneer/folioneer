@@ -5,6 +5,7 @@
 //! `ProfileMoveUseCase`, `TransferUseCase` — over real in-memory SQLite. No mocks (test-rules.md
 //! Tier 3). The portfolio is invented data.
 
+use chrono::Datelike;
 use folioneer_lib::context::account::{
     AccountError, AccountService, ProfileService, SqliteAccountRepository, SqliteHoldingRepository,
     SqliteProfileRepository, SqliteTransactionRepository, DEFAULT_PROFILE_ID,
@@ -25,6 +26,7 @@ use folioneer_lib::use_cases::global_performance::GlobalPerformanceUseCase;
 use folioneer_lib::use_cases::holding_transaction::HoldingTransactionUseCase;
 use folioneer_lib::use_cases::price_freshness::PriceFreshnessUseCase;
 use folioneer_lib::use_cases::profile_move::ProfileMoveUseCase;
+use folioneer_lib::use_cases::profile_overview::ProfileOverviewUseCase;
 use folioneer_lib::use_cases::shared::price_fetch_log::SqlitePriceFetchLogRepository;
 use folioneer_lib::use_cases::transfer::{TransferError, TransferFigures, TransferUseCase};
 use std::sync::Arc;
@@ -531,4 +533,74 @@ async fn pfl_034_profile_changes_are_signalled() {
     rx.drain();
     ctx.profiles.remove(&other).await.expect("removed");
     assert_eq!(rx.drain(), [Event::ProfileUpdated]);
+}
+
+// PFL-055 — every profile with its own value, computed within it; a profile without an
+// account is worth 0 with no performance; no row adds profiles together.
+#[tokio::test]
+async fn pfl_055_every_profile_has_its_own_figures() {
+    let ctx = ctx().await;
+    let theirs = two_profiles_parent_in_use(&ctx).await;
+    let son = ctx.profiles.create("Son").await.expect("created").id;
+    let overview = ProfileOverviewUseCase::new(
+        ctx.profiles.clone(),
+        ctx.accounts.clone(),
+        ctx.assets.clone(),
+        ctx.currencies.clone(),
+    )
+    .read()
+    .await
+    .expect("overview");
+    let parent = ctx
+        .accounts
+        .get_by_id(&theirs)
+        .await
+        .expect("read")
+        .expect("account")
+        .profile_id;
+    assert_eq!(overview.in_use, parent);
+    assert_eq!(overview.currency, "EUR");
+    let rows: Vec<(String, u32, i64)> = overview
+        .rows
+        .iter()
+        .map(|row| (row.profile.id.clone(), row.account_count, row.value))
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            (DEFAULT_PROFILE_ID.to_string(), 1, micro(1_000)),
+            (parent, 1, micro(300)),
+            (son, 0, 0),
+        ]
+    );
+    assert_eq!(overview.rows[2].ytd_performance_pct, None);
+}
+
+// PFL-055 / PRF-034 — a profile whose accounts started this year has a year-to-date
+// percentage: the current month row's, as an account's (ACC-024).
+#[tokio::test]
+async fn pfl_055_a_profile_started_this_year_has_a_year_to_date_percentage() {
+    let ctx = ctx().await;
+    let today = chrono::Local::now().date_naive();
+    let start = today.with_day(1).expect("first of the month");
+    let id = account(&ctx, "PEA").await;
+    ctx.recording
+        .record_deposit(
+            &id,
+            start.format("%Y-%m-%d").to_string(),
+            micro(1_000),
+            None,
+        )
+        .await
+        .expect("deposit");
+    let overview = ProfileOverviewUseCase::new(
+        ctx.profiles.clone(),
+        ctx.accounts.clone(),
+        ctx.assets.clone(),
+        ctx.currencies.clone(),
+    )
+    .read()
+    .await
+    .expect("overview");
+    assert_eq!(overview.rows[0].ytd_performance_pct, Some(0));
 }

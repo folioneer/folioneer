@@ -12,6 +12,7 @@ import { CategoryManager } from "@/features/categories";
 import { CurrencyRatesView } from "@/features/currency";
 import { DesignSystemPage } from "@/features/design-system";
 import { AccountPerformancePage, GlobalPerformancePage } from "@/features/performance";
+import { ProfilesOverview } from "@/features/profiles";
 import {
   AccountJournalPage,
   AddTransactionPage,
@@ -106,6 +107,13 @@ const categoriesRoute = createRoute({
   component: CategoryManager,
 });
 
+// PFL-055 (#768) — every profile with its own figures.
+const profilesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/profiles",
+  component: ProfilesOverview,
+});
+
 const currencyRatesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/currency-rates",
@@ -120,6 +128,7 @@ const designSystemRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  profilesRoute,
   assetsRoute,
   accountsRoute,
   accountDetailsRoute,

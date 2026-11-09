@@ -18,6 +18,8 @@ vi.mock("@/features/settings", () => ({
     isOpen ? <div data-testid="settings-dialog" /> : null,
 }));
 vi.mock("./SidebarVersion", () => ({ SidebarVersion: () => null }));
+let mockProfileCount = 1;
+vi.mock("./useProfileCount", () => ({ useProfileCount: () => mockProfileCount }));
 
 describe("Sidebar", () => {
   // The header stacks over anything inside the drawer.
@@ -28,5 +30,18 @@ describe("Sidebar", () => {
     fireEvent.click(document.getElementById("nav-settings") as HTMLElement);
 
     expect(screen.getByTestId("settings-dialog").closest("aside")).toBeNull();
+  });
+
+  // #768 (the validated mock) — the "Profiles" entry shows first, from two profiles on.
+  it("shows the Profiles entry first from two profiles on", () => {
+    mockProfileCount = 1;
+    const { unmount } = render(<Sidebar isOpen toggleDrawer={vi.fn()} />);
+    expect(document.getElementById("nav-profiles")).toBeNull();
+    unmount();
+    mockProfileCount = 2;
+    render(<Sidebar isOpen toggleDrawer={vi.fn()} />);
+    const entries = document.querySelectorAll("nav button[id^='nav-']");
+    expect(entries[0]?.id).toBe("nav-profiles");
+    mockProfileCount = 1;
   });
 });

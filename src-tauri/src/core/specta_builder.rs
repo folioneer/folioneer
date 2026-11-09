@@ -183,6 +183,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             account::rename_profile,
             account::remove_profile,
             crate::use_cases::profile_move::move_account_to_profile,
+            crate::use_cases::profile_overview::get_profile_overview,
             account::get_asset_ids_for_account,
             account::get_transactions,
             account::get_account_journal,

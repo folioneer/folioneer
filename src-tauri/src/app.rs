@@ -231,7 +231,7 @@ pub fn run() {
                         account_service.clone(),
                     ),
                 ));
-                app_handle.manage(profile_service);
+                app_handle.manage(Arc::clone(&profile_service));
 
                 let account_details_uc = AccountDetailsUseCase::new(
                     account_service.clone(),
@@ -344,6 +344,15 @@ pub fn run() {
                     .with_launch_sync(Arc::new(LaunchSync(Arc::clone(&portfolio_sync_uc))));
 
                 app_handle.manage(account_details_uc);
+                // PFL-055 — every profile's own figures.
+                app_handle.manage(Arc::new(
+                    crate::use_cases::profile_overview::ProfileOverviewUseCase::new(
+                        Arc::clone(&profile_service),
+                        account_service.clone(),
+                        asset_service.clone(),
+                        Arc::clone(&currency_service),
+                    ),
+                ));
                 app_handle.manage(account_summary_uc);
                 app_handle.manage(account_performance_uc);
                 app_handle.manage(global_performance_uc);
