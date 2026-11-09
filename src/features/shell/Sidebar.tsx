@@ -27,7 +27,9 @@ export function Sidebar({ isOpen, toggleDrawer }: SidebarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   // #768 (the validated mock) — the "Profiles" entry, first, from two profiles on.
   const navItems =
-    (useProfileList()?.profiles.length ?? 0) > 1 ? [PROFILES_NAV_ITEM, ...NAV_ITEMS] : NAV_ITEMS;
+    (useProfileList().list?.profiles.length ?? 0) > 1
+      ? [PROFILES_NAV_ITEM, ...NAV_ITEMS]
+      : NAV_ITEMS;
 
   useEffect(() => {
     logger.info("[Sidebar] mounted");

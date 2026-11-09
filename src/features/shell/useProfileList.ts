@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
 import type { ProfileList } from "@/bindings";
 import { logger } from "@/lib/logger";
+import type { I18nMessage } from "@/ui/format/i18n";
 import { listProfiles, onProfilesChanged } from "./gateway";
+import { profileChipErrorToI18n } from "./profile_chip/presenter";
 
 /**
  * #768 / #770 — the profiles and the one in use, for the sidebar's "Profiles" entry and the
  * agent's connection dialog; read again when the profiles change (PFL-034) or a sync applied
- * changes. null until read, or when they cannot be.
+ * changes. `list` is null until read, or when they cannot be; `error` then says why (F27).
  */
-export function useProfileList(): ProfileList | null {
+export function useProfileList(): { list: ProfileList | null; error: I18nMessage | null } {
   const [list, setList] = useState<ProfileList | null>(null);
+  const [error, setError] = useState<I18nMessage | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -20,8 +23,10 @@ export function useProfileList(): ProfileList | null {
         logger.error("[useProfileList] the profiles could not be read", {
           code: result.error.code,
         });
+        setError(profileChipErrorToI18n(result.error));
         return;
       }
+      setError(null);
       setList(result.data);
     };
     void load();
@@ -32,5 +37,5 @@ export function useProfileList(): ProfileList | null {
     };
   }, []);
 
-  return list;
+  return { list, error };
 }

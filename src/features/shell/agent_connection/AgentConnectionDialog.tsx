@@ -3,6 +3,7 @@ import type { AgentConnectionRequest, ProfileList } from "@/bindings";
 import { Button } from "@/ui/components/button/Button";
 import { Dialog } from "@/ui/components/modal/Dialog";
 import { formatIsoTime } from "@/ui/format/date";
+import type { I18nMessage } from "@/ui/format/i18n";
 import { useActiveAfterAMoment } from "./useActiveAfterAMoment";
 import { useKeepFocusOnActions } from "./useKeepFocusOnActions";
 
@@ -12,6 +13,8 @@ interface AgentConnectionDialogProps {
   user: string | null;
   /** The profiles and the one in use (AGT-100); null until read. */
   profiles: ProfileList | null;
+  /** Why the profiles could not be read, if they could not (F27). */
+  profilesError?: I18nMessage | null;
   onAnswer: (requestId: number, allow: boolean) => void;
 }
 
@@ -30,6 +33,7 @@ export function AgentConnectionDialog({
   request,
   user,
   profiles,
+  profilesError = null,
   onAnswer,
 }: AgentConnectionDialogProps) {
   const { t, i18n } = useTranslation();
@@ -104,6 +108,11 @@ export function AgentConnectionDialog({
           {severalProfiles && ` ${t("agent.connection_other_profiles")}`}
           {` ${t("agent.connection_asks")}`}
         </p>
+        {profilesError && (
+          <p id="agent-connection-profiles-error" role="alert" className="text-m3-error">
+            {t(profilesError.key, profilesError.vars)}
+          </p>
+        )}
       </div>
     </Dialog>
   );

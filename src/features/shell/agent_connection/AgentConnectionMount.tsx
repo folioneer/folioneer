@@ -26,7 +26,7 @@ export function AgentConnectionMount() {
     answerReplacement,
   } = useAgentConnections();
   useAgentRecordingNotice(sessions);
-  const profiles = useProfileList();
+  const { list: profiles, error: profilesError } = useProfileList();
 
   if (request) {
     return (
@@ -35,6 +35,7 @@ export function AgentConnectionMount() {
         request={request}
         user={user}
         profiles={profiles}
+        profilesError={profilesError}
         onAnswer={answer}
       />
     );

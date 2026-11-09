@@ -22,12 +22,14 @@ describe("useProfileList", () => {
       },
     });
     const { result } = renderHook(() => useProfileList());
-    await waitFor(() => expect(result.current?.profiles).toHaveLength(2));
-    expect(result.current?.in_use).toBe("default-profile");
+    await waitFor(() => expect(result.current.list?.profiles).toHaveLength(2));
+    expect(result.current.list?.in_use).toBe("default-profile");
+    expect(result.current.error).toBeNull();
 
     mockList.mockResolvedValueOnce({ status: "error", error: { code: "DatabaseError" } });
     const { result: failed } = renderHook(() => useProfileList());
     await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
-    expect(failed.current).toBeNull();
+    expect(failed.current.list).toBeNull();
+    await waitFor(() => expect(failed.current.error).toEqual({ key: "error.DatabaseError" }));
   });
 });

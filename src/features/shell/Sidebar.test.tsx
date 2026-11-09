@@ -21,8 +21,11 @@ vi.mock("./SidebarVersion", () => ({ SidebarVersion: () => null }));
 let mockProfileCount = 1;
 vi.mock("./useProfileList", () => ({
   useProfileList: () => ({
-    profiles: Array.from({ length: mockProfileCount }, () => ({})),
-    in_use: "default-profile",
+    list: {
+      profiles: Array.from({ length: mockProfileCount }, () => ({})),
+      in_use: "default-profile",
+    },
+    error: null,
   }),
 }));
 

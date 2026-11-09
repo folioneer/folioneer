@@ -28,7 +28,7 @@ const several = {
   ],
   in_use: "p-1",
 };
-profileList.mockReturnValue(one);
+profileList.mockReturnValue({ list: one, error: null });
 
 import { AgentConnectionMount } from "./AgentConnectionMount";
 import { AgentIndicator } from "./AgentIndicator";
@@ -146,7 +146,7 @@ const replacement = (overrides = {}) => ({
 describe("AgentConnectionMount", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    profileList.mockReturnValue(one);
+    profileList.mockReturnValue({ list: one, error: null });
     vi.useFakeTimers();
   });
   afterEach(() => vi.useRealTimers());
@@ -176,19 +176,23 @@ describe("AgentConnectionMount", () => {
   });
 
   // AGT-100 / AGT-101 — with several profiles, the paragraph names the one in use and says
-  // the others are out of reach; before the profiles are read, it names none.
+  // the others are out of reach; profiles that cannot be read, it names none and says why.
   it("names the profile in use, and with several says the others are out of reach", () => {
     hook.mockReturnValue(state({ request }));
-    profileList.mockReturnValue(several);
+    profileList.mockReturnValue({ list: several, error: null });
     const { unmount } = render(<AgentConnectionMount />);
     expect(document.getElementById("agent-connection-covers")).toHaveTextContent(
       "agent.connection_reach(Mother) agent.connection_other_profiles agent.connection_asks",
     );
     unmount();
-    profileList.mockReturnValue(null);
+    profileList.mockReturnValue({ list: null, error: { key: "error.DatabaseError" } });
     render(<AgentConnectionMount />);
     expect(document.getElementById("agent-connection-covers")).toHaveTextContent(
       "agent.connection_reach_unread agent.connection_asks",
+    );
+    // F27 — profiles that could not be read say so.
+    expect(document.getElementById("agent-connection-profiles-error")).toHaveTextContent(
+      "error.DatabaseError",
     );
   });
 
