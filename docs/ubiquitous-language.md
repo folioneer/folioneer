@@ -694,7 +694,13 @@ A holding whose merged transactions, each valid on the device that recorded it, 
 
 ### Import mapper
 
-How one provider's export is read, kept as a JSON file in the mappers folder of the data folder and reused for every file of that shape: which column is what, each operation label's operation type, the asset each unknown name stands for (IMP-020). The user, the community or the Folioneer team can add one. Its info entry names its provider: who the export comes from, not an External provider of prices. In French: « Modèle d'import » (owner, 2026-10-31).
+How one provider's export is read and reused for every file of that shape — the user's kept as a JSON file in the mappers folder of the data folder, a Built-in preset shipped with the application: which column is what, each operation label's operation type, the asset each unknown name stands for (IMP-020). The user, the community or the Folioneer team can add one. Its info entry names its provider: who the export comes from, not an External provider of prices. In French: « Modèle d'import » (owner, 2026-10-31).
+
+> Status: confirmed
+
+### Built-in preset
+
+An import mapper that ships with the application, read-only: the user picks it as it is, or saves a copy as a mapper of their own (IMP-020F). In French: « Modèle intégré » (owner, 2026-10-31).
 
 > Status: confirmed
 

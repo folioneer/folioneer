@@ -4,7 +4,7 @@
 
 Every transaction is typed by hand today, which stops anyone with years of history from starting (#369). Brokers export CSV files, and none agree on columns, separators, number and date formats or encoding. An **Account import** brings a file's rows into one account in two steps: the file is read through an **Import mapper** and previewed row by row, nothing written; then the user confirms, and the rows are recorded at once (IMP-050).
 
-This spec holds the reading, the import mapper and the preview (#501), the confirmation and the **Added deposit** (#502); the window (#503) and the preview it opens (#504). The account import is a surface beside the window, the command line and the AI agent connection: any of them may start it, and its rows are judged and recorded through the same recorder as theirs, by the same rules — every transaction follows them, whatever records it (owner, 2026-10-25): the purchase (TRX), the sale (SEL), the dividend (DIV), the deposit and the withdrawal (CSH). This version starts it from the window (#503). Figures follow TRX-024. No mapper ships with the application: the user saves or adds the first. The reading rules were checked against a French broker's securities export: one file, ISO-8859-1 (read as Windows-1252, IMP-011), `;` with a trailing `;`, a decimal dot, no ISIN column, the trade tax on its own row (owner, 2026-10-25).
+This spec holds the reading, the import mapper and the preview (#501), the confirmation and the **Added deposit** (#502); the window (#503) and the preview it opens (#504). The account import is a surface beside the window, the command line and the AI agent connection: any of them may start it, and its rows are judged and recorded through the same recorder as theirs, by the same rules — every transaction follows them, whatever records it (owner, 2026-10-25): the purchase (TRX), the sale (SEL), the dividend (DIV), the deposit and the withdrawal (CSH). This version starts it from the window (#503). Figures follow TRX-024. Built-in presets ship with the application (IMP-020F); the user saves or adds the others. The reading rules were checked against a French broker's securities export: one file, ISO-8859-1 (read as Windows-1252, IMP-011), `;` with a trailing `;`, a decimal dot, no ISIN column, the trade tax on its own row (owner, 2026-10-25).
 
 ---
 
@@ -17,6 +17,7 @@ How one provider's export is read, saved under that provider and reused for ever
 | Field             | Business meaning                                                                                                                                        |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`              | The mapper's own identity, set when it is first written: a change of provider keeps it.                                                                 |
+| `built_in`        | Whether it is a built-in preset, read-only (IMP-020F); never in a file.                                                                                 |
 | `provider`        | Who the export comes from ("Fortuneo PEA"), in the file's info entry: not empty once trimmed, unique among mappers, case and accents ignored (IMP-024). |
 | `separator`       | The character between two fields: `;`, `,` or a tab.                                                                                                    |
 | `decimal_mark`    | The mark before a figure's decimals: a dot or a comma.                                                                                                  |
@@ -83,17 +84,21 @@ One row of the file that is not blank — one line, or several when a quoted fie
 
 ### Import mapper (020–029)
 
-**IMP-020 — A mapper is a file (backend)**: An import mapper is a JSON file in the mappers folder of the data folder, on this computer: its info entry (the provider), its format, its columns, its operation types and its asset matches. Saving a new mapper writes its file, under a file name of its own: it never replaces a file of the folder. A folder not there yet is created. A write that fails is rejected with a specific error and leaves the folder's files as they were.
+**IMP-020 — A mapper is a file (backend)**: A user's import mapper is a JSON file in the mappers folder of the data folder, on this computer — a built-in preset is not (IMP-020F): its info entry (the provider), its format, its columns, its operation types and its asset matches. Saving a new mapper writes its file, under a file name of its own: it never replaces a file of the folder. A folder not there yet is created. A write that fails is rejected with a specific error and leaves the folder's files as they were.
 
-**IMP-020A — The list is what the folder holds (backend)**: The saved mappers are the `.json` files the folder holds, read each time the list is asked for, sorted by provider, case and accents ignored, then by identity; no folder, no mapper. A file that cannot be read, larger than 1 MB, not JSON, holding a field a mapper does not have, lacking one it needs or with a value outside the ones allowed, or breaking IMP-021, the empty provider of IMP-024 or IMP-024A does not read as a mapper, and neither does a file whose name a mapper's identity cannot take: it is left out of the list and left in place, and the failure is logged. A folder that cannot be read is rejected with a specific error.
+**IMP-020A — The list is the built-in presets and what the folder holds (backend)**: The mappers are the built-in presets (IMP-020F) and the `.json` files the folder holds, read each time the list is asked for, sorted by provider, case and accents ignored, then by identity; no folder, only the built-in presets. A file that cannot be read, larger than 1 MB, not JSON, holding a field a mapper does not have, lacking one it needs or with a value outside the ones allowed — the `built_in` mark among the fields a file does not hold —, or breaking IMP-021, the empty provider of IMP-024 or IMP-024A does not read as a mapper, and neither does a file whose name a mapper's identity cannot take: it is left out of the list and left in place, and the failure is logged. A folder that cannot be read is rejected with a specific error, the built-in presets with it.
 
 **IMP-020B — A mapper from elsewhere is added from its file (backend)**: The user picks a mapper's file in the system dialog; it is written into the folder as IMP-020 says, whatever the picked file was called, its provider trimmed, and joins the list. A file that cannot be read or does not read as a mapper (IMP-020A), or whose trimmed provider another mapper holds (IMP-024), is refused with a specific error saying why, and nothing is written; a write that fails is rejected as in IMP-020. Its asset matches are kept as they are (IMP-033).
 
-**IMP-020C — The mapper chosen is remembered for the imported file's folder (backend)**: A completed confirmation made with a saved mapper remembers that mapper for the folder the imported file sits in, replacing what that folder remembered, on this computer and never synced — whether or not the user changed the mapper in use or any row was recorded. That folder is known by its full path as the system resolves it: a folder moved or renamed remembers nothing. If remembering fails the account import stands, and the failure is logged.
+**IMP-020C — The mapper chosen is remembered for the imported file's folder (backend)**: A completed confirmation made with a saved mapper or a built-in preset remembers that mapper for the folder the imported file sits in, replacing what that folder remembered, on this computer and never synced — whether or not the user changed the mapper in use or any row was recorded. That folder is known by its full path as the system resolves it: a folder moved or renamed remembers nothing. If remembering fails the account import stands, and the failure is logged.
 
 **IMP-020D — The imported file's folder preselects its mapper (frontend + backend)**: A file picked for import has the mapper its folder remembers preselected; the user may pick another. A folder that remembers nothing, a mapper no longer held or that no longer reads, or a memory or mappers folder that cannot be read, preselects none, and a failure is logged.
 
 **IMP-020E — A saved mapper is reused (backend)**: A saved mapper picked for the next file reads it with its own separator, decimal mark, date format and encoding, none detected. The preview runs with the mapper in use, saved or not. Picking a mapper that is no longer held or no longer reads (IMP-020A) is rejected with a specific error.
+
+**IMP-020F — Built-in presets (backend)**: A built-in preset is a saved mapper that ships with the application, read-only: every rule of a saved mapper holds for it but where IMP-020G and IMP-040A say otherwise. Its identity is its own, which no file of the folder can take, and an update of the application that corrects it keeps it.
+
+**IMP-020G — Saving a built-in preset saves a copy (backend)**: Saving a built-in preset, as it is or changed, writes a mapper of its own, which needs a provider of its own (IMP-024); the preset stays as it was.
 
 **IMP-021 — The columns a row needs (backend)**: A mapper names the column of each field a row reads, by its header, compared trimmed and case ignored: the date and the operation, always; the asset by one or more of its ISIN, its reference and its name, at least one; the quantity, the unit price, the gross amount, the fees, the net amount and the currency, each optional. One column may serve two fields. A mapper without the date or the operation column, or without any asset column, is rejected with a specific error when saved or used; one naming columns the file lacks is rejected when used on that file, with a specific error naming each of them.
 
@@ -107,7 +112,7 @@ One row of the file that is not blank — one line, or several when a quoted fie
 
 **IMP-025 — A saved mapper is changed (backend)**: Saving a mapper that is already saved replaces its file, under its provider or a new one, keeping its identity. Saving over a mapper that is no longer held or no longer reads (IMP-020A) is rejected with a specific error.
 
-**IMP-027 — Two mappers of one provider (backend)**: Files copied into the folder by hand may share a provider: both are listed (IMP-020A), each with its identity, and nothing is reported. Either may be saved again under that provider; the user renames one.
+**IMP-027 — Two mappers of one provider (backend)**: Files copied into the folder by hand, or a user's mapper and a built-in preset an update brings, may share a provider: both are listed (IMP-020A), each with its identity, and nothing is reported. Either file may be saved again under that provider, and the user renames one; a built-in preset is never renamed, and only the user's mapper keeps that provider when saved (IMP-020G).
 
 ### Rows and the preview (030–039)
 
@@ -120,6 +125,8 @@ One row of the file that is not blank — one line, or several when a quoted fie
 **IMP-032 — Each row is matched to an asset (backend)**: A row of a purchase, a sale, a dividend or a trade tax is matched to an asset of the portfolio, archived ones included: first by the mapper's asset matches (IMP-033, IMP-033A), then by its own ISIN and then its reference, each trimmed and case ignored, then its exact name, case and accents ignored: each that the row holds is tried in that order, and the first matching exactly one asset gives it. A row that none matches to exactly one asset is an **unknown asset**. A deposit and a withdrawal are the account's cash and take no asset.
 
 **IMP-033 — An unknown asset is matched once (backend)**: The user matches an unknown asset's name, ISIN or reference to an asset of the portfolio; the match is part of the mapper in use, kept when it is saved, so the next file of that provider matches it. A match is compared as the field it was read from is (IMP-032). Every row of that name, ISIN or reference then takes that asset, and the preview judges them again. A match to an asset unknown to the portfolio is rejected with a specific error when it is made. Saving a mapper keeps its matches as they are. The user may create the asset from the row instead (IMP-052).
+
+**IMP-033B — A match made on a built-in preset (backend)**: An asset matched while a built-in preset is in use holds for that account import, and is remembered once the user saves a copy (IMP-020G; owner, 2026-10-31).
 
 **IMP-033A — A match whose asset is not held is passed over (backend)**: A saved match whose asset the portfolio does not hold, as in a mapper written elsewhere, is passed over: the next matches of IMP-032 apply, and the row is unknown if none does. Of two matches for one text, the first whose asset is held applies.
 
@@ -140,6 +147,8 @@ One row of the file that is not blank — one line, or several when a quoted fie
 ### Deletion (040–049)
 
 **IMP-040 — A mapper is deleted (backend)**: The user deletes a saved mapper; nothing already recorded changes. Deleting a mapper that is no longer held, or a file that cannot be removed, is rejected with a specific error.
+
+**IMP-040A — A built-in preset is not deleted (backend)**: Deleting a built-in preset is rejected with the specific error of a mapper not held (IMP-040).
 
 ### Confirmation (050–059)
 
@@ -243,6 +252,8 @@ Pick a file → the mapper → Preview.
 
 ## Open Questions
 
+- [x] Which presets ship first? — Interactive Brokers' Trades and Cash Transactions sections, each exported alone from a Flex Query, one data file each so adding a preset changes no code (owner, 2026-10-26 and 2026-11-14, #548).
+- [x] What does the Interactive Brokers Cash preset do with a withholding tax and a payment in lieu of dividends? — A withholding tax is not imported, so a dividend comes in gross until #629 settles the tax withheld at source (agent's standing choice, 2026-11-14, on #548); a payment in lieu of dividends is a dividend, as the broker pays it in its place (agent's choice, 2026-11-14).
 - [x] Where does an asset come from when the file has no ISIN? — Its exact name, case and accents ignored; one matching none or two is an unknown asset, matched once and remembered by the mapper (owner, 2026-10-25).
 - [x] When is the mapper chosen remembered? — At the confirmation, not at the choice, so a file only previewed changes nothing (IMP-017) (agent's reading of the owner's 2026-10-31 decision).
 - [x] Where does a saved mapper live? — In a JSON file in the mappers folder of the data folder, never the database, so there is one source of truth and the community can add its own; its sync is #715 (owner, 2026-10-31).

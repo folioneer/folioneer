@@ -25,4 +25,4 @@ pub use domain::{
     OperationType, Separator,
 };
 pub use error::AccountImportError;
-pub use infrastructure::{FsImportMapperStore, SqliteMapperChoiceRepository};
+pub use infrastructure::{built_in_presets, FsImportMapperStore, SqliteMapperChoiceRepository};

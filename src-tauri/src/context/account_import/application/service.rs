@@ -1,6 +1,6 @@
 use crate::context::account_import::domain::{
-    ImportMapper, ImportMapperDraft, ImportMapperStore, MapperChoiceRepository, PickedMapperFile,
-    LARGEST_MAPPER_FILE,
+    built_in_id, ImportMapper, ImportMapperDraft, ImportMapperStore, MapperChoiceRepository,
+    PickedMapperFile, LARGEST_MAPPER_FILE,
 };
 use crate::context::account_import::error::AccountImportError;
 use crate::core::BACKEND;
@@ -14,6 +14,8 @@ pub struct AccountImportService {
     choices: Box<dyn MapperChoiceRepository>,
     /// Held across a check of the folder and the write it allows (IMP-020, IMP-024).
     writing: tokio::sync::Mutex<()>,
+    /// IMP-020F — the presets that ship with the application, read-only.
+    built_in: Vec<ImportMapper>,
 }
 
 impl AccountImportService {
@@ -26,14 +28,42 @@ impl AccountImportService {
             store,
             choices,
             writing: tokio::sync::Mutex::new(()),
+            built_in: Vec::new(),
         }
+    }
+
+    /// IMP-020F — the service with the built-in presets `files`, each its file's name and
+    /// bytes; one that does not read as a mapper is left out, its failure logged.
+    pub fn with_built_in(mut self, files: Vec<(String, Vec<u8>)>) -> Self {
+        self.built_in = files
+            .into_iter()
+            .filter_map(|(stem, bytes)| match read_mapper(&built_in_id(&stem), &bytes) {
+                Ok(mapper) => Some(ImportMapper {
+                    built_in: true,
+                    ..mapper
+                }),
+                Err(e) => {
+                    tracing::error!(target: BACKEND, preset = %stem, err = %e, "built-in preset left out");
+                    None
+                }
+            })
+            .collect();
+        self
+    }
+
+    /// IMP-020F — the built-in preset `mapper_id`, when it is one.
+    fn built_in(&self, mapper_id: &str) -> Option<ImportMapper> {
+        self.built_in
+            .iter()
+            .find(|mapper| mapper.id == mapper_id)
+            .cloned()
     }
 
     /// IMP-020A — the mappers the folder holds, by provider; a file that does not read as a
     /// mapper is left out, its failure logged.
     pub async fn list_import_mappers(&self) -> StdResult<Vec<ImportMapper>, AccountImportError> {
         let ids = self.store.ids().await.map_err(store_error("list"))?;
-        let mut mappers = Vec::with_capacity(ids.len());
+        let mut mappers = self.built_in.clone();
         for id in ids {
             let bytes = match self.store.read(&id).await {
                 Ok(Some(bytes)) => bytes,
@@ -75,6 +105,12 @@ impl AccountImportService {
             Some(id) => Some(self.get_import_mapper(id).await?),
             None => None,
         };
+        // IMP-020F — a built-in preset is never written: saving it saves a copy, which
+        // takes a provider of its own.
+        let (held, mapper_id) = match held {
+            Some(preset) if preset.built_in => (None, None),
+            held => (held, mapper_id),
+        };
         let id = mapper_id.unwrap_or_default();
         let checked = ImportMapper::with_id(id, draft)?;
         let provider_kept = held.is_some_and(|held| held.has_provider(&checked.info.provider));
@@ -112,6 +148,9 @@ impl AccountImportService {
         &self,
         mapper_id: &str,
     ) -> StdResult<ImportMapper, AccountImportError> {
+        if let Some(preset) = self.built_in(mapper_id) {
+            return Ok(preset);
+        }
         let bytes = self
             .store
             .read(mapper_id)

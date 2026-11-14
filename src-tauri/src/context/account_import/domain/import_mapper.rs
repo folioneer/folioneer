@@ -165,6 +165,14 @@ pub struct ImportMapper {
     pub operation_types: Vec<OperationLabel>,
     /// Each name, ISIN or reference matched to an asset.
     pub asset_matches: Vec<AssetMatch>,
+    /// IMP-020F — whether it ships with the application, read-only; never in its file.
+    pub built_in: bool,
+}
+
+/// IMP-020F — the identity of a built-in preset: no file of the mappers folder can take it
+/// (`names_a_file` refuses its `:`).
+pub fn built_in_id(stem: &str) -> String {
+    format!("built-in:{stem}")
 }
 
 /// What a mapper holds besides its identity: exactly what its file holds (IMP-020). A field
@@ -275,6 +283,7 @@ impl ImportMapper {
             columns,
             operation_types: draft.operation_types,
             asset_matches: draft.asset_matches,
+            built_in: false,
         })
     }
 
