@@ -77,7 +77,8 @@ issues for `Migrated from <id>`. A spec rule is `TRIGRAM-NNN` (Conventions).
   flow issue is ready once it carries its Decision.
 - **A batch** is the Queued items in row order, their Batch field its date. `/plan-batch`
   proposes it in chat; the owner's yes sets Batch, order and Status, and nothing else
-  makes an item Queued. A cut during a batch is the owner's.
+  makes an item Queued, but for a slice split off one (§ 11). A cut during a batch is the
+  owner's.
 - **Sized by its work**, not its number of items: `/plan-batch` sums the sizes of what it
   proposes and stops at what the last batches merged (their `batch-audit` issues), saying
   both figures. A programme enters as its first slice.
@@ -367,6 +368,10 @@ check proves is one story whatever its size. A feature whose backend or frontend
 about 20 files or 500 lines ships as one PR per layer, in order: spec, contract,
 migration, backend and bindings; then the frontend; then E2E and closure. Each is
 mergeable on its own.
+
+A slice split off a Queued item during its run stays in the batch: its own issue,
+Queued, the same Batch, right after its parent, run in its turn. It is the item, not an
+addition; leaving it out is a cut (§ 2).
 
 While a pull request waits for its checks, the next task may be prepared on a branch
 not pushed yet, so pull requests that change the same file do not conflict: its harness
