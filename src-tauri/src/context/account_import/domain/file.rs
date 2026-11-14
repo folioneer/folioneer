@@ -543,6 +543,11 @@ mod tests {
         // An opening quote with no closing one: each line stays a row.
         let (file, found) = read("A;B\n1;\"open\n2;b\n").expect("read");
         assert_eq!(found.rows, 2);
+        assert_eq!(
+            file.lines[0].fields,
+            ["1", "open"],
+            "the field runs to the line's end"
+        );
         assert_eq!(file.lines[1].fields, ["2", "b"]);
         // Under `;`, a quote after a comma is no field's first character: each line a row.
         let (file, found) = read("A;B\n1;x,\"y\n2;z,\"w\n3;v\n").expect("read");

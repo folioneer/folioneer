@@ -65,7 +65,7 @@ One row of the file that is not blank — one line, or several when a quoted fie
 
 **IMP-012B — A line break inside a quoted field (backend)**: A line break inside a quoted field is part of the field: its row goes on to the closing quote, over as many lines as it takes, and is numbered by the line it starts on.
 
-**IMP-012C — A quote that never closes (backend)**: A file with an opening quote that never closes is read line by line, each line a row.
+**IMP-012C — A quote that never closes (backend)**: A file with an opening quote that never closes is read line by line, each line a row. Each line's fields are then read as IMP-012A says, the field the unclosed quote opens running to the end of its line, without the quote.
 
 **IMP-013 — The decimal mark is detected (backend)**: With `,` as separator the decimal mark is the dot. Otherwise it is the comma when a field of the file outside the header, trimmed, is a figure written with a comma: a sign or none, digits — their thousands separated by dots or spaces as IMP-013A groups them, or not separated —, a comma and one or more digits ("1.234,56", "-12,5"; ",5" tells nothing); the dot in any other case.
 
@@ -75,7 +75,7 @@ One row of the file that is not blank — one line, or several when a quoted fie
 
 **IMP-015 — The header names the columns (backend)**: The first line of the file is its header; each column is named by its header field, trimmed. A file whose header holds a name twice, compared trimmed and case ignored (IMP-021), is rejected with a specific error; an empty header field names no column and is never a name held twice.
 
-**IMP-016 — Blank and short lines (backend)**: A line whose fields are all empty once trimmed — a line of separators only among them — is blank and skipped. A line with fewer fields than the header is rejected in the preview, its reason naming the line; a line's fields beyond the header's are ignored.
+**IMP-016 — Blank and short rows (backend)**: A row whose fields are all empty once trimmed — a row of separators only among them — is blank and skipped. A row with fewer fields than the header is rejected in the preview, its reason naming the line it starts on (IMP-012B); a row's fields beyond the header's are ignored.
 
 **IMP-017 — Reading and previewing write nothing (backend)**: Reading a file and previewing it write nothing: no transaction, asset, holding or mapper. The portfolio is unchanged until the user confirms (IMP-050), but for an asset the user creates (IMP-052); a mapper is written only when saved or added (IMP-020, IMP-020B).
 
