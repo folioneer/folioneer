@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT id, name\n            FROM categories\n            WHERE LOWER(name) = LOWER(?) AND is_deleted = 0\n            ",
+  "query": "\n            SELECT id, name\n            FROM categories\n            WHERE is_deleted = 0\n            ORDER BY id\n            ",
   "describe": {
     "columns": [
       {
@@ -15,12 +15,12 @@
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 0
     },
     "nullable": [
       false,
       false
     ]
   },
-  "hash": "e7512560746e0bc6036d47bcc6ede0b3eab516adfef7c4ce7f761458067ea1d3"
+  "hash": "125ecf4d142eba1e58df351db469f6740af269e2a1280463d54e8be8a2269c88"
 }

@@ -12,7 +12,8 @@ use crate::shared::domain::{
     SyncedRecord,
 };
 use crate::shared::infrastructure::change_recorder::{
-    rank_from_columns, ChangeRecorder, NoopChangeRecorder, RankColumns,
+    rank_from_columns, rank_of_same_name, ChangeRecorder, NamedRankRow, NoopChangeRecorder,
+    RankColumns,
 };
 use crate::shared::infrastructure::uow::UnitOfWork;
 use anyhow::{Context, Result};
@@ -635,19 +636,17 @@ impl AssetRepository for SqliteAssetRepository {
         category_id: &str,
         name: &str,
     ) -> Result<Option<Rank>> {
-        let row = sqlx::query_as!(
-            RankRow,
-            r#"SELECT sync_logical_timestamp, sync_origin, sync_device_id
-               FROM categories WHERE LOWER(name) = LOWER(?) AND id <> ? AND is_deleted = 0
-               ORDER BY sync_origin, sync_logical_timestamp, sync_device_id, id
-               LIMIT 1"#,
-            name,
+        let rows = sqlx::query_as!(
+            NamedRankRow,
+            r#"SELECT name, sync_logical_timestamp, sync_origin, sync_device_id
+               FROM categories WHERE id <> ? AND is_deleted = 0
+               ORDER BY sync_origin, sync_logical_timestamp, sync_device_id, id"#,
             category_id
         )
-        .fetch_optional(conn)
+        .fetch_all(conn)
         .await
         .with_context(|| format!("Failed to look up categories named {}", name))?;
-        Ok(row.and_then(RankRow::rank))
+        Ok(rank_of_same_name(rows, name))
     }
 
     async fn apply_asset(

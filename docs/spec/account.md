@@ -14,12 +14,12 @@ This spec covers the CRUD lifecycle of accounts. The Account Details view (drill
 
 A financial account owned by the user.
 
-| Field     | Business meaning                                                                                                                         |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`    | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among the accounts of its profile (case-insensitive, ACC-003).     |
-| `country` | The account's own country (two upper-case letters), when one is set; absent otherwise (ACC-041).                                         |
-| `wrapper` | The identifier of the tax wrapper the account sits in, normally one of the lists of ACC-040; absent when none is set (ACC-043, ACC-044). |
-| `holder`  | Whose name the account is in, free text; absent when none is set (ACC-050). Read by no figure (ACC-052).                                 |
+| Field     | Business meaning                                                                                                                                      |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`    | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among the accounts of its profile (the case ignored for every letter, ACC-003). |
+| `country` | The account's own country (two upper-case letters), when one is set; absent otherwise (ACC-041).                                                      |
+| `wrapper` | The identifier of the tax wrapper the account sits in, normally one of the lists of ACC-040; absent when none is set (ACC-043, ACC-044).              |
+| `holder`  | Whose name the account is in, free text; absent when none is set (ACC-050). Read by no figure (ACC-052).                                              |
 
 ### PortfolioTotal
 
@@ -43,7 +43,7 @@ The total of every account of the profile in use (PFL-050), read together with t
 
 **ACC-002 — Account validation (backend)** _(formerly R2)_: An `Account` is valid if and only if its `name` (after ACC-001 normalisation) is non-empty. Any violation is rejected with an explicit error.
 
-**ACC-003 — Name uniqueness (backend)** _(formerly R3)_: No two accounts of one profile share a name (PFL-022; comparison is performed on the normalised name per ACC-001, case-insensitive). Any create or edit operation resulting in a duplicate is rejected with a specific error. ACC-001, ACC-002, and ACC-003 apply to both creation and modification.
+**ACC-003 — Name uniqueness (backend)** _(formerly R3)_: No two accounts of one profile share a name (PFL-022; comparison is performed on the normalised name per ACC-001, the case ignored for every letter, an accented one included: "épargne" is "ÉPARGNE"; an accent still tells two names apart: "Epargne" is not "Épargne". Names are compared letter by letter as typed: a capital that is written as two letters is not its small letter ("STRASSE" is not "Straße"), and a letter typed with a separate combining accent is not the same letter typed as one character). Any create or edit operation resulting in a duplicate is rejected with a specific error. ACC-001, ACC-002, and ACC-003 apply to both creation and modification.
 
 **ACC-004 — No update frequency (backend + frontend)** _(formerly R4)_: An account carries no update frequency: nothing in the application depends on how often its figures are updated, so the account form asks for none and the account table shows none (ACC-008, ACC-016, ACC-017). An account change written before data format version 8 carries one, which is ignored (SYN-038).
 

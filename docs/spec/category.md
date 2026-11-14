@@ -8,10 +8,10 @@ A category (`AssetCategory`) is a free-form grouping defined by the user to orga
 
 ## Category field definitions
 
-| Field  | Meaning                                                                                                                          |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| `id`   | Unique identifier generated at creation (UUID). The system category has the fixed id `default-uncategorized`.                    |
-| `name` | User-defined human-readable name (e.g. "US Stocks", "European Real Estate"). Unique across active categories (case-insensitive). |
+| Field  | Meaning                                                                                                                                                 |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`   | Unique identifier generated at creation (UUID). The system category has the fixed id `default-uncategorized`.                                           |
+| `name` | User-defined human-readable name (e.g. "US Stocks", "European Real Estate"). Unique across the categories, the case ignored for every letter (CAT-001). |
 
 ---
 
@@ -19,7 +19,7 @@ A category (`AssetCategory`) is a free-form grouping defined by the user to orga
 
 ### Backend
 
-**CAT-001 (was R1) — Required fields (backend)**: A category is valid if its `name` is non-empty and unique among all existing categories (case-insensitive). The backend rejects creation or modification with an already-used name.
+**CAT-001 (was R1) — Required fields (backend)**: A category is valid if its `name` is non-empty and unique among all existing categories, the case ignored for every letter as for an account (ACC-003). The backend rejects creation or modification with an already-used name.
 
 **CAT-002 (was R2) — System category cannot be deleted or renamed (backend)**: The category `default-uncategorized` (id: `default-uncategorized`) is a pre-seeded system category. It cannot be deleted or renamed. Any attempt is rejected by the backend with an explicit error.
 

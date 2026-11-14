@@ -9,6 +9,7 @@ use super::domain::{
 use super::error::AccountError;
 use crate::context::account::domain::{default_profile_id, Profile};
 use crate::core::{logger::BACKEND, Event, SideEffectEventBus};
+use crate::shared::domain::name::same_name;
 use crate::shared::domain::{Rank, RecordKind, SyncedChild, SyncedRecord};
 use crate::shared::infrastructure::change_recorder::LocalWriteOutranked;
 use crate::shared::infrastructure::uow::UnitOfWork;
@@ -637,7 +638,7 @@ impl AccountService {
         let name_changes = self
             .get_by_id(&account.id)
             .await?
-            .is_none_or(|current| !current.name.eq_ignore_ascii_case(&account.name));
+            .is_none_or(|current| !same_name(&current.name, &account.name));
         if name_changes {
             if let Some(existing) =
                 find_account_by_name(&*self.account_repo, &account.name, &account.profile_id)
@@ -5376,6 +5377,51 @@ mod tests {
             .unwrap();
         let err = svc
             .create("alpha".to_string(), String::new(), "EUR".to_string(), false)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AccountError::NameAlreadyExists),
+            "got: {err:?}"
+        );
+    }
+
+    // #810 / ACC-003 — the case is ignored for every letter, an accented one included.
+    #[tokio::test]
+    async fn acc_003_names_differing_only_in_accented_capitals_are_one_name() {
+        let svc = setup_service().await;
+        svc.create(
+            "Épargne".to_string(),
+            String::new(),
+            "EUR".to_string(),
+            false,
+        )
+        .await
+        .unwrap();
+        let err = svc
+            .create(
+                "épargne".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                false,
+            )
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AccountError::NameAlreadyExists),
+            "got: {err:?}"
+        );
+        let other = svc
+            .create("Other".to_string(), String::new(), "EUR".to_string(), false)
+            .await
+            .unwrap();
+        let err = svc
+            .update(
+                other.id,
+                "éPARGNE".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                false,
+            )
             .await
             .unwrap_err();
         assert!(

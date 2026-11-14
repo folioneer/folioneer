@@ -137,6 +137,21 @@ async fn pfl_011_the_default_profile_holds_the_accounts() {
     assert_eq!(seen, [(None, 1), (Some("Parent".into()), 0)]);
 }
 
+// #810 / PFL-020 — the case is ignored for every letter, an accented one included.
+#[tokio::test]
+async fn pfl_020_names_differing_only_in_accented_capitals_are_one_name() {
+    let ctx = ctx().await;
+    ctx.profiles.create("Élodie").await.expect("created");
+    assert!(matches!(
+        ctx.profiles.create("élodie").await,
+        Err(AccountError::ProfileNameAlreadyExists)
+    ));
+    assert!(matches!(
+        ctx.profiles.rename(DEFAULT_PROFILE_ID, "éLODIE").await,
+        Err(AccountError::ProfileNameAlreadyExists)
+    ));
+}
+
 // PFL-020 / PFL-030 — a name is trimmed and never empty, never another profile's, case
 // ignored; the default profile is renamed; an unknown one is rejected.
 #[tokio::test]
@@ -200,6 +215,17 @@ async fn pfl_031_an_account_moves_and_names_are_per_profile() {
     let other = account(&ctx, "PEA").await;
     assert!(matches!(
         ctx.moving.move_account(&other, &parent).await,
+        Err(AccountError::NameAlreadyExists)
+    ));
+    // #810 — a name differing only by the case of an accented letter is the same name.
+    let accented = account(&ctx, "épargne").await;
+    ctx.moving
+        .move_account(&accented, &parent)
+        .await
+        .expect("moved");
+    let capital = account(&ctx, "ÉPARGNE").await;
+    assert!(matches!(
+        ctx.moving.move_account(&capital, &parent).await,
         Err(AccountError::NameAlreadyExists)
     ));
     assert!(matches!(

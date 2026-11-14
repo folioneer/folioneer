@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS \"profile_id!: String\", holder FROM accounts WHERE LOWER(name) = LOWER(?) AND COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') = ?",
+  "query": "SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS \"profile_id!: String\", holder FROM accounts WHERE COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') = ?",
   "describe": {
     "columns": [
       {
@@ -46,7 +46,7 @@
       {
         "name": "profile_id!: String",
         "ordinal": 8,
-        "type_info": "Null"
+        "type_info": "Text"
       },
       {
         "name": "holder",
@@ -55,7 +55,7 @@
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
       false,
@@ -66,9 +66,9 @@
       true,
       true,
       false,
-      null,
+      false,
       true
     ]
   },
-  "hash": "4bc77df74ee66223c4af4af8252e8b9895b60c9b43896fb43626e0e576005732"
+  "hash": "1a0422a73359523f4d1ac1f8cc80d485e2dc9b189249da73aafbb2312d0a8366"
 }
