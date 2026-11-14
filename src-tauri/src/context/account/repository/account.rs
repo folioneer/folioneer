@@ -11,6 +11,7 @@ use crate::context::account::domain::{
     TransactionType, WriteOffReason,
 };
 use crate::context::account::repository::fee_schedule::schedule_content;
+use crate::shared::domain::name::same_name;
 use crate::shared::domain::{
     ChangeDraft, LogicalTimestamp, Operation, Origin, Rank, RecordIdentity, RecordKind,
     SyncedChild, SyncedRecord,
@@ -153,6 +154,28 @@ impl RankRow {
             self.sync_device_id,
         )
     }
+}
+
+/// A row's name beside its rank columns, to find the one sharing a name (`same_name`).
+#[derive(sqlx::FromRow)]
+struct NamedRankRow {
+    name: String,
+    sync_logical_timestamp: Option<String>,
+    sync_origin: Option<String>,
+    sync_device_id: Option<String>,
+}
+
+/// The rank of the first of `rows`, in their order, that shares `name`.
+fn rank_of_same_name(rows: Vec<NamedRankRow>, name: &str) -> Option<Rank> {
+    rows.into_iter()
+        .find(|row| same_name(&row.name, name))
+        .and_then(|row| {
+            rank_from_columns(
+                row.sync_logical_timestamp,
+                row.sync_origin,
+                row.sync_device_id,
+            )
+        })
 }
 
 /// How `persist_pending` treats the transactions it writes: a local write records each
@@ -689,18 +712,21 @@ async fn account_by_name<'e>(
     name: &str,
     profile_id: &str,
 ) -> Result<Option<Account>> {
-    // PFL-022 — a name is unique within its profile.
-    let row = sqlx::query_as!(
+    // PFL-022 — a name is unique within its profile; compared here, case ignored for every
+    // letter (ACC-003).
+    let rows = sqlx::query_as!(
         AccountRow,
-        r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS "profile_id!: String", holder FROM accounts WHERE LOWER(name) = LOWER(?) AND COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') = ?"#,
-        name,
+        r#"SELECT id, name, bank_name, currency, management_fees_enabled, country, wrapper, cost_basis_method, COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') AS "profile_id!: String", holder FROM accounts WHERE COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') = ?"#,
         profile_id
     )
-    .fetch_optional(executor)
+    .fetch_all(executor)
     .await
     .with_context(|| format!("Failed to find account by name {}", name))?;
 
-    Ok(row.map(Account::from))
+    Ok(rows
+        .into_iter()
+        .find(|row| same_name(&row.name, name))
+        .map(Account::from))
 }
 
 #[async_trait::async_trait]
@@ -1296,22 +1322,20 @@ impl AccountRepository for SqliteAccountRepository {
         account_id: &str,
         name: &str,
     ) -> Result<Option<Rank>> {
-        let row = sqlx::query_as!(
-            RankRow,
-            r#"SELECT id AS identity, sync_logical_timestamp, sync_origin, sync_device_id
-               FROM accounts WHERE LOWER(name) = LOWER(?) AND id <> ?
+        let rows = sqlx::query_as!(
+            NamedRankRow,
+            r#"SELECT name, sync_logical_timestamp, sync_origin, sync_device_id
+               FROM accounts WHERE id <> ?
                  AND COALESCE((SELECT p.id FROM profiles p WHERE p.id = accounts.profile_id), 'default-profile') =
                      (SELECT COALESCE((SELECT p.id FROM profiles p WHERE p.id = own.profile_id), 'default-profile') FROM accounts own WHERE own.id = ?)
-               ORDER BY sync_origin, sync_logical_timestamp, sync_device_id, id
-               LIMIT 1"#,
-            name,
+               ORDER BY sync_origin, sync_logical_timestamp, sync_device_id, id"#,
             account_id,
             account_id
         )
-        .fetch_optional(conn)
+        .fetch_all(conn)
         .await
         .with_context(|| format!("Failed to look up accounts named {}", name))?;
-        Ok(row.and_then(RankRow::rank))
+        Ok(rank_of_same_name(rows, name))
     }
 
     async fn apply_account(
@@ -1451,19 +1475,17 @@ impl AccountRepository for SqliteAccountRepository {
         profile_id: &str,
         name: &str,
     ) -> Result<Option<Rank>> {
-        let row = sqlx::query_as!(
-            RankRow,
-            r#"SELECT id AS identity, sync_logical_timestamp, sync_origin, sync_device_id
-               FROM profiles WHERE LOWER(name) = LOWER(?) AND id <> ?
-               ORDER BY sync_origin, sync_logical_timestamp, sync_device_id, id
-               LIMIT 1"#,
-            name,
+        let rows = sqlx::query_as!(
+            NamedRankRow,
+            r#"SELECT name AS "name!", sync_logical_timestamp, sync_origin, sync_device_id
+               FROM profiles WHERE name IS NOT NULL AND id <> ?
+               ORDER BY sync_origin, sync_logical_timestamp, sync_device_id, id"#,
             profile_id
         )
-        .fetch_optional(conn)
+        .fetch_all(conn)
         .await
         .with_context(|| format!("Failed to look up profiles named {}", name))?;
-        Ok(row.and_then(RankRow::rank))
+        Ok(rank_of_same_name(rows, name))
     }
 
     async fn profile_in_use(&self) -> Result<String> {
@@ -1670,6 +1692,34 @@ mod tests {
     use crate::shared::domain::quantity::from_surface;
     use sqlx::sqlite::SqlitePoolOptions;
     use std::sync::Arc;
+
+    // #810 / CFR-035 — the clash a merge reports is found whatever the case of an accented
+    // letter, and it is the first row in rank order.
+    #[test]
+    fn rank_of_same_name_ignores_the_case_of_accented_letters() {
+        let row = |name: &str, device: &str| NamedRankRow {
+            name: name.to_string(),
+            sync_logical_timestamp: Some("0000000000000001".to_string()),
+            sync_origin: Some("User".to_string()),
+            sync_device_id: Some(device.to_string()),
+        };
+        let rows = || {
+            vec![
+                row("Epargne", "a"),
+                row("éPARGNE", "b"),
+                row("Épargne", "c"),
+            ]
+        };
+        let found = rank_of_same_name(rows(), "Épargne").expect("a clash");
+        let expected = rank_from_columns(
+            Some("0000000000000001".to_string()),
+            Some("User".to_string()),
+            Some("b".to_string()),
+        )
+        .expect("a rank");
+        assert_eq!(found, expected);
+        assert!(rank_of_same_name(rows(), "Autre").is_none());
+    }
 
     async fn make_pool() -> Pool<Sqlite> {
         let pool = SqlitePoolOptions::new()

@@ -61,7 +61,7 @@ The profile this installation works in, kept on this device only (PFL-012).
 
 ### Creation (020–029)
 
-**PFL-020 — A new profile (backend)**: A profile is created with a name, trimmed: an empty name is rejected with a specific error, and so is a name another profile has, case ignored.
+**PFL-020 — A new profile (backend)**: A profile is created with a name, trimmed: an empty name is rejected with a specific error, and so is a name another profile has, the case ignored for every letter as for an account (ACC-003).
 
 **PFL-021 — A new account's profile (backend)**: A new account belongs to the profile it is created in: the profile in use, unless another is given; an unknown profile is rejected with a specific error.
 

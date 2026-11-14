@@ -24,7 +24,7 @@ use_cases/{name}/    cross-context orchestrators: orchestrator.rs, api.rs, error
 use_cases/shared/    what use cases share (Global Value, the account summaries, the cross-account performance, price movement, fetch scope, the chosen External provider)
 core/                legacy shared bucket: db.rs, event_bus/ (Event enum), logger.rs,
                      specta_builder.rs (the command registry), cash.rs
-shared/              gold shared code: domain/record_change.rs (change-log vocabulary),
+shared/              gold shared code: domain/ (record_change.rs, the change-log vocabulary; amount.rs, quantity.rs; name.rs, whether two names are one),
                      infrastructure/ (app_directories, change_recorder, container, e2e_run, http, scheduler/, uow, window_lock)
 lib.rs               the crate root: modules, the headless entry, tracing — the application core
 app.rs               the Tauri shell (feature `app`, B46): wires services, use cases and dispatchers

@@ -59,6 +59,22 @@ fn xpar() -> Exchange {
 
 // ── Category CRUD ─────────────────────────────────────────────────────────────
 
+/// #810 / CAT-001 — the case is ignored for every letter, an accented one included.
+#[tokio::test]
+async fn cat_001_names_differing_only_in_accented_capitals_are_one_name() {
+    let (svc, _bus) = setup().await;
+    svc.create_category("Énergie").await.expect("created");
+    assert!(matches!(
+        svc.create_category("énergie").await,
+        Err(AssetError::DuplicateName)
+    ));
+    let other = svc.create_category("Other").await.expect("created");
+    assert!(matches!(
+        svc.update_category(&other.id, "éNERGIE").await,
+        Err(AssetError::DuplicateName)
+    ));
+}
+
 /// create_category() persists and get_category_by_id() retrieves it.
 #[tokio::test]
 async fn test_create_category_and_retrieve_by_id() {

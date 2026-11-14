@@ -7,6 +7,7 @@ use super::super::domain::{
 };
 use super::asset_price::source_from_storage;
 use crate::core::logger::BACKEND;
+use crate::shared::domain::name::same_name;
 use crate::shared::domain::{
     ChangeDraft, LogicalTimestamp, Operation, Origin, Rank, RecordIdentity, RecordKind,
     SyncedRecord,
@@ -163,6 +164,28 @@ impl RankRow {
             self.sync_device_id,
         )
     }
+}
+
+/// A row's name beside its rank columns, to find the one sharing a name (`same_name`).
+#[derive(sqlx::FromRow)]
+struct NamedRankRow {
+    name: String,
+    sync_logical_timestamp: Option<String>,
+    sync_origin: Option<String>,
+    sync_device_id: Option<String>,
+}
+
+/// The rank of the first of `rows`, in their order, that shares `name`.
+fn rank_of_same_name(rows: Vec<NamedRankRow>, name: &str) -> Option<Rank> {
+    rows.into_iter()
+        .find(|row| same_name(&row.name, name))
+        .and_then(|row| {
+            rank_from_columns(
+                row.sync_logical_timestamp,
+                row.sync_origin,
+                row.sync_device_id,
+            )
+        })
 }
 
 /// SQLite implementation of the AssetRepository.
@@ -635,19 +658,17 @@ impl AssetRepository for SqliteAssetRepository {
         category_id: &str,
         name: &str,
     ) -> Result<Option<Rank>> {
-        let row = sqlx::query_as!(
-            RankRow,
-            r#"SELECT sync_logical_timestamp, sync_origin, sync_device_id
-               FROM categories WHERE LOWER(name) = LOWER(?) AND id <> ? AND is_deleted = 0
-               ORDER BY sync_origin, sync_logical_timestamp, sync_device_id, id
-               LIMIT 1"#,
-            name,
+        let rows = sqlx::query_as!(
+            NamedRankRow,
+            r#"SELECT name, sync_logical_timestamp, sync_origin, sync_device_id
+               FROM categories WHERE id <> ? AND is_deleted = 0
+               ORDER BY sync_origin, sync_logical_timestamp, sync_device_id, id"#,
             category_id
         )
-        .fetch_optional(conn)
+        .fetch_all(conn)
         .await
         .with_context(|| format!("Failed to look up categories named {}", name))?;
-        Ok(row.and_then(RankRow::rank))
+        Ok(rank_of_same_name(rows, name))
     }
 
     async fn apply_asset(
@@ -904,6 +925,34 @@ impl AssetRepository for SqliteAssetRepository {
 mod tests {
     use super::*;
     use sqlx::sqlite::SqlitePoolOptions;
+
+    // #810 / CFR-035 — the clash a merge reports is found whatever the case of an accented
+    // letter, and it is the first row in rank order.
+    #[test]
+    fn rank_of_same_name_ignores_the_case_of_accented_letters() {
+        let row = |name: &str, device: &str| NamedRankRow {
+            name: name.to_string(),
+            sync_logical_timestamp: Some("0000000000000001".to_string()),
+            sync_origin: Some("User".to_string()),
+            sync_device_id: Some(device.to_string()),
+        };
+        let rows = || {
+            vec![
+                row("Epargne", "a"),
+                row("éPARGNE", "b"),
+                row("Épargne", "c"),
+            ]
+        };
+        let found = rank_of_same_name(rows(), "Épargne").expect("a clash");
+        let expected = rank_from_columns(
+            Some("0000000000000001".to_string()),
+            Some("User".to_string()),
+            Some("b".to_string()),
+        )
+        .expect("a rank");
+        assert_eq!(found, expected);
+        assert!(rank_of_same_name(rows(), "Autre").is_none());
+    }
 
     async fn setup_pool() -> Pool<Sqlite> {
         let pool = SqlitePoolOptions::new()

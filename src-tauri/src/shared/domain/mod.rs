@@ -2,6 +2,8 @@
 
 /// The largest figure of money a record carries (TRX-020, SYN-034).
 pub mod amount;
+/// Whether two names a user typed are one name (ACC-003, PFL-020, CAT-001).
+pub mod name;
 pub mod quantity;
 /// The multi-device sync record-change vocabulary (`RecordKind`, `Origin`, `Operation`,
 /// `LogicalTimestamp`, `RecordIdentity`, `Rank`, `ChangeDraft`) — SYN-021, CFR-010/012/014/016/020.

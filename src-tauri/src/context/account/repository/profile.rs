@@ -8,6 +8,7 @@ use std::sync::Arc;
 use crate::context::account::domain::{
     Profile, ProfileRepository, ProfileSummary, DEFAULT_PROFILE_ID,
 };
+use crate::shared::domain::name::same_name;
 use crate::shared::domain::{
     ChangeDraft, LogicalTimestamp, Operation, Origin, RecordIdentity, RecordKind,
 };
@@ -109,16 +110,15 @@ impl ProfileRepository for SqliteProfileRepository {
 
     async fn name_taken(&self, name: &str, except_id: Option<String>) -> Result<bool> {
         let except = except_id.unwrap_or_default();
-        let found = sqlx::query_scalar!(
-            r#"SELECT COUNT(*) AS "count!: i64" FROM profiles
-               WHERE name IS NOT NULL AND LOWER(name) = LOWER(?) AND id != ?"#,
-            name,
+        // PFL-020 — compared here, the case ignored for every letter.
+        let names = sqlx::query_scalar!(
+            r#"SELECT name AS "name!" FROM profiles WHERE name IS NOT NULL AND id != ?"#,
             except
         )
-        .fetch_one(&self.pool)
+        .fetch_all(&self.pool)
         .await
         .context("profile name taken")?;
-        Ok(found > 0)
+        Ok(names.iter().any(|taken| same_name(taken, name)))
     }
 
     async fn save(&self, profile: &Profile) -> Result<()> {

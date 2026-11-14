@@ -1,10 +1,10 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS identity, sync_logical_timestamp, sync_origin, sync_device_id\n               FROM profiles WHERE LOWER(name) = LOWER(?) AND id <> ?\n               ORDER BY sync_origin, sync_logical_timestamp, sync_device_id, id\n               LIMIT 1",
+  "query": "SELECT name, sync_logical_timestamp, sync_origin, sync_device_id\n               FROM categories WHERE id <> ? AND is_deleted = 0\n               ORDER BY sync_origin, sync_logical_timestamp, sync_device_id, id",
   "describe": {
     "columns": [
       {
-        "name": "identity",
+        "name": "name",
         "ordinal": 0,
         "type_info": "Text"
       },
@@ -25,7 +25,7 @@
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
       false,
@@ -34,5 +34,5 @@
       true
     ]
   },
-  "hash": "d98742b4adfa6411fc92c22560d16fa34b2c79ce6b5cf9c37e28beba1920761f"
+  "hash": "671dc3af903bc87e6990646aec6271ce71ae764025e13df6f4b4ae1883fc1dd4"
 }

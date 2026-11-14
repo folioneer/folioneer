@@ -5,6 +5,7 @@ use super::domain::{
     PriceHistoryBackfillOutcome, ReportedSplit, SYSTEM_CATEGORY_ID,
 };
 use super::error::AssetError;
+use crate::shared::domain::name::same_name;
 use crate::shared::infrastructure::uow::UnitOfWork;
 use crate::{
     context::asset::{AddedAsset, CreateAssetDTO, NamedAsset, UpdateAssetDTO},
@@ -546,7 +547,7 @@ impl AssetService {
         // CFR-035 — the uniqueness rule (CAT-001) binds the label being set: a label that
         // already clashes after a merge is accepted unchanged, a rename into another
         // category's label is rejected.
-        let label_changes = !existing.name.eq_ignore_ascii_case(label);
+        let label_changes = !same_name(&existing.name, label);
         let candidate = existing.update_from(label.to_string())?;
         if label_changes {
             if let Some(other) =

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use super::super::domain::{AssetCategory, AssetCategoryRepository};
 use super::asset::{asset_identity, current_asset_timestamp, fetch_asset, stamp_asset_rank};
+use crate::shared::domain::name::same_name;
 use crate::shared::domain::{
     ChangeDraft, LogicalTimestamp, Operation, Origin, RecordIdentity, RecordKind,
 };
@@ -160,20 +161,24 @@ impl AssetCategoryRepository for SqliteAssetCategoryRepository {
     }
 
     async fn find_by_name(&self, name: &str) -> Result<Option<AssetCategory>> {
-        let row = sqlx::query_as!(
+        // CAT-001 — compared here, the case ignored for every letter.
+        let rows = sqlx::query_as!(
             CategoryRow,
             r#"
             SELECT id, name
             FROM categories
-            WHERE LOWER(name) = LOWER(?) AND is_deleted = 0
-            "#,
-            name
+            WHERE is_deleted = 0
+            ORDER BY id
+            "#
         )
-        .fetch_optional(&self.pool)
+        .fetch_all(&self.pool)
         .await
         .with_context(|| format!("Failed to find category by name: {}", name))?;
 
-        Ok(row.map(AssetCategory::from))
+        Ok(rows
+            .into_iter()
+            .find(|row| same_name(&row.name, name))
+            .map(AssetCategory::from))
     }
 
     async fn get_by_id(&self, id: &str) -> Result<Option<AssetCategory>> {
