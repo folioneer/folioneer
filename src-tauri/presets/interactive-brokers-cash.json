@@ -1,0 +1,61 @@
+{
+  "info": {
+    "provider": "Interactive Brokers — Cash"
+  },
+  "separator": "Comma",
+  "decimal_mark": "Dot",
+  "date_format": "YearMonthDay",
+  "encoding": "Utf8",
+  "columns": {
+    "date": "SettleDate",
+    "operation": "Type",
+    "isin": "ISIN",
+    "reference": "Symbol",
+    "name": "Description",
+    "quantity": null,
+    "unit_price": null,
+    "gross_amount": null,
+    "fees": null,
+    "net_amount": "Amount",
+    "currency": "CurrencyPrimary"
+  },
+  "operation_types": [
+    {
+      "label": "Dividends",
+      "transaction_type": "Dividend"
+    },
+    {
+      "label": "Payment In Lieu Of Dividends",
+      "transaction_type": "Dividend"
+    },
+    {
+      "label": "Deposits/Withdrawals",
+      "transaction_type": "DepositOrWithdrawal"
+    },
+    {
+      "label": "Withholding Tax",
+      "transaction_type": "NotImported"
+    },
+    {
+      "label": "Broker Interest Received",
+      "transaction_type": "NotImported"
+    },
+    {
+      "label": "Broker Interest Paid",
+      "transaction_type": "NotImported"
+    },
+    {
+      "label": "Bond Interest Received",
+      "transaction_type": "NotImported"
+    },
+    {
+      "label": "Other Fees",
+      "transaction_type": "NotImported"
+    },
+    {
+      "label": "Commission Adjustments",
+      "transaction_type": "NotImported"
+    }
+  ],
+  "asset_matches": []
+}

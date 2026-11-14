@@ -169,6 +169,12 @@ An AI agent — Claude Code, Claude Desktop — can read the portfolio, an accou
 
 What an AI agent recorded is marked in the account journal ("Recorded by"). An AI agent can correct or cancel what an AI agent recorded, in this session or an earlier one; for a transaction you typed it can only ask you, one at a time — Folioneer shows it in full and you remove it or refuse. It reads no file.
 
+## Importing a broker's history
+
+An account's history is imported from its broker's CSV export through an import mapper. Folioneer ships built-in presets for some brokers:
+
+- [Interactive Brokers](src-tauri/presets/interactive-brokers.md) — two Flex Queries, Trades and Cash Transactions.
+
 ## Documentation
 
 - [Architecture](ARCHITECTURE.md) — system design, bounded contexts, data flow

@@ -1,0 +1,4 @@
+"ClientAccountID","CurrencyPrimary","Symbol","Description","ISIN","TradeDate","Buy/Sell","Quantity","TradePrice","IBCommission","NetCash"
+"U0000000","EUR","ACME","ACME WORLD CORP","FR0000000010","2024-02-05","BUY","10","100.5","-1","-1006"
+"U0000000","EUR","BTP","BETA POWER SE","FR0000000002","2024-03-12","BUY","4","50","-1.25","-201.25"
+"U0000000","EUR","ACME","ACME WORLD CORP","FR0000000010","2024-06-18","SELL","-4","120","-1","479"

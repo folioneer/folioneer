@@ -1,0 +1,33 @@
+{
+  "info": {
+    "provider": "Interactive Brokers — Trades"
+  },
+  "separator": "Comma",
+  "decimal_mark": "Dot",
+  "date_format": "YearMonthDay",
+  "encoding": "Utf8",
+  "columns": {
+    "date": "TradeDate",
+    "operation": "Buy/Sell",
+    "isin": "ISIN",
+    "reference": "Symbol",
+    "name": "Description",
+    "quantity": "Quantity",
+    "unit_price": "TradePrice",
+    "gross_amount": null,
+    "fees": "IBCommission",
+    "net_amount": "NetCash",
+    "currency": "CurrencyPrimary"
+  },
+  "operation_types": [
+    {
+      "label": "BUY",
+      "transaction_type": "Purchase"
+    },
+    {
+      "label": "SELL",
+      "transaction_type": "Sale"
+    }
+  ],
+  "asset_matches": []
+}
