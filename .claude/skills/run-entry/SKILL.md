@@ -109,10 +109,15 @@ In the same PR, before the merge, then the closing brief (`CLAUDE.md`) with the 
 - A spec touched or named: `spec-checker` on it, and what it reports fixed.
 - What the task met and did not fix is filed as issues (`docs/workflow.md` § 2, headless
   too), never left in chat; a task issue the work resolved is `Closes #NN` too.
+- A slice split off the item is Queued right after it (`docs/workflow.md` § 11):
+  `gh project item-add`, then Status Queued and the parent's Batch (`gh project
+item-edit`), then placed after the parent (`gh api graphql`,
+  `updateProjectV2ItemPosition` with `afterId`).
 
 ## Rules
 
 1. Headless never asks the human; questions are comments on the issue.
-2. `CLAUDE.md` § Core rules 1 and Step 5 hold, and the batch is never edited.
+2. `CLAUDE.md` § Core rules 1 and Step 5 hold, and the batch is never edited
+   (`docs/workflow.md` § 11 for a split slice).
 3. One task per invocation. Stop after Step 9.
 4. Three hours of wall clock per task; over that, open question and stop.

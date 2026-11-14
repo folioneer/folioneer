@@ -39,10 +39,11 @@ Written to read the same in every repository that works this way.
 - `.claude/skills/plan-batch/` — refines the candidates, proposes the next batch, and
   sets it on the Project once approved. Never: queues what the owner has not approved, nor commits.
 - `.claude/skills/run-batch/` — runs a batch from its Queued items to its audit by
-  chaining the other skills, and owns the batch's task list. Never: decides, edits the batch or releases.
+  chaining the other skills, and owns the batch's task list. Never: decides, edits the batch (but for a split slice, § 11) or releases.
 - `.claude/skills/run-entry/` — runs one task through the ceremony (`docs/workflow.md` § 3),
-  its task list only when run alone, and files what it met and did not fix before the issue
-  closes. Never: a second task, a guess where a question is owed, nor a finding left in chat.
+  its task list only when run alone, files what it met and did not fix before the issue
+  closes, and queues a slice it splits off right after its item (`docs/workflow.md` § 11).
+  Never: a second task, a guess where a question is owed, nor a finding left in chat.
 - `.claude/skills/design-proposal/` — renders the target state before anything a user
   sees changes, publishing the mocks in `folioneer/folioneer-design`. Never: builds what
   it shows, nor commits a mock to this repository.
