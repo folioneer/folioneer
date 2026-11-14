@@ -615,7 +615,7 @@ struct HoldingDetail {
     inconsistency: Option<HoldingInconsistency>, // derived on read; Some when the merged ledger oversells the position or overdraws cash (SYN-040, CFR-042); None otherwise — see sync-contract.md
     current_price_source: Option<AssetPriceSource>, // where current_price comes from (asset contract); None when there is no price (MKT-142)
     price_outdated: bool,                      // the latest price is outdated for the asset (MKT-205); false without a price, for cash and in a read with a date (MKT-206)
-    unrecorded_splits: Vec<UnrecordedSplit>,   // the reported splits the account held through without recording one, oldest first (MKT-231); empty for cash and in a read with a date, today included (MKT-206); a closed position (ClosedHoldingDetail) carries none
+    unrecorded_splits: Vec<UnrecordedSplit>,   // the reported splits the account held through without recording a split or free shares, oldest first (MKT-231); empty for cash and in a read with a date, today included (MKT-206); a closed position (ClosedHoldingDetail) carries none
     fx_rate_date: Option<String>,       // ISO date of the rate that converted a foreign holding; None for a same-currency holding, cash, or when no rate is usable (FXR-090)
     fee_rate_percent_micros: Option<i64>, // annual rate of the active fee schedule of this pair, micro-percent; None without one, and always in the as-of view (FEE-074)
     period_performance: HoldingPeriodPerformance, // windowed position returns ending today (ACD-054–057)
@@ -625,7 +625,7 @@ struct HoldingDetail {
     note_alarm_triggered: bool,         // computed from current_price on every live read; false without a note, an alarm or a price (HNO-030)
 }
 
-// MKT-231 — a reported split (MKT-230) the account held through without recording one. Read model.
+// MKT-231 — a reported split (MKT-230) the account held through without recording a split or free shares. Read model.
 struct UnrecordedSplit {
     date: String,   // the reported split's date, ISO yyyy-mm-dd
     new: i64,       // new shares of its split factor (SPL-062)
@@ -954,6 +954,7 @@ struct AccountJournal {
 - 2026-11-01 — #577 (SPL-010, DIV-023): `Transaction` gains `split_factor` and `dividend_amount`, each moved out of `quantity`, which is 0 on a split and a dividend. No command changed.
 - 2026-10-25 — #502 (IMP-051): `Transaction` gains `added_deposit`, absent from a change written before data format 11 and then `false`. No command changed.
 - 2026-11-14 — #774 (DIV-011, DIV-040, DIV-045): a dividend needs its asset held on its date or before it; `correct_transaction`, `cancel_transaction`, `correct_transfer` and `cancel_transfer` gain `DividendBeforeHolding`.
+- 2026-11-14 — #825 (MKT-231): free shares within 5 days of a reported split's date also end an unrecorded split; the comments of `HoldingDetail.unrecorded_splits` and `UnrecordedSplit` say so. No type or command changed.
 - 2026-10-24 — #510 (TRF): `record_transfer` (`TransferDTO`, `TransferError`), `correct_transfer` (`CorrectTransferDTO`) and `cancel_transfer`; `TransactionType` gains `TransferOut` and `TransferIn`, `Transaction` gains `transfer_id`; `AccountError` gains `TransferToSameAccount`, `TransferReceivedAboveSent`, `TransferRateMissing { from_currency, to_currency }`, `TransferRateNotOne`, `PartOfTransfer` and `TransferNotFound`. `correct_transaction` and `correct_write_off` refuse a part of a transfer; `cancel_transaction` removes the whole transfer. Data format version 9 (SYN-038).
 
 - 2026-10-24 — #405 (ACC-004, PRF-013, GPF-014): `Account`, `CreateAccountDTO`, `UpdateAccountDTO` and `AccountSummary` lose `update_frequency`, and the `UpdateFrequency` type goes; `AccountPerformanceResponse` loses `month_view_available`, its `monthly` series always filled.

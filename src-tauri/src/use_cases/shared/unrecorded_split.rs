@@ -8,8 +8,8 @@ use specta::Type;
 use crate::context::account::{Account, Transaction, TransactionType};
 use crate::context::asset::ReportedSplit;
 
-/// MKT-231 — how many days either side of the reported date a recorded split still counts
-/// as recording it: a broker's date can differ from the exchange's (owner, 2026-10-19).
+/// MKT-231 — how many days either side of the reported date a recorded split, or free
+/// shares, still count as recording it: a broker's date can differ from the exchange's (owner, 2026-10-19).
 const MATCHING_DAYS: i64 = 5;
 
 /// A reported split an account holding the asset has not recorded (MKT-231). A read
@@ -27,8 +27,9 @@ pub struct UnrecordedSplit {
 /// MKT-231 — the reported splits of `asset_id` that the account whose `transactions`
 /// these are has not recorded, oldest first: dated on or before `today`, held the day
 /// before (its transactions dated before the split replayed to a quantity above zero),
-/// and no split of the asset recorded within [`MATCHING_DAYS`] of that date, whatever its
-/// factor.
+/// and neither a split nor free shares of the asset recorded within [`MATCHING_DAYS`] of
+/// that date, whatever the factor or the quantity — a provider reports a bonus issue as a
+/// split, and its owner records it as free shares.
 pub fn unrecorded_splits(
     transactions: &[Transaction],
     asset_id: &str,
@@ -43,7 +44,10 @@ pub fn unrecorded_splits(
             let day_before = date.pred_opt()?.format("%Y-%m-%d").to_string();
             let recorded = transactions.iter().any(|transaction| {
                 transaction.asset_id == asset_id
-                    && transaction.transaction_type == TransactionType::Split
+                    && matches!(
+                        transaction.transaction_type,
+                        TransactionType::Split | TransactionType::FreeShares
+                    )
                     && NaiveDate::parse_from_str(&transaction.date, "%Y-%m-%d")
                         .is_ok_and(|recorded| (recorded - date).num_days().abs() <= MATCHING_DAYS)
             });
@@ -141,6 +145,38 @@ mod tests {
             );
             assert_eq!(found.is_empty(), ends_it, "recorded on {recorded_on}");
         }
+    }
+
+    // #825 / MKT-231 (owner, 2026-11-14) — a bonus issue a provider reports as a split is
+    // recorded as free shares: within 5 days either side of the reported date they end it,
+    // whatever their quantity; 6 days away, or with none, the split stays unrecorded.
+    #[test]
+    fn free_shares_recorded_within_five_days_of_the_reported_date_end_it() {
+        for (recorded_on, quantity, ends_it) in [
+            ("2026-06-10", 2_000_000, true),
+            ("2026-06-20", 1, true),
+            ("2026-06-09", 2_000_000, false),
+            ("2026-06-21", 1, false),
+        ] {
+            let transactions = vec![
+                bought_on("2019-03-01"),
+                transaction_on(ASSET, TransactionType::FreeShares, recorded_on, quantity),
+            ];
+            let found = unrecorded_splits(
+                &transactions,
+                ASSET,
+                &[reported("2026-06-15", 11, 10)],
+                day("2026-10-19"),
+            );
+            assert_eq!(found.is_empty(), ends_it, "free shares on {recorded_on}");
+        }
+        let without = unrecorded_splits(
+            &[bought_on("2019-03-01")],
+            ASSET,
+            &[reported("2026-06-15", 11, 10)],
+            day("2026-10-19"),
+        );
+        assert_eq!(without.len(), 1, "no free shares: still unrecorded");
     }
 
     // MKT-231 — not held the day before: bought on the split's date or later, or not yet.

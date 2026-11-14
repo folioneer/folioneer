@@ -148,8 +148,8 @@ recorded Stock Split rescales a position. In French: "Division signalée" (owner
 
 ### Unrecorded split
 
-A reported split that an account holding the asset on the day before it has not recorded
-as a Stock Split within 5 days of that date (MKT-231); the holding row and an AI agent say so. In French:
+A reported split that an account holding the asset on the day before it has recorded
+neither as a Stock Split nor as free shares within 5 days of that date (MKT-231); the holding row and an AI agent say so. In French:
 "Division non enregistrée" (owner, 2026-10-19).
 
 > Status: confirmed
