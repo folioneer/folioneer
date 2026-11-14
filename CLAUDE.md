@@ -29,19 +29,19 @@ What the human is told rests on what was read. A statement that the code does or
 2. **Gold for new code, bit by bit for existing** — `docs/workflow.md` § 10. When in doubt, defer.
 3. **Boyscout** — small mechanical fixes inside the files already edited ship in the same PR. Known dead code is removed in the same commit. No transition comments: code and docs describe what is, not what was.
 4. **Coverage when a real gap surfaces** — add a focused test; the floors in `coverage-gates.json` only rise.
-5. **Challenge reviewer returns** — every finding graded (a)/(b)/(c) and recorded in the PR body, or after the push in a PR comment (`docs/workflow.md` § 7).
+5. **Challenge reviewer returns** — every finding graded (a)/(b)/(c) in the task's record, the PR comment posted before the merge (`docs/workflow.md` § 7).
 6. **PR size** — one story per pull request; about 400 hand-written lines per reviewer lane, a split above about 800 (`docs/workflow.md` § 11).
 
 ## Opening and closing a piece of work
 
-**Opening brief** — four lines before the first edit (first message in chat; top of the PR body headless):
+**Opening brief** — four lines before the first edit (first message in chat; a comment on the issue headless):
 
     **Task**     — the issue (ticket #123) or the request, in one line
     **Scope**    — the commit type and the layers (backend / frontend / E2E / docs / CI)
     **Design**   — none, validated, or needed (then the mocks come before anything else)
     **Touching** — the paths, so the reviewer lanes are known before the diff exists
 
-**Closing brief** — the last message (and the PR body's first lines): (1) what changed for whoever reads this next — for `feat` / `fix`, what a user notices, or "nothing — internal"; otherwise what can now be done or trusted; (2) what the project accumulated — tests added and the coverage or golden figure that moved, or the guarantee a harness change buys and how we know it can fail (you watched it go red). What is still owed becomes a `task` issue.
+**Closing brief** — the last message (headless: the record's first lines, `docs/workflow.md` § 3, step 9): (1) what changed for whoever reads this next — for `feat` / `fix`, what a user notices, or "nothing — internal"; otherwise what can now be done or trusted; (2) what the project accumulated — tests added and the coverage or golden figure that moved, or the guarantee a harness change buys and how we know it can fail (you watched it go red). What is still owed becomes a `task` issue.
 
 ## Where things are
 
@@ -66,7 +66,7 @@ What the human is told rests on what was read. A statement that the code does or
 ## Standards
 
 - **Nothing about credentials in public text** — PR bodies, issues, comments and commit messages never mention secrets, tokens, keys or their handling.
-- **Concise by default** — each fact once, in the fewest words that keep it verifiable. A finding is one line: location, claim, fix. A PR body says what changed and what proves it, under 20 lines; the triage table lists only findings that changed something.
+- **Concise by default** — each fact once, in the fewest words that keep it verifiable. A finding is one line: location, claim, fix. A PR body and the record of a task are `docs/workflow.md` § 3, steps 8 and 9.
 - **Where a rule lives** — a rule about how we work is written in the repository (a `flow` issue first, then its home: this file, `docs/workflow.md` or a rules document). The decisions of one discussion are recorded together, in one pull request.
 - **Commits** — `docs/commit-rules.md`: conventional types; `feat` / `fix` titles are user-facing changelog lines (≤ 100 characters after `: `, an optional scope from its list); one task, one commit; fixes after a push are `--fixup` commits.
 - **Visual proof** — any `.tsx` / `.css` change carries screenshots (`/visual-proof`, `docs/visual-proof-rules.md`); a change with none states "No visual impact" and points to a screen that consumes it.

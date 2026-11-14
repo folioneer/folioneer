@@ -10,7 +10,7 @@ dark mode**. Use `/visual-proof` to automate the full capture workflow.
 
 ## When visual proof is not required
 
-State it explicitly at the top of the PR description or commit message:
+State it explicitly in the task's record (`docs/workflow.md` § 3, step 9) or the commit message:
 
 > No visual impact — internal refactor / Rust-only change.
 

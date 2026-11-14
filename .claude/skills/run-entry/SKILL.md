@@ -18,7 +18,7 @@ this file is the checklist.
   question becomes a comment on the issue with `needs-owner` (`docs/workflow.md` § 2).
 - **Chat, named issue** (`#123`): `gh issue view 123 --comments`.
 - **Chat, plain request**: the request is the task; no issue is created — the PR body
-  is its record. Write its Done when into the opening brief.
+  carries the request in one line. Write its Done when into the opening brief.
 - **Decision scan**, for an issue (a pull request has none), before the branch exists:
   run it as `docs/workflow.md` § 3 states it. Chat: the questions it leaves are asked
   then, and the answers written on the issue. Headless: each becomes a comment with
@@ -31,7 +31,7 @@ this file is the checklist.
 
 ## Step 1 — Opening brief, branch, task list
 
-- Opening brief (chat: first message; headless: top of the PR body):
+- Opening brief (chat: first message; headless: a comment on the issue):
   **Task** — the issue or the request in one line · **Scope** — commit type and layers ·
   **Design** — none / validated / needed · **Touching** — the paths.
 - `git checkout -b <type>/123-<slug>` (`<type>/<slug>` for a plain request), `<type>`
@@ -83,7 +83,8 @@ one call, each given the branch, the spec and the vocabulary; every finding grad
 
 ## Step 8 — Pull request and merge
 
-- Push, `gh pr create --body-file`: the body of `docs/workflow.md` § 3, step 8.
+- Push, `gh pr create --body-file`: `Closes #123` and the session link, no more
+  (`docs/workflow.md` § 3, step 8).
 - `just watch-pr` in the background: exit 0 is green; `scripts/watch-pr.py` lists the others.
 - A red reviewer lane: read its newest comment; grade, apply and re-read locally as
   `docs/workflow.md` § 7 says; push.
@@ -95,7 +96,7 @@ one call, each given the branch, the spec and the vocabulary; every finding grad
   § 8). Fix with `git commit --fixup <sha>` (never a new titled commit, never a
   force-push), push, watch again. The same gate red three times: open question, leave
   the PR open, stop.
-- All green: every lane's newest comment, green or not, graded in a PR comment
+- All green: every lane's newest comment, green or not, graded; the record posted
   (`docs/workflow.md` § 3, step 9); `just merge` folds the fixups.
 
 ## Step 9 — Closure
@@ -103,7 +104,7 @@ one call, each given the branch, the spec and the vocabulary; every finding grad
 In the same PR, before the merge, then the closing brief (`CLAUDE.md`) with the PR number:
 
 - **The source docs still match the code**: spec, contract, an ADR for a hard technical
-  choice, `ARCHITECTURE.md` for a new module. The PR body says which changed, or "docs:
+  choice, `ARCHITECTURE.md` for a new module. The record says which changed, or "docs:
   none needed".
 - A spec touched or named: `spec-checker` on it, and what it reports fixed.
 - What the task met and did not fix is filed as issues (`docs/workflow.md` § 2, headless

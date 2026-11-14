@@ -91,8 +91,8 @@ issues for `Migrated from <id>`. A spec rule is `TRIGRAM-NNN` (Conventions).
 ## 3. The loop — one run, one task
 
 A task — a Queued item (`/run-entry`, headless), an issue the human names, or a chat
-request (its record is the pull request body) — lands on `main` through the **ceremony**:
-here a pull request, every check green, merged by `just merge` (steps 8–10).
+request (the pull request body carries it in one line) — lands on `main` through the
+**ceremony**: here a pull request, every check green, merged by `just merge` (steps 8–10).
 
 1. **Pick and brief.** In chat, a question to the human goes through `AskUserQuestion`,
    one per call: what happened, what each option changes and costs, the recommended one
@@ -128,7 +128,8 @@ here a pull request, every check green, merged by `just merge` (steps 8–10).
      questions, new vocabulary included, so a decision is taken once, knowing its
      consequences.
 
-   The opening brief states Task, Scope, Design, Touching. Branch `<type>/123-slug`, the
+   The opening brief states Task, Scope, Design, Touching (headless: a comment on the
+   issue). Branch `<type>/123-slug`, the
    issue's number leading the slug, or `<type>/slug`, off a fresh `main`, where `<type>`
    is the commit type the change will carry; the item moves to In progress.
 
@@ -152,13 +153,16 @@ here a pull request, every check green, merged by `just merge` (steps 8–10).
    🔴 remains.
 7. **Evidence:** `/visual-proof` for every changed component; the E2E run in CI captures
    the real app and links its screenshots from the pull request.
-8. **PR**, opened for the record, not for approval. Body under 20 lines: `Closes #123`, the
-   task, each Done-when clause with the test that proves it and where that test was seen
-   red (or why it could not be), findings that changed something, issues filed,
-   screenshots. The commit title is the changelog line.
+8. **PR**, opened to run the checks, not for approval. Its body holds only `Closes #123`
+   (a chat request: the request in one line) and the session link. The commit title is
+   the changelog line.
 9. **Merge:** `just watch-pr` waits for the checks; each lane's newest comment, green or
-   not, is read and its findings graded (§ 7); then `just merge` — it refuses until every
-   check is green and folds `fixup!` commits, so the task lands as one commit.
+   not, is read and its findings graded (§ 7). Then the **record**, one PR comment —
+   headless, the closing brief opens it: each Done-when clause with the test that proves
+   it and where that test was seen red (or why it could not be), every finding graded, the
+   issues filed, the source docs changed (or "docs: none needed"), the screenshots. Then
+   `just merge` — it refuses until every check is green and folds `fixup!` commits, so
+   the task lands as one commit.
 10. **Closure** in the same PR: on an issue that touched a spec, `spec-checker` runs
     first and what it finds is fixed; a coverage floor the run measured more than a point
     above rises to half a point under that figure (`coverage-gates.json`, never down);
@@ -278,8 +282,8 @@ the branch, the spec and the vocabulary, never a description of the change. Also
 `adr-reviewer` when an ADR changes, `spec-checker` before closing an issue with spec
 rules. What every reviewer does is in `.claude/agents/review-protocol.md`.
 
-Every finding, local or from CI, is graded before any is applied; one line per finding that
-changed something or was rejected goes in the PR body, or in a PR comment once pushed:
+Every finding, local or from CI, is graded before any is applied; one line per finding
+goes in the task's record (§ 3, step 9):
 
 - **(a)** in scope → fix in the PR.
 - **(b)** bigger, or outside the file set → a `task` issue, linked from that line.
