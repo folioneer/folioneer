@@ -25,8 +25,8 @@ figures are not comparable. A `truncated` list is said beside the oldest figures
 ## Step 2 — Read the records
 
 - Each pull request merged in the window (`current.pull_requests.first` to `.last`):
-  `gh pr view <n> --json title,body,commits,comments,reviews` — the graded findings are in
-  the body and the comments, beside each CI round's report.
+  `gh pr view <n> --json title,body,commits,comments,reviews` — the task's record
+  (`docs/workflow.md` § 3, step 9) sits beside each CI round's report.
 - The issues closed and filed in the window (`gh issue list --state all --search
 "updated:>=<start date>"`), with their threads: the owner's answers are there.
 - The last `batch-audit` issue's audit (the figures before), `docs/workflow.md`,
@@ -38,8 +38,8 @@ State a count only when you counted it; otherwise write "not counted".
 
 - What caused each CI round beyond the first: a rebase, a fix after a review or a
   failed check, a cancelled job — from the commits and the comments.
-- The defects the reviewers found before merge, each in a few words; the claims a pull
-  request body rejected with a source; the criticals only CI found.
+- The defects the reviewers found before merge, each in a few words; the findings the records
+  rejected (c) with a source; the criticals only CI found.
 - The owner's answers given during the batch, and which the reading before the work
   should have asked earlier.
 - Every statement in a guide that a pull request shows to be false or contradicted, and

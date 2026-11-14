@@ -57,7 +57,7 @@ the link never moves.
 A chat request without an issue gets the links in chat instead.
 
 - **Chat:** point the human to the issue (or the links) and ask. On a yes, set the issue's Design to
-  `validated` (`gh issue edit`; a chat request has no issue: say so in the PR body) and
+  `validated` (`gh issue edit`; a chat request has no issue: say so in the record) and
   continue the task. On a no, write what the human wants on the issue and stop.
 - **Headless:** add `needs-owner` to the issue. The human validates in the thread.
 
