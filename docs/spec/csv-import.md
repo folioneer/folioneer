@@ -38,7 +38,7 @@ What reading a file through a mapper shows, nothing written (IMP-017).
 
 ### PreviewRow (computed, never stored)
 
-One line of the file that is not blank, once read through a mapper and judged.
+One row of the file that is not blank — one line, or several when a quoted field holds a line break (IMP-012B) —, once read through a mapper and judged.
 
 | Field       | Business meaning                                                                                                                                                                                                       |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -59,9 +59,13 @@ One line of the file that is not blank, once read through a mapper and judged.
 
 **IMP-011 — The encoding is detected (backend)**: A file whose bytes read as UTF-8 is read as UTF-8, its byte order mark dropped; any other file is read as Windows-1252, which reads every byte and reads an ISO-8859-1 file as written. A file read as UTF-8 by the user's choice or a saved mapper's (IMP-018, IMP-020E) whose bytes are not UTF-8 is rejected with a specific error.
 
-**IMP-012 — The separator is detected (backend)**: The separator is the one of `;`, tab and `,` that splits the header into more than one field and each of the first 20 lines after it that are not blank (IMP-016) into at least as many; when several do, the first in that order. When none does, the file is rejected with a specific error, unless the user picks one (IMP-018).
+**IMP-012 — The separator is detected (backend)**: The separator is the one of `;`, tab and `,` that splits the header into more than one field and each of the first 20 rows after it that are not blank (IMP-016) into at least as many; when several do, the first in that order. The rows are read under each of the three in turn, since what a quote opens depends on the separator (IMP-012A, IMP-012B). When none does, the file is rejected with a specific error, unless the user picks one (IMP-018).
 
-**IMP-012A — How a field is read (backend)**: A field between double quotes holds the separator as text, and two double quotes inside it stand for one; a field is read trimmed. Empty fields at the end of the header, a trailing separator's among them, add no column; a line keeps every field, its empty last one included.
+**IMP-012A — How a field is read (backend)**: A field between double quotes holds the separator as text, and two double quotes inside it stand for one; a quote opens such a field only as the field's first character, the spaces before it left aside. A field is read trimmed. Empty fields at the end of the header, a trailing separator's among them, add no column; a row keeps every field, its empty last one included.
+
+**IMP-012B — A line break inside a quoted field (backend)**: A line break inside a quoted field is part of the field: its row goes on to the closing quote, over as many lines as it takes, and is numbered by the line it starts on.
+
+**IMP-012C — A quote that never closes (backend)**: A file with an opening quote that never closes is read line by line, each line a row.
 
 **IMP-013 — The decimal mark is detected (backend)**: With `,` as separator the decimal mark is the dot. Otherwise it is the comma when a field of the file outside the header, trimmed, is a figure written with a comma: a sign or none, digits — their thousands separated by dots or spaces as IMP-013A groups them, or not separated —, a comma and one or more digits ("1.234,56", "-12,5"; ",5" tells nothing); the dot in any other case.
 
