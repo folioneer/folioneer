@@ -288,9 +288,9 @@ mod tests {
         assert_eq!(summaries[0].total_global_value, 0);
     }
 
-    // CSH-094 — unpriced non-cash holding contributes 0 (no fallback to average_price)
+    // CSH-094 / PRF-022A — a non-cash holding with no recorded price contributes its cost
     #[tokio::test]
-    async fn unpriced_holding_contributes_zero() {
+    async fn an_unpriced_holding_contributes_its_cost() {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
@@ -326,7 +326,7 @@ mod tests {
             )
             .await
             .unwrap();
-        // No record_asset_price → unpriced
+        // No record_asset_price → unpriced: 2 units at an average cost of 100
 
         let uc = AccountSummaryUseCase::new(
             account_svc,
@@ -334,7 +334,7 @@ mod tests {
             make_currency_service_with_no_rate(),
         );
         let summaries = uc.get_account_summaries().await.unwrap().summaries;
-        assert_eq!(summaries[0].total_global_value, 0);
+        assert_eq!(summaries[0].total_global_value, 200_000_000);
     }
 
     // ACC-045 — each row of the accounts list carries the account's wrapper, or none.

@@ -32,17 +32,17 @@ Represents the current state of a financial position within the account. Persist
 
 Read projection for **open** positions (`quantity > 0`). Enriched by `AccountDetailsUseCase` with asset metadata. Defined as a Rust struct with `#[derive(Type, Serialize)]`.
 
-| Field             | Source                       | Business meaning                                                                                                                              |
-| ----------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `asset_id`        | `Holding`                    | ID of the held asset.                                                                                                                         |
-| `asset_name`      | `AssetService`               | Display name of the asset.                                                                                                                    |
-| `asset_reference` | `AssetService`               | Ticker or user-defined reference.                                                                                                             |
-| `quantity`        | `Holding`                    | Current number of units held, as decimal text (TRX-024B). Always > 0.                                                                         |
-| `average_price`   | `Holding`                    | VWAP purchase price in account currency (i64 micros); under FIFO its lots' (CBM-027).                                                         |
-| `cost_basis`      | computed                     | `quantity × average_price` (i128 intermediate, per ACD-023/ACD-024). Not stored in DB.                                                        |
-| `realized_pnl`    | `Holding.total_realized_pnl` | Cumulative realized P&L from partial sells and write-offs (i64 micros, WOF-021). Zero if none. See SEL-042.                                   |
-| `market_value`    | computed                     | Value in account currency (i64 micros), the holding's contribution to `total_global_value`; `None` when unpriced or no usable rate (ACD-052). |
-| `weight_pct`      | computed                     | Share of `total_global_value` in micro-percent; `None` when `market_value` is `None` or the Global Value is not positive (ACD-052).           |
+| Field             | Source                       | Business meaning                                                                                                                                                              |
+| ----------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `asset_id`        | `Holding`                    | ID of the held asset.                                                                                                                                                         |
+| `asset_name`      | `AssetService`               | Display name of the asset.                                                                                                                                                    |
+| `asset_reference` | `AssetService`               | Ticker or user-defined reference.                                                                                                                                             |
+| `quantity`        | `Holding`                    | Current number of units held, as decimal text (TRX-024B). Always > 0.                                                                                                         |
+| `average_price`   | `Holding`                    | VWAP purchase price in account currency (i64 micros); under FIFO its lots' (CBM-027).                                                                                         |
+| `cost_basis`      | computed                     | `quantity × average_price` (i128 intermediate, per ACD-023/ACD-024). Not stored in DB.                                                                                        |
+| `realized_pnl`    | `Holding.total_realized_pnl` | Cumulative realized P&L from partial sells and write-offs (i64 micros, WOF-021). Zero if none. See SEL-042.                                                                   |
+| `market_value`    | computed                     | Value in account currency (i64 micros), the holding's contribution to `total_global_value`; `None` for a foreign holding with a recorded price and no usable rate (ACD-052B). |
+| `weight_pct`      | computed                     | Share of `total_global_value` in micro-percent; `None` when `market_value` is `None` or the Global Value is not positive (ACD-052).                                           |
 
 ### ClosedHoldingDetail (Backend DTO)
 
@@ -111,7 +111,11 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 
 **ACD-051 — Holdings display grouping (frontend)**: The active holdings table groups rows by asset class ahead of the backend `asset_name` sort (ACD-033): the Cash Holding first (per CSH-092), then `Stocks`, then all other asset classes. Within each group, rows keep ascending `asset_name` order. Asset class is read from the loaded asset catalog (the global asset store); a holding whose asset is not yet loaded is treated as "other" until the catalog resolves.
 
-**ACD-052 — Holding weight in the Global Value (frontend + backend)**: Each `HoldingDetail` exposes `market_value: Option<i64>` — the holding's value in account-currency micros, its contribution to `total_global_value` (CSH-094): the balance for the Cash Holding, price × quantity × FX for a priced non-cash holding, `None` when no price is recorded or a foreign holding has no usable rate (FXR-034); a `None` counts as 0 in the Global Value. It also exposes `weight_pct: Option<i64>` — `market_value × 100_000_000 / total_global_value`, micro-percent (55 % = 55_000_000), `i128` intermediate, truncated; `None` when `market_value` is `None` or `total_global_value ≤ 0`. The frontend renders `weight_pct` as a "Weight %" column right after Current Value, formatted with 2 decimals (rounded), "—" when it is `None`. The Cash Holding row shows its weight too (its Current Value cell stays blank, MKT-143); both the live and the as-of views carry both fields.
+**ACD-052 — Holding weight in the Global Value (backend)**: Each holding of an account's details has a weight — its market value (ACD-052B) over the Global Value (CSH-094), in micro-percent (55 % = 55_000_000), truncated — and none when it has no market value or the Global Value is not positive. Both the live and the as-of views carry it.
+
+**ACD-052A — The Weight % column (frontend)**: The frontend renders `weight_pct` as a "Weight %" column right after Current Value, formatted with 2 decimals (rounded), "—" when it is `None`. The Cash Holding row shows its weight too (its Current Value cell stays blank, MKT-143A).
+
+**ACD-052B — A holding's market value (backend)**: Each holding of an account's details has a market value, in the account's currency — its contribution to the Global Value (CSH-094): the balance for the Cash Holding, price × quantity × FX for a priced non-cash holding, its cost basis for one with no recorded price (PRF-022A). A foreign holding with a recorded price and no usable rate has none (FXR-034), and then counts as 0 in the Global Value. Both the live and the as-of views carry it.
 
 **ACD-053 — Net cash input since inception**: `AccountDetailsResponse` exposes `total_net_cash_input: i64` — Σ `Deposit` amounts − Σ `Withdrawal` amounts across the account's whole transaction history, in account-currency micros; negative when withdrawals exceed deposits; `0` when no cash transactions exist. The as-of view counts only transactions dated on or before the as-of date. The frontend displays the figure in the summary header next to the Global Value.
 
@@ -123,9 +127,9 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 
 **ACD-055 — Window-start definitions (backend)**: The `ytd` window starts at 31 December of the prior year; the `one_year` / `two_years` / `five_years` / `ten_years` windows start at today minus 1/2/5/10 calendar years (a 29 February start clamps to 28 February in a non-leap target year). The window start is the baseline valuation date: the position standing at the end of that day forms the start value, and flows are counted strictly after it, through today. A window that opens while the position is not held has no figure (ACD-057): the since-start figure covers the holding's whole life.
 
-**ACD-056 — Windowed metric formula (backend)**: For one holding and one window, `start_value` = quantity held at the window start × carry-forward recorded price as of the window start (PRF-022) × FX rate as of the window start (FXR-035), in account-currency micros with i128 intermediates; `end_value` = the holding's `market_value` (ACD-052). The position's external flows are its own `Purchase` (+`total_amount`), `Sell` (−`total_amount`) and `OpeningBalance` (+ entry-date market value, fallback `total_amount`, per PRF-086) transactions dated inside the flow window; `Deposit`, `Withdrawal`, `Dividend`, `FreeShares`, `ManagementFee` and `Interest` are not flows. Dividends received for the asset inside the flow window are added to the gain (DIV-071 semantics): `gain = end_value − start_value − net_flow + dividends`. The percentage is `gain × 100_000_000 / (start_value + Σ flow × days_remaining / days_in_window)`, truncated toward zero (micro-percent, PRF-032 scaling). A write-off is no flow of the position (WOF-023). A transfer in is an inflow of the receiving position and a transfer out an outflow of the sending one (TRF-027).
+**ACD-056 — Windowed metric formula (backend)**: For one holding and one window, `start_value` = quantity held at the window start × carry-forward recorded price as of the window start (PRF-022) × FX rate as of the window start (FXR-035), in account-currency micros with i128 intermediates; `end_value` = the holding's `market_value` (ACD-052B). The position's external flows are its own `Purchase` (+`total_amount`), `Sell` (−`total_amount`) and `OpeningBalance` (+ entry-date market value, fallback `total_amount`, per PRF-086) transactions dated inside the flow window; `Deposit`, `Withdrawal`, `Dividend`, `FreeShares`, `ManagementFee` and `Interest` are not flows. Dividends received for the asset inside the flow window are added to the gain (DIV-071 semantics): `gain = end_value − start_value − net_flow + dividends`. The percentage is `gain × 100_000_000 / (start_value + Σ flow × days_remaining / days_in_window)`, truncated toward zero (micro-percent, PRF-032 scaling). A write-off is no flow of the position (WOF-023). A transfer in is an inflow of the receiving position and a transfer out an outflow of the sending one (TRF-027).
 
-**ACD-057 — Windowed metric None conditions (backend)**: A window's value is `None` when any of: the holding's `market_value` is `None` (no recorded price or no usable FX rate today, FXR-034); the position was held at the window start but has no recorded price on or before it, or is foreign with no usable FX rate at the window start (FXR-034); the position was not held at the window start — bought inside the window, or held before it and sold out by its start (gh245); or the Dietz denominator is not positive.
+**ACD-057 — Windowed metric None conditions (backend)**: A window's value is `None` when any of: the holding's `market_value` is `None` (a recorded price with no usable FX rate today, FXR-034); the position was held at the window start but has no recorded price on or before it, or is foreign with no usable FX rate at the window start (FXR-034); the position was not held at the window start — bought inside the window, or held before it and sold out by its start (gh245); or the Dietz denominator is not positive.
 
 ### States
 
@@ -225,8 +229,8 @@ UPDATE holdings SET
   - Avg. Price
   - Realized P&L (`—` when zero or no sells or write-offs), with "of which lost:" under it (WOF-059)
   - Current Price (MKT-031)
-  - Current Value (current price × quantity, asset currency; `—` when no price — MKT-143)
-  - Weight % (share of the Global Value; `—` when none — ACD-052)
+  - Current Value (asset currency; `—` when none — MKT-143A)
+  - Weight % (share of the Global Value; `—` when none — ACD-052A)
   - Actions: Buy, Sell, Write off (WOF-050), Transfer (TRF-050), Inspect
 - **Closed Positions Section** (rendered only when `closed_holdings` non-empty, per ACD-047):
   - Section heading "Closed positions"

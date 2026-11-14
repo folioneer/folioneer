@@ -56,17 +56,21 @@ pub fn account_global_value(
             total = total.saturating_add(holding.quantity);
             continue;
         }
-        let Some(rate) = snapshot
-            .rates
-            .get(&(asset.currency.clone(), account_currency.to_string()))
-            .copied()
-        else {
-            continue;
+        // PRF-022A — a holding with no recorded price is worth its cost: its average cost,
+        // already in the account's currency.
+        let converted_price = match snapshot.prices.get(&holding.asset_id) {
+            Some(latest) => {
+                let Some(rate) = snapshot
+                    .rates
+                    .get(&(asset.currency.clone(), account_currency.to_string()))
+                    .copied()
+                else {
+                    continue;
+                };
+                convert_at_rate(latest.price, rate)
+            }
+            None => holding.average_price,
         };
-        let Some(latest) = snapshot.prices.get(&holding.asset_id) else {
-            continue;
-        };
-        let converted_price = convert_at_rate(latest.price, rate);
         let market_value =
             (holding.quantity as i128 * converted_price as i128 / QUANTITY_UNIT) as i64;
         total = total.saturating_add(market_value);
@@ -158,20 +162,24 @@ mod tests {
         assert_eq!(value, 250_000_000);
     }
 
-    // FXR-034 — a non-cash holding with no recorded price contributes 0.
+    // #824 / PRF-022A — a non-cash holding with no recorded price contributes its cost.
     #[test]
-    fn non_cash_holding_with_no_recorded_price_contributes_zero() {
+    fn non_cash_holding_with_no_recorded_price_contributes_its_cost() {
         let mut snapshot = empty_snapshot();
         snapshot.assets.insert(
             "asset-1".to_string(),
             AssetValuationFacts {
-                currency: "EUR".to_string(),
+                currency: "USD".to_string(),
                 class: AssetClass::Stocks,
             },
         );
-        let holdings = vec![holding("asset-1", 1_000_000)];
-        let value = account_global_value("EUR", &holdings, &snapshot);
-        assert_eq!(value, 0);
+        // Two units at an average cost of 150, in the account's currency: no rate needed.
+        let mut held = holding("asset-1", 2_000_000);
+        held.average_price = 150_000_000;
+        assert_eq!(account_global_value("EUR", &[held], &snapshot), 300_000_000);
+        // Free shares came in at no cost: worth 0 until a price is recorded.
+        let free = holding("asset-1", 1_000_000);
+        assert_eq!(account_global_value("EUR", &[free], &snapshot), 0);
     }
 
     // FXR-034 — a foreign-currency holding with no usable rate contributes 0.
