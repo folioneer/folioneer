@@ -312,7 +312,7 @@ async fn exp_032_the_json_file_holds_every_table() {
     let value: serde_json::Value =
         serde_json::from_str(&read(Path::new(&report.written_to))).expect("JSON");
     assert_eq!(value["format"], "folioneer-export");
-    assert_eq!(value["version"], 2);
+    assert_eq!(value["version"], 3);
     assert_eq!(value["accounts"].as_array().map(Vec::len), Some(2));
     assert_eq!(value["transactions"].as_array().map(Vec::len), Some(8));
     let deposit = &value["transactions"][0];
@@ -545,7 +545,7 @@ async fn exp_031_each_type_writes_its_own_figures() {
     };
     assert_eq!(
         header("accounts.csv"),
-        "id,name,bank,currency,country,wrapper,management_fees_enabled,cost_basis_method"
+        "id,name,bank,currency,country,wrapper,holder,management_fees_enabled,cost_basis_method"
     );
     assert_eq!(
         header("prices.csv"),
@@ -555,8 +555,56 @@ async fn exp_031_each_type_writes_its_own_figures() {
         .starts_with("id,account_id,account_name,account_currency,date,type,"));
 }
 
+// #819 / EXP-031 / EXP-032 — an account's holder is exported, after its wrapper: as recorded
+// (ACC-050), an empty field in CSV and `null` in JSON when it has none; the format is
+// version 3.
+#[tokio::test]
+async fn exp_031_an_account_s_holder_is_exported_in_both_formats() {
+    let p = portfolio().await;
+    let held = account(&p, "Joint").await;
+    account(&p, "Mine").await;
+    p.accounts
+        .set_holder(&held, Some("Alice, Bob".to_string()))
+        .await
+        .expect("holder");
+    let out = tempfile::tempdir().expect("folder");
+
+    let json = p
+        .export
+        .export(ExportFormat::Json, out.path())
+        .await
+        .expect("exported");
+    let written = read(Path::new(&json.written_to));
+    let value: serde_json::Value = serde_json::from_str(&written).expect("JSON");
+    assert_eq!(value["version"], 3);
+    assert_eq!(value["accounts"][0]["name"], "Joint");
+    assert_eq!(value["accounts"][0]["holder"], "Alice, Bob");
+    assert_eq!(value["accounts"][1]["holder"], serde_json::Value::Null);
+    // The keys in the order written: `holder` right after `wrapper`.
+    let keys: Vec<&str> = written
+        .split('"')
+        .filter(|part| ["wrapper", "holder", "management_fees_enabled"].contains(part))
+        .take(3)
+        .collect();
+    assert_eq!(keys, ["wrapper", "holder", "management_fees_enabled"]);
+
+    let csv = p
+        .export
+        .export(ExportFormat::Csv, out.path())
+        .await
+        .expect("exported");
+    let accounts = read(&Path::new(&csv.written_to).join("accounts.csv"));
+    let rows: Vec<&str> = accounts.lines().collect();
+    assert!(rows[1].contains(",\"Alice, Bob\",false,"), "{}", rows[1]);
+    assert!(
+        rows[2].ends_with(",,,,false,WeightedAverage"),
+        "{}",
+        rows[2]
+    );
+}
+
 // EXP-027 / EXP-033 — every recorded exchange rate is in the export, by its currencies then
-// date, with its source; the format is version 2.
+// date, with its source.
 #[tokio::test]
 async fn exp_027_the_exchange_rates_are_exported() {
     let p = portfolio().await;
@@ -578,7 +626,7 @@ async fn exp_027_the_exchange_rates_are_exported() {
         .expect("exported");
     let value: serde_json::Value =
         serde_json::from_str(&read(Path::new(&report.written_to))).expect("JSON");
-    assert_eq!(value["version"], 2);
+    assert_eq!(value["version"], 3);
     let rates: Vec<(String, String, String, String)> = value["rates"]
         .as_array()
         .expect("rates")
