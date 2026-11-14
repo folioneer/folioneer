@@ -55,6 +55,7 @@ export const OPERATION_TYPE_LABELS: Record<OperationType, string> = {
   Dividend: "account_import.type_dividend",
   Deposit: "account_import.type_deposit",
   Withdrawal: "account_import.type_withdrawal",
+  DepositOrWithdrawal: "account_import.type_deposit_or_withdrawal",
   TradeTax: "account_import.type_trade_tax",
   NotImported: "account_import.type_not_imported",
 };

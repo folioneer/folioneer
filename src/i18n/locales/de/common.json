@@ -1122,6 +1122,7 @@
     "type_dividend": "Dividende",
     "type_deposit": "Einzahlung",
     "type_withdrawal": "Auszahlung",
+    "type_deposit_or_withdrawal": "Einzahlung oder Auszahlung, nach dem Vorzeichen des Betrags",
     "type_trade_tax": "Transaktionssteuer",
     "type_not_imported": "Nicht importiert",
     "provider_label": "Anbieter",

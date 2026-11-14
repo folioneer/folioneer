@@ -7,6 +7,7 @@ import {
   fileNameOf,
   folderOf,
   mapperFileRefusalToI18n,
+  OPERATION_TYPE_LABELS,
   typeOfLabel,
   withFormatOf,
   withLabelType,
@@ -102,5 +103,15 @@ describe("account import presenter", () => {
     expect(accountImportErrorToI18n({ code: "UnreadableFile" } as never)).toEqual({
       key: "error.Unknown",
     });
+  });
+});
+
+// #548 / IMP-031A — the mapper form offers the deposit or withdrawal by its sign, with its own
+// label, beside the other operation types.
+describe("OPERATION_TYPE_LABELS", () => {
+  it("labels the deposit or withdrawal by its sign", () => {
+    expect(OPERATION_TYPE_LABELS.DepositOrWithdrawal).toBe(
+      "account_import.type_deposit_or_withdrawal",
+    );
   });
 });
