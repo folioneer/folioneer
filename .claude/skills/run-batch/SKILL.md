@@ -32,9 +32,9 @@ write each answer on its issue. The batch then runs without waiting on the owner
 ## Step 3 — Run the items
 
 For each remaining item that is ready, in order: `/run-entry #123`; a slice one of them
-splits off is Queued right after it and run in its turn (`docs/workflow.md` § 11). While a pull request
-waits for its checks, the next task may be prepared on a branch not pushed yet
-(`docs/workflow.md` § 11).
+splits off is Queued right after it and run in its turn (`docs/workflow.md` § 11). While
+a pull request waits for its checks, the next task may be prepared on a branch not pushed
+yet (`docs/workflow.md` § 11).
 
 Stop, and say where, when `/run-entry` stops by its own rules (an open question, the
 same gate red three times, the three-hour budget). An item that is not ready is said so

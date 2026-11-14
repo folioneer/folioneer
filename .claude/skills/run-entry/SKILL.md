@@ -110,8 +110,8 @@ In the same PR, before the merge, then the closing brief (`CLAUDE.md`) with the 
 - What the task met and did not fix is filed as issues (`docs/workflow.md` § 2, headless
   too), never left in chat; a task issue the work resolved is `Closes #NN` too.
 - A slice split off the item is Queued right after it (`docs/workflow.md` § 11):
-  `gh project item-add`, then Status Queued and the parent's Batch (`gh project
-item-edit`), then placed after the parent (`gh api graphql`,
+  `gh project item-add`, then Status Queued and the parent's Batch
+  (`gh project item-edit`), then placed after the parent (`gh api graphql`,
   `updateProjectV2ItemPosition` with `afterId`).
 
 ## Rules
