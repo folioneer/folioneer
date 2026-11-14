@@ -1,6 +1,6 @@
 ---
 name: design-proposal
-description: Produces the design proposal required before anything the user sees changes — rendered mocks of the target state in light and dark, plus a five-line note, published in the folioneer/folioneer-design repository and posted on the issue — for an issue or a chat request. Invoked as `/design-proposal <id>` (an issue number, or a short slug for a chat request). The human validates; nothing visible is built before that.
+description: Produces the design proposal required before anything the user sees changes — rendered mocks of the target state in light and dark, an existing screen's current state beside them, plus a five-line note, published in the folioneer/folioneer-design repository and posted on the issue — for an issue or a chat request. Invoked as `/design-proposal <id>` (an issue number, or a short slug for a chat request). The human validates; nothing visible is built before that.
 argument-hint: "[123 | slug]"
 ---
 
@@ -21,10 +21,14 @@ empty case if it changes).
 
 Follow `/visual-proof` Steps 0 (config) and 3 (write `preview.html` and
 `src/__preview__/main.tsx`), with one difference: the preview renders the **proposed**
-component tree, not the current one. Copy the current component into the preview where
+component tree, and beside it the current one for an existing screen (below). Copy the current component into the preview where
 the change is layout-only, or compose the target from existing `ui/` components with
 sample data for a new surface. Sample data is invented, never copied from the installed
 app. Never modify the real component for a proposal; the preview is disposable.
+
+For a state of an existing screen, the same preview also renders the **current**
+component, imported as it is, with the same sample data, under the id
+`state-{state}-current`.
 
 ## Step 3 — Capture into the design repository
 
@@ -35,10 +39,11 @@ an existing clone), then run `/visual-proof` Step 4 with the output directory in
 clone: start Vite in the background, wait until the preview answers, capture, stop Vite.
 
 ```bash
-VP_PORT={port} VP_HOST={host} VP_NAME={id} VP_STATES={state1,state2} VP_OUT_DIR={clone}/{id} node scripts/visual-proof-capture.mjs
+VP_PORT={port} VP_HOST={host} VP_NAME={id} VP_STATES={state1,state1-current,state2} VP_OUT_DIR={clone}/{id} node scripts/visual-proof-capture.mjs
 ```
 
-Produces `{clone}/{id}/{id}-{light|dark}-{state}.png`. Delete `preview.html` and
+Produces `{clone}/{id}/{id}-{light|dark}-{state}.png` and, for each state of an existing
+screen, `{id}-{light|dark}-{state}-current.png`. Delete `preview.html` and
 `src/__preview__/` afterwards.
 
 ## Step 4 — Write the note
@@ -52,7 +57,9 @@ Commit the folder in the clone and push it straight to its `main`: the repositor
 only mocks and their notes — no pull request, review, CI or hooks. Post the note on the
 issue with each image inline, linked from the pushed commit
 (`https://raw.githubusercontent.com/folioneer/folioneer-design/<sha>/<id>/<file>`), so
-the link never moves.
+the link never moves. A state of an existing screen is one table row per theme, the
+current capture on the left and the proposed one on the right, under the headers
+"Current" and "Proposed".
 
 A chat request without an issue gets the links in chat instead.
 

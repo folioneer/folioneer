@@ -45,8 +45,9 @@ Written to read the same in every repository that works this way.
   closes, and queues a slice it splits off right after its item (`docs/workflow.md` § 11).
   Never: a second task, a guess where a question is owed, nor a finding left in chat.
 - `.claude/skills/design-proposal/` — renders the target state before anything a user
-  sees changes, publishing the mocks in `folioneer/folioneer-design`. Never: builds what
-  it shows, nor commits a mock to this repository.
+  sees changes, an existing screen's current state beside it, publishing the mocks in
+  `folioneer/folioneer-design`. Never: builds what it shows, nor commits a mock to this
+  repository.
 - `.claude/skills/visual-proof/` — captures every state of a changed component, light
   and dark. Never: stands in for the design proposal.
 - `.claude/skills/dep-audit/` — checks the dependencies for outdated versions and known

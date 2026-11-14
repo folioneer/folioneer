@@ -192,7 +192,10 @@ audits the range it closes (§ 12). A batch is named by its dates, never a versi
 Before **any** change to what the user sees — a new screen, a moved or added control, a
 changed layout or wording pattern — the agent renders mocks of the target state with
 the real components and tokens (`/design-proposal`): `{id}-{light|dark}-{state}.png`
-plus a five-line note (what moves, is added, is removed, stays), pushed to
+plus a five-line note (what moves, is added, is removed, stays). A proposal that changes
+an existing screen captures its current state too
+(`{id}-{light|dark}-{state}-current.png`), shown beside the proposed one in both themes; a
+new surface has no current state (owner, 2026-10-24). All of it is pushed to
 `folioneer/folioneer-design` (owner, 2026-10-19) — one folder per issue, straight to its
 `main`, no pull request, review or CI — and posted on the issue with each image inline.
 Once validated, the mocks are the window's description: no spec restates them
