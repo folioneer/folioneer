@@ -80,6 +80,10 @@ pub enum AccountError {
     /// Correcting a transaction would leave a later sell with insufficient units.
     #[error("Editing this transaction would create a cascading oversell")]
     CascadingOversell,
+    /// DIV-011 / DIV-040 — a dividend is dated, or would be left dated, before the account
+    /// first held its asset.
+    #[error("A dividend of this asset would be dated before the asset was first held")]
+    DividendBeforeHolding,
     /// A stored write-off has no reason, and its correction names none (WOF-033).
     #[error("This write-off has no reason; correct it with one")]
     WriteOffWithoutReason,
@@ -383,6 +387,10 @@ mod tests {
         assert_eq!(
             to_value(AccountError::CascadingOversell).unwrap(),
             json!({ "code": "CascadingOversell" })
+        );
+        assert_eq!(
+            to_value(AccountError::DividendBeforeHolding).unwrap(),
+            json!({ "code": "DividendBeforeHolding" })
         );
         assert_eq!(
             to_value(AccountError::TransferRateMissing {

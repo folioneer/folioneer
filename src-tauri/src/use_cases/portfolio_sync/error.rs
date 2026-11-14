@@ -208,6 +208,7 @@ mod tests {
                 "DatabaseError",
                 "DateInFuture",
                 "DateTooOld",
+                "DividendBeforeHolding",
                 "EndBeforeStart",
                 "ExchangeRateNotPositive",
                 "FeesNegative",

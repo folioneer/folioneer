@@ -311,6 +311,7 @@ describe("transactionMutationErrorToI18n", () => {
   it.each([
     "ClosedPosition",
     "CascadingOversell",
+    "DividendBeforeHolding",
     "TransactionNotFound",
     "AccountNotFound",
     "NameAlreadyExists",

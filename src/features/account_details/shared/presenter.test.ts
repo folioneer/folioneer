@@ -679,6 +679,13 @@ describe("dividendErrorToI18n", () => {
     });
   });
 
+  // DIV-040 — correcting a dividend to a date before its asset was first held.
+  it("DividendBeforeHolding maps to its own sentence", () => {
+    expect(dividendErrorToI18n({ code: "DividendBeforeHolding" })).toEqual({
+      key: "error.DividendBeforeHolding",
+    });
+  });
+
   it.each([
     "DatabaseError",
     "AssetNotFound",

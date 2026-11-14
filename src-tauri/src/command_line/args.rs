@@ -210,7 +210,7 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
             json,
         });
     }
-    // CLI-027 / CLI-028 — cash and a dividend have an amount and no quantity.
+    // CLI-027 / `command-line.md § holding dividend` — cash and a dividend have an amount and no quantity.
     let recording = match command.as_str() {
         "account deposit" | "account withdraw" => {
             let cash = CashAmount {
@@ -552,7 +552,7 @@ mod tests {
         );
     }
 
-    // CLI-028 — a dividend reads its account, its asset and its amount; the rate defaults
+    // `command-line.md § holding dividend` — a dividend reads its account, its asset and its amount; the rate defaults
     // to 1.
     #[test]
     fn cli_028_reads_a_dividend() {

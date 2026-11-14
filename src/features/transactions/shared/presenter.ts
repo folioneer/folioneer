@@ -45,6 +45,8 @@ export function transactionMutationErrorToI18n(err: AccountError | OpenHoldingEr
       };
     case "ClosedPosition":
     case "CascadingOversell":
+    // DIV-045 — a change that would leave a dividend before its asset was first held.
+    case "DividendBeforeHolding":
     case "TransactionNotFound":
     case "AccountNotFound":
     case "NameAlreadyExists":

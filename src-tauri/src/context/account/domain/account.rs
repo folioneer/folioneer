@@ -805,12 +805,26 @@ impl Account {
             Self::ensure_held(held, updated_tx.quantity)?;
         }
 
+        // DIV-040 — the dividend being corrected is judged on its new date, whatever its
+        // date was; DIV-045B spares only the other dividends already so.
+        let mut unheld_dividends = self.dividends_before_holding(&asset_id);
+        unheld_dividends.remove(tx_id);
+
         // Replace the transaction in-memory, keeping the original so a failed
         // recalculation restores the history instead of leaving the splice behind
         let original_tx = match self.transactions.iter_mut().find(|t| t.id == tx_id) {
             Some(slot) => std::mem::replace(slot, updated_tx),
             None => return Err(AccountError::TransactionNotFound.into()),
         };
+
+        // DIV-040 — a dividend moved before the asset was first held, or a purchase moved
+        // after one of its dividends, is refused.
+        if let Err(e) = self.ensure_dividends_follow_holding(&asset_id, &unheld_dividends) {
+            if let Some(slot) = self.transactions.iter_mut().find(|t| t.id == tx_id) {
+                *slot = original_tx;
+            }
+            return Err(e.into());
+        }
 
         // Full recalculation for the (account, asset) pair — SEL-032 cascading check inside.
         // CSH-013 — the Cash Holding is not recalculated here: `replay_cash_holding` (below)
@@ -913,7 +927,14 @@ impl Account {
             .iter()
             .position(|t| t.id == tx_id)
             .ok_or(AccountError::TransactionNotFound)?;
-        self.transactions.remove(pos);
+        let unheld_dividends = self.dividends_before_holding(&asset_id);
+        let removed = self.transactions.remove(pos);
+        // DIV-040 — removing what first brought the asset in is refused while a dividend
+        // of it is dated after.
+        if let Err(e) = self.ensure_dividends_follow_holding(&asset_id, &unheld_dividends) {
+            self.transactions.insert(pos, removed);
+            return Err(e.into());
+        }
         self.pending_changes
             .push(AccountChange::TransactionDeleted(tx_id.to_string()));
 
@@ -1349,9 +1370,15 @@ impl Account {
                 Self::ensure_held(held, taken)?;
             }
         }
+        let unheld_dividends = self.dividends_before_holding(asset_id);
         self.transactions
             .retain(|t| t.transfer_id.as_deref() != Some(transfer_id));
         self.transactions.extend(parts);
+        // DIV-045 — a transfer in moved after a dividend of its asset is refused.
+        if let Err(e) = self.ensure_dividends_follow_holding(asset_id, &unheld_dividends) {
+            self.transactions = before;
+            return Err(e.into());
+        }
         let pair_txs: Vec<&Transaction> = self
             .transactions
             .iter()
@@ -1418,8 +1445,15 @@ impl Account {
             .iter()
             .map(|t| t.id.clone())
             .collect();
+        let unheld_dividends = self.dividends_before_holding(&asset_id);
         self.transactions
             .retain(|t| t.transfer_id.as_deref() != Some(transfer_id));
+        // DIV-045 — removing the transfer in that first brought the asset in is refused
+        // while a dividend of it is dated after.
+        if let Err(e) = self.ensure_dividends_follow_holding(&asset_id, &unheld_dividends) {
+            self.transactions = before;
+            return Err(e.into());
+        }
         let pair_txs: Vec<&Transaction> = self
             .transactions
             .iter()
@@ -2329,6 +2363,56 @@ impl Account {
     ) -> i64 {
         Self::reconstruct_holding_as_of(transactions, asset_id, as_of, CostBasisMethod::default())
             .quantity
+    }
+
+    /// DIV-011 — whether the asset was held on `date` or before it: a dividend is paid days
+    /// to months after the date that gave the right to it, so a position sold in between
+    /// still receives it. What first brings a quantity in is a purchase, an opening balance
+    /// or a transfer in.
+    pub(crate) fn held_on_or_before(
+        transactions: &[Transaction],
+        asset_id: &str,
+        date: &str,
+    ) -> bool {
+        transactions
+            .iter()
+            .filter(|t| {
+                t.asset_id == asset_id
+                    && matches!(
+                        t.transaction_type,
+                        TransactionType::Purchase
+                            | TransactionType::OpeningBalance
+                            | TransactionType::TransferIn
+                    )
+            })
+            .any(|t| t.date.as_str() <= date)
+    }
+
+    /// DIV-011 — the dividends of `asset_id` dated before the account first held it.
+    fn dividends_before_holding(&self, asset_id: &str) -> std::collections::BTreeSet<String> {
+        self.transactions
+            .iter()
+            .filter(|t| {
+                t.asset_id == asset_id
+                    && t.transaction_type == TransactionType::Dividend
+                    && !Self::held_on_or_before(&self.transactions, asset_id, &t.date)
+            })
+            .map(|t| t.id.clone())
+            .collect()
+    }
+
+    /// DIV-040 — a change is refused when it leaves a dividend of `asset_id` dated before
+    /// the asset was first held; one `already` so before the change does not refuse it.
+    fn ensure_dividends_follow_holding(
+        &self,
+        asset_id: &str,
+        already: &std::collections::BTreeSet<String>,
+    ) -> StdResult<(), AccountError> {
+        if self.dividends_before_holding(asset_id).is_subset(already) {
+            Ok(())
+        } else {
+            Err(AccountError::DividendBeforeHolding)
+        }
     }
 
     /// The cash a transaction moves on the account's cash line: Deposit / Sell / Dividend
@@ -5772,6 +5856,70 @@ mod tests {
             ),
             "expected InsufficientCash when cancelling dividend would overdraw, got: {err}"
         );
+    }
+
+    // DIV-040 / DIV-045B (#774) — a dividend already dated before its asset was first held
+    // (a change from another computer) is judged on its new date when it is corrected;
+    // another one left so does not refuse a change to another transaction.
+    #[test]
+    fn div_040_a_dividend_already_before_any_holding_is_judged_on_its_new_date() {
+        let mut acc = base_account();
+        let opening = acc
+            .open_holding(
+                "asset-aapl".to_string(),
+                "2024-03-01".to_string(),
+                from_surface(micro(10)),
+                micro(1_000),
+            )
+            .unwrap()
+            .id
+            .clone();
+        let mut early = Vec::new();
+        for date in ["2024-01-10", "2024-01-20"] {
+            let dividend = Transaction::new_dividend(
+                acc.id.clone(),
+                "asset-aapl".to_string(),
+                date.to_string(),
+                micro(5),
+                1_000_000,
+                None,
+            )
+            .unwrap();
+            early.push(dividend.id.clone());
+            acc.apply_dividend(dividend).unwrap();
+        }
+        let move_to = |acc: &mut Account, id: &str, date: &str, quantity: i64, price: i64| {
+            acc.correct_transaction(
+                id,
+                date.to_string(),
+                quantity,
+                price,
+                1_000_000,
+                0,
+                None,
+                None,
+            )
+            .map(|_| ())
+        };
+
+        let refused = move_to(&mut acc, &early[0], "2024-02-01", micro(5), 0).unwrap_err();
+        assert!(
+            matches!(
+                refused.downcast_ref::<AccountError>(),
+                Some(AccountError::DividendBeforeHolding)
+            ),
+            "{refused}"
+        );
+        move_to(&mut acc, &early[0], "2024-04-01", micro(5), 0).expect("after the first holding");
+        // DIV-045B — the second dividend, still before any holding, refuses nothing.
+        move_to(
+            &mut acc,
+            &opening,
+            "2024-03-15",
+            from_surface(micro(10)),
+            micro(100),
+        )
+        .expect("another transaction's change");
     }
 
     // DIV-040 — correcting a dividend recomputes total_amount from the new

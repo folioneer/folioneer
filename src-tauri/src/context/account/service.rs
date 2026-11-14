@@ -799,6 +799,26 @@ impl AccountService {
         ))
     }
 
+    /// DIV-011 — whether the account held the asset on `date` or before it. An unknown
+    /// account or asset never did; an unparseable `date` is rejected with `InvalidDate`.
+    pub async fn held_on_or_before(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        date: &str,
+    ) -> StdResult<bool, AccountError> {
+        NaiveDate::parse_from_str(date, "%Y-%m-%d").map_err(|_| AccountError::InvalidDate)?;
+        let transactions = self
+            .transaction_repo
+            .get_by_account_asset(account_id, asset_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "held_on_or_before: repository failure");
+                AccountError::DatabaseError
+            })?;
+        Ok(Account::held_on_or_before(&transactions, asset_id, date))
+    }
+
     /// CBM-010 — the account's cost basis method; the weighted average for an unknown
     /// account, whose history is empty (TDI-010).
     pub async fn cost_basis_method(
@@ -3150,6 +3170,13 @@ pub trait AccountServiceContract: Send + Sync {
         asset_id: &str,
         date: &str,
     ) -> StdResult<HoldingSnapshot, AccountError>;
+    /// DIV-011 — whether the account held the asset on a date or before it.
+    async fn held_on_or_before(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        date: &str,
+    ) -> StdResult<bool, AccountError>;
     /// PFL-050 / PFL-051 — the accounts of the profile in use.
     async fn accounts_in_use(&self) -> StdResult<Vec<Account>, AccountError>;
     /// PFL-055 — the accounts of one profile.
@@ -3666,6 +3693,15 @@ impl AccountServiceContract for AccountService {
         date: &str,
     ) -> StdResult<HoldingSnapshot, AccountError> {
         AccountService::holding_snapshot_as_of(self, account_id, asset_id, date).await
+    }
+
+    async fn held_on_or_before(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        date: &str,
+    ) -> StdResult<bool, AccountError> {
+        AccountService::held_on_or_before(self, account_id, asset_id, date).await
     }
 
     async fn accounts_in_use(&self) -> StdResult<Vec<Account>, AccountError> {
@@ -4610,13 +4646,13 @@ fn recorded_key(op: &RecordingOp, cash_asset_id: &str) -> Option<RecordedKey> {
     }
 }
 
-/// DIV-011 — the account held the step's asset on its date, the steps taken before it
-/// included.
+/// DIV-011 — the account held the step's asset on its date or before it, the steps taken
+/// before it included.
 fn holds(account: &Account, op: &RecordingOp) -> bool {
     let RecordingOp::Dividend { asset_id, date, .. } = op else {
         return true;
     };
-    Account::quantity_held_as_of(&account.transactions, asset_id, date) > 0
+    Account::held_on_or_before(&account.transactions, asset_id, date)
 }
 
 /// IMP-036 — the transactions the account held when judging began, each matched once.

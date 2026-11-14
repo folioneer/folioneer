@@ -138,6 +138,8 @@ export function dividendErrorToI18n(err: DividendError): I18nMessage {
     case "DateInFuture":
     case "DateTooOld":
     case "InvalidDate":
+    // DIV-040 — a correction that dates the dividend before its asset was first held.
+    case "DividendBeforeHolding":
       return { key: `error.${err.code}` };
     // DIV-011 — a dividend is judged on its date, not today.
     case "AssetNotHeld":
